@@ -45,7 +45,7 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
                             making the changes it has shown, and writing an options.<app> file.
 """
 
-import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest, unixConfig, sys
+import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest, unixConfig, sys, guiplugins
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
@@ -283,6 +283,25 @@ class ImportTestSuite(optimization.ImportTestSuite):
             return os.path.join(rootDir, "carmen_10", carmtmp)
         elif version == "9":
             return os.path.join(rootDir, "carmen_9", carmtmp)
+
+class EnableDiagnostics(guiplugins.InteractiveAction):
+    def __repr__(self):
+        return "Diagnostics"
+    def getTitle(self):
+        return "Diagnostics"
+    def getScriptTitle(self):
+        return "Enable Diagnostics"
+    def matchesMode(self, dynamic):
+        return not dynamic
+    def __call__(self, test):
+        diagDir = os.path.join(test.abspath, "Diagnostics")
+        os.mkdir(diagDir)
+        diagFile = os.path.join(test.app.abspath, "diagnostics.etab")
+        targetDiagFile = os.path.join(diagDir, "diagnostics.etab")
+        shutil.copyfile(diagFile, targetDiagFile)
+        self.viewFile(targetDiagFile)
+
+guiplugins.interactiveActionHandler.testClasses += [ EnableDiagnostics ]
 
 class MigrateApcTest(plugins.Action):
     def __init__(self):

@@ -96,6 +96,11 @@ class TestComparison:
     def createFileComparison(self, test, standardFile, tmpFile):
         return FileComparison(test, standardFile, tmpFile)
     def save(self, exact = 1, versionString = ""):
+        # Force exactness unless there is only one difference : otherwise
+        # performance is averaged when results have changed as well
+        resultCount = len(self.changedResults) + len(self.newResults)
+        if resultCount > 1:
+            exact = 1
         for comparison in self.changedResults:
             comparison.overwrite(exact, versionString)
         for comparison in self.newResults:

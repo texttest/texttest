@@ -237,3 +237,15 @@ optimization.noIncreaseExceptMethods["broken hard trip constraints"] = [ "MaxRos
 optimization.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
 optimization.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]
 
+class PrintRuleValue(plugins.Action):
+    def __repr__(self):
+        return "Printing rule values for"
+    def __call__(self, test):
+        self.describe(test)
+        rulesFile = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", getOption(test.options, "-s"), "APC_FILES", "rules")
+        for line in open(rulesFile).xreadlines():
+            if line.find("index_group_generation TRUE") != -1:
+                print test.getIndent() + "INDEX GROUPS"
+    def setUpSuite(self, suite):
+        self.describe(suite)
+                

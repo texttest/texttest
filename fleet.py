@@ -6,7 +6,7 @@ Note though that the 'matador.ImportTest' script is not implemeted for Fleet yet
 helpOptions = """
 """
 
-import os, string, optimization, matador
+import os, string, optimization, matador, plugins, shutil
 
 def getConfig(optionMap):
     return FleetConfig(optionMap)
@@ -33,6 +33,14 @@ class FleetConfig(matador.MatadorConfig):
             # print help information and exit:
             return "" 
         return subPlan
+    def getTestRunner(self):
+        matadorRunner = matador.MatadorConfig.getTestRunner(self)
+        if not usingOptionFile():
+            return matadorRunner
+        else:
+            return plugins.CompositeAction([ CopyCommandsFile(), matadorRunner ])
+    def getTestCollator(self):
+        return plugins.CompositeAction([ matador.MatadorConfig.getTestCollator(self), RemoveCommandsFile() ])
     def printHelpDescription(self):
         print helpDescription
         matador.MatadorConfig.printHelpDescription(self)
@@ -42,4 +50,19 @@ class FleetConfig(matador.MatadorConfig):
         # Reset matador values
         self.noIncreaseExceptMethods = {}
         self.noIncreaseExceptMethods[optimization.costEntryName] = []
+
+class CopyCommandsFile(plugins.Action):
+    def __call__(self, test):
+        fileName = "commands"
+        filePath = test.makeFileName(fileName)
+        tmpPath = test.makeFileName(fileName, temporary=1)
+        if os.path.isfile(filePath):
+            shutil.copyfile(filePath, tmpPath)
+
+class RemoveCommandsFile(plugins.Action):
+    def __call__(self, test):
+        fileName = "commands"
+        tmpPath = test.makeFileName(fileName, temporary=1)
+        if os.path.isfile(tmpPath):
+            os.remove(tmpPath)
 

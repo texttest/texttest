@@ -11,7 +11,9 @@ A user guide (UserGuide.html) is available to document the framework itself.
 builtInOptions = """
 -a <app>   - run only the application with extension <app>
 
--v <vers>  - use <vers> as the version name(s). For several versions, use a comma-separated list (see User Guide)
+-v <vers>  - use <vers> as the version name(s). Versions separated by "." characters will be aggregated.
+             Versions separated by "," characters will be run one after another. See the User Guide for
+             a fuller explanation of what a "version" means.
 
 -c <chkt>  - use <chkt> as the checkout instead of the "default_checkout" entry (see User Guide)
 
@@ -196,10 +198,12 @@ class TestSuite(Test):
         return testCaseList
             
 class Application:
-    def __init__(self, name, abspath, configFile, versions, optionMap, builtInOptions):
+    def __init__(self, name, abspath, configFile, version, optionMap, builtInOptions):
         self.name = name
         self.abspath = abspath
-        self.versions = versions
+        self.versions = version.split(".")
+        if self.versions[0] == "":
+            self.versions = []
         self.parallelMode = optionMap.has_key("p")
         self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions(0))
         self.fullName = self._getFullName()
@@ -209,7 +213,7 @@ class Application:
         self.configObject = self.makeConfigObject(optionMap)
         allowedOptions = self.configObject.getOptionString() + builtInOptions
         newVersions = self.configObject.getVersions(self)
-        self.versions = versions + newVersions
+        self.versions += newVersions
         if len(newVersions) > 0:
             # Get config files for configuration versions... (though we can't iterate here!)
             self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions())
@@ -376,6 +380,7 @@ class OptionFinder:
     def __init__(self):
         self.inputOptions = self.buildOptions()
         self._setUpLogging()
+        debugLog.debug(repr(self.inputOptions))
     def _setUpLogging(self):
         global debugLog
         if self.inputOptions.has_key("x"):
@@ -419,6 +424,7 @@ class OptionFinder:
         debugLog.info("Using test suite at " + dirName)
         appList = self._findApps(dirName, 1)
         appList.sort()
+        debugLog.info("Found applications : " + repr(appList))
         return appList
     def _findApps(self, dirName, recursive):
         appList = []
@@ -434,8 +440,9 @@ class OptionFinder:
                     continue
                 versionList = self.findVersionList()
                 try:
-                    app = Application(appName, dirName, pathname, versionList, self.inputOptions, "a:c:d:h:m:s:v:xp")
-                    appList.append(app)
+                    for version in versionList:
+                        app = Application(appName, dirName, pathname, version, self.inputOptions, "a:c:d:h:m:s:v:xp")
+                        appList.append(app)
                 except (SystemExit, KeyboardInterrupt):
                     raise sys.exc_type, sys.exc_value
                 except:
@@ -448,7 +455,7 @@ class OptionFinder:
         if self.inputOptions.has_key("v"):
             return self.inputOptions["v"].split(",")
         else:
-            return []
+            return [""]
     def findSelectedAppNames(self):
         if self.inputOptions.has_key("a"):
             return self.inputOptions["a"].split(",")

@@ -105,7 +105,7 @@ class ExtractSubPlanFile(plugins.Action):
                 os.system("uncompress " + targetFileZ)
             return
         if os.path.isfile(test.makeFileName(self.targetName)):
-            errText = "Expected file '" + sourcePath + "'not created by test"
+            errText = "Expected file '" + sourcePath + "' not created by test"
             open(targetFile,"w").write(errText + os.linesep)
             
 # Abstract base class for handling running tests in temporary subplan dirs

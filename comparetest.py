@@ -303,6 +303,7 @@ class FileComparison:
         self.differenceId = 0
         self.tmpFile = stdFile
         self.tmpCmpFile = self.stdCmpFile
+        self.stdFile = stdFile
     def saveResults(self, destFile):
         plugins.movefile(self.tmpFile, destFile)
         

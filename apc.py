@@ -49,7 +49,7 @@ apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTM
                              correct CARMSYS etc. environment variables for the test and run Studio.
 """
 
-import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins
+import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins, math
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -241,6 +241,9 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.kpiGroupForTest = {}
         self.testInGroupList = []
         self.finalCostsInGroup = {}
+        self.weightKPI = []
+        self.sumKPITime = 0.0
+        self.minKPITime = 0.0
     def __del__(self):
         for groupName in self.finalCostsInGroup.keys():
             fcTupleList = self.finalCostsInGroup[groupName]
@@ -250,6 +253,19 @@ class MakeProgressReport(optimization.MakeProgressReport):
         for testTuple in self.testInGroupList:
             test, referenceFile, currentFile, userName = testTuple
             self.doCompare(test, referenceFile, currentFile, userName)
+
+        # The weighted KPI is prodsum(KPIx * Tx / Tmin) ^ (1 / sum(Tx/Tmin))
+        # Tx is the average of the 'time to worst cost' for a specific test case, ie
+        # Tx = (curTTWC + refTTWC) / 2
+        #
+        sumKPI = 1.0
+        sumTimeParts = 0.0
+        for tup in self.weightKPI:
+            kpi, kpiTime = tup
+            sumKPI *= math.pow(kpi, 1.0 * kpiTime / self.minKPITime)
+            sumTimeParts += 1.0 * kpiTime / self.minKPITime
+        avg = math.pow(sumKPI, 1.0 / float(sumTimeParts))
+        print os.linesep, "Overall time weighted KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
         optimization.MakeProgressReport.__del__(self)
     def _calculateMargin(self, fcTupleList):
         if len(fcTupleList) < 2:
@@ -334,6 +350,12 @@ class MakeProgressReport(optimization.MakeProgressReport):
             self.worstKpi = kpi
         if kpi < self.bestKpi:
             self.bestKpi = kpi
+        kpiTime = (currTTWC + refTTWC) / 2.0
+        self.sumKPITime += kpiTime
+        if len(self.weightKPI) == 0 or kpiTime < self.minKPITime:
+            self.minKPITime = kpiTime
+        weightKPItuple = kpi, kpiTime
+        self.weightKPI.append(weightKPItuple)
         print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.percent(kpi)
         self.reportLine("                            ", "Current", "Version " + self.referenceVersion)
         self.reportLine("Initial cost of plan        ", currentCosts[0], referenceCosts[0])

@@ -63,7 +63,7 @@ class CheckForBugs(plugins.Action):
                 trigger = self.findTrigger(fileStem, bugText)
                 del self.bugMap[fileStem][trigger]
     def findTrigger(self, fileStem, bugText):
-        for trigger in self.bugMap[fileStem]:
+        for trigger in self.bugMap[fileStem].keys():
             if trigger.text == bugText:
                 return trigger
             

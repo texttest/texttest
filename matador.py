@@ -15,6 +15,9 @@ helpOptions = """-diag      - Run with diagnostics on. This will set the environ
              as producing lots of text tends to slow down the program, and will tell the comparator to also
              compare the diagnostics found in the ./Diagnostics subdirectory.
 
+-prrep <v> - Generate a Progress Report relative to the version <v>. This will produce some key numbers for all
+             tests that take more than 30 minutes.
+
 -kpi <ver> - Generate a Key Performance Indicator ("KPI") relative to the version <ver>. This will try to apply
              some formula to boil down the results of the tests given to a single-number "performance indicator".
              Please note that the results so far are not very reliable, as the formula itself is still under development.

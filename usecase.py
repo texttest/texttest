@@ -75,6 +75,8 @@ class ScriptEngine:
     def __init__(self, logger = None, enableShortcuts = 0):
         if not os.environ.has_key("USECASE_HOME"):
             os.environ["USECASE_HOME"] = os.path.expanduser("~/usecases")
+        else:
+            os.environ["USECASE_HOME"] = os.path.abspath(os.environ["USECASE_HOME"])
         self.replayer = self.createReplayer(logger)
         self.recorder = UseCaseRecorder()
         self.enableShortcuts = enableShortcuts
@@ -82,7 +84,7 @@ class ScriptEngine:
         prevArg = ""
         for arg in sys.argv[1:]:
             if prevArg.find("-replay") != -1:
-                self.replayer.addScript(arg)
+                self.replayer.addScript(ReplayScript(arg))
             if prevArg.find("-record") != -1:
                 self.recorder.addScript(arg)
             if prevArg.find("-recinp") != -1:
@@ -116,14 +118,20 @@ class ScriptEngine:
 class ReplayScript:
     def __init__(self, scriptName):
         self.commands = []
+        self.exitObservers = []
         self.pointer = 0
         if not os.path.isfile(scriptName):
             raise UseCaseScriptError, "Cannot replay script " + scriptName + ", no such file or directory"
         for line in open(scriptName).xreadlines():
             if line != "" and line[0] != "#":
                 self.commands.append(line.strip())
+    def addExitObserver(self, observer):
+        self.exitObservers.append(observer)
     def getCommand(self):
         if self.pointer >= len(self.commands):
+            for observer in self.exitObservers:
+                observer.notifyExit()
+            self.pointer = 0
             return None
 
         nextCommand = self.commands[self.pointer]
@@ -141,8 +149,8 @@ class UseCaseReplayer:
         self.processId = os.getpid() # So we can generate signals for ourselves...
     def addEvent(self, event):
         self.events[event.name] = event
-    def addScript(self, scriptName):
-        self.scripts.append(ReplayScript(scriptName))
+    def addScript(self, script):
+        self.scripts.append(script)
         self.enableReading()
     def enableReading(self):
         # If events fail, we store them and wait for the relevant handler
@@ -262,6 +270,7 @@ class UseCaseRecorder:
         self.processId = os.getpid()
         self.applicationEvents = seqdict()
         self.translationParser = self.readTranslationFile()
+        self.suspended = 0
         self.realSignalHandlers = {}
         self.signalNames = {}
         for entry in dir(signal):
@@ -277,6 +286,8 @@ class UseCaseRecorder:
             except:
                 # Various signals aren't really valid here...
                 pass
+    def notifyExit(self):
+        self.suspended = 0
     def addScript(self, scriptName):
         self.scripts.append(RecordScript(scriptName))
     def blockTopLevel(self, eventName):
@@ -315,7 +326,7 @@ class UseCaseRecorder:
     def addEvent(self, event):
         self.events.append(event)
     def writeEvent(self, *args):
-        if len(self.scripts) == 0:
+        if len(self.scripts) == 0 or self.suspended == 1:
             return
         event = self.findEvent(*args)
         if event.shouldRecord(*args):

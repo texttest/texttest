@@ -589,6 +589,7 @@ class Application:
         # External viewing tools
         # Do this here rather than from the GUI: if applications can be run with the GUI
         # anywhere it needs to be set up
+        self.setConfigDefault("add_shortcut_bar", 1)
         self.setConfigDefault("test_colours", self.getGuiColourDictionary())
         self.setConfigDefault("file_colours", self.getGuiColourDictionary())
         self.setConfigDefault("gui_entry_overrides", {})

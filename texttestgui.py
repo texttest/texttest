@@ -39,7 +39,9 @@ class TextTestGUI:
         guiplugins.setUpGuiLog()
         global guilog, scriptEngine
         from guiplugins import guilog
-        scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
+        if not os.environ.has_key("USECASE_HOME"):
+            os.environ["USECASE_HOME"] = os.path.join(os.environ["TEXTTEST_HOME"], "usecases")
+        scriptEngine = ScriptEngine(guilog)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic
@@ -61,17 +63,20 @@ class TextTestGUI:
 
         mainWindow = self.createWindowContents(testWins)
         shortcutBar = scriptEngine.createShortcutBar()
-        vbox = gtk.VBox()
-        vbox.pack_start(mainWindow, expand=gtk.TRUE, fill=gtk.TRUE)
-        vbox.pack_start(shortcutBar, expand=gtk.FALSE, fill=gtk.FALSE)
-        #shortcutBar.show()
-        vbox.show()
-        win.add(vbox)
+        if shortcutBar:
+            vbox = gtk.VBox()
+            vbox.pack_start(mainWindow, expand=gtk.TRUE, fill=gtk.TRUE)
+            vbox.pack_start(shortcutBar, expand=gtk.FALSE, fill=gtk.FALSE)
+            shortcutBar.show()
+            vbox.show()
+            win.add(vbox)
+        else:
+            win.add(mainWindow)
         win.show()
         win.resize(self.getWindowWidth(), self.getWindowHeight())
         return win
     def getWindowHeight(self):
-        return (gtk.gdk.screen_height() * 4) / 5
+        return (gtk.gdk.screen_height() * 5) / 6
     def getWindowWidth(self):
         screenWidth = gtk.gdk.screen_width()
         if self.performanceColumn:
@@ -108,6 +113,8 @@ class TextTestGUI:
         self.model.set_value(iter, 2, app)
         self.model.set_value(iter, 3, nodeName)
     def addSuite(self, suite):
+        if suite.app.getConfigValue("add_shortcut_bar"):
+            scriptEngine.enableShortcuts = 1
         if not self.dynamic:
             self.addApplication(suite.app)
         if self.dynamic and suite.app.hasPerformanceComparison():
@@ -284,6 +291,8 @@ class TextTestGUI:
         if self.performanceColumn:
             guilog.info("(Second column '" + self.model.get_value(iter, 4) + "' coloured " + self.model.get_value(iter, 5) + ")")
     def redrawSuite(self, suite):
+        if suite.size() == 0:
+            return
         maybeNewTest = suite.testcases[-1]
         suiteIter = self.itermap[suite]
         if self.itermap.has_key(maybeNewTest):

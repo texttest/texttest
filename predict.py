@@ -3,7 +3,8 @@
 helpDescription = """
 It is possible to specify predictively how an application behaves. In general this works by reading
 the config file list "internal_error_text" and searching the resulting log file for it. If this text
-is found, a warning is generated. predict.CheckPredictions can also be run as a standalone action to
+is found, a warning is generated. Conversely, you can specify the list "internal_compulsory_text" which
+raises a warning if the text is not found. predict.CheckPredictions can also be run as a standalone action to
 check the standard test results for internal errors.
 """
 

@@ -8,8 +8,8 @@ filtered using the config file list entries corresponding to the stem of the fil
 This will remove all run-dependent text like process IDs, timestamps etc., and ensure
 that false failures are avoided in this way.
 
-If standard results have not already been collected, the results are saved as the new
-standard results and must be checked carefully by hand. If standard results have been
+If standard results have not already been collected, the results are reported as new results
+and must be checked carefully by hand and saved if correct. If standard results have been
 collected, the filtered new results are compared with the standard and any difference
 is interpreted as a test failure. 
 """

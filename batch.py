@@ -12,6 +12,9 @@ helpOptions = """
              If set to "none", it ensures that that batch session will ignore that application.
              <bname>_version, these entries form a list and ensure that only the versions listed are accepted.
              If the list is empty, all versions are allowed.
+             <bname>_use_collection, if equal to "true", send the batch report to an intermediate file where it
+             can be collected and amalgamated with others using the script batch.CollectFiles. This avoids too
+             many emails being sent by batch mode if many independent things are tested.
 """
 
 import os, performance, plugins, respond, sys, predict, string

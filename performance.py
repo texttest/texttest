@@ -20,9 +20,9 @@ is checked. If it is greater than the config file entry "cputime_variation_%", f
 is reported.
 
 When differences in performance are reported, you are given the option to save as described below.
-The default behaviour is to save the average of the old result and the new result. In order
-to override this and save the exact result, append a '+' to the save option that you type.
-(so "s+" to save the standard version, "1+" to save the first offered version etc.)
+The default behaviour (if there are no other differences) is to save the average of the old result
+and the new result. In order to override this and save the exact result, append a '+' to the save
+option that you type. (so "s+" to save the standard version, "1+" to save the first offered version etc.)
 """ + comparetest.helpDescription
 
 # This module won't work without an external module creating a file called performance.app

@@ -7,7 +7,7 @@ helpDescription = """
 The LSF configuration is designed to run on a UNIX system with the LSF (Load Sharing Facility)
 product from Platform installed.
 
-It's default operation is to submit all jobs to the queue indicated by the config file value
+Its default operation is to submit all jobs to the queue indicated by the config file value
 "lsf_queue". To provide more complex rules for queue selection a derived configuration would be
 needed.
 """
@@ -23,7 +23,15 @@ user friendly but less portable than the default "ndiff".
 
 It also generates performance checking and memory checking by using the LSF report file to
 extract this information. The reliability of memory checking is however uncertain, hence
-it is currently disabled by default.
+it is currently disabled by default. As well as the CPU time needed by performance.py, it will
+report the real time and any jobs which are currently running on the other processors of
+the execution machine, if it has others. These have been found to be capable of interfering
+with the performance of the job.
+
+The environment variables LSF_RESOURCE and LSF_PROCESSES can be used to turn on LSF functionality
+for particular parts of the test suite. The first will always ensure that a resource is specified
+(equivalent to -R command line), while the second will ensure that LSF makes a request for that number
+of processes. A single number is a precise limit, while min,max can specify a range.
 """
 
 batchInfo = """
@@ -48,7 +56,6 @@ helpOptions = """
 
 -perf      - Force execution on the performance test machines. Equivalent to -R "hname == <perf1> || hname == <perf2>...",
              where <perf1>, <perf2> etc. are the machines listed in the config file list entry "performance_test_machine".
-             Does not work in conjunction with -R <resrc>, currently.
 """ + batch.helpOptions             
 
 def getConfig(optionMap):

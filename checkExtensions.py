@@ -39,7 +39,7 @@ def isCompressed(path):
     else:
         return 0
 
-class CheckExtConfig(carmen.Config):
+class CheckExtConfig(carmen.CarmenConfig):
     def getExecuteCommand(self, binary, test):
         return binary.replace("ARCHITECTURE", carmen.architecture) + " " + test.options
     def getTestCollator(self):

@@ -222,7 +222,7 @@ class MakeTmpSubPlan(plugins.Action):
                         #print self.raveParameters
                         for overrideItems in self.raveParameters:
                             for override in overrideItems:
-                                file.write(override.strip(os.linesep) + os.linesep)
+                                file.write(override.strip() + os.linesep)
                     file.write(line)
             else:
                 os.symlink(fromPath, toPath)            

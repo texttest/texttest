@@ -65,10 +65,12 @@ optimization.TableTest     - Displays solution data in a table. Works the same a
                                by underscores. Default is TOTAL cost and cpu time only.
                                Example: i=cost_of_roster,rost/sec,Generated_rosters
                              
-optimization.StartStudio   - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
-                             This is intended to be used on a single specified test and will terminate
-                             the testsuite after it starts Studio. It is a simple shortcut to set the
-                             correct CARMSYS etc. environment variables for the test and run Studio.
+optimization.StartStudio   - Starts up Studio (with ${CARMSYS}/bin/studio) and loads the subplan, with
+                             CARMUSR and CARMTMP set for the specific test. This is intended to be used
+                             on a single specified test and will terminate the testsuite after it starts
+                             Studio. If serveral tests are specified, the subplan will be loaded for the
+                             first one. It is a simple shortcut to set the correct CARMSYS etc. environment
+                             variables for the test and run Studio.
 """
 
 
@@ -205,7 +207,12 @@ class StartStudio(plugins.Action):
         print "CARMSYS:", os.environ["CARMSYS"]
         print "CARMUSR:", os.environ["CARMUSR"]
         print "CARMTMP:", os.environ["CARMTMP"]
-        commandLine = os.path.join(os.environ["CARMSYS"], "bin", "studio")
+        fullSubPlanPath = test.app.configObject._getSubPlanDirName(test)
+        lPos = fullSubPlanPath.find("LOCAL_PLAN/")
+        subPlan = fullSubPlanPath[lPos + 11:]
+        localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
+        studioCommand = "studio -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'"
+        commandLine = os.path.join(os.environ["CARMSYS"], "bin", studioCommand)
         print os.popen(commandLine).readline()
         sys.exit(0)
 

@@ -416,7 +416,9 @@ class FetchApcCore(plugins.Action):
         self.diag = plugins.getDiagnostics("FetchApcCore")
     def isApcLogFileKept(self, errorFileName):
         for line in open(errorFileName).xreadlines():
+            print lines
             if line.find("*** Keeping the logfiles in") != -1:
+                print "found"
                 return "Yes"
         return []
     def __call__(self, test):

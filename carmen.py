@@ -72,7 +72,7 @@ helpScripts = """carmen.TraverseCarmUsers   - Traverses all CARMUSR's associated
                              the specified time. Default time is 1440 minutes.
 """
 
-import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, time, predict
+import lsf, default, performance, os, string, shutil, plugins, batch, sys, signal, respond, time, predict
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -553,7 +553,7 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
             return 1
         libFile = test.getConfigValue("rave_static_library")
         if libFile:
-            return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(libFile)
+            return plugins.modifiedTime(ruleset.targetFile) < plugins.modifiedTime(libFile)
         else:
             return 1
     def acceptsTestSuite(self, suite):
@@ -564,9 +564,7 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
         self.diag.info("CARMTMP: " + carmtmp)
         # Ruleset is local if CARMTMP depends on the CARMSYS or the user's home directory  
         return carmtmp.find(os.environ["CARMSYS"]) != -1 or carmtmp.find(os.environ["HOME"]) != -1
-    def modifiedTime(self, filename):
-        return os.stat(filename)[stat.ST_MTIME]
-
+    
 class WaitForDispatch(lsf.Wait):
     def __init__(self):
         lsf.Wait.__init__(self)

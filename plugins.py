@@ -1,5 +1,5 @@
 
-import os, log4py, string, signal, shutil, time, re
+import os, log4py, string, signal, shutil, time, re, stat
 from types import FileType
 from ndict import seqdict
 
@@ -69,6 +69,10 @@ def abspath(relpath):
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
     return map(string.strip, input.split(","))
+
+# Another useful thing that saves an import and remembering weird stuff
+def modifiedTime(filename):
+    return os.stat(filename)[stat.ST_MTIME]
 
 # Another useful utility, for moving files around
 def movefile(sourcePath, targetFile):

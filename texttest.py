@@ -768,6 +768,7 @@ class TextTest:
         self.gui = None
         if useGui:
             try:
+                self.ensureDisplaySet()
                 import texttestgui
                 self.gui = texttestgui.TextTestGUI(guiScript)
             except:
@@ -779,6 +780,25 @@ class TextTest:
             return "%d%b%H:%M:%S"
         else:
             return "%H%M%S"
+    def ensureDisplaySet(self):
+        # DISPLAY variable must be set if we are to run the GUI
+        if not os.environ.has_key("DISPLAY"):
+            for app in self.allApps:
+                try:
+                    displayModule = app.getConfigValue("display_module")
+                    importCommand = "from " + displayModule + " import getDisplay"
+                    exec importCommand
+                    display = getDisplay()
+                    if display:
+                        os.environ["DISPLAY"] = display
+                        return
+                    else:
+                        print "Application", app, "searched for a display but could not find one."
+                except ImportError:
+                    print "Failed to import display_module", displayModule
+                except AttributeError:
+                    pass
+            raise plugins.TextTestError, "DISPLAY variable not set and no selected configuration has any way to set one"
     def run(self):
         try:
             self._run()

@@ -64,6 +64,22 @@ def getArchitecture(app):
             return version
     return app.getConfigValue("default_architecture")
 
+def findDisplay(maintainer, server):
+    line = os.popen("remsh " + server + " 'ps -efl | grep " + maintainer + " | grep Xsun | grep -v grep'").readline()
+    if len(line):
+        return server + line.split()[-2] + ".0"
+
+def getDisplay():
+    # The nightjob should connect to Geoff or Johan A.'s display, if available
+    maintainers = [ "geoff", "johana" ]
+    sunServers = [ "murray", "westray" ]
+    for maintainer in maintainers:
+        for server in sunServers:
+            display = findDisplay(maintainer, server)
+            if display:
+                return display
+    
+
 class UserFilter(default.TextFilter):
     def acceptsTestSuite(self, suite):
         if isUserSuite(suite):

@@ -93,7 +93,7 @@ class UNIXInteractiveResponder(InteractiveResponder):
             argumentString = " /dev/null " + comparison.tmpFile
         else:
             argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
-        if displayStream == sys.stdout and repr(comparison) == app.getConfigValue("log_file"):
+        if os.environ.has_key("DISPLAY") and displayStream == sys.stdout and repr(comparison) == app.getConfigValue("log_file"):
             print "<See tkdiff window>"
             os.system("tkdiff" + argumentString + " &")
         else:

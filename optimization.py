@@ -832,7 +832,7 @@ class PlotTest(plugins.Action):
     def __call__(self, test):
         for version in self.plotVersions:
             try:
-                optRun = OptimizationRun(test, version, [ costEntryName, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus)
+                optRun = OptimizationRun(test, version, [ self.plotItem, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus)
             except EnvironmentError:
                 print "No status file does exist for test " + test.name + "(" + version + ")"
 
@@ -842,8 +842,8 @@ class PlotTest(plugins.Action):
             plotFile = open(plotFileName, "w")
             for solution in optRun.solutions:
                 if self.plotAgainstSolNum:
-                    plotFile.write(str(solution[costEntryName]) + os.linesep)
+                    plotFile.write(str(solution[self.plotItem]) + os.linesep)
                 else:
-                    plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[costEntryName]) + os.linesep)
+                    plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[self.plotItem]) + os.linesep)
             self.plotFiles.append(plotFileName)
 

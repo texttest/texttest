@@ -120,6 +120,11 @@ class TestCase(Test):
         return fileName
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
+    def getInputFileName(self):
+        tmpFile = self.getTmpFileName("input", "r")
+        if os.path.isfile(tmpFile):
+            return tmpFile
+        return self.inputFile
         
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):

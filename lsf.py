@@ -140,9 +140,10 @@ class SubmitTest(plugins.Action):
     def __call__(self, test):
         queueToUse = self.queueFunction(test)
         self.describe(test, " to LSF queue " + queueToUse)
-        testCommand = "'" + self.getExecuteCommand(test) 
-        if os.path.isfile(test.inputFile):
-            testCommand = testCommand + " < " + test.inputFile
+        testCommand = "'" + self.getExecuteCommand(test)
+        inputFileName = test.getInputFileName()
+        if os.path.isfile(inputFileName):
+            testCommand = testCommand + " < " + inputFileName
         outfile = test.getTmpFileName("output", "w")
         testCommand = testCommand + " > " + outfile + "'"
         errfile = test.getTmpFileName("errors", "w")

@@ -105,8 +105,9 @@ class RunTest(plugins.Action):
         self.describe(test)
         outfile = test.getTmpFileName("output", "w")
         stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfile)
-        if os.path.isfile(test.inputFile):
-            inputData = open(test.inputFile).read()
+        inputFileName = test.getInputFileName()
+        if os.path.isfile(inputFileName):
+            inputData = open(inputFileName).read()
             stdin.write(inputData)
         stdin.close()
         errfile = open(test.getTmpFileName("errors", "w"), "w")

@@ -150,7 +150,6 @@ class CollateUNIXFiles(default.CollateFiles):
         try:
             os.rename(sourcePath, targetFile)
         except:
-            print "Failed to rename '" + sourcePath + "' to '" + targetFile + "', using copy-delete"
             shutil.copyfile(sourcePath, targetFile)
             os.remove(sourcePath)
 

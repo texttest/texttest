@@ -484,7 +484,6 @@ class TestSuite(Test):
                 testCase = TestCase(testName, testPath, self.app, self)
                 if testCase.valid and testCase.isAcceptedByAll(filters):
                     testCaseList.append(testCase)
-                testCase.tearDownEnvironment()
         if not allowEmpty and len(testCaseList) == 0:
             self.valid = 0
         return testCaseList

@@ -216,9 +216,9 @@ class CarmenConfig(lsf.LSFConfig):
         if user in apcDevelopers:
             return 1
 
-        # Detect TextTest APC jobs
+        # Detect TextTest APC jobs and XPRESS tests
         parts = jobName.split(os.sep)
-        return parts[0].find("APC") != -1
+        return parts[0].find("APC") != -1 or parts[0].find("MpsSolver") != -1
     def printHelpOptions(self, builtInOptions):
         print lsf.helpOptions + batchInfo
         default.Config.printHelpOptions(self, builtInOptions)

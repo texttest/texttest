@@ -26,25 +26,6 @@ apc.ImportTest             - Import new test cases and test users.
                              the test is run. The action will look for available subplandirectories under
                              CARMUSR and present them to you.
 
-apc.PlotApcTest [options]  - Displays a gnuplot graph with the cpu time (in minutes) versus total cost. 
-                             The data is extracted from the status file of test(s), and if the test is
-                             currently running, the temporary status file is used, see however the
-                             option nt below. All tests selected are plotted in the same graph.
-                             The following options are supported:
-                             - r=range
-                               The x-axis has the range range. Default is the whole data set. Example: 60:
-                             - p=an absolute file name
-                               Prints the graph to a postscript file instead of displaying it.
-                             - i=item
-                               Which item to plot from the status file. Note that whitespaces are replaced
-                               by underscores. Default is TOTAL cost. Example: i=overcover_cost.
-                             - s
-                               Plot against solution number instead of cpu time.
-                             - nt
-                               Do not use status file from the currently running test.
-                             - v=v1,v2
-                               Plot multiple versions in same dia, ie 'v=,9' means master and version 9
-
 apc.PrintAirport           - Prints the target AirportFile location for each user
 
 apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test

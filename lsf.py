@@ -249,14 +249,16 @@ class MakeResourceFiles(plugins.Action):
         os.remove(tmpFile)
         # Read the UNIX performance file, allowing us to discount system time.
         tmpFile = test.getTmpFileName("unixperf", "r")
-        file = open(tmpFile)
-        for line in file.readlines():
-            if line.find("user") != -1:
-                cpuTime = line.strip().split()[-1]
-                resourceDict["CPU time"] = "CPU time   : " + string.rjust(cpuTime, 9) + " sec."
-        os.remove(tmpFile)
+        if os.path.isfile(tmpFile):
+            file = open(tmpFile)
+            for line in file.readlines():
+                if line.find("user") != -1:
+                    cpuTime = line.strip().split()[-1]
+                    resourceDict["CPU time"] = "CPU time   : " + string.rjust(cpuTime, 9) + " sec."
+            os.remove(tmpFile)
+
         # remove the command-file created before submitting the command
-        # Note APC does not create one!
+        # Note not everybody creates one!
         cmdFile = test.getTmpFileName("cmd", "r")
         if os.path.isfile(cmdFile):
             os.remove(cmdFile)

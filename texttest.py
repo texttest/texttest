@@ -1089,11 +1089,11 @@ class TestRunner:
             self.handleExceptions(previousTestRunner.appRunner.tearDownSuite, suite)
         for suite in setUpSuites:
             suite.setUpEnvironment()
+            self.appRunner.markForSetUp(suite, self.actionSequence)
         while len(self.actionSequence):
             action = self.actionSequence[0]
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
-            for suite in setUpSuites:
-                self.handleExceptions(self.appRunner.setUpSuite, action, suite)
+            self.handleExceptions(self.appRunner.setUpSuites, action, self.test)
             completed, tryOthersNow = self.performAction(action, runToCompletion)
             self.diag.info("<-End Performing action " + str(action) + self.returnString(completed, tryOthersNow))
             if completed:
@@ -1178,6 +1178,7 @@ class ApplicationRunner:
         self.actionSequence = actionSequence
         self.cleanupSequence = self.getCleanUpSequence(actionSequence)
         self.suitesSetUp = {}
+        self.suitesToSetUp = {}
         self.diag = diag
         self.setUpApplications(self.actionSequence)
     def getCleanUpSequence(self, actionSequence):
@@ -1206,6 +1207,18 @@ class ApplicationRunner:
                     message = str(sys.exc_type) + ": " + message
                 raise BadConfigError, message
         self.testSuite.tearDownEnvironment()
+    def markForSetUp(self, suite, actions):
+        newActions = []
+        for action in actions:
+            newActions.append(action)
+        self.suitesToSetUp[suite] = newActions
+    def setUpSuites(self, action, test):
+        if test.parent:
+            self.setUpSuites(action, test.parent)
+        if test.classId() == "test-suite":
+            if action in self.suitesToSetUp[test]:
+                self.setUpSuite(action, test)
+                self.suitesToSetUp[test].remove(action)
     def setUpSuite(self, action, suite):
         self.diag.info(str(action) + " set up " + repr(suite))
         action.setUpSuite(suite)

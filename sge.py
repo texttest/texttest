@@ -102,9 +102,10 @@ class QueueSystem:
         self.parseQstatErrors(stderr)
     def parseQstatOutput(self, stdout, states):
         for line in stdout.xreadlines():
-            if line.startswith("job") or line.startswith("----"):
+            line = line.strip()
+            if line.startswith("job") or line.startswith("----") or line == "":
                 continue
-            words = line.strip().split()
+            words = line.split()
             jobId = words[0]
             if not self.activeJobs.has_key(jobId):
                 continue

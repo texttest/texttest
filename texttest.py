@@ -24,7 +24,7 @@ builtInOptions = """
 
 -m <times> - perform the actions usually performed by the configuration, but repeated <times> times.
 
--p         - run in parallel mode. Do not clean up any temporary files looking like they belon to other TextTest
+-p         - run in parallel mode. Do not clean up any temporary files looking like they belong to other TextTest
              runs.
 
 -help      - Do not run anything. Instead, generate useful text, such as this.

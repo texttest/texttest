@@ -377,11 +377,7 @@ class Application:
         absroot = os.path.abspath(root)
         if not os.path.isdir(absroot):
             os.makedirs(absroot)
-        savedir = os.getcwd()
-        os.chdir(absroot)
-        result = os.path.join(os.getcwd(), self.getTmpIdentifier())
-        os.chdir(savedir)
-        return result
+        return os.path.join(absroot, self.getTmpIdentifier())
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:

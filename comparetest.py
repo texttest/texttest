@@ -119,11 +119,17 @@ class TestComparison:
                 self.makeComparisons(test, os.path.join(dir, file))
             elif self.shouldCompare(file, dir, test.app):
                 fullPath = os.path.join(dir, file)
-                stdFile = os.path.normpath(fullPath.replace(test.app.writeDirectory, test.app.abspath))
+                stdFile = os.path.normpath(self.findTestDirectory(fullPath, test))
                 comparison = self.makeComparison(test, stdFile, fullPath, makeNew)
                 self.addComparison(fullPath, comparison)
     def shouldCompare(self, file, dir, app):
         return not file.startswith("input.") and app.ownsFile(file)
+    def findTestDirectory(self, fullPath, test):
+        savedir = os.getcwd()
+        os.chdir(test.app.writeDirectory)
+        result = os.path.normpath(fullPath.replace(os.getcwd(), test.app.abspath))
+        os.chdir(savedir)
+        return result
     def makeComparison(self, test, standardFile, tmpFile, makeNew = 0):
         comparison = self.createFileComparison(test, standardFile, tmpFile, makeNew)
         if comparison.newResult() or comparison.hasDifferences():

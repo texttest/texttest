@@ -195,6 +195,8 @@ class TextTestGUI:
                     continue
                 elif retValue == "wait":
                     self.postponedTests.append(test)
+                    # Must restore environment when postponing...
+                    self.postponedInstructions.append((test, plugins.SetUpEnvironment(1)))
                     self.postponedInstructions.append((test, action))
             return 1
     def notifyChange(self, test):

@@ -73,6 +73,9 @@ class Test:
         # Should do this, but not quite yet...
         # self.properties.readValuesFromFile(os.path.join(self.abspath, "properties"), app.name, app.getVersionFileExtensions())
     def expandEnvironmentReferences(self, referenceVars = []):
+        self._expandEnvironmentReferences(referenceVars)
+        self.tearDownEnvironment()
+    def _expandEnvironmentReferences(self, referenceVars):
         childReferenceVars = copy(referenceVars)
         for var, value in self.environment.items():
             expValue = os.path.expandvars(value)
@@ -96,7 +99,6 @@ class Test:
             else:
                 debugLog.info("Not adding reference " + var + " as same as local value " + expValue + " in " + self.name)
         self.expandChildEnvironmentReferences(childReferenceVars)
-        self.tearDownEnvironment()
     def expandChildEnvironmentReferences(self, referenceVars):
         pass
     def makeFileName(self, stem, refVersion = None, temporary = 0, forComparison = 1):
@@ -263,8 +265,9 @@ class TestCase(Test):
     def testCaseList(self):
         return [ self ]
     def expandEnvironmentReferences(self, referenceVars = []):
+        self._expandEnvironmentReferences(referenceVars)
         self.options = os.path.expandvars(self.options)
-        Test.expandEnvironmentReferences(self, referenceVars)
+        self.tearDownEnvironment()
     def _setOptions(self):
         optionsFile = self.makeFileName("options")
         self.options = ""

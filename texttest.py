@@ -388,12 +388,13 @@ class Application:
             return self.configDir["full_name"]
         else:
             return string.upper(self.name)
+    def getFullVersion(self):
+        return string.join(self.versions, ".")
     def versionSuffix(self):
-        if len(self.versions) == 0:
+        fullVersion = self.getFullVersion()
+        if len(fullVersion) == 0:
             return ""
-        if len(self.versions) == 1:
-            return "." + self.versions[0]
-        return "." + string.join(self.versions, ".")
+        return "." + fullVersion
     def description(self):
         description = "Application " + self.fullName
         if len(self.versions):

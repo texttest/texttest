@@ -107,11 +107,9 @@ class UNIXInteractiveResponder(InteractiveResponder):
 
     
 class OverwriteOnFailures(Responder):
-    def __init__(self, version):
-        self.version = version
     def responderText(self, test):
         testComparison = test.stateDetails
         diffText = testComparison.getDifferenceSummary()
         return "- overwriting" + diffText
     def handleFailure(self, test, testComparison):
-        testComparison.save(1, self.version)
+        testComparison.save(1, test.app.getFullVersion())

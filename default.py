@@ -100,7 +100,7 @@ class Config(plugins.Configuration):
         return comparetest.MakeComparisons(self.optionMap.has_key("n"))
     def getTestResponder(self):
         if self.optionMap.has_key("o"):
-            return respond.OverwriteOnFailures(self.optionValue("v"))
+            return respond.OverwriteOnFailures()
         else:
             return respond.InteractiveResponder()
     # Utilities, which prove useful in many derived classes

@@ -99,7 +99,7 @@ class ApcConfig(optimization.OptimizationConfig):
         if self.useLSF():
             return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
         elif self.optionMap.has_key("rundebug"):
-            return RunApcTestInDebugger(self.optionValue("rundebug"))
+            return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
         else:
             return RunApcTest()
     def getTestCollator(self):
@@ -193,9 +193,10 @@ class RunApcTest(default.RunTest):
 # Runs the test in gdb and displays the log file. 
 #
 class RunApcTestInDebugger(default.RunTest):
-    def __init__(self, options):
+    def __init__(self, options, keepTmpFiles):
         self.inXEmacs = None
         self.showLogFile = 1
+        self.keepTmps = keepTmpFiles;
         opts = options.split(" ")
         if opts[0] == "":
             return
@@ -250,7 +251,8 @@ class RunApcTestInDebugger(default.RunTest):
         os.system("source " + configFile + ";" + executeCommand)
         # Remove the temp files, texttest will compare them if we dont remove them.
         os.remove(gdbArgs)
-        os.remove(apcLog)
+        if not self.keepTmps:
+            os.remove(apcLog)
         if self.inXEmacs:
             os.remove(gdbStart)
             os.remove(gdbWithArgs)

@@ -455,10 +455,10 @@ class AttachProfiler(plugins.Action):
 
 class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):
-        processLine = "/users/lennart/bin/process_gprof prof.*" + " > " + test.makeFileName("lprof", temporary = 1)
+        processLine = "/users/lennart/bin/process_gprof -t 0.5 prof.*" + " > " + test.makeFileName("lprof", temporary = 1)
         os.system(processLine)
         # Compress and save the raw data.
-        cmdLine = "gzip prof.*;mv prof.* " + test.makeFileName("prof", temporary = 1)
+        cmdLine = "gzip prof.[0-9]*;mv prof.[0-9]*.gz " + test.makeFileName("prof", temporary = 1)
         os.system(cmdLine)
     def __repr__(self):
         return "Profiling"    

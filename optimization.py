@@ -74,10 +74,10 @@ optimization.TraverseSubPlans
                            - Traverses all subplan directories associated with the selected tests,
                              and executes the command specified by argument. Be careful to quote the command
                              if you use options, otherwise texttest will try to interpret the options.
-                             Example: texttest -s carmen.TraverseCarmUsers "pwd".
+                             Example: texttest -s optimization.TraverseSubPlans "pwd".
                              This will display the path of all subplan directories in the test suite.
                              Example:
-                             texttest -apc -s carmen.TraverseCarmUsers "grep use_column_generation_method APC_FILES/rules"
+                             texttest -apc -s optimization.TraverseSubPlans "grep use_column_generation_method APC_FILES/rules"
                              This will show for which APC tests the column generation method is used.
 """
 

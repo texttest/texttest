@@ -232,7 +232,7 @@ class CarmenConfig(lsf.LSFConfig):
     def getQueuePerformancePrefix(self, test, arch, rave = 0):
         cpuTime = performance.getTestPerformance(test)
         usePrefix = None
-        if os.environ.has_key("LSF_QUEUE_PREFIX"):
+        if not rave and os.environ.has_key("LSF_QUEUE_PREFIX"):
             usePrefix = os.environ["LSF_QUEUE_PREFIX"]
         # Currently no short queue for powerpc_aix4
         if arch == "powerpc" and "9" in test.app.versions:

@@ -88,13 +88,15 @@ class RunTest(default.RunTest):
         # put the command in a file to avoid quoting problems,
         # also fix env.variables that remote login doesn't reset
         cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
-        f = open(cmdFile, "w")
-        f.write("HOST=`hostname`; export HOST" + os.linesep)
-        f.write(testCommand + os.linesep)
-        f.close()
+        self.buildCommandFile(test, cmdFile, testCommand)
         unixPerfFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
         timedTestCommand = '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
         return timedTestCommand
+    def buildCommandFile(self, test, cmdFile, testCommand):
+        f = open(cmdFile, "w")
+        f.write(testCommand + os.linesep)
+        f.close()
+        return cmdFile
     def changeState(self, test):
         test.changeState(test.RUNNING, "Running on " + hostname())
     def getInstructions(self, test):

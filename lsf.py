@@ -235,6 +235,22 @@ class SubmitTest(unixConfig.RunTest):
     def describe(self, test):
         queueToUse = self.queueFunction(test)
         unixConfig.RunTest.describe(self, test, " to LSF queue " + queueToUse)
+    def buildCommandFile(self, test, cmdFile, testCommand):
+        f = open(cmdFile, "w")
+        f.write("HOST=`hostname`; export HOST" + os.linesep)
+        if os.environ.has_key("LSF_ENVIRONMENT"):
+            data = os.environ["LSF_ENVIRONMENT"]
+            defs = data.split(";")
+            for def1 in defs:
+                parts = def1.split("=")
+                if len(parts) > 1:
+                    var = parts[0]
+                    value = parts[1]
+                    if value != "dummy":
+                        f.write(var + "=" + "\"" + value + "\"; export " + var + os.linesep)
+        f.write(testCommand + os.linesep)
+        f.close()
+        return cmdFile
     def changeState(self, test):
         # Don't change state just because we submitted to LSF
         pass

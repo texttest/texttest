@@ -2,7 +2,7 @@
 
 # GUI for TextTest written with PyGTK
 
-import plugins, gtk, gobject, os, string, time, sys
+import guiplugins, comparetest, gtk, gobject, os, string, time, sys
 from threading import Thread, currentThread
 from gtkscript import eventHandler
 from Queue import Queue, Empty
@@ -10,11 +10,12 @@ from Queue import Queue, Empty
 class TextTestGUI:
     def __init__(self, replayScriptName, recordScriptName):
         eventHandler.setScripts(replayScriptName, recordScriptName)
+        if replayScriptName:
+            guiplugins.InteractiveAction.allowExternalPrograms = 0
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.instructions = []
         self.postponedInstructions = []
         self.postponedTests = []
-        self.interactiveActions = []
         self.itermap = {}
         self.quitGUI = 0
         self.workQueue = Queue()
@@ -54,8 +55,6 @@ class TextTestGUI:
             self.model.set_value(iter, 1, "white")
         except:
             self.model.set_value(iter, 1, self.getTestColour(suite))
-    def addInteractiveActions(self, actions):
-        self.interactiveActions = actions
     def getTestColour(self, test):
         if test.state == test.FAILED or test.state == test.UNRUNNABLE:
             return "red"
@@ -172,7 +171,7 @@ class TextTestGUI:
         self.recreateTestView(test)
     def recreateTestView(self, test):
         self.contents.remove(self.testCaseGUI.getWindow())
-        self.testCaseGUI = TestCaseGUI(test, self.interactiveActions)
+        self.testCaseGUI = TestCaseGUI(test)
         self.contents.pack_start(self.testCaseGUI.getWindow(), expand=gtk.TRUE, fill=gtk.TRUE)
         self.contents.show()
     def makeButtons(self, list):
@@ -187,18 +186,18 @@ class TextTestGUI:
         return buttonbox
         
 class TestCaseGUI:
-    def __init__(self, test = None, interactiveActions = []):
-        self.exactButton = None
-        self.optionChooser = None
+    def __init__(self, test = None):
         self.test = test
-        self.interactiveDialogue = None
-        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.testComparison = None
+        self.fileViewAction = guiplugins.ViewFile(test)
+        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.addFilesToModel(test)
         view = self.createView(self.createTitle(test))
-        buttonbox = self.makeButtons(test, interactiveActions)
-        radioButtonBox = self.makeRadioButtons(test)
+        actionInstances = self.makeActionInstances(test)
+        buttons = self.makeButtons(actionInstances)
         textview = self.createTextView(test)
-        self.window = self.createWindow(buttonbox, radioButtonBox, view, textview)
+        notebook = self.createNotebook(textview, actionInstances)
+        self.window = self.createWindow(buttons, view, notebook)
     def addFilesToModel(self, test):
         compiter = self.model.insert_before(None, None)
         self.model.set_value(compiter, 0, "Comparison Files")
@@ -206,38 +205,47 @@ class TestCaseGUI:
         self.model.set_value(newiter, 0, "New Files")
         if not test or test.state < test.RUNNING:
             return
+        
+        self.testComparison = test.stateDetails
+        if test.state == test.RUNNING:
+            self.testComparison = comparetest.TestComparison(test, 0)
+            self.testComparison.makeComparisons(test, test.getDirectory(temporary = 1), makeNew = 1)
         try:
-            testComparison = test.stateDetails
-            for name in testComparison.attemptedComparisons:
-                fileComparison = testComparison.findFileComparison(name)
+            for fileName in self.testComparison.attemptedComparisons:
+                fileComparison = self.testComparison.findFileComparison(fileName)
                 if not fileComparison:
-                    self.addComparison(compiter, name, fileComparison, "green")
+                    self.addComparison(compiter, fileName, fileComparison, self.getSuccessColour())
                 elif not fileComparison.newResult():
-                    self.addComparison(compiter, name, fileComparison, "red")
-            for fc in testComparison.newResults:
-                self.addComparison(newiter, os.path.basename(fc.stdFile), fc, "red")
+                    self.addComparison(compiter, fileName, fileComparison, self.getFailureColour())
+            for fc in self.testComparison.newResults:
+                self.addComparison(newiter, fc.tmpFile, fc, self.getFailureColour())
         except AttributeError:
             pass
+    def getSuccessColour(self):
+        if self.test.state == self.test.RUNNING:
+            return "yellow"
+        else:
+            return "green"
+    def getFailureColour(self):
+        if self.test.state == self.test.RUNNING:
+            return "yellow"
+        else:
+            return "red"
     def addComparison(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
-        self.model.set_value(fciter, 0, name)
+        self.model.set_value(fciter, 0, os.path.basename(name))
         self.model.set_value(fciter, 1, colour)
+        self.model.set_value(fciter, 2, name)
         if comp:
-            self.model.set_value(fciter, 2, comp)
-    def createWindow(self, buttonbox, radioButtonBox, view, textView):
+            self.model.set_value(fciter, 3, comp)
+    def createWindow(self, buttons, view, notebook):
         fileWin = gtk.ScrolledWindow()
         fileWin.add(view)
-        self.dataWindow = gtk.ScrolledWindow()
-        if textView:
-            self.dataWindow.add(textView)
         vbox = gtk.VBox()
-        vbox.pack_start(buttonbox, expand=gtk.FALSE, fill=gtk.FALSE)
-        if radioButtonBox:
-            vbox.pack_start(radioButtonBox, expand=gtk.FALSE, fill=gtk.FALSE)
+        vbox.pack_start(buttons, expand=gtk.FALSE, fill=gtk.FALSE)
         vbox.pack_start(fileWin, expand=gtk.TRUE, fill=gtk.TRUE)
-        vbox.pack_start(self.dataWindow, expand=gtk.TRUE, fill=gtk.TRUE)
+        vbox.pack_start(notebook, expand=gtk.TRUE, fill=gtk.TRUE)
         fileWin.show()
-        self.dataWindow.show()
         vbox.show()    
         return vbox
     def createView(self, title):
@@ -250,15 +258,18 @@ class TestCaseGUI:
         view.show()
         return view
     def createTextView(self, test):
-        if not test:
-            return None
+        textViewWindow = gtk.ScrolledWindow()
         textview = gtk.TextView()
         textview.set_wrap_mode(gtk.WRAP_WORD)
         textbuffer = textview.get_buffer()
         textbuffer.set_text(self.getTestInfo(test))
+        textViewWindow.add(textview)
         textview.show()
-        return textview
+        textViewWindow.show()
+        return textViewWindow
     def getTestInfo(self, test):
+        if not test:
+            return ""
         if test.state == test.UNRUNNABLE:
             return str(test.stateDetails).split(os.linesep)[0]
         elif test.state == test.FAILED:
@@ -277,123 +288,65 @@ class TestCaseGUI:
             return "Test-case info"
         return repr(test).replace("_", "__")
     def displayDifferences(self, view, path, column, *args):
-        comparison = self.model.get_value(self.model.get_iter(path), 2)
-        if comparison:
-            if comparison.newResult():
-                os.system("xemacs " + comparison.tmpCmpFile + " &")
-            else:
-                os.system("tkdiff " + comparison.stdCmpFile + " " + comparison.tmpCmpFile + " &")
-    def makeButtons(self, test, interactiveActions):
-        buttonbox = gtk.HBox()
+        iter = self.model.get_iter(path)
+        fileName = self.model.get_value(iter, 2)
+        comparison = self.model.get_value(iter, 3)
+        self.fileViewAction.view(comparison, fileName)
+    def makeActionInstances(self, test):
+        instances = []
         if not test:
-            return buttonbox
-        if test.state == test.FAILED:
-            options = test.app.getVersionFileExtensions()
-            self.addButton(self.save, buttonbox, "Save...", "")
-            for option in options:     
-                self.addButton(self.save, buttonbox, option, option)
-        for intvAction in interactiveActions:
-            instance = intvAction()
+            return instances
+        # A special one that we "hardcode" so we can find it...
+        instances.append(self.fileViewAction)
+        for intvActionClass in guiplugins.interactiveActionClasses:
+            instance = intvActionClass(test)
+            instances.append(instance)
+        return instances
+    def makeButtons(self, interactiveActions):
+        executeButtons = gtk.HBox()
+        for instance in interactiveActions:
             buttonTitle = instance.getTitle()
-            if len(instance.getSwitches()) or len(instance.getArgumentOptions()):
-                buttonTitle += "..."
-            self.addButton(self.runInteractive, buttonbox, buttonTitle, instance)
-        buttonbox.show()
-        return buttonbox
-    def hasPerformance(self, comparisonList):
-        for comparison in comparisonList:
-            if comparison.getType() != "difference" and comparison.hasDifferences():
-                return 1
-        return 0
-    def makeRadioButtons(self, test):
-        if not test or test.state != test.FAILED:
-            return None
-        try:
-            comparisonList = test.stateDetails.getComparisons()
-            if not self.hasPerformance(comparisonList):
-                return None
-        except AttributeError:
-            return None
-        buttonbox = gtk.HBox()
-        averageButton = gtk.RadioButton(None)
-        averageButton.set_label("Average Performance")
-        self.exactButton = gtk.RadioButton(averageButton)
-        self.exactButton.set_label("Exact Performance")
-        if len(comparisonList) != 1:
-            self.exactButton.set_active(gtk.TRUE)
-        buttonbox.pack_start(averageButton, expand=gtk.FALSE, fill=gtk.TRUE)
-        buttonbox.pack_start(self.exactButton, expand=gtk.FALSE, fill=gtk.TRUE)
-        averageButton.show()
-        self.exactButton.show()
-        buttonbox.show()
-        return buttonbox
+            if instance.canPerformOnTest():
+                self.addButton(self.runInteractive, executeButtons, buttonTitle, instance)
+        executeButtons.show()
+        return executeButtons
+    def createNotebook(self, textview, interactiveActions):
+        pages = []
+        pages.append((textview, "Text Info"))
+        for instance in interactiveActions:
+            if instance.options or instance.switches:
+                display = createDisplay(instance.options.values(), instance.switches.values())
+                pages.append((display, instance.getOptionTitle()))
+        notebook = eventHandler.createNotebook("notebook", pages)
+        notebook.show()
+        return notebook
     def addButton(self, method, buttonbox, label, option):
         button = gtk.Button()
         button.set_label(label)
         eventHandler.connect(label, "clicked", button, method, None, option)
         button.show()
         buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
-    def getSaveExactness(self):
-        if self.exactButton:
-            return self.exactButton.get_active() == gtk.TRUE
-        else:
-            return 1
-    def save(self, button, option, *args):
-        print "Saving", self.test, "version", option
-        testComparison = self.test.stateDetails
-        if testComparison:
-            testComparison.save(self.getSaveExactness(), option)
     def runInteractive(self, button, action, *args):
-        if self.optionChooser and self.optionChooser.button == button:
-            action.__init__(self.optionChooser.getOptions())
-            self.test.callAction(action)
-            return
-        action.describe(self.test)
-        if len(action.getArgumentOptions()) == 0 and len(action.getSwitches()) == 0:
-            self.test.callAction(action)
-            return
-        self.dataWindow.remove(self.dataWindow.get_child())
-        self.optionChooser = OptionChooser(button, action, self.test)
-        self.dataWindow.add_with_viewport(self.optionChooser.display)
-        self.dataWindow.show()
-        button.set_label(action.getTitle())
-        button.show()
+        self.test.callAction(action)
 
-
-class OptionChooser:
-    def __init__(self, button, action, test):
-        self.entries = []
-        self.checkButtons = []
-        self.button = button
-        self.display = self.createDisplay(action)
-    def createDisplay(self, action):
-        vbox = gtk.VBox()
-        for key, description in action.getArgumentOptions().items():
-            hbox = gtk.HBox()
-            label = gtk.Label(description + "  ")
-            entry = eventHandler.createEntry(description)
-            hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
-            hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)
-            label.show()
-            entry.show()
-            hbox.show()
-            self.entries.append((entry, key))
-            vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
-        for key, description in action.getSwitches().items():
-            checkButton = eventHandler.createCheckButton(description)
-            checkButton.show()
-            self.checkButtons.append((checkButton, key))
-            vbox.pack_start(checkButton, expand=gtk.FALSE, fill=gtk.FALSE)
-        vbox.show()    
-        return vbox
-    def getOptions(self):
-        options = []
-        for entry, option in self.entries:
-            text = entry.get_text()
-            if len(text):
-                options.append(option + "=" + text)
-        for button, option in self.checkButtons:
-            if button.get_active():
-                options.append(option)
-        return options
+def createDisplay(options, switches):
+    vbox = gtk.VBox()
+    for option in options:
+        hbox = gtk.HBox()
+        label = gtk.Label(option.name + "  ")
+        entry = eventHandler.createEntry(option.name, option.defaultValue)
+        option.valueMethod = entry.get_text
+        hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
+        hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)
+        label.show()
+        entry.show()
+        hbox.show()
+        vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
+    for switch in switches:
+        checkButton = eventHandler.createCheckButton(switch.name, switch.defaultValue)
+        switch.valueMethod = checkButton.get_active
+        checkButton.show()
+        vbox.pack_start(checkButton, expand=gtk.FALSE, fill=gtk.FALSE)
+    vbox.show()    
+    return vbox
 

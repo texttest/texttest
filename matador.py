@@ -119,7 +119,7 @@ class MatadorConfig(optimization.OptimizationConfig):
     def setUpApplication(self, app):
         optimization.OptimizationConfig.setUpApplication(self, app)
         if os.environ.has_key("DIAGNOSTICS_IN"):
-            app.addToConfigList("copy_test_path", "Diagnostics")
+            app.addToConfigList("copy_test_path", "Diagnostics/diagnostics.etab")
             app.addToConfigList("compare_extension", "diag")
         self.itemNamesInFile[optimization.memoryEntryName] = "Memory"
         self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"

@@ -223,6 +223,7 @@ class RunTest(plugins.Action):
         if test.state == test.UNRUNNABLE:
             return
         self.describe(test)
+        test.changeState(test.RUNNING, "Running on local machine")
         outfile = test.makeFileName("output", temporary=1)
         stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfile)
         inputFileName = test.inputFile

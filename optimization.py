@@ -51,8 +51,6 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                              - sg
                                Plot all tests chosen on the same graph, rather than one window per test
                                
-optimization.JoinPlot      - As PlotTest above but allows plots of multiple apps in same diag
-
 optimization.TableTest     - Displays solution data in a table. Works the same as PlotTest in most respects,
                              in terms of which data is displayed and the fact that temporary files are used if possible.
                              Currently supports these options:
@@ -84,7 +82,7 @@ optimization.TraverseSubPlans
 """
 
 
-import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, lsf
+import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, lsf, guiplugins
 
 itemNamesConfigKey = "_itemnames_map"
 noIncreasMethodsConfigKey = "_noincrease_methods_map"
@@ -150,8 +148,6 @@ class OptimizationConfig(carmen.CarmenConfig):
     def getTestCollator(self):
         solutionCollator = unixConfig.CollateFile("best_solution", "solution")
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])
-    def getInteractiveActions(self):
-        return [ ViewLog, PlotTest, TableTest ]
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
@@ -273,7 +269,9 @@ class LogFileFinder:
         self.test = test
         test.app.setConfigDefault("log_file", "output")
         self.logStem = test.app.getConfigValue("log_file")
-    def findFile(self, version = None):
+    def findFile(self, version = None, specFile = ""):
+        if len(specFile):
+            return 0, self.findSpecifiedFile(version, specFile)
         if self.tryTmpFile:
             if not version:
                 version = string.join(self.test.app.versions, ".")
@@ -318,11 +316,15 @@ class LogFileFinder:
                 return currentFile, tmpDir
         else:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
+            return None, None
     def findTempFileInTest(self, version, stem):
+        fromThisRun = self.test.makeFileName(stem, version, temporary=1)
+        app = self.test.app
+        if os.path.isfile(fromThisRun):
+            return fromThisRun, app.writeDirectory
         versionMod = ""
         if version:
             versionMod = "." + version
-        app = self.test.app
         searchString = app.name + versionMod + app.getTestUser()
         root, localDir = os.path.split(app.writeDirectory)
         for subDir in os.listdir(root):
@@ -337,28 +339,17 @@ class LogFileFinder:
         return None, None
 
 class OptimizationRun:
-    def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0, specFile = "", givenLogFile = ""):
+    def __init__(self, app, definingItems, interestingItems, logFile, scale = 0):
         self.diag = plugins.getDiagnostics("optimization")
-        self.performance = performance.getTestPerformance(test, version) # float value
-        if givenLogFile:
-            self.logFile = givenLogFile
-        else:
-            logFinder = LogFileFinder(test, tryTmpFile)
-            if specFile == "":
-                foundTmp, self.logFile = logFinder.findFile(version)
-                # Doesn't make sense to scale temporary files, as they probably aren't complete
-                if foundTmp:
-                    scale = 0
-            else:
-                self.logFile = logFinder.findSpecifiedFile(version, specFile)
+        self.logFile = logFile
         self.diag.info("Reading data from " + self.logFile)
         self.penaltyFactor = 1.0
         allItems = definingItems + interestingItems
-        calculator = OptimizationValueCalculator(allItems, self.logFile, test.app.getConfigValue(itemNamesConfigKey))
+        calculator = OptimizationValueCalculator(allItems, self.logFile, app.getConfigValue(itemNamesConfigKey))
         self.solutions = calculator.getSolutions(definingItems)
+        self.diag.debug("Solutions :" + repr(self.solutions))
         if scale and self.solutions and timeEntryName in allItems:
             self.scaleTimes()
-        self.diag.debug("Solutions :" + repr(self.solutions))
     def scaleTimes(self):
         finalTime = self.solutions[-1][timeEntryName]
         if finalTime == 0.0:
@@ -510,16 +501,13 @@ class TableTest(plugins.Action):
     def __init__(self, args = []):
         self.definingValues = [ timeEntryName, costEntryName ]
         self.interestingValues = [ ]
-        self.scaleTime = 1
         self.useTmpFiles = 1
         self.interpretOptions(args)
         self.values = self.definingValues + self.interestingValues
     def interpretOptions(self, args):
         for ar in args:
             arr = ar.split("=")
-            if arr[0]=="ns":
-                self.scaleTime = 0
-            elif arr[0]=="nt":
+            if arr[0]=="nt":
                 self.useTmpFiles = 0
             elif arr[0]=="i":
                 for entry in arr[1].split(","):
@@ -536,12 +524,12 @@ class TableTest(plugins.Action):
     def getSwitches(self):
         switches = {}
         switches["nt"] = "Ignore temporary file"
-        switches["ns"] = "Don't scale times"
         return switches
     def __call__(self, test):
         # Values that should be reported if present, but should not be fatal if not
         extraValues = [ "machine", "Crew Members" ]
-        currentRun = OptimizationRun(test, None, self.definingValues, self.interestingValues + extraValues, self.scaleTime, self.useTmpFiles)
+        logFile = test.makeFileName(test.app.getConfigValue("log_file"), temporary = self.useTmpFiles)
+        currentRun = OptimizationRun(test.app, self.definingValues, self.interestingValues + extraValues, logFile)
         self.displayTitle(test, currentRun.solutions[0])
         self.display(currentRun)
     def displayTitle(self, test, initialSol):
@@ -590,8 +578,10 @@ class TestReport(plugins.Action):
         definingValues = [ costEntryName, timeEntryName ]
         # Values that should be reported if present, but should not be fatal if not
         interestingValues = [ memoryEntryName, "cost of rosters" ]
-        currentRun = OptimizationRun(test, self.currentVersion, definingValues, interestingValues)
-        referenceRun = OptimizationRun(test, self.referenceVersion, definingValues, interestingValues)
+        currentLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.currentVersion)
+        refLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.referenceVersion)
+        currentRun = OptimizationRun(test.app, definingValues, interestingValues, currentLogFile, 1)
+        referenceRun = OptimizationRun(test.app, definingValues, interestingValues, refLogFile, 1)
         if currentRun.logFile != referenceRun.logFile:
             self.compare(test, referenceRun, currentRun)
 
@@ -958,48 +948,6 @@ class ImportTest(plugins.Action):
     def testForImportTestCase(self, testInfo):
         return 0
 
-class ViewLog(plugins.Action):
-    def __init__(self, args = []):
-        self.simple = 0
-    def __repr__(self):
-        return "Viewing log of"
-    def __call__(self, test):
-        job = lsf.LSFJob(test)
-        status, machine = job.getStatus()
-        if status == "DONE" or status == "EXIT":
-            print "Job is not running!"
-            return
-        if status != "PEND":
-            if machine != None:
-                self.showLogFile(test, machine, self.getLogFileName(test))
-                self.showRunStatusFile(test)
-            else:
-                print "Could not find machine name."
-    def getLogFileName(self, test):
-        if test.app.name == "apc":
-            subplanDir = test.writeDirs[-1];
-            subplanName = subplanDir.split("/")[-2]
-            return "/tmp/" + subplanName + "\*/apclog" 
-        logFileName = test.app.getConfigValue("log_file")
-        return test.makeFileName(logFileName, temporary=1)
-    def showLogFile(self, test, machine, logFileName):
-        command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''"
-        os.system(command)
-    def showRunStatusFile(self, test):
-        # Under construction! 
-        #  $CARMSYS/bin/APCstatus.sh ${SUBPLAN}/run_status
-        return
-    def getTitle(self):
-        return "View Log"
-    def getArgumentOptions(self):
-        options = {}
-        return options
-    def getSwitches(self):
-        switches = {}
-        #switches["lf"] = "APC log file"
-        #switches["st"] = "APC status file"
-        return switches
-
 class TraverseSubPlans(plugins.Action):
     def __init__(self, args = []):
         self.Command = string.join(args)
@@ -1052,261 +1000,241 @@ class PlotTest(plugins.Action):
     def __repr__(self):
         return "Plotting"
     def __call__(self, test):
+        test.makeBasicWriteDirectory()
+        self.describe(test)
         commonPlotter(test)
     def setUpSuite(self, suite):
-        commonPlotter.setUpSuite(suite)
-    # Interactive stuff
-    def getTitle(self):
-        return "Plot Graph"
-    def getArgumentOptions(self):
-        options = {}
-        options["r"] = "Time range in minutes"
-        options["p"] = "Absolute file to print to"
-        options["i"] = "Log file item to plot"
-        options["v"] = "Versions to plot"
-        return options
-    def getSwitches(self):
-        switches = {}
-        switches["pc"] = "Plot in colour"
-        switches["s"] = "Plot against solution number rather than time"
-        switches["nt"] = "Ignore temporary file"
-        switches["b"] = "Plot original and temporary file"
-        switches["ns"] = "Don't scale times"
-        switches["nv"] = "No line type grouping for versions"
-        return switches
+        self.describe(suite)
+    def setUpApplication(self, app):
+        app.makeWriteDirectory()
+        app.setConfigDefault("log_file", "output")
+    def getCleanUpAction(self):
+        if commonPlotter.plotForTest:
+            plotOptions = commonPlotter.plotForTest.getPlotOptions()
+            return GraphPlot(commonPlotter.testGraph, plotOptions)
         
 # Class for using gnuplot to plot test curves of tests
 #
 class _PlotTest(plugins.Action):
     def __init__(self, args = []):
-        self.plotFiles = []
-        self.plotItem = [ costEntryName ]
-        self.plotItemApp = {}
-        self.plotrange = "0:"
-        self.plotPrint = None
-        self.plotPrintColor = None
-        self.plotAgainstSolNum = 0
-        self.plotVersions = [ "" ]
-        self.plotScaleTime = 1
-        self.plotVersionColoring = 1
-        self.plotUseTmpStatus = 1
-        self.plotStates = [ "" ]
+        self.testGraph = TestGraph()
+        self.args = args
+        self.plotForTest = None
+    def __call__(self, test):
+        self.plotForTest = PlotTestInGUI(test, self.testGraph)
+        self.plotForTest.readCommandLineArguments(self.args)
+        self.plotForTest(test)
+    
+class GraphPlot(plugins.Action):
+    def __init__(self, graph, plotOptions):
+        self.graph = graph
+        self.timeRange, self.targetFile, self.colour = plotOptions
+    def setUpApplication(self, app):
+        self.graph.plot(self.timeRange, self.targetFile, self.colour)
+    
+class TestGraph:
+    def __init__(self):
+        self.plotLines = []
+        self.pointTypes = {}
+        self.lineTypes = {}
         self.yLabel = ""
-        self.plotInSameGraph = 0
-        self.lastSuite = ""
-        # Must be last in the constructor
-        self.interpretOptions(args)
-    def __del__(self):
-        if self.plotInSameGraph:
-            self.plotGraph()
-    def setUpSuite(self, suite):
-        self.lastSuite = suite.name
-    def interpretOptions(self, args):
-        for ar in args:
-            arr = ar.split("=")
-            if arr[0]=="r":
-                self.plotrange = arr[1]
-            elif arr[0]=="p":
-                self.plotPrint = arr[1]
-            elif arr[0]=="pc":
-                self.plotPrintColor = 1
-            elif arr[0]=="s":
-                self.plotAgainstSolNum = 1
-            elif arr[0]=="v":
-                self.plotVersions = arr[1].split(",")
-            elif arr[0]=="b":
-                self.plotStates = [ "run" , "orig" ]
-            elif arr[0]=="ns":
-                self.plotScaleTime = 0
-            elif arr[0]=="nt":
-                self.plotUseTmpStatus = 0
-            elif arr[0]=="nv":
-                self.plotVersionColoring = 0
-            elif arr[0]=="sg":
-                self.plotInSameGraph = 1
-            elif arr[0]=="i":
-                if arr[1]=="apctimes":
-                    arr[1] = "OC_to_DH_time,Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time"
-                itemsToPlot = arr[1].split(",")
-                self.plotItem = []
-                for item in itemsToPlot:
-                    parts = item.split(":")
-                    if len(parts) < 2:
-                        self.plotItem.append(parts[0].replace("_"," "))
-                    else:
-                        self.plotItemApp[parts[0]] = parts[1].replace("_"," ")
-            else:
-                print "Unknown option " + arr[0]
-    def getYlabel(self):
-        if len(self.items) == 1:
-            return self.plotItem[0]
+        self.pointTypeCounter = 1
+        self.lineTypeCounter = 2
+        self.users = []
+        self.apps = []
+    def addLine(self, plotLine):
+        self.plotLines.append(plotLine)
+        test = plotLine.test
+        if not test.app in self.apps:
+            self.apps.append(test.app)
+        user, testName = test.getRelPath().split(os.sep)
+        if not user in self.users:
+            self.users.append(user)
+        if not test in self.pointTypes.keys():
+            plotLine.pointType = str(self.pointTypeCounter)
+            self.pointTypes[test] = plotLine.pointType
+            self.pointTypeCounter += 1
         else:
-            return ""
-    def getPlotFileName(self, version, state, item):
-        return "plot-" + version + "-" + state + "-" + item
-    def getPlotUserAndTest(self, file):
-        username = file.split(os.sep)[-3]
-        testname = file.split(os.sep)[-2]
-        return username, testname
-    def getPlotInfo(self, file):
-        plotFileName = file.split(os.sep)[-1]
-        app = plotFileName.split(".")[-1]
-        ver = plotFileName.split("-")[1]
-        state = plotFileName.split("-")[2]
-        item = int(plotFileName.split("-")[3].split(".")[0])
-        username, testname = self.getPlotUserAndTest(file)
-        return app,ver,state,item,username,testname
-    def setPointandLineTypes(self):
-        if len(self.plotVersions)>1 or len(self.plotStates)>1 or len(self.items)>1:
-            # Choose line type.
-            self.versionLineType = {}
-            counter = 2
-            for versionIndex in range(len(self.plotVersions)):
-                for stateIndex in range(len(self.plotStates)):
-                    for itemIndex in range(len(self.items)):
-                        self.versionLineType[self.plotVersions[versionIndex], self.plotStates[stateIndex], itemIndex] = counter
-                        counter = counter + 1
-            # Choose point type.
-            self.testPointType = {}
-            counter = 1
-            for file in self.plotFiles:
-                username, testname = self.getPlotUserAndTest(file)
-                name = username + "::" + testname
-                if not self.testPointType.has_key(name):
-                    self.testPointType[name] = counter
-                    counter = counter + 1
-    def getStyle(self, file):
-        plotFileName = file.split(os.sep)[-1]
-        app, ver, state, item, username, testname = self.getPlotInfo(file)
-        name = username + "::" + testname
-        if (len(self.plotVersions)>1 or len(self.plotStates)>1) and self.plotVersionColoring:
-            style = " with linespoints lt " +  str(self.versionLineType[ver,state,item]) + " pt " + str(self.testPointType[name])
+            plotLine.pointType = self.pointTypes[test]
+            
+        if not plotLine.name in self.lineTypes.keys():
+            plotLine.lineType = str(self.lineTypeCounter)
+            self.lineTypes[plotLine.name] = plotLine.lineType
+            self.lineTypeCounter += 1
+        else:
+            plotLine.lineType = self.lineTypes[plotLine.name]
+    def plot(self, timeRange, targetFile, colour):
+        if len(self.plotLines) == 0:
+            return
+
+        stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
+        
+        multipleLines = (len(self.plotLines) > 1)
+        multipleUsers = len(self.users) > 1
+        multipleTests = len(self.pointTypes) > 1
+        plotArguments = []
+        for plotLine in self.plotLines:
+            plotArguments.append(plotLine.getPlotArguments(multipleUsers, multipleLines, multipleTests))
+
+        if targetFile:
+            absTargetFile = os.path.expanduser(targetFile)
+            if not os.path.isabs(absplotPrint):
+                print "An absolute path must be given."
+                return
+            stdin.write("set terminal postscript")
+            if colour:
+                stdin.write(" color")
+            stdin.write(os.linesep)
+
+        stdin.write("set ylabel '" + self.getAxisLabel("y") + "'" + os.linesep)
+        stdin.write("set xlabel '" + self.getAxisLabel("x") + "'" + os.linesep)
+        stdin.write("set time" + os.linesep)
+        stdin.write("set title \"" + self.makeTitle() + "\"" + os.linesep)
+        stdin.write("set xtics border nomirror norotate" + os.linesep)
+        stdin.write("set ytics border nomirror norotate" + os.linesep)
+        stdin.write("set border 3" + os.linesep)
+        stdin.write("set xrange [" + timeRange +"];" + os.linesep)
+        stdin.write("plot " + string.join(plotArguments, ",") + os.linesep)
+        stdin.write("quit" + os.linesep)
+        stdin.close()
+        if targetFile:
+            tmppf = stdout.read()
+            if len(tmppf) > 0:
+                open(absTargetFile, "w").write(tmppf)
+    def getAxisLabel(self, axis):
+        label = None
+        for plotLine in self.plotLines:
+            lineLabel = plotLine.getAxisLabel(axis)
+            if not label:
+                label = lineLabel
+            elif label != lineLabel:
+                return ""
+        return label
+    def makeTitle(self):
+        title = ""
+        firstApp = self.apps[0]
+        if len(self.apps) == 1:
+            title += firstApp.fullName + " "
+            version = firstApp.getFullVersion(forSave=1)
+            if version:
+                title += "Version " + version + " "
+        firstUser = self.users[0]
+        if len(self.users) == 1:
+            title += "(in user " + firstUser + ") " 
+        firstTest = self.pointTypes.keys()[0]
+        if len(self.pointTypes) == 1:
+            title += ": Test " + firstTest.name
+        return title
+        
+# Same as above, but from GUI. Refactor!
+class PlotTestInGUI(guiplugins.InteractiveAction):
+    def __init__(self, test, graph = None):
+        guiplugins.InteractiveAction.__init__(self, test)
+        self.options["r"] = guiplugins.TextOption("Time range in minutes", "0:")
+        self.options["p"] = guiplugins.TextOption("Absolute file to print to")
+        self.options["i"] = guiplugins.TextOption("Log file item to plot", costEntryName)
+        self.options["v"] = guiplugins.TextOption("Extra versions to plot")
+        self.switches["pc"] = guiplugins.Switch("Print in colour")
+        self.switches["s"] = guiplugins.Switch("Plot against solution number rather than time")
+        self.externalGraph = graph
+        if graph:
+            self.testGraph = graph
+        else:
+            self.testGraph = TestGraph()
+    def __repr__(self):
+        return "Plotting Graph"
+    def getTitle(self):
+        return "Plot Graph"
+    def getOptionTitle(self):
+        return "Graph"
+    def getItemsToPlot(self):
+        text = self.options["i"].getValue()
+        if text == "apctimes":
+            text = "OC_to_DH_time,Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time"
+        return plugins.commasplit(text)
+    def __repr__(self):
+        return "Plotting"
+    def __call__(self, test):
+        logFileStem = test.app.getConfigValue("log_file")
+        if test.state == test.RUNNING or test.state == test.FAILED:
+            logFileFinder = LogFileFinder(test, tryTmpFile = 1)
+            foundTmp, logFile = logFileFinder.findFile()
+            if foundTmp:
+                self.writePlotFiles("this run", logFile, test)
+        stdFile = test.makeFileName(logFileStem)
+        if os.path.isfile(stdFile):
+            self.writePlotFiles("std result", stdFile, test)
+        for version in plugins.commasplit(self.options["v"].getValue()):
+            if version:
+                self.writePlotFiles(version, test.makeFileName(logFileStem, version), test)
+        if not self.externalGraph:
+            self.plotGraph()
+    def plotGraph(self):
+        range, fileName, writeColour = self.getPlotOptions()
+        self.testGraph.plot(range, fileName, writeColour)
+        self.testGraph = TestGraph()
+    def getPlotOptions(self):
+        range = self.options["r"].getValue()
+        fileName = self.options["p"].getValue()
+        writeColour = self.switches["pc"].getValue()
+        return range, fileName, writeColour
+    def writePlotFiles(self, lineName, logFile, test):
+        plotItems = self.getItemsToPlot()
+        optRun = OptimizationRun(test.app, [ timeEntryName ] + plotItems, [], logFile)
+        if len(optRun.solutions) == 0:
+            return
+
+        for item in plotItems:
+            plotLine = PlotLine(test, lineName, item, optRun, self.switches["s"].getValue())
+            self.testGraph.addLine(plotLine)
+
+guiplugins.interactiveActionClasses += [ PlotTestInGUI ]
+
+class PlotLine:
+    def __init__(self, test, lineName, item, optRun, plotAgainstSolution):
+        self.test = test
+        self.name = lineName
+        self.lineType = None
+        self.pointType = None
+        if item != costEntryName:
+            self.name += "." + item
+        self.axisLabels = {}
+        if plotAgainstSolution:
+            self.axisLabels["x"] = "Solution number"
+        else:
+            self.axisLabels["x"] = "CPU time (min)"
+        self.axisLabels["y"] = item
+        self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
+        self.writeFile(optRun, item, plotAgainstSolution)
+    def getAxisLabel(self, axis):
+        return self.axisLabels[axis]
+    def getPlotFileName(self, lineName, item):
+        if item == costEntryName:
+            return "plot-" + lineName.replace(" ", "-")
+        else:
+            return "plot-" + lineName.replace(" ", "-") + "-" + item.replace(" ", "-")
+    def writeFile(self, optRun, item, plotAgainstSolution):
+        plotFile = open(self.plotFileName, "w")
+        for solution in optRun.solutions:
+            if plotAgainstSolution:
+                plotFile.write(str(solution[item]) + os.linesep)
+            else:
+                plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[item]) + os.linesep)
+    def getPlotArguments(self, multipleUsers, multipleLines, multipleTests):
+        return "'" + self.plotFileName + "' " + self.getPlotName(multipleUsers, multipleTests) + self.getStyle(multipleLines)
+    def getPlotName(self, addUserDescriptor, addTestDescriptor):
+        title = " title \""
+        if addUserDescriptor:
+            user, name = self.test.getRelPath.split(os.sep)
+            title += user + "."
+        if addTestDescriptor:
+            title += self.test.name + "."
+        title += self.name + "\" "
+        return title
+    def getStyle(self, multipleLines):
+        if multipleLines:
+            style = " with linespoints lt " +  self.lineType + " pt " + self.pointType
         else:
             style = " with linespoints "
         return style
-    # Counts number of tests, versions etc that will be plotted.
-    def count(self):
-        self.appnames = {}
-        self.vers = {}
-        self.states = {}
-        self.items ={}
-        self.usernames = {}
-        self.testnames = {}
-        for file in self.plotFiles:
-            appname, ver , state, item, username, testname = self.getPlotInfo(file)
-            self.appnames[appname] = 1
-            self.vers[ver] = 1
-            self.states[state] = 1
-            self.items[item] = 1
-            self.usernames[username] = 1
-            self.testnames[testname] = 1
-        #print len(self.appnames),len(self.vers),len(self.states),len(self.items),len(self.usernames), len(self.testnames)
-    def makeTitle(self):
-        title = ""
-        if len(self.usernames) == 1:
-            title += "User " + self.usernames.keys()[0] + " "
-        if len(self.testnames) == 1:
-            title += "Test " + self.testnames.keys()[0] + " "
-        if len(self.appnames) == 1:
-            title += "Application " + self.appnames.keys()[0] + " "
-        if len(self.vers) == 1:
-            ver = self.vers.keys()[0]
-            if ver == "":
-                ver = "master"
-            title += "Version " + ver + " "
-        return title
-    def makePlotName(self, file):
-        appname, ver, state, item, username, testname = self.getPlotInfo(file)
-        name = username + "::" + testname
-        title = " title \""
-        if len(self.usernames) > 1:
-            title += username + "."
-        if len(self.testnames) > 1:
-            title += testname + "."
-        if len(self.appnames) > 1:
-            title += appname + "."
-        if len(self.vers) > 1:
-            if ver == "":
-                title += "master."
-            else:
-                title += ver + "."
-        if len(self.states) > 1:
-            title += state + "."
-        if len(self.items) > 1:
-            title += self.plotItem[item]
-        title += "\" "
-        return title
-    def __repr__(self):
-        return "Plotting"
-    def plotGraph(self):
-        if len(self.plotFiles) > 0:
-            stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
-            self.count()
-            self.setPointandLineTypes()
-
-            fileList = []
-            for file in self.plotFiles:
-                fileList.append("'" + file + "' " + self.makePlotName(file) + self.getStyle(file))
-
-            if self.plotPrint:
-                absplotPrint = os.path.expanduser(self.plotPrint)
-                if not os.path.isabs(absplotPrint):
-                    print "An absolute path must be given."
-                    return
-                stdin.write("set terminal postscript")
-                if self.plotPrintColor:
-                    stdin.write(" color")
-                stdin.write(os.linesep)
-
-            stdin.write("set ylabel '" + self.getYlabel() + "'" + os.linesep)
-            if self.plotAgainstSolNum:
-                stdin.write("set xlabel 'Solution number'" + os.linesep)
-            else: 
-                stdin.write("set xlabel 'CPU time (min)'" + os.linesep)
-            stdin.write("set time" + os.linesep)
-            stdin.write("set title \"" + self.makeTitle() + "\"" + os.linesep)
-            stdin.write("set xtics border nomirror norotate" + os.linesep)
-            stdin.write("set ytics border nomirror norotate" + os.linesep)
-            stdin.write("set border 3" + os.linesep)
-            stdin.write("set xrange [" + self.plotrange +"];" + os.linesep)
-            stdin.write("plot " + string.join(fileList, ",") + os.linesep)
-            stdin.write("quit" + os.linesep)
-            stdin.close()
-            if self.plotPrint:
-                tmppf = stdout.read()
-                if len(tmppf) > 0:
-                    open(absplotPrint,"w").write(tmppf)
-            self.plotFiles = []
-    def __call__(self, test):
-        # In GUI mode we can rely on existing dirs
-        if not os.path.isdir(test.writeDirs[0]):
-            os.makedirs(test.writeDirs[0])
-        os.chdir(test.writeDirs[0])
-        for version in self.plotVersions:
-            for state in self.plotStates:
-                for item in range(len(self.plotItem)):
-                    try:
-                        parts = self.plotItem[item].split(":")
-                        if len(parts) < 2:
-                            usePlotItem = parts[0]
-                        else:
-                            if test.app.name == parts[0]:
-                                usePlotItem = parts[1]
-                            else:
-                                usePlotItem = costEntryName
-                        optRun = OptimizationRun(test, version, [ timeEntryName, usePlotItem], [], self.plotScaleTime, self.plotUseTmpStatus, state)
-                    except plugins.TextTestError:
-                        print "No status file does exist for test " + test.app.name + "::" + test.name + "(" + version + ")"
-                        continue
-
-                    plotFileName = test.makeFileName(self.getPlotFileName(version, state, str(item)), temporary = 1)
-                    plotFile = open(plotFileName, "w")
-                    for solution in optRun.solutions:
-                        if self.plotAgainstSolNum:
-                            plotFile.write(str(solution[usePlotItem]) + os.linesep)
-                        else:
-                            plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[usePlotItem]) + os.linesep)
-                    self.plotFiles.append(plotFileName)
-        if not self.plotInSameGraph:
-            self.plotGraph()
-        
+    

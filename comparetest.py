@@ -67,17 +67,22 @@ class TestComparison:
         if len(self.attemptedComparisons) == 0:
             return " - NONE!"
         if len(self.newResults) == 0 and len(self.changedResults) == 0:
-            return " - SUCCESS! (on " + string.join(self.attemptedComparisons, ",") + ")"
-        return " (on " + string.join(self.attemptedComparisons, ",") + ")"
-    def addComparison(self, standardFile, comparison):
-        self.attemptedComparisons.append(os.path.basename(standardFile))
+            return " - SUCCESS! (on " + self.attemptedComparisonsOutput() + ")"
+        return " (on " + self.attemptedComparisonsOutput() + ")"
+    def attemptedComparisonsOutput(self):
+        baseNames = []
+        for attempt in self.attemptedComparisons:
+            baseNames.append(os.path.basename(attempt))
+        return string.join(baseNames, ",")
+    def addComparison(self, tmpFile, comparison):
+        self.attemptedComparisons.append(tmpFile)
         if comparison == None:
             return
         if comparison.newResult():
             self.newResults.append(comparison)
         else:
             self.changedResults.append(comparison)
-    def makeComparisons(self, test, dir):
+    def makeComparisons(self, test, dir, makeNew = 0):
         fileList = os.listdir(dir)
         fileList.sort()
         for file in fileList:
@@ -86,22 +91,22 @@ class TestComparison:
             elif self.shouldCompare(file, dir, test.app):
                 fullPath = os.path.join(dir, file)
                 stdFile = os.path.normpath(fullPath.replace(test.app.writeDirectory, test.app.abspath))
-                comparison = self.makeComparison(test, stdFile, fullPath)
-                self.addComparison(stdFile, comparison)
+                comparison = self.makeComparison(test, stdFile, fullPath, makeNew)
+                self.addComparison(fullPath, comparison)
     def shouldCompare(self, file, dir, app):
         return not file.startswith("input.") and app.ownsFile(file)
-    def makeComparison(self, test, standardFile, tmpFile):
-        comparison = self.createFileComparison(test, standardFile, tmpFile)
+    def makeComparison(self, test, standardFile, tmpFile, makeNew = 0):
+        comparison = self.createFileComparison(test, standardFile, tmpFile, makeNew)
         if comparison.newResult() or comparison.hasDifferences():
             return comparison
         if self.overwriteOnSuccess:
             os.rename(tmpFile, standardFile)
         return None
-    def createFileComparison(self, test, standardFile, tmpFile):
-        return FileComparison(test, standardFile, tmpFile)
+    def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
+        return FileComparison(test, standardFile, tmpFile, makeNew)
     def findFileComparison(self, name):
         for comparison in self.getComparisons():
-            if os.path.basename(comparison.stdFile) == name:
+            if comparison.tmpFile == name:
                 return comparison
         return None
     def save(self, exact = 1, versionString = ""):
@@ -140,11 +145,14 @@ class MakeComparisons(plugins.Action):
         self.describe(suite)
 
 class FileComparison:
-    def __init__(self, test, standardFile, tmpFile):
+    def __init__(self, test, standardFile, tmpFile, makeNew = 0):
         self.stdFile = standardFile
         self.tmpFile = tmpFile
-        self.stdCmpFile = test.app.filterFile(standardFile)
-        self.tmpCmpFile = test.app.filterFile(tmpFile)
+        self.stdCmpFile = test.app.filterFile(standardFile, tmpFile + "origcmp")
+        tmpCmpFileName = tmpFile + "cmp"
+        if makeNew:
+            tmpCmpFileName = tmpFile + "partcmp"
+        self.tmpCmpFile = test.app.filterFile(tmpFile, tmpCmpFileName, makeNew)
         self.test = test
     def __repr__(self):
         return os.path.basename(self.stdFile).split('.')[0]

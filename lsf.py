@@ -217,7 +217,7 @@ class SubmitTest(plugins.Action):
         queueToUse = self.queueFunction(test)
         self.describe(test, " to LSF queue " + queueToUse)
         testCommand = self.getExecuteCommand(test)
-        reportfile =  test.makeFileName("report", temporary=1)
+        reportfile =  test.makeFileName("lsfreport", temporary=1, forComparison=0)
         lsfJob = LSFJob(test)
         lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -u nobody"
         resource = self.resourceFunction(test)
@@ -225,7 +225,7 @@ class SubmitTest(plugins.Action):
             lsfOptions += " -R '" + resource + "'"
         if os.environ.has_key("LSF_PROCESSES"):
             lsfOptions += " -n " + os.environ["LSF_PROCESSES"]
-        unixPerfFile = test.makeFileName("unixperf", temporary=1)
+        unixPerfFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
         timedTestCommand = '\\time -p sh ' + testCommand + ' 2> ' + unixPerfFile
         commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile
         self.diag.info("Submitting with command : " + commandLine)
@@ -242,7 +242,7 @@ class SubmitTest(plugins.Action):
         errfile = test.makeFileName("errors", temporary=1)
         # put the command in a file to avoid quoting problems,
         # also fix env.variables that LSF doesn't reset
-        cmdFile = test.makeFileName("cmd", temporary=1)
+        cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
         f = open(cmdFile, "w")
         f.write("HOST=`hostname`; export HOST\n")
         f.write(testCommand + " > " + outfile + " 2> " + errfile + "\n")
@@ -340,7 +340,7 @@ class MakeResourceFiles(plugins.Action):
         if test.state == test.UNRUNNABLE:
             return
         textList = [ "Max Memory", "Max Swap", "CPU time", [ "executed on host", "home directory" ], "Real time" ]
-        tmpFile = test.makeFileName("report", temporary=1)
+        tmpFile = test.makeFileName("lsfreport", temporary=1, forComparison=0)
         resourceDict = self.makeResourceDict(tmpFile, textList)
         if len(resourceDict) < len(textList):
             # Race condition with LSF writing the report... wait a bit and try again
@@ -348,7 +348,7 @@ class MakeResourceFiles(plugins.Action):
             resourceDict = self.makeResourceDict(tmpFile, textList)
         os.remove(tmpFile)
         # Read the UNIX performance file, allowing us to discount system time.
-        tmpFile = test.makeFileName("unixperf", temporary=1)
+        tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
         if os.path.isfile(tmpFile):
             file = open(tmpFile)
             for line in file.readlines():
@@ -365,7 +365,7 @@ class MakeResourceFiles(plugins.Action):
 
         # remove the command-file created before submitting the command
         # Note not everybody creates one!
-        cmdFile = test.makeFileName("cmd", temporary=1)
+        cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
         if os.path.isfile(cmdFile):
             os.remove(cmdFile)
         # There was still an error (jobs killed in emergency), so don't write resource files

@@ -106,7 +106,7 @@ class EntryEvent(Event):
     def generate(self, argumentString):
         self.widget.set_text(argumentString)
         return 1
-        
+
 class SignalEvent(Event):
     def __init__(self, name, widget, signalName):
         Event.__init__(self, name, widget)
@@ -115,6 +115,20 @@ class SignalEvent(Event):
         self.widget.emit(self.signalName, *argumentString)
         return 1
 
+class NotebookPageChangeEvent(SignalEvent):
+    def __init__(self, name, widget):
+        SignalEvent.__init__(self, name, widget, "switch-page")
+    def outputForScript(self, page, page_num, *args):
+        newPage = self.widget.get_nth_page(page_num)
+        return self.name + " " + self.widget.get_tab_label_text(newPage)
+    def generate(self, argumentString):
+        for i in range(len(self.widget.get_children())):
+            page = self.widget.get_nth_page(i)
+            if self.widget.get_tab_label_text(page) == argumentString:
+                self.widget.set_current_page(i)
+                return 1
+        raise GtkScriptError, "Could not find page " + argumentString + " in '" + self.name + "'"
+    
 class TreeViewSignalEvent(SignalEvent):
     def __init__(self, name, widget, signalName, argumentParseData):
         SignalEvent.__init__(self, name, widget, signalName)
@@ -214,15 +228,29 @@ class EventHandler:
                 handler.addObserver(self.recordScript)
         else:
             gtk.idle_add(method)
-    def createEntry(self, description):
+    def createEntry(self, description, defaultValue):
         entry = gtk.Entry()
+        entry.set_text(defaultValue)
         if self.hasScript():
             stateChangeName = "enter " + self.standardName(description) + " ="
             entryEvent = EntryEvent(stateChangeName, entry)
             self.addEventToScripts(entryEvent, "focus-out-event")
         return entry
-    def createCheckButton(self, description):
+    def createNotebook(self, description, pages):
+        notebook = gtk.Notebook()
+        for page, tabText in pages:
+            label = gtk.Label(tabText)
+            notebook.append_page(page, label)
+        if self.hasScript():
+            stateChangeName = "page " + self.standardName(description) + " to"
+            event = NotebookPageChangeEvent(stateChangeName, notebook)
+            self.addEventToScripts(event, event.signalName)
+        return notebook
+    def createCheckButton(self, description, defaultValue):
         button = gtk.CheckButton(description)
+        if defaultValue:
+            button.set_active(gtk.TRUE)
+
         if self.hasScript():
             checkChangeName = "check " + self.standardName(description)
             uncheckChangeName = "uncheck " + self.standardName(description)
@@ -276,6 +304,8 @@ class ReplayScript:
         print "'" + eventName + "' event created with arguments '" + argumentString + "'"
         event = self.events[eventName]
         if event.generate(argumentString):
+            # Can be useful to uncomment if you want a slow-motion replay...
+            #time.sleep(1)
             return gtk.TRUE
         else:
             self.waitingForHandler = event

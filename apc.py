@@ -53,7 +53,7 @@ apc.UpdatePerformance      - Update the performance file for tests with time fro
 
 """
 
-import default, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig
+import default, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -205,6 +205,45 @@ class RunApcTest(default.RunTest):
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
         default.RunTest.__call__(self, test)
+
+class ViewApcLog(guiplugins.InteractiveAction):
+    def __repr__(self):
+        return "Viewing log of"
+    def __call__(self, test):
+        job = lsf.LSFJob(test)
+        status, machine = job.getStatus()
+        if status == "DONE" or status == "EXIT":
+            print "Job is not running!"
+            return
+        if status != "PEND":
+            if machine != None:
+                self.showLogFile(test, machine, self.getLogFileName(test))
+                self.showRunStatusFile(test)
+            else:
+                print "Could not find machine name."
+    def getLogFileName(self, test):
+        subplanDir = test.writeDirs[-1];
+        subplanName = subplanDir.split("/")[-2]
+        return "/tmp/" + subplanName + "\*/apclog" 
+    def showLogFile(self, test, machine, logFileName):
+        command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''"
+        self.startExternalProgram(command)
+    def showRunStatusFile(self, test):
+        # Under construction! 
+        #  $CARMSYS/bin/APCstatus.sh ${SUBPLAN}/run_status
+        return
+    def getTitle(self):
+        return "View APC Log"
+    def getArgumentOptions(self):
+        options = {}
+        return options
+    def getSwitches(self):
+        switches = {}
+        #switches["lf"] = "APC log file"
+        #switches["st"] = "APC status file"
+        return switches
+
+guiplugins.interactiveActionClasses.append(ViewApcLog)
 
 #
 # Runs the test in gdb and displays the log file. 

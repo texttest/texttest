@@ -75,8 +75,10 @@ class Test:
             os.environ[var] = self.environment[var]
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
-    def makeFileName(self, stem, refVersion = None, temporary = 0):
+    def makeFileName(self, stem, refVersion = None, temporary = 0, forComparison = 1):
         root = self.getDirectory(temporary)
+        if not forComparison:
+            return os.path.join(root, stem)
         stemWithApp = stem + "." + self.app.name
         nonVersionName = os.path.join(root, stemWithApp)
         versions = self.app.getVersionFileExtensions()
@@ -94,6 +96,12 @@ class Test:
                 debugLog.info("Chosen " + versionName)
                 return nonVersionName + "." + version
         return nonVersionName
+    def makePathName(self, fileName, startDir):
+        fullPath = os.path.join(startDir, fileName)
+        if os.path.exists(fullPath) or startDir == self.app.abspath:
+            return fullPath
+        parent, current = os.path.split(startDir)
+        return self.makePathName(fileName, parent)
     def getRelPath(self):
         relPath = self.abspath.replace(self.app.abspath, "")
         if relPath.startswith(os.sep):
@@ -201,18 +209,15 @@ class TestCase(Test):
         return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
-    def makePathName(self, fileName, startDir):
-        fullPath = os.path.join(startDir, fileName)
-        if os.path.exists(fullPath) or startDir == self.app.abspath:
-            return fullPath
-        parent, current = os.path.split(startDir)
-        return self.makePathName(fileName, parent)
     def makeBasicWriteDirectory(self):
         os.makedirs(self.writeDirs[0])
         for copyTestPath in self.app.getConfigList("copy_test_path"):
             fullPath = self.makePathName(copyTestPath, self.abspath)
             target = os.path.join(self.writeDirs[0], copyTestPath)
             if os.path.isfile(fullPath):
+                dir, localName = os.path.split(target)
+                if not os.path.isdir(dir):
+                    os.makedirs(dir)
                 shutil.copy(fullPath, target)
             if os.path.isdir(fullPath):
                 shutil.copytree(fullPath, target)
@@ -335,7 +340,7 @@ class Application:
         self.versions = version.split(".")
         if self.versions[0] == "":
             self.versions = []
-        self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions(0))
+        self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions(baseVersion=0))
         self.fullName = self._getFullName()
         debugLog.info("Found application " + repr(self))
         self.checkout = self.makeCheckout(optionMap)
@@ -360,8 +365,11 @@ class Application:
             return self.configDir["full_name"]
         else:
             return string.upper(self.name)
-    def getFullVersion(self):
-        return string.join(self.versions, ".")
+    def getFullVersion(self, forSave = 0):
+        versionsToUse = self.versions
+        if forSave:
+            versionsToUse = self.filterUnsaveable(self.versions)
+        return string.join(versionsToUse, ".")
     def versionSuffix(self):
         fullVersion = self.getFullVersion()
         if len(fullVersion) == 0:
@@ -372,13 +380,24 @@ class Application:
         if len(self.versions):
             description += ", version " + string.join(self.versions, ".")
         return description
-    def getVersionFileExtensions(self, baseVersion = 1):
-        if len(self.versions) == 0:
-            return []
+    def filterUnsaveable(self, versions):
+        saveableVersions = []
+        unsaveableVersions = self.getConfigList("unsaveable_version")
+        for version in versions:
+            if not version in unsaveableVersions:
+                saveableVersions.append(version)
+        return saveableVersions
+    def getVersionFileExtensions(self, baseVersion = 1, forSave = 0):
+        versionsToUse = self.versions
         if baseVersion:
-            return self._getVersionExtensions(self.getConfigList("base_version") + self.versions)
-        else:
-            return self._getVersionExtensions(self.versions)
+            versionsToUse = self.getConfigList("base_version") + self.versions
+        if forSave:
+            versionsToUse = self.filterUnsaveable(versionsToUse)
+            
+        if len(versionsToUse) == 0:
+            return []
+
+        return self._getVersionExtensions(versionsToUse)
     def _getVersionExtensions(self, versions):
         if len(versions) == 1:
             return versions
@@ -462,8 +481,6 @@ class Application:
         return getConfig(optionMap)
     def getActionSequence(self):
         return self.configObject.getActionSequence()
-    def getInteractiveActions(self):
-        return self.configObject.getInteractiveActions()
     def printHelpText(self):
         print helpIntro
         header = "Description of the " + self.getConfigValue("config_module") + " configuration"
@@ -496,19 +513,18 @@ class Application:
             self.configDir[key] = value
     def addToConfigList(self, key, value):
         self.configDir.addEntry(key, value)
-    def filterFile(self, fileName):
+    def filterFile(self, fileName, newFileName, makeNew = 0):
         stem = os.path.basename(fileName).split('.')[0]
         if not self.configDir.has_key(stem) or not os.path.isfile(fileName):
             debugLog.info("No filter for " + fileName)
             return fileName
 
-        if fileName.find(globalRunIdentifier) != -1:
-            newFileName = fileName + "cmp"
-        else:
-            newFileName = os.path.join(os.getcwd(), stem + "." + self.name + "origcmp")
         # Don't recreate filtered files
         if os.path.isfile(newFileName):
-            return newFileName
+            if makeNew:
+                os.remove(newFileName)
+            else:
+                return newFileName
         
         oldFile = open(fileName)
         newFile = open(newFileName, "w")
@@ -863,7 +879,6 @@ class ApplicationRunner:
             self.testSuite = tmpSuite
             if gui:
                 gui.addSuite(self.testSuite)
-                gui.addInteractiveActions(app.getInteractiveActions())
     def actionCount(self):
         return len(self.actionSequence)
     def performAction(self, actionNum):

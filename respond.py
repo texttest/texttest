@@ -61,7 +61,7 @@ class InteractiveResponder(Responder):
     def getInstructions(self, test):
         return []
     def askUser(self, test, testComparison, allowView):      
-        versions = test.app.getVersionFileExtensions()
+        versions = test.app.getVersionFileExtensions(forSave=1)
         options = ""
         for i in range(len(versions)):
             options += "Save Version " + versions[i] + "(" + str(i + 1) + "), "

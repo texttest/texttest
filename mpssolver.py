@@ -87,9 +87,6 @@ class MpsSolverConfig(carmen.CarmenConfig):
         return binary + " " + test.options + mpsFiles
     def checkPerformance(self):
         return not self.optionMap.has_key("diag")
-#    def getTestCollator(self):
-#        solutionCollator = unixConfig.CollateFile("best_solution", "solution")
-#        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
@@ -112,18 +109,18 @@ class MakeComparisons(comparetest.MakeComparisons):
         return MpsSolverTestComparison(test, self.overwriteOnSuccess)
 
 class MpsSolverTestComparison(performance.PerformanceTestComparison):
-    def createFileComparison(self, test, standardFile, tmpFile):
+    def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         stem, ext = os.path.basename(standardFile).split(".", 1)
         if (stem == "memory"):
-            return MemoryFileComparison(test, standardFile, tmpFile)
+            return MemoryFileComparison(test, standardFile, tmpFile, makeNew = 0)
         elif (stem == "output"):
-            return OutputFileComparison(test, standardFile, tmpFile)
+            return OutputFileComparison(test, standardFile, tmpFile, makeNew = 0)
         else:
-            return performance.PerformanceTestComparison.createFileComparison(self, test, standardFile, tmpFile)
+            return performance.PerformanceTestComparison.createFileComparison(self, test, standardFile, tmpFile, makeNew)
 
 class OutputFileComparison(comparetest.FileComparison):
-    def __init__(self, test, standardFile, tmpFile):
-        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile)
+    def __init__(self, test, standardFile, tmpFile, makeNew):
+        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile, makeNew)
         if os.path.isfile(self.stdCmpFile):
             self.columnFilter(self.stdCmpFile)
         self.columnFilter(self.tmpCmpFile)
@@ -176,8 +173,8 @@ def getOutputMemory(fileName):
         return float(-1)
 
 class MemoryFileComparison(comparetest.FileComparison):
-    def __init__(self, test, standardFile, tmpFile):
-        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile)
+    def __init__(self, test, standardFile, tmpFile, makeNew):
+        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile, makeNew)
         if (os.path.exists(self.stdCmpFile)):
             self.oldMaxMemory = getMaxMemory(self.stdCmpFile)
             self.newMaxMemory = getMaxMemory(self.tmpCmpFile)
@@ -333,8 +330,9 @@ class FeasibilityStatisticsBuilder(plugins.Action):
 
 class CopyFile(plugins.Action):
     def __call__(self, test):
-        self.copy(os.path.join(test.abspath, "output.tip.1427"), os.path.join(test.abspath, "output.tip.1428"))
-        self.copy(os.path.join(test.abspath, "performance.tip.1427"), os.path.join(test.abspath, "performance.tip.1428"))
+        self.copy(os.path.join(test.abspath, "output.tip.1428"), os.path.join(test.abspath, "output.tip.1429"))
+        self.copy(os.path.join(test.abspath, "performance.tip.1428"), os.path.join(test.abspath, "performance.tip.1429"))
+        self.copy(os.path.join(test.abspath, "environment.tip.1428"), os.path.join(test.abspath, "environment.tip.1429"))
     def copy(self, source, target):
         if (os.path.isfile(source)):
             shutil.copyfile(source, target)

@@ -66,12 +66,12 @@ class PerformanceTestComparison(comparetest.TestComparison):
         if self.execHost != None and self.hasDifferences():
             return "FAILED on " + self.execHost + " :"
         return comparetest.TestComparison.__repr__(self)
-    def createFileComparison(self, test, standardFile, tmpFile):
+    def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         stem, ext = os.path.basename(standardFile).split(".", 1)
         if (stem == "performance"):
-            return PerformanceFileComparison(test, standardFile, tmpFile)
+            return PerformanceFileComparison(test, standardFile, tmpFile, makeNew)
         else:
-            return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile)
+            return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile, makeNew)
     def shouldCompare(self, file, dir, app):
         if not comparetest.TestComparison.shouldCompare(self, file, dir, app):
             return 0
@@ -102,8 +102,8 @@ class MakeComparisons(comparetest.MakeComparisons):
         return PerformanceTestComparison(test, self.overwriteOnSuccess)
 
 class PerformanceFileComparison(comparetest.FileComparison):
-    def __init__(self, test, standardFile, tmpFile):
-        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile)
+    def __init__(self, test, standardFile, tmpFile, makeNew):
+        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile, makeNew)
         if (os.path.exists(self.stdCmpFile)):
             self.oldCPUtime = getPerformance(self.stdCmpFile)
             self.newCPUtime = getPerformance(self.tmpCmpFile)

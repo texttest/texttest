@@ -145,14 +145,14 @@ class CarmenConfig(lsf.LSFConfig):
             return None
     def getRealRuleBuilder(self):
         ruleRunner = None
-        if self.useLSF() and not self.isNightJob():
+        if self.useLSF():
             ruleRunner = lsf.SubmitTest(self.findLSFQueue, self.findLSFResource)
         return [ self.getRuleBuildObject(ruleRunner), self.getRuleWaitingAction(), \
                                          EvaluateRuleBuild(self.getRuleSetName) ]
     def getRuleBuildObject(self, ruleRunner):
         return CompileRules(self.getRuleSetName, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
     def getRuleWaitingAction(self):
-        if self.useLSF() and not self.isNightJob():
+        if self.useLSF():
             return lsf.UpdateLSFStatus(self.getRuleSetName, RULESET_NOT_BUILT)
         else:
             return None

@@ -1,4 +1,4 @@
-import carmen, os, sys, string, shutil, KPI, plugins, performance
+import carmen, os, sys, string, shutil, KPI, plugins, performance, math
 
 class OptimizationConfig(carmen.CarmenConfig):
     def getOptionString(self):
@@ -168,6 +168,13 @@ class CalculateKPI(TestReport):
         self.describe(suite)
 
 class MakeProgressReport(TestReport):
+    def __init__(self, referenceVersion):
+        TestReport.__init__(self, referenceVersion)
+        self.kpi = 1.0
+        self.testCount = 0
+    def __del__(self):
+        avg = math.pow(self.kpi, 1.0 / float(self.testCount))
+        print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
     def __repr__(self):
         return "Comparison on"
     def setUpApplication(self, app):
@@ -178,28 +185,33 @@ class MakeProgressReport(TestReport):
             underline += "-"
         print os.linesep + header
         print underline
+    def percent(self, fValue):
+        return str(int(round(100.0 * fValue))) + "%"
     def compare(self, test, referenceFile, currentFile):
         currPerf = int(performance.getTestPerformance(test))
         refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
-        if currPerf < 30 and refPerf < 30:
-            return
-
-        userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
-        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ")"
         referenceCosts = self.getCosts(referenceFile, "plan")
         currentCosts =  self.getCosts(currentFile, "plan")
         refRosterCosts = self.getCosts(referenceFile, "roster")
         currRosterCosts = self.getCosts(currentFile, "roster")
+        currTTWC = currPerf
+        refTTWC = refPerf
+        if currentCosts[-1] < referenceCosts[-1]:
+            currTTWC = self.timeToCost(currentFile, currPerf, currentCosts, referenceCosts[-1])
+        else:
+            refTTWC = self.timeToCost(referenceFile, refPerf, referenceCosts, currentCosts[-1])
+        kpi = float(currTTWC) / float(refTTWC)
+        self.testCount += 1
+        self.kpi *= kpi
+        userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
+        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.percent(kpi)
         self.reportLine("                         ", "Current", "Version " + self.referenceVersion)
         self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
         self.reportLine("Initial cost of rosters  ", currRosterCosts[0], refRosterCosts[0])
         self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
         self.reportLine("Final cost of rosters    ", currRosterCosts[-1], refRosterCosts[-1])
         self.reportLine("Total time (minutes)     ", currPerf, refPerf)
-        if currentCosts[-1] < referenceCosts[-1]:
-            self.reportLine("Time to worst cost (mins)", self.timeToCost(currentFile, currPerf, currentCosts, referenceCosts[-1]), refPerf)
-        else:
-            self.reportLine("Time to worst cost (mins)", currPerf, self.timeToCost(referenceFile, refPerf, referenceCosts, currentCosts[-1]))
+        self.reportLine("Time to worst cost (mins)", currTTWC, refTTWC)
     def getCosts(self, file, type):
         costCommand = "grep 'cost of " + type + "' " + file + " | awk -F':' '{ print $2 }'"
         return map(self.makeInt, os.popen(costCommand).readlines())

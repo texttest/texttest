@@ -111,7 +111,15 @@ class PerformanceFileComparison(comparetest.FileComparison):
 
 class TimeFilter(plugins.Filter):
     def __init__(self, timeLimit):
-        self.timeLimit = float(timeLimit)
+        self.minTime = 0.0
+        self.maxTime = None
+        times = timeLimit.split(",")
+        if len(times) == 1:
+            self.maxTime = float(timeLimit)
+        else:
+            self.minTime = float(times[0])
+            if len(times[1]):
+                self.maxTime = float(times[1])
     def acceptsTestCase(self, test):
         testPerformance = getTestPerformance(test)
-        return testPerformance < self.timeLimit
+        return testPerformance > self.minTime and (self.maxTime == None or testPerformance < self.maxTime)

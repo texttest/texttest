@@ -102,7 +102,7 @@ class UNIXInteractiveResponder(InteractiveResponder):
                     return
                 displayStream.write(line)
                 linesWritten += 1
-
+            stdin.close()
     
 class OverwriteOnFailures(Responder):
     def responderText(self, test):

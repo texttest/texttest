@@ -246,6 +246,19 @@ class OptimizationRun:
                 lastCost = solution[costEntryName]
                 lastTime = solution[timeEntryName]
         return self.getPerformance()
+    def costAtTime(self, targetTime):
+        lastCost = 0
+        lastTime = 0
+        for solution in self.solutions:
+            if abs(solution[timeEntryName]) > abs(targetTime):
+                timeGap = lastTime - solution[timeEntryName]
+                percent = float(lastTime - targetTime) / timeGap
+                cost = lastCost + (solution[costEntryName] - lastCost) * percent
+                return int(round(cost))
+            else:
+                lastCost = solution[costEntryName]
+                lastTime = solution[timeEntryName]
+        return lastCost
     def getMeasuredSolution(self, margin):
         if margin == 0.0 or self.isVeryShort():
             return -1

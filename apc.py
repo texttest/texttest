@@ -357,8 +357,16 @@ class MakeProgressReport(optimization.MakeProgressReport):
         return kpi
     def reportCosts(self, test, currentRun, referenceRun):
         optimization.MakeProgressReport.reportCosts(self, test, currentRun, referenceRun)
+        if self.kpiGroupForTest.has_key(test.name):
+            groupName = self.kpiGroupForTest[test.name]
+            if self.groupTimeLimit.has_key(groupName):
+                qualTime = self.groupTimeLimit[groupName]
+                curCost = currentRun.costAtTime(qualTime)
+                refCost = referenceRun.costAtTime(qualTime)
+                self.reportLine("Cost at " + str(qualTime) + " mins time", curCost, refCost)
         currentMargin, refMargin = self.getMargins(test)
         self.reportLine("Cost variance tolerance (%) ", currentMargin, refMargin)
+                
 
 class ApcTestCaseInformation(optimization.TestCaseInformation):
     def __init__(self, suite, name):

@@ -86,7 +86,9 @@ class SubPlanDirManager:
                 self.makeLinksIn(apcFiles, os.path.join(fromDir, file))
 
     def removeTemporary(self, test):
-        self._removeDir(self.tmpDirs[test])
+        tmpDir = self.tmpDirs[test]
+        if os.path.isdir(tmpDir):
+            self._removeDir(tmpDir)
     def getSubPlanDirName(self, test):
         subPlanDir = self.getSubPlanDirFromTest(test)
         dirs = subPlanDir.split(os.sep)[:-1]
@@ -119,6 +121,14 @@ class SubPlanDirManager:
             os.remove(subDir)
         except:
             os.rmdir(subDir)
+
+class RemoveTemporarySubplan(plugins.Action):
+    def __init__(self, subplanManager):
+        self.subplanManager = subplanManager
+    def __call__(self, test):
+        self.subplanManager.removeTemporary(test)
+    def __repr__(self):
+        return "Removing temporary subplan for"
 
 class CalculateKPI(plugins.Action):
     def __init__(self, referenceVersion):

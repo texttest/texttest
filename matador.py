@@ -59,9 +59,10 @@ class MatadorConfig(optimization.OptimizationConfig):
         return None
     def getExecuteCommand(self, binary, test):
         return self.subplanManager.getExecuteCommand(binary, test)
-            
-#    def getTestCollator(self):
-#        return optimization.OptimizationConfig.getTestCollator(self) + [ MakeMatadorStatusFile() ]
+    def getTestCollator(self):
+        subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
+        subActions.append(optimization.RemoveTemporarySubplan(self.subplanManager))
+        return plugins.CompositeAction(subActions)
 
 class MakeMatadorStatusFile(plugins.Action):
     def __call__(self, test):

@@ -19,7 +19,7 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
         subActions.append(RemoveLogs())
         subActions.append(optimization.ExtractSubPlanFile(self, "status", "status"))
-        subActions.append(RemoveTemporarySubplan(self.subplanManager))
+        subActions.append(optimization.RemoveTemporarySubplan(self.subplanManager))
         return plugins.CompositeAction(subActions)
     def getRuleSetName(self, test):
         fileName = test.makeFileName("options")
@@ -49,14 +49,6 @@ class ApcSubPlanDirManager(optimization.SubPlanDirManager):
         options[1] = os.path.normpath(options[1]).replace(dirName, tmpDir)
         return binary + " " + string.join(options, " ")
     
-class RemoveTemporarySubplan(plugins.Action):
-    def __init__(self, subplanManager):
-        self.subplanManager = subplanManager
-    def __call__(self, test):
-        self.subplanManager.removeTemporary(test)
-    def __repr__(self):
-        return "Removing temporary subplan for"
-
 class ApcCompileRules(carmen.CompileRules):
     def __init__(self, getRuleSetName, libraryFile, sFilter = None, forcedRuleCompile = 0):
         carmen.CompileRules.__init__(self, getRuleSetName, "-optimize", sFilter)
@@ -71,12 +63,12 @@ class ApcCompileRules(carmen.CompileRules):
             self.linuxRuleSetBuild(test)
         else:
             carmen.CompileRules.__call__(self, test)
-
     def linuxRuleSetBuild(self, test):
         ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName)
         if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
             return
         apcExecutable = ruleset.targetFile
+        carmen.ensureDirectoryExists(os.path.dirname(apcExecutable))
         ruleLib = self.getRuleLib(ruleset.name)
         if self.isNewer(apcExecutable, self.apcLib):
             return
@@ -87,7 +79,8 @@ class ApcCompileRules(carmen.CompileRules):
             returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile))
             if returnValue:
                 raise "Failed to build ruleset, exiting"
-        commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib) + "-o " + apcExecutable
+        commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib)
+        commandLine += "-o " + apcExecutable
         si, so, se = os.popen3(commandLine)
         lastErrors = se.readlines()
         if len(lastErrors) > 0:

@@ -253,3 +253,16 @@ class CheckBuild(plugins.Action):
                 print "Build on", arch, "SUCCEEDED!"
                 absPath = self.builder.getAbsPath(app, "codebase")
                 os.remove(os.path.join(absPath, "build." + arch))
+
+def ensureDirectoryExists(path):
+    if len(path) == 0:
+        return
+    if os.path.isdir(path):
+        return
+    h, t = os.path.split(path)
+    ensureDirectoryExists(h)
+    if len(t) > 0:
+        os.mkdir(path)
+
+    
+    

@@ -14,11 +14,7 @@ import comparetest, ndiff, sys, string, os, plugins, predict
 # Abstract base to make it easier to write test responders
 class Responder(plugins.Action):
     def __call__(self, test):
-        if os.path.isfile("core.Z"):
-            os.system("uncompress core.Z")
-        if os.path.isfile("core"):
-            self.handleCoreFile(test)
-            os.remove("core")
+        self.findAndHandleCoreFiles(test)
         if predict.testBrokenPredictionMap.has_key(test):
             predictionText = predict.testBrokenPredictionMap[test]
             print test.getIndent() + "WARNING :", predictionText, "in", repr(test)
@@ -34,6 +30,17 @@ class Responder(plugins.Action):
         pass
     def handleFailedPrediction(self, test, desc):
         pass
+    def findAndHandleCoreFiles(self, test):
+        for filename in os.listdir(test.abspath):
+            if not filename.startswith("core"):
+                continue
+            if filename == "core.Z":
+                os.system("uncompress core.Z")
+            elif filename != "core":
+                os.rename(filename, "core")
+        if os.path.isfile("core"):
+             self.handleCoreFile(test)
+             os.remove("core")
     def responderText(self, test):
         testComparison = comparetest.testComparisonMap[test]
         diffText = testComparison.getDifferenceSummary()

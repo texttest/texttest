@@ -638,56 +638,6 @@ class GrepApcLog(plugins.Action):
             grepLines = os.popen("rsh " + machine + " '" + cmdLine + "'").read()
             print grepLines
 
-# ~/work/KPI/master/Testing/TextTest/texttest.py -a apc -v asn_on -s apc.SaveApcLog
-class SaveApcLog(plugins.Action):
-    def __init__(self, strDate = '20May'):
-        self.strDate = strDate
-    def __repr__(self):
-        return "Saving apclog"
-    def __call__(self, test):
-	strVersion = test.app.versionSuffix()[1:]
-        logFinder = optimization.LogFileFinder(test)
-        tmpStatusFile = logFinder.findFile(strVersion)
-        if tmpStatusFile.find(test.getTestUser()) == -1:
-            print "FAILURE: Status file missing for " + test.name
-	    return
-	else:
-            print "Status file found: .%s/%s" %(test.getRelPath(), string.split(tmpStatusFile, os.sep)[-1])
-        grepCommand = "grep Machine " + tmpStatusFile
-        grepLines = os.popen(grepCommand).readlines()
-        if len(grepLines) > 0:
-            machine = grepLines[0].split()[-1]
-	    print 'Machine: "%s"' %(machine)
-	    #cmdLine = 'cd %s;find . -maxdepth 1 -name \*%s_%s_%s%s\*' %(getApcHostTmp(), strVersion, test.name, test.getTestUser(), self.strDate)
-	    cmdLine = 'cd /tmp;find . -maxdepth 1 -name \*%s_%s_%s%s\*' %(strVersion, test.name, test.getTestUser(), self.strDate)
-	    r, w, e = popen2.popen3("rsh " + machine + " '" + cmdLine + "'")
-	    linesError = e.readlines()
-	    linesOutput = r.readlines()
-	    r.close()
-	    e.close()
-	    w.close()
-	    if len(linesError) > 0:
-		print 'FAILURE:\n   ' + string.join(linesError, '   \n') + '\n'
-	    elif len(linesOutput) == 0:
-		print 'FAILURE:  No APC log directory found\n'
-	    else:
-		strJobName = string.strip(linesOutput[0][2:])
-		print 'APC job found: %s' %(strJobName)
-		#cmdLine2 = 'cd %s;rm %s/APC_rot;mv %s %s/Testing/Automatic/picador%s/' %(getApcHostTmp(), strJobName, strJobName, test.app.checkout, test.getRelPath())
-		cmdLine2 = 'cd /tmp;rm %s/APC_rot;mv %s %s/Testing/Automatic/picador%s/' %(strJobName, strJobName, test.app.checkout, test.getRelPath())
-		r2, w2, e2 = popen2.popen3("rsh " + machine + " '" + cmdLine2 + "'")
-		linesError2 = e2.readlines()
-		linesOutput2 = r2.readlines()
-		r2.close()
-		e2.close()
-		w2.close()
-		if len(linesError2) > 0:
-		    print 'FAILURE:\n   ' + string.join(linesError2, '   \n') + '\n'
-		else:
-		    print 'SUCCESS: Apc log files moved to %s\n' %(test.getRelPath())
-	else:
-	    print 'FAILURE: No machine found in status file.\n'
-
 class UpdateCvsIgnore(plugins.Action):
     def __init__(self):
         self.masterCvsIgnoreFile = None

@@ -1218,15 +1218,17 @@ class _PlotTest(plugins.Action):
                     open(absplotPrint,"w").write(tmppf)
             self.plotFiles = []
     def __call__(self, test):
-        if not self.testWritedir.has_key(test):
-            rootPath = os.path.join(os.environ["HOME"], ".texttestplot", self.lastSuite, test.name)
-            if os.path.isdir(rootPath):
-                test.cleanPreviousWriteDirs(rootPath);
-            test.createDir(rootPath);
-            self.testWritedir[test] = test.writeDirs[0]
-        else:
-            test.writeDirs = []
-            test.writeDirs.append(self.testWritedir[test])
+        # In GUI mode we can rely on existing dirs
+        if len(test.writeDirs) == 0:
+            if not self.testWritedir.has_key(test):
+                rootPath = os.path.join(os.environ["HOME"], ".texttestplot", self.lastSuite, test.name)
+                if os.path.isdir(rootPath):
+                    test.cleanPreviousWriteDirs(rootPath);
+                test.createDir(rootPath);
+                self.testWritedir[test] = test.writeDirs[0]
+            else:
+                test.writeDirs = []
+                test.writeDirs.append(self.testWritedir[test])
         os.chdir(test.writeDirs[0])
         for version in self.plotVersions:
             for state in self.plotStates:
@@ -1255,5 +1257,6 @@ class _PlotTest(plugins.Action):
                     self.plotFiles.append(plotFileName)
         if not self.plotInSameGraph:
             self.plotGraph()
-        test.writeDirs = []
+        if self.testWritedir.has_key(test):
+            test.writeDirs = []
         

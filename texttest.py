@@ -44,6 +44,7 @@ class Test:
         self.app = app
         self.abspath = abspath
         self.paddedName = self.name
+        self.previousEnv = {}
         self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
         # Single pass to expand all variables (don't want multiple expansion)
         for var, value in self.environment.items():
@@ -53,7 +54,9 @@ class Test:
                 debugLog.info("Expanded " + var + " path " + value + " to " + self.environment[var])
             else:
                 self.environment[var] = expValue
-                debugLog.info("Expanded variable " + var + " to " + expValue)
+                debugLog.info("Expanded variable " + var + " to " + expValue + " in " + self.name)
+            if os.environ.has_key(var):
+                self.previousEnv[var] = os.environ[var]
             os.environ[var] = self.environment[var]
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
@@ -81,14 +84,21 @@ class Test:
         self.tearDownEnvironment()
     def setUpEnvironment(self):
         for var, value in self.environment.items():
+            if os.environ.has_key(var):
+                self.previousEnv[var] = os.environ[var]
             os.environ[var] = value
             debugLog.info("Setting " + var + " to " + os.environ[var])
     def tearDownEnvironment(self):
         # Note this has no effect on the real environment, but can be useful for internal environment
         # variables. It would be really nice if Python had a proper "unsetenv" function...
+        debugLog.info("Restoring environment for " + self.name + " to " + repr(self.previousEnv))
         for var in self.environment.keys():
             if os.environ.has_key(var):
-                del os.environ[var]
+                if self.previousEnv.has_key(var):
+                    os.environ[var] = self.previousEnv[var]
+                else:
+                    debugLog.info("Removed variable " + var)
+                    del os.environ[var]
     def getIndent(self):
         dirCount = string.count(self.getRelPath(), os.sep)
         retstring = ""
@@ -215,15 +225,15 @@ class TestSuite(Test):
             testName = string.strip(testline)
             testPath = os.path.join(self.abspath, testName)
             testSuite = TestSuite(testName, testPath, self.app, filters)
+            testSuite.tearDownEnvironment()
             if testSuite.isValid():
                 if not testSuite.rejected:
                     testCaseList.append(testSuite)
-                    testSuite.tearDownEnvironment()
             else:
                 testCase = TestCase(testName, testPath, self.app)
+                testCase.tearDownEnvironment()
                 if testCase.isValid() and testCase.isAcceptedByAll(filters):
                     testCaseList.append(testCase)
-                    testCase.tearDownEnvironment()
         return testCaseList
             
 class Application:

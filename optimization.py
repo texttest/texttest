@@ -179,11 +179,15 @@ class RemoveTemporarySubplan(plugins.Action):
         return "Removing temporary subplan for"
 
 class TestReport(plugins.Action):
-    def __init__(self, referenceVersion):
-        self.referenceVersion = referenceVersion
+    def __init__(self, versionString):
+        versions = versionString.split(",")
+        self.referenceVersion = versions[0]
+        self.currentVersion = None
+        if len(versions) > 1:
+            self.currentVersion = versions[1]
         self.statusFileName = None
     def __call__(self, test):
-        currentFile = test.makeFileName(self.statusFileName)
+        currentFile = test.makeFileName(self.statusFileName, self.currentVersion)
         referenceFile = test.makeFileName(self.statusFileName, self.referenceVersion)
         if currentFile != referenceFile:
             self.compare(test, referenceFile, currentFile)
@@ -204,7 +208,7 @@ class CalculateKPIs(TestReport):
         return "KPI calc. for"
     def compare(self, test, referenceFile, currentFile):
         floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion)
-        floatNowPerfScale = performance.getTestPerformance(test)
+        floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion)
 	#print 'ref: %f, now: %f' %(floatRefPerfScale, floatNowPerfScale)
         if currentFile != referenceFile:
 	    aKPI = None
@@ -234,7 +238,10 @@ class MakeProgressReport(TestReport):
         return "Comparison on"
     def setUpApplication(self, app):
         TestReport.setUpApplication(self, app)
-        header = "Progress Report for " + repr(app) + ", compared to version " + self.referenceVersion
+        currentText = ""
+        if self.currentVersion != None:
+            currentText = " Version " + self.currentVersion
+        header = "Progress Report for " + repr(app) + currentText + ", compared to version " + self.referenceVersion
         underline = ""
         for i in range(len(header)):
             underline += "-"
@@ -243,7 +250,7 @@ class MakeProgressReport(TestReport):
     def percent(self, fValue):
         return str(int(round(100.0 * fValue))) + "%"
     def compare(self, test, referenceFile, currentFile):
-        currPerf = int(performance.getTestPerformance(test))
+        currPerf = int(performance.getTestPerformance(test, self.currentVersion))
         refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
         referenceCosts = self.getCosts(referenceFile, "plan")
         currentCosts =  self.getCosts(currentFile, "plan")
@@ -260,13 +267,18 @@ class MakeProgressReport(TestReport):
         self.kpi *= kpi
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
         print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.percent(kpi)
-        self.reportLine("                         ", "Current", "Version " + self.referenceVersion)
+        self.reportLine("                         ", self.currentText(), "Version " + self.referenceVersion)
         self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
         self.reportLine("Initial cost of rosters  ", currRosterCosts[0], refRosterCosts[0])
         self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
         self.reportLine("Final cost of rosters    ", currRosterCosts[-1], refRosterCosts[-1])
         self.reportLine("Total time (minutes)     ", currPerf, refPerf)
         self.reportLine("Time to worst cost (mins)", currTTWC, refTTWC)
+    def currentText(self):
+        if self.currentVersion == None:
+            return "Current"
+        else:
+            return "Version " + self.currentVersion
     def getCosts(self, file, type):
         costCommand = "grep 'cost of " + type + "' " + file + " | awk -F':' '{ print $2 }'"
         return map(self.makeInt, os.popen(costCommand).readlines())

@@ -262,11 +262,14 @@ class TestCase(Test):
         return "test-case"
     def testCaseList(self):
         return [ self ]
+    def expandEnvironmentReferences(self, referenceVars = []):
+        self.options = os.path.expandvars(self.options)
+        Test.expandEnvironmentReferences(self, referenceVars)
     def _setOptions(self):
         optionsFile = self.makeFileName("options")
         self.options = ""
         if (os.path.isfile(optionsFile)):
-            self.options = os.path.expandvars(open(optionsFile).readline().strip())
+            self.options = open(optionsFile).readline().strip()
         elif not os.path.isfile(self.inputFile) and not os.path.isfile(self.useCaseFile):
             self.valid = 0
     def getDirectory(self, temporary, forComparison = 1):
@@ -994,7 +997,11 @@ class OptionFinder(seqdict):
                     os.environ["TEXTTEST_DIAGDIR"] = os.path.dirname(diagFile)
                 writeDir = os.getenv("TEXTTEST_DIAGDIR")
                 if not os.path.isdir(writeDir):
-                    os.makedirs(writeDir)
+                    try:
+                        os.makedirs(writeDir)
+                    except OSError:
+                        # Not a reason not to work if we can't do this for some reason
+                        pass
                 print "TextTest will write diagnostics in", writeDir, "based on file at", diagFile
                 for file in os.listdir(writeDir):
                     if file.endswith(".diag"):

@@ -63,6 +63,8 @@ class Test:
     UNRUNNABLE = 5
     def __init__(self, name, abspath, app, parent = None):
         self.name = name
+        # There is nothing to stop several tests having the same name. Maintain another name known to be unique
+        self.uniqueName = name
         self.app = app
         self.parent = parent
         self.abspath = abspath
@@ -225,8 +227,8 @@ class TestCase(Test):
         if state == self.UPDATED or (oldState and oldState == self.FAILED):
             # Don't record event if we're being 'saved' or whatever
             return
-        eventName = "test " + self.name + " to " + self.stateChangeDescription(state)
-        category = self.name
+        eventName = "test " + self.uniqueName + " to " + self.stateChangeDescription(state)
+        category = self.uniqueName
         # Files abound here, we wait a little for them to clear up
         ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=1)
     def stateChangeDescription(self, state):
@@ -1289,6 +1291,54 @@ def tmpString():
     else:
         return "tmp"
 
+# Class to allocate unique names to tests for script identification and cross process communication
+class UniqueNameFinder:
+    def __init__(self):
+        self.name2test = {}
+        self.diag = plugins.getDiagnostics("Unique Names")
+    def addSuite(self, test):
+        self.store(test)
+        try:
+            for subtest in test.testcases:
+                self.addSuite(subtest)
+        except AttributeError:
+            pass
+    def store(self, test):
+        if self.name2test.has_key(test.name):
+            oldTest = self.name2test[test.name]
+            self.storeUnique(oldTest, test)
+        else:
+            self.name2test[test.name] = test
+    def findParentIdentifiers(self, oldTest, newTest):
+        oldParentId = " at top level"
+        if oldTest.parent:
+            oldParentId = " under " + oldTest.parent.name
+        newParentId = " at top level"
+        if newTest.parent:
+            newParentId = " under " + newTest.parent.name
+        if oldTest.parent and newTest.parent and oldParentId == newParentId:
+            oldNextLevel, newNextLevel = self.findParentIdentifiers(oldTest.parent, newTest.parent)
+            oldParentId += oldNextLevel
+            newParentId += newNextLevel
+        return oldParentId, newParentId
+    def storeUnique(self, oldTest, newTest):
+        oldParentId, newParentId = self.findParentIdentifiers(oldTest, newTest)
+        if oldParentId != newParentId:
+            self.storeBothWays(oldTest.name + oldParentId, oldTest)
+            self.storeBothWays(newTest.name + newParentId, newTest)
+        elif oldTest.app.name != newTest.app.name:
+            self.storeBothWays(oldTest.name + " for " + oldTest.app.fullName, oldTest)
+            self.storeBothWays(newTest.name + " for " + newTest.app.fullName, newTest)
+        elif oldTest.app.getFullVersion() != newTest.app.getFullVersion():
+            self.storeBothWays(oldTest.name + " version " + oldTest.app.getFullVersion(), oldTest)
+            self.storeBothWays(newTest.name + " version " + newTest.app.getFullVersion(), newTest)
+        else:
+            raise plugins.TextTestError, "Could not find unique name for tests with name " + oldTest.name
+    def storeBothWays(self, name, test):
+        self.diag.info("Setting unique name for test " + test.name + " to " + name)
+        self.name2test[name] = test
+        test.uniqueName = name
+
 # --- MAIN ---
 
 class TextTest:
@@ -1316,12 +1366,19 @@ class TextTest:
             return "%H%M%S"
     def createActionRunner(self):
         actionRunner = ActionRunner()
+        uniqueNameFinder = UniqueNameFinder()
+        appSuites = []
         for app in self.allApps:
             try:
                 valid, testSuite = app.createTestSuite()
-                if not valid:
-                    continue
-
+                if valid:
+                    appSuites.append((app, testSuite))
+                    uniqueNameFinder.addSuite(testSuite)
+            except BadConfigError:
+                print "Error creating test suite for application", app, "-", sys.exc_value
+                    
+        for app, testSuite in appSuites:
+            try:
                 empty = testSuite.size() == 0
                 if self.gui and (not empty or not self.gui.dynamic):
                     self.gui.addSuite(testSuite)

@@ -28,7 +28,7 @@ class TextTestGUI:
         from guiplugins import guilog
         scriptEngine = ScriptEngine(guilog)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
-                                   gobject.TYPE_STRING, gobject.TYPE_STRING)
+                                   gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic
         self.performanceColumn = 0
         self.itermap = seqdict()
@@ -81,9 +81,11 @@ class TextTestGUI:
     def addApplication(self, app):
         colour = app.getConfigValue("test_colours")["app_static"]
         iter = self.model.insert_before(None, None)
-        self.model.set_value(iter, 0, "Application " + app.fullName)
+        nodeName = "Application " + app.fullName
+        self.model.set_value(iter, 0, nodeName)
         self.model.set_value(iter, 1, colour)
         self.model.set_value(iter, 2, app)
+        self.model.set_value(iter, 3, nodeName)
     def addSuite(self, suite):
         if not self.dynamic:
             self.addApplication(suite.app)
@@ -99,6 +101,7 @@ class TextTestGUI:
                 nodeName += " (" + appName + ")"
         self.model.set_value(iter, 0, nodeName)
         self.model.set_value(iter, 2, suite)
+        self.model.set_value(iter, 3, suite.uniqueName)
         self.updateStateInModel(suite, iter)
         try:
             for test in suite.testcases:
@@ -133,14 +136,8 @@ class TextTestGUI:
             colour2 = colour
         self.model.set_value(iter, 1, colour)
         if self.performanceColumn:
-            self.model.set_value(iter, 3, details)
-            self.model.set_value(iter, 4, colour2)
-    def stateChangeDescription(self, test, state):
-        if state == test.RUNNING:
-            return "start"
-        if state == test.FAILED or state == test.UNRUNNABLE or state == test.SUCCEEDED:
-            return "complete"
-        return "finish preprocessing"
+            self.model.set_value(iter, 4, details)
+            self.model.set_value(iter, 5, colour2)
     def createWindowContents(self, testWins):
         self.contents = gtk.HBox(homogeneous=gtk.TRUE)
         testCaseWin = self.rightWindowGUI.getWindow()
@@ -181,12 +178,12 @@ class TextTestGUI:
         column = gtk.TreeViewColumn("Test Behaviour", renderer, text=0, background=1)
         view.append_column(column)
         if self.performanceColumn:
-            perfColumn = gtk.TreeViewColumn("Performance", renderer, text=3, background=4)
+            perfColumn = gtk.TreeViewColumn("Performance", renderer, text=4, background=5)
             view.append_column(perfColumn)
         view.expand_all()
         if not self.dynamic:
-            scriptEngine.monitorTreeSelection("add to test selection", "remove from test selection", self.selection, argumentParseData=(column, 0))
-        scriptEngine.connect("select test", "row_activated", view, self.viewTest, argumentParseData=(column, 0))
+            scriptEngine.monitorTreeSelection("add to test selection", "remove from test selection", self.selection, argumentParseData=(column, 3))
+        scriptEngine.connect("select test", "row_activated", view, self.viewTest, argumentParseData=(column, 3))
         view.show()
 
         # Create scrollbars around the view.
@@ -248,7 +245,7 @@ class TextTestGUI:
         self.updateStateInModel(test, iter, state)
         guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
         if self.performanceColumn:
-            guilog.info("(Second column '" + self.model.get_value(iter, 3) + "' coloured " + self.model.get_value(iter, 4) + ")")
+            guilog.info("(Second column '" + self.model.get_value(iter, 4) + "' coloured " + self.model.get_value(iter, 5) + ")")
     def redrawSuite(self, suite):
         newTest = suite.testcases[-1]
         suiteIter = self.itermap[suite]

@@ -266,8 +266,7 @@ class RunLProf(plugins.Action):
         runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId
         outputFile = "prof." + processId
         processLine = "/users/lennart/bin/process_gprof " + outputFile + " > lprof." + test.app.name + test.app.versionSuffix()
-        removeLine = "rm " + outputFile
-        commandLine = "rsh " + executionMachine + " '" + runLine + "; " + processLine + "; " + removeLine + "'"
+        commandLine = "rsh " + executionMachine + " '" + runLine + "; " + processLine + "'"
         os.system(commandLine)
 
 class BuildCode(plugins.Action):

@@ -84,6 +84,7 @@ class ApcConfig(optimization.OptimizationConfig):
     def getTestCollator(self):
         baseCollator = unixConfig.UNIXConfig.getTestCollator(self)
         subActions = []
+        subActions.append(unixConfig.CollateFile("best_solution", "solution"))
         subActions.append(unixConfig.CollateFile("status", "status"))
         subActions.append(unixConfig.CollateFile("run_status_script_error", "error"))        
         subActions.append(FetchApcCore(self))

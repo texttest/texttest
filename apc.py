@@ -10,7 +10,8 @@ this special strategy.
 It will fetch the optimizer's status file from the subplan (the "status" file) and write it for
 comparison as the file status.<app> after each test has run."""
 
-helpOptions = """-rundebug <options> - (only APC) Runs the test in the debugger (gdb) and displays the log file. The run
+helpOptions = """-rundebug <options>
+           - (only APC) Runs the test in the debugger (gdb) and displays the log file. The run
              is made locally, and if its successful, the debugger is exited, and texttest
              continues as usual. If the run fails, the buffer is flushed and one are left 
              in the debugger. To enter the debugger during the run, type C-c.
@@ -19,6 +20,12 @@ helpOptions = """-rundebug <options> - (only APC) Runs the test in the debugger 
                The debugger is run in xemacs, in gdbsrc mode.
              - nolog
                The log file is not displayed.
+
+-extractlogs <option>
+           - (only APC) Executes the command specified by the config value extract_logs_<option>,
+             and the result is piped into a file named <option>.<app>.<ver> If no option is given or the config value
+             specified does not exist, then the command specifed by extract_logs_default is used, and the result is
+             saved in the file extract.<app>.<ver>
 """
 
 helpScripts = """apc.CleanTmpFiles          - Removes all temporary files littering the test directories
@@ -62,6 +69,7 @@ class ApcConfig(optimization.OptimizationConfig):
     def getArgumentOptions(self):
         options = optimization.OptimizationConfig.getArgumentOptions(self)
         options["rundebug"] = "Run debugger"
+        options["extractlogs"] = "Extract Apc Logs"
         return options
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
@@ -90,11 +98,12 @@ class ApcConfig(optimization.OptimizationConfig):
             modeString = "-optimize"
         return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, staticFilter, ruleCompile, modeString)
     def getSpecificTestRunner(self):
+        subActions = [ self._getApcTestRunner() ]
         if self.optionMap.has_key("lprof"):
-            subActions = [ self._getApcTestRunner(), carmen.AttachProfiler() ]
-            return plugins.CompositeAction(subActions)
-        else:
-            return self._getApcTestRunner()
+            subActions.append(carmen.AttachProfiler())
+        if self.optionMap.has_key("extractlogs"):
+            subActions.append(KeepApcLogs())
+        return plugins.CompositeAction(subActions)
     def _getApcTestRunner(self):
         if self.useLSF():
             return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
@@ -116,6 +125,8 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions.append(RemoveLogs())
         if self.optionMap.has_key("lprof"):
             subActions.append(carmen.ProcessProfilerResults())
+        if self.optionMap.has_key("extractlogs"):
+            subActions.append(ExtractApcLogs(self.optionValue("extractlogs")))
         localAction = plugins.CompositeAction(subActions)
         if not self.useLSF():
             return localAction
@@ -433,6 +444,12 @@ class FetchApcCore(plugins.Action):
             subplanName = test.writeDirs[-1].split(os.sep)[-2]
             apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
             apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
+            # Check if there is a apc_debug file.
+            stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls apc_debug"  + "'")
+            stderrlines = stderr.readlines()
+            if not stderrlines:
+                self.diag.info("apc_debug file is found. Aborting.")
+                return
             self.describe(test, " from " + machine)
             # Check if there really is a core file! One don't get a core if APC does a scream for example.
             stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls core"  + "'")
@@ -460,7 +477,67 @@ class FetchApcCore(plugins.Action):
                 cmdLine = "rm -rf " + apcTmpDir 
                 os.system("rsh " + machine + " '" + cmdLine + "'")
     def __repr__(self):
-        return "Fetching core for"
+        return "Fetching crash for"
+
+class KeepApcLogs(plugins.Action):
+    def __init__(self):
+        pass
+    def __call__(self, test):
+        waitDispatch = carmen.WaitForDispatch()
+        waitDispatch.__call__(test)
+        job = lsf.LSFJob(test)
+        status, machine = job.getStatus()
+        subplanName = test.writeDirs[-1].split(os.sep)[-2]
+        apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
+        apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
+        cmdLine = "cd " + apcTmpDir + ";touch apc_debug"
+        os.system("rsh " + machine + " '" + cmdLine + "'")
+        self.describe(test, " on " + machine)
+    def __repr__(self):
+        return "Keeping APC logfile for"
+
+class ExtractApcLogs(plugins.Action):
+    def __init__(self, args):
+        self.args = args
+    def __call__(self, test):
+        if not self.args:
+            print "No argument given, using config value extract_logs_default"
+            extractCommand = test.app.getConfigValue("extract_logs_default")
+            saveName = "extract"
+        else:
+            try:
+                extractCommand = test.app.getConfigValue("extract_logs_" + self.args)
+                saveName = self.args
+            except KeyError:
+                print "Config value " + self.args + " does not exist, using config value extract_logs_default"
+                extractCommand = test.app.getConfigValue("extract_logs_default")
+                saveName = "extract"
+        # Find machine name
+        logFinder = optimization.LogFileFinder(test)
+        foundTmp, tmpStatusFile = logFinder.findFile()
+        if not foundTmp:
+            return
+        grepCommand = "grep Machine " + tmpStatusFile
+        grepLines = os.popen(grepCommand).readlines()
+        if len(grepLines) > 0:
+            machine = grepLines[0].split()[-1]
+            self.describe(test)
+            subplanName = test.writeDirs[-1].split(os.sep)[-2]
+            apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
+            apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
+            # Extract from the apclog
+            cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + test.writeDirs[0] + os.sep + saveName + "." + test.app.name + test.app.versionSuffix()
+            os.system("rsh " + machine + " '" + cmdLine + "'")
+            # Remove dir
+            cmdLine = "rm -rf " + apcTmpDir 
+            os.system("rsh " + machine + " '" + cmdLine + "'")
+            # Remove the error file (which is create because we are keeping the logfiles,
+            # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***")
+            os.system("rm -f error*")
+    def __repr__(self):
+        return "Extracting APC logfile for"
+        
+
 
 #
 # TODO: Check Sami's stuff in /users/sami/work/Matador/Doc/Progress

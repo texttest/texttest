@@ -234,7 +234,13 @@ class AddTestPerformance(plugins.Action):
         return "Adding performance for"
     def __call__(self, test):
         testPerformance = getTestPerformance(test)
-        self.describe(test, ": " + str(int(testPerformance)) + " minutes")
+        if os.environ.has_key("LSF_PROCESSES"):
+            parCPUs = int(os.environ["LSF_PROCESSES"])
+            self.describe(test, ": " + str(int(testPerformance)) + " minutes * " + str(parCPUs))
+            if parCPUs > 0:
+                testPerformance *= parCPUs
+        else:
+            self.describe(test, ": " + str(int(testPerformance)) + " minutes")
         self.performance += testPerformance
         self.numberTests += 1
     def __del__(self):

@@ -357,49 +357,17 @@ class RunTests(InteractiveAction):
             errText = open(errFile).read()
             if len(errText):
                 raise plugins.TextTestError, "Dynamic run failed, with the following errors:" + os.linesep + errText
-    def findCommonParentName(self, selTests):
-        allParents = self.findAllParents(selTests)
-        if len(allParents) == 1:
-            return self.checkNotRoot(allParents[0])
-
-        descendantMap = {}
-        for parent in allParents:
-            self.mapSuite(descendantMap, parent, parent)
-
-        for suite, descendants in descendantMap.items():
-            if len(descendants) == len(allParents):
-                return self.checkNotRoot(suite)
-        return None
-    def checkNotRoot(self, suite):
-        if suite.parent:
-            return suite.name
-        else:
-            return None
-    def mapSuite(self, descendantMap, suite, descendant):
-        if not descendantMap.has_key(suite):
-            descendantMap[suite] = []
-        descendantMap[suite].append(descendant)
-        if suite.parent:
-            self.mapSuite(descendantMap, suite.parent, descendant)
-    def findAllParents(self, selTests):
-        allParents = []
-        for test in selTests:
-            if not test.parent in allParents:
-                allParents.append(test.parent)
-        return allParents
     def getTextTestOptions(self, app, selTests):
         ttOptions = [ "-a " + app.name ]
         ttOptions += self.invisibleGroup.getCommandLines()
         for group in self.optionGroups:
             ttOptions += group.getCommandLines()
-        selTestNames = []
+        selTestPaths = []
         for test in selTests:
-            if not test.name in selTestNames:
-                selTestNames.append(test.name)
-        ttOptions.append("-t " + string.join(selTestNames, ","))
-        commonParentName = self.findCommonParentName(selTests)
-        if commonParentName:
-            ttOptions.append("-ts " + commonParentName)
+            relPath = test.getRelPath()
+            if not relPath in selTestPaths:
+                selTestPaths.append(relPath)
+        ttOptions.append("-tp " + string.join(selTestPaths, ","))
         return ttOptions
 
 class EnableDiagnostics(InteractiveAction):

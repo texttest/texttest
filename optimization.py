@@ -147,8 +147,10 @@ class OptimizationConfig(carmen.CarmenConfig):
         if test.classId() == "test-case":
             test.setUpEnvironment(parents=1)
             dirName = self._getSubPlanDirName(test)
-            readDirs["Subplan"] = [ os.path.join(dirName, "APC_FILES", "rules") ]
-            readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", self.getRuleSetName(test)) ]
+            rulesFile = os.path.join(dirName, "APC_FILES", "rules")
+            if os.path.isfile(rulesFile):
+                readDirs["Subplan"] = [ rulesFile ]
+                readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", self.getRuleSetName(test)) ]
             test.tearDownEnvironment(parents=1)
         elif test.environment.has_key("CARMUSR"):
             readDirs["Resource"] = [ os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab") ]

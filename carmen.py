@@ -205,7 +205,7 @@ class BuildCode(plugins.Action):
             raise "Product " + repr(app) + " did not build, exiting"
         print "Product", app, "built correctly in", absPath
         os.remove(buildFile)
-        os.system("gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& build.install")
+        os.system("gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null")
         print "Making install from", absPath ,"to", os.environ["CARMSYS"]
     def buildRemote(self, machine, arch, absPath):
         print "Building remotely in parallel on " + machine + "..."

@@ -246,14 +246,16 @@ class LogFileFinder:
             return fileInTest
         # Look for output, find appropriate temp subplan, and look there
         outputInTest = self.findTempFileInTest(version, "output")
-        grepCommand = "grep -E 'SUBPLAN' " + file
+        if not outputInTest:
+            return None
+        grepCommand = "grep -E 'SUBPLAN' " + outputInTest
         grepLines = os.popen(grepCommand).readlines()
         if len(grepLines) > 0:
             currentFile = os.path.join(grepLines[0].split()[1], self.logStem)
             if os.path.isfile(currentFile):
                 return currentFile
         else:
-            print "Could not find subplan name in output file " + file + os.linesep
+            print "Could not find subplan name in output file " + fileInTest + os.linesep
     def findTempFileInTest(self, version, stem):                           
         for file in os.listdir(self.test.abspath):
             if file.startswith("output") and file.find(version + self.test.getTestUser()) != -1:

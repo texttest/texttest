@@ -577,7 +577,7 @@ class BuildCode(plugins.Action):
         machine = self.getMachine(app, arch)
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
-            raise "Product " + repr(app) + " did not build, exiting"
+            raise plugins.TextTestError, "Product " + repr(app) + " did not build, exiting"
         print "Product", app, "built correctly in", absPath
         os.remove(buildFile)
         commandLine = "cd " + absPath + "; gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"

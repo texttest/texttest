@@ -399,13 +399,24 @@ class FetchApcCore(plugins.Action):
     def __init__(self, config):
         self.config = config
         self.diag = plugins.getDiagnostics("FetchApcCore")
+    def isApcLogFileKept(self, errorFileName):
+        for line in open(errorFileName).xreadlines():
+            if line.find("*** Keeping the logfiles in") != -1:
+                return "Yes"
+        return []
     def __call__(self, test):
         if self.config.isReconnecting():
             return
         coreFileName = os.path.join(test.getDirectory(temporary=1), "core.Z")
-        if not os.path.isfile(test.makeFileName("error", temporary=1)):
+        errorFileName = test.makeFileName("error", temporary=1)
+        if not os.path.isfile(errorFileName):
             return
         self.diag.info("Error file found.")
+        # An error file can be created even if there are no kept log files
+        if not self.isApcLogFileKept(errorFileName):
+            self.diag.info("APC log files are NOT kept, exiting.")
+            return
+        self.diag.info("APC log files are kept.")
         logFinder = optimization.LogFileFinder(test)
         foundTmp, tmpStatusFile = logFinder.findFile()
         if not foundTmp:
@@ -415,33 +426,34 @@ class FetchApcCore(plugins.Action):
         grepLines = os.popen(grepCommand).readlines()
         if len(grepLines) > 0:
             machine = grepLines[0].split()[-1]
-            testDirEnd = test.app.name + test.app.versionSuffix() + test.getTmpExtension()
-            self.describe(test, " from " + machine)
+            subplanName = test.writeDirs[-1].split(os.sep)[-2]
             apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
+            apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
+            self.describe(test, " from " + machine)
             # Check if there really is a core file! One don't get a core if APC does a scream for example.
-            stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcHostTmp + "/*" + testDirEnd + "_*; ls core"  + "'")
+            stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls core"  + "'")
             stderrlines = stderr.readlines()
             if stderrlines:
                 print "No core file present."
             else:
                 binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
                 binCmd = "echo ' " + binName +  "' >> core"
-                cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; " + binCmd + ";compress -c core > " + coreFileName
+                cmdLine = "cd " + apcTmpDir + "; " + binCmd + ";compress -c core > " + coreFileName
                 os.system("rsh " + machine + " '" + cmdLine + "'")
             # Show log file!
             if not self.config.isNightJob():
-                command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + apcHostTmp + "/*" + testDirEnd + "_*/apclog" + "''"
+                command = "xon " + machine + " 'xterm -bg white -fg black -T " + test.name + " -e 'less +F " + apcTmpDir + os.sep + "apclog" + "''"
                 os.system(command)
             tmpDir = test.writeDirs[0]
             if os.path.isdir(tmpDir):
                 tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
                 if os.path.isfile(tgzFile):
                     os.remove(tgzFile)
-                cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; tar cf - . | gzip -c > " + tgzFile
+                cmdLine = "cd " + apcTmpDir + "; tar cf - . | gzip -c > " + tgzFile
                 self.diag.info("Crash is saved in " + tgzFile)
                 os.system("rsh " + machine + " '" + cmdLine + "'")
             if self.config.isNightJob():
-                cmdLine = "rm -rf " + apcHostTmp + "/*" + testDirEnd + "_*"
+                cmdLine = "rm -rf " + apcTmpDir 
                 os.system("rsh " + machine + " '" + cmdLine + "'")
     def __repr__(self):
         return "Fetching core for"

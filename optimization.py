@@ -286,11 +286,12 @@ class LogFileFinder:
             versionMod = "." + version
         searchString = self.test.app.name + versionMod + self.test.getTestUser()
         for subDir in os.listdir(self.test.abspath):
-            if os.path.isdir(subDir) and subDir.startswith(searchString):
-                for file in subDir:
+            fullDir = os.path.join(self.test.abspath, subDir)
+            if os.path.isdir(fullDir) and subDir.startswith(searchString):
+                for file in os.listdir(fullDir):
                     # don't pick up comparison files
                     if file.startswith(stem) and not file.endswith("cmp"):
-                        return file
+                        return os.path.join(fullDir, file)
         return None
 
 class OptimizationRun:

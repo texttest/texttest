@@ -141,6 +141,8 @@ class PerformanceFileComparison(comparetest.FileComparison):
         else:
             return self.descriptors["badperf"]
     def getSummary(self):
+        if self.newResult():
+            return comparetest.FileComparison.getSummary(self)
         type = self.getType()
         return str(int(self.calculatePercentageIncrease())) + "% " + type
     def getDetails(self):

@@ -2,7 +2,6 @@
 import os, plugins, respond, string, carmen, checkExtensions
 
 from checkExtensions import COMPRESS, UNCOMPRESS
-from glob import glob
 
 def getConfig(optionMap):
     return Ctf2RrlConfig(optionMap)
@@ -12,8 +11,10 @@ def decompressAndRename(src,dst):
         os.system('zcat ' + src + ' > ' + dst)
         os.unlink(src)
     else:
-        os.rename(src,dst)
-
+        try:
+            os.rename(src, dst)
+        except OSError:
+            shutil.copyfile(src, dst)
 
 class Ctf2RrlConfig(checkExtensions.CheckExtConfig):
     def getTestCollator(self):

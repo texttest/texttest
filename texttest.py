@@ -27,15 +27,6 @@ builtInOptions = """
 -gx        - run static GUI, which won't run tests unless instructed. Useful for creating new tests
              and viewing the test suite.
 
--delay <s> - only has effect with -replay. PyUseCase's replay will proceed with pauses of <s> seconds so you can
-             see what happens.
-
--record <s>- use PyUseCase to record all user actions in the GUI to the script <s>
-
--replay <s>- use PyUseCase to replay the script <s> created previously in the GUI. No effect without -g.
-
--recinp <s>- use PyUseCase to record everything received on standard input to the script <s> 
-
 -s <scrpt> - instead of the normal actions performed by the configuration, use the script <scpt>. If this contains
              a ".", an attempt will be made to understand it as the Python class <module>.<classname>. If this fails,
              it will be interpreted as an external script.
@@ -65,6 +56,8 @@ class Test:
         # List of objects observing this test, to be notified when it changes state
         self.observers = []
         self.environment = MultiEntryDictionary()
+        # Java equivalent of the environment mechanism...
+        self.properties = MultiEntryDictionary()
         if parent == None:
             for var, value in app.getEnvironment():
                 self.environment[var] = value
@@ -75,6 +68,8 @@ class Test:
                 inVarName = diagDict["input_directory_variable"]
                 self.environment[inVarName] = self.abspath
         self.environment.readValuesFromFile(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
+        # Should do this, but not quite yet...
+        # self.properties.readValuesFromFile(os.path.join(self.abspath, "properties"), app.name, app.getVersionFileExtensions())
         # Single pass to expand all variables (don't want multiple expansion)
         for var, value in self.environment.items():
             expValue = os.path.expandvars(value)
@@ -185,10 +180,11 @@ class TestCase(Test):
         self.useCaseFile = self.makeFileName("usecase")
         self._setOptions()
         # List of directories where this test will write files. First is where it executes from
-        self.writeDirs = []
-        basicWriteDir = os.path.join(app.writeDirectory, self.getRelPath())
-        self.writeDirs.append(basicWriteDir)
+        self.writeDirs = [ os.path.join(app.writeDirectory, self.getRelPath()) ]
+        self.setTestEnvironment()
+    def setTestEnvironment(self):
         diagDict = self.app.getConfigValue("diagnostics")
+        basicWriteDir = self.writeDirs[0]
         if self.app.useDiagnostics:
             inVarName = diagDict["input_directory_variable"]
             self.environment[inVarName] = os.path.join(self.abspath, "Diagnostics")
@@ -197,6 +193,26 @@ class TestCase(Test):
         elif diagDict.has_key("write_directory_variable"):
             outVarName = diagDict["write_directory_variable"]
             self.environment[outVarName] = basicWriteDir
+        if os.path.isfile(self.useCaseFile):
+            self.setUseCaseEnvironment()
+    def setUseCaseEnvironment(self):
+        # Here we assume the application uses either PyUseCase or JUseCase
+        # PyUseCase reads environment variables, but you can't do that from java,
+        # so we have a "properties file" set up as well. Do both always, to save forcing
+        # apps to tell us which to do...
+        jusecaseEntries = {}
+        replayScript = self.useCaseFile
+        recordScript = self.makeFileName("usecase", temporary=1)
+        replaySpeed = self.app.slowMotionReplaySpeed
+
+        self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
+        jusecaseEntries["replay"] = replayScript
+        self.environment["USECASE_RECORD_SCRIPT"] = recordScript
+        jusecaseEntries["record"] = recordScript
+        if replaySpeed:
+            self.environment["USECASE_REPLAY_DELAY"] = str(replaySpeed)
+            jusecaseEntries["delay"] = str(replaySpeed)
+        self.properties["jusecase"] = jusecaseEntries
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -264,6 +280,13 @@ class TestCase(Test):
         if copyAll:
             self.collatePaths("copy_test_path", self.copyTestPath)
         self.collatePaths("link_test_path", self.linkTestPath)
+        self.createPropertiesFiles()
+    def createPropertiesFiles(self):
+        for var, value in self.properties.items():
+            propFileName = os.path.join(self.writeDirs[0], var + ".properties")
+            file = open(propFileName, "w")
+            for subVar, subValue in value.items():
+                file.write(subVar + "=" + subValue + os.linesep)            
     def cleanNonBasicWriteDirectories(self):
         if len(self.writeDirs) > 0:
             for writeDir in self.writeDirs[1:]:

@@ -119,12 +119,13 @@ class CarmenConfig(lsf.LSFConfig):
         arch = getArchitecture(test.app)
         return self.getQueuePerformancePrefix(test, arch) + arch + self.getQueuePlatformSuffix(test.app, arch)
     def getQueuePerformancePrefix(self, test, arch):
-        if arch == "powerpc" or arch == "parisc_2_0":
-            return ""
         cpuTime = performance.getTestPerformance(test)
+        # Currently no short queue for powerpc_aix4
+        if arch == "powerpc" and "9" in test.app.versions:
+            return ""
         if cpuTime < 10:
             return "short_"
-        elif cpuTime < 120:
+        elif arch == "powerpc" or arch == "parisc_2_0" or cpuTime < 120:
             return ""
         else:
             return "idle_"

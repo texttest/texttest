@@ -79,7 +79,7 @@ class CollateCore(CollateFile):
         file.close()
         # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
         # Unfortunately running gdb is not the answer, because it truncates the data...
-        binary = os.popen("csh -c 'echo `tail -c 1024 " + path + "`'").read().split(" ")[-1].strip()
+        binary = os.popen("csh -c 'echo `tail -c 1024 " + path + "`' 2> /dev/null").read().split(" ")[-1].strip()
         newPath = path + "tmp" 
         writeFile = open(newPath, "w")
         if os.path.isfile(binary):

@@ -26,7 +26,10 @@ builtInOptions = """
 
 -gx        - run static GUI, which won't run tests unless instructed. Useful for creating new tests
              and viewing the test suite.
-             
+
+-delay <s> - only has effect with -replay. PyUseCase's replay will proceed with pauses of <s> seconds so you can
+             see what happens.
+
 -record <s>- use PyUseCase to record all user actions in the GUI to the script <s>
 
 -replay <s>- use PyUseCase to replay the script <s> created previously in the GUI. No effect without -g.
@@ -574,6 +577,7 @@ class Application:
         debugLog.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(optionMap)
         self.useDiagnostics = self.setDiagnosticSettings(optionMap)
+        self.slowMotionReplaySpeed = self.setSlowMotionSettings(optionMap)
     def __repr__(self):
         return self.fullName
     def __cmp__(self, other):
@@ -603,6 +607,7 @@ class Application:
         self.setConfigDefault("diagnostics", {})
         self.setConfigDefault("copy_test_path", [])
         self.setConfigDefault("link_test_path", [])
+        self.setConfigDefault("slow_motion_replay_speed", 0)
         # External viewing tools
         # Do this here rather than from the GUI: if applications can be run with the GUI
         # anywhere it needs to be set up
@@ -659,11 +664,18 @@ class Application:
             envVarName = self.getConfigValue("diagnostics")["trace_level_variable"]
             os.environ[envVarName] = optionMap["trace"]
         return 0
+    def setSlowMotionSettings(self, optionMap):
+        if optionMap.has_key("actrep"):
+            return self.getConfigValue("slow_motion_replay_speed")
+        else:
+            return 0
     def addToOptionGroup(self, group):
         if group.name.startswith("What"):
             group.addOption("c", "Use checkout")
             group.addOption("v", "Run this version")
         elif group.name.startswith("How"):
+            if self.getConfigValue("slow_motion_replay_speed"):
+                group.addSwitch("actrep", "Run with slow motion replay")
             diagDict = self.getConfigValue("diagnostics")
             if diagDict.has_key("configuration_file"):
                 group.addSwitch("diag", "Write target application diagnostics")
@@ -677,6 +689,7 @@ class Application:
             group.addOption("a", "Applications containing")
             group.addOption("s", "Run this script")
             group.addOption("d", "Run tests at")
+            group.addOption("delay", "Between replayed actions, delay this long")
             group.addOption("record", "Record user actions to this script")
             group.addOption("replay", "Replay user actions from this script")
             group.addOption("recinp", "Record standard input to this script")

@@ -309,6 +309,9 @@ class RunTest(plugins.Action):
         if os.path.isfile(useCaseFileName):
             recFile = test.makeFileName("usecase", temporary=1)
             testCommand += " --replay " + useCaseFileName + " --record " + recFile
+            replaySpeed = test.app.slowMotionReplaySpeed
+            if replaySpeed:
+                testCommand += " --delay " + str(replaySpeed)
         testCommand += " < " + self.getInputFile(test)
         outfile = test.makeFileName("output", temporary=1)
         return testCommand + " > " + outfile

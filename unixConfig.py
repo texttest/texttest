@@ -146,7 +146,7 @@ class RunTest(default.RunTest):
         default.RunTest.setUpApplication(self, app)
         self.collectStdErr = app.getConfigValue("collect_standard_error")
         virtualDisplayMachines = app.getConfigValue("virtual_display_machine")
-        if len(virtualDisplayMachines) > 0:
+        if len(virtualDisplayMachines) > 0 and app.slowMotionReplaySpeed == 0:
             self.allocateVirtualDisplay(virtualDisplayMachines)
     def allocateVirtualDisplay(self, virtualDisplayMachines):
         for machine in virtualDisplayMachines:

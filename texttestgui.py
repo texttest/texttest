@@ -664,51 +664,77 @@ class TestCaseGUI(RightWindowGUI):
         self.model.set_value(defiter, 0, "Definition Files")
         stdFiles = []
         defFiles = []
+        diagConfigFileName = self.getDiagDefinitionFile(test.app)
         for file in os.listdir(test.abspath):
             if test.app.ownsFile(file):
-                if self.isDefinitionFile(file):
+                if self.isDefinitionFile(file, test.app):
                     defFiles.append(file)
                 elif test.classId() == "test-case":
                     stdFiles.append(file)
-        diagDir = os.path.join(test.abspath, "Diagnostics")
-        diagFiles = []
-        if os.path.isdir(diagDir):
-            configFileName = test.getConfigValue("diagnostics")["configuration_file"]
-            configPath = os.path.join(diagDir, configFileName)
-            if os.path.isfile(configPath):
-                defFiles.append(configPath)
-                for diagFile in os.listdir(diagDir):
-                    fullPath = os.path.join(diagDir, diagFile)
-                    if os.path.isfile(fullPath) and diagFile != configFileName:
-                        diagFiles.append(fullPath)
+            elif file == diagConfigFileName:
+                defFiles.append(file)
         self.addFilesUnderIter(defiter, defFiles, test.abspath)
         if len(stdFiles):
             self.addFilesUnderIter(stditer, stdFiles, test.abspath)
+            self.addStaticDiagFilesToModel(test, diagConfigFileName, stditer, defiter)
+        self.addStaticDataFilesToModel(test)
+    def addStaticDiagFilesToModel(self, test, diagConfigFileName, stditer, defiter):
+        diagDir = os.path.join(test.abspath, "Diagnostics")
+        configPath = os.path.join(diagDir, diagConfigFileName)
+        if os.path.isfile(configPath):
+            defdiagiter = self.model.insert_before(defiter, None)
+            self.model.set_value(defdiagiter, 0, "Diagnostics")
+            self.addFilesUnderIter(defdiagiter, [ configPath ])
+        diagFiles = []
+        if os.path.isdir(diagDir):
+            for diagFile in os.listdir(diagDir):
+                fullPath = os.path.join(diagDir, diagFile)
+                if os.path.isfile(fullPath) and diagFile != diagConfigFileName:
+                    diagFiles.append(fullPath)
         if len(diagFiles):
-            exiter = self.model.insert_before(None, None)
-            self.model.set_value(exiter, 0, "Diagnostic Files")
+            exiter = self.model.insert_before(stditer, None)
+            self.model.set_value(exiter, 0, "Diagnostics")
             self.addFilesUnderIter(exiter, diagFiles)
-        for name, filelist in test.extraReadFiles().items():
-            exiter = self.model.insert_before(None, None)
-            self.model.set_value(exiter, 0, name + " Files")
-            self.addFilesUnderIter(exiter, filelist)
+    def addStaticDataFilesToModel(self, test):
+        dataFileList = test.extraReadFiles().items()
+        if len(dataFileList) > 0:
+            datiter = self.model.insert_before(None, None)
+            self.model.set_value(datiter, 0, "Data Files")            
+            for name, filelist in dataFileList:
+                if len(name) > 0:
+                    exiter = self.model.insert_before(datiter, None)
+                    self.model.set_value(exiter, 0, name)
+                    self.addFilesUnderIter(exiter, filelist)
+                else:
+                    self.addFilesUnderIter(datiter, filelist)
+    def getDiagDefinitionFile(self, app):
+        diagDict = app.getConfigValue("diagnostics")
+        if diagDict.has_key("configuration_file"):
+            return diagDict["configuration_file"]
+        return ""
     def addFilesUnderIter(self, iter, files, dir = None):
         files.sort()
         colour = self.colours["static"]
         if self.dynamic:
             colour = self.colours["not_started"]
+        dirs = []
         for file in files:
+            if file == "CVS":
+                continue
             if dir:
                 fullPath = os.path.join(dir, file)
             else:
                 fullPath = file
-            newiter = self.addFileToModel(iter, fullPath, None, colour)
-    def isDefinitionFile(self, file):
-        definitions = [ "options.", "input.", "usecase.", "environment", "testsuite" ]
-        for defin in definitions:
-            if file.startswith(defin):
-                return 1
-        return 0
+            if os.path.isdir(fullPath):
+                dirs.append(fullPath)
+            else:
+                self.addFileToModel(iter, fullPath, None, colour)
+        for subdir in dirs:
+            newiter = self.addFileToModel(iter, subdir, None, colour)
+            self.addFilesUnderIter(newiter, os.listdir(subdir), subdir)
+    def isDefinitionFile(self, file, app):
+        stem = file.split(".")[0]
+        return stem in app.getConfigValue("definition_file_stems")
     def getSuccessColour(self):
         if self.test.state == self.test.RUNNING:
             return self.colours["running"]

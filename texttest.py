@@ -289,7 +289,7 @@ class OptionFinder:
                     continue
                 versionString = self.findVersionString()
                 try:
-                    app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:m:s:v:xp")
+                    app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:h:m:s:v:xp")
                     appList.append(app)
                 except KeyError, e:
                     print "Could not use application", appName, "-", e
@@ -307,6 +307,8 @@ class OptionFinder:
             return int(self.inputOptions["m"])
         else:
             return 1
+    def helpMode(self):
+        return self.inputOptions.has_key("help")
     def debugMode(self):
         return self.inputOptions.has_key("x")
     def parallelMode(self):
@@ -447,6 +449,9 @@ class TextTest:
         actionSequence = inputOptions.getActionSequence(app)
         acceptsApp, filterList = app.getFilterList()
         if not acceptsApp:
+            return
+        if inputOptions.helpMode():
+            print "No documentation yet available for application", app
             return
         allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
         try:

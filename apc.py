@@ -107,7 +107,10 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions.append(FetchApcCore())
         subActions.append(RemoveLogs())
         if self.optionMap.slaveRun():
-            subActions.append(ExtractApcLogs(self.optionValue("extractlogs")))
+            useExtractLogs = self.optionValue("extractlogs")
+            if useExtractLogs == "":
+                useExtractLogs = "all"
+            subActions.append(ExtractApcLogs(useExtractLogs))
         return subActions
     def _getSubPlanDirName(self, test):
         statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))

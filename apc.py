@@ -174,14 +174,25 @@ def verifyAirportFile(arch):
                 return
     raise plugins.TextTestError, "Failed to find AirportFile"
 
+def verifyLogFileDir(arch):
+    if arch == "sparc":
+        carmTmp = os.environ["CARMTMP"]
+        if os.path.isdir(carmTmp):
+            logFileDir = carmTmp + "/logfiles"
+            if not os.path.isdir(logFileDir):
+                os.makedirs(logFileDir)
+        
+
 class SubmitApcTest(lsf.SubmitTest):
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
+        verifyLogFileDir(carmen.getArchitecture(test.app))
         lsf.SubmitTest.__call__(self, test)
         
 class RunApcTest(default.RunTest):
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
+        verifyLogFileDir(carmen.getArchitecture(test.app))
         default.RunTest.__call__(self, test)
 
 class ViewApcLog(guiplugins.InteractiveAction):

@@ -1,6 +1,9 @@
 #!/usr/local/bin/python
 
 import os, time, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types, predict, guiplugins
+from Queue import Queue, Empty
+from threading import Thread
+from copy import deepcopy
 
 # Text only relevant to using the LSF configuration directly
 helpDescription = """
@@ -167,44 +170,112 @@ class LSFConfig(unixConfig.UNIXConfig):
         app.setConfigDefault("lsf_queue", "texttest_default")
         app.setConfigDefault("min_time_for_performance_force", -1)
 
-class LSFJob:
-    def __init__(self, test, jobNameFunction = None):
+class LSFServer:
+    instance = None
+    def __init__(self):
+        self.submissionQueue = Queue()
+        self.lsfThread = Thread(target=self.runLsfThread)
+        self.lsfThread.setDaemon(1)
+        self.lsfThread.start()
+        self.allJobs = {}
+        self.activeJobs = {}
+        LSFServer.instance = self
+        self.diag = plugins.getDiagnostics("LSF Thread")
+    def getJobName(self, test, jobNameFunction):
         jobName = repr(test.app) + test.app.versionSuffix() + test.getRelPath()
         if jobNameFunction:
             jobName = jobNameFunction(test)
-        self.name = test.getTmpExtension() + jobName
-        self.app = test.app
-    def hasStarted(self):
-        retstring = self.getStringFromLSF("-r")
-        return retstring.find("not found") == -1
-    def hasFinished(self):
-        retstring = self.getStringFromLSF()
-        return retstring.find("not found") != -1
-    def kill(self):
-        os.system("bkill -J " + self.name + " > /dev/null 2>&1")
-    def getStatus(self):
-        try:
-            return self._getStatus()
-        except IOError:
-            # Assume this is interrupted system call and keep trying
-            return self.getStatus()
-    def _getStatus(self):
-        lsfOutput = self.getStringFromLSF("-w -a")
-        if len(lsfOutput) == 0:
-            return "DONE", None
-        if lsfOutput.find("not found") != -1:
-            # If it doesn't exist we can assume it's done, it's the same effect...
-            return "DONE", None
-        data = lsfOutput.split()
-        status = data[2]
-        if status == "EXIT":
-            if self._requeueTest(data):
-                return "PEND", None
-        if status == "PEND" or len(data) < 6:
-            return status, None
+        return test.getTmpExtension() + jobName
+    def submitJob(self, test, jobNameFunction, lsfOptions, command):
+        jobName = self.getJobName(test, jobNameFunction)
+        envCopy = deepcopy(os.environ)
+        self.submissionQueue.put((jobName, "-J " + jobName + " " + lsfOptions + " '" + command + "'", envCopy))
+    def findJob(self, test, jobNameFunction = None):
+        jobName = self.getJobName(test, jobNameFunction)
+        if self.allJobs.has_key(jobName):
+            return self.allJobs[jobName]
         else:
-            execMachine = data[5].split('.')[0]
-            return status, execMachine
+            return LSFJob()
+    def runLsfThread(self):
+        while 1:
+            # Submit at most 5 jobs, then do an update
+            try:
+                for i in range(5):
+                    self.createJobFromQueue()
+            except Empty:
+                pass
+
+            if len(self.activeJobs):
+                self.updateJobs()
+            # We must sleep for a bit, or we use the whole CPU (busy-wait)
+            time.sleep(0.1)
+    def getEnvironmentString(self, envDict):
+        envStr = "env "
+        for key, value in envDict.items():
+            envStr += "'" + key + "=" + value + "' "
+        return envStr
+    def createJobFromQueue(self):
+        jobName, bsubArgs, envDict = self.submissionQueue.get_nowait()
+        envString = self.getEnvironmentString(envDict)
+        command = envString + "bsub " + bsubArgs
+        self.diag.info("Creating job " + jobName + " with command : " + command)
+        stdin, stdout, stderr = os.popen3(command)
+        errorMessage = self.findError(stderr)
+        if errorMessage:
+            self.allJobs[jobName] = LSFJob("submit_failed", errorMessage)
+            self.diag.info("Job not created : " + errorMessage)
+        else:
+            jobId = self.findJobId(stdout)
+            self.diag.info("Job created with id " + jobId)
+            job = LSFJob(jobId)
+            self.activeJobs[jobId] = job
+            self.allJobs[jobName] = job
+    def findError(self, stderr):
+        for errorMessage in stderr.readlines():
+            if errorMessage and errorMessage.find("still trying") == -1:
+                return errorMessage
+        return ""
+    def getJobId(self, line):
+        word = line.split()[1]
+        return word[1:-1]
+    def findJobId(self, stdout):
+        for line in stdout.readlines():
+            if line.find("is submitted") != -1:
+                return self.getJobId(line)
+        print "ERROR: unexpected output from bsub!!!"
+        return ""
+    def updateJobs(self):
+        commandLine = "bjobs -a -w " + string.join(self.activeJobs.keys())
+        stdin, stdout, stderr = os.popen3(commandLine)
+        self.parseOutput(stdout)
+        self.parseErrors(stderr)
+    def parseOutput(self, stdout):
+        for line in stdout.xreadlines():
+            if line.startswith("JOBID"):
+                continue
+            words = line.strip().split()
+            jobId = words[0]
+            job = self.activeJobs[jobId]
+            status = words[2]
+            if job.status == "PEND" and status != "PEND" and len(words) >= 6:
+                fullMachines = words[5].split(':')
+                job.machines = map(lambda x: x.split('.')[0], fullMachines)
+            if status == "EXIT":
+                if self._requeueTest(words):
+                    job.machines = []
+                    status = "PEND"
+            job.status = status
+            if status == "EXIT" or status == "DONE":
+                del self.activeJobs[jobId]
+            self.diag.info("Job " + jobId + " in state " + job.status + " on machines " + repr(job.machines))
+    def parseErrors(self, stderr):
+        # Assume anything we can't find any more has completed OK
+        for errorMessage in stderr.readlines():
+            if errorMessage and errorMessage.find("still trying") == -1:
+                jobId = self.getJobId(errorMessage)
+                job = self.activeJobs[jobId]
+                job.status = "DONE"
+                del self.activeJobs[jobId]
     def _requeueTest(self, jobInfoList): # REQUEUE if last two log message bhist lines contains REQUEUE_PEND and Exited
         jobId = jobInfoList[0]
         std = os.popen("bhist -l " + jobId + " 2>&1")
@@ -230,22 +301,42 @@ class LSFJob:
         if len(requeueLine) > 0:
             return 1
         return 0
-    def getProcessIdWithoutLSF(self, firstpid):
-        status, machine = self.getStatus()
-        if machine:
+
+class LSFJob:
+    def __init__(self, jobId = "not_submitted", errorMessage = ""):
+        self.jobId = jobId
+        self.errorMessage = errorMessage
+        self.machines = []
+        if errorMessage:
+            self.status = "EXIT"
+        else:
+            self.status = "PEND"
+    def hasStarted(self):
+        return self.status != "PEND"
+    def hasFinished(self):
+        return self.status == "DONE" or self.status == "EXIT"
+    def isSubmitted(self):
+        return self.jobId != "not_submitted" and len(self.errorMessage) == 0
+    def isActive(self):
+        return self.isSubmitted() and not self.hasFinished()
+    def kill(self):
+        os.system("bkill " + self.jobId + " > /dev/null 2>&1")
+    def getProcessIdWithoutLSF(self, firstpid, app):
+        if len(self.machines):
+            machine = self.machines[0]
             pslines = os.popen("rsh " + machine + " pstree -p -l " + firstpid + " 2>&1").readlines()
             if len(pslines) == 0:
                 return []
             psline = pslines[0]
-            batchpos = psline.find(os.path.basename(self.app.getConfigValue("binary")))
+            batchpos = psline.find(os.path.basename(app.getConfigValue("binary")))
             if batchpos != -1:
                 apcj = psline[batchpos:].split('---')
                 if len(apcj) > 1:
                     pid = apcj[1].split('(')[-1].split(')')[0]
                     return pid
         return []
-    def getProcessId(self):
-        for line in self.getFile("-l").xreadlines():
+    def getProcessId(self, app):
+        for line in os.popen("bjobs -l " + self.jobId).xreadlines():
             pos = line.find("PIDs")
             if pos != -1:
                 pids = line[pos + 6:].strip().split(' ')
@@ -253,16 +344,8 @@ class LSFJob:
                     return pids[-1]
                 # Try to figure out the PID, without having to wait for LSF.
                 if len(pids) == 1:
-                    return self.getProcessIdWithoutLSF(pids[0])
+                    return self.getProcessIdWithoutLSF(pids[0], app)
         return []
-    def getFile(self, options = ""):
-        return os.popen("bjobs -J " + self.name + " " + options + " 2>&1")
-    def getStringFromLSF(self, options = ""):
-        file = self.getFile(options)
-        lines = file.readlines()
-        if len(lines) == 0:
-            return ""
-        return lines[-1].strip()        
     
 class SubmitTest(unixConfig.RunTest):
     def __init__(self, loginShell, queueFunction, resourceFunction, machineFunction):
@@ -290,20 +373,16 @@ class SubmitTest(unixConfig.RunTest):
         if jobNameFunction:
             repFileName += jobNameFunction(test)
         reportfile =  test.makeFileName(repFileName, temporary=1, forComparison=0)
-        lsfJob = LSFJob(test, jobNameFunction)
-        lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -u nobody" + commandLsfOptions
+        lsfOptions = " -q " + queueToUse + " -o " + reportfile + " -u nobody" + commandLsfOptions
         resource = self.resourceFunction(test)
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
         machine = self.machineFunction(test)
         if len(machine):
             lsfOptions += " -m '" + machine + "'"
-        commandLine = "bsub " + lsfOptions + " '" + command + "' > " + reportfile
-        self.diag.info("Submitting with command : " + commandLine)
-        stdin, stdout, stderr = os.popen3(commandLine)
-        for errorMessage in stderr.readlines():
-            if errorMessage and errorMessage.find("still trying") == -1:
-                raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
+        if not LSFServer.instance:
+            LSFServer.instance = LSFServer()
+        LSFServer.instance.submitJob(test, jobNameFunction, lsfOptions, command)
         return self.WAIT
     def describe(self, test, jobNameFunction = None):
         queueToUse = self.queueFunction(test)
@@ -335,14 +414,14 @@ class KillTest(plugins.Action):
     def __call__(self, test):
         if test.state > test.RUNNING:
             return
-        job = LSFJob(test, self.jobNameFunction)
-        if job.hasFinished() or job.name in self.jobsKilled:
+        job = LSFServer.instance.findJob(test, self.jobNameFunction)
+        if not job.isActive() or job.jobId in self.jobsKilled:
             return
         if self.jobNameFunction:
             print test.getIndent() + repr(self), self.jobNameFunction(test), "in LSF"
         else:
             self.describe(test, " in LSF")
-        self.jobsKilled.append(job.name)
+        self.jobsKilled.append(job.jobId)
         job.kill()
         
 class Wait(plugins.Action):
@@ -352,7 +431,7 @@ class Wait(plugins.Action):
     def __repr__(self):
         return "Waiting for " + self.eventName + " of"
     def __call__(self, test):
-        job = LSFJob(test, self.jobNameFunction)
+        job = LSFServer.instance.findJob(test, self.jobNameFunction)
         if self.checkCondition(job):
             return
         postText = "..."
@@ -361,13 +440,10 @@ class Wait(plugins.Action):
         self.describe(test, postText)
         while not self.checkCondition(job):           
             time.sleep(2)
+            # Object is renewed when job is submitted
+            job = LSFServer.instance.findJob(test, self.jobNameFunction)
     def checkCondition(self, job):
-        try:
-            return job.hasFinished()
-        # Can get interrupted system call here, which is bad. Assume not finished.
-        except IOError:
-            return 0
-
+        return job.hasFinished()
 
 class UpdateLSFStatus(plugins.Action):
     def __init__(self, jobNameFunction = None):
@@ -379,11 +455,12 @@ class UpdateLSFStatus(plugins.Action):
         # Don't look for unrunnable tests...
         if test.state == test.UNRUNNABLE:
             return
-        job = LSFJob(test, self.jobNameFunction)
-        status, machine = job.getStatus()
-        self.diag.info("Job " + job.name + " in state " + status + " for test " + test.name)
-        exitStatus = self.processStatus(test, status, machine)
-        if status == "DONE" or status == "EXIT":
+        job = LSFServer.instance.findJob(test, self.jobNameFunction)
+        if job.errorMessage:
+            raise plugins.TextTestError, "Failed to submit to LSF (" + job.errorMessage.strip() + ")"
+        self.diag.info("Job " + job.jobId + " in state " + job.status + " for test " + test.name)
+        exitStatus = self.processStatus(test, job.status, job.machines)
+        if job.status == "DONE" or job.status == "EXIT":
             return exitStatus
 
         global emergencyFinish
@@ -396,7 +473,7 @@ class UpdateLSFStatus(plugins.Action):
             job.kill()
             return
         return self.WAIT | self.RETRY
-    def processStatus(self, test, status, machine):
+    def processStatus(self, test, status, machines):
         pass
     def getCleanUpAction(self):
         return KillTest(self.jobNameFunction)
@@ -405,10 +482,10 @@ class UpdateTestLSFStatus(UpdateLSFStatus):
     def __init__(self):
         UpdateLSFStatus.__init__(self)
         self.logFile = None
-    def processStatus(self, test, status, machine):
+    def processStatus(self, test, status, machines):
         details = ""
-        if machine != None:
-            details += "Executing on " + machine + os.linesep
+        if len(machines):
+            details += "Executing on " + string.join(machines, ',') + os.linesep
             
         details += "Current LSF status = " + status + os.linesep
         details += self.getExtraRunData(test)
@@ -441,26 +518,8 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         self.isSlowdownJob = isSlowdownJob
         self.timesWaitedForLSF = 0
     def findExecutionMachines(self, test):
-        tmpFile = test.makeFileName("lsfreport", temporary=1, forComparison=0)
-        executionMachines = []
-        activeRegion = 0
-        for line in open(tmpFile).xreadlines():
-            if line.find("executed on host") != -1 or (activeRegion and line.find("home directory") == -1):
-                executionMachines.append(self.parseMachine(line))
-                activeRegion = 1
-            else:
-                activeRegion = 0
-        if len(executionMachines) == 0:
-            # Assume race condition with LSF writing the report... wait a bit and try again
-            if self.timesWaitedForLSF < 10:
-                time.sleep(2)
-                self.timesWaitedForLSF += 1
-                return self.findExecutionMachines(test)
-            else:
-                print "WARNING : Could not find machines in LSF report, keeping it"
-                return executionMachines
-
-        return executionMachines
+        job = LSFServer.instance.findJob(test)
+        return job.machines
     def findPerformanceMachines(self, app):
         rawPerfMachines = unixConfig.MakePerformanceFile.findPerformanceMachines(self, app)
         perfMachines = []

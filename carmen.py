@@ -463,11 +463,11 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
             self.ruleCompilations.append(jobName)
             ruleset = self.getRuleSetName(test)
             self.raiseFailureWithError(ruleset, str(test.stateDetails))
-    def processStatus(self, test, status, machine):
+    def processStatus(self, test, status, machines):
         ruleset = self.getRuleSetName(test)
         details = "Compiling ruleset " + ruleset
-        if machine != None:
-            details += " on " + machine
+        if len(machines):
+            details += " on " + string.join(machines, ",")
         details += os.linesep + "Current LSF status = " + status + os.linesep
         state = test.state
         if status == "PEND":
@@ -571,33 +571,25 @@ class WaitForDispatch(lsf.Wait):
         lsf.Wait.__init__(self)
         self.eventName = "dispatch"
     def checkCondition(self, job):
-        try:
-            # A job can be so quick that we don't catch it running.
-            if job.hasFinished():
-                return 1
-            else:
-                return job.getProcessId()
-        except IOError:
-            return 0
-
+        return job.status != "PEND"
+        
 class AttachProfiler(plugins.Action):
     def __repr__(self):
         return "Attaching lprof on"
     def __call__(self, test):
         waitDispatch = WaitForDispatch()
-        waitDispatch.__call__(test)
-        job = lsf.LSFJob(test)
-        status, executionMachine = job.getStatus()
-        processId = job.getProcessId()
+        waitDispatch(test)
+        job = lsf.LSFServer.instance.findJob(test)
+        processId = job.getProcessId(test.app)
         if not processId:
             if job.hasFinished():
                 print "Job already finished; profiler not attached."
             else:
                 print "Failed to find process id; profiler not attached."
             return
-        self.describe(test, ", executing on " + executionMachine + ", pid " + str(processId))
+        self.describe(test, ", executing on " + string.join(job.machines, ",") + ", pid " + str(processId))
         runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId + " >& gprof.output"
-        os.spawnlp(os.P_NOWAIT, "rsh", "rsh", executionMachine, runLine)
+        os.spawnlp(os.P_NOWAIT, "rsh", "rsh", job.machines[0], runLine)
 
 class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):

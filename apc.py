@@ -427,10 +427,8 @@ def getTestMachineAndApcLogDir(test):
     diag = plugins.getDiagnostics("getTestMachineAndApcLogDir")
     # Find which machine the job was run on.
     if test.app.configObject.target.useLSF():
-        job = lsf.LSFJob(test)
-        file = job.getFile("-w -a")
-        lines = file.readlines()
-        machine = lines[-1].split()[5].split(".")[0]
+        job = lsf.LSFServer.instance.findJob(test)
+        machine = job.machines[0]
         diag.info("Test was run using LSF on " + machine)
     else:
         machine = unixConfig.hostname()
@@ -470,11 +468,11 @@ class FetchApcCore(plugins.Action):
         self.diag.info("APC log files are kept.")
         #Find which machine the job was run on.
         if self.config.useLSF():
-            job = lsf.LSFJob(test)
-            status, machine = job.getStatus()
-            if not machine:
+            job = lsf.LSFServer.instance.findJob(test)
+            if len(job.machines) == 0:
                 print "Failed to find exec host for job from LSF!"
                 return
+            machine = job.machines[0]
         else:
             machine = unixConfig.hostname()
         self.diag.info("Job was ran on machine " + machine)
@@ -522,12 +520,12 @@ class KeepApcLogs(plugins.Action):
         pass
     def __call__(self, test):
         waitDispatch = carmen.WaitForDispatch()
-        waitDispatch.__call__(test)
-        job = lsf.LSFJob(test)
+        waitDispatch(test)
+        job = lsf.LSFServer.instance.findJob(test)
         if job.hasFinished():
             print "Job has already finished, not keeping APC logs."
             return
-        status, machine = job.getStatus()
+        machine = job.machines[0]
         subplanName = test.writeDirs[-1].split(os.sep)[-2]
         apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
         apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"

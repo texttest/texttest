@@ -69,7 +69,7 @@ optimization.StartStudio   - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTM
 """
 
 
-import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig
+import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, lsf
 
 itemNamesConfigKey = "_itemnames_map"
 noIncreasMethodsConfigKey = "_noincrease_methods_map"
@@ -124,7 +124,7 @@ class OptimizationConfig(carmen.CarmenConfig):
         solutionCollator = unixConfig.CollateFile("best_solution", "solution")
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])
     def getInteractiveActions(self):
-        return [ PlotTest, TableTest ]
+        return [ PlotTest, TableTest, ViewLog ]
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
@@ -779,7 +779,7 @@ class TestCaseInformation(TestInformation):
         return ", Test: '" + self.name + "'"
     def getRuleSetName(self, absSubPlanDir):
         problemPath = os.path.join(absSubPlanDir,"problems")
-        if not carmen.isCompressed(problemPath):
+        if not unixConfig.isCompressed(problemPath):
             problemLines = open(problemPath).xreadlines()
         else:
             tmpName = os.tmpnam()
@@ -881,6 +881,48 @@ class ImportTest(plugins.Action):
     
     def testForImportTestCase(self, testInfo):
         return 0
+
+class ViewLog(plugins.Action):
+    def __init__(self, args = []):
+        self.simple = 0
+    def __repr__(self):
+        return "Viewing log of"
+    def __call__(self, test):
+        job = lsf.LSFJob(test)
+        status, machine = job.getStatus()
+        if status == "DONE" or status == "EXIT":
+            print "Job is not running!"
+            return
+        if status != "PEND":
+            if machine != None:
+                self.showLogFile(test, machine, self.getLogFileName(test))
+                self.showRunStatusFile(test)
+            else:
+                print "Could not find machine name."
+    def getLogFileName(self, test):
+        if test.app.name == "apc":
+            subplanDir = test.writeDirs[-1];
+            subplanName = subplanDir.split("/")[-2]
+            return "/tmp/" + subplanName + "\*/apclog" 
+        logFileName = test.app.getConfigValue("log_file")
+        return test.makeFileName(logFileName, temporary=1)
+    def showLogFile(self, test, machine, logFileName):
+        command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'tail -f " + logFileName + "''"
+        os.system(command)
+    def showRunStatusFile(self, test):
+        # Under construction! 
+        #  $CARMSYS/bin/APCstatus.sh ${SUBPLAN}/run_status
+        return
+    def getTitle(self):
+        return "View Log"
+    def getArgumentOptions(self):
+        options = {}
+        return options
+    def getSwitches(self):
+        switches = {}
+        #switches["lf"] = "APC log file"
+        #switches["st"] = "APC status file"
+        return switches
 
 #
 #

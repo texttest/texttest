@@ -175,10 +175,12 @@ class BatchResponder(respond.Responder):
             if not self.failureDetail.has_key(test):
                 continue
             testComparison = self.failureDetail[test]
-            mailFile.write("--------------------------------------------------------" + os.linesep)
-            mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
-            os.chdir(test.getDirectory(temporary=1))
-            self.responder.displayComparisons(testComparison.getComparisons(), mailFile, self.mainSuite.app)
+            comparisonList = testComparison.getComparisons()
+            if len(comparisonList):
+                mailFile.write("--------------------------------------------------------" + os.linesep)
+                mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
+                os.chdir(test.getDirectory(temporary=1))
+                self.responder.displayComparisons(comparisonList, mailFile, self.mainSuite.app)
         
 class MailSender(plugins.Action):
     def __init__(self, sessionName):

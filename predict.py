@@ -13,10 +13,10 @@ import os, filecmp, string, plugins, copy
 class CheckLogFilePredictions(plugins.Action):
     def __init__(self):
         self.logFile = None
-    def getLogFile(self, test):
-        logFile = test.makeFileName(self.logFile, temporary=1)
+    def getLogFile(self, test, stem):
+        logFile = test.makeFileName(stem, temporary=1)
         if not os.path.isfile(logFile):
-            logFile = test.makeFileName(self.logFile)
+            logFile = test.makeFileName(stem)
         return logFile
     def insertError(self, test, error):
         test.changeState(test.FAILED, error)
@@ -43,8 +43,13 @@ class CheckPredictions(CheckLogFilePredictions):
         if len(self.internalErrorList) == 0 and len(self.internalCompulsoryList) == 0:
             return
                 
-        logFile = self.getLogFile(test)
         compsNotFound = copy.deepcopy(self.internalCompulsoryList)
+        self.extractErrorsFrom(test, self.logFile, compsNotFound)
+        self.extractErrorsFrom(test, "errors", compsNotFound)
+        for comp in compsNotFound:
+            self.insertError(test, "ERROR : Compulsory message missing (" + comp + ")")
+    def extractErrorsFrom(self, test, fileStem, compsNotFound):
+        logFile = self.getLogFile(test, fileStem)
         for line in open(logFile).xreadlines():
             for error in self.internalErrorList:
                 if line.find(error) != -1:
@@ -52,8 +57,6 @@ class CheckPredictions(CheckLogFilePredictions):
             for comp in compsNotFound:
                 if line.find(comp) != -1:
                     compsNotFound.remove(comp)
-        for comp in compsNotFound:
-            self.insertError(test, "ERROR : Compulsory message missing (" + comp + ")")
     def setUpApplication(self, app):
         CheckLogFilePredictions.setUpApplication(self, app)
         self.internalErrorList = app.getConfigList("internal_error_text")

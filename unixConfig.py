@@ -52,30 +52,27 @@ def isCompressed(path):
 
 # Deal with UNIX-compressed files as well as straight text
 class CollateFile(default.CollateFile):
-    def transformToText(self, sourcePath):
-        if not isCompressed(sourcePath):
-            return sourcePath       
-        if sourcePath.endswith(".Z"):
-            os.system("uncompress " + sourcePath)
-            return sourcePath[:-2]
-        else:
-            toUse = sourcePath + ".Z"
-            os.rename(sourcePath, toUse)
-            os.system("uncompress " + toUse)
-            return sourcePath
+    def transformToText(self, path):
+        if not isCompressed(path):
+            return        
+        toUse = path + ".Z"
+        os.rename(path, toUse)
+        os.system("uncompress " + toUse)
 
 # Extract just the stack trace rather than the whole core
 class CollateCore(CollateFile):
-    def extract(self, sourceFile, targetFile):
+    def transformToText(self, path):
+        CollateFile.transformToText(self, path)
         fileName = "coreCommands.gdb"
         file = open(fileName, "w")
         file.write("bt\nq\n")
         file.close()
         # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
         # Unfortunately running gdb is not the answer, because it truncates the data...
-        binary = os.popen("csh -c 'echo `tail -c 1024 core`'").read().split(" ")[-1].strip()        
-        gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " core")
-        writeFile = open(targetFile, "w")
+        binary = os.popen("csh -c 'echo `tail -c 1024 " + path + "`'").read().split(" ")[-1].strip()        
+        gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " " + path)
+        newPath = "tmp" + path
+        writeFile = open(newPath, "w")
         prevLine = ""
         for line in gdbData.xreadlines():
             if line.find("Program terminated") != -1:
@@ -86,5 +83,5 @@ class CollateCore(CollateFile):
                 endPos = line.rfind("()")
                 writeFile.write(line[startPos:endPos] + os.linesep)
             prevLine = line
-        os.remove(fileName)
-        os.remove(sourceFile)
+        os.remove(path)
+        os.rename(newPath, path)

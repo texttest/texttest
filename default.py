@@ -117,8 +117,8 @@ class CollateFile(plugins.Action):
         targetFile = test.getTmpFileName(self.targetStem, "w")
         fullpath = self.findPath(test)
         if fullpath:
-            actualPath = self.transformToText(fullpath)
-            self.extract(actualPath, targetFile)
+            shutil.copyfile(fullpath, targetFile)
+            self.transformToText(targetFile)
         elif os.path.isfile(test.makeFileName(self.targetStem)):
             errText = "Expected file '" + self.sourcePattern + "' not created by test"
             open(targetFile, "w").write(errText + os.linesep)
@@ -131,7 +131,7 @@ class CollateFile(plugins.Action):
         return None
     def transformToText(self, path):
         # By default assume it is text
-        return path
+        pass
     def currDir(self, test, filename):
         return os.path.join(test.abspath, filename)       
     def extract(self, sourcePath, targetFile):

@@ -383,16 +383,51 @@ class PrintRuleValue(plugins.Action):
 
 class CopyEnvironment(plugins.Action):
     def __repr__(self):
-        return "Making environment.9 for"
+        return "Making environment.ARCH for"
     def setUpSuite(self, suite):
-        targetFile = os.path.join(suite.abspath, "environment.9")
-        if carmen.isUserSuite(suite) and os.path.isfile(targetFile):
+        versions = [ "", ".10", ".9" ]
+        archs = [ "sparc", "parisc_2_0", "powerpc" ]
+        if carmen.isUserSuite(suite):
             self.describe(suite)
-            file = open(targetFile, "w")
-            carmtmp = os.path.join("/carm/user_and_tmp/carmen_9.0_deliver/tmps_for_Matador_9", os.path.basename(os.path.normpath(os.environ["CARMTMP"])))
-            print carmtmp
-            file.write("CARMTMP:" + carmtmp + os.linesep)
-
+            for version in versions:
+                oldFile = os.path.join(suite.abspath, "environment" + version)
+                if not os.path.isfile(oldFile):
+                    return
+                
+                oldcarmtmp = self.getCarmtmp(oldFile)
+                root, local = os.path.split(os.path.normpath(oldcarmtmp))
+                newcarmtmp = os.path.join("/carm/proj/matador/carmtmps/", self.getDirVersion(version), "i386_linux", local)
+                self.replaceInFile(oldFile, oldcarmtmp, newcarmtmp)
+                for arch in archs:
+                    targetFile = oldFile + "." + arch
+                    self.makeCarmtmpFile(targetFile, version, arch, local)
+    def makeCarmtmpFile(self, targetFile, version, arch, local):
+        file = open(targetFile, "w")
+        dirVersion = self.getDirVersion(version)
+        carmtmp = os.path.join("/carm/proj/matador/carmtmps/", dirVersion, arch, local)
+        print carmtmp
+        file.write("CARMTMP:" + carmtmp + os.linesep)
+        file.close()
+        os.system("cvs add " + targetFile)
+    def getCarmtmp(self, file):
+        for line in open(file).xreadlines():
+            if line.startswith("CARMTMP"):
+                name, carmtmp = line.strip().split(":")
+                return carmtmp
+    def getDirVersion(self, version):
+        if version == "":
+            return "master"
+        else:
+            return "carmen_" + version[1:]
+    def replaceInFile(self, oldFile, oldVal, newVal):
+        newFileName = oldFile + ".new"
+        newFile = open(newFileName, "w")
+        for line in open(oldFile).xreadlines():
+            newFile.write(line.replace(oldVal, newVal))
+        newFile.close()
+        os.rename(newFileName, oldFile)
+        os.system("cvs diff " + oldFile)
+        
 class TimeSummary(plugins.Action):
     def __init__(self, args = []):
         self.timeVersions = [ "" ]

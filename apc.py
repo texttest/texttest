@@ -246,7 +246,8 @@ class RunApcTestInDebugger(default.RunTest):
         apcLogFile.write("")
         apcLogFile.close()
         if self.showLogFile:
-            os.system("xon " + os.environ["HOST"] + " 'xterm -bg white -fg black -T " + "APCLOG-" + test.name + "" + " -e 'less +F " + apcLog + "''")
+            command = "xon " + os.environ["HOST"] + " 'xterm -bg white -fg black -T " + "APCLOG-" + test.name + "" + " -e 'less +F " + apcLog + "''"
+            process = plugins.BackgroundProcess(command)
         # Create a script for gdb to run.
         gdbArgs = test.makeFileName("gdb_args", temporary=1)
         gdbArgsFile = open(gdbArgs, "w")
@@ -491,7 +492,7 @@ class FetchApcCore(plugins.Action):
         # Show log file!
         if not self.config.isNightJob():
             command = "xon " + machine + " 'xterm -bg white -fg black -T " + test.name + " -e 'less +F " + apcTmpDir + os.sep + "apclog" + "''"
-            os.system(command)
+            process = plugins.BackgroundProcess(command)
         tmpDir = test.writeDirs[0]
         if os.path.isdir(tmpDir):
             tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")

@@ -566,17 +566,39 @@ class TestCaseGUI(RightWindowGUI):
         if test.state == test.RUNNING:
             self.testComparison = comparetest.TestComparison(test)
             self.testComparison.makeComparisons(test, makeNew = 1)
+        diagComps = []
+        hasNewDiags, hasOldDiags = 0, 0
         try:
             for fileComparison in self.testComparison.allResults:
-                if fileComparison.newResult():
-                    self.addDynamicFileToModel(newiter, fileComparison, self.getFailureColour())
-                elif fileComparison.hasDifferences():
-                    self.addDynamicFileToModel(compiter, fileComparison, self.getFailureColour())
+                if fileComparison.isDiagnostic():
+                    if fileComparison.newResult():
+                        hasNewDiags = 1
+                    else:
+                        hasOldDiags = 1
+                    diagComps.append(fileComparison)
                 else:
-                    self.addDynamicFileToModel(compiter, fileComparison, self.getSuccessColour())
+                    self.addDynamicComparisonToModel(newiter, compiter, fileComparison)
         except AttributeError:
             # The above code assumes we have failed on comparison: if not, don't display things
             pass
+        diagcompiter, diagnewiter = None, None
+        if hasOldDiags:
+            guilog.info("Adding subtree for diagnostic comparisons") 
+            diagcompiter = self.model.insert_before(compiter, None)
+            self.model.set_value(diagcompiter, 0, "Diagnostics")
+        if hasNewDiags:
+            guilog.info("Adding subtree for new diagnostic files") 
+            diagnewiter = self.model.insert_before(newiter, None)
+            self.model.set_value(diagnewiter, 0, "Diagnostics")
+        for diagComp in diagComps:
+            self.addDynamicComparisonToModel(diagnewiter, diagcompiter, diagComp)
+    def addDynamicComparisonToModel(self, newiter, compiter, fileComparison):
+        if fileComparison.newResult():
+            self.addDynamicFileToModel(newiter, fileComparison, self.getFailureColour())
+        elif fileComparison.hasDifferences():
+            self.addDynamicFileToModel(compiter, fileComparison, self.getFailureColour())
+        else:
+            self.addDynamicFileToModel(compiter, fileComparison, self.getSuccessColour())
     def addDynamicFileToModel(self, iter, comparison, colour):
         self.addFileToModel(iter, comparison.tmpFile, comparison, colour)
     def addStaticFilesToModel(self, test):
@@ -593,9 +615,24 @@ class TestCaseGUI(RightWindowGUI):
                     defFiles.append(file)
                 elif test.classId() == "test-case":
                     stdFiles.append(file)
+        diagDir = os.path.join(test.abspath, "Diagnostics")
+        diagFiles = []
+        if os.path.isdir(diagDir):
+            configFileName = test.getConfigValue("diagnostics")["configuration_file"]
+            configPath = os.path.join(diagDir, configFileName)
+            if os.path.isfile(configPath):
+                defFiles.append(configPath)
+                for diagFile in os.listdir(diagDir):
+                    fullPath = os.path.join(diagDir, diagFile)
+                    if os.path.isfile(fullPath) and diagFile != configFileName:
+                        diagFiles.append(fullPath)
         self.addFilesUnderIter(defiter, defFiles, test.abspath)
         if len(stdFiles):
             self.addFilesUnderIter(stditer, stdFiles, test.abspath)
+        if len(diagFiles):
+            exiter = self.model.insert_before(None, None)
+            self.model.set_value(exiter, 0, "Diagnostic Files")
+            self.addFilesUnderIter(exiter, diagFiles)
         for name, filelist in test.extraReadFiles().items():
             exiter = self.model.insert_before(None, None)
             self.model.set_value(exiter, 0, name + " Files")

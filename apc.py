@@ -198,21 +198,8 @@ class ViewApcLog(guiplugins.InteractiveAction):
     def __repr__(self):
         return "Viewing log of"
     def __call__(self, test):
-        job = lsf.LSFJob(test)
-        status, machine = job.getStatus()
-        if status == "DONE" or status == "EXIT":
-            print "Job is not running!"
-            return
-        if status != "PEND":
-            if machine != None:
-                self.showLogFile(test, machine, self.getLogFileName(test))
-                self.showRunStatusFile(test)
-            else:
-                print "Could not find machine name."
-    def getLogFileName(self, test):
-        subplanDir = test.writeDirs[-1];
-        subplanName = subplanDir.split("/")[-2]
-        return "/tmp/" + subplanName + "\*/apclog" 
+        machine, apcTmpDir = getTestMachineAndApcLogDir(test)
+        self.showLogFile(test, machine, apcTmpDir + "/apclog")
     def showLogFile(self, test, machine, logFileName):
         command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''"
         self.startExternalProgram(command)
@@ -411,7 +398,7 @@ class ApcUpdateLSFStatus(lsf.UpdateTestLSFStatus):
              try:
                  runStatusHead = open(runStatusHeadFile).read()
                  return runStatusHead
-             except OSError:
+             except OSError,IOError:
                  return "Error opening/reading " + runStatusHeadFile                 
          else:
              return "Run status file is not avaliable yet."

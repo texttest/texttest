@@ -372,8 +372,9 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
     def processStatus(self, test, status, machines):
         ruleset = self.getRuleSetName(test)
         details = "Compiling ruleset " + ruleset
+        machineStr = string.join(machines, ",")
         if len(machines):
-            details += " on " + string.join(machines, ",")
+            details += " on " + machineStr
         details += os.linesep + "Current LSF status = " + status + os.linesep
         if status == "PEND":
             test.state.freeText = details
@@ -381,11 +382,11 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
             test.changeState(RunningRuleCompilation(details, test.state))
 
         if status == "EXIT":
-            return self.raiseFailure(test, ruleset)
+            return self.raiseFailure(test, ruleset, machineStr)
         elif status == "DONE":
             self.ruleCompilations.append(self.jobNameFunction(test))
             test.changeState(plugins.TestState("not_started", "Ruleset " + ruleset + " succesfully compiled"))
-    def raiseFailure(self, test, ruleset):
+    def raiseFailure(self, test, ruleset, machineStr):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         jobName = self.jobNameFunction(test)
         if not test.state.thisTestCompiles:
@@ -395,11 +396,11 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
             else:
                 return self.RETRY | self.WAIT
         self.ruleCompilations.append(jobName)
-        errContents = self.findErrorMessage(compTmp)
+        errContents = self.findErrorMessage(compTmp, machineStr)
         self.raiseFailureWithError(ruleset, errContents)
-    def findErrorMessage(self, compTmp):
+    def findErrorMessage(self, compTmp, machineStr):
         if not os.path.isfile(compTmp):
-            return "Rave compiler did not run at all, possibly problems with execution machine"
+            return "Rave compiler did not run at all, possibly problems with execution machine (" + machineStr + ")"
         errContents = string.join(open(compTmp).readlines(),"")
         if errContents.find("Compiling... failed!") != -1:
             return "Rave compiler failed in C-compilation phase." + os.linesep + "See " + compTmp + " for details."

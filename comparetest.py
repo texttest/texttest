@@ -3,7 +3,9 @@
 helpDescription = """
 By default, TextTest collects the application's standard output in output.<app> and standard error
 in errors.<app> (this last on UNIX only). You can collect other files for comparison by specifying
-collate_file:<source>-><target>, where <source> is some file your application writes (standard UNIX
+[collate_file]
+<target>:<source>
+, where <source> is some file your application writes (standard UNIX
 pattern matching is allowed here, e.g *.myext), and <target> is what you want it to be called by TextTest.
 
 Evaluation of test results consists by default of comparing all files that have been collected.
@@ -54,6 +56,7 @@ plugins.addCategory("failure", "FAILED")
 class TestComparison(plugins.TestState):
     def __init__(self, previousInfo, execHost, appAbs):
         plugins.TestState.__init__(self, "failure", "", started=1, completed=1)
+        self.execHost = execHost
         self.allResults = []
         self.changedResults = []
         self.newResults = []
@@ -171,7 +174,11 @@ class TestComparison(plugins.TestState):
             self.categorise()
     def categorise(self):
         if not self.hasResults():
-            raise plugins.TextTestError, "No output files at all produced, presuming problems running test"
+            errMsg = "No output files at all produced, presuming problems running test" 
+            if self.execHost:
+                raise plugins.TextTestError, errMsg + " on " + self.execHost
+            else:
+                raise plugins.TextTestError, errMsg
         if self.failedPrediction:
             # Keep the category we had before
             return

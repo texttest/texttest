@@ -181,17 +181,29 @@ class Application:
         oldFile = open(fileName)
         newFile = open(newFileName, "w")
         forbiddenText = self.getConfigValue(stem)
+        linesToRemove = 0 
         for line in oldFile.readlines():
-            if self.filterLine(line, forbiddenText):
+            linesToRemove += self.calculateLinesToRemove(line, forbiddenText)
+            if linesToRemove == 0:
                 newFile.write(line)
+            else:
+                linesToRemove -= 1
         newFile.close()
         return newFileName
 #private:
-    def filterLine(self, line, forbiddenText):
+    def calculateLinesToRemove(self, line, forbiddenText):
         for text in forbiddenText:
-            if line.find(text) != -1:
-                return 0
-        return 1
+            searchText = text
+            linePoint = text.find("{LINES:")
+            if linePoint != -1:
+                searchText = text[:linePoint]
+            if line.find(searchText) != -1:
+                if linePoint != -1:
+                    var, val = text[linePoint + 1:-1].split(":")
+                    return int(val)
+                else:
+                    return 1
+        return 0
     def makeCheckout(self):
         checkout = inputOptions.checkoutName()
         if checkout == None:

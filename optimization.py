@@ -1095,7 +1095,75 @@ class PlotTest(plugins.Action):
         app.makeWriteDirectory()
     def getCleanUpAction(self):
         return GraphPlot()
-        
+
+plotAveragerCount = 0
+
+class PlotAverager:
+    def __init__(self, tmpFileDirectory):
+        self.average = {}
+        self.numberOfGraphs = 0
+        self.plotLineRepresentant = None
+        self.tmpFileDirectory = tmpFileDirectory
+    def addGraph(self, graph):
+        self.numberOfGraphs += 1
+        if not self.average:
+            self.average = graph
+            return
+        graphXValues = graph.keys()
+        graphXValues.sort()
+        averageXValues = self.average.keys()
+        averageXValues.sort()
+        averagePos = 0
+        #print "Average", averageXValues
+        #print "Graph", graphXValues
+        prev_xvals = graphXValues[0]
+        old_average = self.average[prev_xvals]
+        for xvals in graphXValues:
+            #print xvals,averageXValues[averagePos]
+            # The same x-value exists both in graph and average.
+            if averagePos < len(averageXValues) and averageXValues[averagePos] == xvals:
+                #print "Found same X value,",xvals," ,adding"
+                old_average = self.average[xvals]
+                self.average[xvals] += graph[xvals]
+                averagePos += 1
+            # There is some distance left to the next average x-value; just fill in the new values.
+            elif averagePos >= len(averageXValues)-1 or averageXValues[averagePos] > xvals:
+                #print "Filling in new values"
+                self.average[xvals] = graph[xvals] + old_average
+            # Count up the averagePos
+            else:
+                #print "Counting up averagePos, old", averageXValues[averagePos]
+                while averagePos < len(averageXValues) and averageXValues[averagePos] <= xvals:
+                    #print "Doing add", averageXValues[averagePos],xvals, averageXValues[averagePos]-xvals
+                    old_average = self.average[averageXValues[averagePos]]
+                    self.average[averageXValues[averagePos]] += graph[prev_xvals]
+                    averagePos +=1
+                #print "Stopped at", averageXValues[averagePos]
+                if averagePos < len(averageXValues) and averageXValues[averagePos] == xvals:
+                    print "Same value!!!"
+                #print "Doing extra add",xvals
+                self.average[xvals] = graph[xvals] + old_average
+            prev_xvals = xvals
+            #if averagePos == len(averageXValues):
+                #print "End of average"
+        # If there are any average values left.
+        if averagePos < len(averageXValues):
+            while averagePos < len(averageXValues):
+                self.average[averageXValues[averagePos]] += graph[graphXValues[-1]]
+                averagePos += 1
+        #print graph, self.average
+    def plotArgument(self):
+        global plotAveragerCount
+        plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))
+        plotAveragerCount += 1
+        plotFile = open(plotFileName, "w")
+        xValues = self.average.keys()
+        xValues.sort()
+        for xVal in xValues:
+            plotFile.write(str(xVal) + " " + str(self.average[xVal]/self.numberOfGraphs) + os.linesep)
+        plotFile.close()
+        return "'" + plotFileName + "' " + " title \"" + self.plotLineRepresentant.name + "\" with lines lt " + self.plotLineRepresentant.lineType + " lw 2"
+
 # Class for using gnuplot to plot test curves of tests
 #
 class _PlotTest(plugins.Action):
@@ -1103,18 +1171,19 @@ class _PlotTest(plugins.Action):
         self.testGraph = TestGraph()
         self.args = args
         self.plotForTest = None
+        self.plotAveragers = {}
     def __call__(self, test):
-        self.plotForTest = PlotTestInGUI(test, graph=self.testGraph)
+        self.plotForTest = PlotTestInGUI(test, graph=self.testGraph, plotAveragers=self.plotAveragers)
         self.plotForTest.optionGroup.readCommandLineArguments(self.args)
         self.plotForTest(test)
     
 class GraphPlot(plugins.Action):
     def setUpApplication(self, app):
         if commonPlotter.plotForTest:
-            xrange, yrange, targetFile, colour ,title = commonPlotter.plotForTest.getPlotOptions()
+            xrange, yrange, targetFile, colour, onlyAverage, title = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
             os.chdir(app.writeDirectory)
-            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, colour, title, wait=1)
+            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, colour, onlyAverage, commonPlotter.plotAveragers, title, wait=1)
     
 class TestGraph:
     def __init__(self):
@@ -1158,7 +1227,7 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, writeDir, xrange, yrange, targetFile, colour, title = None, wait=0):
+    def plot(self, writeDir, xrange, yrange, targetFile, colour, onlyAverage, plotAveragers, title = None, wait=0):
         if len(self.plotLines) == 0:
             return
 
@@ -1188,9 +1257,15 @@ class TestGraph:
             gnuplotFile.write("set yrange [" + yrange +"];" + os.linesep)
         plotArguments = self.getPlotArguments()
         plotCommand = "plot "
-        for plotArgument in plotArguments:
-            gnuplotFile.write(plotCommand + plotArgument + os.linesep)
-            plotCommand = "replot "
+        if not onlyAverage:
+            for plotArgument in plotArguments:
+                gnuplotFile.write(plotCommand + plotArgument + os.linesep)
+                plotCommand = "replot "
+        if plotAveragers:
+            for plotAverager in plotAveragers:
+                plotArgument = plotAveragers[plotAverager].plotArgument()
+                gnuplotFile.write(plotCommand + plotArgument + os.linesep)
+                plotCommand = "replot "
         gnuplotFile.write("quit" + os.linesep)
         gnuplotFile.close()
         commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName
@@ -1234,7 +1309,7 @@ class TestGraph:
 
 # Same as above, but from GUI. Refactor!
 class PlotTestInGUI(guiplugins.InteractiveAction):
-    def __init__(self, test, oldOptionGroup = None, graph = None):
+    def __init__(self, test, oldOptionGroup = None, graph = None, plotAveragers = None):
         guiplugins.InteractiveAction.__init__(self, test, oldOptionGroup, "Graph")
         self.addOption(oldOptionGroup, "r", "Horizontal range", "0:")
         self.addOption(oldOptionGroup, "yr", "Vertical range")
@@ -1244,12 +1319,15 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         self.addOption(oldOptionGroup, "v", "Extra versions to plot")
         self.addSwitch(oldOptionGroup, "pc", "Print in colour")
         self.addSwitch(oldOptionGroup, "s", "Plot against solution number rather than time")
+        self.addSwitch(oldOptionGroup, "av", "Plot also average")
+        self.addSwitch(oldOptionGroup, "oav", "Plot only average")
         self.addOption(oldOptionGroup, "title", "Title of the plot")
         self.externalGraph = graph
         if graph:
             self.testGraph = graph
         else:
             self.testGraph = TestGraph()
+        self.plotAveragers = plotAveragers
     def __repr__(self):
         return "Plotting Graph"
     def getTitle(self):
@@ -1277,16 +1355,17 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):
-        xrange, yrange, fileName, writeColour, title = self.getPlotOptions()
-        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, writeColour, title)
+        xrange, yrange, fileName, writeColour , onlyAverage, title= self.getPlotOptions()
+        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, writeColour, onlyAverage, title, None)
         self.testGraph = TestGraph()
     def getPlotOptions(self):
         xrange = self.optionGroup.getOptionValue("r")
         yrange = self.optionGroup.getOptionValue("yr")
         fileName = self.optionGroup.getOptionValue("p")
         writeColour = self.optionGroup.getSwitchValue("pc")
+        onlyAverage = self.optionGroup.getSwitchValue("oav")
         title = self.optionGroup.getOptionValue("title")
-        return xrange, yrange, fileName, writeColour, title
+        return xrange, yrange, fileName, writeColour, onlyAverage, title
     def writePlotFiles(self, lineName, logFile, test):
         plotItems = self.getItemsToPlot()
         optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
@@ -1294,7 +1373,13 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             return
 
         for item in plotItems:
-            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"))
+            averager = None
+            if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
+                if not self.plotAveragers.has_key(lineName+item):
+                    averager = self.plotAveragers[lineName+item] = PlotAverager(self.test.app.writeDirectory)
+                else:
+                    averager = self.plotAveragers[lineName+item]
+            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), averager)
             self.testGraph.addLine(plotLine)
 
 class StartStudio(guiplugins.InteractiveAction):
@@ -1323,7 +1408,7 @@ class StartStudio(guiplugins.InteractiveAction):
 guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUI, StartStudio ]
 
 class PlotLine:
-    def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale):
+    def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale, averager):
         self.test = test
         self.name = lineName
         self.lineType = None
@@ -1348,7 +1433,11 @@ class PlotLine:
                 self.axisLabels["x"] = "CPU time (min)"
         self.axisLabels["y"] = item
         self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
-        self.writeFile(optRun, item, plotAgainstSolution, timeScaleFactor)
+        graph = self.writeFile(optRun, item, plotAgainstSolution, timeScaleFactor)
+        if averager:
+            averager.addGraph(graph)
+            if not averager.plotLineRepresentant:
+                averager.plotLineRepresentant = self
     def getAxisLabel(self, axis):
         return self.axisLabels[axis]
     def getPlotFileName(self, lineName, item):
@@ -1361,12 +1450,18 @@ class PlotLine:
         if not os.path.isdir(dir):
             os.makedirs(dir)
         plotFile = open(self.plotFileName, "w")
+        graph = {}
+        cnt = 0
         for solution in optRun.solutions:
             if solution.has_key(item):
                 if plotAgainstSolution:
                     plotFile.write(str(solution[item]) + os.linesep)
+                    graph[cnt] = solution[item]
+                    cnt = cnt + 1
                 else:
                     plotFile.write(str(solution[timeEntryName]/timeScaleFactor) + "  " + str(solution[item]) + os.linesep)
+                    graph[solution[timeEntryName]/timeScaleFactor] = solution[item]
+        return graph           
     def getPlotArguments(self, multipleApps, multipleUsers, multipleLines, multipleTests):
         return "'" + self.plotFileName + "' " + self.getPlotName(multipleApps, multipleUsers, multipleTests) + self.getStyle(multipleLines)
     def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):

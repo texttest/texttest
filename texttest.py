@@ -171,11 +171,12 @@ class TestCase(Test):
     def __init__(self, name, abspath, app, parent):
         Test.__init__(self, name, abspath, app, parent)
         self.inputFile = self.makeFileName("input")
+        self.useCaseFile = self.makeFileName("usecase")
         optionsFile = self.makeFileName("options")
         self.options = ""
         if (os.path.isfile(optionsFile)):
             self.options = os.path.expandvars(open(optionsFile).readline().strip())
-        elif not os.path.isfile(self.inputFile):
+        elif not os.path.isfile(self.inputFile) and not os.path.isfile(self.useCaseFile):
             self.valid = 0
         # List of directories where this test will write files. First is where it executes from
         self.writeDirs = []

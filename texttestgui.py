@@ -503,7 +503,7 @@ class TestCaseGUI(RightWindowGUI):
                 fullPath = file
             newiter = self.addFileToModel(iter, fullPath, None, colour)
     def isDefinitionFile(self, file):
-        definitions = [ "options.", "input.", "environment", "testsuite" ]
+        definitions = [ "options.", "input.", "usecase.", "environment", "testsuite" ]
         for defin in definitions:
             if file.startswith(defin):
                 return 1

@@ -187,13 +187,12 @@ class ImportTestCase(ImportTest):
         test.makeBasicWriteDirectory()
         test.setUpEnvironment(parents=1)
         os.chdir(test.writeDirs[0])
-        command = test.getExecuteCommand()
-        recordCommand = self.getRecordCommand(command, test.abspath)
+        recordCommand = test.getExecuteCommand() + " -record " + test.useCaseFile
         os.system(recordCommand)
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
         if self.optionGroup.getSwitchValue("editsc"):
-            self.viewFile(os.path.join(test.abspath, "gui_script"), wait=1)
+            self.viewFile(test.useCaseFile, wait=1)
     def recordStandardResult(self, test):
         print "Running test", test, "to get standard behaviour..."
         commandLine = self.getTextTestName() + " -a " + test.app.name + " -o -t " + test.name + " -ts " + self.test.name \
@@ -210,10 +209,7 @@ class ImportTestCase(ImportTest):
         optionString = self.getOptions()
         print "Using option string :", optionString
         optionFile = open(os.path.join(testDir, "options." + suite.app.name), "w")
-        optionFile.write(optionString)
-        if self.appIsGUI():
-            optionFile.write(" " + self.getReplayOption())
-        optionFile.write(os.linesep)
+        optionFile.write(optionString + os.linesep)
         return optionString
     def writeInputFile(self, suite, testDir):
         if not self.optionGroup.getSwitchValue("editin"):
@@ -225,12 +221,6 @@ class ImportTestCase(ImportTest):
         self.viewFile(inputFile, wait=1)
     def getOptions(self):
         return self.optionGroup.getOptionValue("opt")
-    # We assume tested GUIs support record and replay. These default to command
-    # line -replay and -record
-    def getReplayOption(self):
-        return "-replay gui_script"
-    def getRecordCommand(self, command, testDir):
-        return command.replace(self.getReplayOption(), "-record " + os.path.join(testDir, "gui_script"))
 
 class ImportTestSuite(ImportTest):
     def __init__(self, suite):

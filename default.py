@@ -274,6 +274,9 @@ class RunTest(plugins.Action):
         os.system(testCommand)
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()
+        useCaseFileName = test.useCaseFile
+        if os.path.isfile(useCaseFileName):
+            testCommand += " -replay " + useCaseFileName
         inputFileName = test.inputFile
         if os.path.isfile(inputFileName):
             testCommand = testCommand + " < " + inputFileName

@@ -333,17 +333,20 @@ class LogFileFinder:
         return None
 
 class OptimizationRun:
-    def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0, specFile = ""):
+    def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0, specFile = "", givenLogFile = ""):
         self.diag = plugins.getDiagnostics("optimization")
         self.performance = performance.getTestPerformance(test, version) # float value
-        logFinder = LogFileFinder(test, tryTmpFile)
-        if specFile == "":
-            foundTmp, self.logFile = logFinder.findFile(version)
-            # Doesn't make sense to scale temporary files, as they probably aren't complete
-            if foundTmp:
-                scale = 0
+        if givenLogFile:
+            self.logFile = givenLogFile
         else:
-            self.logFile = logFinder.findSpecifiedFile(version, specFile)
+            logFinder = LogFileFinder(test, tryTmpFile)
+            if specFile == "":
+                foundTmp, self.logFile = logFinder.findFile(version)
+                # Doesn't make sense to scale temporary files, as they probably aren't complete
+                if foundTmp:
+                    scale = 0
+                else:
+                    self.logFile = logFinder.findSpecifiedFile(version, specFile)
         self.diag.info("Reading data from " + self.logFile)
         self.penaltyFactor = 1.0
         allItems = definingItems + interestingItems

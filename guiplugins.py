@@ -104,8 +104,11 @@ class SaveTest(InteractiveAction):
         if testComparison:
             if singleFile:
                 testComparison.saveSingle(singleFile, self.getExactness(), version)
+                test.notifyChanged()
             else:
                 testComparison.save(self.getExactness(), version, overwriteSuccess)
+                # So it goes green in the GUI...
+                test.changeState(test.SUCCEEDED, testComparison)
 
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!

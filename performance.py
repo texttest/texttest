@@ -80,14 +80,12 @@ def getTestMemory(test, version = None):
     return getPerformance(test.makeFileName("memory", version))
 
 class PerformanceTestComparison(comparetest.TestComparison):
+    def __init__(self, previousInfo, execHost):
+        comparetest.TestComparison.__init__(self, previousInfo, execHost)
+        self.execHost = execHost
     def __repr__(self):
-        execHost = None
-        try:
-            execHost = self.test.execHost
-        except AttributeError:
-            pass
-        if execHost != None and self.hasDifferences():
-            return "FAILED on " + execHost + " :"
+        if self.execHost != None and self.hasDifferences():
+            return "FAILED on " + self.execHost + " :"
         return comparetest.TestComparison.__repr__(self)
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         baseName = os.path.basename(standardFile)

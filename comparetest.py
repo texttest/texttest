@@ -50,15 +50,14 @@ from ndict import seqdict
 from predict import FailedPrediction
 
 class TestComparison:
-    def __init__(self, test):
-        self.test = test
+    def __init__(self, previousInfo, execHost):
         self.allResults = []
         self.changedResults = []
         self.newResults = []
         self.correctResults = []
         self.failedPrediction = None
-        if isinstance(test.stateDetails, FailedPrediction):
-            self.failedPrediction = test.stateDetails
+        if isinstance(previousInfo, FailedPrediction):
+            self.failedPrediction = previousInfo
         self.diag = plugins.getDiagnostics("TestComparison")
     def __repr__(self):
         if len(self.changedResults) > 0 or self.failedPrediction:
@@ -74,7 +73,6 @@ class TestComparison:
     def needsRecalculation(self):
         for comparison in self.allResults:
             if comparison.needsRecalculation():
-                self.diag.info("Recalculation needed for test " + self.test.name + " for " + self.test.app.description()) 
                 return 1
         return 0
     def getType(self):
@@ -194,7 +192,6 @@ class TestComparison:
         comparison.overwrite(exact, versionString)
         storageList.remove(comparison)
         self.correctResults.append(comparison)
-        self.test.notifyChanged()
     def findComparison(self, stem):
         for comparison in self.changedResults:
             if comparison.stem == stem:
@@ -218,17 +215,21 @@ class TestComparison:
         self.correctResults += self.changedResults + self.newResults
         self.changedResults = []
         self.newResults = []
-        self.test.changeState(self.test.SUCCEEDED, self)
 
 class MakeComparisons(plugins.Action):
     testComparisonClass = TestComparison
     def __repr__(self):
         return "Comparing differences for"
+    def execHost(self, test):
+        try:
+            return test.execHost
+        except AttributeError:
+            return None
     def __call__(self, test):
         # Don't compare killed tests...
         if test.state == test.KILLED:
             return
-        testComparison = self.testComparisonClass(test)
+        testComparison = self.testComparisonClass(test.stateDetails, self.execHost(test))
         testComparison.makeComparisons(test)
         self.describe(test, testComparison.getPostText())
         if not testComparison.hasResults():

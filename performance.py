@@ -160,7 +160,12 @@ class PerformanceFileComparison(comparetest.FileComparison):
     def _hasDifferences(self, app):
         configDescriptor = self.descriptors["config"]
         if configDescriptor == "cputime":
-            perfList = app.getConfigValue("performance_test_machine") + app.getConfigValue("performance_test_resource")
+            perfList = app.getConfigValue("performance_test_machine")
+            try:
+                # Hack for queuesystem configuration, which might not be used...
+                perfList += app.getConfigValue("performance_test_resource")
+            except KeyError:
+                pass
             if perfList == None or len(perfList) == 0 or perfList[0] == "none":
                 return 0
         longEnough = self.newPerformance > float(app.getConfigValue("minimum_" + configDescriptor + "_for_test"))

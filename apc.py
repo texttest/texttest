@@ -622,8 +622,6 @@ class MakeProgressReport(optimization.MakeProgressReport):
                 
 
 class ApcTestCaseInformation(optimization.TestCaseInformation):
-    def __init__(self, suite, name):
-        optimization.TestCaseInformation.__init__(self, suite, name)
     def isComplete(self):
         if not os.path.isdir(self.testPath()):
             return 0
@@ -638,6 +636,7 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
         testPath = self.testPath()
         optionPath = self.makeFileName("options")
         envPath = self.makeFileName("environment")
+        statusPath = self.makeFileName("status")
         perfPath = self.makeFileName("performance")
         createdPath = 0
         if not os.path.isdir(testPath):
@@ -696,7 +695,7 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
     def buildPerformance(self, subPlanDir):
         statusPath = self.makeFileName("status")
         if not os.path.isfile(statusPath):
-            statusPath = os.path.join(subPlanDir, "status")
+            shutil.copyfile(os.path.join(subPlanDir, "status"), statusPath)
         if os.path.isfile(statusPath):
             lastLines = os.popen("tail -10 " + statusPath).xreadlines()
             for line in lastLines:

@@ -415,10 +415,13 @@ class MakeMemoryFile(plugins.Action):
             return None
         endOfString = pos + len(self.memoryFinder)
         memString = line[endOfString:].lstrip()
-        memNumber = float(memString.split()[0])
-        if memString.lower().find("kb") != -1:
-            memNumber = float(memNumber / 1024.0)
-        return memNumber
+        try:
+            memNumber = float(memString.split()[0])
+            if memString.lower().find("kb") != -1:
+                memNumber = float(memNumber / 1024.0)
+            return memNumber
+        except:
+            return None
 
 # A standalone action, we add description and generate the main file instead...
 class ExtractMemory(MakeMemoryFile):

@@ -75,21 +75,24 @@ class Config(plugins.Configuration):
 
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):
-        self.text = filterText
+        self.texts = filterText.split(",")
     def containsText(self, test):
-        return test.name.find(self.text) != -1
+        for text in self.texts:
+            if test.name.find(text) != -1:
+                return 1
+        return 0
     def equalsText(self, test):
-        return test.name == self.text
+        return test.name in self.texts
     
 class TestNameFilter(TextFilter):
     def acceptsTestCase(self, test):
         return self.containsText(test)
     
-class FileFilter(plugins.Filter):
+class FileFilter(TextFilter):
     def __init__(self, filterFile):
         self.texts = map(string.strip, open(filterFile).readlines())
     def acceptsTestCase(self, test):
-        return test.name in self.texts
+        return self.equalsText(test)
 
 # Use communication channels for stdin and stderr (because we don't know how to redirect these on windows).
 # Tried to use communication channels on all three, but read() blocks and deadlock between stderr and stdout can result.

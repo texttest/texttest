@@ -20,8 +20,8 @@ will soon be replaced with a version hierarchy, when the framework can handle th
 """
 
 helpOptions = """
--u <text>  - select only user suites whose name contains <text>. A user suite is defined as a test suite which
-             defines CARMUSR locally.
+-u <texts> - select only user suites whose name contains one of the strings in <texts>. <texts> is interpreted as a
+             comma-separated list. A user suite is defined as a test suite which defines CARMUSR locally.
 
 -lprof     - Run LProf on the test concerned. This will automatically profile the job and generate the textual
              data in the test directory, in a file called lprof.<app>. It is proposed to automatically generate

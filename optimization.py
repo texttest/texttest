@@ -1092,7 +1092,7 @@ class _PlotTest(plugins.Action):
         else:
             return ""
     def getPlotFileName(self, version, state, item):
-        return "plot." + version + "." + state + "." + item
+        return "plot-" + version + "-" + state + "-" + item
     def getPlotUserAndTest(self, file):
         username = file.split(os.sep)[-4]
         testname = file.split(os.sep)[-3]
@@ -1100,9 +1100,9 @@ class _PlotTest(plugins.Action):
     def getPlotInfo(self, file):
         plotFileName = file.split(os.sep)[-1]
         app = plotFileName.split(".")[-1]
-        ver = plotFileName.split(".")[-4]
-        state = plotFileName.split(".")[-3]
-        item = int(plotFileName.split(".")[-2])
+        ver = plotFileName.split("-")[1]
+        state = plotFileName.split("-")[2]
+        item = int(plotFileName.split("-")[3].split(".")[0])
         username, testname = self.getPlotUserAndTest(file)
         return app,ver,state,item,username,testname
     def setPointandLineTypes(self):

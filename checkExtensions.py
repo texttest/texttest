@@ -117,7 +117,20 @@ class CreateCompareFiles(plugins.Action):
             return
         #print "Extensions to be compared:",checkExtensions
         for ext in checkExtensions:
-            files2Check+=glob('*'+ext)
+            flist=glob('*'+ext)
+            if flist:
+                files2Check+=flist
+            else:
+                #Special check to see if a file was not created at all
+                #(but has a stored compare file)
+                #It should also be reported as an error
+                missing=glob(('*'+ext).replace('.','_')+'.'+test.app.name)
+                for file in missing:
+                    dummyErrFileName=file.split('.')[0]
+                    f=open(test.getTmpFileName(dummyErrFileName,'w'),'w')
+                    f.write("File %s was not created!\nThis dummy file was created by the test framework.\n"\
+                            %(dummyErrFileName))
+                    f.close()                    
         #print "These files will be compared:",(' ').join(files2Check)
         for file in files2Check:
             #the current standard compare can't handle dots in the names

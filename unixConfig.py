@@ -80,6 +80,7 @@ class RunTest(default.RunTest):
         self.collectStdErr = 1
         self.testDisplay = None
         self.realDisplay = os.getenv("DISPLAY")
+        self.virtualDisplayDiag = plugins.getDiagnostics("virtual display")
     def __call__(self, test):
         if self.testDisplay:
             os.environ["DISPLAY"] = self.testDisplay
@@ -136,6 +137,7 @@ class RunTest(default.RunTest):
             self.allocateVirtualDisplay(virtualDisplayMachines)
     def allocateVirtualDisplay(self, virtualDisplayMachines):
         for machine in virtualDisplayMachines:
+            self.virtualDisplayDiag.info("Looking for virtual display on " + machine)
             display = self.findDisplay(machine)
             if display and display != "":
                 return self.setDisplay(display)
@@ -171,12 +173,18 @@ class RunTest(default.RunTest):
     def findDisplay(self, server):
         line = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep -v grep'").readline()
         if len(line):
+            self.virtualDisplayDiag.info("Found Xvfb process running:" + os.linesep + line)
             serverName = server + line.split()[-1] + ".0"
-            (cin, cout, cerr) = os.popen3("remsh " + server + " 'xterm -display " + serverName + " -e echo test'")
+            testCommandLine = "remsh " + server + " 'xterm -display " + serverName + " -e echo test'"
+            self.virtualDisplayDiag.info("Testing with command '" + testCommandLine + "'")
+            (cin, cout, cerr) = os.popen3(testCommandLine)
             lines = cerr.readlines()
             if len(lines) == 0:
                 return serverName
             else:
+                print "Failed to connect to virtual server on", server
+                for line in lines:
+                    print line.strip()
                 return ""
         return None
 

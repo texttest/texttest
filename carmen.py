@@ -149,6 +149,8 @@ class RunWithParallelAction(plugins.Action):
     def __repr__(self):
         return repr(self.baseRunner)
     def __call__(self, test):
+        if test.state.isComplete():
+            return
         processId = os.fork()
         if processId == 0:
             self.baseRunner(test)

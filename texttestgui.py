@@ -544,7 +544,7 @@ class TestCaseGUI(RightWindowGUI):
             return self.colours["failure"]
     def getSaveTestAction(self):
         for instance in self.actionInstances:
-            if isinstance(instance, guiplugins.SaveTest):
+            if isinstance(instance, guiplugins.SaveTest) and instance.canPerformOnTest():
                 return instance
         return None
     def createTextView(self, test):

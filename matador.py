@@ -93,6 +93,32 @@ class MatadorConfig(optimization.OptimizationConfig):
             if line.startswith("153"):
                 return line.split(";")[3]
         return ""
+    def filesFromRulesFile(self, test, rulesFile):
+        raveParamName = "raveparameters." + test.app.name + test.app.versionSuffix()
+        raveParamFile = test.makePathName(raveParamName, test.abspath)
+        scriptFile = self.findScriptFile(raveParamFile)
+        if not scriptFile:
+            scriptFile = self.findScriptFile(rulesFile)
+        if scriptFile:
+            return [ ("Script", scriptFile) ]
+        else:
+            return []
+    def findScriptFile(self, fileName):
+        if not os.path.isfile(fileName):
+            return
+        for line in open(fileName).xreadlines():
+            words = line.split()
+            if len(words) < 2:
+                continue
+            if words[0].endswith("script_file_name"):
+                return self.getScriptPath(words[1])
+    def getScriptPath(self, file):
+        fullPath = os.path.join(os.environ["CARMUSR"], "apc_scripts", file)
+        if os.path.isfile(fullPath):
+            return fullPath
+        fullPath = os.path.join(os.environ["CARMUSR"], "matador_scripts", file)
+        if os.path.isfile(fullPath):
+            return fullPath
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)

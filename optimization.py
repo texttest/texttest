@@ -156,6 +156,8 @@ class OptimizationConfig(ravebased.Config):
             if os.path.isfile(rulesFile):
                 readDirs["Subplan"] = [ rulesFile ]
                 readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", self.getRuleSetName(test)) ]
+                for title, fileName in self.filesFromRulesFile(test, rulesFile):
+                    readDirs[title] = [ fileName ]
             test.tearDownEnvironment(parents=1)
         elif test.environment.has_key("CARMUSR"):
             readDirs["Resource"] = [ os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab") ]
@@ -163,6 +165,8 @@ class OptimizationConfig(ravebased.Config):
             readDirs["RAVE module"] = [ os.path.join(test.environment["CARMSYS"], \
             "carmusr_default", "crc", "modules", test.getConfigValue("rave_name")) ]
         return readDirs
+    def filesFromRulesFile(self, test, rulesFile):
+        return []
     def getSpecificTestRunner(self):
         return ravebased.Config.getTestRunner(self) 
     def printHelpDescription(self):

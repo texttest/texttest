@@ -243,7 +243,7 @@ class CarmenConfig(lsf.LSFConfig):
         # Currently no short queue for powerpc_aix4
         if arch == "powerpc" and "9" in test.app.versions:
             return ""
-        if usePrefix == None and (cpuTime < 10 or rave):
+        if usePrefix == None and (cpuTime < test.getConfigValue("maximum_cputime_for_short_queue") or rave):
             return "short_"
         elif arch == "powerpc" or arch == "parisc_2_0":
             return ""
@@ -293,6 +293,7 @@ class CarmenConfig(lsf.LSFConfig):
         app.setConfigDefault("default_architecture", "i386_linux")
         app.setConfigDefault("rave_name", None)
         app.setConfigDefault("rave_static_library", "")
+        app.setConfigDefault("maximum_cputime_for_short_queue", 10)
         # dictionary of lists
         app.setConfigDefault("build_targets", { "" : [] })
     def getApplicationEnvironment(self, app):

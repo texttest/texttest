@@ -117,7 +117,9 @@ class OptimizationConfig(carmen.CarmenConfig):
     def getCompileRules(self, localFilter):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestRunner(self):
-        return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), carmen.CarmenConfig.getTestRunner(self) ])
+        return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
+    def getSpecificTestRunner(self):
+        return carmen.CarmenConfig.getTestRunner(self) 
     def getTestCollator(self):
         solutionCollator = unixConfig.CollateFile("best_solution", "solution")
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])

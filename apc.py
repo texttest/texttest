@@ -70,7 +70,7 @@ class ApcConfig(optimization.OptimizationConfig):
         else:
             ruleCompile = self.optionMap.has_key("rulecomp")
         return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, staticFilter, ruleCompile)
-    def getTestRunner(self):
+    def getSpecificTestRunner(self):
         if self.optionMap.has_key("lprof"):
             subActions = [ self._getApcTestRunner(), carmen.WaitForDispatch(), carmen.RunLProf(-2) ]
             return plugins.CompositeAction(subActions)

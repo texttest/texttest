@@ -264,10 +264,10 @@ class RunTest(plugins.Action):
     def __repr__(self):
         return "Running"
     def __call__(self, test):
-        if test.app.name in self.brokenApps.keys():
-            test.changeState(test.UNRUNNABLE, self.brokenApps[test.app.name])
         if test.state == test.UNRUNNABLE:
             return
+        if test.app.name in self.brokenApps.keys():
+            raise plugins.TextTestError, self.brokenApps[test.app.name]
         retValue = self.runTest(test)
         # Change state after we've started running!
         self.changeState(test)
@@ -373,14 +373,18 @@ class ReconnectTest(plugins.Action):
     def __call__(self, test):
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
         writeDir = test.writeDirs[0]
-        if not os.path.exists(reconnLocation):
+        if not self.canReconnectTo(reconnLocation):
             os.makedirs(writeDir)
-            return
+            raise plugins.TextTestError, "No test results found to reconnect to"
+        
         print "Reconnecting to test", test.name
         shutil.copytree(reconnLocation, writeDir)
         for file in os.listdir(writeDir):
             if file.endswith("cmp"):
                 os.remove(os.path.join(writeDir, file))
+    def canReconnectTo(self, dir):
+        # If the directory does not exist or is empty, we cannot reconnect to it.
+        return os.path.exists(dir) and len(os.listdir(dir)) > 0
     def setUpApplication(self, app):
         root, localDir = os.path.split(app.writeDirectory)
         if not os.path.isdir(root):

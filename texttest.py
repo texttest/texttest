@@ -476,7 +476,8 @@ class Application:
         homeName = os.path.join(homeDir, name)
         if os.path.exists(homeName):
             return homeName
-        return None
+        # Return the name even though it doesn't exist, then it can be used
+        return name
     def makeAbsPath(self, path):
         if (os.path.isabs(path)):
             return path

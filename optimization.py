@@ -860,13 +860,30 @@ class PlotTest(plugins.Action):
         return "Plotting"
     def __del__(self):
         if len(self.plotFiles) > 0:
-            stdin, stdout, stderr = os.popen3("gnuplot -persist")
+            stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
             fileList = []
-            style = " with linespoints"
+            if len(self.plotVersions)>1:
+                versionLineType = {}
+                counter = 1
+                for index in range(len(self.plotVersions)):
+                    versionLineType[self.plotVersions[index]] = counter
+                    counter = counter + 1
+                testPointType = {}
+                counter = 0
+                for file in self.plotFiles:
+                    name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
+                    if not testPointType.has_key(name):
+                        testPointType[name] = counter
+                        counter = counter + 1
+                    
             for file in self.plotFiles:
                 ver = file.split(os.sep)[-1].split(".",1)[-1]
                 name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
                 title = " title \"" + name + " " + ver + "\" "
+                if len(self.plotVersions)>1:
+                    style = " with linespoints lt " +  str(versionLineType[file.split(".")[-1]]) + " pt " + str(testPointType[name])
+                else:
+                    style = " with linespoints "
                 fileList.append("'" + file + "' " + title + style)
             if self.plotPrint:
                 absplotPrint = os.path.expanduser(self.plotPrint)
@@ -876,8 +893,11 @@ class PlotTest(plugins.Action):
                 stdin.write("set terminal postscript" + os.linesep)
 
             stdin.write("set ylabel '" + self.getYlabel() + "'" + os.linesep)
-            stdin.write("set xlabel 'CPU time (min)'" + os.linesep)
-            stdin.write("set time" + os.linesep)
+            if self.plotAgainstSolNum:
+                stdin.write("set xlabel 'Solution number'" + os.linesep)
+            else: 
+                stdin.write("set xlabel 'CPU time (min)'" + os.linesep)
+                stdin.write("set time" + os.linesep)
             stdin.write("set xtics border nomirror norotate" + os.linesep)
             stdin.write("set ytics border nomirror norotate" + os.linesep)
             stdin.write("set border 3" + os.linesep)
@@ -897,8 +917,10 @@ class PlotTest(plugins.Action):
                 print "No status file does exist for test " + test.name + "(" + version + ")"
 
             plotFileName = test.makeFileName("plot")
-            if len(version) > 0:
-                plotFileName += "." + version
+#            if len(version) > 0:
+            plotFileName += "." + version
+#            else:
+#                plotFileName += "." + "main"
             plotFile = open(plotFileName, "w")
             for solution in optRun.solutions:
                 if self.plotAgainstSolNum:

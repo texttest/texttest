@@ -217,17 +217,12 @@ class TextTestGUI:
                 return gtk.FALSE
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
-            return gtk.TRUE
-    
-    def stateChangeEvent(self, test, state):
-        eventName = "test " + test.name + " to " + self.stateChangeDescription(test, state)
-        category = test.name
-        scriptEngine.applicationEvent(eventName, category)
+            return gtk.TRUE    
     def testChanged(self, test, state, byAction):
         if test.classId() == "test-case":
             self.redrawTest(test, state)
             if byAction:
-                self.stateChangeEvent(test, state)
+                test.stateChangeEvent(state)
         else:
             self.redrawSuite(test)
         if self.rightWindowGUI and self.rightWindowGUI.test == test:

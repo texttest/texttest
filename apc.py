@@ -462,9 +462,10 @@ class FetchApcCore(plugins.Action):
         #Find which machine the job was run on.
         if self.config.useLSF():
             job = lsf.LSFJob(test)
-            file = job.getFile("-w -a")
-            lines = file.readlines()
-            machine = lines[-1].split()[5].split(".")[0]
+            status, machine = job.getStatus()
+            if not machine:
+                print "Failed to find exec host for job from LSF!"
+                return
         else:
             machine = unixConfig.hostname()
         self.diag.info("Job was ran on machine " + machine)

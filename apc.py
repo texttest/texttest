@@ -1,4 +1,4 @@
-import default, carmen, lsf, os, sys, stat, string, shutil, optimization, plugins
+import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -7,6 +7,8 @@ class ApcConfig(optimization.OptimizationConfig):
     def __init__(self, optionMap):
         optimization.OptimizationConfig.__init__(self, optionMap)
         self.subplanManager = ApcSubPlanDirManager(self)
+    def getProgressReportBuilder(self):
+        return MakeProgressReport(self.optionValue("prrep"))
     def getLibraryFile(self):
         return os.path.join("data", "apc", carmen.architecture, "libapc.a")
     def getSubPlanFileName(self, test, sourceName):
@@ -142,6 +144,37 @@ class StartStudio(plugins.Action):
         print os.popen(commandLine).readline()
         sys.exit(0)
 
+class MakeProgressReport(optimization.MakeProgressReport):
+    def __init__(self, referenceVersion):
+        optimization.MakeProgressReport.__init__(self, referenceVersion)
+    def compare(self, test, referenceFile, currentFile):
+        currPerf = int(performance.getTestPerformance(test))
+        refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
+        referenceCosts = self.getCosts(referenceFile, "TOTAL")
+        currentCosts =  self.getCosts(currentFile, "TOTAL")
+        currTTWC = currPerf
+        refTTWC = refPerf
+        if currentCosts[-1] < referenceCosts[-1]:
+            currTTWC = self.timeToCost(currentFile, currPerf, currentCosts, referenceCosts[-1])
+        else:
+            refTTWC = self.timeToCost(referenceFile, refPerf, referenceCosts, currentCosts[-1])
+        if float(refTTWC) < 1:
+            return
+        kpi = float(currTTWC) / float(refTTWC)
+        self.testCount += 1
+        self.kpi *= kpi
+        userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
+        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.percent(kpi)
+        self.reportLine("                         ", "Current", "Version " + self.referenceVersion)
+        self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
+        self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
+        self.reportLine("Total time (minutes)     ", currPerf, refPerf)
+        self.reportLine("Time to worst cost (mins)", currTTWC, refTTWC)
+    def getCosts(self, file, type):
+        costCommand = "grep '" + type + "' " + file + " | awk '{ print $3 }'"
+        return map(self.makeInt, os.popen(costCommand).readlines())
+
+
 class ApcTestCaseInformation(optimization.TestCaseInformation):
     def __init__(self, suite, name):
         optimization.TestCaseInformation.__init__(self, suite, name)
@@ -215,13 +248,15 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
         return lpEtabLine + os.linesep + spEtabLine
 
     def buildPerformance(self, subPlanDir):
-        statusPath = os.path.join(subPlanDir, "status")
+        statusPath = self.makeFileName("status")
+        if not os.path.isfile(statusPath):
+            statusPath = os.path.join(subPlanDir, "status")
         if os.path.isfile(statusPath):
             lastLines = os.popen("tail -10 " + statusPath).xreadlines()
             for line in lastLines:
                 if line[0:5] == "Time:":
                     sec = line.split(":")[1].split("s")[0]
-                    return "CPU time   :     " + str(int(sec)) + ".0 sec. on heathlands"
+                    return "CPU time   :     " + str(int(sec)) + ".0 sec. on onepusu"
 # Give some default that will not end it up in the short queue
         return "CPU time   :      2500.0 sec. on heathlands"
         

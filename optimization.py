@@ -8,8 +8,10 @@ class OptimizationConfig(carmen.CarmenConfig):
 	    listKPIs = [KPI.cSimpleRosteringOptTimeKPI, KPI.cFullRosteringOptTimeKPI, KPI.cWorstBestRosteringOptTimeKPI]
             return [ CalculateKPIs(self.optionValue("kpi"), listKPIs) ]
         if self.optionMap.has_key("prrep"):
-            return [ MakeProgressReport(self.optionValue("prrep")) ]
+            return [ self.getProgressReportBuilder() ]
         return carmen.CarmenConfig.getActionSequence(self)
+    def getProgressReportBuilder(self):
+        return MakeProgressReport(self.optionValue("prrep"))
     def getRuleBuilder(self, neededOnly):
         if self.isNightJob() or not neededOnly:
             return self.getCompileRules(None)
@@ -183,8 +185,9 @@ class MakeProgressReport(TestReport):
         self.kpi = 1.0
         self.testCount = 0
     def __del__(self):
-        avg = math.pow(self.kpi, 1.0 / float(self.testCount))
-        print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
+        if self.testCount > 0:
+            avg = math.pow(self.kpi, 1.0 / float(self.testCount))
+            print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
     def __repr__(self):
         return "Comparison on"
     def setUpApplication(self, app):

@@ -42,8 +42,8 @@ class JavaPropertyReader:
             wFile.write(key + "=" + self.properties[key] + os.linesep)
 
 class RecordTest(guiplugins.RecordTest):
-    def __init__(self, test):
-        guiplugins.RecordTest.__init__(self, test)
+    def __init__(self, test, oldOptionGroup):
+        guiplugins.RecordTest.__init__(self, test, oldOptionGroup)
         self.test = test
         self.test.setUpEnvironment(1)
         baseName = os.environ["DMG_PROPS_INPUT"]
@@ -51,10 +51,10 @@ class RecordTest(guiplugins.RecordTest):
         defaultHTTPdir = os.environ["DMG_RECORD_HTTP_DIR"]
         self.test.tearDownEnvironment(1)
         self.props = JavaPropertyReader(propFileInCheckout)
-        self.optionGroup.addOption("v", "Version", "")
-        self.optionGroup.addOption("host", "DMServer host", self.props.get("host"))
-        self.optionGroup.addOption("port", "Port", self.props.get("port"))
-        self.optionGroup.addOption("w", "HTTP dir", defaultHTTPdir)
+        self.addOption(oldOptionGroup, "v", "Version", "")
+        self.addOption(oldOptionGroup, "host", "DMServer host", self.props.get("host"))
+        self.addOption(oldOptionGroup, "port", "Port", self.props.get("port"))
+        self.addOption(oldOptionGroup, "w", "HTTP dir", defaultHTTPdir)
     def canPerformOnTest(self):
         existName = self.test.makeFileName("input")
         if os.path.isfile(existName):

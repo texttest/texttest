@@ -3,7 +3,7 @@ import plugins, os, sys, shutil, string
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
-    def __init__(self, test, optionName):
+    def __init__(self, test, optionName = ""):
         self.test = test
         self.processes = []
         self.optionGroup = plugins.OptionGroup(optionName)
@@ -339,6 +339,10 @@ class InteractiveActionHandler:
             return realClassName(test)
         except ImportError:
             return className(test)
+        except:
+            # If some invalid interactive action is provided, need to know which
+            print "Error with interactive action", className.__name__
+            raise sys.exc_type, sys.exc_value
         
 interactiveActionHandler = InteractiveActionHandler()
 

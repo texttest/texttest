@@ -15,6 +15,9 @@ helpOptions = """
 -o         - run in overwrite mode. This means that the interactive dialogue is replaced by simply
              overwriting all previous results with new ones.
 
+-n         - run in new-file mode. Tests that succeed will still overwrite the standard file, rather than
+             leaving it, as is the deafult behaviour.
+
 -reconnect <fetchdir:user>
             - Reconnect to already run tests, optionally takes a directory and user from which to
               fetch temporary files.
@@ -31,7 +34,7 @@ def getConfig(optionMap):
 
 class Config(plugins.Configuration):
     def getOptionString(self):
-        return "iot:f:"
+        return "iont:f:"
     def getActionSequence(self):
         actions = [ self.getTestRunner(), self.getTestEvaluator() ]
         if self.optionMap.has_key("i"):
@@ -57,7 +60,7 @@ class Config(plugins.Configuration):
         # Won't do anything, of course
         return plugins.Action()
     def getTestComparator(self):
-        return comparetest.MakeComparisons()
+        return comparetest.MakeComparisons(self.optionMap.has_key("n"))
     def getTestResponder(self):
         if self.optionMap.has_key("o"):
             return respond.OverwriteOnFailures(self.optionValue("v"))

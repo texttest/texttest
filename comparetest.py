@@ -30,6 +30,8 @@ class TestComparison:
             return ""
 
 class MakeComparisons(plugins.Action):
+    def __init__(self, newFiles):
+        self.newFiles = newFiles
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):
@@ -74,6 +76,8 @@ class MakeComparisons(plugins.Action):
         if os.path.exists(standardFile):
             if comparison.hasDifferences():
                 return comparison
+            elif self.newFiles:
+                os.rename(tmpFile, standardFile)
             else:
                 os.remove(tmpFile)
         else:

@@ -36,7 +36,7 @@ default.CountTest          - produce a brief report on the number of tests in th
 default.ExtractMemory      - update the memory files from the standard log files
 """
 
-import os, shutil, plugins, respond, performance, string, predict
+import os, shutil, plugins, respond, performance, string, predict, sys
 from glob import glob
 
 def getConfig(optionMap):
@@ -144,7 +144,11 @@ class Config(plugins.Configuration):
         # Don't know of any that work anywhere with the same name...
         return None
     def defaultTextDiffTool(self):
-        return "ndiff.py -q"
+        for dir in sys.path:
+            fullPath = os.path.join(dir, "ndiff.py")
+            if os.path.isfile(fullPath):
+                return sys.executable + " " + fullPath + " -q"
+        return None
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output")
         app.setConfigDefault("diff_program", self.defaultGraphicalDiffTool())

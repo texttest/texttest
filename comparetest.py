@@ -36,6 +36,14 @@ and must be checked carefully by hand and saved if correct. If standard results 
 collected, the filtered new results are compared with the standard and any difference
 is interpreted as a test failure. 
 """
+helpScripts = """
+comparetest.RemoveObsoleteVersions
+                           - For each selected test, compares all files with the same stem with each other
+                             and schedules any obsolete versions for removal. For example, if output.app.2
+                             is equivalent to output.app, it will be removed, but not if it is equivalent to
+                             output.app.3, when only a warning is written.
+""" 
+
 
 import os, filecmp, string, plugins, time
 from ndict import seqdict
@@ -471,3 +479,59 @@ class LineFilter:
                 wordNumber -= 1
         return len(words) + 1
 
+class RemoveObsoleteVersions(plugins.Action):
+    def __init__(self):
+        self.filesToRemove = []
+    def __repr__(self):
+        return "Removing obsolete versions for"
+    def __call__(self, test):
+        self.describe(test)
+        test.makeBasicWriteDirectory()
+        compFiles = {}
+        for file in os.listdir(test.abspath):
+            if test.app.ownsFile(file):
+                stem = file.split(".")[0]
+                compFile = self.filterFile(test, os.path.join(test.abspath, file))
+                if compFiles.has_key(stem):
+                    compFiles[stem].append(compFile)
+                else:
+                    compFiles[stem] = [ compFile ]
+        for compFilesMatchingStem in compFiles.values():
+            for index1 in range(len(compFilesMatchingStem)):
+                for index2 in range(index1 + 1, len(compFilesMatchingStem)):
+                    self.compareFiles(test, compFilesMatchingStem[index1], compFilesMatchingStem[index2])
+        for file in self.filesToRemove:
+            os.system("cvs rm -f " + file)
+        self.filesToRemove = []
+    def cmpFile(self, test, file):
+        basename = os.path.basename(file)
+        return test.makeFileName(basename + "cmp", temporary=1, forComparison=0)
+    def origFile(self, test, file):
+        if file.endswith("cmp"):
+            return os.path.join(test.abspath, os.path.basename(file)[:-3])
+        else:
+            return file
+    def filterFile(self, test, file):
+        newFile = self.cmpFile(test, file)
+        filter = RunDependentTextFilter(test.app, os.path.basename(file).split(".")[0])
+        return filter.filterFile(file, newFile)
+    def compareFiles(self, test, file1, file2):
+        origFile1 = self.origFile(test, file1)
+        origFile2 = self.origFile(test, file2)
+        if origFile1 in self.filesToRemove or origFile2 in self.filesToRemove:
+            return
+        if filecmp.cmp(file1, file2, 0):
+            local1 = os.path.basename(origFile1)
+            local2 = os.path.basename(origFile2)
+            if local1.find(local2) != -1:
+                print test.getIndent() + local1, "obsolete due to", local2
+                self.filesToRemove.append(origFile1)
+            elif local2.find(local1) != -1:
+                print test.getIndent() + local2, "obsolete due to", local1
+                self.filesToRemove.append(origFile2)
+            else:
+                print test.getIndent() + local1, "equivalent to", local2
+    def setUpSuite(self, suite):
+        self.describe(suite)
+    def setUpApplication(self, app):
+        app.makeWriteDirectory()

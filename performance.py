@@ -52,7 +52,7 @@ performance.MemoryStatistics
                                version1[,version2]
                              - l
                                Print only tests with difference larger than limit
-"""
+""" + comparetest.helpScripts
 
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing

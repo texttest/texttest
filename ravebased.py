@@ -136,7 +136,8 @@ class Config(carmen.CarmenConfig):
     def getRealRuleBuilder(self):
         jobNameCreator = RulesetJobBuildNameCreator(self.getRuleSetName)
         if self.useLSF():
-            ruleRunner = lsf.SubmitTest(self.findRaveCompilationLSFQueue, self.findLSFResource, self.findLSFMachine, self.optionMap)
+            ruleRunner = lsf.SubmitTest(self.getLoginShell(), self.findRaveCompilationLSFQueue, \
+                                        self.findLSFResource, self.findLSFMachine, self.optionMap)
             return [ self.getRuleBuildObject(ruleRunner, jobNameCreator), \
                      UpdateRulesetBuildStatus(self.getRuleSetName, jobNameCreator) ]
         else:

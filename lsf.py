@@ -100,7 +100,7 @@ class LSFConfig(unixConfig.UNIXConfig):
         if not self.useLSF():
             return unixConfig.UNIXConfig._getActionSequence(self, makeDirs)
 
-        submitter = SubmitTest(self.findLSFQueue, self.findLSFResource, self.findLSFMachine, self.optionMap)
+        submitter = SubmitTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource, self.findLSFMachine, self.optionMap)
         actions = [ submitter, self.updaterLSFStatus(), default.SaveState() ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
@@ -347,7 +347,8 @@ class LSFJob:
         os.system("bkill " + self.jobId + " > /dev/null 2>&1")
     
 class SubmitTest(plugins.Action):
-    def __init__(self, queueFunction, resourceFunction, machineFunction, optionMap):
+    def __init__(self, loginShell, queueFunction, resourceFunction, machineFunction, optionMap):
+        self.loginShell = loginShell
         self.queueFunction = queueFunction
         self.resourceFunction = resourceFunction
         self.machineFunction = machineFunction
@@ -376,9 +377,15 @@ class SubmitTest(plugins.Action):
         tmpDir, local = os.path.split(test.app.writeDirectory)
         slaveLog = test.makeFileName("slavelog", temporary=1, forComparison=0)
         slaveErrs = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
-        return "python " + sys.argv[0] + " -d " + test.app.abspath + " -a " + test.app.name + test.app.versionSuffix() \
-               + " -c " + test.app.checkout + " -t " + test.getRelPath() + " -slave " + test.getTmpExtension() \
-               + " -tmp " + tmpDir + " " + self.runOptions + " > " + slaveLog + " 2> " + slaveErrs
+        commandLine = "python " + sys.argv[0] + " -d " + test.app.abspath + " -a " + test.app.name + test.app.versionSuffix() \
+                      + " -c " + test.app.checkout + " -t " + test.getRelPath() + " -slave " + test.getTmpExtension() \
+                      + " -tmp " + tmpDir + " " + self.runOptions + " > " + slaveLog
+        # C-shell based shells have different syntax here...
+        if self.loginShell.find("csh") != -1:
+            commandLine = "( " + commandLine + " ) >& " + slaveErrs
+        else:
+            commandLine += " 2> " + slaveErrs
+        return self.loginShell + " -c \"" + commandLine + "\""
     def runCommand(self, test, command, jobNameFunction = None, commandLsfOptions = "", copyEnv = 1):
         self.describe(test, jobNameFunction)
         

@@ -124,9 +124,11 @@ class TestComparison:
             self.correctResults.append(comparison)
     def makeComparisons(self, test, makeNew = 0):
         self.makeComparisonsInDir(test, test.getDirectory(temporary=1), makeNew)
-        if len(self.changedResults) == 1 and self.changedResults[0].hasExternalExcuse():
+        if len(self.changedResults) == 1 and self.changedResults[0].checkExternalExcuses():
             # If the only difference has an excuse, remove it...
+            fileComparison = self.changedResults[0]
             del self.changedResults[0]
+            self.correctResults.append(fileComparison)
     def makeComparisonsInDir(self, test, dir, makeNew = 0):
         fileList = os.listdir(dir)
         fileList.sort()
@@ -217,7 +219,7 @@ class FileComparison:
         self.differenceId = -1
     def __repr__(self):
         return os.path.basename(self.stdFile).split('.')[0]
-    def hasExternalExcuse(self):
+    def checkExternalExcuses(self):
         # No excuses here...
         return 0
     def getType(self):

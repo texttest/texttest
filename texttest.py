@@ -211,16 +211,27 @@ class TestCase(Test):
         return filter.acceptsTestCase(self)
     def makeBasicWriteDirectory(self):
         os.makedirs(self.writeDirs[0])
-        for copyTestPath in self.app.getConfigList("copy_test_path"):
+        self.collatePaths("copy_test_path", self.copyTestPath)
+        self.collatePaths("link_test_path", self.linkTestPath)
+    def collatePaths(self, configListName, collateMethod):
+        for copyTestPath in self.app.getConfigList(configListName):
             fullPath = self.makePathName(copyTestPath, self.abspath)
             target = os.path.join(self.writeDirs[0], copyTestPath)
-            if os.path.isfile(fullPath):
-                dir, localName = os.path.split(target)
-                if not os.path.isdir(dir):
-                    os.makedirs(dir)
-                shutil.copy(fullPath, target)
-            if os.path.isdir(fullPath):
-                shutil.copytree(fullPath, target)
+            dir, localName = os.path.split(target)
+            if not os.path.isdir(dir):
+                os.makedirs(dir)
+            collateMethod(fullPath, target)
+    def copyTestPath(self, fullPath, target):
+        if os.path.isfile(fullPath):
+            shutil.copy(fullPath, target)
+        if os.path.isdir(fullPath):
+            shutil.copytree(fullPath, target)
+    def linkTestPath(self, fullPath, target):
+        # Linking doesn't exist on windows!
+        if os.name != "posix":
+            return self.copyTestPath(fullPath, target)
+        if os.path.exists(fullPath):
+            os.symlink(fullPath, target)
     def createDir(self, rootDir, nameBase = "", subDir = None):
         writeDir = os.path.join(rootDir, nameBase + self.app.getTmpIdentifier())
         fullWriteDir = writeDir

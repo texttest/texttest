@@ -247,7 +247,8 @@ class Application:
         try:
             exec importCommand
         except:
-            if sys.exc_type == exceptions.ImportError:
+            errorString = "No module named " + configModule
+            if sys.exc_type == exceptions.ImportError and str(sys.exc_value) == errorString:
                 raise KeyError, "could not find config_module " + configModule
             else:
                 printException()

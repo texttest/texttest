@@ -226,6 +226,17 @@ class TestCase(Test):
         os.makedirs(self.writeDirs[0])
         self.collatePaths("copy_test_path", self.copyTestPath)
         self.collatePaths("link_test_path", self.linkTestPath)
+    def cleanNonBasicWriteDirectories(self):
+        if len(self.writeDirs) > 0:
+            for writeDir in self.writeDirs[1:]:
+                self._removeDir(writeDir)
+    def _removeDir(self, writeDir):
+        parent, local = os.path.split(writeDir)
+        if local.find(self.app.getTmpIdentifier()) != -1:
+            debugLog.info("Removing write directory under", parent)
+            shutil.rmtree(writeDir)
+        elif parent:
+            self._removeDir(parent)
     def collatePaths(self, configListName, collateMethod):
         for copyTestPath in self.app.getConfigValue(configListName):
             fullPath = self.makePathName(copyTestPath, self.abspath)
@@ -250,16 +261,20 @@ class TestCase(Test):
         fullWriteDir = writeDir
         if subDir:
             fullWriteDir = os.path.join(writeDir, subDir)
-        self.createDirs(fullWriteDir)
+        try:
+            self.createDirs(fullWriteDir)
+        except OSError:
+            # If started twice at the same time this can happen...
+            return self.createDir(rootDir, nameBase + "?", subDir)
         return writeDir
     def createDirs(self, fullWriteDir):
-        os.makedirs(fullWriteDir)
+        os.makedirs(fullWriteDir)    
         debugLog.info("Created write directory " + fullWriteDir)
         self.writeDirs.append(fullWriteDir)
         return fullWriteDir
     def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
         nameBase = basicDir + "."
-        self.app.cleanPreviousWriteDirs(rootDir, nameBase)
+        self.app.tryCleanPreviousWriteDirs(rootDir, nameBase)
         writeDir = self.createDir(rootDir, nameBase, subDir)
         newBasic = os.path.basename(writeDir)
         debugLog.info("Replacing " + basicDir + " with " + newBasic)
@@ -375,6 +390,9 @@ class TestSuite(Test):
             if test.name == testName:
                 return 1
         return 0
+    def cleanNonBasicWriteDirectories(self):
+        for test in self.testcases:
+            test.cleanNonBasicWriteDirectories()
             
 class Application:
     def __init__(self, name, abspath, configFile, version, optionMap):
@@ -538,8 +556,7 @@ class Application:
         return fullList
     def makeWriteDirectory(self):
         root, tmpId = os.path.split(self.writeDirectory)
-        if self.keepTmpFiles:
-            self.cleanPreviousWriteDirs(root)
+        self.tryCleanPreviousWriteDirs(root)
         os.makedirs(self.writeDirectory)
         debugLog.info("Made root directory at " + self.writeDirectory)
     def removeWriteDirectory(self):
@@ -556,8 +573,8 @@ class Application:
                 print "Write directory still in use, waiting 1 second to remove..."
                 time.sleep(1)
         print "Something still using write directory", self.writeDirectory, ": leaving it"
-    def cleanPreviousWriteDirs(self, rootDir, nameBase = ""):
-        if not os.path.isdir(rootDir):
+    def tryCleanPreviousWriteDirs(self, rootDir, nameBase = ""):
+        if not self.keepTmpFiles or not os.path.isdir(rootDir):
             return
         currTmpString = nameBase + self.name + self.versionSuffix() + tmpString()
         for file in os.listdir(rootDir):
@@ -934,6 +951,8 @@ class ApplicationRunner:
                 self._performAction(self.testSuite, cleanUp)
         # Hardcoded destructor-like cleanup (the destructor isn't called for some reason)
         self.app.removeWriteDirectory()
+        if not self.app.keepTmpFiles:
+            self.testSuite.cleanNonBasicWriteDirectories()
     def _performAction(self, suite, action):
         debugLog.debug("Performing action " + repr(action))
         suite.setUpEnvironment()

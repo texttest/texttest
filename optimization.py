@@ -258,7 +258,7 @@ class LogFileFinder:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
     def findTempFileInTest(self, version, stem):                           
         for file in os.listdir(self.test.abspath):
-            if file.startswith("output") and file.find(version + self.test.getTestUser()) != -1:
+            if file.startswith(stem) and file.find(version + self.test.getTestUser()) != -1:
                 return file
 
 class OptimizationRun:

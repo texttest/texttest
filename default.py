@@ -448,19 +448,20 @@ class CreateCatalogue(plugins.Action):
         file.close()
     def writeFileStructure(self, file, fileNames):
         prevParts = []
+        tabSize = 4
         for fileName in fileNames:
             parts = fileName.split(os.sep)
             indent = 0
             for index in range(len(parts)):
                 part = parts[index]
-                indent += len(part)
+                indent += tabSize
                 if index >= len(prevParts) or part != prevParts[index]:
                     prevParts = []
                     file.write(part + os.linesep)
                     if index != len(parts) - 1:
-                        file.write((" " * indent))
+                        file.write(("-" * indent))
                 else:
-                    file.write(" " * len(part))
+                    file.write("-" * tabSize)
             prevParts = parts
     def findAllFiles(self, test):
         fileList = []

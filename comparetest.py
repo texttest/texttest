@@ -23,6 +23,7 @@ class TestComparison:
         self.changedResults = []
         self.attemptedComparisons = []
         self.newResults = []
+        self.failedPrediction = test.stateDetails
     def __repr__(self):
         if len(self.changedResults) > 0:
             return "FAILED :"
@@ -35,6 +36,11 @@ class TestComparison:
     def hasDifferences(self):
         return len(self.changedResults) > 0
     def getType(self):
+        if self.failedPrediction:
+            if self.failedPrediction.find("Stack trace") != -1:
+                return "crash"
+            else:
+                return "badPredict"
         if len(self.changedResults) > 1:
             return "difference"
         if len(self.changedResults) > 0:
@@ -119,10 +125,10 @@ class MakeComparisons(plugins.Action):
         testComparison = self.makeTestComparison(test)
         for tmpExt, subDir in self.fileFinders(test):
             testComparison.makeComparisons(test, tmpExt, subDir)
-        if testComparison.hasDifferences() or testComparison.hasNewResults():
+        if testComparison.hasDifferences() or testComparison.hasNewResults() or testComparison.failedPrediction:
             test.changeState(test.FAILED, testComparison)
         else:
-            test.changeState(test.SUCCEEDED)
+            test.changeState(test.SUCCEEDED, testComparison)
         self.describe(test, testComparison.getPostText())
     def makeTestComparison(self, test):
         return TestComparison(test, self.overwriteOnSuccess)

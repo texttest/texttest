@@ -70,7 +70,7 @@ optimization.StartStudio   - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTM
 """
 
 
-import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict
+import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig
 
 itemNamesConfigKey = "_itemnames_map"
 noIncreasMethodsConfigKey = "_noincrease_methods_map"
@@ -115,7 +115,8 @@ class OptimizationConfig(carmen.CarmenConfig):
     def getCompileRules(self, localFilter):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
-        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), ExtractSubPlanFile(self, "best_solution", "solution") ])
+        solutionCollator = unixConfig.CollateFile("best_solution", "solution", [ self.getSubPlanFileName ])
+        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])
     def keepTemporarySubplans(self):
         if self.optionMap.has_key("keeptmp"):
             return 1
@@ -132,31 +133,6 @@ class OptimizationConfig(carmen.CarmenConfig):
     def setUpApplication(self, app):
         app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile);
         app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods);
-
-class ExtractSubPlanFile(plugins.Action):
-    def __init__(self, config, sourceName, targetName):
-        self.config = config
-        self.sourceName = sourceName
-        self.targetName = targetName
-    def __repr__(self):
-        return "Extracting subplan file " + self.sourceName + " to " + self.targetName + " on"
-    def __call__(self, test):
-        if self.config.isReconnecting():
-            return
-        sourcePath = self.config.getSubPlanFileName(test, self.sourceName)
-        diag = plugins.getDiagnostics("Extract subplan")
-        targetFile = test.getTmpFileName(self.targetName, "w")
-        diag.info("Extracting " + sourcePath + " to " + targetFile)
-        if os.path.isfile(sourcePath):
-            shutil.copyfile(sourcePath, targetFile)
-            if carmen.isCompressed(targetFile):
-                targetFileZ = targetFile + ".Z"
-                os.rename(targetFile, targetFileZ)
-                os.system("uncompress " + targetFileZ)
-            return
-        if os.path.isfile(test.makeFileName(self.targetName)):
-            errText = "Expected file '" + sourcePath + "' not created by test"
-            open(targetFile,"w").write(errText + os.linesep)
             
 # Abstract base class for handling running tests in temporary subplan dirs
 # see example usage in apc.py

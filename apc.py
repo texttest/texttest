@@ -76,8 +76,6 @@ class ApcConfig(optimization.OptimizationConfig):
             ruleCompile = self.optionMap.has_key("rulecomp")
         return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, staticFilter, ruleCompile)
     def getTestRunner(self):
-        if self.isReconnecting():
-            return default.ReconnectTest(self.optionValue("reconnect"))
         if self.optionMap.has_key("lprof"):
             subActions = [ self._getApcTestRunner(), carmen.WaitForDispatch(), carmen.RunLProf(-2) ]
             return plugins.CompositeAction(subActions)

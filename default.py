@@ -32,6 +32,7 @@ default.CountTest          - produce a brief report on the number of tests in th
 """
 
 import os, re, shutil, plugins, respond, comparetest, string, predict
+from glob import glob
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -40,7 +41,7 @@ class Config(plugins.Configuration):
     def getOptionString(self):
         return "iont:f:"
     def getActionSequence(self):
-        actions = [ self.getTestRunner(), self.getTestEvaluator() ]
+        actions = [ self.tryGetTestRunner(), self.getTestEvaluator() ]
         if self.optionMap.has_key("i"):
             return [ plugins.CompositeAction(actions) ]
         else:
@@ -52,16 +53,22 @@ class Config(plugins.Configuration):
         return filters
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
+    def tryGetTestRunner(self):
+        if self.optionMap.has_key("reconnect"):
+            return plugins.Action()
+        else:
+            return self.getTestRunner()
     def getTestRunner(self):
+        return RunTest()
+    def getTestEvaluator(self):
+        subParts = [ self.getFileExtractor(), self.getTestPredictionChecker(), self.getTestComparator(), self.getTestResponder() ]
+        return plugins.CompositeAction(subParts)
+    def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"))
         else:
-            return RunTest()
-    def getTestEvaluator(self):
-        subParts = [ self.getTestCollator(), self.getTestPredictionChecker(), self.getTestComparator(), self.getTestResponder() ]
-        return plugins.CompositeAction(subParts)
+            return self.getTestCollator()
     def getTestCollator(self):
-        # Won't do anything, of course
         return plugins.Action()
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
@@ -96,6 +103,40 @@ class Config(plugins.Configuration):
         print "--------------------------------------------------------"
         self.printHelpScripts()
 
+class CollateFile(plugins.Action):
+    def __init__(self, sourcePattern, targetStem, dirFunctions = []):
+        self.sourcePattern = sourcePattern
+        self.targetStem = targetStem
+        if len(dirFunctions):
+            self.dirFunctions = dirFunctions
+        else:
+            self.dirFunctions = [ self.currDir ]
+    def __call__(self, test):
+        if test.state != test.RUNNING:
+            return
+        targetFile = test.getTmpFileName(self.targetStem, "w")
+        fullpath = self.findPath(test)
+        if fullpath:
+            actualPath = self.transformToText(fullpath)
+            self.extract(actualPath, targetFile)
+        elif os.path.isfile(test.makeFileName(self.targetStem)):
+            errText = "Expected file '" + self.sourcePattern + "' not created by test"
+            open(targetFile, "w").write(errText + os.linesep)
+    def findPath(self, test):
+        for dirFunction in self.dirFunctions:
+            pattern = dirFunction(test, self.sourcePattern)
+            paths = glob(pattern)
+            if len(paths):
+                return paths[0]
+        return None
+    def transformToText(self, path):
+        # By default assume it is text
+        return path
+    def currDir(self, test, filename):
+        return os.path.join(test.abspath, filename)       
+    def extract(self, sourcePath, targetFile):
+        shutil.copyfile(sourcePath, targetFile)
+    
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):
         self.texts = plugins.commasplit(filterText)

@@ -9,7 +9,7 @@ to Python's ndiff, and sendmail is used to implement an email-sending batch mode
 The default behaviour is to run all tests locally.
 """
 
-import default, batch, respond, comparetest, predict
+import default, batch, respond, comparetest, predict, os
 
 def getConfig(optionMap):
     return UNIXConfig(optionMap)
@@ -26,6 +26,8 @@ class UNIXConfig(default.Config):
         if self.optionMap.has_key("b"):
             seq.append(batch.MailSender(self.optionValue("b")))
         return seq
+    def getTestCollator(self):
+        return CollateCore("core*", "stacktrace")
     def getTestResponder(self):
         diffLines = 30
         # If running multiple times, batch mode is assumed
@@ -41,4 +43,48 @@ class UNIXConfig(default.Config):
         print batch.helpOptions
         default.Config.printHelpOptions(self, builtInOptions)
 
+def isCompressed(path):
+    magic = open(path).read(2)
+    if magic[0] == chr(0x1f) and magic[1] == chr(0x9d):
+        return 1
+    else:
+        return 0
 
+# Deal with UNIX-compressed files as well as straight text
+class CollateFile(default.CollateFile):
+    def transformToText(self, sourcePath):
+        if not isCompressed(sourcePath):
+            return sourcePath       
+        if sourcePath.endswith(".Z"):
+            os.system("uncompress " + sourcePath)
+            return sourcePath[:-2]
+        else:
+            toUse = sourcePath + ".Z"
+            os.rename(sourcePath, toUse)
+            os.system("uncompress " + toUse)
+            return sourcePath
+
+# Extract just the stack trace rather than the whole core
+class CollateCore(CollateFile):
+    def extract(self, sourceFile, targetFile):
+        fileName = "coreCommands.gdb"
+        file = open(fileName, "w")
+        file.write("bt\nq\n")
+        file.close()
+        # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
+        # Unfortunately running gdb is not the answer, because it truncates the data...
+        binary = os.popen("csh -c 'echo `tail -c 1024 core`'").read().split(" ")[-1].strip()        
+        gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " core")
+        writeFile = open(targetFile, "w")
+        prevLine = ""
+        for line in gdbData.xreadlines():
+            if line.find("Program terminated") != -1:
+                writeFile.write(line)
+                writeFile.write("Stack trace from gdb :" + os.linesep)
+            if line[0] == "#" and line != prevLine:
+                startPos = line.find("in ") + 3
+                endPos = line.rfind("()")
+                writeFile.write(line[startPos:endPos] + os.linesep)
+            prevLine = line
+        os.remove(fileName)
+        os.remove(sourceFile)

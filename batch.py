@@ -17,7 +17,7 @@ helpOptions = """
              many emails being sent by batch mode if many independent things are tested.
 """
 
-import os, performance, plugins, respond, sys, predict, string
+import os, performance, plugins, respond, sys, string
 
 class BatchFilter(plugins.Filter):
     def __init__(self, batchSession):
@@ -65,6 +65,8 @@ class BatchCategory:
         self.count = 0
         self.text = []
     def addTest(self, test, postText):
+        if not postText:
+            postText = ""
         if len(postText) > 0:
             postText = " : " + postText
         self.text.append(test.getIndent() + "- " + repr(test) + postText + os.linesep)
@@ -89,7 +91,6 @@ class BatchCategory:
             mailFile.writelines(self.text)
             mailFile.write(os.linesep)
 
-killedTests = []
 allBatchResponders = []
 categoryNames = [ "badPredict", "crash", "dead", "difference", "faster", "slower", "success", "unfinished" ]
 categoryDescriptions = [ "had internal errors", "CRASHED", "caused exception", "FAILED", "ran faster", "ran slower", "succeeded", "were unfinished" ]
@@ -110,36 +111,20 @@ class BatchResponder(respond.Responder):
         if category != None:
             self.categories[category].addTest(test, postText)
     def handleSuccess(self, test):
-        category = self.findSuccessCategory(test)
-        self.addTestToCategory(category, test)
-    def handleFailure(self, test, testComparison):
-        category = self.findFailureCategory(test, testComparison)
-        self.addTestToCategory(category, test)
-    def handleFailedPrediction(self, test, desc):
-        if not test in killedTests and not test in self.crashDetail.keys():
-            self.addTestToCategory("badPredict", test, desc)
-    def handleCoreFile(self, test):
-        crashText = self.responder.getCrashText(test)
-        self.crashDetail[test] = crashText
-    def handleDead(self, test):
-        self.deadDetail[test] = test.stateDetails
+        self.addTestToCategory("success", test)
+    def handleKilled(self, test):
+        self.addTestToCategory("unfinished", test)
+    def handleUnrunnable(self, test):
         self.addTestToCategory("dead", test)
-    def findFailureCategory(self, test, testComparison):
-        successCategory = self.findSuccessCategory(test)
-        if successCategory != "success":
-            return successCategory
-        # Don't provide failure information on crashes and unfinished tests, it's confusing...
-        self.failureDetail[test] = testComparison
-        return testComparison.getType()
-    def findSuccessCategory(self, test):
-        if test in killedTests:
-            return "unfinished"
-        if test in self.crashDetail.keys():
-            return "crash"
-        # Already added it in this case
-        if predict.testBrokenPredictionMap.has_key(test):
-            return None
-        return "success"
+        self.deadDetail[test] = test.stateDetails
+    def handleFailure(self, test, testComparison):
+        category = testComparison.getType()
+        if category == "crash":
+            self.crashDetail[test] = testComparison.failedPrediction
+            self.addTestToCategory(category, test)
+        else:
+            self.failureDetail[test] = testComparison
+            self.addTestToCategory(category, test, testComparison.failedPrediction)
     def setUpSuite(self, suite):
         if self.mainSuite == None:
             self.mainSuite = suite

@@ -120,11 +120,12 @@ class LSFConfig(unixConfig.UNIXConfig):
                 resourceList.append(resource)
         return resourceList
     def getTestCollator(self):
+        baseCollator = unixConfig.UNIXConfig.getTestCollator(self)
         if not self.useLSF():
-            return default.Config.getTestCollator(self)
+            return baseCollator
         else:
             resourceAction = MakeResourceFiles(self.checkPerformance(), self.checkMemory(), self.isSlowdownJob)
-            return plugins.CompositeAction([ Wait(), resourceAction ])
+            return plugins.CompositeAction([ Wait(), resourceAction, baseCollator ])
     def getTestComparator(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestComparator(self)
@@ -251,8 +252,7 @@ class Wait(plugins.Action):
             if emergencyFinish:
                 print "Emergency finish: killing job!"
                 job.kill()
-                # This will only happen in batch mode: tell batch to treat the job as unfinished
-                batch.killedTests.append(test)
+                test.changeState(test.KILLED, "Killed by LSF emergency finish")
                 return
             time.sleep(2)
     # Involves sleeping, don't do it from GUI

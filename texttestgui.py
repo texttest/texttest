@@ -163,7 +163,7 @@ class TestCaseGUI:
         self.model.set_value(newiter, 0, "New Files")
         if not test:
             return
-        if test.state == test.FAILED:
+        if test.state == test.FAILED or test.state == test.SUCCEEDED:
             os.chdir(test.abspath)
             testComparison = test.stateDetails
             for name in testComparison.attemptedComparisons:
@@ -206,14 +206,21 @@ class TestCaseGUI:
         view.show()
         return view
     def createTextView(self, test):
-        if not test or test.state != test.UNRUNNABLE:
+        if not test:
             return None
         textview = gtk.TextView()
         textview.set_wrap_mode(gtk.WRAP_WORD)
         textbuffer = textview.get_buffer()
-        textbuffer.set_text(str(test.stateDetails).split(os.linesep)[0])
+        textbuffer.set_text(self.getTestInfo(test))
         textview.show()
         return textview
+    def getTestInfo(self, test):
+        if test.state == test.UNRUNNABLE:
+            return str(test.stateDetails).split(os.linesep)[0]
+        elif test.state == test.FAILED and test.stateDetails.failedPrediction:
+            return test.stateDetails.failedPrediction
+        else:
+            return ""
     def getWindow(self):
         return self.window
     def createTitle(self, test):
@@ -275,6 +282,7 @@ class TestCaseGUI:
         else:
             return 1
     def save(self, button, option, *args):
+        os.chdir(self.test.abspath)
         print "Saving", self.test, "version", option
         testComparison = self.test.stateDetails
         if testComparison:

@@ -9,52 +9,40 @@ the results for that version. This will create or override results files of the 
 instead of files of the form <root>.<app>
 """
 
-import comparetest, ndiff, sys, string, os, plugins, predict
+import comparetest, ndiff, sys, string, os, plugins
     
 # Abstract base to make it easier to write test responders
 class Responder(plugins.Action):
     def __call__(self, test):
-        self.findAndHandleCoreFiles(test)
-        if predict.testBrokenPredictionMap.has_key(test):
-            predictionText = predict.testBrokenPredictionMap[test]
-            print test.getIndent() + "WARNING :", predictionText, "in", repr(test)
-            self.handleFailedPrediction(test, predictionText)
         if test.state == test.FAILED:
             testComparison = test.stateDetails
             print test.getIndent() + repr(test), self.responderText(test)
             self.handleFailure(test, testComparison)
-        else:
+        elif test.state == test.SUCCEEDED:
             self.handleSuccess(test)
+        elif test.state == test.KILLED:
+            self.handleKilled(test)
+        elif test.state == test.UNRUNNABLE:
+            print test.getIndent() + repr(test), "Failed: ", str(test.stateDetails).split(os.linesep)[0]
+            self.handleUnrunnable(test)
     def handleSuccess(self, test):
         pass
-    def handleFailedPrediction(self, test, desc):
+    def handleUnrunnable(self, test):
         pass
-    def findAndHandleCoreFiles(self, test):
-        for filename in os.listdir(test.abspath):
-            if not filename.startswith("core"):
-                continue
-            if filename == "core.Z":
-                os.system("uncompress core.Z")
-            elif filename != "core":
-                os.rename(filename, "core")
-        if os.path.isfile("core"):
-             self.handleCoreFile(test)
-             os.remove("core")
+    def handleKilled(self, test):
+        pass
     def responderText(self, test):
         testComparison = test.stateDetails
         diffText = testComparison.getDifferenceSummary()
         return repr(testComparison) + diffText
-    def processUnRunnable(self, test):
-        print test.getIndent() + repr(test), "Failed: ", str(test.stateDetails).split(os.linesep)[0]
-        self.handleDead(test)
-    def handleDead(self, test):
-        pass
     def __repr__(self):
         return "Responding to"
 
 # Uses the python ndiff library, which should work anywhere. Override display method to use other things
 class InteractiveResponder(Responder):
     def handleFailure(self, test, testComparison):
+        if testComparison.failedPrediction:
+            print testComparison.failedPrediction
         performView = self.askUser(test, testComparison, 1)
         if performView:
             self.displayComparisons(testComparison.getComparisons(), sys.stdout, test.app)
@@ -100,25 +88,6 @@ class InteractiveResponder(Responder):
 class UNIXInteractiveResponder(InteractiveResponder):
     def __init__(self, lineCount):
         self.lineCount = lineCount
-    def handleCoreFile(self, test):
-        print self.getCrashText(test)
-    def getCrashText(self, test):
-        fileName = "coreCommands.gdb"
-        file = open(fileName, "w")
-        file.write("bt\nq\n")
-        file.close()
-        # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
-        # Unfortunately running gdb is not the answer, because it truncates the data...
-        binary = os.popen("csh -c 'echo `tail -c 1024 core`'").read().split(" ")[-1].strip()        
-        gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " core")
-        crashText = ""
-        for line in gdbData.xreadlines():
-            if line.find("Program terminated") != -1:
-                crashText += test.getIndent() + repr(test) + " CRASHED (" + line.strip() + ") : stack trace from gdb follows" + os.linesep
-            if line[0] == "#":
-                crashText += line
-        os.remove(fileName)
-        return crashText
     def display(self, comparison, displayStream, app):
         if comparison.newResult():
             argumentString = " /dev/null " + comparison.tmpFile

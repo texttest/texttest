@@ -79,6 +79,12 @@ class Test:
         if parent == None:
             for var, value in app.getEnvironment():
                 self.environment[var] = value
+        diagDict = self.getConfigValue("diagnostics")
+        if diagDict.has_key("input_directory_variable"):
+            diagConfigFile = os.path.join(self.abspath, diagDict["configuration_file"])
+            if os.path.isfile(diagConfigFile):
+                inVarName = diagDict["input_directory_variable"]
+                self.environment[inVarName] = self.abspath
         self.environment.readValuesFromFile(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
         # Single pass to expand all variables (don't want multiple expansion)
         for var, value in self.environment.items():
@@ -185,12 +191,15 @@ class TestCase(Test):
         self.writeDirs = []
         basicWriteDir = os.path.join(app.writeDirectory, self.getRelPath())
         self.writeDirs.append(basicWriteDir)
+        diagDict = self.app.getConfigValue("diagnostics")
         if self.app.useDiagnostics:
-            diagDict = self.app.getConfigValue("diagnostics")
             inVarName = diagDict["input_directory_variable"]
             self.environment[inVarName] = os.path.join(self.abspath, "Diagnostics")
             outVarName = diagDict["write_directory_variable"]
             self.environment[outVarName] = os.path.join(basicWriteDir, "Diagnostics")
+        elif diagDict.has_key("write_directory_variable"):
+            outVarName = diagDict["write_directory_variable"]
+            self.environment[outVarName] = basicWriteDir
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -848,10 +857,6 @@ class Application:
         return self.configObject.getExecuteCommand(binary, test)
     def getEnvironment(self):
         env = [ ("TEXTTEST_CHECKOUT", self.checkout) ]
-        diagDict = self.getConfigValue("diagnostics")
-        if diagDict.has_key("input_directory_variable"):
-            inVarName = diagDict["input_directory_variable"]
-            env.append((inVarName, self.abspath))
         return env + self.configObject.getApplicationEnvironment(self)
             
 class OptionFinder:

@@ -700,6 +700,8 @@ class Application:
         fullList += fromRemaining
         return fullList
     def makeWriteDirectory(self):
+        if (os.path.isdir(self.writeDirectory)):
+            return
         root, tmpId = os.path.split(self.writeDirectory)
         self.tryCleanPreviousWriteDirs(root)
         os.makedirs(self.writeDirectory)

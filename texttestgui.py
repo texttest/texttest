@@ -253,6 +253,7 @@ class TextTestGUI:
         scriptEngine.setSelection(self.selection, [ iter ]) 
         guilog.info("Viewing new test " + newTest.name)
         self.recreateTestView(newTest)
+        self.selection.get_tree_view().expand_all()
     def quit(self, *args):
         gtk.main_quit()
         self.killInteractiveProcesses()
@@ -413,6 +414,16 @@ class RightWindowGUI:
             vbox.pack_start(checkButton, expand=gtk.FALSE, fill=gtk.FALSE)
         vbox.show()    
         return vbox
+    def destroyDialog(self, dialog, *args):
+        dialog.destroy()
+    def showError(self, message):
+        guilog.info("ERROR : " + message)
+        dialog = gtk.Dialog("TextTest Message", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+        label = gtk.Label(message)
+        dialog.vbox.pack_start(label, expand=gtk.TRUE, fill=gtk.TRUE)
+        label.show()
+        scriptEngine.connect("agree to texttest message", "response", dialog, self.destroyDialog, gtk.RESPONSE_ACCEPT)
+        dialog.show()
 
 class ApplicationGUI(RightWindowGUI):
     def __init__(self, app, selection, itermap):
@@ -435,14 +446,17 @@ class ApplicationGUI(RightWindowGUI):
             fullPath = os.path.join(self.app.abspath, file)
             self.addFileToModel(confiter, fullPath, None, colour)
     def runInteractive(self, button, action, *args):
-        newSuite = action.performOn(self.app, self.getSelectedTests())
-        if newSuite:
-            iterlist = self.getSelectedIters(newSuite)
-            if self.app.extra:
-                extraSuite = action.performOn(self.app.extra, self.getSelectedTests())
-                iterlist += self.getSelectedIters(extraSuite)
-            scriptEngine.setSelection(self.selection, iterlist)
-            self.selection.get_tree_view().grab_focus()
+        try:
+            newSuite = action.performOn(self.app, self.getSelectedTests())
+            if newSuite:
+                iterlist = self.getSelectedIters(newSuite)
+                if self.app.extra:
+                    extraSuite = action.performOn(self.app.extra, self.getSelectedTests())
+                    iterlist += self.getSelectedIters(extraSuite)
+                scriptEngine.setSelection(self.selection, iterlist)
+                self.selection.get_tree_view().grab_focus()
+        except plugins.TextTestError, e:
+            self.showError(str(e))
     def getSelectedIters(self, suite):
         iters = []
         try:

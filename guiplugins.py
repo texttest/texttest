@@ -277,16 +277,14 @@ class RunTests(InteractiveAction):
         return "Run selected tests"
     def performOn(self, app, selTests):
         if len(selTests) == 0:
-            print "No tests selected - cannot run!"
-            return
+            raise plugins.TextTestError, "No tests selected - cannot run!"
         ttOptions = string.join(self.getTextTestOptions(app, selTests))
-        commandLine = self.getTextTestName() + " " + ttOptions
+        app.makeWriteDirectory()
+        logFile = os.path.join(app.writeDirectory, "dynamic_run.log")
+        errFile = os.path.join(app.writeDirectory, "dynamic_errors.log")
+        commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
         print "Starting dynamic TextTest with options :", ttOptions
-        shellTitle = app.fullName + " Tests"
-        shellOptions = ""
-        if ttOptions.find("-build ") != -1:
-            shellOptions = "-hold"
-        self.startExternalProgram(commandLine, shellTitle, shellOptions)
+        self.startExternalProgram(commandLine)
     def getTextTestOptions(self, app, selTests):
         ttOptions = [ "-a " + app.name ]
         ttOptions += self.invisibleGroup.getCommandLines()

@@ -116,7 +116,9 @@ class BatchResponder(respond.Responder):
     def handleFailure(self, test, comparisons):
         category = self.findFailureCategory(test, comparisons)
         self.categories[category].addTest(test)
-        self.failureDetail[test] = comparisons
+        # Don't provide failure information on crashes, it's confusing...
+        if category != "crash":
+            self.failureDetail[test] = comparisons
     def findFailureCategory(self, test, comparisons):
         if test in self.crashDetail.keys():
             return "crash"
@@ -136,7 +138,7 @@ class BatchResponder(respond.Responder):
         for category in self.categories.values():
             category.addSuite(suite)
     def failureCount(self):
-        return len(self.failureDetail)
+        return len(self.failureDetail) + len(self.crashDetail)
     def testCount(self):
         count = 0
         for category in self.categories.values():

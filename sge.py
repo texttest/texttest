@@ -87,8 +87,8 @@ class QueueSystem:
             job = self.activeJobs[jobId]
             status = self.getStatus(words[4], states)
             if job.status == "PEND" and status != "PEND" and len(words) >= 6:
-                fullMachines = words[7].split('@')[-1]
-                job.machines = map(lambda x: x.split('.')[0], fullMachines)
+                fullMachine = words[7].split('@')[-1]
+                job.machines = [ fullMachine.split('.')[0] ]
             job.status = status
             if status == "EXIT" or status == "DONE":
                 del self.activeJobs[jobId]

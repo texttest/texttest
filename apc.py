@@ -93,8 +93,7 @@ class ApcConfig(optimization.OptimizationConfig):
         # This one should be added, but we have to change the names, which will require some work.
         #subActions.append(unixConfig.CollateFile("run_status_error", "errors"))
         subActions.append(unixConfig.CollateFile("run_status_warning", "warnings"))
-        # Removed this functionality temporarily, since it has caused a lot of problems.
-        #subActions.append(FetchApcCore(self))
+        subActions.append(FetchApcCore(self))
         subActions.append(baseCollator)
         subActions.append(RemoveLogs())
         localAction = plugins.CompositeAction(subActions)
@@ -299,33 +298,46 @@ class RemoveLogs(plugins.Action):
 class FetchApcCore(plugins.Action):
     def __init__(self, config):
         self.config = config
+        self.diag = plugins.getDiagnostics("FetchApcCore")
     def __call__(self, test):
         if self.config.isReconnecting():
             return
         coreFileName = os.path.join(test.getDirectory(temporary=1), "core.Z")
         if not os.path.isfile(test.makeFileName("error", temporary=1)):
-            return            
+            return
+        self.diag.info("Error file found.")
         logFinder = optimization.LogFileFinder(test)
         foundTmp, tmpStatusFile = logFinder.findFile()
         if not foundTmp:
             return
+        self.diag.info("Found temporary status file " + tmpStatusFile)
         grepCommand = "grep Machine " + tmpStatusFile
         grepLines = os.popen(grepCommand).readlines()
         if len(grepLines) > 0:
             machine = grepLines[0].split()[-1]
-            testDirEnd = test.app.name + test.app.versionSuffix() + "_" + test.name + "_" + test.getTmpExtension()
+            testDirEnd = test.app.name + test.app.versionSuffix() + test.getTmpExtension()
             self.describe(test, " from " + machine)
-            binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
-            binCmd = "echo ' " + binName +  "' >> core"
-            apcHostTmp = getApcHostTmp()
-            cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*;" + binCmd + ";compress -c core > " + coreFileName
-            os.system("rsh " + machine + " '" + cmdLine + "'")
-            tmpDir = test.writeDirs[-1]
+            apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
+            # Check if there really is a core file! One don't get a core if APC does a scream for example.
+            stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcHostTmp + "/*" + testDirEnd + "_*; ls core"  + "'")
+            stderrlines = stderr.readlines()
+            if stderrlines:
+                print "No core file present."
+            else:
+                binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
+                binCmd = "echo ' " + binName +  "' >> core"
+                cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; " + binCmd + ";compress -c core > " + coreFileName
+                os.system("rsh " + machine + " '" + cmdLine + "'")
+            # Show log file!
+            command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + apcHostTmp + "/*" + testDirEnd + "_*/apclog" + "''"
+            os.system(command)
+            tmpDir = test.writeDirs[0]
             if os.path.isdir(tmpDir):
                 tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
                 if os.path.isfile(tgzFile):
                     os.remove(tgzFile)
                 cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; tar cf - . | gzip -c > " + tgzFile
+                self.diag.info("Crash is saved in " + tgzFile)
                 os.system("rsh " + machine + " '" + cmdLine + "'")
             if self.config.isNightJob():
                 cmdLine = "rm -rf " + apcHostTmp + "/*" + testDirEnd + "_*"

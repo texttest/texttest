@@ -945,7 +945,7 @@ class OptionFinder:
                 except (SystemExit, KeyboardInterrupt):
                     raise sys.exc_type, sys.exc_value
                 except BadConfigError:
-                    print "Could not use application", appName, "-", sys.exc_value
+                    sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + os.linesep)
                     raisedError = 1
             elif os.path.isdir(pathname) and recursive:
                 subRaisedError, subApps = self._findApps(pathname, 0)
@@ -1456,7 +1456,7 @@ class TextTest:
                     actionRunner.addTestActions(testSuite, actionSequence)
                     print "Using", app.description() + ", checkout", app.checkout
             except BadConfigError:
-                print "Error in set-up of application", app, "-", sys.exc_value
+                sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + os.linesep)
         return actionRunner
     def run(self):
         try:

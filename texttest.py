@@ -505,7 +505,7 @@ class Application:
         if fileName.find(globalRunIdentifier) != -1:
             newFileName = fileName + "cmp"
         else:
-            newFileName = os.path.join(os.path.dirname(fileName), stem + "." + self.name + "origcmp")
+            newFileName = os.path.join(os.getcwd(), stem + "." + self.name + "origcmp")
         
         oldFile = open(fileName)
         newFile = open(newFileName, "w")

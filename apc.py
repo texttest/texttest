@@ -388,7 +388,7 @@ class ApcCompileRules(ravebased.CompileRules):
 
 class ApcUpdateLSFStatus(lsf.UpdateTestLSFStatus):
     def getExtraRunData(self, test):
-         subplanDir = test.writeDirs[-1];
+         subplanDir = test.writeDirs[-1]
          runStatusHeadFile = os.path.join(subplanDir, "run_status_head")
          if os.path.isfile(runStatusHeadFile):
              try:
@@ -464,6 +464,10 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         subplanName, apcFiles = os.path.split(test.writeDirs[1])
         baseSubPlan = os.path.basename(subplanName)
         return os.path.join(self.getApcHostTmp(), baseSubPlan + "_" + processId)
+    def makeLinks(self, test):
+        sourceName = os.path.join(test.writeDirs[1], "run_status_head")
+        targetName = os.path.join(test.writeDirs[0], "run_status_head")
+        os.symlink(sourceName, targetName)
     def performParallelAction(self, test, processInfo):
         processId, processName = processInfo[0]
         runProcessId, runProcessName = processInfo[-1]
@@ -471,6 +475,7 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         self.diag.info("APC log directory is " + apcTmpDir + " based on process " + processName)
         if not os.path.isdir(apcTmpDir):
             raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + runProcessName
+        self.makeLinks(test)
         test.writeDirs.append(apcTmpDir)
         self.describe(test)
         if self.keepLogs:

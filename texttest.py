@@ -563,9 +563,16 @@ class MultiEntryDictionary:
             return
         overrideDir = MultiEntryDictionary(extraFileName)
         for key, value in overrideDir.items():
-            self.dict[key] = value
             if not key in self.entries:
                 self.entries.append(key)
+                self.dict[key] = value
+            elif type(self.dict[key]) == types.ListType:
+                if type(value) == types.ListType:
+                    self.dict[key] += value
+                else:
+                    self.dict[key].append(value)
+            else:
+                self.dict[key] = value
     def addLine(self, line, separator = ':'):
         entryName, entry = string.split(line, separator, 1)
         if self.dict.has_key(entryName):

@@ -78,11 +78,19 @@ class PerformanceTestComparison(comparetest.TestComparison):
         cmpFlag = 0
         self.execHost = execHost
         if execHost != None:
-            cmpFlag = execHost in self.test.app.getConfigList("performance_test_machine")
+            cmpFlag = self.checkHosts()
         if cmpFlag == 0:
             os.remove(tmpFile)
         return cmpFlag
-        
+    def checkHosts(self):
+        for host in self.execHost.split(","):
+            realHost = host
+            if host[1] == "*":
+                realHost = host[2:]
+            if not realHost in self.test.app.getConfigList("performance_test_machine"):
+                return 0
+        return 1
+    
 # Does the same as the basic test comparison apart from when comparing the performance file
 class MakeComparisons(comparetest.MakeComparisons):
     def makeTestComparison(self, test):

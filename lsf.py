@@ -184,6 +184,8 @@ class SubmitTest(plugins.Action):
         resource = self.resourceFunction(test)
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
+        if os.environ.has_key("LSF_PROCESSES"):
+            lsfOptions += " -n " + os.environ["LSF_PROCESSES"]
         unixPerfFile = test.getTmpFileName("unixperf", "w")
         timedTestCommand = '\\time -p sh ' + testCommand + ' 2> ' + unixPerfFile
         commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile
@@ -211,6 +213,7 @@ class SubmitTest(plugins.Action):
         self.describe(suite)
     def setUpApplication(self, app):
         app.setConfigDefault("lsf_queue", "normal")
+        app.setConfigDefault("lsf_processes", "1")
     def getCleanUpAction(self):
         return KillTest()
 
@@ -254,7 +257,7 @@ class MakeResourceFiles(plugins.Action):
         self.checkMemory = checkMemory
         self.isSlowdownJob = isSlowdownJob
     def __call__(self, test):
-        textList = [ "Max Memory", "Max Swap", "CPU time", "executed on host", "Real time" ]
+        textList = [ "Max Memory", "Max Swap", "CPU time", [ "executed on host", "home directory" ], "Real time" ]
         tmpFile = test.getTmpFileName("report", "r")
         resourceDict = self.makeResourceDict(tmpFile, textList)
         if len(resourceDict) < len(textList):
@@ -284,31 +287,41 @@ class MakeResourceFiles(plugins.Action):
         if len(resourceDict) < len(textList):
             return
         if self.checkPerformance:
-            self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3]], resourceDict[textList[4]], test.getTmpFileName("performance", "w"))
+            self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3][0]], resourceDict[textList[4]], test.getTmpFileName("performance", "w"))
         if self.checkMemory:
             self.writeMemoryFile(resourceDict[textList[0]], resourceDict[textList[1]], test.getTmpFileName("memory", "w"))
 #private
     def makeResourceDict(self, tmpFile, textList):
         resourceDict = {}
         file = open(tmpFile)
+        activeList = 0
         for line in file.readlines():
             for text in textList:
-                if string.find(line, text) != -1:
+                if type(text) == types.ListType:
+                    if line.find(text[0]) != -1:
+                        resourceDict[text[0]] = [ line ]
+                        activeList = 1
+                    elif activeList and line.find(text[1]) == -1:
+                        resourceDict[text[0]].append(line)
+                    else:
+                        activeList = 0
+                elif string.find(line, text) != -1:
                     resourceDict[text] = line
         return resourceDict
-    def writePerformanceFile(self, test, cpuLine, executionLine, realLine, fileName):
-        executionMachine = self.findExecutionMachine(executionLine)
+    def writePerformanceFile(self, test, cpuLine, executionLines, realLine, fileName):
+        executionMachines = map(self.findExecutionMachine, executionLines)
         file = open(fileName, "w")
-        line = string.strip(cpuLine) + " on " + executionMachine + os.linesep
+        line = string.strip(cpuLine) + " on " + string.join(executionMachines, ",") + os.linesep
         file.write(line)
         file.write(realLine)
-        for jobLine in self.findRunningJobs(executionMachine):
-            file.write(jobLine + os.linesep)
+        for machine in executionMachines:
+            for jobLine in self.findRunningJobs(machine):
+                file.write(jobLine + os.linesep)
         file.close()
     def findExecutionMachine(self, line):
         start = string.find(line, "<")
         end = string.find(line, ">", start)
-        fullName = line[start + 1:end]
+        fullName = line[start + 1:end].replace("1*", "")
         return string.split(fullName, ".")[0]
     def findRunningJobs(self, machine):
         # On a multi-processor machine performance can be affected by jobs on other processors,

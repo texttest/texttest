@@ -256,19 +256,31 @@ class WindowsProcessHandler:
         # Start the process in a subshell so redirection works correctly
         args = [self.cmdStarter, "/C", commandLine ]
         processHandle = os.spawnv(os.P_NOWAIT, self.cmdStarter, args)
-        return self.findProcessId(processHandle)
+        # As we start a shell, we have a handle on the shell itself, not
+        # on the process running in it. Unlike UNIX, killing the shell is not enough!
+        cmdProcId = self.findProcessId(processHandle)
+        for subProcId, subProcHandle in self.findChildProcesses(cmdProcId):
+            return subProcId
+        # If no subprocesses can be found, just kill the shell
+        return cmdProcId
     def findProcessId(self, processHandle):
-        stdout = os.popen("handle -a -p " + str(os.getpid()))
+        childProcesses = self.findChildProcesses(str(os.getpid()))
+        for subProcId, subProcHandle in childProcesses:
+            if subProcHandle == processHandle:
+                return subProcId
+    def findChildProcesses(self, processId):
+        subprocesses = []
+        stdout = os.popen("handle -a -p " + processId)
         for line in stdout.readlines():
             words = line.split()
-            handleId = self.getHandleId(words)
-            if handleId == processHandle:
+            if len(words) < 2:
+                continue
+            if words[1] == "Process":
                 processInfo = words[-1]
                 idStart = processInfo.find("(")
-                return processInfo[idStart + 1:-1]
+                subprocesses.append((processInfo[idStart + 1:-1], self.getHandleId(words)))
+        return subprocesses
     def getHandleId(self, words):
-        if len(words) == 0:
-            return
         try:
             # Drop trailing colon
             return int(words[0][:-1], 16)
@@ -281,7 +293,7 @@ class WindowsProcessHandler:
                 return 1
         return 0
     def kill(self, process, killSignal):
-        return os.system("pskill " + str(process))
+        return os.system("pskill " + str(process) + " 2> nul")
 
 # Generally useful class to encapsulate a background process, of which TextTest creates
 # a few... seems it only works on UNIX right now.

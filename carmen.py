@@ -126,16 +126,12 @@ class CarmenConfig(lsf.LSFConfig):
         else:
             return "idle_"
     def getQueuePlatformSuffix(self, app):
-        version9 = "9" in app.versions
         if architecture == "i386_linux":
-            if version9:
-                return "_RH7"
-            else:
-                return "_RH8"
+            return "_RH8"
         elif architecture == "sparc":
             return "_sol8"
         elif architecture == "powerpc":
-            if version9:
+            if "9" in app.versions:
                 return "_aix4"
             else:
                 return "_aix5"

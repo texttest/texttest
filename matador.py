@@ -231,3 +231,9 @@ optimization.noIncreaseExceptMethods["crew with illegal rosters"] = []
 optimization.noIncreaseExceptMethods["broken hard trip constraints"] = [ "MaxRoster" ]
 optimization.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
 optimization.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]
+
+class MakeParallelFile(plugins.Action):
+    def __call__(self, test):
+        newfile = open("options.cas.par1local", "w")
+        newfile.write(test.options + " -m singleton" + os.linesep)
+        newfile.close()

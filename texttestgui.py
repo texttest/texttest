@@ -44,7 +44,7 @@ class TextTestGUI:
         except:
             self.model.set_value(iter, 1, self.getTestColour(suite))
     def getTestColour(self, test):
-        if test.state == test.FAILED:
+        if test.state == test.FAILED or test.state == test.UNRUNNABLE:
             return "red"
         if test.state == test.SUCCEEDED:
             return "green"
@@ -154,7 +154,8 @@ class TestCaseGUI:
         view = self.createView(self.createTitle(test))
         buttonbox = self.makeButtons(test)
         radioButtonBox = self.makeRadioButtons(test)
-        self.window = self.createWindow(buttonbox, radioButtonBox, view)
+        textview = self.createTextView(test)
+        self.window = self.createWindow(buttonbox, radioButtonBox, view, textview)
     def addFilesToModel(self, test):
         compiter = self.model.insert_before(None, None)
         self.model.set_value(compiter, 0, "Comparison Files")
@@ -166,18 +167,25 @@ class TestCaseGUI:
             os.chdir(test.abspath)
             testComparison = test.stateDetails
             for name in testComparison.attemptedComparisons:
-                fciter = self.model.insert_before(compiter, None)
-                self.model.set_value(fciter, 0, name)
                 fileComparison = testComparison.findFileComparison(name)
-                if fileComparison:
-                    self.model.set_value(fciter, 1, "red")
-                    self.model.set_value(fciter, 2, fileComparison)
-                else:
-                    self.model.set_value(fciter, 1, "green")
-    def createWindow(self, buttonbox, radioButtonBox, view):
+                if not fileComparison:
+                    self.addComparison(compiter, name, fileComparison, "green")
+                elif not fileComparison.newResult():
+                    self.addComparison(compiter, name, fileComparison, "red")
+            for fc in testComparison.newResults:
+                self.addComparison(newiter, fc.stdFile, fc, "red")
+    def addComparison(self, iter, name, comp, colour):
+        fciter = self.model.insert_before(iter, None)
+        self.model.set_value(fciter, 0, name)
+        self.model.set_value(fciter, 1, colour)
+        if comp:
+            self.model.set_value(fciter, 2, comp)
+    def createWindow(self, buttonbox, radioButtonBox, view, textView):
         fileWin = gtk.ScrolledWindow()
         fileWin.add(view)
         dataWin = gtk.ScrolledWindow()
+        if textView:
+            dataWin.add(textView)
         vbox = gtk.VBox()
         vbox.pack_start(buttonbox, expand=gtk.FALSE, fill=gtk.FALSE)
         if radioButtonBox:
@@ -197,6 +205,15 @@ class TestCaseGUI:
         view.connect("row_activated", self.displayDifferences)
         view.show()
         return view
+    def createTextView(self, test):
+        if not test or test.state != test.UNRUNNABLE:
+            return None
+        textview = gtk.TextView()
+        textview.set_wrap_mode(gtk.WRAP_WORD)
+        textbuffer = textview.get_buffer()
+        textbuffer.set_text(str(test.stateDetails).split(os.linesep)[0])
+        textview.show()
+        return textview
     def getWindow(self):
         return self.window
     def createTitle(self, test):
@@ -208,7 +225,10 @@ class TestCaseGUI:
         model, iter = view.get_selection().get_selected()
         comparison = self.model.get_value(iter, 2)
         if comparison:
-            os.system("tkdiff " + comparison.stdCmpFile + " " + comparison.tmpCmpFile + " &")
+            if comparison.newResult():
+                os.system("xemacs " + comparison.tmpCmpFile + " &")
+            else:
+                os.system("tkdiff " + comparison.stdCmpFile + " " + comparison.tmpCmpFile + " &")
     def makeButtons(self, test):
         buttonbox = gtk.HBox()
         if not test or test.state != test.FAILED:

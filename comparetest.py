@@ -94,7 +94,7 @@ class TestComparison:
     def createFileComparison(self, test, standardFile, tmpFile):
         return FileComparison(test, standardFile, tmpFile)
     def findFileComparison(self, name):
-        for comparison in self.changedResults:
+        for comparison in self.getComparisons():
             if comparison.stdFile == name:
                 return comparison
         return None

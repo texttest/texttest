@@ -116,7 +116,8 @@ class LSFConfig(unixConfig.UNIXConfig):
         if not self.useLSF():
             return default.Config.getTestCollator(self)
         else:
-            return plugins.CompositeAction([ Wait(), MakeResourceFiles(self.checkPerformance(), self.checkMemory()) ])
+            resourceAction = MakeResourceFiles(self.checkPerformance(), self.checkMemory(), self.isSlowdownJob)
+            return plugins.CompositeAction([ Wait(), resourceAction ])
     def getTestComparator(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestComparator(self)
@@ -126,6 +127,8 @@ class LSFConfig(unixConfig.UNIXConfig):
         return 0
     def checkPerformance(self):
         return 1
+    def isSlowdownJob(self, jobUser, jobName):
+        return 0
     def printHelpDescription(self):
         print helpDescription, lsfGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription 
     def printHelpOptions(self, builtInOptions):
@@ -246,9 +249,10 @@ class Wait(plugins.Action):
         return job.hasFinished()
 
 class MakeResourceFiles(plugins.Action):
-    def __init__(self, checkPerformance, checkMemory):
+    def __init__(self, checkPerformance, checkMemory, isSlowdownJob):
         self.checkPerformance = checkPerformance
         self.checkMemory = checkMemory
+        self.isSlowdownJob = isSlowdownJob
     def __call__(self, test):
         textList = [ "Max Memory", "Max Swap", "CPU time", "executed on host", "Real time" ]
         tmpFile = test.getTmpFileName("report", "r")
@@ -307,12 +311,19 @@ class MakeResourceFiles(plugins.Action):
         fullName = line[start + 1:end]
         return string.split(fullName, ".")[0]
     def findRunningJobs(self, machine):
+        # On a multi-processor machine performance can be affected by jobs on other processors,
+        # as for example a process can hog the memory bus. Allow subclasses to define how to
+        # stop these "slowdown jobs" to avoid false performance failures. Even if they aren't defined
+        # as such, print them anyway so the user can judge for himself...
         jobs = []
         for line in os.popen("bjobs -m " + machine + " -u all -w 2>&1 | grep RUN").xreadlines():
             fields = line.split()
             user = fields[1]
             jobName = fields[6]
-            jobs.append("Also on " + machine + " : " + user + "'s job '" + jobName + "'")
+            descriptor = "Also on "
+            if self.isSlowdownJob(user, jobName):
+                descriptor = "Suspected of SLOWING DOWN "
+            jobs.append(descriptor + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
     def writeMemoryFile(self, memLine, swapLine, fileName):
         file = open(fileName, "w")

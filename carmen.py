@@ -142,6 +142,15 @@ class CarmenConfig(lsf.LSFConfig):
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob"
+    def isSlowdownJob(self, user, jobName):
+        # APC is observed to slow down the other job on its machine by up to 20%. Detect it
+        apcDevelopers = [ "curt", "lennart", "johani", "rastjo" ]
+        if user in apcDevelopers:
+            return 1
+
+        # Detect TextTest APC jobs
+        parts = jobName.split(os.sep)
+        return parts[0].find("APC") != -1
     def printHelpOptions(self, builtInOptions):
         print lsf.helpOptions + batchInfo
         default.Config.printHelpOptions(self, builtInOptions)

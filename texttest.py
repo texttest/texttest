@@ -531,9 +531,12 @@ class Application:
             self.setConfigDefault("diff_program", "tkdiff.tcl")
             self.setConfigDefault("follow_program", None)
     def setDependentConfigDefaults(self):
+        binary = self.getConfigValue("binary")
+        if not binary:
+            raise BadConfigError, "config file entry 'binary' not defined"
         # Set values which default to other values
         self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module"))
-        if self.getConfigValue("binary").endswith(".py"):
+        if binary.endswith(".py"):
             self.setConfigDefault("interpreter", "python")
         else:
             self.setConfigDefault("interpreter", "")

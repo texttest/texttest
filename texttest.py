@@ -540,9 +540,11 @@ class Application:
         oldFile = open(fileName)
         newFile = open(newFileName, "w")
         forbiddenText = self.getConfigList(stem)
-        linesToRemove = 0 
+        linesToRemove = 0
+        lineNumber = 0
         for line in oldFile.readlines():
-            linesToRemove += self.calculateLinesToRemove(line, forbiddenText)
+            lineNumber += 1
+            linesToRemove += self.calculateLinesToRemove(line, lineNumber, forbiddenText)
             if linesToRemove == 0:
                 newFile.write(line)
             else:
@@ -559,8 +561,11 @@ class Application:
     	if text.find(ptn) != -1:
 	    return 1
 	return 0
-    def calculateLinesToRemove(self, line, forbiddenText):
+    def calculateLinesToRemove(self, line, lineNumber, forbiddenText):
+        lineNumberString = "{LINE " + str(lineNumber) + "}"
         for text in forbiddenText:
+            if text == lineNumberString:
+                return 1
             searchText = text
             linePoint = text.find("{LINES:")
             if linePoint != -1:

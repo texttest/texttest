@@ -124,7 +124,7 @@ class LSFConfig(unixConfig.UNIXConfig):
 
 class LSFJob:
     def __init__(self, test):
-        self.name = test.getTmpExtension() + repr(test.app) + test.getRelPath()
+        self.name = test.getTmpExtension() + repr(test.app) + test.app.versionSuffix() + test.getRelPath()
     def hasStarted(self):
         retstring = self.getFile("-r").readline()
         return string.find(retstring, "not found") == -1

@@ -195,11 +195,39 @@ class LSFJob:
             return "DONE", None
         data = lastLine.split()
         status = data[2]
+        if status == "EXIT":
+            if self._requeueTest(data):
+                return "PEND", None
         if status == "PEND" or len(data) < 6:
             return status, None
         else:
             execMachine = data[5].split('.')[0]
             return status, execMachine
+    def _requeueTest(self, jobInfoList): # REQUEUE if last two log message bhist lines contains REQUEUE_PEND and Exited
+        jobId = jobInfoList[0]
+        std = os.popen("bhist -l " + jobId + " 2>&1")
+        requeueLine = ""
+        exitLine = ""
+        for line in std.xreadlines():
+            colonParts = line.split(":")
+            if len(colonParts) < 4:
+                continue
+            logMsg = colonParts[3]
+            if len(logMsg.strip()) == 0:
+                continue
+            if logMsg.find("REQUEUE_PEND") != -1:
+                requeueLine = colonParts[3]
+                exitLine = ""
+                continue
+            if len(requeueLine) > 0 and logMsg.find("Exited") != -1:
+                exitLine = logMsg
+                continue
+            if logMsg.find("Starting"):
+                requeueLine = ""
+                exitLine = ""
+        if len(requeueLine) > 0:
+            return 1
+        return 0
     def getProcessIdWithoutLSF(self, firstpid):
         status, machine = self.getStatus()
         if machine:

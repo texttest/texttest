@@ -223,6 +223,7 @@ class BackgroundProcess:
             os.kill(process, killSignal)
             print "Killed process", process, "with signal", killSignal
         except OSError:
+            print "Process", process, "already terminated, could not kill with signal", killSignal
             pass
         for i in range(10):
             time.sleep(0.1)

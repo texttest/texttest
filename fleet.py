@@ -45,9 +45,19 @@ class FleetConfig(matador.MatadorConfig):
         matador.MatadorConfig.setUpApplication(self, app)
         self.itemNamesInFile[optimization.costEntryName] = "Optimizer cost"
         self.itemNamesInFile[optimization.memoryEntryName] = "Memory consumption"
-        self.itemNamesInFile[optimization.timeEntryName] = "CPU time"
+        self.itemNamesInFile[optimization.timeEntryName] = "cpu time"
         self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
         # Reset matador values
         self.noIncreaseExceptMethods = {}
         self.noIncreaseExceptMethods[optimization.costEntryName] = []
+    def  setApplicationDefaults(self, app):
+	matador.MatadorConfig.setApplicationDefaults(self, app)
+        self.itemNamesInFile[optimization.costEntryName] = "Optimizer cost"
+        self.itemNamesInFile[optimization.memoryEntryName] = "Memory consumption"
+        self.itemNamesInFile[optimization.timeEntryName] = "cpu time"
+        self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
+        # Reset matador values
+        self.noIncreaseExceptMethods = {}
+        self.noIncreaseExceptMethods[optimization.costEntryName] = []
+	
 

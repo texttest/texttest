@@ -342,9 +342,9 @@ class UpdateLSFStatus(plugins.Action):
         job = LSFJob(test, self.jobNameFunction)
         status, machine = job.getStatus()
         self.diag.info("Job " + job.name + " in state " + status + " for test " + test.name)
-        self.processStatus(test, status, machine)
+        exitStatus = self.processStatus(test, status, machine)
         if status == "DONE" or status == "EXIT":
-            return
+            return exitStatus
 
         global emergencyFinish
         if emergencyFinish:

@@ -393,7 +393,7 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
     def processStatus(self, test, status, machine):
         ruleset = self.getRuleSetName(test)
         if status == "EXIT":
-            self.raiseFailure(test, ruleset)
+            return self.raiseFailure(test, ruleset)
         elif status == "DONE":
             self.ruleCompilations.append(self.jobNameFunction(test))
             test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")

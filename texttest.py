@@ -320,7 +320,8 @@ class TestSuite(Test):
             debugLog.debug("Refilter check of " + test.name + " for " + self.name)
             if test.classId() == self.classId():
                 test.reFilter(filters)
-                testCaseList.append(test)
+                if test.size() > 0:
+                    testCaseList.append(test)
             elif test.isAcceptedByAll(filters):
                 debugLog.debug("Refilter ok of " + test.name + " for " + self.name)
                 testCaseList.append(test)
@@ -598,13 +599,18 @@ class OptionFinder:
         optionKey = None                                                                                                                 
         for item in sys.argv[1:]:                      
             if item[0] == "-":                         
-                optionKey = item[1:].strip()
+                optionKey = self.stripMinuses(item)
                 inputOptions[optionKey] = ""
             elif optionKey:
                 if len(inputOptions[optionKey]):
                     inputOptions[optionKey] += " "
                 inputOptions[optionKey] += item.strip()
         return inputOptions
+    def stripMinuses(self, item):
+        if item[1] == "-":
+            return item[2:].strip()
+        else:
+            return item[1:].strip()
     def findApps(self):
         dirName = self.directoryName()
         os.chdir(dirName)

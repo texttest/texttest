@@ -5,15 +5,28 @@
 import plugins, gtk, gobject, os, string, time, sys
 
 class ActivateEvent:
-    def __init__(self, widget):
+    def __init__(self, widget, active = gtk.TRUE):
         self.widget = widget
+        self.active = active
+    def writeEventToScript(self, activeWidget, eventName):
+        global appendToScript
+        if appendToScript and activeWidget.get_active() == self.active:
+            appendToScript.write(eventName + os.linesep)
     def generate(self, argumentString):
-        self.widget.set_active(gtk.TRUE)
+        self.widget.set_active(self.active)
         return 1
 
 class EntryEvent:
     def __init__(self, widget):
         self.widget = widget
+        self.oldText = ""
+    def writeEventToScript(self, entryWidget, event, eventName):
+        global appendToScript
+        if appendToScript:
+            text = entryWidget.get_text()
+            if text != self.oldText:
+                appendToScript.write(eventName + " " + text + os.linesep)
+                self.oldText = text
     def generate(self, argumentString):
         self.widget.set_text(argumentString)
         return 1
@@ -22,6 +35,10 @@ class SignalEvent:
     def __init__(self, signalName, widget):
         self.signalName = signalName
         self.widget = widget
+    def writeEventToScript(self, widget, eventName, *args):
+        global appendToScript
+        if appendToScript:
+            appendToScript.write(eventName + os.linesep)
     def generate(self, argumentString):
         self.widget.emit(self.signalName, *argumentString)
         return 1
@@ -31,6 +48,10 @@ class TreeViewSignalEvent(SignalEvent):
         SignalEvent.__init__(self, signalName, widget)
         self.column, self.valueId = argumentParseData
         self.model = widget.get_model()
+    def writeEventToScript(self, view, path, column, eventName, *args):
+        nodeLabel = self.model.get_value(self.model.get_iter(path), self.valueId)
+        if appendToScript:
+            appendToScript.write(eventName + " " + nodeLabel + os.linesep)
     def generate(self, argumentString):
         arguments = argumentString.split(" ")
         rowText = arguments[0]
@@ -61,8 +82,10 @@ class EventHandler:
         self.events = {}
     def connect(self, eventName, signalName, widget, method, argumentParseData = None, *data):
         stdName = self.standardName(eventName)
-        self.events[stdName] = self.createSignalEvent(signalName, widget, argumentParseData)
+        signalEvent = self.createSignalEvent(signalName, widget, argumentParseData)
+        self.events[stdName] = signalEvent
         widget.connect(signalName, method, *data)
+        widget.connect(signalName, signalEvent.writeEventToScript, stdName)
     def createSignalEvent(self, signalName, widget, argumentParseData):
         if isinstance(widget, gtk.TreeView):
             return TreeViewSignalEvent(signalName, widget, argumentParseData)
@@ -88,12 +111,20 @@ class EventHandler:
     def createEntry(self, description):
         entry = gtk.Entry()
         stateChangeName = "enter " + self.standardName(description) + " ="
-        self.events[stateChangeName] = EntryEvent(entry)
+        entryEvent = EntryEvent(entry)
+        self.events[stateChangeName] = entryEvent
+        entry.connect("focus-out-event", entryEvent.writeEventToScript, stateChangeName)
         return entry
     def createCheckButton(self, description):
         button = gtk.CheckButton(description)
-        stateChangeName = "check " + self.standardName(description)
-        self.events[stateChangeName] = ActivateEvent(button)
+        checkChangeName = "check " + self.standardName(description)
+        uncheckChangeName = "uncheck " + self.standardName(description)
+        checkEvent = ActivateEvent(button)
+        uncheckEvent = ActivateEvent(button, gtk.FALSE)
+        self.events[checkChangeName] = checkEvent
+        self.events[uncheckChangeName] = uncheckEvent
+        button.connect("toggled", checkEvent.writeEventToScript, checkChangeName)
+        button.connect("toggled", uncheckEvent.writeEventToScript, uncheckChangeName)
         return button
     def findEvent(self, command):
         for eventName in self.events.keys():
@@ -103,12 +134,19 @@ class EventHandler:
             
 eventHandler = EventHandler()
 
+
+
 class TextTestGUI:
     def __init__(self, scriptName):
+        global appendToScript
+        appendToScript = None
         self.scriptCommands = []
         self.scriptPointer = 0
         if scriptName:
-            self.scriptCommands = map(string.strip, open(scriptName).readlines())
+            if os.path.isfile(scriptName):
+                self.scriptCommands = map(string.strip, open(scriptName).readlines())
+            if len(self.scriptCommands) == 0:
+                appendToScript = open(scriptName, "a")
         self.scriptName = scriptName
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.instructions = []
@@ -236,11 +274,13 @@ class TextTestGUI:
                 self.model.row_changed(self.model.get_path(iter), iter)
         return gtk.TRUE
     def runScriptCommands(self):
+        global appendToScript
         if self.scriptPointer >= len(self.scriptCommands):
+            appendToScript = open(self.scriptName, "a")
             return gtk.FALSE
         nextCommand = self.scriptCommands[self.scriptPointer]
         try:
-            if eventHandler.generateEvent(nextCommand):
+            if nextCommand == "" or eventHandler.generateEvent(nextCommand):
                 self.scriptPointer += 1
             elif self.scriptPointer > 0:
                 self.scriptPointer -= 1

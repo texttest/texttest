@@ -37,7 +37,7 @@ collected, the filtered new results are compared with the standard and any diffe
 is interpreted as a test failure. 
 """
 
-import os, filecmp, string, plugins
+import os, filecmp, string, plugins, time
 from ndict import seqdict
 from predict import FailedPrediction
 
@@ -63,6 +63,12 @@ class TestComparison:
         return len(self.newResults) > 0
     def hasDifferences(self):
         return len(self.changedResults) > 0
+    def needsRecalculation(self):
+        for comparison in self.allResults:
+            if comparison.needsRecalculation():
+                self.diag.info("Recalculation needed for test " + self.test.name + " for " + self.test.app.description()) 
+                return 1
+        return 0
     def getType(self):
         if self.failedPrediction:
             return self.failedPrediction.type
@@ -140,6 +146,8 @@ class TestComparison:
         fileList = os.listdir(dir)
         fileList.sort()
         for file in fileList:
+            if file == "framework_tmp":
+                continue
             fullPath = os.path.join(dir, file)
             if os.path.isdir(file):
                 self.makeComparisonsInDir(test, fullPath, makeNew)
@@ -191,21 +199,20 @@ class TestComparison:
         self.test.changeState(self.test.SUCCEEDED, self)
 
 class MakeComparisons(plugins.Action):
+    testComparisonClass = TestComparison
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):
         # Don't compare killed tests...
         if test.state == test.KILLED:
             return
-        testComparison = self.makeTestComparison(test)
+        testComparison = self.testComparisonClass(test)
         testComparison.makeComparisons(test)
         if testComparison.hasDifferences() or testComparison.hasNewResults() or testComparison.failedPrediction:
             test.changeState(test.FAILED, testComparison)
         else:
             test.changeState(test.SUCCEEDED, testComparison)
         self.describe(test, testComparison.getPostText())
-    def makeTestComparison(self, test):
-        return TestComparison(test)
     def fileFinders(self, test):
         defaultFinder = test.app.name + test.app.versionSuffix() + test.getTmpExtension(), ""
         return [ defaultFinder ]
@@ -218,10 +225,11 @@ class FileComparison:
         self.tmpFile = tmpFile
         self.stem = os.path.basename(tmpFile).split('.')[0]
         filter = RunDependentTextFilter(test.app, self.stem)
-        self.stdCmpFile = filter.filterFile(standardFile, tmpFile + "origcmp")
-        tmpCmpFileName = tmpFile + "cmp"
+        filterFileBase = test.makeFileName(os.path.basename(tmpFile), temporary=1, forComparison=0)
+        self.stdCmpFile = filter.filterFile(standardFile, filterFileBase + "origcmp")
+        tmpCmpFileName = filterFileBase + "cmp"
         if makeNew:
-            tmpCmpFileName = tmpFile + "partcmp"
+            tmpCmpFileName = filterFileBase + "partcmp"
         self.tmpCmpFile = filter.filterFile(tmpFile, tmpCmpFileName, makeNew)
         self.test = test
         self.differenceId = -1
@@ -230,6 +238,14 @@ class FileComparison:
     def checkExternalExcuses(self):
         # No excuses here...
         return 0
+    def needsRecalculation(self):
+        # A test that has been saved doesn't need recalculating
+        if self.tmpFile == self.stdFile or self.stdCmpFile == self.stdFile:
+            return 0
+        
+        if plugins.modifiedTime(self.tmpCmpFile) < plugins.modifiedTime(self.tmpFile):
+            return 1
+        return not self.newResult() and (plugins.modifiedTime(self.stdCmpFile) <= plugins.modifiedTime(self.stdFile))
     def getType(self):
         return "difference"
     def isDiagnostic(self):
@@ -297,9 +313,12 @@ class RunDependentTextFilter:
             self.diag.info("No filter for " + fileName)
             return fileName
 
-        # Don't recreate filtered files
+        # Don't recreate filtered files, unless makeNew is set or they're out of date...
         if os.path.isfile(newFileName):
-            if makeNew:
+            newModTime = plugins.modifiedTime(newFileName)
+            oldModTime = plugins.modifiedTime(fileName)
+            self.diag.info("Filter file exists, modified at " + str(newModTime) + " (original updated at " + str(oldModTime) + ")")
+            if makeNew or newModTime <= oldModTime:
                 os.remove(newFileName)
             else:
                 return newFileName

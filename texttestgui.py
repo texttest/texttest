@@ -357,9 +357,17 @@ class TextTestGUI:
     def recreateTestView(self, test):
         if self.rightWindowGUI:
             self.contents.remove(self.rightWindowGUI.getWindow())
+            self.rightWindowGUI = None
         if test.classId() == "test-app":
             self.rightWindowGUI = ApplicationGUI(test, self.selection, self.itermap)
         else:
+            if test.state == test.FAILED or test.state == test.SUCCEEDED:
+                try:
+                    if test.stateDetails.needsRecalculation():
+                        cmpAction = comparetest.MakeComparisons()
+                        cmpAction(test)
+                except AttributeError:
+                    pass
             self.rightWindowGUI = TestCaseGUI(test, self.dynamic)
         if self.contents:
             self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=gtk.TRUE, fill=gtk.TRUE)

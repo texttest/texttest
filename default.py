@@ -1,16 +1,11 @@
 #!/usr/local/bin/python
 
 helpDescription = """
-The default configuration, with no modifications, will run all tests on the local machine,
-sending standard output to output.<app> and standard error to errors.<app>. These files
-will then be filtered using the list entries "output" and "error" from the config file,
-to remove run-dependent text.
+The default configuration is the simplest and most portable. It is intended to run on
+any architecture. Therefore, differences in results are displayed using Python's ndiff
+module, the most portable differencing tool I can find, anyway.
 
-Failure is reported on any differences with the standard versions of those files, and displayed
-using Python's ndiff module. A simple interactive dialogue is then produced, allowing the changes
-to be saved as new standard results.
-
-The default configuration is intended to be usable on any platform.
+Its default behaviour is to run all tests on the local machine.
 """
 
 helpOptions = """
@@ -69,7 +64,7 @@ class Config(plugins.Configuration):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
     def printHelpDescription(self):
-        print helpDescription
+        print helpDescription, comparetest.helpDescription
     def printHelpOptions(self, builtInOptions):
         print helpOptions, builtInOptions
     def printHelpText(self, builtInOptions):

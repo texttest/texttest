@@ -1,5 +1,24 @@
 #!/usr/local/bin/python
+
 import os, comparetest, string, plugins
+
+helpDescription = """
+Performance analysis makes use of files containing a single line, which
+looks like:
+CPU time :     30.31 sec. on apple
+where "apple" is some host name.
+
+Instead of the default file comparison described below, these files are evaluated
+as follows. First, the execution machine (apple) is looked for in the config file
+list entry called "performance_test_machine". If our execution machine is not in
+this list, performance information is disregarded. If it is in this list, the number
+of seconds is extracted. If this is then less than the config file entry
+"minimum_cputime_for_test", performance information is also disregarded. If the
+test ran on a performance test machine and it ran for long enough for performance
+checking to be worthwhile, the deviation from the standard performance in percentage
+is checked. If it is greater than the config file entry "cputime_variation_%", failure
+is reported.
+""" + comparetest.helpDescription
 
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing

@@ -1,18 +1,25 @@
 #!/usr/local/bin/python
 
+import os, time, string, signal, sys, default, performance, respond, batch, plugins, types
+
 helpDescription = """
-The LSF configuration, with no modifications, will submit all tests to LSF's "normal" queue.
-It will then wait for each test in turn, and provide comparison when each has finished.
+The LSF configuration is designed to run on a UNIX system with the LSF (Load Sharing Facility)
+product from Platform installed.
 
-sending standard output to output.<app> and standard error to errors.<app>. These files
-will then be filtered using the list entries "output" and "error" from the config file,
-to remove run-dependent text.
+It's default operation is to submit all tests to LSF's "normal" queue. For this reason
+it is probably not so useful as a standalone configuration, because most people will
+want to configure which queue they send jobs to, and hence need a derived configuration.
 
-Failure is reported on any differences with the standard versions of those files, and displayed
-using Python's ndiff module. A simple interactive dialogue is then produced, allowing the changes
-to be saved as new standard results.
+After submitting all tests, it will then wait for each test in turn, and provide comparison when
+each has finished.
 
-The default configuration is intended to be usable on any platform.
+Because UNIX is assumed anyway, results are presented using "tkdiff" for the file matching
+the "log_file" entry in the config file, and "diff" for everything else. These are more
+user friendly but less portable than the default "ndiff".
+
+It also generates performance checking and memory checking by using the LSF report file to
+extract this information. The reliability of memory checking is however uncertain, hence
+it is currently disabled by default.
 """
 
 helpOptions = """
@@ -21,25 +28,15 @@ helpOptions = """
 
 -r <mins>  - run only tests which are expected to complete in less than <mins> minutes.
 
--b <bname> - run in batch mode, using batch session name <bname>. This will replace the interactive
-             dialogue with an email report, which is sent to $USER if the session name <bname> is
-             not recognised by the config file.
-
-             There is also a possibility to define batch sessions in the config file. The following
-             entries are understood:
-             <bname>_timelimit,  if present, will run only tests up to that limit
-             <bname>_recipients, if present, ensures that mail is sent to those addresses instead of $USER.
-             If set to "none", it ensures that that batch session will ignore that application.
-             <bname>_version, these entries form a list and ensure that only the versions listed are accepted.
-             If the list is empty, all versions are allowed.
-
 -R <resrc> - Use the LSF resource <resrc>. This is essentially forwarded to LSF's bsub command, so for a full
              list of its capabilities, consult the LSF manual. However, it is particularly useful to use this
-             to force a test to go to certain machines, using -R "hname == hostname", or to avoid similar machines
-             using -R "hname != hostname"
+             to force a test to go to certain machines, using -R "hname == <hostname>", or to avoid similar machines
+             using -R "hname != <hostname>"
+""" + batch.helpOptions + """
+             Note that it can be useful to send the whole TextTest run to LSF in batch mode, using LSF's termination
+             time feature. If this is done, LSF will send TextTest a signal 10 minutes before the termination time,
+             which allows TextTest to kill all remaining jobs and report them as unfinished in its report.
 """
-
-import os, time, string, signal, sys, default, performance, respond, batch, plugins, types
 
 def getConfig(optionMap):
     return LSFConfig(optionMap)
@@ -95,7 +92,7 @@ class LSFConfig(default.Config):
     def checkPerformance(self):
         return 1
     def printHelpDescription(self):
-        print default.helpDescription
+        print helpDescription, performance.helpDescription 
     def printHelpOptions(self, builtInOptions):
         print helpOptions, default.helpOptions, builtInOptions
 

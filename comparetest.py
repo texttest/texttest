@@ -1,4 +1,19 @@
 #!/usr/local/bin/python
+
+helpDescription = """
+Evaluation of test results consists by default of comparing all files that have been collected.
+If nothing else is specified, the application's standard output is collected in output.<app>
+and standard error is collected in errors.<app>. All files, including these two, are then
+filtered using the config file list entries corresponding to the stem of the file name (e.g  "output").
+This will remove all run-dependent text like process IDs, timestamps etc., and ensure
+that false failures are avoided in this way.
+
+If standard results have not already been collected, the results are saved as the new
+standard results and must be checked carefully by hand. If standard results have been
+collected, the filtered new results are compared with the standard and any difference
+is interpreted as a test failure. 
+"""
+
 import os, filecmp, string, plugins
 
 testComparisonMap = {}

@@ -4,8 +4,6 @@ The MpsSolver configuration is based on the Carmen configuration. """
 helpOptions = """-memstat version,version:limit    Give memory statistics
     Print only tests with difference larger than limit
     
--perfstat version,version:limit    Give performance statistics
-    Print only tests with difference larger than limit
 -feasstat version,version          Give infeasibility statistics
 
 """
@@ -113,11 +111,6 @@ def getOutputMemory(fileName):
     except:
         return float(-1)
 
-def minsec(minFloat):
-    intMin = int(minFloat)
-    secPart = minFloat - intMin
-    return str(intMin) + "m" + str(int(secPart * 60)) + "s"
-
 def percentDiff(perf1, perf2):
     if perf2 != 0:
         return int((perf1 / perf2) * 100.0)
@@ -127,29 +120,6 @@ def percentDiff(perf1, perf2):
 def pad(str, padSize):
     return str.ljust(padSize)
         
-class PerformanceStatisticsBuilder(plugins.Action):
-    def __init__(self, argString):
-        args = argString.split(":")
-        versionString = args[0]
-        try:
-            self.limit = int(args[1])
-        except:
-            self.limit = 0
-        versions = versionString.split(",")
-        self.referenceVersion = versions[0]
-        self.currentVersion = None
-        if len(versions) > 1:
-            self.currentVersion = versions[1]
-    def setUpSuite(self, suite):
-        self.suiteName = suite.name + os.linesep + "   "
-    def __call__(self, test):
-        refPerf = performance.getTestPerformance(test, self.referenceVersion)
-        currPerf = performance.getTestPerformance(test, self.currentVersion)
-        pDiff = percentDiff(currPerf, refPerf)
-        if self.limit == 0 or pDiff > self.limit:
-            print self.suiteName + pad(test.name, 30) + "\t", minsec(refPerf), minsec(currPerf), "\t" + str(pDiff) + "%"
-            self.suiteName = "   "
-
 def getTestMemory(test, version = None):
     stemWithApp = "output" + "." + test.app.name
     if version != None and version != "":

@@ -36,6 +36,13 @@ this has proved somewhat more stable than sampling approaches. This is controlle
 helpScripts = """performance.AddTestPerformance
                            - Adds up the CPU time performance as specified by the test's
                              performance file for the selected tests. 
+performance.PerformanceStatistics
+                           - Displays 
+                             Currently supports these options:
+                             - v
+                               version1[,version2]
+                             - l
+                               Print only tests with difference larger than limit
 """
 
 # This module won't work without an external module creating a file called performance.app
@@ -221,3 +228,42 @@ class AddTestPerformance(plugins.Action):
     def __del__(self):
         print "Added-up test performance (for " + str(self.numberTests) + " tests) is " + str(int(self.performance)) + " minutes (" + str(int(self.performance/60)) + " hours)"
         
+def percentDiff(perf1, perf2):
+    if perf2 != 0:
+        return int((perf1 / perf2) * 100.0)
+    else:
+        return 0
+
+class PerformanceStatistics(plugins.Action):
+    def __init__(self, args = []):
+        self.interpretOptions(args)
+        self.limit = 0
+    def interpretOptions(self, args):
+        for ar in args:
+            arr = ar.split("=")
+            if arr[0]=="v":
+                versions = arr[1].split(",")
+                self.referenceVersion = versions[0]
+                self.currentVersion = None
+                if len(versions) > 1:
+                    self.currentVersion = versions[1]
+            elif arr[0]=="l":
+                try:
+                    self.limit = int(arr[1])
+                except:
+                    self.limit = 0
+            else:
+                print "Unknown option " + arr[0]
+    def setUpSuite(self, suite):
+        self.suiteName = suite.name + os.linesep + "   "
+    def __call__(self, test):
+        refPerf = getTestPerformance(test, self.referenceVersion)
+        currPerf = getTestPerformance(test, self.currentVersion)
+        pDiff = percentDiff(currPerf, refPerf)
+        if self.limit == 0 or pDiff > self.limit:
+            print self.suiteName + test.name.ljust(30) + "\t", self.minsec(refPerf), self.minsec(currPerf), "\t" + str(pDiff) + "%"
+            self.suiteName = "   "
+    def minsec(self, minFloat):
+        intMin = int(minFloat)
+        secPart = minFloat - intMin
+        return str(intMin) + "m" + str(int(secPart * 60)) + "s"

@@ -34,7 +34,7 @@ matador.TimeSummary         - Show a summary of 'useful' time in generation solu
 
 """
 
-import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest
+import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest, unixConfig, sys
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
@@ -88,7 +88,14 @@ class MatadorConfig(optimization.OptimizationConfig):
                 if line.find("Loading rule set") != -1:
                     finalWord = line.split(" ")[-1]
                     return finalWord.strip()
-        return getOption(test.options, "-r")
+        fromOptions = getOption(test.options, "-r")
+        if fromOptions:
+            return fromOptions
+        subPlanDir = self._getSubPlanDirName(test)
+        for line in open(os.path.join(subPlanDir, "APC_FILES", "problems")).xreadlines():
+            if line.startswith("153"):
+                return line.split(";")[3]
+        return ""
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -213,6 +220,106 @@ class ImportTest(optimization.ImportTest):
             optimization.ImportTest.setUpSuite(self, suite)
         else:
             self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
+
+class MigrateApcTest(plugins.Action):
+    def __init__(self):
+        self.ruleSetMap = {}
+        self.paramSetMap = {}
+        self.app = None
+    def __repr__(self):
+        return "Migrating APC tests for"
+    def migrateTest(self, testDir, optionsPath):
+        os.chdir(testDir)
+        apcOptionList = open("options.apc").readline().split()
+        apcSubPlanDir = os.path.normpath(os.path.expandvars(apcOptionList[0]))
+        dropApcFiles, apcFiles = os.path.split(apcSubPlanDir)
+        matadorName = dropApcFiles + "_auto" + self.app.name
+        print "Migrating test", os.path.basename(testDir)
+
+        self.apcRulesetName = os.path.basename(apcOptionList[3])
+        self.matRulesetName = self.ruleSetMap[self.apcRulesetName]
+        print "Transforming ruleset from", self.apcRulesetName, "to", self.matRulesetName
+
+        self.transform(os.path.join(dropApcFiles, "subplanHeader"), self.replaceRuleset)
+        self.transform(os.path.join(apcSubPlanDir, "problems"), self.replaceRuleset)        
+        self.transform(os.path.join(dropApcFiles, "subplanRules"), self.replaceParameters)
+        self.transform(os.path.join(apcSubPlanDir, "rules"), self.replaceParameters)
+
+        print "Creating subplan in dir", matadorName
+        prefix = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", "")
+        shortMatName = matadorName.replace(prefix, "")
+        # Commit the changes
+        shutil.copytree(dropApcFiles, matadorName)
+        matadorFull = os.path.join(matadorName, "APC_FILES")
+        self.commitChange(dropApcFiles, matadorName, "subplanHeader")
+        self.commitChange(dropApcFiles, matadorName, "subplanRules")
+        self.commitChange(apcSubPlanDir, matadorFull, "problems")
+        self.commitChange(apcSubPlanDir, matadorFull, "rules")
+        open(optionsPath, "w").write("-s " + shortMatName + os.linesep)
+        os.symlink(matadorFull, "APC_FILES")
+    def transform(self, absPath, transformMethod):
+        apcPath = self.getPath(absPath)
+        matPath = os.path.basename(absPath) + "." + self.app.name
+        file = open(matPath, "w")
+        for line in open(apcPath).xreadlines():
+            file.write(transformMethod(line))
+        file.close()
+        os.system("diff " + apcPath + " " + matPath)
+        print "Changes in", os.path.basename(absPath), "OK?"
+        response = sys.stdin.readline().strip()
+    def commitChange(self, oldDir, newDir, fileName):
+        oldPath = os.path.join(oldDir, fileName)
+        if unixConfig.isCompressed(oldPath):
+            os.remove(fileName)
+        newFile = fileName + "." + self.app.name
+        shutil.copyfile(newFile, os.path.join(newDir, fileName))
+        os.remove(newFile)
+    def replaceRuleset(self, line):
+        return line.replace(self.apcRulesetName, self.matRulesetName)
+    def replaceParameters(self, line):
+        paramName = line.split()[0]
+        if paramName in self.paramSetMap:
+            return line.replace(paramName, self.paramSetMap[paramName])
+        if paramName.find(".") != -1:
+            module = paramName.split(".")[0]
+            if module.find("builtin") == -1:
+                return line.replace(module, self.app.fullName.lower())
+        return line
+    def getPath(self, absPath):
+        if unixConfig.isCompressed(absPath):
+            localName = os.path.basename(absPath) + ".Z"
+            shutil.copyfile(absPath, localName)
+            os.system("uncompress " + localName)
+            return os.path.basename(absPath)
+        return absPath
+    def setUpSuite(self, suite):
+        self.describe(suite)
+        if not carmen.isUserSuite(suite):
+            return
+        for testline in open(suite.testCaseFile).readlines():
+            if testline != '\n' and testline[0] != '#':
+                testDir = os.path.join(suite.abspath, testline.strip())
+                optionsPath = os.path.join(testDir, "options." + suite.app.name)
+                if not os.path.isfile(optionsPath):
+                    self.migrateTest(testDir, optionsPath)
+    def setUpApplication(self, app):
+        self.app = app
+        mapFile = os.path.join(app.abspath, "remap_rulesets.etab")
+        if not os.path.isfile(mapFile):
+            raise plugins.TextTestError, "Cannot find ruleset mapping file at", mapFile
+        self.setUpMapFile(mapFile, self.ruleSetMap)
+        paramMapFile = os.path.join(os.environ["CARMSYS"], "carmusr_default", "crc", "etable", "remap_" + self.app.fullName.lower() + ".etab")
+        if not os.path.isfile(paramMapFile):
+            raise plugins.TextTestError, "Cannot find parameter mapping file at", paramMapFile
+        self.setUpMapFile(paramMapFile, self.paramSetMap)
+    def setUpMapFile(self, mapFile, mapToWrite):
+        for line in open(mapFile).xreadlines():
+            entries = plugins.commasplit(line)
+            if len(entries) < 3:
+                continue
+            key = entries[0].replace('"', '')
+            value = entries[1].replace('"', '')
+            mapToWrite[key] = value
 
 class PrintRuleValue(plugins.Action):
     def __repr__(self):

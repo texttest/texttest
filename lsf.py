@@ -335,6 +335,7 @@ class UpdateLSFStatus(plugins.Action):
     
 class MakePerformanceFile(unixConfig.MakePerformanceFile):
     def __init__(self, isSlowdownJob):
+        unixConfig.MakePerformanceFile.__init__(self)
         self.isSlowdownJob = isSlowdownJob
         self.timesWaitedForLSF = 0
     def findExecutionMachines(self, test):

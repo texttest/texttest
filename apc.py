@@ -53,12 +53,15 @@ def getApcHostTmp():
 class ApcConfig(optimization.OptimizationConfig):
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
-	    listKPIs = [KPI.cSimplePairingOptTimeKPI,
-			KPI.cWorstBestPairingOptTimeKPI,
-			KPI.cPairingQualityKPI,
-			KPI.cAverageMemoryKPI,
-			KPI.cMaxMemoryKPI]
+            listKPIs = [KPI.cSimplePairingOptTimeKPI,
+                        KPI.cWorstBestPairingOptTimeKPI,
+                        KPI.cPairingQualityKPI,
+                        KPI.cAverageMemoryKPI,
+                        KPI.cMaxMemoryKPI]
             return [ optimization.CalculateKPIs(self.optionValue("kpi"), listKPIs) ]
+        if self.optionMap.has_key("kpiData"):
+            listKPIs = [KPI.cSimplePairingOptTimeKPI]
+            return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         return optimization.OptimizationConfig.getActionSequence(self)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))

@@ -92,15 +92,19 @@ class OptimizationConfig(carmen.CarmenConfig):
     def getArgumentOptions(self):
         options = carmen.CarmenConfig.getArgumentOptions(self)
         options["prrep"] = "Run KPI progress report"
+        options["kpiData"] = "Output KPI curve data etc."
         options["kpi"] = "Run Henrik's old KPI"
         return options
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
-	    listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
-			KPI.cFullRosteringOptTimeKPI,
-			KPI.cWorstBestRosteringOptTimeKPI,
-			KPI.cRosteringQualityKPI]
+            listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
+                        KPI.cFullRosteringOptTimeKPI,
+                        KPI.cWorstBestRosteringOptTimeKPI,
+                        KPI.cRosteringQualityKPI]
             return [ CalculateKPIs(self.optionValue("kpi"), listKPIs) ]
+        if self.optionMap.has_key("kpiData"):
+            listKPIs = [KPI.cSimpleRosteringOptTimeKPI]
+            return [ WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
         return carmen.CarmenConfig.getActionSequence(self)
@@ -559,8 +563,12 @@ class TestReport(plugins.Action):
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):
         TestReport.__init__(self, referenceVersion)
-	self.KPIHandler = KPI.KPIHandler()
-	self.listKPIs = listKPIs
+        self.KPIHandler = KPI.KPIHandler()
+        self.listKPIs = listKPIs
+        print '\nKPI order:\n'
+        for aKPIconst in listKPIs:
+            print self.KPIHandler.getKPIname(aKPIconst)
+        print ''
     def __del__(self):
         if self.KPIHandler.getNrOfKPIs() > 0:
             print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, ":", os.linesep, self.KPIHandler.getAllGroupsKPIAverageText()
@@ -569,24 +577,54 @@ class CalculateKPIs(TestReport):
     def __repr__(self):
         return "KPI calc. for"
     def compare(self, test, referenceRun, currentRun):
-	referenceFile = referenceRun.logFile
-	currentFile = currentRun.logFile
+        referenceFile = referenceRun.logFile
+        currentFile = currentRun.logFile
         floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion)
         floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion)
-	#print 'ref: %f, now: %f' %(floatRefPerfScale, floatNowPerfScale)
-	#print 'Ref : ' + referenceFile
-	#print 'Curr: ' + currentFile
-        if currentFile != referenceFile:
-	    aKPI = None
-	    listKPIs = []
-	    for aKPIConstant in self.listKPIs:
-		aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile, floatRefPerfScale, floatNowPerfScale)
-		self.KPIHandler.addKPI(aKPI)
-		listKPIs.append(aKPI.getTextKPI())
-            self.describe(test, ' vs ver. %s, (%d sol. KPIs: %s)' %(self.referenceVersion, aKPI.getNofSolutions(), ', '.join(listKPIs)))
+        aKPI = None
+        listKPIs = []
+        for aKPIConstant in self.listKPIs:
+            aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile, floatRefPerfScale, floatNowPerfScale)
+            self.KPIHandler.addKPI(aKPI)
+            listKPIs.append(aKPI.getTextKPI())
+        self.describe(test, ' vs ver. %s, (%d sol. KPIs: %s)' %(self.referenceVersion, aKPI.getNofSolutions(), ', '.join(listKPIs)))
     def setUpSuite(self, suite):
         self.describe(suite)
 
+class WriteKPIData(TestReport):
+    def __init__(self, referenceVersion, listKPIs):
+        TestReport.__init__(self, referenceVersion)
+        self.KPIHandler = KPI.KPIHandler()
+        self.listKPIs = listKPIs
+    def __del__(self):
+        if self.KPIHandler.getNrOfKPIs() > 0:
+            print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, ":", os.linesep, self.KPIHandler.getAllGroupsKPIAverageText()
+        else:
+            print os.linesep, "No KPI tests were found with respect to version " + self.referenceVersion
+    def __repr__(self):
+        return ""
+    def compare(self, test, referenceRun, currentRun):
+        strCarmusr = '(Carmusr)%s' %(os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1])
+        listThisKPI = [strCarmusr]
+        referenceFile = referenceRun.logFile
+        currentFile = currentRun.logFile
+        floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion)
+        floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion)
+        aKPI = None
+        listKPIData = []
+        for aKPIConstant in self.listKPIs:
+            aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile, floatRefPerfScale, floatNowPerfScale)
+            self.KPIHandler.addKPI(aKPI)
+            strCurve = 'REF(Curve)%s\nNOW(Curve)%s' %(aKPI.getTextCurve())
+            listThisKPI.append(strCurve)
+            strUncovered = 'REF(Uncovered)%s\nNOW(Uncovered)%s' %(aKPI.getTupFinalUncovered())
+            listThisKPI.append(strUncovered)
+            strDate = 'REF(Date)%s\nNOW(Date)%s' %(aKPI.getTupRunDate())
+            listThisKPI.append(strDate)
+            listKPIData.append(listThisKPI)
+        self.describe(test, os.linesep + string.join(listKPIData[0], os.linesep))
+    def setUpSuite(self, suite):
+        self.describe(suite)
 
 class MakeProgressReport(TestReport):
     def __init__(self, referenceVersion):

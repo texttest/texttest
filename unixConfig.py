@@ -73,7 +73,6 @@ class UNIXConfig(default.Config):
 class RunTest(default.RunTest):
     def __init__(self):
         default.RunTest.__init__(self)
-        self.interactive = 0
         self.process = None
         self.collectStdErr = 1
         self.testDisplay = None
@@ -81,9 +80,10 @@ class RunTest(default.RunTest):
     def __call__(self, test):
         if self.testDisplay:
             os.environ["DISPLAY"] = self.testDisplay
-        default.RunTest.__call__(self, test)
+        retValue = default.RunTest.__call__(self, test)
         if self.testDisplay and self.realDisplay:
             os.environ["DISPLAY"] = self.realDisplay
+        return retValue
     def runTest(self, test):
         if self.process:
             # See if the running process is finished
@@ -95,11 +95,8 @@ class RunTest(default.RunTest):
 
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
-        if self.interactive:
-            self.process = plugins.BackgroundProcess(testCommand, testRun=1)
-            return "retry"
-        else:
-            os.system(testCommand)
+        self.process = plugins.BackgroundProcess(testCommand, testRun=1)
+        return "retry"
     def getExecuteCommand(self, test):
         testCommand = default.RunTest.getExecuteCommand(self, test)
         if self.collectStdErr:
@@ -119,9 +116,6 @@ class RunTest(default.RunTest):
         return cmdFile
     def changeState(self, test):
         test.changeState(test.RUNNING, "Running on " + hostname())
-    def getInstructions(self, test):
-        self.interactive = 1
-        return plugins.Action.getInstructions(self, test)
     def getCleanUpAction(self):
         if self.process:
             print "Killing running test (process id", str(self.process.processId) + ")"

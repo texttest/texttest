@@ -69,8 +69,14 @@ class CarmenConfig(lsf.LSFConfig):
             return RunLprof(baseRunner, self.isExecutable)
         else:
             return baseRunner
-    def isExecutable(self, process, test):
-        return process.find(".") == -1 and process.find("arch") == -1
+    def isExecutable(self, process, parentProcess, test):
+        binaryName = os.path.basename(test.getConfigValue("binary"))
+        return binaryName.startswith(parentProcess) and process.find(".") == -1 and process.find("arch") == -1
+    def binaryRunning(self, processNameDict):
+        for name in processNameDict.values():
+            if self.binaryName.startswith(name):
+                return 1
+        return 0
     def getTestCollator(self):
         if self.optionMap.has_key("lprof"):
             return [ self.getFileCollator(), ProcessProfilerResults() ]
@@ -138,7 +144,6 @@ class CarmenConfig(lsf.LSFConfig):
 class RunWithParallelAction(plugins.Action):
     def __init__(self, baseRunner, isExecutable):
         self.baseRunner = baseRunner
-        self.binaryName = None
         self.isExecutable = isExecutable
         self.diag = plugins.getDiagnostics("Parallel Action")
     def __repr__(self):
@@ -165,29 +170,23 @@ class RunWithParallelAction(plugins.Action):
         allProcesses = plugins.findAllProcesses(firstpid)
         if len(allProcesses) == 0:
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
-        processNameDict = self.getProcessNames(allProcesses)
-        if not self.binaryRunning(processNameDict):
-            self.diag.info("Failed to find '" + self.binaryName + "' in " + repr(processNameDict.values()))
+        if len(allProcesses) == 1:
             return
+        
+        processNameDict = self.getProcessNames(allProcesses)
         executableProcessName = processNameDict.values()[-1]
-        if self.isExecutable(executableProcessName, test):
+        parentProcessName = processNameDict.values()[-2]
+        if self.isExecutable(executableProcessName, parentProcessName, test):
             self.diag.info("Chose process as executable : " + executableProcessName)
             return processNameDict.items()[-2:]
         else:
             self.diag.info("Rejected process as executable : " + executableProcessName + " in " + repr(processNameDict))
-    def binaryRunning(self, processNameDict):
-        for name in processNameDict.values():
-            if self.binaryName.startswith(name):
-                return 1
-        return 0
     def getProcessNames(self, allProcesses):
         dict = seqdict()
         for processId in allProcesses:
             psline = os.popen("ps -l -p " + str(processId)).readlines()[-1]
             dict[str(processId)] = psline.split()[-1]
         return dict        
-    def setUpApplication(self, app):
-        self.binaryName = os.path.basename(app.getConfigValue("binary"))
                 
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, processInfo):

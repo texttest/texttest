@@ -96,7 +96,7 @@ class ApcConfig(optimization.OptimizationConfig):
                 return MarkApcLogDir(baseRunner, self.isExecutable, self.optionMap.has_key("extractlogs"))
             else:
                 return baseRunner
-    def isExecutable(self, process, test):
+    def isExecutable(self, process, parentProcess, test):
         # Process name starts with a dot and may be truncated or have
         # extra junk at the end added by APCbatch.sh
         processData = process[1:]

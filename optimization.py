@@ -5,7 +5,7 @@ class OptimizationConfig(carmen.CarmenConfig):
         return "k:" + carmen.CarmenConfig.getOptionString(self)
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
-            return [ CalculateKPI(self.optionValue("kpi")) ]
+            return [ CalculateKPI(self.optionValue("kpi"), self.getKPIFileName()) ]
 
         return carmen.CarmenConfig.getActionSequence(self)
     def getRuleBuilder(self, neededOnly):
@@ -18,6 +18,8 @@ class OptimizationConfig(carmen.CarmenConfig):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), ExtractSubPlanFile(self, "best_solution", "solution") ])
+    def getKPIFileName(self):
+	return "status"
 
 class ExtractSubPlanFile(plugins.Action):
     def __init__(self, config, sourceName, targetName):
@@ -133,10 +135,11 @@ class RemoveTemporarySubplan(plugins.Action):
         return "Removing temporary subplan for"
 
 class CalculateKPI(plugins.Action):
-    def __init__(self, referenceVersion):
+    def __init__(self, referenceVersion, statusFileName):
         self.referenceVersion = referenceVersion
         self.totalKPI = 0
         self.numberOfValues = 0
+	self.statusFileName = statusFileName
     def __del__(self):
         if self.numberOfValues > 0:
             print "Overall average KPI with respect to version", self.referenceVersion, "=", float(self.totalKPI / self.numberOfValues)
@@ -145,8 +148,8 @@ class CalculateKPI(plugins.Action):
     def __repr__(self):
         return "Calculating KPI for"
     def __call__(self, test):
-        currentFile = test.makeFileName("status")
-        referenceFile = test.makeFileName("status", self.referenceVersion)
+        currentFile = test.makeFileName(self.statusFileName)
+        referenceFile = test.makeFileName(self.statusFileName, self.referenceVersion)
         if currentFile != referenceFile:
             kpiValue = KPI.calculate(referenceFile, currentFile)
             self.describe(test, ", with respect to version " + self.referenceVersion + " - returns " + str(kpiValue))

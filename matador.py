@@ -83,6 +83,8 @@ class MatadorConfig(optimization.OptimizationConfig):
         subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
         subActions.append(optimization.RemoveTemporarySubplan(self.subplanManager))
         return plugins.CompositeAction(subActions)
+    def getKPIFileName(self):
+	return "output"
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)

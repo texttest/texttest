@@ -452,17 +452,17 @@ class OptionFinder:
         rootLogger = log4py.Logger().get_root()        
         rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
     # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
-    def buildOptions(self):
-        inputOptions = {}
-        fullString = string.join(sys.argv[1:])
-        optionList = string.split(fullString, '-')[1:]
-        for item in optionList:
-            option = string.strip(item)
-            if ' ' in option:
-                opt, value = string.split(option, ' ', 1)
-                inputOptions[opt] = value
-            else:
-                inputOptions[option] = ""
+    def buildOptions(self):                                                                                                              
+        inputOptions = {}                                                                                                 
+        optionKey = None                                                                                                                 
+        for item in sys.argv[1:]:                      
+            if item[0] == "-":                         
+                optionKey = item[1:].strip()
+                inputOptions[optionKey] = ""
+            elif optionKey:
+                if len(inputOptions[optionKey]):
+                    inputOptions[optionKey] += " "
+                inputOptions[optionKey] += item.strip() 
         return inputOptions
     def findApps(self):
         dirName = self.directoryName()

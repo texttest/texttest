@@ -593,22 +593,25 @@ class BuildCode(plugins.Action):
                 return "morlaix"
             else:
                 return "tororo"
+    def getRemoteCommandLine(self, arch, absPath, makeCommand):
+        commandLine = "cd " + absPath + "; " + makeCommand
+        if arch == "sparc_64":
+            commandLine = "setenv BITMODE 64; " + commandLine
+        return commandLine
     def buildLocal(self, absPath, app, makeTargets):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."
         arch = getArchitecture(app)
         buildFile = "build.default." + arch
-        commandLine = "cd " + absPath + "; gmake " + makeTargets + " >& " + buildFile
+        commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& " + buildFile)
         machine = self.getMachine(app, arch)
-        if arch == "sparc_64":
-            commandLine = "setenv BITMODE 64; " + commandLine
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
             raise plugins.TextTestError, "Product " + repr(app) + " did not build, exiting"
         print "Product", app, "built correctly in", absPath
         os.remove(buildFile)
         if os.environ.has_key("CARMSYS"):
-            commandLine = "cd " + absPath + "; gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"
+            commandLine = self.getRemoteCommandLine(arch, absPath, "gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null")
             os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
             print "Making install from", absPath ,"to", os.environ["CARMSYS"]
     def buildRemote(self, arch, app):
@@ -632,10 +635,8 @@ class BuildCode(plugins.Action):
         for optValue in targetDir["codebase"]:
             relPath, makeTargets = self.getPathAndTargets(optValue)
             absPath = app.makeAbsPath(relPath)
-            if os.path.isdir(absPath):    
-                commandLine = "cd " + absPath + "; gmake " + makeTargets + " >& build." + arch
-                if arch == "sparc_64":
-                    commandLine = "setenv BITMODE 64; " + commandLine
+            if os.path.isdir(absPath):
+                commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& build." + arch)
                 os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         return 0            
     def checkBuildFile(self, buildFile):

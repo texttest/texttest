@@ -53,6 +53,17 @@ batchInfo = """
              Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
              at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
+helpScripts = """carmen.TraverseCarmUsers   - Traverses all CARMUSR's associated with the selected tests,
+                             and executes the command specified by argument. Be careful to quote the command
+                             if you use options, otherwise texttest will try to interpret the options.
+                             Example: texttest -s carmen.TraverseCarmUsers "pwd". This will
+                             display the path of all CARMUSR's in the test suite.
+                                              
+                             If the argument findchanges=<changed within minutes> is given,
+                             a find command is issued, that prints all files that has changed within
+                             the specified time. Default time is 1440 minutes.
+"""
+
 import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, time, predict
 
 def getConfig(optionMap):
@@ -197,6 +208,9 @@ class CarmenConfig(lsf.LSFConfig):
         default.Config.printHelpOptions(self, builtInOptions)
         print "(Carmen-specific options...)"
         print helpOptions
+    def printHelpScripts(self):
+        lsf.LSFConfig.printHelpScripts(self)
+        print helpScripts
     def printHelpDescription(self):
         print helpDescription, lsf.lsfGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription 
     
@@ -507,6 +521,48 @@ class CheckBuild(plugins.Action):
             print "Build on " + arch + " in " + absPath + resultString
             if result == 0:
                 os.remove(fileName)
+
+class TraverseCarmUsers(plugins.Action):
+    def __init__(self, args = []):
+        self.traversedUsers = {}
+        self.Command = {}
+        for ar in args:
+            arr = ar.split("=")
+            if arr[0]=="findchanges":
+                if len(arr) > 1:
+                    self.time = arr[1]
+                else:
+                    self.time = "1440"
+                    print "Using default time " + self.time + " minutes"
+                self.Command = "find . -path ./LOCAL_PLAN -prune -o -type f -mmin -" + self.time + " -ls"
+            else:
+                self.Command = string.join(args)
+        if not self.Command:
+            raise "No command given"
+    def __repr__(self):
+        return "Traversing CARMUSR "
+    def __call__(self, test):
+        user = os.environ["CARMUSR"]
+        if self.traversedUsers.has_key(user):
+            return
+        self.traversedUsers[user] = 1
+        # Describe is not so good here, since it prints the test name.
+        print "Traversing CARMUSR " + user + ":"
+        # Save the old dir, so we can restore it later.
+        saveDir = os.getcwd()
+        os.chdir(user)
+        os.system(self.Command)
+        # Restore dir
+        os.chdir(saveDir)
+    # Interactive stuff
+    def getTitle(self):
+        return "Traversing users"
+    def getArgumentOptions(self):
+        options = {}
+        return options
+    def getSwitches(self):
+        switches = {}
+        return switches
 
 #
 # This class reads a CarmResources etab file and gives access to it

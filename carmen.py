@@ -236,9 +236,6 @@ class BuildCode(plugins.Action):
         else:
             tuple = processId, arch
             self.childProcesses.append(tuple)
-    def getAbsPath(self, app, target):
-        relPath = app.getConfigValue("build_" + target)
-        return app.makeAbsPath(relPath)
     def checkBuildFile(self, buildFile):
         for line in open(buildFile).xreadlines():
             if line.find("***") != -1 and line.find("Error") != -1:
@@ -258,8 +255,11 @@ class CheckBuild(plugins.Action):
                 print "Build on", arch, "FAILED!"
             else:
                 print "Build on", arch, "SUCCEEDED!"
-                absPath = self.builder.getAbsPath(app, "codebase")
-                os.remove(os.path.join(absPath, "build." + arch))
+                for relPath in app.getConfigList("build_codebase"):
+                    absPath = app.makeAbsPath(relPath)
+                    fullPath = os.path.join(absPath, "build." + arch)
+                    if os.path.isfile(fullPath):
+                        os.remove(fullPath)
 
 def ensureDirectoryExists(path):
     if len(path) == 0:

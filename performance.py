@@ -238,7 +238,7 @@ class TimeFilter(plugins.Filter):
         testPerformance = getTestPerformance(test)
         if testPerformance < 0:
             return 1
-        return testPerformance > self.minTime and (self.maxTime == None or testPerformance < self.maxTime)
+        return testPerformance >= self.minTime and (self.maxTime == None or testPerformance <= self.maxTime)
 
 class AddTestPerformance(plugins.Action):
     def __init__(self):

@@ -827,8 +827,6 @@ class TestSuiteInformation(TestInformation):
 # This is for importing new test cases
 #
 class TestCaseInformation(TestInformation):
-    def __init__(self, suite, name):
-        TestInformation.__init__(self, suite, name)
     def isComplete(self):
         return 1
     def makeImport(self):

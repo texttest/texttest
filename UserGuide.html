@@ -2,7 +2,7 @@
 <html>
 <head>
    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.18-19.7.xsmp i686) [Netscape]">
+   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.18-26.7.xsmp i686) [Netscape]">
 </head>
 <body>
 
@@ -39,11 +39,11 @@ behaviour of the application.
 <br>This is the first thing determined by TextTest on being called, and
 is where in your file system it will
 <br>start to look for tests. It is determined as follows:
-<br>(1)&nbsp;If the command line option "-d" has been set, use the value
-of that.
-<br>(2)&nbsp;If not, but the environment variable "TEXTTEST_HOME" is set,
-use that.
-<br>(3)&nbsp;If neither of the above, use the current working directory.
+<br>(1) If the command line option "-d" has been set, use the value of
+that.
+<br>(2) If not, but the environment variable "TEXTTEST_HOME" is set, use
+that.
+<br>(3) If neither of the above, use the current working directory.
 <p><u>Applications</u>
 <br>To test an application under TextTest, the first thing to do is to
 choose a unique identifier to be
@@ -56,9 +56,9 @@ a file called "config.&lt;app>". TextTest
 it will run. It will start at the root
 <br>directory and look in that directory and one level down in the directory
 structure, and all files
-<br>beginning with "config." are considered. This file is written in&nbsp;
-<a href="#Appendix - TextTest file formats">Standard Dictionary Format</a>,
-and its contents
+<br>beginning with "config." are considered. This file is written in 
+<a href="#Appendix - TextTest file formats">Standard
+Dictionary Format</a>, and its contents
 <br>will vary depending on the configuration used.
 <p>To tell TextTest to run just one particular application, specify "-a
 &lt;app>" on the command line.
@@ -74,7 +74,7 @@ to perform actions (such as running
 by using the "config_module"
 <br>entry. What this configuration will do is up to the person who wrote
 it, and hence in order to find this information out
-<br>for a particular application, run "texttest -a &lt;app> -help".&nbsp;This
+<br>for a particular application, run "texttest -a &lt;app> -help". This
 will ask the configuration to write out what
 <br>it does by default and how you can change what it does.
 <p>A configuration can both extend the range of command line options available,
@@ -120,8 +120,8 @@ file is provided in a test case these variables
 <br>will be set just for that test case. If in a test suite it will be
 set for all test suites and test cases containing in that test suite, operating
 recursively.
-<p>The values of the variables may themselves contain environment variables:&nbsp;if
-so, this should be done in standard UNIX
+<p>The values of the variables may themselves contain environment variables:
+if so, this should be done in standard UNIX
 <br>format using $&lt;var_name>.
 <p><u>Versions of Applications</u>
 <br>It is often needed to define different versions of an application which
@@ -143,6 +143,11 @@ files),
 dictionary, so that entries not present in &lt;root>.&lt;app>.&lt;version>
 are
 <br>read from &lt;root>.&lt;app>.
+<p>Note that several versions can be used at the same time. This is done
+by specifying -v &lt;version1>,&lt;version2>,... on the command line.
+<br>Configurations can also add versions, which can be useful e.g. for
+different platforms, so there may be more than one version
+<br>aggregated at once.
 <p><u>Checkouts of Applications</u>
 <br>It is expected that TextTest test suites will want to be version-controlled,
 and hence an easy means of switching between
@@ -182,7 +187,7 @@ runs several times. To do this, specify -m &lt;number_of_times> on
 <br><i>texttest</i>
 <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Runs all applications and
 all tests it can find, starting at the current directory
-<br><i>texttest -a dip -p&nbsp;</i>
+<br><i>texttest -a dip -p</i>
 <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Searches for a file called
 "config.dip", and runs that application if found. Do not delete other temporary
 files.
@@ -196,18 +201,18 @@ the application with extension "cas", using version 9 of that application.
 Do everything 3 times.
 <p><a NAME="Appendix - TextTest file formats"></a><b><u>Appendix - TextTest
 file formats</u></b>
-<br>TextTest reads two file formats - Standard List Format and Standard&nbsp;Dictionary
-Format. These are designed to be
+<br>TextTest reads two file formats - Standard List Format and Standard
+Dictionary Format. These are designed to be
 <br>as human readable as possible.
 <p>Both will filter out blank lines and lines beginning with "#", the latter
 being interpreted as comments. It's good
 <br>practice to use the latter feature to document things about your application
 and its tests in the TextTest files themselves.
 <p>Both will also expand environment variables, indicated by "$".
-<p>Standard&nbsp;List Format is simple:&nbsp;each entry is a complete line.
-So a Standard List File is simply interpreted as a list
+<p>Standard List Format is simple: each entry is a complete line. So a
+Standard List File is simply interpreted as a list
 <br>of the lines in it which are not blank and do not start with "#".
-<p>Standard&nbsp;Dictionary&nbsp;Format has entries in the form &lt;variable>:&lt;value>,
+<p>Standard Dictionary Format has entries in the form &lt;variable>:&lt;value>,
 where &lt;variable> indicates an environment
 <br>variable to be set in the case of the environment file, and a variable
 understood by TextTest or its configurations in

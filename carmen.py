@@ -76,17 +76,6 @@ class UserFilter(default.TextFilter):
 
 architecture = os.popen("arch").readline()[:-1]
 
-class CarmenBatchFilter(batch.BatchFilter):
-    def acceptsApplication(self, app):
-        if self.acceptsArchitecture(app):
-            return batch.BatchFilter.acceptsApplication(self, app)
-        else:
-            print "Rejected application", app, "on architecture", architecture 
-            return 0
-    def acceptsArchitecture(self, app):
-        allowedArchs = app.getConfigList(self.batchSession + "_architecture")
-        return len(allowedArchs) == 0 or architecture in allowedArchs
-
 class CarmenConfig(lsf.LSFConfig):
     def getOptionString(self):
         return "u:" + lsf.LSFConfig.getOptionString(self)
@@ -94,8 +83,6 @@ class CarmenConfig(lsf.LSFConfig):
         filters = lsf.LSFConfig.getFilterList(self)
         self.addFilter(filters, "u", UserFilter)
         return filters
-    def batchFilterClass(self):
-        return CarmenBatchFilter
     def getActionSequence(self):
         if self.optionMap.has_key("rulecomp"):
             return [ self.getRuleBuilder(0) ]
@@ -136,18 +123,18 @@ class CarmenConfig(lsf.LSFConfig):
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob"
-    def interpretVersion(self, app, versionString):
+    def getVersions(self, app):
         defaultArch = app.getConfigValue("default_architecture")
         if architecture == defaultArch:
-            return versionString
+            return []
         else:
             supportedArchs = app.getConfigList("supported_architecture")
             # In batch mode, don't throw exceptions. Let the Batch Filter deal with it
             if len(supportedArchs) and not architecture in supportedArchs and not self.optionMap.has_key("b"):
                 raise "Unsupported architecture " + architecture + "!!!"
             else:
-                print "Non-default architecture: using version", architecture + versionString
-                return architecture + versionString
+                print "Non-default architecture: using version", architecture
+                return [ architecture ] 
     def printHelpOptions(self, builtInOptions):
         print lsf.helpOptions + batchInfo
         default.Config.printHelpOptions(self, builtInOptions)

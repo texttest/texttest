@@ -19,10 +19,8 @@ class UNIXConfig(default.Config):
         return "b:" + default.Config.getOptionString(self)
     def getFilterList(self):
         filters = default.Config.getFilterList(self)
-        self.addFilter(filters, "b", self.batchFilterClass())
+        self.addFilter(filters, "b", batch.BatchFilter)
         return filters
-    def batchFilterClass(self):
-        return batch.BatchFilter
     def getTestResponder(self):
         diffLines = 30
         # If running multiple times, batch mode is assumed

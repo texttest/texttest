@@ -29,8 +29,9 @@ class BatchFilter(plugins.Filter):
         if not self.hasRecipients(app):
             print "Rejected application", app, "for", self.batchSession, "session"
             return 0
-        if not self.acceptsVersion(app):
-            print "Rejected application", app, "for", self.batchSession, "session, unregistered version '" + app.version + "'"
+        badVersion = self.findUnacceptableVersion(app)
+        if badVersion != None:
+            print "Rejected application", app, "for", self.batchSession, "session, unregistered version '" + badVersion + "'"
             return 0
         
         self.setTimeLimit(app)
@@ -46,9 +47,14 @@ class BatchFilter(plugins.Filter):
             self.performanceFilter = performance.TimeFilter(timeLimit)
         except:
             self.performanceFilter = None
-    def acceptsVersion(self, app):
+    def findUnacceptableVersion(self, app):
         allowedVersions = app.getConfigList(self.batchSession + "_version")
-        return len(allowedVersions) == 0 or app.version in allowedVersions
+        if len(allowedVersions) == 0:
+            return None
+        for version in app.versions:
+            if not version in allowedVersions:
+                return version
+        return None
 
 class BatchCategory:
     def __init__(self, description):
@@ -167,8 +173,10 @@ class BatchResponder(respond.Responder):
         return count
     def getMailHeader(self, app):
         versionString = ""
-        if app.version != "":
-            versionString = "(version " + app.version + ") "
+        if len(app.versions) == 1:
+            versionString = "(version " + app.versions[0] + ") "
+        elif len(app.versions) > 1:
+            versionString = "(versions " + repr(app.versions) + ") "
         return repr(app) + " Test Suite " + versionString + ": "
     def getMailTitle(self):
         title = self.getMailHeader(self.mainSuite.app)

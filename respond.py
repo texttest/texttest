@@ -49,21 +49,26 @@ class InteractiveResponder(Responder):
     def display(self, comparison, displayStream, app):
         ndiff.fcompare(comparison.stdCmpFile, comparison.tmpCmpFile)
     def askUser(self, test, comparisons, allowView):      
-        options = "Save(s) or continue(any other key)?"
-        if len(test.app.version) > 0:
-            options = "Save Version " + test.app.version + "(z), " + options
+        versions = test.app.getVersionFileExtensions()
+        options = ""
+        for i in range(len(versions)):
+            options += "Save Version " + versions[i] + "(" + str(i + 1) + "), "
+        options += "Save(s) or continue(any other key)?"
         if allowView:
             options = "View details(v), " + options
         print test.getIndent() + options
-        response = sys.stdin.readline()
-        if 's' in response:
+        response = sys.stdin.readline().strip()
+        if response == 's':
             for comparison in comparisons:
                 comparison.overwrite()
-        elif allowView and 'v' in response:
+        elif allowView and response == 'v':
             return 1
-        elif 'z' in response:
-            for comparison in comparisons:
-                comparison.overwrite(test.app.version)
+        else:
+            for i in range(len(versions)):
+                versionOption = str(i + 1)
+                if response == versionOption:
+                    for comparison in comparisons:
+                        comparison.overwrite(versions[i])
         return 0
             
 # Uses UNIX tkdiff

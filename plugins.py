@@ -11,8 +11,8 @@ class Configuration:
         return []
     def getFilterList(self):
         return []
-    def interpretVersion(self, app, versionString):
-        return versionString
+    def getVersions(self, app):
+        return []
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options
     def printHelpText(self):

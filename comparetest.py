@@ -96,11 +96,13 @@ class FileComparison:
         return "difference"
     def hasDifferences(self):
         return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
-    def overwrite(self, version = ""):
-        if len(version) and not self.stdFile.endswith("." + version):
-            stdFile = self.stdFile + "." + version
-        else:
-            stdFile = self.stdFile
+    def overwrite(self, versionString = ""):
+        newVersions = versionString.split(".")
+        stdFile = self.stdFile
+        for version in newVersions:
+            ext = "." + version
+            if self.stdFile.find(ext) == -1:
+                stdFile += ext
         if os.path.isfile(stdFile):
             os.remove(stdFile)
         os.rename(self.tmpFile, stdFile)

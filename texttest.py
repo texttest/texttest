@@ -11,7 +11,7 @@ A user guide (UserGuide.html) is available to document the framework itself.
 builtInOptions = """
 -a <app>   - run only the application with extension <app>
 
--v <vers>  - use <vers> as the version name (see User Guide)
+-v <vers>  - use <vers> as the version name(s). For several versions, use a comma-separated list (see User Guide)
 
 -c <chkt>  - use <chkt> as the checkout instead of the "default_checkout" entry (see User Guide)
 
@@ -39,20 +39,22 @@ class Test:
         self.app = app
         self.abspath = abspath
         self.paddedName = self.name
-        self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.version)
+        self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
-    def makeFileName(self, stem, version = None):
-        if version == None:
-            version = self.app.version
+    def makeFileName(self, stem, refVersion = None):
         nonVersionName = os.path.join(self.abspath, stem + "." + self.app.name)
-        if len(version) == 0:
+        versions = self.app.versions
+        if refVersion != None:
+            versions = [ refVersion ]
+        if len(versions) == 0:
             return nonVersionName
-        versionName = nonVersionName + "." + version
-        if os.path.isfile(versionName):
-            return versionName
-        else:
-            return nonVersionName
+        # Prioritise finding earlier versions
+        for version in versions:
+            versionName = nonVersionName + "." + version
+            if os.path.isfile(versionName):
+                return versionName
+        return nonVersionName
     def getRelPath(self):
         return string.replace(self.abspath, self.app.abspath, "")
     def performAction(self, action):
@@ -182,17 +184,18 @@ class TestSuite(Test):
         return testCaseList
             
 class Application:
-    def __init__(self, name, abspath, configFile, version, optionMap, builtInOptions):
+    def __init__(self, name, abspath, configFile, versions, optionMap, builtInOptions):
         self.name = name
         self.abspath = abspath
-        self.configDir = MultiEntryDictionary(configFile, name, version)
+        self.versions = versions
+        self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions())
         self.fullName = self._getFullName()
         debugPrint("Found application " + repr(self))
         self.checkout = self.makeCheckout()
         debugPrint("Checkout set to " + self.checkout)
         self.configObject = self.makeConfigObject(optionMap)
         allowedOptions = self.configObject.getOptionString() + builtInOptions
-        self.version = self.configObject.interpretVersion(self, version)
+        self.versions = versions + self.configObject.getVersions(self)
         # Force exit if something isn't present
         getopt.getopt(sys.argv[1:], allowedOptions)    
 	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
@@ -207,10 +210,29 @@ class Application:
             return string.upper(self.name)
     def description(self):
         description = "Using Application " + self.fullName
-        if len(self.version):
-            description += ", version " + self.version
+        if len(self.versions) == 1:
+            description += ", version " + self.versions[0]
+        elif len(self.versions) > 1:
+            description += ", aggregated versions " + repr(self.versions)
         description += ", checkout " + self.checkout
         return description
+    def getVersionFileExtensions(self):
+        if len(self.versions) == 0:
+            return []
+        else:
+            return self._getVersionExtensions(self.versions)
+    def _getVersionExtensions(self, versions):
+        if len(versions) == 1:
+            return versions
+
+        fullList = []
+        current = versions[0]
+        fullList.append(current)
+        fromRemaining = self._getVersionExtensions(versions[1:])
+        fullList += fromRemaining
+        for item in fromRemaining:
+            fullList.append(current + "." + item)
+        return fullList
     def hasREpattern(self, txt):
     	# return 1 if txt contains a regular expression meta character
 	return self.specialChars.search(txt) != None
@@ -356,9 +378,9 @@ class OptionFinder:
                 appName = components[1]
                 if self.inputOptions.has_key("a") and appName != self.inputOptions["a"]:
                     continue
-                versionString = self.findVersionString()
+                versionList = self.findVersionList()
                 try:
-                    app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:h:m:s:v:xp")
+                    app = Application(appName, dirName, pathname, versionList, self.inputOptions, "a:c:d:h:m:s:v:xp")
                     appList.append(app)
                 except KeyError, e:
                     print "Could not use application", appName, "-", e
@@ -366,11 +388,11 @@ class OptionFinder:
                 for app in self._findApps(pathname, 0):
                     appList.append(app)
         return appList
-    def findVersionString(self):
+    def findVersionList(self):
         if self.inputOptions.has_key("v"):
-            return self.inputOptions["v"]
+            return self.inputOptions["v"].split(",")
         else:
-            return ""
+            return []
     def timesToRun(self):
         if self.inputOptions.has_key("m"):
             return int(self.inputOptions["m"])
@@ -411,7 +433,7 @@ class OptionFinder:
             return app.getActionSequence()
             
 class MultiEntryDictionary:
-    def __init__(self, filename, appName = "", version = ""):
+    def __init__(self, filename, appName = "", versions = []):
         self.dict = {}
         self.entries = []
         if os.path.isfile(filename):
@@ -421,8 +443,9 @@ class MultiEntryDictionary:
                     continue
                 self.addLine(line[:-1])
         self.updateFor(filename, appName)
-        self.updateFor(filename, version)
-        self.updateFor(filename, appName + "." + version)
+        for version in versions:
+            self.updateFor(filename, version)
+            self.updateFor(filename, appName + "." + version)
     def updateFor(self, filename, extra):
         if len(extra) == 0:
             return

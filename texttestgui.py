@@ -266,7 +266,7 @@ class TextTestGUI:
         self.selection.selected_foreach(self.viewAppFromTest)
     def viewAppFromTest(self, model, path, iter, *args):
         test = model.get_value(iter, 2)
-        if test.classId() == "test-case":
+        if test.classId() != "test-app":
             app = test.app
             if self.rightWindowGUI.object != app:
                 guilog.info("Viewing app " + repr(app))

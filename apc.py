@@ -43,13 +43,15 @@ apc.PlotApcTest [options]  - Displays a gnuplot graph with the cpu time (in minu
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
 
+apc.UpdateCvsIgnore        - Make the .cvsignore file in each test directory identical to 'cvsignore.master'
+
 apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
                              This is intended to be used on a single specified test and will terminate
                              the testsuite after it starts Studio. It is a simple shortcut to set the
                              correct CARMSYS etc. environment variables for the test and run Studio.
 """
 
-import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins, math
+import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins, math, filecmp
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -629,3 +631,33 @@ def findTemporaryStatusFile(test,version = ""):
     else:
         print "Could not find subplan name in output file " + file + os.linesep
         return    
+
+
+class UpdateCvsIgnore(plugins.Action):
+    def __init__(self):
+        self.masterCvsIgnoreFile = None
+        self.updateCount = 0
+        pass
+    def __repr__(self):
+        return "Greping"
+    def __del__(self):
+        if self.updateCount > 0:
+            print "Updated", self.updateCount, ".cvsignore files"
+        else:
+            print "No .cvsignore files updated"
+        pass
+    def __call__(self, test):
+        if self.masterCvsIgnoreFile == None:
+            return
+        fileName = os.path.join(test.abspath, ".cvsignore")
+        if not os.path.isfile(fileName) or filecmp.cmp(fileName, self.masterCvsIgnoreFile) == 0:
+            shutil.copyfile(self.masterCvsIgnoreFile, fileName)
+            self.updateCount += 1
+        
+    def setUpSuite(self, suite):
+        pass
+    def setUpApplication(self, app):
+        fileName = os.path.join(app.abspath, "cvsignore.master")
+        if os.path.isfile(fileName):
+            self.masterCvsIgnoreFile = fileName
+

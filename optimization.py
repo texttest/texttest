@@ -21,7 +21,7 @@ class ExtractSubPlanFile:
         self.sourceName = sourceName
         self.targetName = targetName
     def __repr__(self):
-        return ""
+        return "Extracting subplan file " + self.sourceName + " to " + self.targetName + " on"
     def __call__(self, test, description):
         sourcePath = self.config.getSubPlanFileName(test, self.sourceName)
         if os.path.isfile(sourcePath):

@@ -308,10 +308,10 @@ class SubmitTest(unixConfig.RunTest):
         pass
 
 class KillTest(plugins.Action):
+    jobsKilled = []
     def __init__(self, jobNameFunction):
         self.jobNameFunction = jobNameFunction
         # Don't double-kill jobs, it can cause problems and indeterminism
-        self.jobsKilled = []
     def __repr__(self):
         return "Cancelling"
     def __call__(self, test):

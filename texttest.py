@@ -506,6 +506,8 @@ class Application:
     def __init__(self, name, abspath, configFile, version, optionMap):
         self.name = name
         self.abspath = abspath
+        # Place to store reference to extra_version application
+        self.extra = None
         self.versions = version.split(".")
         if self.versions[0] == "":
             self.versions = []
@@ -898,7 +900,9 @@ class OptionFinder:
         aggVersion = extraVersion
         if len(version) > 0:
             aggVersion = version + "." + extraVersion
-        appList.append(self.createApplication(appName, dirName, pathname, aggVersion))
+        extraApp = self.createApplication(appName, dirName, pathname, aggVersion)
+        app.extra = extraApp
+        appList.append(extraApp)
         return appList
     def findVersionList(self):
         if self.inputOptions.has_key("v"):

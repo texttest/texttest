@@ -430,8 +430,10 @@ class ApplicationGUI(RightWindowGUI):
     def runInteractive(self, button, action, *args):
         newSuite = action.performOn(self.app, self.getSelectedTests())
         if newSuite:
-            # Disable recording of selection changes: they're happening programatically
             iterlist = self.getSelectedIters(newSuite)
+            if self.app.extra:
+                extraSuite = action.performOn(self.app.extra, self.getSelectedTests())
+                iterlist += self.getSelectedIters(extraSuite)
             scriptEngine.setSelection(self.selection, iterlist)
             self.selection.get_tree_view().grab_focus()
     def getSelectedIters(self, suite):

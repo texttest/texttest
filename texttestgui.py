@@ -39,8 +39,11 @@ class TextTestGUI:
     def createTopWindow(self, testWins):
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        win.set_title("TextTest functional tests")
-        scriptEngine.connect("close", "delete_event", win, self.quit)
+        if self.dynamic:
+            win.set_title("TextTest dynamic GUI (test runs)")
+        else:
+            win.set_title("TextTest static GUI (test management)")
+        scriptEngine.connect("quit", "delete_event", win, self.quit)
         vbox = self.createWindowContents(testWins)
         win.add(vbox)
         win.show()
@@ -146,7 +149,7 @@ class TextTestGUI:
         return self.contents
     def createTestWindows(self):
         # Create some command buttons.
-        buttons = [("Quit", self.quit)]
+        buttons = []
         if self.dynamic:
             buttons.append(("Save All", self.saveAll))
         else:
@@ -180,7 +183,8 @@ class TextTestGUI:
             perfColumn = gtk.TreeViewColumn("Performance", renderer, text=3, background=4)
             view.append_column(perfColumn)
         view.expand_all()
-        scriptEngine.monitorTreeSelection("add to test selection", "remove from test selection", self.selection, argumentParseData=(column, 0))
+        if not self.dynamic:
+            scriptEngine.monitorTreeSelection("add to test selection", "remove from test selection", self.selection, argumentParseData=(column, 0))
         scriptEngine.connect("select test", "row_activated", view, self.viewTest, argumentParseData=(column, 0))
         view.show()
 
@@ -250,12 +254,14 @@ class TextTestGUI:
         iter = self.addSuiteWithParent(newTest, suiteIter)
         self.itermap[newTest] = iter.copy()
         newTest.observers.append(self)
-        scriptEngine.setSelection(self.selection, [ iter ]) 
         guilog.info("Viewing new test " + newTest.name)
         self.recreateTestView(newTest)
         self.selection.get_tree_view().expand_all()
+        scriptEngine.setSelection(self.selection, [ iter ])
+        self.selection.get_tree_view().grab_focus()
     def quit(self, *args):
         gtk.main_quit()
+        sys.stdout.flush()
         self.killInteractiveProcesses()
         if self.actionThread:
             self.actionThread.terminate()
@@ -366,7 +372,7 @@ class RightWindowGUI:
                     guilog.info("Creating notebook page for '" + optionGroup.name + "'")
                     display = self.createDisplay(optionGroup)
                     pages.append((display, optionGroup.name))
-        notebook = scriptEngine.createNotebook("notebook", pages)
+        notebook = scriptEngine.createNotebook("view options for", pages)
         notebook.show()
         return notebook
     def getHardcodedNotebookPages(self):
@@ -392,11 +398,23 @@ class RightWindowGUI:
         scriptEngine.connect(scriptTitle, "clicked", button, method, None, option)
         button.show()
         buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
+    def diagnoseOption(self, option):
+        value = option.getValue()
+        text = "Creating entry for option '" + option.name + "'"
+        if len(value) > 0:
+            text += " (set to '" + value + "')" 
+        guilog.info(text)
+    def diagnoseSwitch(self, switch):
+        value = switch.getValue()
+        text = "Creating check button for switch '" + switch.name + "'"
+        if value:
+            text += " (checked)"
+        guilog.info(text)        
     def createDisplay(self, optionGroup):
         vbox = gtk.VBox()
         for option in optionGroup.options.values():
             hbox = gtk.HBox()
-            guilog.info("Creating entry for option '" + option.name + "'")
+            self.diagnoseOption(option)
             label = gtk.Label(option.name + "  ")
             entry = scriptEngine.createEntry("enter " + option.name + " =", option.getValue())
             option.setMethods(entry.get_text, entry.set_text)
@@ -407,13 +425,18 @@ class RightWindowGUI:
             hbox.show()
             vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
         for switch in optionGroup.switches.values():
-            guilog.info("Creating check button for switch '" + switch.name + "'")
+            self.diagnoseSwitch(switch)
             checkButton = scriptEngine.createCheckButton(switch.name, switch.getValue())
             switch.setMethods(checkButton.get_active, checkButton.set_active)
             checkButton.show()
             vbox.pack_start(checkButton, expand=gtk.FALSE, fill=gtk.FALSE)
         vbox.show()    
         return vbox
+    def runInteractive(self, button, action, *args):
+        try:
+            self.performInteractiveAction(action)
+        except plugins.TextTestError, e:
+            self.showError(str(e))
     def destroyDialog(self, dialog, *args):
         dialog.destroy()
     def showError(self, message):
@@ -445,18 +468,15 @@ class ApplicationGUI(RightWindowGUI):
         for file in configFiles:
             fullPath = os.path.join(self.app.abspath, file)
             self.addFileToModel(confiter, fullPath, None, colour)
-    def runInteractive(self, button, action, *args):
-        try:
-            newSuite = action.performOn(self.app, self.getSelectedTests())
-            if newSuite:
-                iterlist = self.getSelectedIters(newSuite)
-                if self.app.extra:
-                    extraSuite = action.performOn(self.app.extra, self.getSelectedTests())
-                    iterlist += self.getSelectedIters(extraSuite)
-                scriptEngine.setSelection(self.selection, iterlist)
-                self.selection.get_tree_view().grab_focus()
-        except plugins.TextTestError, e:
-            self.showError(str(e))
+    def performInteractiveAction(self, action):
+        newSuite = action.performOn(self.app, self.getSelectedTests())
+        if newSuite:
+            iterlist = self.getSelectedIters(newSuite)
+            if self.app.extra:
+                extraSuite = action.performOn(self.app.extra, self.getSelectedTests())
+                iterlist += self.getSelectedIters(extraSuite)
+            scriptEngine.setSelection(self.selection, iterlist)
+            self.selection.get_tree_view().grab_focus()
     def getSelectedIters(self, suite):
         iters = []
         try:
@@ -495,19 +515,21 @@ class TestCaseGUI(RightWindowGUI):
 
         self.testComparison = test.stateDetails
         if test.state == test.RUNNING:
-            self.testComparison = comparetest.TestComparison(test, 0)
+            self.testComparison = comparetest.TestComparison(test)
             self.testComparison.makeComparisons(test, makeNew = 1)
         try:
-            for fileName in self.testComparison.attemptedComparisons:
-                fileComparison = self.testComparison.findFileComparison(fileName)
-                if not fileComparison:
-                    self.addFileToModel(compiter, fileName, fileComparison, self.getSuccessColour())
-                elif not fileComparison.newResult():
-                    self.addFileToModel(compiter, fileName, fileComparison, self.getFailureColour())
-            for fc in self.testComparison.newResults:
-                self.addFileToModel(newiter, fc.tmpFile, fc, self.getFailureColour())
+            for fileComparison in self.testComparison.allResults:
+                if fileComparison.newResult():
+                    self.addDynamicFileToModel(newiter, fileComparison, self.getFailureColour())
+                elif fileComparison.hasDifferences():
+                    self.addDynamicFileToModel(compiter, fileComparison, self.getFailureColour())
+                else:
+                    self.addDynamicFileToModel(compiter, fileComparison, self.getSuccessColour())
         except AttributeError:
+            # The above code assumes we have failed on comparison: if not, don't display things
             pass
+    def addDynamicFileToModel(self, iter, comparison, colour):
+        self.addFileToModel(iter, comparison.tmpFile, comparison, colour)
     def addStaticFilesToModel(self, test):
         if test.classId() == "test-case":
             stditer = self.model.insert_before(None, None)
@@ -590,9 +612,9 @@ class TestCaseGUI(RightWindowGUI):
         elif test.state != test.SUCCEEDED and test.stateDetails:
             return test.stateDetails
         return ""
-    def runInteractive(self, button, action, *args):
+    def performInteractiveAction(self, action):
         self.test.callAction(action)
-
+    
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):
     def addOptionsFileOption(self):

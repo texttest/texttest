@@ -41,13 +41,14 @@ class UNIXConfig(default.Config):
     def getTestRunner(self):
         return RunTest()
     def getTestResponder(self):
-        diffLines = 30
         if self.batchMode():
-            return batch.BatchResponder(diffLines, self.optionValue("b"))
-        elif self.optionMap.has_key("o"):
-            return default.Config.getTestResponder(self)
+            return batch.BatchResponder(self.optionValue("b"))
         else:
-            return respond.UNIXInteractiveResponder(diffLines)
+            return default.Config.getTestResponder(self)
+    def defaultGraphicalDiffTool(self):
+        return "tkdiff"
+    def defaultTextDiffTool(self):
+        return "diff"
     def printHelpDescription(self):
         print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
     def printHelpScripts(self):
@@ -162,20 +163,33 @@ class RunTest(default.RunTest):
             return
         # On Linux fourth column of ps output is pid
         pidStr = line.split()[3]
-        os.system("remsh " + server + " 'kill -9 " + pidStr + " >& /dev/null &' < /dev/null >& /dev/null &")
+        os.system(self.getSysCommand(server, "kill -9 " + pidStr))
+    def getSysCommand(self, server, command, background=1):
+        if server == hostname():
+            if background:
+                return command + " >& /dev/null &"
+            else:
+                return command
+        else:
+            if background:
+                command = "'" + command + " >& /dev/null &' < /dev/null >& /dev/null &"
+            else:
+                command = "'" + command + "'"
+            return "remsh " + server + " " + command
     def startServer(self, server):
         print "Starting Xvfb on machine", server
-        os.system("remsh " + server + " 'Xvfb :42 >& /dev/null &' < /dev/null >& /dev/null &")
+        os.system(self.getSysCommand(server, "Xvfb :42"))
         #
         # The Xvfb server needs a running X-client and 'xhost +' if it is to receive X clients from
         # remote hosts.
         #
         serverName = server + ":42.0"
-        os.system("remsh " + server + " 'xclock -display " + serverName + " >& /dev/null &' < /dev/null >& /dev/null & ")
-        os.system("remsh " + server + " 'xterm -display " + serverName + " -e xhost + >& /dev/null &'< /dev/null >& /dev/null & ")
+        os.system(self.getSysCommand(server, "xclock -display " + serverName))
+        os.system(self.getSysCommand(server, "xterm -display " + serverName + " -e xhost +"))
         return serverName
     def getPsOutput(self, server, ownProcesses):
-        lines = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep -v grep'").readlines()
+        psCommand = self.getSysCommand(server, "ps -efl | grep Xvfb | grep -v grep", background=0)
+        lines = os.popen(psCommand).readlines()
         for line in lines:
             if line.find("Xvfb") != -1 and (not ownProcesses or line.find("42") != -1):
                 return line
@@ -185,7 +199,7 @@ class RunTest(default.RunTest):
         if len(line):
             self.virtualDisplayDiag.info("Found Xvfb process running:" + os.linesep + line)
             serverName = server + line.split()[-1] + ".0"
-            testCommandLine = "remsh " + server + " 'xterm -display " + serverName + " -e echo test'"
+            testCommandLine = self.getSysCommand(server, "xterm -display " + serverName + " -e echo test", background=0)
             self.virtualDisplayDiag.info("Testing with command '" + testCommandLine + "'")
             (cin, cout, cerr) = os.popen3(testCommandLine)
             lines = cerr.readlines()

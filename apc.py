@@ -13,7 +13,9 @@ comparison as the file status.<app> after each test has run."""
 helpOptions = """
 """
 
-helpScripts = """apc.ImportTest             - Import new test cases and test users.
+helpScripts = """apc.CleanTmpFiles          - Removes all temporary files littering the test directories
+
+apc.ImportTest             - Import new test cases and test users.
                              The general principle is to add entries to the "testsuite.apc" file and then
                              run this action, typcally 'texttest -a apc -s apc.ImportTest'. The action
                              will then find the new entries (as they have no corresponding subdirs) and
@@ -43,9 +45,14 @@ apc.PlotApcTest [options]  - Displays a gnuplot graph with the cpu time (in minu
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
 
-apc.UpdateCvsIgnore        - Make the .cvsignore file in each test directory identical to 'cvsignore.master'
-
 apc.PrintAirport           - Prints the target AirportFile location for each user
+
+apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
+                             This is intended to be used on a single specified test and will terminate
+                             the testsuite after it starts Studio. It is a simple shortcut to set the
+                             correct CARMSYS etc. environment variables for the test and run Studio.
+
+apc.UpdateCvsIgnore        - Make the .cvsignore file in each test directory identical to 'cvsignore.master'
 
 apc.UpdatePerformance      - Update the performance file for tests with time from the status file if the
                              status file is from a run on a performance test machine.
@@ -53,10 +60,6 @@ apc.UpdatePerformance      - Update the performance file for tests with time fro
                              - v=v1,v2
                                Update for  multiple versions, ie 'v=,9' means master and version 9
 
-apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
-                             This is intended to be used on a single specified test and will terminate
-                             the testsuite after it starts Studio. It is a simple shortcut to set the
-                             correct CARMSYS etc. environment variables for the test and run Studio.
 """
 
 import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins, math, filecmp
@@ -246,6 +249,16 @@ class StartStudio(plugins.Action):
 optimization.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
 optimization.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
 
+class OptimizationRun(optimization.OptimizationRun):
+    def __init__(self, test, version, itemList, margin = 0.0):
+        optimization.OptimizationRun.__init__(self, test, version, itemList, margin)
+        self.penaltyFactor = 1.0
+    def timeToCost(self, targetCost):
+        if len(self.solutions) < 2 or abs(self.solutions[-1][optimization.costEntryName]) < abs(targetCost):
+            return optimization.OptimizationRun.timeToCost(self, targetCost)
+        penalizedTime = self.getPerformance() * self.penaltyFactor
+        return int(penalizedTime)
+        
 #
 # TODO: Check Sami's stuff in /users/sami/work/Matador/Doc/Progress
 #
@@ -255,6 +268,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.refMargins = {}
         self.currentMargins = {}
         self.groupQualityLimit = {}
+        self.groupPenaltyQualityFactor = {}
         self.groupTimeLimit = {}
         self.kpiGroupForTest = {}
         self.testInGroupList = []
@@ -262,8 +276,11 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.weightKPI = []
         self.sumKPITime = 0.0
         self.minKPITime = 0.0
-    def getInterestingValues(self):
-        return [ optimization.costEntryName, optimization.timeEntryName, optimization.memoryEntryName ]
+    def getOptimizationRuns(self, test):
+        interestingValues = [ optimization.costEntryName, optimization.timeEntryName, optimization.memoryEntryName ]
+        currentRun = OptimizationRun(test, self.currentVersion, interestingValues)
+        referenceRun = OptimizationRun(test, self.referenceVersion, interestingValues)
+        return currentRun, referenceRun
     def __del__(self):
         for groupName in self.finalCostsInGroup.keys():
             fcTupleList = self.finalCostsInGroup[groupName]
@@ -324,11 +341,16 @@ class MakeProgressReport(optimization.MakeProgressReport):
                     self.groupQualityLimit[groupName] = int(groupValue)
                 if groupParameter == "t":
                     self.groupTimeLimit[groupName] = int(groupValue)
+                if groupParameter == "pf":
+                    self.groupPenaltyQualityFactor[groupName] = float(groupValue)
     def compare(self, test, referenceRun, currentRun):
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
         if not self.kpiGroupForTest.has_key(test.name):
             return
         groupName = self.kpiGroupForTest[test.name]
+        if self.groupPenaltyQualityFactor.has_key(groupName):
+            referenceRun.penaltyFactor = self.groupPenaltyQualityFactor[groupName]
+            currentRun.penaltyFactor = self.groupPenaltyQualityFactor[groupName]
         testTuple = test, referenceRun, currentRun, userName
         self.testInGroupList.append(testTuple)
         fcTuple = referenceRun.getCost(-1), currentRun.getCost(-1)
@@ -596,7 +618,6 @@ class UpdateCvsIgnore(plugins.Action):
     def __init__(self):
         self.masterCvsIgnoreFile = None
         self.updateCount = 0
-        pass
     def __repr__(self):
         return "Greping"
     def __del__(self):
@@ -698,3 +719,9 @@ class UpdatePerformance(plugins.Action):
         pass
     def setUpApplication(self, app):
         self.statusFileName = app.getConfigValue("log_file")
+
+class CleanTmpFiles(default.CleanTmpFiles):
+    def __init__(self):
+        default.CleanTmpFiles.__init__(self)
+        self.regExps.append(re.compile("plot\.apc.*"))
+

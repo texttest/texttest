@@ -506,3 +506,28 @@ class TimeSummary(plugins.Action):
                 if self.solutionDetail:
                     print "   ", string.join(usePercent," ")
 
+class CleanSubplans(plugins.Action):
+    def __init__(self):
+        self.config = MatadorConfig(None)
+        self.user = os.environ["USER"]
+        self.cleanedPlans = 0
+    def __del__(self):
+        print "Removed ", self.cleanedPlans, " temporary subplan directories"
+    def __repr__(self):
+        return "Cleaning subplans for"
+    def __call__(self, test):
+        subplan = self.config._getSubPlanDirName(test)
+        localplan, subdir = os.path.split(subplan)
+        searchStr = subdir + "." + test.app.name
+        cleanedPlansTest = 0
+        for file in os.listdir(localplan):
+            startsubplan = file.find(searchStr)
+            if startsubplan == -1:
+                continue
+            if file.find(self.user, startsubplan + len(searchStr)) != -1:
+                cleanedPlansTest += 1
+                shutil.rmtree(os.path.join(localplan, file))
+        self.describe(test, " (" + str(cleanedPlansTest) + ")")
+        self.cleanedPlans += cleanedPlansTest
+    def setUpSuite(self, suite):
+        self.describe(suite)

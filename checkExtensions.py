@@ -47,7 +47,6 @@ class createCompareFiles(plugins.Action):
         if test.app.configDir.has_key('check_extension'):
             checkExtensions=test.app.configDir.getListValue('check_extension')
         if not checkExtensions:
-            print  test.app.configDir.keys()
             print "(No file extensions for comparison.)"
             return
         #print "Extensions to be compared:",checkExtensions

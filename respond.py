@@ -102,9 +102,13 @@ class OverwriteOnFailures(Responder):
 
 # Works only on UNIX
 class BatchResponder(Responder):
+    def __repr__(self):
+        return "In"
     def __init__(self, lineCount):
         self.failures = {}
-        self.successes = []
+        self.successText = []
+        self.failuresText = []
+        self.testCount = 0
         self.mainSuite = None
         self.responder = UNIXInteractiveResponder(lineCount)
     def __del__(self):
@@ -115,9 +119,9 @@ class BatchResponder(Responder):
         mailFile.write("To: " + toAddress + os.linesep)
         mailFile.write("Subject: " + self.getMailTitle() + os.linesep)
         mailFile.write(os.linesep) # blank line separating headers from body
-        if len(self.successes) > 0:
+        if self.successCount() > 0:
             mailFile.write("The following tests succeeded : " + os.linesep)
-            mailFile.writelines(self.successes)
+            mailFile.writelines(self.successText)
         if self.failureCount() > 0:
             self.reportFailures(mailFile)
         mailFile.close()
@@ -128,28 +132,32 @@ class BatchResponder(Responder):
         else:
             return fromAddress
     def handleSuccess(self, test):
-        self.successes.append(self.testLine(test))
+        self.successText.append(test.getIndent() + "- " + repr(test) + os.linesep)
+        self.testCount += 1
     def handleFailure(self, test, comparisons):
+        self.failuresText.append(test.getIndent() + "- " + repr(test) + os.linesep)
         self.failures[test] = comparisons
+        self.testCount += 1
     def setUpSuite(self, suite, description):
         if self.mainSuite == None:
             self.mainSuite = suite
+        line = description + ":" + os.linesep
+        self.successText.append(line)
+        self.failuresText.append(line)
     def failureCount(self):
         return len(self.failures)
-    def testCount(self):
-        return self.failureCount() + len(self.successes)
+    def successCount(self):
+        return self.testCount - self.failureCount()
     def getMailTitle(self):
         suiteDescription = repr(self.mainSuite.app) + " Test Suite (" + self.mainSuite.name + " in " + self.mainSuite.app.checkout + ") : "
-        return suiteDescription + str(self.failureCount()) + " out of " + str(self.testCount()) + " tests failed"
-    def testLine(self, test):
-        return repr(test) + os.linesep
+        return suiteDescription + str(self.failureCount()) + " out of " + str(self.testCount) + " tests failed"
     def reportFailures(self, mailFile):
         mailFile.write(os.linesep + "The following tests failed : " + os.linesep)
-        mailFile.writelines(map(self.testLine, self.failures.keys()))
+        mailFile.writelines(self.failuresText)
         mailFile.write(os.linesep + "Failure information for the tests that failed follows..." + os.linesep)
         for test in self.failures.keys():
             mailFile.write("--------------------------------------------------------" + os.linesep)
-            mailFile.write("TEST FAILED -> " + repr(test) + os.linesep)
+            mailFile.write("TEST FAILED -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             os.chdir(test.abspath)
             self.responder.displayComparisons(self.failures[test], mailFile, None)
         

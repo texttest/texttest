@@ -50,10 +50,8 @@ class BatchFilter(plugins.Filter):
             self.performanceFilter = performance.TimeFilter(timeLimit)
     def findUnacceptableVersion(self, app):
         allowedVersions = getBatchConfigValue(app, "batch_version", self.batchSession)
-        if len(allowedVersions) == 0:
-            return None
         for version in app.versions:
-            if not version in allowedVersions:
+            if len(version) and not version in allowedVersions:
                 return version
         return None
 

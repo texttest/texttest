@@ -358,9 +358,12 @@ class ReconnectTest(plugins.Action):
     def __repr__(self):
         return "Reconnect to"
     def __call__(self, test):
-        print "Reconnecting to test", test.name
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
         writeDir = test.writeDirs[0]
+        if not os.path.exists(reconnLocation):
+            os.makedirs(writeDir)
+            return
+        print "Reconnecting to test", test.name
         shutil.copytree(reconnLocation, writeDir)
         for file in os.listdir(writeDir):
             if file.endswith("cmp"):

@@ -124,7 +124,7 @@ class BatchResponder(respond.Responder):
             self.writeFailureDetail(mailFile)
         mailFile.close()
     def createMail(self, title, app):
-        mailFile = os.popen("sendmail -t", "w")
+        mailFile = os.popen("/usr/lib/sendmail -t", "w")
         fromAddress = os.environ["USER"]
         toAddress = self.getRecipient(fromAddress, app)
         mailFile.write("From: " + fromAddress + os.linesep)

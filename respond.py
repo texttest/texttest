@@ -96,16 +96,18 @@ class UNIXInteractiveResponder(InteractiveResponder):
             os.system("tkdiff" + argumentString + " &")
         else:
             stdin, stdout, stderr = os.popen3("diff" + argumentString)
-            linesWritten = 0
-            for line in stdout.xreadlines():
-                if linesWritten >= self.lineCount:
-                    return
-                displayStream.write(line)
-                linesWritten += 1
-            # Don't wait for the garbage collector - we risk a lot of failures otherwise...
-            stdin.close()
-            stdout.close()
-            stderr.close()
+            try:
+                linesWritten = 0
+                for line in stdout.xreadlines():
+                    if linesWritten >= self.lineCount:
+                        return
+                    displayStream.write(line)
+                    linesWritten += 1
+            finally:
+                # Don't wait for the garbage collector - we risk a lot of failures otherwise...
+                stdin.close()
+                stdout.close()
+                stderr.close()
     
 class OverwriteOnFailures(Responder):
     def responderText(self, test):

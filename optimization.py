@@ -1145,8 +1145,8 @@ class _PlotTest(plugins.Action):
     def getPlotFileName(self, version, state, item):
         return "plot-" + version + "-" + state + "-" + item
     def getPlotUserAndTest(self, file):
-        username = file.split(os.sep)[-4]
-        testname = file.split(os.sep)[-3]
+        username = file.split(os.sep)[-3]
+        testname = file.split(os.sep)[-2]
         return username, testname
     def getPlotInfo(self, file):
         plotFileName = file.split(os.sep)[-1]

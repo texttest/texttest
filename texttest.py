@@ -267,7 +267,7 @@ class OptionFinder:
                 if self.inputOptions.has_key("a") and appName != self.inputOptions["a"]:
                     continue
                 versionString = self.findVersionString()
-                app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:s:v:xp")
+                app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:m:s:v:xp")
                 appList.append(app)
             elif os.path.isdir(pathname) and recursive:
                 for app in self._findApps(pathname, 0):
@@ -278,6 +278,11 @@ class OptionFinder:
             return self.inputOptions["v"]
         else:
             return ""
+    def timesToRun(self):
+        if self.inputOptions.has_key("m"):
+            return int(self.inputOptions["m"])
+        else:
+            return 1
     def debugMode(self):
         return self.inputOptions.has_key("x")
     def parallelMode(self):
@@ -410,20 +415,22 @@ def main():
     global globalRunIdentifier
     globalRunIdentifier = tmpString() + time.strftime(timeFormat(), time.localtime())
 
-    for app in inputOptions.findApps():
-        actionSequence = inputOptions.getActionSequence(app)
-        allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, app.getFilterList())
-        for action in actionSequence:
-            filter = extraFilter(action)
-            if filter != None:
-                filterList = app.getFilterList()
-                filterList.append(filter)
-                debugPrint("Creating extra test suite from new filter " + repr(filter))
-                debugPrint(os.getcwd())
-                actionTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
-                actionTests.performAction(action)
-            else:
-                allTests.performAction(action)
+    allApps = inputOptions.findApps()
+    for run in range(inputOptions.timesToRun()):
+        for app in allApps:
+            actionSequence = inputOptions.getActionSequence(app)
+            allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, app.getFilterList())
+            for action in actionSequence:
+                filter = extraFilter(action)
+                if filter != None:
+                    filterList = app.getFilterList()
+                    filterList.append(filter)
+                    debugPrint("Creating extra test suite from new filter " + repr(filter))
+                    debugPrint(os.getcwd())
+                    actionTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
+                    actionTests.performAction(action)
+                else:
+                    allTests.performAction(action)
 
 if __name__ == "__main__":
     main()

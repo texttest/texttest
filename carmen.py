@@ -11,6 +11,12 @@ class UserFilter(default.TextFilter):
         else:
             return 1
 
+class FileFilter(default.TextFilter):
+    def __init__(self, filterFile):
+        self.texts = map(string.strip, open(filterFile).readlines())
+    def acceptsTestCase(self, test):
+        return test.name in self.texts
+        
 architecture = os.popen("arch").readline()[:-1]
 
 def findLSFQueue(test):
@@ -29,11 +35,12 @@ def isUserSuite(suite):
 
 class CarmenConfig(default.Config):
     def getOptionString(self):
-        return "lbr:u:R:" + default.Config.getOptionString(self)
+        return "lbf:r:u:R:" + default.Config.getOptionString(self)
     def getFilterList(self):
         filters = default.Config.getFilterList(self)
         self.addFilter(filters, "r", performance.TimeFilter)
         self.addFilter(filters, "u", UserFilter)
+        self.addFilter(filters, "f", FileFilter)
         return filters
     def addFilter(self, list, optionName, filterObj):
         if self.optionMap.has_key(optionName):
@@ -65,7 +72,8 @@ class CarmenConfig(default.Config):
             return [ performance.MakeComparisons() ]
     def getTestResponder(self):
         diffLines = 30
-        if self.optionMap.has_key("b"):
+        # If running multiple times, batch mode is assumed
+        if self.optionMap.has_key("b") or self.optionMap.has_key("m"):
             return [ respond.BatchResponder(diffLines) ]
         elif self.optionMap.has_key("o"):
             return default.Config.getTestResponder(self)
@@ -76,10 +84,11 @@ def getRaveName(test):
     return test.app.getConfigValue("rave_name")
 
 class CompileRules:
-    def __init__(self, getRuleSetName, filter = None):
+    def __init__(self, getRuleSetName, modeString = "-optimize", filter = None):
         self.rulesCompiled = []
         self.raveName = None
         self.getRuleSetName = getRuleSetName
+        self.modeString = modeString
         self.filter = filter
     def __repr__(self):
         return "Compiling rules for"
@@ -89,9 +98,11 @@ class CompileRules:
             print description + " - ruleset " + ruleset.name
             ruleset.backup()
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-            commandLine = compiler + " " + self.raveName + " -optimize -archs " + architecture + " " + ruleset.sourceFile
+            commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile
             self.rulesCompiled.append(ruleset.name)
             os.system(commandLine)
+            if self.modeString == "-debug":
+                ruleset.moveDebugVersion()
     def setUpSuite(self, suite, description):
         print description
         self.rulesCompiled = []
@@ -111,6 +122,11 @@ class RuleSet:
     def backup(self):
         if self.isCompiled():
             shutil.copyfile(self.targetFile, self.targetFile + ".bak")
+    def moveDebugVersion(self):
+        debugVersion = self.targetFile + "_g"
+        if os.path.isfile(debugVersion):
+            os.remove(self.targetFile)
+            os.rename(debugVersion, self.targetFile)
         
 class UpdatedLocalRulesetFilter:
     def __init__(self, getRuleSetName, libraryFile):

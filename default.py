@@ -290,13 +290,14 @@ class CollateFiles(plugins.Action):
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):
         self.texts = plugins.commasplit(filterText)
+        self.textTriggers = [ plugins.TextTrigger(text) for text in self.texts ]
         self.allTestCaseNames = []
     def containsText(self, test):
         return self.stringContainsText(test.name)
     def stringContainsText(self, searchString):
-        for text in self.texts:
-            if searchString.find(text) != -1:
-                if searchString == text or not text in self.allTestCaseNames:
+        for trigger in self.textTriggers:
+            if trigger.matches(searchString):
+                if searchString == trigger.text or not trigger.text in self.allTestCaseNames:
                     return 1
         return 0
     def equalsText(self, test):
@@ -324,8 +325,8 @@ class TestSuiteFilter(TextFilter):
         pathComponents = test.getRelPath().split(os.sep)
         for path in pathComponents:
             if len(path) and path != test.name:
-                for text in self.texts:
-                    if path.find(text) != -1:
+                for trigger in self.textTriggers:
+                    if trigger.matches(path):
                         return 1
         return 0
 

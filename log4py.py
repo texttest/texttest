@@ -1,6 +1,6 @@
 """
 
-Python logging module - Version 1.1
+Python logging module - Version 1.2
 
 Loglevels:
 
@@ -15,7 +15,10 @@ Format-Parameters:
     %L -- Log type (Error, Warning, Debug or Info)
     %M -- The actual message.
     %N -- The current line number.
-    %T -- Current time.
+    %T -- Current time (human readable).
+    %t -- Current time (machine readable)
+    %U -- Current fully qualified module/file.
+    %u -- Current module/file.
     %x -- NDC (nested diagnostic contexts).
 
 Pre-defined Formats:
@@ -43,6 +46,13 @@ FMT_DEBUG = "%T [%D (%d)] %L %C [%F (%N)] %x%M"
 # Special logging targets
 TARGET_MYSQL = "MySQL"
 TARGET_POSTGRES = "Postgres"
+TARGET_SYSLOG = "Syslog"
+TARGET_SYS_STDOUT = "sys.stdout"
+TARGET_SYS_STDERR = "sys.stderr"
+TARGET_SYS_STDOUT_ALIAS = "stdout"
+TARGET_SYS_STDERR_ALIAS = "stderr"
+
+SPECIAL_TARGETS = [ TARGET_MYSQL, TARGET_POSTGRES, TARGET_SYSLOG, TARGET_SYS_STDOUT, TARGET_SYS_STDERR, TARGET_SYS_STDOUT_ALIAS, TARGET_SYS_STDERR_ALIAS ]
 
 # Configuration files
 CONFIGURATION_FILES = {}
@@ -72,14 +82,14 @@ PURPLE = 35
 AQUA = 36
 WHITE = 37
 
-LOG_MSG = {MSG_DEBUG: "DEBUG", MSG_WARN: "WARNING", MSG_ERROR: "ERROR", MSG_INFO: "INFO"}
-LOG_COLORS = {MSG_DEBUG: [WHITE, BLACK, FALSE], MSG_WARN: [WHITE, BLACK, FALSE], MSG_ERROR: [WHITE, BLACK, TRUE], MSG_INFO: [WHITE, BLACK, FALSE]}
+LOG_MSG = { MSG_DEBUG: "DEBUG", MSG_WARN: "WARNING", MSG_ERROR: "ERROR", MSG_INFO: "INFO"}
+LOG_COLORS = { MSG_DEBUG: [WHITE, BLACK, FALSE], MSG_WARN: [WHITE, BLACK, FALSE], MSG_ERROR: [WHITE, BLACK, TRUE], MSG_INFO: [WHITE, BLACK, FALSE]}
 LOG_LEVELS = { "DEBUG": LOGLEVEL_DEBUG, "VERBOSE": LOGLEVEL_VERBOSE, "NORMAL": LOGLEVEL_NORMAL, "NONE": LOGLEVEL_NONE, "ERROR": LOGLEVEL_ERROR }
 
 SECTION_DEFAULT = "Default"
 
 from time import time, strftime, localtime
-from types import StringType, ClassType, InstanceType, FileType
+from types import StringType, ClassType, InstanceType, FileType, TupleType
 from string import zfill, atoi, lower, upper, join, replace, split, strip
 from re import sub
 from ConfigParser import ConfigParser, NoOptionError
@@ -89,6 +99,8 @@ import traceback
 import os
 import copy
 import socket
+import locale
+import syslog
 
 try:
     import MySQLdb
@@ -97,6 +109,7 @@ except:
     mysql_available = FALSE
 
 # This is the main class for the logging module
+
 class Logger:
 
     cache = {}
@@ -131,7 +144,7 @@ class Logger:
         """ Provides a way to change the base logger object's properties. """
         return Logger.instance
 
-    def get_instance(self, classid = "Main"):
+    def get_instance(self, classid = "Main", use_cache = TRUE):
         """ Either get the cached logger instance or create a new one
 
         Note that this is safe, even if you have your target set to sys.stdout
@@ -148,7 +161,7 @@ class Logger:
         # classid has to be lowercase, because the ConfigParser returns sections lowercase
         classid = lower(classid)
 
-        if (cache.has_key(classid)):
+        if ((cache.has_key(classid)) and (use_cache == TRUE)):
             cat = Logger.cache[classid]
         else:
             instance = Logger.instance
@@ -173,11 +186,14 @@ class Logger:
             self.__Logger_ndc = []
             self.__Logger_classid = classid
 
-            cache[classid] = cat
+            cat.debug("Class %s instantiated" % classid)
+            if (use_cache == TRUE):
+                cache[classid] = cat
 
         return cat
 
     # Log-target handling (add, remove, set, remove_all)
+
     def add_target(self, target, *args):
         """ Add a target to the logger targets. """
         if (not target in self.__Logger_targets):
@@ -194,6 +210,10 @@ class Logger:
                 else:
                     self.error("MySQL target not added - Python-mysql not available")
             else:
+                if (type(target) == StringType):
+                    if (target not in SPECIAL_TARGETS):
+                        target = os.path.expanduser(target)
+                        target = os.path.expandvars(target)
                 self.__Logger_targets.append(target)
 
     def remove_target(self, target):
@@ -205,13 +225,22 @@ class Logger:
 
     def set_target(self, target):
         """ Set a single target. """
-        self.__Logger_targets = [target]
+        if (type(target) == StringType):
+            if (target not in SPECIAL_TARGETS):
+                target = os.path.expanduser(target)
+                target = os.path.expandvars(target)
+        self.__Logger_targets = [ target ]
 
     def remove_all_targets(self):
         """ Remove all targets from the logger targets. """
         self.__Logger_targets=[]
 
+    def get_targets(self):
+        """ Returns all defined targets. """
+        return self.__Logger_targets
+
     # Methods to set properties
+
     def set_loglevel(self, loglevel):
         """ Set the loglevel for the current instance. """
         self.__Logger_loglevel = loglevel
@@ -225,10 +254,11 @@ class Logger:
         self.__Logger_useansicodes = useansicodes
 
     def set_time_format(self, timeformat):
-        """ Set the time format (default: %d.%m.%Y %H:%M:%S). """
+        """ Set the time format (default: loaded from the system locale). """
         self.__Logger_timeformat = timeformat
 
     # Method to get properties
+
     def get_loglevel(self):
         """ Returns the current loglevel. """
         return self.__Logger_loglevel
@@ -245,11 +275,8 @@ class Logger:
         """ Returns the current time format. """
         return self.__Logger_timeformat
 
-    def get_targets(self):
-        """ Returns the current targets. """
-        return self.__Logger_targets
-
     # Methods to push and pop trace messages for nested contexts
+
     def push(self, message):
         """ Add a trace message. """
         self.__Logger_ndc.append(message)
@@ -265,30 +292,47 @@ class Logger:
         self.__Logger_ndc = []
 
     # Methods to actually print messages
-    def debug(self, message):
+
+    def debug(self, *messages):
         """ Write a debug message. """
+        message = self.__Logger_collate_messages(messages)
         if (self.__Logger_loglevel >= LOGLEVEL_DEBUG):
             self.__Logger_showmessage(message, MSG_DEBUG)
 
-    def warn(self, message):
+    def warn(self, *messages):
         """ Write a warning message. """
+        message = self.__Logger_collate_messages(messages)
         if (self.__Logger_loglevel >= LOGLEVEL_VERBOSE):
             self.__Logger_showmessage(message, MSG_WARN)
 
-    def error(self, message):
+    def error(self, *messages):
         """ Write a error message. """
+        message = self.__Logger_collate_messages(messages)
         if (self.__Logger_loglevel >= LOGLEVEL_ERROR):
             self.__Logger_showmessage(message, MSG_ERROR)
 
-    def info(self, message):
+    def info(self, *messages):
         """ Write a info message. """
+        message = self.__Logger_collate_messages(messages)
         if (self.__Logger_loglevel >= LOGLEVEL_NORMAL):
             self.__Logger_showmessage(message, MSG_INFO)
 
-    # Private method of the Logger class - you never have to use those directly
+    # Private methods of the Logger class - you never have to use those directly
+
+    def __Logger_collate_messages(self, messages):
+        """ **(private)** Create a single string from a number of messages. """
+        if (type(messages) == TupleType):
+            message = ""
+            for i in range(len(messages)):
+                message = "%s%s " % (message, messages[i])
+            return strip(message)
+        else:
+            return strip(str(messages))
+
     def __Logger_tracestack(self):
         """ **(private)** Analyze traceback stack and set linenumber and functionname. """
         stack = traceback.extract_stack()
+        self.__Logger_module = stack[-4][0]
         self.__Logger_linenumber = stack[-4][1]
         self.__Logger_functionname = stack[-4][2]
         if (self.__Logger_functionname == "?"):
@@ -296,16 +340,21 @@ class Logger:
 
     def __Logger_setdefaults(self):
         """ **(private)** Set default values for internal variables. """
+        locale.setlocale(locale.LC_ALL)
         self.__Logger_classid = None
-        self.__Logger_targets = [ "sys.stdout" ]            # default target = sys.stdout
+        self.__Logger_targets = [ TARGET_SYS_STDOUT ]            # default target = sys.stdout
         self.__Logger_formatstring = FMT_LONG
         self.__Logger_loglevel = LOGLEVEL_NORMAL
         self.__Logger_useansicodes = FALSE
         self.__Logger_functionname = ""
         self.__Logger_linenumber = -1
-        self.__Logger_timeformat = "%d.%m.%Y %H:%M:%S"
+        try:
+            self.__Logger_timeformat = "%s %s" % (locale.nl_langinfo(locale.D_FMT), locale.nl_langinfo(locale.T_FMT))
+        except (AttributeError):
+            self.__Logger_timeformat = "%d.%m.%Y %H:%M:%S"
         self.__Logger_classname = None
         self.__Logger_configfilename = ""
+        self.__Logger_module = ""
         self.__Logger_ndc = []                              # ndc = Nested Diagnostic Context
 
     def __Logger_find_config(self):
@@ -322,7 +371,11 @@ class Logger:
                     else:
                         home_directory = "C:\\"
                 else:
-                    home_directory = os.environ["HOME"]
+                    if (os.environ.has_key("HOME")):
+                        home_directory = os.environ["HOME"]
+                    else:
+                        # No home directory set
+                        home_directory = ""
                 if (os.sep == "\\"):
                     home_directory = replace(home_directory, "\\", "\\\\")
                 filename = sub("\$HOME", home_directory, filename)
@@ -393,6 +446,14 @@ class Logger:
 
     def __Logger_showmessage(self, message, messagesource):
         """ **(private)** Writes a message to all targets set. """
+
+        if (isinstance(message, Exception)):
+            (exc_type, exc_value, tb) = sys.exc_info()
+            exception_summary = traceback.format_exception(exc_type, exc_value, tb)
+            message = 'Exception caught:\n'
+            for line in exception_summary:
+                message = "%s%s" % (message, line)
+
         currenttime = time()
         self.__Logger_tracestack()
         timedifference = "%.3f" % (currenttime - self.__Logger_timeinit)
@@ -407,6 +468,8 @@ class Logger:
         line = sub("%D", timedifference, line)
         line = sub("%d", timedifflaststep, line)
         line = sub("%F", self.__Logger_functionname, line)
+        line = sub("%U", self.__Logger_module, line)
+        line = sub("%u", os.path.split(self.__Logger_module)[-1], line)
         ndc = self.__Logger_get_ndc()
         if (ndc != ""):
             line = sub("%x", "%s - " % ndc, line)
@@ -421,6 +484,7 @@ class Logger:
             line = sub("%M", message, line)
         line = sub("%N", str(self.__Logger_linenumber), line)
         line = sub("%T", currentformattedtime, line)
+        line = sub("%t", `currenttime`, line)
 
         for i in range(len(self.__Logger_targets)):
             target = self.__Logger_targets[i]
@@ -428,10 +492,13 @@ class Logger:
                 sqltime = strftime("'%Y-%m-%d', '%H:%M:%S'", localtime(currenttime))
                 sqlStatement = "INSERT INTO %s (host, facility, level, date, time, program, msg) VALUES ('%s', '%s', '%s', %s, '%s', '%s')" % (self.__Logger_mysql_tablename, self.hostname, self.__Logger_functionname, LOG_MSG[messagesource], sqltime, str(self.__Logger_classname), sub("'", "`", message + " " + ndc))
                 self.__Logger_mysql_cursor.execute(sqlStatement)
-            elif (target == sys.stdout) or (lower(target) == "stdout") or (lower(target) == "sys.stdout"):
+            elif (target == TARGET_SYSLOG):
+                # We don't need time and stuff here
+                syslog.syslog(message)
+            elif (target == sys.stdout) or (lower(target) == TARGET_SYS_STDOUT) or (lower(target) == TARGET_SYS_STDOUT_ALIAS):
                 sys.stdout.write("%s\n" % line)
-            elif (target == sys.stderr) or (lower(target) == "stderr") or (lower(target) == "sys.stderr"):
-                sys.stdout.write("%s\n" % line)
+            elif (target == sys.stderr) or (lower(target) == TARGET_SYS_STDERR) or (lower(target) == TARGET_SYS_STDERR_ALIAS):
+                sys.stderr.write("%s\n" % line)
             elif (type(target) == FileType):
                 target.write("%s\n" % line)
             else:

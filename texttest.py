@@ -382,13 +382,13 @@ class OptionFinder:
             diagFile = self._getDiagnosticFile()
             if os.path.isfile(diagFile):
                 diagDir = os.path.dirname(diagFile)
+                os.environ["TEXTTEST_DIAGDIR"] = diagDir
                 print "TextTest will write diagnostics in", diagDir
                 for file in os.listdir(diagDir):
                     if file.endswith("diag"):
-                        os.remove(file)
+                        os.remove(os.path.join(diagDir, file))
                 # To set new config files appears to require a constructor...
                 rootLogger = log4py.Logger(log4py.TRUE, diagFile)
-                rootLogger.set_target(os.path.join(diagDir, rootLogger.get_targets()[0]))
             else:
                 print "Could not find diagnostic file at", diagFile, ": cannot run with diagnostics"
                 self._disableDiags()

@@ -71,7 +71,14 @@ def getArchitecture(app):
 def findDisplay(maintainer, server):
     line = os.popen("remsh " + server + " 'ps -efl | grep " + maintainer + " | grep Xvfb | grep -v grep'").readline()
     if len(line):
-        return server + line.split()[-1] + ".0"
+        #
+        # The Xvfb server needs a running X-client and 'xhost +' if it is to receive X clients from
+        # remote hosts.
+        #
+        serverName = server + line.split()[-1] + ".0"
+        os.system("remsh " + server + " 'xclock -display " + serverName + " >& /dev/null &' < /dev/null >& /dev/null & ")
+        os.system("remsh " + server + " 'xterm -display " + serverName + " -e xhost + >& /dev/null &'< /dev/null >& /dev/null & ")
+        return serverName
 
 def getDisplay(trystart = 1):
     # The nightjob should connect to a virtual X server

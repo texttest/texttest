@@ -40,6 +40,10 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                If a comma-seperated list is given, all the listed items are plotted.
                                An abreviation is 'i=apctimes', which is equivalent to specifying 'i=OC_to_DH_time,
                                Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time'.
+                             - av
+                               Also add an average over the tests for the items and versions plotted.
+                             - oav
+                               Only plot the average curves, and not the individual test curves.
                              - s
                                Plot against solution number instead of cpu time.
                              - nt

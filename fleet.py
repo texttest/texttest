@@ -43,31 +43,47 @@ class FleetConfig(matador.MatadorConfig):
         self.noIncreaseExceptMethods = {}
         self.noIncreaseExceptMethods[optimization.costEntryName] = []
 
-class FleetSubPlanDirManager(optimization.SubPlanDirManager):
+class FleetSubPlanDirManager(matador.MatadorSubPlanDirManager):
     def __init__(self, config):
-        optimization.SubPlanDirManager.__init__(self, config)
-    def getSubPlanDirFromTest(self, test):
-        fullPath = self.getFullPath(self.config.subPlanName(test))
-        return fullPath
-    def getFullPath(self, path):
-        fullPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", path)
-        return os.path.normpath(fullPath)
-    def removeTemporary(self, test):
-        optimization.SubPlanDirManager.removeTemporary(self, test)
-        tmpInputFile = test.getTmpFileName("input", "r")
-        if os.path.isfile(tmpInputFile):
-            os.remove(tmpInputFile)
+        matador.MatadorSubPlanDirManager.__init__(self, config)
     def getExecuteCommand(self, binary, test):
         self.makeTemporary(test)
         tmpDir = self.tmpDirs[test]
-        tmpDir = tmpDir.replace(self.getFullPath("") + os.sep,"")
+        tmpDir = tmpDir.replace(self.getFullPath("") + os.sep, "")
+        if self.usesOptionFile(test):
+            return binary + " " + self.setupOptions(test, tmpDir)
+        else:
+            self.setupTemporaryInputFile(test, tmpDir)
+            return binary;
+    def usesOptionFile(self, test):
+        if os.environ.has_key("FLEET_SUBPLAN_IN_INPUT"):
+            return 0
+        else:
+            return 1
+    def setupOptions(self, test, tmpDir):
         optparts = test.options.split()
         for ix in range(len(optparts) - 1):
             if optparts[ix] == "-s" and (ix + 1) < len(optparts):
                 optparts[ix + 1] = tmpDir
             if optparts[ix] == "-c" and (ix + 1) < len(optparts):
                 optparts[ix + 1] = test.abspath + os.sep + optparts[ix + 1]
-        options = string.join(optparts, " ")
-        return binary + " " + options
+        return string.join(optparts, " ")
+    def setupTemporaryInputFile(self, test, tmpDir):
+        loadspEntry = string.join(tmpDir.split(os.sep))
+        tmpInputFile = test.getTmpFileName("input", "w")
+        oldFile = open(test.inputFile)
+        newFile = open(tmpInputFile, "w")
+        for line in oldFile.readlines():
+            entries = line.split()
+            if len(entries) > 1 and entries[0] == "loadsp":
+                newFile.write("loadsp " + loadspEntry + os.linesep)
+            else:
+                newFile.write(line)
+    def removeTemporary(self, test):
+        optimization.SubPlanDirManager.removeTemporary(self, test)
+        if not self.usesOptionFile(test):
+            tmpInputFile = test.getTmpFileName("input", "r")
+            if os.path.isfile(tmpInputFile):
+                os.remove(tmpInputFile)
 
 

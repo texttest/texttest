@@ -188,8 +188,11 @@ class RunWithParallelAction(plugins.Action):
             self.baseRunner(test)
             os._exit(0)
         else:
-            processInfo = self.findProcessInfo(processId, test)
-            self.performParallelAction(test, processInfo)
+            try:
+                processInfo = self.findProcessInfo(processId, test)
+                self.performParallelAction(test, processInfo)
+            except plugins.TextTestError:
+                self.handleNoTimeAvailable(test)
             os.waitpid(processId, 0)
     def findProcessInfo(self, firstpid, test):
         while 1:
@@ -230,6 +233,9 @@ class RunWithParallelAction(plugins.Action):
         self.baseRunner.setUpSuite(suite)
     def setUpApplication(self, app):
         self.baseRunner.setUpApplication(app)
+    def handleNoTimeAvailable(self, test):
+        # Do nothing by default
+        pass
                 
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, processInfo):
@@ -237,6 +243,8 @@ class RunLprof(RunWithParallelAction):
         self.describe(test, ", profiling process '" + processName + "'")
         runLine = "/users/lennart/bin/gprofile " + processId + " >& gprof.output"
         os.system(runLine)
+    def handleNoTimeAvailable(self, test):
+        raise plugins.TextTestError, "Lprof information not collected, test did not run long enough to connect to it"
     
 class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):

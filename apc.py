@@ -482,11 +482,20 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         if resLine.find("/") != -1:
             return resLine
         return "/tmp"
-    def getApcLogDir(self, test, processId):
+    def getApcLogDir(self, test, processId = None):
         # Logfile dir
         subplanName, apcFiles = os.path.split(test.writeDirs[1])
         baseSubPlan = os.path.basename(subplanName)
-        return os.path.join(self.getApcHostTmp(), baseSubPlan + "_" + processId)
+        if processId:
+            return os.path.join(self.getApcHostTmp(), baseSubPlan + "_" + processId)
+        for file in os.listdir(self.getApcHostTmp()):
+            if file.startswith(baseSubPlan + "_"):
+                return os.path.join(self.getApcHostTmp(), file)
+    def handleNoTimeAvailable(self, test):
+        # We try to pick out the log directory, at least
+        apcLogDir = self.getApcLogDir(test)
+        if apcLogDir:
+            test.writeDirs.append(apcLogDir)
     def makeLinks(self, test, apcTmpDir):
         sourceName = os.path.join(test.writeDirs[1], "run_status_head")
         targetName = os.path.join(test.writeDirs[0], "run_status_head")

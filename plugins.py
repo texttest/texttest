@@ -319,7 +319,7 @@ def findAllProcesses(pid):
     
     for line in outLines:
         entries = line.split()
-        if entries[3] == str(pid):
+        if entries[3] == str(pid) and line.find("<defunct>") == -1:
             processes.insert(0, pid)
         if entries[4] == str(pid):
             processes += findAllProcesses(int(entries[3]))

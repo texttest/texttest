@@ -589,8 +589,8 @@ class PlotApcTest(optimization.PlotTest):
             return optimization.PlotTest.getStatusFile(self, test, version)
 
 class GrepApcLog(plugins.Action):
-    def __init__(self):
-        pass
+    def __init__(self,args = ["(heuristic subselection|unfixvars time|focussing|Solv|OBJ|LBD|\*\*\*)"]):
+        self.grepwhat = args[0]
     def __repr__(self):
         return "Greping"
     def __del__(self):
@@ -604,7 +604,7 @@ class GrepApcLog(plugins.Action):
         grepLines = os.popen(grepCommand).readlines()
         if len(grepLines) > 0:
             machine = grepLines[0].split()[-1]
-            Command = "rsh " + machine + " 'cd /tmp/*" + test.name + "*; egrep \"(heuristic subselection|unfixvars time|focussing|Solv|OBJ|LBD|\*\*\*)\" apclog'" 
+            Command = "rsh " + machine + " 'cd /tmp/*" + test.name + "*; egrep \"" + self.grepwhat + "\" apclog'" 
             grepLines = os.popen(Command).read()
             print grepLines
     def setUpSuite(self, suite):

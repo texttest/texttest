@@ -345,7 +345,7 @@ class TestCaseGUI:
         self.model.set_value(compiter, 0, "Comparison Files")
         newiter = self.model.insert_before(None, None)
         self.model.set_value(newiter, 0, "New Files")
-        if not test:
+        if not test or test.state < test.RUNNING:
             return
         try:
             os.chdir(test.getDirectory(temporary=1))

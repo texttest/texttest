@@ -120,6 +120,12 @@ class CarmenConfig(lsf.LSFConfig):
             return architecture
         else:
             return "idle_" + architecture
+    def findResourceList(self, app):
+        resourceList = lsf.LSFConfig.findResourceList(self, app)
+        # Sparc queue requires this resource
+        if architecture == "sparc":
+            resourceList.append("master")
+        return resourceList
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob"

@@ -76,10 +76,32 @@ class LSFConfig(unixConfig.UNIXConfig):
         if not self.useLSF():
             return default.Config.getTestRunner(self)
         else:
-            return SubmitTest(self.findLSFQueue, self.optionValue("R"), self.optionMap.has_key("perf"))
+            return SubmitTest(self.findLSFQueue, self.findLSFResource)
     # Default queue function, users probably need to override
     def findLSFQueue(self, test):
         return "normal"
+    def findLSFResource(self, test):
+        resourceList = self.findResourceList(test.app)
+        if len(resourceList) == 0:
+            return ""
+        elif len(resourceList) == 1:
+            return resourceList[0]
+        else:
+            resource = "(" + resourceList[0] + ")"
+            for res in resourceList[1:]:
+                resource += " && (" + res + ")"
+    def findResourceList(self, app):
+        resourceList = []
+        if self.optionMap.has_key("R"):
+            resourceList.append(self.optionValue("R"))
+        if self.optionMap.has_key("perf"):
+            performanceMachines = app.getConfigList("performance_test_machine")
+            resource = "hname == " + performanceMachines[0]
+            if len(performanceMachines) > 1:
+                for machine in performanceMachines[1:]:
+                    resource += " || hname == " + machine
+            resourceList.append(resource)
+        return resourceList
     def getTestCollator(self):
         if not self.useLSF():
             return default.Config.getTestCollator(self)
@@ -133,10 +155,9 @@ class LSFJob:
         return ""
     
 class SubmitTest(plugins.Action):
-    def __init__(self, queueFunction, resource, performanceOnly):
+    def __init__(self, queueFunction, resourceFunction):
         self.queueFunction = queueFunction
-        self.resource = resource
-        self.performanceOnly = performanceOnly
+        self.resourceFunction = resourceFunction
     def __repr__(self):
         return "Submitting"
     def __call__(self, test):
@@ -152,22 +173,13 @@ class SubmitTest(plugins.Action):
         reportfile =  test.getTmpFileName("report", "w")
         lsfJob = LSFJob(test)
         lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -e " + errfile
-        resource = self.getResource(test.app)
+        resource = self.resourceFunction(test)
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
         commandLine = "bsub " + lsfOptions + " " + testCommand + " > " + reportfile + " 2>&1"
         os.system(commandLine)
     def getExecuteCommand(self, test):
         return test.getExecuteCommand()
-    def getResource(self, app):
-        if len(self.resource) or not self.performanceOnly:
-            return self.resource
-        performanceMachines = app.getConfigList("performance_test_machine")
-        resource = "hname == " + performanceMachines[0]
-        if len(performanceMachines) > 1:
-            for machine in performanceMachines[1:]:
-                resource += " || hname == " + machine
-        return resource
     def setUpSuite(self, suite):
         self.describe(suite)
     def getCleanUpAction(self):

@@ -44,11 +44,12 @@ class Test:
         return os.path.isdir(self.abspath) and self.isValidSpecific()
     def makeFileName(self, stem, refVersion = None):
         nonVersionName = os.path.join(self.abspath, stem + "." + self.app.name)
-        versions = self.app.versions
+        versions = self.app.getVersionFileExtensions()
         if refVersion != None:
             versions = [ refVersion ]
         if len(versions) == 0:
             return nonVersionName
+        
         # Prioritise finding earlier versions
         for version in versions:
             versionName = nonVersionName + "." + version
@@ -197,14 +198,18 @@ class Application:
         self.name = name
         self.abspath = abspath
         self.versions = versions
-        self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions())
+        self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions(0))
         self.fullName = self._getFullName()
         debugPrint("Found application " + repr(self))
         self.checkout = self.makeCheckout()
         debugPrint("Checkout set to " + self.checkout)
         self.configObject = self.makeConfigObject(optionMap)
         allowedOptions = self.configObject.getOptionString() + builtInOptions
-        self.versions = versions + self.configObject.getVersions(self)
+        newVersions = self.configObject.getVersions(self)
+        self.versions = versions + newVersions
+        if len(newVersions) > 0:
+            # Get config files for configuration versions... (though we can't iterate here!)
+            self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions())
         # Force exit if something isn't present
         getopt.getopt(sys.argv[1:], allowedOptions)    
 	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
@@ -231,22 +236,25 @@ class Application:
             description += ", aggregated versions " + repr(self.versions)
         description += ", checkout " + self.checkout
         return description
-    def getVersionFileExtensions(self):
+    def getVersionFileExtensions(self, baseVersion = 1):
         if len(self.versions) == 0:
             return []
+        exts = self._getVersionExtensions(self.versions)
+        if baseVersion:
+            return exts + self.getConfigList("base_version")
         else:
-            return self._getVersionExtensions(self.versions)
+            return exts
     def _getVersionExtensions(self, versions):
         if len(versions) == 1:
             return versions
 
         fullList = []
         current = versions[0]
-        fullList.append(current)
         fromRemaining = self._getVersionExtensions(versions[1:])
-        fullList += fromRemaining
         for item in fromRemaining:
             fullList.append(current + "." + item)
+        fullList.append(current)
+        fullList += fromRemaining
         return fullList
     def hasREpattern(self, txt):
     	# return 1 if txt contains a regular expression meta character
@@ -476,6 +484,7 @@ class MultiEntryDictionary:
     def updateFor(self, filename, extra):
         if len(extra) == 0:
             return
+        debugPrint("Updating " + filename + " for version " + extra) 
         extraFileName = filename + "." + extra
         if not os.path.isfile(extraFileName):
             return
@@ -621,6 +630,7 @@ class TextTest:
                     print app.description()
                     applicationRunners.append(appRunner)
             except (SystemExit, KeyboardInterrupt):
+                printException()
                 raise sys.exc_type, sys.exc_value
             except:
                 print "Not running tests of application", app, "due to exception in set-up:"

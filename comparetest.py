@@ -64,7 +64,7 @@ class FileComparison:
     def getType(self):
         return "difference"
     def hasDifferences(self):
-        return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile)
+        return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
     def overwrite(self, version = ""):
         if len(version) and not self.stdFile.endswith("." + version):
             stdFile = self.stdFile + "." + version

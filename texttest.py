@@ -180,6 +180,7 @@ class Application:
     def filterFile(self, fileName):
         stem = fileName.split('.')[0]
         if not self.configDir.has_key(stem) or not os.path.isfile(fileName):
+            debugPrint("No filter for " + fileName)
             return fileName
 
         newFileName = fileName + "cmp"
@@ -194,6 +195,7 @@ class Application:
             else:
                 linesToRemove -= 1
         newFile.close()
+        debugPrint("Filter for " + fileName + " returned " + newFileName)
         return newFileName
 #private:
     def matchRE(self, ptn, text):

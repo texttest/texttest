@@ -218,10 +218,12 @@ class TestSuite(Test):
             if testSuite.isValid():
                 if not testSuite.rejected:
                     testCaseList.append(testSuite)
+                    testSuite.tearDownEnvironment()
             else:
                 testCase = TestCase(testName, testPath, self.app)
                 if testCase.isValid() and testCase.isAcceptedByAll(filters):
                     testCaseList.append(testCase)
+                    testCase.tearDownEnvironment()
         return testCaseList
             
 class Application:

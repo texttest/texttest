@@ -62,7 +62,12 @@ class TextTestGUI:
         self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
         iter = self.model.insert_before(parent, None)
-        self.model.set_value(iter, 0, suite.name)
+        nodeName = suite.name
+        if parent == None:
+            appName = suite.app.name + suite.app.versionSuffix()
+            if appName != nodeName:
+                nodeName += " (" + appName + ")"
+        self.model.set_value(iter, 0, nodeName)
         self.model.set_value(iter, 2, suite)
         try:
             for test in suite.testcases:
@@ -171,21 +176,24 @@ class TextTestGUI:
             self.recreateTestView(test)
     def runActionThread(self):
         while len(self.instructions):
+            prevTest = None
             for test, action in self.instructions:
                 if self.quitGUI:
                     return
-                self.performAction(test, action)
+                self.performAction(test, action, prevTest)
+                prevTest = test
             self.instructions = self.postponedInstructions
             self.postponedTests = []
             self.postponedInstructions = []
         self.workQueue.put("actions finished")
-    def performAction(self, test, action):
+    def performAction(self, test, action, prevTest):
         while 1:
             if self.quitGUI:
                 return 0
 
             if test in self.postponedTests:
-                self.postponedInstructions.append((test, plugins.SetUpEnvironment(1)))
+                if test != prevTest:
+                    self.postponedInstructions.append((test, plugins.SetUpEnvironment(1)))
                 self.postponedInstructions.append((test, action))
                 return 1
             else:
@@ -196,8 +204,9 @@ class TextTestGUI:
                     continue
                 elif retValue == "wait":
                     self.postponedTests.append(test)
-                    # Must restore environment when postponing...
-                    self.postponedInstructions.append((test, plugins.SetUpEnvironment(1)))
+                    # Must restore environment when postponing..., when the tests differ
+                    if test != prevTest:
+                        self.postponedInstructions.append((test, plugins.SetUpEnvironment(1)))
                     self.postponedInstructions.append((test, action))
             return 1
     def notifyChange(self, test):

@@ -1,0 +1,16 @@
+XCOMM Install test components in generally available place.
+XCOMM $Id: Imakefile,v 1.1 2003/02/07 09:54:18 uddeborg Exp $
+
+MODULEDIR=/usr/local/lib/python
+MODULES=carmen.py comparetest.py default.py KPI.py localrun.py lsf.py \
+	matador.py ndiff.py performance.py respond.py studio.py
+
+CarmFirstTarget()
+
+CopyFiles(install,$(MODULES),$(MODULEDIR),a=r)
+
+XCOMM There is no single macro which both removes the suffix and installs.
+XCOMM Easiest to do by hand, as long as it is only one case.
+install:: /usr/local/bin/runtests
+/usr/local/bin/runtests: runtests.py
+	install -c -m 775 $< $@

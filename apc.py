@@ -75,7 +75,7 @@ class ApcConfig(optimization.OptimizationConfig):
             return self._getApcTestRunner()
     def _getApcTestRunner(self):
         if not self.useLSF():
-            return lsf.LSFConfig.getTestRunner(self)
+            return RunApcTest()
         else:
             return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
     def getTestCollator(self):
@@ -106,9 +106,44 @@ class ApcConfig(optimization.OptimizationConfig):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts
 
+def verifyAirportFile():
+    diag = plugins.getDiagnostics("APC airport")
+    etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
+    customerEtab = os.path.join(etabPath, "Customer.etab")
+    if os.path.isfile(customerEtab):
+        diag.info("Reading etable at " + customerEtab)
+        etab = carmen.ConfigEtable(customerEtab)
+        airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
+        if airportFile != None and os.path.isfile(airportFile):
+            return
+        diag.info("Airport file is at " + airportFile)
+        srcDir = etab.getValue("default", "AirpMaint", "AirportSrcDir")
+        if srcDir == None:
+            srcDir = etab.getValue("default", "AirpMaint", "AirportSourceDir")
+        if srcDir == None:
+            srcDir = os.path.join(os.environ["CARMUSR"], "data", "Airport", "source")
+        srcFile = os.path.join(srcDir, "AirportFile")
+        if os.path.isfile(srcFile) and airportFile != None:
+            apCompile = os.path.join(os.environ["CARMSYS"], "bin", carmen.architecture, "apcomp")
+            if os.path.isfile(apCompile):
+                print "Missing AirportFile detected, building:", airportFile
+                carmen.ensureDirectoryExists(os.path.dirname(airportFile))
+                os.system(apCompile + " " + srcFile + " > " + airportFile)
+            if os.path.isfile(airportFile):
+                return
+    raise plugins.TextTestError, "Failed to find AirportFile"
+
+class RunApcTest(default.RunTest):
+    def __call__(self, test):
+        verifyAirportFile()
+        default.RunTest.__call__(self, test)
+        
 class SubmitApcTest(lsf.SubmitTest):
     def __init__(self, queueFunction, resourceFunction):
         lsf.SubmitTest.__init__(self, queueFunction, resourceFunction)
+    def __call__(self, test):
+        verifyAirportFile()
+        lsf.SubmitTest.__call__(self, test)
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()
         inputFileName = test.getInputFileName()
@@ -143,7 +178,6 @@ class ApcCompileRules(carmen.CompileRules):
     def __call__(self, test):
         self.apcLib = os.path.join(os.environ["CARMSYS"], self.libraryFile)
         carmTmpDir = os.environ["CARMTMP"]
-        self.verifyAirportFile()
         if not os.path.isdir(carmTmpDir):
             os.mkdir(carmTmpDir)
         if self.forcedRuleCompile == 0 and carmen.architecture == "i386_linux":
@@ -207,33 +241,6 @@ class ApcCompileRules(carmen.CompileRules):
             return 0
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
-
-    def verifyAirportFile(self):
-        diag = plugins.getDiagnostics("APC airport")
-        etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
-        customerEtab = os.path.join(etabPath, "Customer.etab")
-        if os.path.isfile(customerEtab):
-            diag.info("Reading etable at " + customerEtab)
-            etab = carmen.ConfigEtable(customerEtab)
-            airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
-            if airportFile != None and os.path.isfile(airportFile):
-                return
-            diag.info("Airport file is at " + airportFile)
-            srcDir = etab.getValue("default", "AirpMaint", "AirportSrcDir")
-            if srcDir == None:
-                srcDir = etab.getValue("default", "AirpMaint", "AirportSourceDir")
-            if srcDir == None:
-                srcDir = os.path.join(os.environ["CARMUSR"], "data", "Airport", "source")
-            srcFile = os.path.join(srcDir, "AirportFile")
-            if os.path.isfile(srcFile) and airportFile != None:
-                apCompile = os.path.join(os.environ["CARMSYS"], "bin", carmen.architecture, "apcomp")
-                if os.path.isfile(apCompile):
-                    print "Missing AirportFile detected, building:", airportFile
-                    carmen.ensureDirectoryExists(os.path.dirname(airportFile))
-                    os.system(apCompile + " " + srcFile + " > " + airportFile)
-                    if os.path.isfile(airportFile):
-                        return
-        raise plugins.TextTestError, "Failed to find AirportFile"
 
       
 class RemoveLogs(plugins.Action):

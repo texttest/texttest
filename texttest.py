@@ -9,6 +9,7 @@ class Test:
         self.app = app
         self.abspath = abspath
         self.paddedName = self.name
+        self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.version)
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
     def makeFileName(self, stem, version = None):
@@ -25,13 +26,17 @@ class Test:
     def getRelPath(self):
         return string.replace(self.abspath, self.app.abspath, "")
     def performAction(self, action):
-        self.performSetUp()
+        self.setUpEnvironment()
         if type(action) == types.ListType:
             for subAction in action:
                 self.performSubAction(subAction)
         else:
             self.performSubAction(action)
         self.performOnSubTests(action)
+    def setUpEnvironment(self):
+        for var, value in self.environment.items():
+            os.environ[var] = self.app.makeAbsPath(os.path.expandvars(value))
+            debugPrint("Setting " + var + " to " + os.environ[var])
     def getIndent(self):
         dirCount = string.count(self.getRelPath(), os.sep)
         retstring = ""
@@ -52,17 +57,15 @@ class TestCase(Test):
         optionsFile = self.makeFileName("options")
         self.options = ""
         if (os.path.isfile(optionsFile)):
-            self.options = open(optionsFile).readline()[:-1]
+            self.options = os.path.expandvars(open(optionsFile).readline()[:-1])
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
         return "test-case"
     def isValidSpecific(self):
         return os.path.isfile(self.inputFile) or len(self.options) > 0
-    def performSetUp(self):
-        os.chdir(self.abspath)
-        debugPrint(self.getExecuteCommand())
     def performSubAction(self, subAction):
+        os.chdir(self.abspath)
         description = self.getIndent() + repr(subAction) + " " + repr(self)
         subAction(self, description)
     def performOnSubTests(self, action):
@@ -87,7 +90,6 @@ class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):
         Test.__init__(self, name, abspath, app)
         self.testCaseFile = self.makeFileName("testsuite")
-        self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.version)
         self.testcases = self.getTestCases(filters)
         if len(self.testcases):
             maxNameLength = max([len(test.name) for test in self.testcases])
@@ -101,10 +103,6 @@ class TestSuite(Test):
         return os.path.isfile(self.testCaseFile)
     def isEmpty(self):
         return len(self.testcases) == 0
-    def performSetUp(self):
-        for var, value in self.environment.items():
-            os.environ[var] = self.app.makeAbsPath(os.path.expandvars(value))
-            debugPrint("Setting " + var + " to " + os.environ[var])
     def performSubAction(self, subAction):
         description = self.getIndent() + repr(subAction) + " " + repr(self)
         subAction.setUpSuite(self, description)
@@ -119,7 +117,7 @@ class TestSuite(Test):
         if not self.isValid() or not self.isAcceptedByAll(filters):
             return testCaseList
 
-        self.performSetUp()
+        self.setUpEnvironment()
         for testline in open(self.testCaseFile).readlines():
             if testline == '\n' or testline[0] == '#':
                 continue

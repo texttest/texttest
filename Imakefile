@@ -1,16 +1,18 @@
 XCOMM Install test components in generally available place.
-XCOMM $Id: Imakefile,v 1.1 2003/02/07 09:54:18 uddeborg Exp $
+XCOMM $Id: Imakefile,v 1.2 2003/02/07 17:01:23 geoff Exp $
 
 MODULEDIR=/usr/local/lib/python
-MODULES=carmen.py comparetest.py default.py KPI.py localrun.py lsf.py \
-	matador.py ndiff.py performance.py respond.py studio.py
+FRAMEWORK_MODULES=comparetest.py default.py localrun.py lsf.py ndiff.py performance.py respond.py
+CARMEN_MODULES=carmen.py optimization.py apc.py KPI.py matador.py studio.py
 
 CarmFirstTarget()
 
-CopyFiles(install,$(MODULES),$(MODULEDIR),a=r)
+XCOMM These might be installed in different places, as they are in fact different
+CopyFiles(install,$(FRAMEWORK_MODULES),$(MODULEDIR),a=r)
+CopyFiles(install,$(CARMEN_MODULES),$(MODULEDIR),a=r)
 
 XCOMM There is no single macro which both removes the suffix and installs.
 XCOMM Easiest to do by hand, as long as it is only one case.
-install:: /usr/local/bin/runtests
-/usr/local/bin/runtests: runtests.py
+install:: /usr/local/bin/texttest
+/usr/local/bin/texttest: texttest.py
 	install -c -m 775 $< $@

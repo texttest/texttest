@@ -400,7 +400,7 @@ class RightWindowGUI:
     def createView(self):
         view = gtk.TreeView(self.model)
         renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Relevant Files", renderer, text=0, background=1)
+        column = gtk.TreeViewColumn(self.object.name.replace("_", "__"), renderer, text=0, background=1)
         view.append_column(column)
         if self.dynamic:
             perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)
@@ -474,36 +474,77 @@ class RightWindowGUI:
         value = option.getValue()
         text = "Creating entry for option '" + option.name + "'"
         if len(value) > 0:
-            text += " (set to '" + value + "')" 
+            text += " (set to '" + value + "')"
+        if len(option.possibleValues) > 1:
+            text += " (drop-down list containing " + repr(option.possibleValues) + ")"
         guilog.info(text)
     def diagnoseSwitch(self, switch):
         value = switch.getValue()
-        text = "Creating check button for switch '" + switch.name + "'"
+        if switch.nameForOff:
+            text = "Creating radio button for switch '" + switch.name + "/" + switch.nameForOff + "'"
+        else:
+            text = "Creating check button for switch '" + switch.name + "'"
         if value:
             text += " (checked)"
         guilog.info(text)        
     def createDisplay(self, optionGroup):
         vbox = gtk.VBox()
         for option in optionGroup.options.values():
-            hbox = gtk.HBox()
-            self.diagnoseOption(option)
-            label = gtk.Label(option.name + "  ")
-            entry = scriptEngine.createEntry("enter " + option.name + " =", option.getValue())
-            option.setMethods(entry.get_text, entry.set_text)
-            hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
-            hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)
-            label.show()
-            entry.show()
-            hbox.show()
+            hbox = self.createOptionBox(option)
             vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
         for switch in optionGroup.switches.values():
-            self.diagnoseSwitch(switch)
-            checkButton = scriptEngine.createCheckButton(switch.name, switch.getValue())
-            switch.setMethods(checkButton.get_active, checkButton.set_active)
-            checkButton.show()
-            vbox.pack_start(checkButton, expand=gtk.FALSE, fill=gtk.FALSE)
+            hbox = self.createSwitchBox(switch)
+            vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
         vbox.show()    
         return vbox
+    def createOptionBox(self, option):
+        hbox = gtk.HBox()
+        self.diagnoseOption(option)
+        label = gtk.Label(option.name + "  ")
+        hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
+        if len(option.possibleValues) > 1:
+            combobox = gtk.Combo()
+            entry = combobox.entry
+            combobox.set_popdown_strings(option.possibleValues)
+            hbox.pack_start(combobox, expand=gtk.TRUE, fill=gtk.TRUE)
+            combobox.show()
+        else:
+            entry = gtk.Entry()
+            entry.show()
+            hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)
+        entry.set_text(option.getValue())
+        scriptEngine.registerEntry(entry, "enter " + option.name + " =")
+        option.setMethods(entry.get_text, entry.set_text)
+        label.show()
+        hbox.show()
+        return hbox
+    def createSwitchBox(self, switch):
+        self.diagnoseSwitch(switch)
+        if switch.nameForOff:
+            radioButton1 = gtk.RadioButton(None, switch.name)
+            radioButton2 = gtk.RadioButton(radioButton1, switch.nameForOff)
+            if switch.getValue():
+                radioButton1.set_active(gtk.TRUE)
+            else:
+                radioButton2.set_active(gtk.TRUE)
+            scriptEngine.registerToggleButton(radioButton1, "choose " + switch.name)
+            scriptEngine.registerToggleButton(radioButton2, "choose " + switch.nameForOff)
+            switch.setMethods(radioButton1.get_active, radioButton1.set_active)
+            hbox = gtk.HBox()
+            hbox.pack_start(radioButton1, expand=gtk.TRUE, fill=gtk.TRUE)
+            hbox.pack_start(radioButton2, expand=gtk.TRUE, fill=gtk.TRUE)
+            radioButton1.show()
+            radioButton2.show()
+            hbox.show()
+            return hbox
+        else:
+            checkButton = gtk.CheckButton(switch.name)
+            if switch.getValue():
+                checkButton.set_active(gtk.TRUE)
+            scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
+            switch.setMethods(checkButton.get_active, checkButton.set_active)
+            checkButton.show()
+            return checkButton
     def runInteractive(self, button, action, *args):
         try:
             self.performInteractiveAction(action)

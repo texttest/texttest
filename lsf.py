@@ -304,6 +304,8 @@ class MakeResourceFiles(plugins.Action):
     def __repr__(self):
         return "Making resource files for"
     def __call__(self, test):
+        if test.state == test.UNRUNNABLE:
+            return
         textList = [ "Max Memory", "Max Swap", "CPU time", [ "executed on host", "home directory" ], "Real time" ]
         tmpFile = test.getTmpFileName("report", "r")
         resourceDict = self.makeResourceDict(tmpFile, textList)

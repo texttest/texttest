@@ -375,13 +375,13 @@ class LogFileFinder:
 class OptimizationRun:
     def __init__(self, app, definingItems, interestingItems, logFile, scalePerf = 0.0, solutions = None):
         self.diag = plugins.getDiagnostics("optimization")
+        self.penaltyFactor = 1.0
         if solutions:
             self.diag.info("Setting solution")
             self.solutions = solutions
             return 
         self.logFile = logFile
         self.diag.info("Reading data from " + self.logFile)
-        self.penaltyFactor = 1.0
         allItems = definingItems + interestingItems
         calculator = OptimizationValueCalculator(allItems, self.logFile, app.getConfigValue(itemNamesConfigKey))
         self.solutions = calculator.getSolutions(definingItems)
@@ -642,6 +642,8 @@ class TestReport(plugins.Action):
         referenceRun = OptimizationRun(test.app, definingValues, interestingValues, refLogFile, refPerf)
         if currentRun.logFile != referenceRun.logFile:
             self.compare(test, referenceRun, currentRun)
+        else:
+            print "Skipping test due to same logfile", test.name
 
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):
@@ -1122,6 +1124,7 @@ class PlotAverager:
         self.numberOfGraphs = 0
         self.plotLineRepresentant = None
         self.tmpFileDirectory = tmpFileDirectory
+
     def addGraph(self, graph):
         self.numberOfGraphs += 1
         if not self.average:
@@ -1131,54 +1134,44 @@ class PlotAverager:
         graphXValues.sort()
         averageXValues = self.average.keys()
         averageXValues.sort()
-        averagePos = 0
-        #print "Average", averageXValues
-        #print "Graph", graphXValues
-        prev_xvals = graphXValues[0]
-        # Find the old_average value to start with.
-        if self.average.has_key(prev_xvals):
-            old_average = self.average[prev_xvals]
-        elif averageXValues[0] < prev_xvals:
-            avPos = 0
-            while averageXValues[avPos] < prev_xvals:
-                old_average = self.average[averageXValues[avPos]]
-                avPos += 1
-        else:
-            old_average = self.average[averageXValues[0]]
-        for xvals in graphXValues:
-            #print xvals,averageXValues[averagePos]
-            # The same x-value exists both in graph and average.
-            if averagePos < len(averageXValues) and averageXValues[averagePos] == xvals:
-                #print "Found same X value,",xvals," ,adding"
-                old_average = self.average[xvals]
-                self.average[xvals] += graph[xvals]
-                averagePos += 1
-            # There is some distance left to the next average x-value; just fill in the new values.
-            elif averagePos >= len(averageXValues)-1 or averageXValues[averagePos] > xvals:
-                #print "Filling in new values"
-                self.average[xvals] = graph[xvals] + old_average
-            # Count up the averagePos
-            else:
-                #print "Counting up averagePos, old", averageXValues[averagePos]
-                while averagePos < len(averageXValues) and averageXValues[averagePos] <= xvals:
-                    #print "Doing add", averageXValues[averagePos],xvals, averageXValues[averagePos]-xvals
-                    old_average = self.average[averageXValues[averagePos]]
-                    self.average[averageXValues[averagePos]] += graph[prev_xvals]
-                    averagePos +=1
-                #print "Stopped at", averageXValues[averagePos]
-                if averagePos < len(averageXValues) and averageXValues[averagePos] == xvals:
-                    print "Same value!!!"
-                #print "Doing extra add",xvals
-                self.average[xvals] = graph[xvals] + old_average
-            prev_xvals = xvals
-            #if averagePos == len(averageXValues):
-                #print "End of average"
-        # If there are any average values left.
-        if averagePos < len(averageXValues):
-            while averagePos < len(averageXValues):
-                self.average[averageXValues[averagePos]] += graph[graphXValues[-1]]
-                averagePos += 1
-        #print graph, self.average
+        mergedVals = self.mergeVals(averageXValues, graphXValues)
+        extendedGraph = self.extendGraph(graph, mergedVals)
+        extendedAverage = self.extendGraph(self.average, mergedVals)
+        for xval in extendedAverage.keys():
+            extendedAverage[xval] += extendedGraph[xval]
+        self.average = extendedAverage
+
+    def mergeVals(self, values1, values2):
+        merged = values1
+        merged.extend(values2)
+        merged.sort()
+        mergedVals = [ merged[0] ]
+        prev = merged[0]
+        for val in merged[1:]:
+            if not val == prev:
+                mergedVals.append(val)
+                prev = val
+        return mergedVals
+
+    def extendGraph(self, graph, xvalues):
+        currentxvalues = graph.keys()
+        currentxvalues.sort()
+        extendedGraph = graph
+        for xval in xvalues:
+            if not graph.has_key(xval):
+                extendedGraph[xval] = graph[self.findClosestEarlierVal(xval, currentxvalues)]
+        return graph
+
+    def findClosestEarlierVal(self, xval, xvalues):
+        if xval < xvalues[0]:
+            return xvalues[0]
+        if xval > xvalues[-1]:
+            return xvalues[-1]
+        pos = 0
+        while xvalues[pos] < xval:
+            pos += 1
+        return xvalues[pos-1]
+
     def getGraph(self):
         graph = {}
         xValues = self.average.keys()
@@ -1186,6 +1179,7 @@ class PlotAverager:
         for xVal in xValues:
             graph[xVal] = self.average[xVal]/self.numberOfGraphs
         return graph
+    
     def plotArgument(self):
         global plotAveragerCount
         plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))

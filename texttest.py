@@ -1183,11 +1183,12 @@ class TestRunner:
 
             completed = not retValue & plugins.Action.RETRY
             tryOthers = retValue & plugins.Action.WAIT and not runToCompletion
+            # Don't busy-wait : assume lack of completion is a sign we might keep doing this
+            if not completed:
+                time.sleep(0.1)
             if completed or tryOthers:
                 # Don't attempt to retry the action, mark complete
                 return completed, tryOthers 
-            # Don't busy-wait
-            time.sleep(0.1)
     def callAction(self, action):
         self.test.setUpEnvironment()
         retValue = self.handleExceptions(self.test.callAction, action)

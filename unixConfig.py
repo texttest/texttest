@@ -323,6 +323,7 @@ class CollateUNIXFiles(default.CollateFiles):
     def writeStackTrace(self, stdoutFile, writeFile):
         prevLine = ""
         foundStack = 0
+        printedStackLines = 0
         for line in open(stdoutFile).xreadlines():
             if line.find("Program terminated") != -1:
                 writeFile.write(line)
@@ -332,7 +333,13 @@ class CollateUNIXFiles(default.CollateFiles):
                 startPos = line.find("in ") + 3
                 endPos = line.rfind("(")
                 writeFile.write(line[startPos:endPos] + os.linesep)
+                printedStackLines += 1
             prevLine = line
+            # Sometimes you get enormous stacktraces from GDB, for example, if you have
+            # an infinite recursive loop.
+            if printedStackLines >= 30:
+                writeFile.write("Stack trace print-out aborted after 30 function calls" + os.linesep)
+                break
         return foundStack
     def writeGdbErrors(self, stderrFile, writeFile):
         writeFile.write("GDB backtrace command failed : Stack trace not produced for crash" + os.linesep)

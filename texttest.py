@@ -1094,6 +1094,7 @@ class ApplicationRunner:
         self.cleanupSequence = self.getCleanUpSequence(actionSequence)
         self.suitesSetUp = {}
         self.diag = diag
+        self.setUpApplications(self.actionSequence)
     def getCleanUpSequence(self, actionSequence):
         cleanupSequence = []
         for action in actionSequence:
@@ -1102,8 +1103,6 @@ class ApplicationRunner:
                 cleanupSequence.append(cleanAction)
         cleanupSequence.reverse()
         return cleanupSequence
-    def startRun(self):
-        self.setUpApplications(self.actionSequence)
     def performCleanup(self):
         self.setUpApplications(self.cleanupSequence)
         self.testSuite.app.removeWriteDirectory()
@@ -1117,7 +1116,10 @@ class ApplicationRunner:
                 raise sys.exc_type, sys.exc_value
             except:
                 printException()
-                raise BadConfigError, str(sys.exc_type) + ": " + str(sys.exc_value)
+                message = str(sys.exc_value)
+                if sys.exc_type != plugins.TextTestError:
+                    message = str(sys.exc_type) + ": " + message
+                raise BadConfigError, message
         self.testSuite.tearDownEnvironment()
     def setUpSuite(self, action, suite):
         self.diag.info(str(action) + " set up " + repr(suite))
@@ -1151,7 +1153,6 @@ class ActionRunner:
             testRunner = TestRunner(test, actionSequence, appRunner, self.diag)
             self.testQueue.append(testRunner)
             self.allTests.append(testRunner)
-        appRunner.startRun()
     def hasTests(self):
         return len(self.allTests) > 0
     def runCleanup(self):

@@ -60,6 +60,7 @@ class Test:
     def makeFileName(self, stem, refVersion = None):
         nonVersionName = os.path.join(self.abspath, stem + "." + self.app.name)
         versions = self.app.getVersionFileExtensions()
+        debugLog.info("Versions available : " + repr(versions))
         if refVersion != None:
             versions = [ refVersion ]
         if len(versions) == 0:
@@ -159,6 +160,7 @@ class TestSuite(Test):
         Test.__init__(self, name, abspath, app)
         self.rejected = 0
         self.testCaseFile = self.makeFileName("testsuite")
+        debugLog.info("Reading test suite file " + self.testCaseFile)
         self.testcases = self.getTestCases(filters)
         if len(self.testcases):
             maxNameLength = max([len(test.name) for test in self.testcases])
@@ -258,11 +260,10 @@ class Application:
     def getVersionFileExtensions(self, baseVersion = 1):
         if len(self.versions) == 0:
             return []
-        exts = self._getVersionExtensions(self.versions)
         if baseVersion:
-            return self.getConfigList("base_version") + exts
+            return self._getVersionExtensions(self.getConfigList("base_version") + self.versions)
         else:
-            return exts
+            return self._getVersionExtensions(self.versions)
     def _getVersionExtensions(self, versions):
         if len(versions) == 1:
             return versions

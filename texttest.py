@@ -746,6 +746,7 @@ class OptionFinder:
         appList = []
         raisedError = 0
         selectedAppDict = self.findSelectedAppNames()
+        debugLog.info("Selecting apps according to dictionary :" + repr(selectedAppDict))
         for f in os.listdir(dirName):
             pathname = os.path.join(dirName, f)
             if os.path.isfile(pathname):

@@ -36,7 +36,7 @@ class ActionThread(Thread):
         self.join()
 
 class TextTestGUI:
-    def __init__(self, dynamic):
+    def __init__(self, dynamic, startTime):
         guiplugins.setUpGuiLog()
         global guilog, scriptEngine
         from guiplugins import guilog
@@ -46,19 +46,20 @@ class TextTestGUI:
         self.dynamic = dynamic
         self.itermap = seqdict()
         self.actionThread = None
-        self.topWindow = None
+        self.topWindow = self.createTopWindow(startTime)
         self.rightWindowGUI = None
         self.contents = None
         self.workQueue = Queue()
-    def createTopWindow(self, testWins):
+    def createTopWindow(self, startTime):
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
         if self.dynamic:
-            win.set_title("TextTest dynamic GUI (test runs)")
+            win.set_title("TextTest dynamic GUI (tests started at " + startTime + ")")
         else:
             win.set_title("TextTest static GUI (test management)")
         scriptEngine.connect("close window", "delete_event", win, self.exit)
-
+        return win
+    def fillTopWindow(self, testWins):
         mainWindow = self.createWindowContents(testWins)
         shortcutBar = scriptEngine.createShortcutBar()
         if shortcutBar:
@@ -67,12 +68,11 @@ class TextTestGUI:
             vbox.pack_start(shortcutBar, expand=gtk.FALSE, fill=gtk.FALSE)
             shortcutBar.show()
             vbox.show()
-            win.add(vbox)
+            self.topWindow.add(vbox)
         else:
-            win.add(mainWindow)
-        win.show()
-        win.resize(self.getWindowWidth(), self.getWindowHeight())
-        return win
+            self.topWindow.add(mainWindow)
+        self.topWindow.show()
+        self.topWindow.resize(self.getWindowWidth(), self.getWindowHeight())
     def getWindowHeight(self):
         return (gtk.gdk.screen_height() * 5) / 6
     def getWindowWidth(self):
@@ -215,7 +215,7 @@ class TextTestGUI:
         self.createIterMap()
         testWins = self.createTestWindows()
         self.createDefaultRightGUI()
-        self.topWindow = self.createTopWindow(testWins)
+        self.fillTopWindow(testWins)
         if self.dynamic:
             self.actionThread = ActionThread(actionRunner)
             self.actionThread.start()

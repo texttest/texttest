@@ -1524,8 +1524,9 @@ class TextTest:
             os.environ["USECASE_HOME"] = os.path.join(self.inputOptions.directoryName, "usecases")
         if self.inputOptions.useGUI():
             try:
-                import texttestgui
-                self.gui = texttestgui.TextTestGUI(not self.inputOptions.useStaticGUI())
+                from texttestgui import TextTestGUI
+                startTime = globalRunIdentifier.replace(tmpString(), "")
+                self.gui = TextTestGUI(not self.inputOptions.useStaticGUI(), startTime)
             except:
                 print "Cannot use GUI: caught exception:"
                 printException()

@@ -536,8 +536,9 @@ class UpdateTestLSFStatus(UpdateLSFStatus):
             self.testsWaitingForFiles[test] = 0
         if self.testsWaitingForFiles[test] > 10:
             raise plugins.TextTestError, "No results produced on " + machineStr + ", presuming problems running test there"
-        
+
         self.testsWaitingForFiles[test] += 1
+        self.describe(test, " : results not yet available, file system wait time " + str(self.testsWaitingForFiles[test]))
         return self.WAIT | self.RETRY
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")

@@ -226,6 +226,12 @@ class Config(plugins.Configuration):
         severities["usecase"] = 2
         severities["catalogue"] = 2
         return severities
+    def getDefaultMailAddress(self):
+        if os.name == "posix":
+            domainName = os.popen("hostname -d").read().strip()
+            return os.environ["USER"] + "@" + domainName
+        else:
+            return "non_existent_mail_address"
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output")
         app.setConfigDefault("failure_severity", self.defaultSeverities())
@@ -250,7 +256,9 @@ class Config(plugins.Configuration):
         app.addConfigEntry("pending", "white", "test_colours")
         app.addConfigEntry("definition_file_stems", "knownbugs")
         # Batch values. Maps from session name to values
-        app.setConfigDefault("batch_recipients", { "default" : "$USER" })
+        app.setConfigDefault("smtp_server", "localhost")
+        app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() })
+        app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() })
         app.setConfigDefault("batch_timelimit", { "default" : None })
         app.setConfigDefault("batch_use_collection", { "default" : "false" })
         # Sample to show that values are lists

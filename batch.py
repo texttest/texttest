@@ -17,9 +17,19 @@ helpOptions = """
              many emails being sent by batch mode if many independent things are tested.
 """
 
-import os, performance, plugins, respond, sys, string, time, types
+import os, performance, plugins, respond, sys, string, time, types, smtplib
 from ndict import seqdict
 from cPickle import Pickler
+
+# Class to fake mail sending
+class FakeSMTP:
+    def connect(self, server):
+        print "Connecting to fake SMTP server at", server
+    def sendmail(self, fromAddr, toAddr, contents):
+        print "Sending mail from address", fromAddr
+        raise smtplib.SMTPServerDisconnected, "Could not send mail to " + toAddr + ": I'm only a fake server!"
+    def quit(self):
+        pass
 
 class BatchFilter(plugins.Filter):
     def __init__(self, batchSession):
@@ -69,24 +79,25 @@ class BatchCategory(plugins.Filter):
         self.allTests.append(test)
     def acceptsTestCase(self, test):
         return self.testLines.has_key(test.getRelPath())
-    def describeBrief(self, mailFile, app):
+    def describeBrief(self, app):
         if len(self.allTests) > 0:
-            mailFile.write("The following tests " + self.longDescription + " : " + "\n")
             valid, suite = app.createTestSuite([ self ])
-            self.writeTestLines(mailFile, suite)
-            mailFile.write("\n")
-    def writeTestLines(self, mailFile, test):
+            return "The following tests " + self.longDescription + " : \n" + \
+                   self.getTestLines(suite) + "\n"
+    def getTestLines(self, test):
         if test.classId() == "test-case":
-            mailFile.write(self.testLines[test.getRelPath()])
+            return self.testLines[test.getRelPath()]
         else:
-            mailFile.write(test.getIndent() + "In " + repr(test) + ":" + "\n")
+            lines = test.getIndent() + "In " + repr(test) + ":\n"
             for subtest in test.testcases:
-                self.writeTestLines(mailFile, subtest)
-    def describeFull(self, mailFile):
+                lines += self.getTestLines(subtest)
+            return lines
+    def describeFull(self):
         fullDescriptionString = self.getFullDescription()
         if fullDescriptionString:
-            mailFile.write("\n" + "Detailed information for the tests that " + self.longDescription + " follows..." + "\n")
-            mailFile.write(fullDescriptionString)
+            return "\nDetailed information for the tests that " + self.longDescription + " follows...\n" + fullDescriptionString
+        else:
+            return ""
     def getFullDescription(self):
         fullText = ""
         for test in self.allTests:
@@ -144,15 +155,21 @@ class BatchResponder(respond.Responder):
         for category in categoryList:
             count += len(category.allTests)
         return count
-    def writeFailuresBrief(self, mailFile):
+    def getFailuresBrief(self):
+        contents = ""
         for category in self.failCategories():
-            category.describeBrief(mailFile, self.mainSuite.app)        
-    def writeSuccessBrief(self, mailFile):
+            contents += category.describeBrief(self.mainSuite.app)
+        return contents
+    def getSuccessBrief(self):
+        contents = ""
         for category in self.successCategories:
-            category.describeBrief(mailFile, self.mainSuite.app)        
-    def writeDetails(self, mailFile):
+            contents += category.describeBrief(self.mainSuite.app)
+        return contents
+    def getDetails(self):
+        contents = ""
         for category in self.allCategories():
-            category.describeFull(mailFile)
+            contents += category.describeFull()
+        return contents
     def getCleanUpAction(self):
         return MailSender(self.sessionName)
 
@@ -177,62 +194,96 @@ class MailSender(plugins.Action):
         if len(appResponders) == 0:
             self.diag.info("No responders for " + repr(app))
             return
-        sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + repr(app) + " ...")
-        sys.stdout.flush()
         mailTitle = self.getMailTitle(app, appResponders)
-        mailFile = self.createMail(mailTitle, app, appResponders)
+        mailContents = self.createMailHeaderSection(mailTitle, app, appResponders)
         if len(appResponders) > 1:
             for resp in appResponders:
-                mailFile.write(self.getMailTitle(app, [ resp ]) + "\n")
-            mailFile.write("\n")
+                mailContents += self.getMailTitle(app, [ resp ]) + "\n"
+            mailContents += "\n"
         if not self.isAllSuccess(appResponders):
-            self.performForAll(mailFile, app, appResponders, BatchResponder.writeFailuresBrief, sectionHeaders[0])
-            self.performForAll(mailFile, app, appResponders, BatchResponder.writeDetails, sectionHeaders[1])
+            mailContents += self.performForAll(app, appResponders, BatchResponder.getFailuresBrief, sectionHeaders[0])
+            mailContents += self.performForAll(app, appResponders, BatchResponder.getDetails, sectionHeaders[1])
         if not self.isAllFailure(appResponders):
-            self.performForAll(mailFile, app, appResponders, BatchResponder.writeSuccessBrief, sectionHeaders[2])
-        mailFile.close()
+            mailContents += self.performForAll(app, appResponders, BatchResponder.getSuccessBrief, sectionHeaders[2])
         for responder in appResponders:
             allBatchResponders.remove(responder)
-        sys.stdout.write("done." + "\n")
-    def performForAll(self, mailFile, app, appResponders, method, headline):
-        mailFile.write(headline + " follows..." + "\n")
-        mailFile.write("---------------------------------------------------------------------------------" + "\n")
+        self.sendOrStoreMail(app, mailContents)
+    def performForAll(self, app, appResponders, method, headline):
+        contents = headline + " follows...\n" + \
+                   "---------------------------------------------------------------------------------" + "\n"
         for resp in appResponders:
             if len(appResponders) > 1:
                 if headline.find("Details") != -1 and not resp is appResponders[0]:
-                    mailFile.write("---------------------------------------------------------------------------------" + "\n")
-                mailFile.write(self.getMailTitle(app, [ resp ]) + "\n")
-                mailFile.write("\n")
-            method(resp, mailFile)
-            mailFile.write("\n")
-    def createMail(self, title, app, appResponders):
-        fromAddress = os.environ["USER"]
-        toAddress = self.getRecipient(app)
-        if self.useCollection(app):
-            writeDir = app.writeDirectory
-            # Hack for self-tests: if there isn't a write directory, use the tests themselves!
-            if not os.path.isdir(writeDir):
-                writeDir = app.abspath
-            collFile = os.path.join(writeDir, "batchreport." + app.name + app.versionSuffix())
-            self.diag.info("Sending mail to", collFile)
-            mailFile = open(collFile, "w")
-            mailFile.write(toAddress + "\n")
-            mailFile.write(self.getMachineTitle(app, appResponders) + "\n")
-            mailFile.write(title + "\n")
-            mailFile.write("\n") # blank line separating headers from body
-            return mailFile
+                    contents += "---------------------------------------------------------------------------------" + "\n"
+                contents += self.getMailTitle(app, [ resp ]) + "\n\n"
+            contents += method(resp) + "\n"
+        return contents
+    def storeMail(self, app, mailContents):
+        localFileName = "batchreport." + app.name + app.versionSuffix()
+        collFile = os.path.join(app.writeDirectory, localFileName)
+        if not self.useCollection(app):
+            root, local = os.path.split(app.writeDirectory)
+            collFile = self.findAvailable(os.path.join(root, localFileName))
+        self.diag.info("Sending mail to", collFile)
+        file = open(collFile, "w")
+        file.write(mailContents)
+        file.close()
+    def getSmtp(self):
+        # Mock out sending of mail...
+        if plugins.BackgroundProcess.fakeProcesses:
+            return FakeSMTP()
         else:
-            mailFile = os.popen("/usr/lib/sendmail -t", "w")
-            mailFile.write("From: " + fromAddress + "\n")
-            mailFile.write("To: " + toAddress + "\n")
-            mailFile.write("Subject: " + title + "\n")
-            mailFile.write("\n") # blank line separating headers from body
-            return mailFile
+            return smtplib.SMTP()
+    def sendOrStoreMail(self, app, mailContents):
+        sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + repr(app) + " ...")
+        sys.stdout.flush()
+        if self.useCollection(app):
+            self.storeMail(app, mailContents)
+            sys.stdout.write("file written")
+        else:
+            # Write the result in here...
+            smtp = self.getSmtp()
+            self.sendMail(smtp, app, mailContents)
+            smtp.quit()
+        sys.stdout.write("\n")
+    def sendMail(self, smtp, app, mailContents):
+        smtpServer = app.getConfigValue("smtp_server")
+        fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
+        toAddress = app.getCompositeConfigValue("batch_recipients", self.sessionName)
+        try:
+            smtp.connect(smtpServer)
+        except smtplib.SMTPException:
+            sys.stdout.write("FAILED : Could not connect to SMTP server\n" + \
+                             str(sys.exc_type) + ": " + str(sys.exc_value))
+            return self.storeMail(app, mailContents)
+        try:
+            smtp.sendmail(fromAddress, toAddress, mailContents)
+        except smtplib.SMTPException:
+            sys.stdout.write("FAILED : Mail could not be sent\n" + \
+                             str(sys.exc_type) + ": " + str(sys.exc_value))
+            return self.storeMail(app, mailContents)
+        sys.stdout.write("done.")
+    def findAvailable(self, origFile):
+        if not os.path.isfile(origFile):
+            return origFile
+        for i in range(20):
+            attempt = origFile + str(i)
+            if not os.path.isfile(attempt):
+                return attempt
+    
+    def createMailHeaderSection(self, title, app, appResponders):
+        toAddress = app.getCompositeConfigValue("batch_recipients", self.sessionName)
+        # blank line needed to separate headers from body
+        if self.useCollection(app):
+            return toAddress + "\n" + \
+                   self.getMachineTitle(app, appResponders) + "\n" + \
+                   title + "\n\n" # blank line separating headers from body
+        else:
+            fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
+            return "From: " + fromAddress + "\nTo: " + toAddress + "\n" + \
+                   "Subject: " + title + "\n\n"
     def useCollection(self, app):
         return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
-    def getRecipient(self, app):
-        # See if the session name has an entry, if not, send to the user
-        return os.path.expandvars(app.getCompositeConfigValue("batch_recipients", self.sessionName))
     def getMailHeader(self, app, appResponders):
         title = time.strftime("%y%m%d") + " " + repr(app)
         versions = self.findCommonVersions(app, appResponders)
@@ -318,7 +369,8 @@ class CollectFiles(plugins.Action):
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()
-        app.addConfigEntry("collection", self.getCollectionSetting(), "batch_use_collection")
+        # Collection should not itself use collection
+        app.addConfigEntry("collection", "false", "batch_use_collection")
         userName, rootDir = app.getPreviousWriteDirInfo(self.userName)
         dirlist = os.listdir(rootDir)
         dirlist.sort()
@@ -330,9 +382,9 @@ class CollectFiles(plugins.Action):
             return
         
         mailTitle = self.getTitle(app, totalValues)
-        mailFile = self.mailSender.createMail(mailTitle, app, [])
-        self.writeBody(mailFile, fileBodies)
-        mailFile.close()
+        mailContents = self.mailSender.createMailHeaderSection(mailTitle, app, [])
+        mailContents += self.getBody(fileBodies)
+        self.mailSender.sendOrStoreMail(app, mailContents)
     def parseDirectory(self, fullDir, app, totalValues):
         prefix = "batchreport." + app.name + app.versionSuffix()
         # Don't collect to more collections!
@@ -365,11 +417,6 @@ class CollectFiles(plugins.Action):
         fileBody = file.read()
         file.close()
         return fileBody
-    def getCollectionSetting(self):
-        if plugins.BackgroundProcess.fakeProcesses:
-            return "true"
-        else:
-            return "false"
     def getTitle(self, app, totalValues):
         title = self.mailSender.getMailHeader(app, [])
         total = 0
@@ -383,10 +430,9 @@ class CollectFiles(plugins.Action):
             title += self.mailSender.briefText(count, catName)
         # Lose trailing comma
         return title[:-1]
-    def extractHeader(self, body, mailFile):
+    def extractHeader(self, body):
         firstSep = body.find("\n") + 1
         header = body[0:firstSep]
-        mailFile.write(header)
         return header, body[firstSep:]
     def extractSection(self, sectionHeader, body):
         headerLoc = body.find(sectionHeader)
@@ -398,12 +444,17 @@ class CollectFiles(plugins.Action):
         section = body[0:headerLoc].strip()
         newBody = body[nextLine:].strip()
         return section, newBody
-    def writeBody(self, mailFile, bodies):
+    def getBody(self, bodies):
         if len(bodies) == 1:
-            return mailFile.write(bodies[0])
+            return bodies[0]
 
-        parsedBodies = [ self.extractHeader(body, mailFile) for body in bodies ]
-        mailFile.write("\n")
+        totalBody = ""
+        parsedBodies = []
+        for subBody in bodies:
+            header, parsedSubBody = self.extractHeader(subBody)
+            totalBody += header
+            parsedBodies.append((header, parsedSubBody))
+        totalBody += "\n"
 
         sectionMap = {}
         prevSectionHeader = ""
@@ -417,20 +468,22 @@ class CollectFiles(plugins.Action):
                 if len(section) != 0:
                     parsedSections.append((header, section))
 
-            self.writeSection(mailFile, prevSectionHeader, parsedSections)
+            totalBody += self.getSectionBody(prevSectionHeader, parsedSections)
             parsedBodies = newParsedBodies
             prevSectionHeader = sectionHeader
-        self.writeSection(mailFile, prevSectionHeader, parsedBodies)
-    def writeSection(self, mailFile, sectionHeader, parsedSections):
+        totalBody += self.getSectionBody(prevSectionHeader, parsedBodies)
+        return totalBody
+    def getSectionBody(self, sectionHeader, parsedSections):
         if len(sectionHeader) == 0 or len(parsedSections) == 0:
-            return
-        mailFile.write(sectionHeader + " follows...\n")
+            return ""
+        sectionBody = sectionHeader + " follows...\n"
         detailSection = sectionHeader.find("Details") != -1
         if not detailSection or len(parsedSections) == 1: 
-            mailFile.write("=================================================================================\n")
+            sectionBody += "=================================================================================\n"
         for header, section in parsedSections:
             if len(parsedSections) > 1:
                 if detailSection:
-                    mailFile.write("=================================================================================\n")
-                mailFile.write(header + "\n")
-            mailFile.write(section + "\n\n")
+                    sectionBody += "=================================================================================\n"
+                sectionBody += header + "\n"
+            sectionBody += section + "\n\n"
+        return sectionBody

@@ -1,30 +1,11 @@
 helpDescription = """
 The Matador configuration is based on the Carmen configuration. It will compile all static rulesets in the test
-suite before running any tests, if the library file "matador.o" has changed since the static ruleset was last built.
-It will also fetch the optimizer's solution from the subplan (the "best_solution" link) and write it for comparison
-as the file solution.<app> after each test has run.
-
-It also uses the temporary subplan concept, such that all tests will actually be run in different, temporary subplans
-when the tests are run. These subplans should then be cleaned up afterwards. The point of this is to avoid clashes in
-solution due to two runs of the same test writing to the same subplan.
-
-Also, you can specify a "rave_parameter" entry in your config file, typically in a version file. The value of this
-should be a line to insert into the rules file after the subplan is copied. By doing this you can experiment with a new
-feature on a lot of tests without having to manually create new tests.
-
-In other respects, it follows the usage of the Carmen configuration.""" 
+suite before running any tests, if the library file "matador.o" has changed since the static ruleset was last built.""" 
 
 helpOptions = """-diag      - Run with diagnostics on. This will set the environment variables DIAGNOSTICS_IN and DIAGNOSTICS_OUT to
              both point at the subdirectory ./Diagnostics in the test case. It will also disable performance checking,
              as producing lots of text tends to slow down the program, and will tell the comparator to also
              compare the diagnostics found in the ./Diagnostics subdirectory.
-
--prrep <v> - Generate a Progress Report relative to the version <v>. This will produce some key numbers for all
-             tests specified.
-
--kpi <ver> - Generate a Key Performance Indicator ("KPI") relative to the version <ver>. This will try to apply
-             some formula to boil down the results of the tests given to a single-number "performance indicator".
-             Please note that the results so far are not very reliable, as the formula itself is still under development.
 """
 
 import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest
@@ -90,9 +71,9 @@ class MatadorConfig(optimization.OptimizationConfig):
         return plugins.CompositeAction(subActions)
     def printHelpDescription(self):
         print helpDescription
-        carmen.CarmenConfig.printHelpDescription(self)
+        optimization.OptimizationConfig.printHelpDescription(self)
     def printHelpOptions(self, builtInOptions):
-        carmen.CarmenConfig.printHelpOptions(self, builtInOptions)
+        optimization.OptimizationConfig.printHelpOptions(self, builtInOptions)
         print helpOptions
 
 class MakeMatadorStatusFile(plugins.Action):

@@ -1,3 +1,9 @@
+helpDescription = """
+The Fleet configuration is the same as the Matador configuration."""
+
+helpOptions = """
+"""
+
 import os, string, optimization, matador
 
 def getConfig(optionMap):
@@ -20,6 +26,9 @@ class FleetConfig(matador.MatadorConfig):
             # print help information and exit:
             return ""
         return subPlan
+    def printHelpDescription(self):
+        print helpDescription
+        matador.MatadorConfig.printHelpDescription(self)
 
 
 class FleetSubPlanDirManager(optimization.SubPlanDirManager):

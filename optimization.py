@@ -1,3 +1,25 @@
+helpDescription = """
+It will fetch the optimizer's solution from the subplan (the "best_solution" link) and write it for
+comparison as the file solution.<app> after each test has run.
+
+It also uses the temporary subplan concept, such that all tests will actually be run in different, temporary
+subplans when the tests are run. These subplans should then be cleaned up afterwards. The point of this
+is to avoid clashes in solution due to two runs of the same test writing to the same subplan.
+
+Also, you can specify a "rave_parameter" entry in your config file, typically in a version file. The value
+of this should be a line to insert into the rules file after the subplan is copied. By doing this you can
+experiment with a new feature on a lot of tests without having to manually create new tests.
+
+In other respects, it follows the usage of the Carmen configuration.""" 
+
+helpOptions = """-prrep <v> - Generate a Progress Report relative to the version <v>. This will produce some key numbers for all
+             tests specified.
+
+-kpi <ver> - Generate a Key Performance Indicator ("KPI") relative to the version <ver>. This will try to apply
+             some formula to boil down the results of the tests given to a single-number "performance indicator".
+             Please note that the results so far are not very reliable, as the formula itself is still under development.
+"""
+
 import carmen, os, sys, string, shutil, KPI, plugins, performance, math
 
 class OptimizationConfig(carmen.CarmenConfig):
@@ -24,6 +46,12 @@ class OptimizationConfig(carmen.CarmenConfig):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), ExtractSubPlanFile(self, "best_solution", "solution") ])
+    def printHelpDescription(self):
+        print helpDescription
+        carmen.CarmenConfig.printHelpDescription(self)
+    def printHelpOptions(self, builtInOptions):
+        carmen.CarmenConfig.printHelpOptions(self, builtInOptions)
+        print helpOptions
 
 class ExtractSubPlanFile(plugins.Action):
     def __init__(self, config, sourceName, targetName):

@@ -1,3 +1,18 @@
+helpDescription = """
+The apc configuration is based on the Carmen configuration. It will compile all rulesets in the test
+suite before running any tests, if the library file "libapc.a" has changed since the ruleset was last built.
+
+It uses a special ruleset building strategy on the linux platforms, such that rebuilding the APC binary
+after a small change to APC will be really quick. It does so by not invoking 'crc_compile', instead
+it makes its own link command. By using the "-rulecomp" flag you can avoid building the ruleset with
+this special strategy.
+
+It will fetch the optimizer's status file from the subplan (the "status" file) and write it for
+comparison as the file status.<app> after each test has run."""
+
+helpOptions = """
+"""
+
 import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins
 
 def getConfig(optionMap):
@@ -37,6 +52,12 @@ class ApcConfig(optimization.OptimizationConfig):
         return None
     def getExecuteCommand(self, binary, test):
         return self.subplanManager.getExecuteCommand(binary, test)
+    def printHelpDescription(self):
+        print helpDescription
+        optimization.OptimizationConfig.printHelpDescription(self)
+    def printHelpOptions(self, builtInOptions):
+        optimization.OptimizationConfig.printHelpOptions(self, builtInOptions)
+        print helpOptions
 
 class ApcSubPlanDirManager(optimization.SubPlanDirManager):
     def __init__(self, config):

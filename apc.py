@@ -10,10 +10,13 @@ this special strategy.
 It will fetch the optimizer's status file from the subplan (the "status" file) and write it for
 comparison as the file status.<app> after each test has run."""
 
-helpOptions = """-rundebug  - (only APC) Runs the test in the debugger (gdb) and displays the log file. The run
+helpOptions = """-rundebug <options> - (only APC) Runs the test in the debugger (gdb) and displays the log file. The run
              is made locally, and if its successful, the debugger is exited, and texttest
              continues as usual. If the run fails, the buffer is flushed and one are left 
              in the debugger. To enter the debugger during the run, type C-c.
+             The following options are avaliable:
+             - xemacs
+               The debugger is run in xemacs, in gdbsrc mode.
 """
 
 helpScripts = """apc.CleanTmpFiles          - Removes all temporary files littering the test directories
@@ -90,7 +93,7 @@ class ApcConfig(optimization.OptimizationConfig):
         if self.useLSF():
             return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
         elif self.optionMap.has_key("rundebug"):
-            return RunApcTestInDebugger()
+            return RunApcTestInDebugger(self.optionValue("rundebug"))
         else:
             return RunApcTest()
     def getTestCollator(self):
@@ -184,6 +187,10 @@ class RunApcTest(default.RunTest):
 # Runs the test in gdb and displays the log file. 
 #
 class RunApcTestInDebugger(default.RunTest):
+    def __init__(self, options):
+        self.inXEmacs = None
+        if options == "xemacs":
+            self.inXEmacs = 1
     def __repr__(self):
         return "Debugging"
     def __call__(self, test):
@@ -215,13 +222,36 @@ class RunApcTestInDebugger(default.RunTest):
         outFile = open(out, "w")
         outFile.write("SUBPLAN " + opts[0] + os.linesep)
         outFile.close()
-        # Source the CONFIG file to get the environment correct and run gdb with the script.
+        # Create execute command.
         binName = opts[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
+        if self.inXEmacs:
+            gdbStart, gdbWithArgs = self.runInXEmacs(test, binName, gdbArgs)
+            executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
+        else:
+            executeCommand = "gdb " + binName + " -silent -x " + gdbArgs
+        # Source the CONFIG file to get the environment correct and run gdb with the script.
         configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
-        os.system("source " + configFile + ";gdb " + binName + " -silent -x " + gdbArgs)
+        os.system("source " + configFile + ";" + executeCommand)
         # Remove the temp files, texttest will compare them if we dont remove them.
         os.remove(gdbArgs)
         os.remove(apcLog)
+        if self.inXEmacs:
+            os.remove(gdbStart)
+            os.remove(gdbWithArgs)
+    def runInXEmacs(self, test, binName, gdbArgs):
+        gdbStart = test.makeFileName("gdb_start", temporary=1)
+        gdbWithArgs = test.makeFileName("gdb_w_args", temporary=1)
+        gdbStartFile = open(gdbStart, "w")
+        gdbStartFile.write("(defun gdbwargs () \"\"" + os.linesep)
+        gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
+        gdbStartFile.write("(gdbsrc \"" + binName + "\"))" + os.linesep)
+        gdbStartFile.close()
+        gdbWithArgsFile = open(gdbWithArgs, "w")
+        gdbWithArgsFile.write("#!/bin/sh" + os.linesep)
+        gdbWithArgsFile.write("gdb -x " + gdbArgs + " $*" + os.linesep)
+        gdbWithArgsFile.close()
+        os.chmod(gdbWithArgs, stat.S_IXUSR | stat.S_IRWXU)
+        return gdbStart, gdbWithArgs
     def setUpSuite(self, suite):
         self.describe(suite)
     

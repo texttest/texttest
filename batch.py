@@ -285,6 +285,7 @@ class MailSender(plugins.Action):
 class CollectFiles(plugins.Action):
     def __init__(self):
         self.mailSender = MailSender("collection")
+        self.diag = plugins.getDiagnostics("batch collect")
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = []
@@ -292,6 +293,7 @@ class CollectFiles(plugins.Action):
             totalValues.append(0)
         prefix = "batchreport." + app.name + app.versionSuffix()
         # Don't collect to more collections!
+        self.diag.info("Setting up application " + app.name + " looking for " + prefix) 
         app.addConfigEntry("collection", "false", "batch_use_collection")
         for filename in os.listdir(app.abspath):
             if filename.startswith(prefix):

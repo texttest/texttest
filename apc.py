@@ -315,7 +315,7 @@ class ApcCompileRules(carmen.CompileRules):
         self.getLibraryFile = getLibraryFile
         self.diag = plugins.getDiagnostics("ApcCompileRules")
     def compileRulesForTest(self, test):
-        self.apcLib = os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test))
+        self.apcLib = os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test.app))
         if self.forcedRuleCompile == 0 and carmen.getArchitecture(test.app) == "i386_linux":
             self.linuxRuleSetBuild(test)
         else:

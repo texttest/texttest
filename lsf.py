@@ -43,7 +43,8 @@ class QueueSystem:
         for line in stdout.readlines():
             if line.find("is submitted") != -1:
                 return self.getJobId(line)
-        print "ERROR: unexpected output from bsub!!!"
+            else:
+                print "Unexpected output from bsub :", line.strip()
         return ""
     def getResourceArg(self, submissionRules):
         resourceList = submissionRules.findResourceList()

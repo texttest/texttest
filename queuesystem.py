@@ -134,6 +134,7 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         app.setConfigDefault("min_time_for_performance_force", -1)
         app.setConfigDefault("queue_system_module", "LSF")
         app.setConfigDefault("performance_test_resource", [])
+        app.setConfigDefault("parallel_environment_name", "make")
 
 class SubmissionRules:
     def __init__(self, optionMap, test, nonTestProcess):
@@ -151,7 +152,9 @@ class SubmissionRules:
         if queue:
             return name + " queue " + queue
         else:
-            return "default " + name + " queue"    
+            return "default " + name + " queue"
+    def getParallelEnvironment(self):
+        return self.test.getConfigValue("parallel_environment_name")
     def findResourceList(self):
         resourceList = []
         if self.optionMap.has_key("R"):

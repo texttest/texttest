@@ -11,9 +11,8 @@ class QueueSystem:
         # Sungrid doesn't like : or / in job names
         qsubArgs = "-N " + jobName.replace(":", "").replace("/", ".")
         if submissionRules.processesNeeded != "1":
-            # We need a 'parallel environment' to be defined here for this
-            # to work
-            qsubArgs += " -pe " + submissionRules.processesNeeded
+            qsubArgs += " -pe " + submissionRules.getParallelEnvironment() + " " + \
+                        submissionRules.processesNeeded
         queue = submissionRules.findQueue()
         if queue:
             qsubArgs += " -q " + queue
@@ -39,7 +38,8 @@ class QueueSystem:
         for line in stdout.readlines():
             if line.find("has been submitted") != -1:
                 return self.getJobId(line)
-        print "ERROR: unexpected output from qsub!!!"
+            else:
+                print "Unexpected output from qsub :", line.strip()
         return ""
     def getResourceArg(self, submissionRules):
         resourceList = submissionRules.findResourceList()
@@ -148,5 +148,8 @@ class MachineInfo:
                 jobs.append((user, jobName))
         return jobs
     def findAllMachinesForJob(self):
-        # Need all hosts for parallel, but don't know how yet. Default.
-        return []
+        if not os.environ.has_key("PE_HOSTFILE"):
+            return []
+
+        hostlines = open(os.environ["PE_HOSTFILE"]).readlines()
+        return [ hostline.split()[0].split(".")[0] for hostline in hostlines ] 

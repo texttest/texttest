@@ -110,13 +110,14 @@ class OptimizationConfig(ravebased.Config):
         self.itemNamesInFile = {}
         # Static data for what data to check in CheckOptimizationRun, and what methods to avoid it with
         self.noIncreaseExceptMethods = {}
-    def addToOptionGroup(self, group):
-        ravebased.Config.addToOptionGroup(self, group)
-        if group.name.startswith("Invisible"):
-            # These need a better interface before they can be plugged in, really
-            group.addOption("prrep", "Run KPI progress report")
-            group.addOption("kpiData", "Output KPI curve data etc.")
-            group.addOption("kpi", "Run Henrik's old KPI")
+    def addToOptionGroups(self, app, groups):
+        ravebased.Config.addToOptionGroups(self, app, groups)
+        for group in groups:
+            if group.name.startswith("Invisible"):
+                # These need a better interface before they can be plugged in, really
+                group.addOption("prrep", "Run KPI progress report")
+                group.addOption("kpiData", "Output KPI curve data etc.")
+                group.addOption("kpi", "Run Henrik's old KPI")
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimpleRosteringOptTimeKPI,

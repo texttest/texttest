@@ -56,10 +56,11 @@ def getMajorReleaseId(app):
     return "master"
 
 class CarmenConfig(lsf.LSFConfig):
-    def addToOptionGroup(self, group):
-        lsf.LSFConfig.addToOptionGroup(self, group)
-        if group.name.startswith("How"):
-            group.addSwitch("lprof", "Run with LProf profiler")
+    def addToOptionGroups(self, app, groups):
+        lsf.LSFConfig.addToOptionGroups(self, app, groups)
+        for group in groups:
+            if group.name.startswith("How"):
+                group.addSwitch("lprof", "Run with LProf profiler")
     def getLoginShell(self):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"

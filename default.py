@@ -50,24 +50,25 @@ def getConfig(optionMap):
     return Config(optionMap)
 
 class Config(plugins.Configuration):
-    def addToOptionGroup(self, group):
-        if group.name.startswith("Select"):
-            group.addOption("t", "Test names containing")
-            group.addOption("f", "Tests listed in file")
-            group.addOption("ts", "Suite names containing")
-            group.addOption("grep", "Log files containing")
-        elif group.name.startswith("What"):
-            group.addOption("reconnect", "Reconnect to previous run")
-            group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
-        elif group.name.startswith("How"):
-            group.addSwitch("noperf", "Disable any performance testing")
-        elif group.name.startswith("Invisible"):
-            # Only relevant without the GUI
-            group.addSwitch("o", "Overwrite all failures")
-            group.addOption("tp", "Tests with exact path") # use for internal communication
-            group.addSwitch("n", "Create new results files (overwrite everything)")
-        elif group.name.startswith("Side"):
-            group.addSwitch("keeptmp", "Keep temporary write-directories")
+    def addToOptionGroups(self, app, groups):
+        for group in groups:
+            if group.name.startswith("Select"):
+                group.addOption("t", "Test names containing")
+                group.addOption("f", "Tests listed in file")
+                group.addOption("ts", "Suite names containing")
+                group.addOption("grep", "Log files containing")
+            elif group.name.startswith("What"):
+                group.addOption("reconnect", "Reconnect to previous run")
+                group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
+            elif group.name.startswith("How"):
+                group.addSwitch("noperf", "Disable any performance testing")
+            elif group.name.startswith("Invisible"):
+                # Only relevant without the GUI
+                group.addSwitch("o", "Overwrite all failures")
+                group.addOption("tp", "Tests with exact path") # use for internal communication
+                group.addSwitch("n", "Create new results files (overwrite everything)")
+            elif group.name.startswith("Side"):
+                group.addSwitch("keeptmp", "Keep temporary write-directories")
     def getActionSequence(self):
         return self._getActionSequence(makeDirs=1)
     def _getActionSequence(self, makeDirs):

@@ -612,9 +612,9 @@ class ConfigurationWrapper:
             return self.target.setApplicationDefaults(app)
         except:
             self.raiseException(req = "set defaults")
-    def addToOptionGroup(self, group):
+    def addToOptionGroups(self, app, groups):
         try:
-            return self.target.addToOptionGroup(group)
+            return self.target.addToOptionGroups(app, groups)
         except:
             self.raiseException(req = "add to option group")
     def getActionSequence(self):
@@ -753,16 +753,18 @@ class Application:
             self.setConfigDefault("interpreter", "python")
         else:
             self.setConfigDefault("interpreter", "")
-    def createOptionGroups(self, inputOptions):
+    def createOptionGroup(self, name):
         defaultDict = self.getConfigValue("gui_entry_overrides")
         optionDict = self.getConfigValue("gui_entry_options")
+        return plugins.OptionGroup(name, defaultDict, optionDict)
+    def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "What to run", "How to run", "Side effects", "Invisible" ]
         optionGroups = []
         for name in groupNames:
-            group = plugins.OptionGroup(name, defaultDict, optionDict)
+            group = self.createOptionGroup(name)
             self.addToOptionGroup(group)
-            self.configObject.addToOptionGroup(group)
             optionGroups.append(group)
+        self.configObject.addToOptionGroups(self, optionGroups)
         for option in inputOptions.keys():
             optionGroup = self.findOptionGroup(option, optionGroups)
             if not optionGroup:

@@ -11,7 +11,7 @@ class Configuration:
     CLEAN_PREVIOUS = 4
     def __init__(self, optionMap):
         self.optionMap = optionMap
-    def addToOptionGroup(self, group):
+    def addToOptionGroups(self, app, groups):
         pass
     def getActionSequence(self):
         return []

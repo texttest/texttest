@@ -87,19 +87,20 @@ class RulesetJobBuildNameCreator:
         return self.getUserParentName(test.parent)
 
 class Config(carmen.CarmenConfig):
-    def addToOptionGroup(self, group):
-        carmen.CarmenConfig.addToOptionGroup(self, group)
-        if group.name.startswith("Select"):
-            group.addOption("u", "CARMUSRs containing")
-        elif group.name.startswith("What"):
-            group.addSwitch("rulecomp", "Build all rulesets")
-            group.addSwitch("skip", "Build no rulesets")
-        elif group.name.startswith("How"):
-            group.addSwitch("debug", "Use debug rulesets")
-            group.addSwitch("raveexp", "Run with RAVE Explorer")
-        elif group.name.startswith("Side"):
-            group.addOption("build", "Build application target")
-            group.addOption("buildl", "Build application target locally")        
+    def addToOptionGroups(self, app, groups):
+        carmen.CarmenConfig.addToOptionGroups(self, app, groups)
+        for group in groups:
+            if group.name.startswith("Select"):
+                group.addOption("u", "CARMUSRs containing")
+            elif group.name.startswith("What"):
+                group.addSwitch("rulecomp", "Build all rulesets")
+                group.addSwitch("skip", "Build no rulesets")
+            elif group.name.startswith("How"):
+                group.addSwitch("debug", "Use debug rulesets")
+                group.addSwitch("raveexp", "Run with RAVE Explorer")
+            elif group.name.startswith("Side"):
+                group.addOption("build", "Build application target")
+                group.addOption("buildl", "Build application target locally")        
     def getFilterList(self):
         filters = carmen.CarmenConfig.getFilterList(self)
         self.addFilter(filters, "u", UserFilter)

@@ -68,11 +68,12 @@ def getConfig(optionMap):
     return ApcConfig(optionMap)
 
 class ApcConfig(optimization.OptimizationConfig):
-    def addToOptionGroup(self, group):
-        optimization.OptimizationConfig.addToOptionGroup(self, group)
-        if group.name.startswith("How"):
-            group.addOption("rundebug", "Run debugger")
-            group.addOption("extractlogs", "Extract Apc Logs")
+    def addToOptionGroups(self, app, groups):
+        optimization.OptimizationConfig.addToOptionGroups(self, app, groups)
+        for group in groups:
+            if group.name.startswith("How"):
+                group.addOption("rundebug", "Run debugger")
+                group.addOption("extractlogs", "Extract Apc Logs")
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI,

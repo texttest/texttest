@@ -16,12 +16,13 @@ def getConfig(optionMap):
     return UNIXConfig(optionMap)
 
 class UNIXConfig(default.Config):
-    def addToOptionGroup(self, group):
-        default.Config.addToOptionGroup(self, group)
-        if group.name.startswith("Select"):
-            group.addOption("r", "Execution time <min, max>")
-        elif group.name.startswith("How"):
-            group.addOption("b", "Run batch mode session")
+    def addToOptionGroups(self, app, groups):
+        default.Config.addToOptionGroups(self, app, groups)
+        for group in groups:
+            if group.name.startswith("Select"):
+                group.addOption("r", "Execution time <min, max>")
+            elif group.name.startswith("How"):
+                group.addOption("b", "Run batch mode session")
     def getFilterList(self):
         filters = default.Config.getFilterList(self)
         self.addFilter(filters, "b", batch.BatchFilter)

@@ -83,13 +83,14 @@ class RunTestInSlave(unixConfig.RunTest):
         pass
         
 class LSFConfig(unixConfig.UNIXConfig):
-    def addToOptionGroup(self, group):
-        unixConfig.UNIXConfig.addToOptionGroup(self, group)
-        if group.name.startswith("How"):
-            group.addSwitch("l", "Run tests locally", nameForOff="Submit tests to LSF")
-            group.addSwitch("perf", "Run on performance machines only")
-            group.addOption("R", "Request LSF resource")
-            group.addOption("q", "Request LSF queue")
+    def addToOptionGroups(self, app, groups):
+        unixConfig.UNIXConfig.addToOptionGroups(self, app, groups)
+        lsfGroup = app.createOptionGroup("LSF")
+        lsfGroup.addSwitch("l", "Run tests locally", nameForOff="Submit tests to LSF")
+        lsfGroup.addSwitch("perf", "Run on performance machines only")
+        lsfGroup.addOption("R", "Request LSF resource")
+        lsfGroup.addOption("q", "Request LSF queue")
+        groups.insert(3, lsfGroup)
     def useLSF(self):
         if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l") or self.optionMap.has_key("rundebug"):
             return 0
@@ -399,6 +400,7 @@ class SubmitTest(plugins.Action):
             lsfOptions += " -m '" + machine + "'"
         if not LSFServer.instance:
             LSFServer.instance = LSFServer(self.origEnv)
+        self.diag.info("Submitting LSF job : " + command)
         LSFServer.instance.submitJob(test, jobNameFunction, lsfOptions, command, copyEnv)
         return self.WAIT
     def setRunOptions(self, app):

@@ -143,10 +143,15 @@ class CarmenConfig(lsf.LSFConfig):
             return plugins.Action()
     def getTestRunner(self):
         if self.optionMap.has_key("lprof"):
-            subActions = [ lsf.LSFConfig.getTestRunner(self), WaitForDispatch(), RunLProf() ]
+            subActions = [ lsf.LSFConfig.getTestRunner(self), AttachProfiler() ]
             return plugins.CompositeAction(subActions)
         else:
             return lsf.LSFConfig.getTestRunner(self)
+    def getTestCollator(self):
+        if self.optionMap.has_key("lprof"):
+            return plugins.CompositeAction([ lsf.LSFConfig.getTestCollator(self), ProcessProfilerResults() ])
+        else:
+            return lsf.LSFConfig.getTestCollator(self)
     def findLSFQueue(self, test):
         if self.queueDecided(test):
             return lsf.LSFConfig.findLSFQueue(self, test)
@@ -357,8 +362,12 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
     def __init__(self, getRuleSetName, getLibraryFile):
         self.getRuleSetName = getRuleSetName
         self.getLibraryFile = getLibraryFile
+        self.diag = plugins.getDiagnostics("UpdatedLocalRulesetFilter")
     def acceptsTestCase(self, test):
         ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test), getArchitecture(test.app))
+        self.diag.info("Checking " + self.getRuleSetName(test))
+        self.diag.info("Target file is " + ruleset.targetFile)
+        self.diag.info("Library files is " + self.getLibraryFile(test))
         if not ruleset.isValid():
             return 0
         if not ruleset.isCompiled():
@@ -369,6 +378,7 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
             return 1
 
         carmtmp = suite.environment["CARMTMP"]
+        self.diag.info("CARMTMP: " + carmtmp)
         return carmtmp.find(os.environ["CARMSYS"]) != -1
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
@@ -377,23 +387,27 @@ class WaitForDispatch(lsf.Wait):
     def __init__(self):
         self.eventName = "dispatch"
     def checkCondition(self, job):
-        return len(job.getProcessIds()) >= 4
+        return job.getProcessId()
 
-class RunLProf(plugins.Action):
-    def __init__(self,whichProcessId=-1):
-        self.whichProcessId = whichProcessId;
+class AttachProfiler(plugins.Action):
     def __repr__(self):
-        return "Running LProf profiler on"
+        return "Attaching lprof on"
     def __call__(self, test):
+        waitDispatch = WaitForDispatch()
+        waitDispatch.__call__(test)
         job = lsf.LSFJob(test)
         status, executionMachine = job.getStatus()
-        self.describe(test, ", executing on " + executionMachine)
-        processId = job.getProcessIds()[self.whichProcessId]
-        runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId
-        outputFile = "prof." + processId
-        processLine = "/users/lennart/bin/process_gprof " + outputFile + " > lprof." + test.app.name + test.app.versionSuffix()
-        commandLine = "rsh " + executionMachine + " '" + runLine + "; " + processLine + "'"
-        os.system(commandLine)
+        processId = job.getProcessId()
+        self.describe(test, ", executing on " + executionMachine + ", pid " + str(processId))
+        runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId + " >& gprof.output"
+        os.spawnlp(os.P_NOWAIT, "rsh", "rsh", executionMachine, runLine)
+
+class ProcessProfilerResults(plugins.Action):
+    def __call__(self, test):
+        processLine = "/users/lennart/bin/process_gprof prof.*" + " > lprof." + test.app.name + test.app.versionSuffix()
+        os.system(processLine)
+    def __repr__(self):
+        return "Profiling"    
 
 class BuildCode(plugins.Action):
     def __init__(self, target):

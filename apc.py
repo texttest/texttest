@@ -91,7 +91,7 @@ class ApcConfig(optimization.OptimizationConfig):
         return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, staticFilter, ruleCompile, modeString)
     def getSpecificTestRunner(self):
         if self.optionMap.has_key("lprof"):
-            subActions = [ self._getApcTestRunner(), carmen.WaitForDispatch(), carmen.RunLProf(-1) ]
+            subActions = [ self._getApcTestRunner(), carmen.AttachProfiler() ]
             return plugins.CompositeAction(subActions)
         else:
             return self._getApcTestRunner()
@@ -114,6 +114,8 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions.append(FetchApcCore(self))
         subActions.append(baseCollator)
         subActions.append(RemoveLogs())
+        if self.optionMap.has_key("lprof"):
+            subActions.append(carmen.ProcessProfilerResults())
         localAction = plugins.CompositeAction(subActions)
         if not self.useLSF():
             return localAction

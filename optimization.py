@@ -9,7 +9,7 @@ class OptimizationConfig(carmen.CarmenConfig):
         if self.optionMap.has_key("rulecomp"):
             return carmen.CarmenConfig.getActionSequence(self)
         
-        staticFilter = carmen.UpdatedStaticRulesetFilter(self.getRuleSetName, self.getLibraryFile())
+        staticFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
         return [ carmen.CompileRules(self.getRuleSetName, staticFilter) ] + carmen.CarmenConfig.getActionSequence(self)
     def getTestCollator(self):
         return carmen.CarmenConfig.getTestCollator(self) + [ ExtractSubPlanFile(self, "best_solution", "solution") ]

@@ -110,11 +110,10 @@ class RuleSet:
         if self.isCompiled():
             shutil.copyfile(self.targetFile, self.targetFile + ".bak")
         
-class UpdatedStaticRulesetFilter:
+class UpdatedLocalRulesetFilter:
     def __init__(self, getRuleSetName, libraryFile):
         self.getRuleSetName = getRuleSetName
         self.libraryFile = libraryFile
-        self.defaultAcceptance = 0
     def acceptsTestCase(self, test):
         ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test))
         if not ruleset.isValid():
@@ -123,24 +122,13 @@ class UpdatedStaticRulesetFilter:
             return 1
         return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.libraryFile))
     def acceptsTestSuite(self, suite):
-        raveName = getRaveName(suite)
         if not isUserSuite(suite):
-            self.defaultAcceptance = self.isDefaultStatic(raveName)
-            return 1       
-        resourceFile = os.path.join(suite.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab")
-        return self.isStaticInFile(resourceFile, raveName)
+            return 1
+
+        carmtmp = suite.environment["CARMTMP"]
+        return carmtmp.find("$CARMSYS") != -1 or carmtmp.find("${CARMSYS}") != -1
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
-    def isStaticInFile(self, fileName, raveName):
-        resourceFile = open(fileName)
-        for line in resourceFile.readlines():
-            if line.find(raveName) != -1 and line.find("UseStaticLinking") != -1:
-                entry = line.split(',')[4].strip()
-                return entry[1:-1] == "true"
-        return self.defaultAcceptance
-    def isDefaultStatic(self, raveName):
-        fileName = os.path.join(os.environ["CARMSYS"], "data", "config", "CarmResources", "General.etab")
-        return self.isStaticInFile(fileName, raveName)
 
 class WaitForDispatch(lsf.Wait):
     def __init__(self):

@@ -604,7 +604,7 @@ class MakeProgressReport(TestReport):
     def reportCosts(self, test, currentRun, referenceRun):
         costEntries = []
         for entry in currentRun.solutions[0].keys():
-            if entry.find("cost") != -1:
+            if entry.find("cost") != -1 and entry in referenceRun.solutions[0].keys():
                 costEntries.append(entry)
         costEntries.sort()
         for entry in costEntries:

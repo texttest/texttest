@@ -17,7 +17,7 @@ helpOptions = """
              many emails being sent by batch mode if many independent things are tested.
 """
 
-import os, performance, plugins, respond, sys, string
+import os, performance, plugins, respond, sys, string, time
 
 class BatchFilter(plugins.Filter):
     def __init__(self, batchSession):
@@ -226,7 +226,7 @@ class MailSender(plugins.Action):
         except:
             return fromAddress
     def getMailHeader(self, app, appResponders):
-        title = repr(app) + " Test Suite "
+        title = time.strftime("%y%m%d") + " " + repr(app) + " Test Suite "
         versions = self.findCommonVersions(app, appResponders)
         return title + self.getVersionString(versions) + ": "
     def getMailTitle(self, app, appResponders):

@@ -111,12 +111,21 @@ class QueueSystem:
                 continue
             job = self.activeJobs[jobId]
             status = self.getStatus(words[4], states, jobId)
+            if job.status == "PEND" and status == "PEND" and words[4] == "t" and len(words) >= 6:
+                self.setJobHost(job, words[7])
             if job.status == "PEND" and status != "PEND" and len(words) >= 6:
-                fullMachine = words[7].split('@')[-1]
-                job.machines = [ fullMachine.split('.')[0] ]
+                self.setJobHost(job, words[7])
             job.status = status
             if status == "EXIT" or status == "DONE":
                 del self.activeJobs[jobId]
+    def setJobHost(self, job, queueName):
+        parts = queueName.split('@')
+        if len(parts) > 1:
+            fullMachine = parts[-1]
+            job.machines = [ fullMachine.split('.')[0] ]
+        else:
+            if len(job.machines) < 1:
+                job.machines = [ "UNKNOWN" ]
     def parseQstatErrors(self, stderr):
         # Assume anything we can't find any more has completed OK
         for errorMessage in stderr.readlines():
@@ -139,7 +148,7 @@ class MachineInfo:
     def findResourceMachines(self, resource):
         machines = []
         for line in os.popen("qhost -l '" + resource + "'"):
-            if not line.startswith("HOSTNAME") and not line.startswith("-----") and not line.startswith("global"):
+           if not line.startswith("HOSTNAME") and not line.startswith("-----") and not line.startswith("global"):
                 machines.append(line.split()[0].split(".")[0])
         return machines
     def findRunningJobs(self, machine):
@@ -161,6 +170,16 @@ class MachineInfo:
     def findAllMachinesForJob(self):
         if not os.environ.has_key("PE_HOSTFILE"):
             return []
-
         hostlines = open(os.environ["PE_HOSTFILE"]).readlines()
-        return [ hostline.split()[0].split(".")[0] for hostline in hostlines ] 
+        hostlist = []
+        for line in hostlines:
+            parts = line.strip().split()
+            if len(parts) < 2:
+                continue
+            host = parts[0].split(".")[0]
+            counter = int(parts[1])
+            while counter > 0:
+                hostlist.append(host)
+                counter = counter - 1
+        return hostlist
+

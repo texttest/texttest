@@ -129,7 +129,7 @@ class NotebookPageChangeEvent(SignalEvent):
             if self.widget.get_tab_label_text(page) == argumentString:
                 self.widget.set_current_page(i)
                 return
-        raise GtkScriptError, "Could not find page " + argumentString + " in '" + self.name + "'"
+        raise usecase.UseCaseScriptError, "Could not find page " + argumentString + " in '" + self.name + "'"
 
 class TreeSignalEvent(SignalEvent):
     def __init__(self, name, widget, signalName, argumentParseData):
@@ -141,7 +141,7 @@ class TreeSignalEvent(SignalEvent):
     def getPathData(self, argumentString):
         path = self.findTreePath(self.model.get_iter_root(), argumentString)
         if not path:
-            raise GtkScriptError, "Could not find row '" + argumentString + "' in Tree View"
+            raise usecase.UseCaseScriptError, "Could not find row '" + argumentString + "' in Tree View"
         return path
     def findTreePath(self, iter, argumentText):
         if self.pathHasText(iter, argumentText):

@@ -289,7 +289,7 @@ class BuildCode(plugins.Action):
                 self.buildLocal(absPath, app)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
-        self.buildRemote("sundance", "sparc", app) 
+        self.buildRemote("turin", "sparc", app) 
         self.buildRemote("ramechap", "parisc_2_0", app)
         self.buildRemote("naxos", "powerpc", app)
     def buildLocal(self, absPath, app):
@@ -297,13 +297,13 @@ class BuildCode(plugins.Action):
         print "Building", app, "in", absPath, "..."
         buildFile = "build.default"
         commandLine = "cd " + absPath + "; gmake >& " + buildFile
-        os.system("rsh wake '" + commandLine + "' < /dev/null")
+        os.system("rsh cat '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
             raise "Product " + repr(app) + " did not build, exiting"
         print "Product", app, "built correctly in", absPath
         os.remove(buildFile)
         commandLine = "cd " + absPath + "; gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"
-        os.system("rsh wake '" + commandLine + "' < /dev/null")
+        os.system("rsh cat '" + commandLine + "' < /dev/null")
         print "Making install from", absPath ,"to", os.environ["CARMSYS"]
     def buildRemote(self, machine, arch, app):
         print "Building remotely in parallel on " + machine + " ..."

@@ -475,7 +475,10 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
         carmtmp = suite.environment["CARMTMP"]
         self.diag.info("CARMTMP: " + carmtmp)
         # Ruleset is local if CARMTMP depends on the CARMSYS or the tests
-        return carmtmp.find(os.environ["CARMSYS"]) != -1 or carmtmp.find(os.environ["TEXTTEST_HOME"]) != -1
+        if carmtmp.find(os.environ["CARMSYS"]) != -1:
+            return 1
+        ttHome = os.getenv("TEXTTEST_HOME")
+        return ttHome and carmtmp.find(ttHome) != -1
 
 class BuildCode(plugins.Action):
     builtDirs = {}

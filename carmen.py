@@ -669,6 +669,8 @@ class BuildCode(plugins.Action):
                 return "morlaix"
             else:
                 return "tororo"
+        if arch == "ia64_hpux":
+            return "wakeman"
     def getRemoteCommandLine(self, arch, absPath, makeCommand):
         commandLine = "cd " + absPath + "; " + makeCommand
         if arch == "sparc_64":

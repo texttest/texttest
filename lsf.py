@@ -86,7 +86,7 @@ class LSFConfig(unixConfig.UNIXConfig):
         if not self.useLSF():
             return unixConfig.UNIXConfig.getTestRunner(self)
         else:
-            return SubmitTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource)
+            return SubmitTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource, self.findLSFMachine)
     def getPerformanceFileMaker(self):
         if self.useLSF():
             return MakePerformanceFile(self.isSlowdownJob)
@@ -113,6 +113,18 @@ class LSFConfig(unixConfig.UNIXConfig):
             for res in resourceList[1:]:
                 resource += " && (" + res + ")"
             return resource
+    def findLSFMachine(self, test):
+        if not self.forceOnPerformanceMachines(test):
+            return ""
+        performanceMachines = test.getConfigValue("performance_test_machine")
+        if len(performanceMachines) == 0 or performanceMachines[0] == "none":
+            return ""
+    
+        machine = performanceMachines[0]
+        if len(performanceMachines) > 1:
+            for currMachine in performanceMachines[1:]:
+                machine += " " + currMachine
+        return machine
     def forceOnPerformanceMachines(self, test):
         if self.optionMap.has_key("perf"):
             return 1
@@ -127,14 +139,6 @@ class LSFConfig(unixConfig.UNIXConfig):
         resourceList = []
         if self.optionMap.has_key("R"):
             resourceList.append(self.optionValue("R"))
-        if self.forceOnPerformanceMachines(test):
-            performanceMachines = test.getConfigValue("performance_test_machine")
-            if len(performanceMachines) > 0 and performanceMachines[0] != "none":
-                resource = "select[hname == " + performanceMachines[0]
-                if len(performanceMachines) > 1:
-                    for machine in performanceMachines[1:]:
-                        resource += " || hname == " + machine
-                resourceList.append(resource + "]")
         if os.environ.has_key("LSF_RESOURCE"):
             resource = os.getenv("LSF_RESOURCE")
             if len(resource):
@@ -261,10 +265,11 @@ class LSFJob:
         return lines[-1].strip()        
     
 class SubmitTest(unixConfig.RunTest):
-    def __init__(self, loginShell, queueFunction, resourceFunction):
+    def __init__(self, loginShell, queueFunction, resourceFunction, machineFunction):
         unixConfig.RunTest.__init__(self, loginShell)
         self.queueFunction = queueFunction
         self.resourceFunction = resourceFunction
+        self.machineFunction = machineFunction
         self.diag = plugins.getDiagnostics("LSF")
     def __repr__(self):
         return "Submitting"
@@ -290,6 +295,9 @@ class SubmitTest(unixConfig.RunTest):
         resource = self.resourceFunction(test)
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
+        machine = self.machineFunction(test)
+        if len(machine):
+            lsfOptions += " -m '" + machine + "'"
         commandLine = "bsub " + lsfOptions + " '" + command + "' > " + reportfile
         self.diag.info("Submitting with command : " + commandLine)
         stdin, stdout, stderr = os.popen3(commandLine)
@@ -453,6 +461,20 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
                 return executionMachines
 
         return executionMachines
+    def findPerformanceMachines(self, app):
+        rawPerfMachines = unixConfig.MakePerformanceFile.findPerformanceMachines(self, app)
+        perfMachines = []
+        for machine in rawPerfMachines:
+            perfMachines += self.findActualMachines(machine)
+        return perfMachines
+    def findActualMachines(self, machine):
+        # 'machine' may actually be a host group
+        machines = []
+        for line in os.popen("bhosts " + machine + " 2>&1"):
+            if line.startswith("HOST_NAME"):
+                continue
+            machines.append(line.split()[0].split(".")[0])
+        return machines
     def parseMachine(self, line):
         start = string.find(line, "<")
         end = string.find(line, ">", start)

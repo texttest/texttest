@@ -79,22 +79,15 @@ def getTestPerformance(test, version = None):
 def getTestMemory(test, version = None):
     return getPerformance(test.makeFileName("memory", version))
 
-def getPerformanceHost(fileName):
-    try:
-        parts = open(fileName).readline().split()
-        if parts[-2] == "on":
-            return parts[-1]
-    except:
-        pass
-    return None
-
 class PerformanceTestComparison(comparetest.TestComparison):
-    def __init__(self, test):
-        comparetest.TestComparison.__init__(self, test)
-        self.execHost = None
     def __repr__(self):
-        if self.execHost != None and self.hasDifferences():
-            return "FAILED on " + self.execHost + " :"
+        execHost = None
+        try:
+            execHost = self.test.execHost
+        except AttributeError:
+            pass
+        if execHost != None and self.hasDifferences():
+            return "FAILED on " + execHost + " :"
         return comparetest.TestComparison.__repr__(self)
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         baseName = os.path.basename(standardFile)
@@ -118,34 +111,6 @@ class PerformanceTestComparison(comparetest.TestComparison):
             descriptors["badperf"] = "slower"
             descriptors["config"] = "cputime"
         return descriptors
-    def shouldCompare(self, file, dir, app):
-        if not comparetest.TestComparison.shouldCompare(self, file, dir, app):
-            return 0
-        if file.find(".") == -1:
-            return 0
-        stem, ext = file.split(".",1)
-        if stem != "performance":
-            return 1
-        tmpFile = os.path.join(dir, file)
-        execHost = getPerformanceHost(tmpFile)
-        cmpFlag = 0
-        self.execHost = execHost
-        if execHost != None:
-            cmpFlag = self.checkHosts()
-        if cmpFlag == 0:
-            os.remove(tmpFile)
-        return cmpFlag
-    def checkHosts(self):
-        perfMachines = self.test.app.getConfigValue("performance_test_machine")
-        if "any" in perfMachines:
-            return 1
-        for host in self.execHost.split(","):
-            realHost = host
-            if host[1] == "*":
-                realHost = host[2:]
-            if not realHost in perfMachines:
-                return 0
-        return 1
 
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile, descriptors, makeNew):

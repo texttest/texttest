@@ -180,7 +180,7 @@ class CarmenConfig(lsf.LSFConfig):
             return None
     def getRealRuleBuilder(self):
         if self.useLSF():
-            ruleRunner = lsf.SubmitTest(self.getLoginShell(), self.findRaveCompilationLSFQueue, self.findLSFResource)
+            ruleRunner = lsf.SubmitTest(self.getLoginShell(), self.findRaveCompilationLSFQueue, self.findLSFResource, self.findLSFMachine)
         else:
             ruleRunner = default.RunTest()
         jobNameCreator = RulesetJobBuildNameCreator(self.getRuleSetName)

@@ -329,16 +329,24 @@ class MakePerformanceFile(plugins.Action):
     def __init__(self):
         self.includeSystemTime = 0
         self.diag = plugins.getDiagnostics("makeperformance")
+        self.performanceMachines = []
     def setUpApplication(self, app):
         self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
+        self.performanceMachines = self.findPerformanceMachines(app)
     def __repr__(self):
         return "Making performance file for"
     def __call__(self, test):
         if test.state == test.UNRUNNABLE or test.state == test.KILLED:
             return
 
-        cpuTime, realTime = self.readTimes(test)
         executionMachines = self.findExecutionMachines(test)
+        # Ugly hack to work around lack of proper test states
+        test.execHost = string.join(executionMachines, ",")
+        
+        # Check that all of the execution machines are also performance machines
+        if not self.allMachinesTestPerformance(test, executionMachines):
+            return
+        cpuTime, realTime = self.readTimes(test)
         # There was still an error (jobs killed in emergency), so don't write performance files
         if cpuTime == None:
             print "Not writing performance file for", test
@@ -346,7 +354,20 @@ class MakePerformanceFile(plugins.Action):
         fileToWrite = test.makeFileName("performance", temporary=1)
         self.writeFile(test, cpuTime, realTime, executionMachines, fileToWrite)
     def findExecutionMachines(self, test):
-        return [ hostname() ] 
+        return [ hostname() ]
+    def findPerformanceMachines(self, app):
+        return app.getConfigValue("performance_test_machine")
+    def allMachinesTestPerformance(self, test, executionMachines):
+        if "any" in self.performanceMachines:
+            return 1
+        for host in executionMachines:
+            realHost = host
+            # Format support e.g. 2*apple for multi-processor machines
+            if host[1] == "*":
+                realHost = host[2:]
+            if not realHost in self.performanceMachines:
+                return 0
+        return 1
     def readTimes(self, test):
         # Read the UNIX performance file, allowing us to discount system time.
         tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
@@ -377,7 +398,7 @@ class MakePerformanceFile(plugins.Action):
         return 60 * float(parts[0]) + float(parts[1])
     def writeFile(self, test, cpuTime, realTime, executionMachines, fileName):
         file = open(fileName, "w")
-        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. on " + string.join(executionMachines, ",") + os.linesep
+        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. on " + test.execHost + os.linesep
         file.write(cpuLine)
         realLine = "Real time  : " + self.timeString(realTime) + " sec." + os.linesep
         file.write(realLine)

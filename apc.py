@@ -97,7 +97,7 @@ class ApcConfig(optimization.OptimizationConfig):
         return subActions
     def _getApcTestRunner(self):
         if self.useLSF():
-            return SubmitApcTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource)
+            return SubmitApcTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource, self.findLSFMachine)
         elif self.optionMap.has_key("rundebug"):
             return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
         else:

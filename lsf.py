@@ -64,6 +64,7 @@ emergencyFinish = 0
 
 def tenMinutesToGo(signal, stackFrame):
     print "Received LSF signal for termination in 10 minutes, killing all remaining jobs"
+    sys.stdout.flush() # Try not to lose log file information...
     global emergencyFinish
     emergencyFinish = 1
 

@@ -52,7 +52,7 @@ batchInfo = """
              Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
              at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
-import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond
+import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, shlex
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -313,6 +313,93 @@ class CheckBuild(plugins.Action):
             print "Build on " + arch + " in " + absPath + resultString
             if result == 0:
                 os.remove(fileName)
+
+#
+# This class reads a CarmResources etab file and gives access to it
+#
+class ConfigEtable:
+   def __init__(self, fileName):
+      self.inFile = open(fileName)
+      self.applications = {}
+      self.columns = self._readColumns()
+      self.parser = shlex.shlex(self.inFile)
+      lineTuple = self._readTuple()
+      while lineTuple != None:
+         self._storeValue(lineTuple[0], lineTuple[1], lineTuple[2], lineTuple[4])
+         lineTuple = self._readTuple()
+   def getValue(self, application, module, name):
+      try:
+         appDict = self.applications[application]
+         moduleDict = appDict[module]
+         value = moduleDict[name]
+      except:
+         return None
+      return self._etabExpand(value)
+   def _storeValue(self, app, module, name, value):
+      if not self.applications.has_key(app):
+         self.applications[app] = {}
+      if not self.applications[app].has_key(module):
+         self.applications[app][module] = {}
+      self.applications[app][module][name] = value
+   def _readTuple(self):
+      tup = []
+      while len(tup) < len(self.columns):
+         tok = self._readConfigToken()
+         if tok == "":
+            break
+         if tok != ",":
+            if tok.startswith('"'):
+               tok = tok[1:-1]
+            tup.append(tok)
+      if len(tup) == len(self.columns):
+         return tup
+      else:
+         return None
+   def _readColumns(self):
+      numCols = self._readNumCols()
+      cols = []
+      while len(cols) < numCols:
+         line = self.inFile.readline()
+         parts = line.split()
+         if len(parts) > 0 and len(parts[0].strip()) > 0:
+            cols.append(parts[0])
+      return cols
+   def _readNumCols(self):
+      numCols = -1
+      inComment = 0
+      while numCols == -1:
+         line = self.inFile.readline()
+         if line.startswith("/*"):
+            inComment = 1
+         if line.strip().endswith("*/"):
+            inComment = 0
+         if not inComment:
+            try:
+               numCols = int(line.strip())
+            except:
+               pass
+      return numCols
+   def _readConfigToken(self):
+      tok = self.parser.get_token()
+      while tok.startswith("/*"):
+         while not tok.endswith("*/"):
+            self.parser.get_token()
+         tok = self.parser.get_token()
+      return tok
+   def _etabExpand(self, value):
+      if not value.startswith("$("):
+         return value
+      lPos = value.find(")")
+      if lPos == -1:
+         return value
+      parts = value[2:lPos].split(".")
+      if len(parts) == 3:
+         expanded = self.getValue(parts[0], parts[1], parts[2])
+         whole = expanded + self._etabExpand(value[lPos + 1:])
+         return self._etabExpand(whole)
+      else:
+         whole = "${" + value[2:lPos] + "}" + self._etabExpand(value[lPos + 1:])
+         return os.path.expandvars(whole)
 
 def ensureDirectoryExists(path):
     if len(path) == 0:

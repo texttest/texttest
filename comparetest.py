@@ -229,9 +229,10 @@ class TestComparison(plugins.TestState):
         return FileComparison(test, standardFile, tmpFile, makeNew)
     def saveSingle(self, stem, exact = 1, versionString = ""):
         comparison, storageList = self.findComparison(stem)
-        comparison.overwrite(exact, versionString)
-        storageList.remove(comparison)
-        self.correctResults.append(comparison)
+        if comparison:
+            comparison.overwrite(exact, versionString)
+            storageList.remove(comparison)
+            self.correctResults.append(comparison)
     def findComparison(self, stem):
         for comparison in self.changedResults:
             if comparison.stem == stem:
@@ -239,6 +240,7 @@ class TestComparison(plugins.TestState):
         for comparison in self.newResults:
             if comparison.stem == stem:
                 return comparison, self.newResults
+        return None, None
     def save(self, exact = 1, versionString = "", overwriteSuccessFiles = 0):
         # Force exactness unless there is only one difference : otherwise
         # performance is averaged when results have changed as well

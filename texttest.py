@@ -348,6 +348,8 @@ class Application:
         self.setConfigDefault("write_tmp_files", "~/texttesttmp")
         root = os.path.expanduser(self.getConfigValue("write_tmp_files"))
         self.writeDirectory = os.path.join(os.path.abspath(root), self.getTmpIdentifier())
+        if not os.path.isdir(os.path.abspath(root)):
+            os.makedirs(os.path.abspath(root))
         self.configObject.setUpApplication(self)
     def __repr__(self):
         return self.fullName

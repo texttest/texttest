@@ -252,7 +252,7 @@ class LineFilter:
         self.triggerNumber = 0
         self.linesToRemove = 1
         self.autoRemove = 0
-        self.wordNumber = 0
+        self.wordNumber = None
         for syntaxString in self.syntaxStrings:
             linePoint = self.trigger.find(syntaxString)
             if linePoint != -1:
@@ -307,7 +307,7 @@ class LineFilter:
         else:
             return 0
     def filterWords(self, line):
-        if self.wordNumber:
+        if self.wordNumber != None:
             words = line.rstrip().split(" ")
             self.diag.info("Removing word " + str(self.wordNumber) + " from " + repr(words))
             realNumber = self.findRealWordNumber(words)

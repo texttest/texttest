@@ -25,10 +25,22 @@ apc.ImportTest             - Import new test cases and test users.
                              the test is run. The action will look for available subplandirectories under
                              CARMUSR and present them to you.
 
-apc.PlotApcTest [range]    - Create a gnuplot diagram with x-time, y-cost from the status file of test(s)
-                             This extracts costs and times from the status file of the tests you apply
-                             it to. It then displays a plot of how the cost changes over time in each
-                             test run. All plots end up in the same diagram.
+apc.PlotApcTest [options]  - Displays a gnuplot graph with the cpu time (in minutes) versus total cost. 
+                             The data is extracted from the status file of test(s), and if the test is
+                             currently running, the temporary status file is used, see however the
+                             option nt below. All tests selected are plotted in the same graph.
+                             The following options are supported:
+                             - r=range
+                               The x-axis has the range range. Default is the whole data set. Example: 60:
+                             - p=an absolute file name
+                               Prints the graph to a postscript file instead of displaying it.
+                             - i=item
+                               Which item to plot from the status file. Note that whitespaces are replaced
+                               by underscores. Default is TOTAL cost. Example: i=overcover_cost.
+                             - s
+                               Plot against solution number instead of cpu time.
+                             - nt
+                               Do not use status file from the currently running test.
 
 apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
                              This is intended to be used on a single specified test and will terminate
@@ -430,8 +442,24 @@ class PlotApcTest(plugins.Action):
         self.plotFiles = []
         self.statusFileName = None
         self.plotItem = " " + "TOTAL cost"
-        if args[0]:
-            self.plotrange = args[0]
+        self.plotrange = "0:"
+        self.plotPrint = []
+        self.plotUseTmpStatus = "t"
+        self.plotAgainstSolNum = []
+        for ar in args:
+            arr = ar.split("=")
+            if arr[0]=="r":
+                self.plotrange = arr[1]
+            elif arr[0]=="p":
+                self.plotPrint = arr[1]
+            elif arr[0]=="i":
+                self.plotItem = " " + arr[1].replace("_"," ")
+            elif arr[0]=="nt":
+                self.plotUseTmpStatus = []
+            elif arr[0]=="s":
+                self.plotAgainstSolNum = "t"
+            else:
+                print "Unknown option " + arr[0]
     def __repr__(self):
         return "Plotting"
     def __del__(self):
@@ -443,12 +471,24 @@ class PlotApcTest(plugins.Action):
                 title = " title \"" + file.split(os.sep)[-2] + "_" + self.plotItem.strip().replace(" ","_") + "\" "
                 fileList.append("'" + file + "' " + title + style)
 #            print "plot " + string.join(fileList, ",") + os.linesep
+            if self.plotPrint:
+                absplotPrint = os.path.expanduser(self.plotPrint)
+                if not os.path.isabs(absplotPrint):
+                    print "An absolute path must be given."
+                    return
+                stdin.write("set terminal postscript" + os.linesep)
+            stdin.write("set xrange [" + self.plotrange +"];" + os.linesep)
             stdin.write("plot " + string.join(fileList, ",") + os.linesep)
-            stdin.write("set xrange [" + self.plotrange +"]; rep" + os.linesep)
             stdin.write("quit" + os.linesep)
+            if self.plotPrint:
+                stdin.close()
+                tmppf = stdout.read()
+                if len(tmppf) > 0:
+                    open(absplotPrint,"w").write(tmppf)
+                    
     def __call__(self, test):
-        currentFile = self.findTemporaryStatusFile(test)
-        if currentFile:
+        currentFile = findTemporaryStatusFile(test)
+        if self.plotUseTmpStatus and currentFile:
             print "Using status file in temporary subplan directory for plotting test " + test.name
         else:
             currentFile = test.makeFileName(self.statusFileName)
@@ -459,29 +499,56 @@ class PlotApcTest(plugins.Action):
         plotFileName = test.makeFileName("plot")
         plotFile = open(plotFileName,"w")
         for il in range(len(costs)):
-            plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
-            #plotFile.write(str(costs[il]) + os.linesep)
+            if self.plotAgainstSolNum:
+                plotFile.write(str(costs[il]) + os.linesep)
+            else:
+                plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
         self.plotFiles.append(plotFileName)
     def setUpSuite(self, suite):
         pass
     def setUpApplication(self, app):
         self.statusFileName = app.getConfigValue("log_file")
-    def findTemporaryStatusFile(self,test):
-        foundoutputfile = 0
-        for file in os.listdir(test.abspath):
-            if file.startswith("output") and file.find(test.getTestUser()) != -1:
-                foundoutputfile = 1
-                break
-        if not foundoutputfile:
+
+class GrepApcLog(plugins.Action):
+    def __init__(self):
+        pass
+    def __repr__(self):
+        return "Greping"
+    def __del__(self):
+        pass
+    def __call__(self, test):
+        tmpStatusFile = findTemporaryStatusFile(test)
+        if not tmpStatusFile:
+            print "Test " + test.name + " is not running."
             return
-        grepCommand = "grep -E 'SUBPLAN' " + file
+        grepCommand = "grep Machine " + tmpStatusFile
         grepLines = os.popen(grepCommand).readlines()
         if len(grepLines) > 0:
-            currentFile = grepLines[0].split()[1] + os.sep + "status"
-            if not os.path.isfile(currentFile):
-                return
-            else:
-                return currentFile
+            machine = grepLines[0].split()[-1]
+            Command = "rsh " + machine + " 'cd /tmp/*" + test.name + "*; egrep \"(heuristic subselection|unfixvars time|focussing|Solv|OBJ|LBD|\*\*\*)\" apclog'" 
+            grepLines = os.popen(Command).read()
+            print grepLines
+    def setUpSuite(self, suite):
+        pass
+    def setUpApplication(self, app):
+        pass
+        
+def findTemporaryStatusFile(test):
+    foundoutputfile = 0
+    for file in os.listdir(test.abspath):
+        if file.startswith("output") and file.find(test.getTestUser()) != -1:
+            foundoutputfile = 1
+            break
+    if not foundoutputfile:
+        return
+    grepCommand = "grep -E 'SUBPLAN' " + file
+    grepLines = os.popen(grepCommand).readlines()
+    if len(grepLines) > 0:
+        currentFile = grepLines[0].split()[1] + os.sep + "status"
+        if not os.path.isfile(currentFile):
+            return
         else:
-            print "Could not find subplan name in output file " + file + os.linesep
-            return    
+            return currentFile
+    else:
+        print "Could not find subplan name in output file " + file + os.linesep
+        return    

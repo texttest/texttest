@@ -177,12 +177,17 @@ class CollateUNIXFiles(default.CollateFiles):
     def extract(self, sourcePath, targetFile):
         if self.isCoreFile(targetFile):
             # Try to avoid race conditions extracting core files
-            time.sleep(1)
-        try:
-            os.rename(sourcePath, targetFile)
-        except:
+            time.sleep(2)
+        # Renaming links is fairly dangerous, if they point at relative paths. Copy these.
+        if os.path.islink(sourcePath):
             shutil.copyfile(sourcePath, targetFile)
-            os.remove(sourcePath)
+        else:
+            try:
+                # This generally fails due to cross-device link problems
+                os.rename(sourcePath, targetFile)
+            except:
+                shutil.copyfile(sourcePath, targetFile)
+                os.remove(sourcePath)
 
 class MakePerformanceFile(plugins.Action):
     def __init__(self):
@@ -222,11 +227,11 @@ class MakePerformanceFile(plugins.Action):
         cpuTime = None
         realTime = None
         for line in file.readlines():
-            if line.find("user") != -1:
+            if line.startswith("user"):
                 cpuTime = self.parseUnixTime(line)
-            if self.includeSystemTime and line.find("sys") != -1:
+            if self.includeSystemTime and line.startswith("sys") != -1:
                 cpuTime = cpuTime + self.parseUnixTime(line)
-            if line.find("real") != -1:
+            if line.startswith("real"):
                 realTime = self.parseUnixTime(line)
         os.remove(tmpFile)
         return cpuTime, realTime

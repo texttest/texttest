@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, string, getopt, types, time
+import os, sys, string, getopt, types, time, re
 from stat import *
 
 # Base class for TestCase and TestSuite
@@ -146,8 +146,12 @@ class Application:
         allowedOptions = self.configObject.getOptionString() + builtInOptions
         # Force exit if something isn't present
         getopt.getopt(sys.argv[1:], allowedOptions)    
+	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
     def __repr__(self):
         return string.upper(self.name)
+    def hasREpattern(self, txt):
+    	# return 1 if txt contains a regular expression meta character
+	return self.specialChars.search(txt) != None
     def makeAbsPath(self, path):
         if (os.path.isabs(path)):
             return path
@@ -191,13 +195,25 @@ class Application:
         newFile.close()
         return newFileName
 #private:
+    def matchRE(self, ptn, text):
+	if re.compile(ptn).search(text):
+	    return 1
+	return 0
+    def matchPlain(self, ptn, text):
+    	if text.find(ptn) != -1:
+	    return 1
+	return 0
     def calculateLinesToRemove(self, line, forbiddenText):
         for text in forbiddenText:
             searchText = text
             linePoint = text.find("{LINES:")
             if linePoint != -1:
                 searchText = text[:linePoint]
-            if line.find(searchText) != -1:
+	    if self.hasREpattern(searchText):
+	    	found = self.matchRE(searchText, line[:-1])
+	    else:
+	    	found = self.matchPlain(searchText, line[:-1])
+            if found:
                 if linePoint != -1:
                     var, val = text[linePoint + 1:-1].split(":")
                     return int(val)

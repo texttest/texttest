@@ -167,10 +167,20 @@ class ViewFile(InteractiveAction):
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveAction):
     def __init__(self, suite, oldOptionGroup):
-        InteractiveAction.__init__(self, suite, oldOptionGroup, "Adding " + self.testType())
+        InteractiveAction.__init__(self, suite, oldOptionGroup, self.getTabTitle())
         if self.canPerformOnTest():
-            self.optionGroup.addOption("name", self.testType() + " Name")
-            self.optionGroup.addOption("desc", self.testType() + " Description")
+            self.optionGroup.addOption("name", self.getNameTitle(), self.getDefaultName(suite))
+            self.optionGroup.addOption("desc", self.getDescTitle(), self.getDefaultDesc(suite))
+    def getNameTitle(self):
+        return self.testType() + " Name"
+    def getDescTitle(self):
+        return self.testType() + " Description"
+    def getDefaultName(self, suite):
+        return ""
+    def getDefaultDesc(self, suite):
+        return ""
+    def getTabTitle(self):
+        return "Adding " + self.testType()
     def getTitle(self):
         return "Add " + self.testType()
     def testType(self):
@@ -421,10 +431,39 @@ class EnableDiagnostics(InteractiveAction):
         shutil.copyfile(diagFile, targetDiagFile)
         self.viewFile(targetDiagFile, refresh=1)
 
+class CopyTest(ImportTest):
+    def __repr__(self):
+        return "Copy"
+    def testType(self):
+        return "Test"
+    def getTabTitle(self):
+        return "Copying"
+    def getNameTitle(self):
+        return "Name of copied test"
+    def getDescTitle(self):
+        return "Description of new test"
+    def getDefaultName(self, test):
+        return test.name + "_copy"
+    def getDefaultDesc(self, test):
+        return "Copy of " + test.name
+    def getTitle(self):
+        return "Copy"
+    def getScriptTitle(self):
+        return "Copy Test"
+    def __call__(self, test):
+        suite = test.parent
+        self.setUpSuite(suite)
+    def createTestContents(self, suite, testDir):
+        for file in os.listdir(self.test.abspath):
+            if suite.app.ownsFile(file):
+                sourceFile = os.path.join(self.test.abspath, file)
+                targetFile = os.path.join(testDir, file)
+                shutil.copyfile(sourceFile, targetFile)
+    
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.testClasses =  [ SaveTest, RecordTest, EnableDiagnostics ]
+        self.testClasses =  [ SaveTest, RecordTest, EnableDiagnostics, CopyTest ]
         self.suiteClasses = [ ImportTestCase, ImportTestSuite ]
         self.appClasses = [ SelectTests, RunTests, ResetGroups ]
         self.optionGroupMap = {}

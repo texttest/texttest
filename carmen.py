@@ -165,7 +165,10 @@ class CarmenConfig(lsf.LSFConfig):
         return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleBuilder() ] + \
                  lsf.LSFConfig._getActionSequence(self, useGui, makeDirs = 0)
     def getCarmVarChecker(self):
-        return CheckCarmVariables()
+        if not self.isReconnecting():
+            return CheckCarmVariables()
+        else:
+            return None
     def getRuleCleanup(self):
         return CleanupRules(self.getRuleSetName)
     def isRaveRun(self):

@@ -589,9 +589,11 @@ class ApplicationRunner:
     def actionCount(self):
         return len(self.actionSequence)
     def performAction(self, actionNum):
+        debugLog.debug("Performing action number " + str(actionNum) + " of " + str(self.actionCount()))
         if actionNum < self.actionCount():
             action = self.actionSequence[actionNum]
             if action.getFilter() != None:
+                debugLog.debug("Performing action with filter " + repr(action.getFilter()))
                 self._performActionWithFilter(action)
             else:
                 self._performAction(self.testSuite, action)
@@ -609,6 +611,7 @@ class ApplicationRunner:
         actionTests = TestSuite(os.path.basename(self.app.abspath), self.app.abspath, self.app, newFilterList)
         self._performAction(actionTests, action)
     def _performAction(self, suite, action):
+        debugLog.debug("Performing action " + repr(action))
         action.setUpApplication(suite.app)
         debugLog.debug("Current config dictionary for " + repr(suite.app) + ": " + os.linesep + repr(suite.app.configDir.dict))
         suite.performAction(action)    

@@ -74,6 +74,9 @@ def getPerformance(fileName):
 def getTestPerformance(test, version = None):
     return getPerformance(test.makeFileName("performance", version)) / 60
 
+def getTestMemory(test, version = None):
+    return getPerformance(test.makeFileName("memory", version))
+
 def getPerformanceHost(fileName):
     try:
         parts = open(fileName).readline().split()

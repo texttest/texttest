@@ -2,7 +2,7 @@
 <html>
 <head>
    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-   <meta name="GENERATOR" content="Mozilla/4.77 [en] (X11; U; SunOS 5.9 sun4u) [Netscape]">
+   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.20-13.8smp i686) [Netscape]">
 </head>
 <body>
 
@@ -86,11 +86,11 @@ installed. It is expected that you will
 <br>want to extend these configurations to take advantage of local circumstances
 or to add features that you need.
 <p><u>User Interfaces</u>
-<br>TextTest is a command line program:&nbsp;all suitable options must
-be provided on startup as described by
+<br>TextTest is a command line program: all suitable options must be provided
+on startup as described by
 <br>your configuration. It does however have a GUI for monitoring the tests,
 which is enabled by the -g option
-<br>and requires PyGTK&nbsp;to be installed (the GUI library). Alternatively
+<br>and requires PyGTK to be installed (the GUI library). Alternatively
 there is a basic text interface provided
 <br>by the default configuration, see the configuration help for details.
 <p>Using the GUI should be fairly self-explanatory. Double clicking on
@@ -225,6 +225,17 @@ the run directories of previous runs that it finds. This means
 <br>that you cannot run more than one instance of TextTest on the same
 application with the same version simultaneously if you are
 <br>specifying the -keeptmp flag.
+<p>Sometimes additional input files are needed besides standard input for
+a test to run. These may be for individual tests
+<br>or for groups of tests. You then need to specify the "link_test_path"
+config file entry in order for links to be
+<br>provided from the test run directories to these files. You can then
+refer to a local file of the appropriate name
+<br>in your options file, for example. The path may be a file or a directory,
+and it will be found anywhere in the test hierarchy
+<br>for a particular test.
+<p>There is also "copy_test_path", which is useful for directory structures
+which a program may want to write to.
 <p><u>Repeating things</u>
 <br>It can be useful to detect unreliable behaviour to repeat the test
 runs several times. To do this, specify -m &lt;number_of_times> on

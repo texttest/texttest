@@ -151,5 +151,5 @@ class BatchResponder(Responder):
             mailFile.write("--------------------------------------------------------" + os.linesep)
             mailFile.write("TEST FAILED -> " + repr(test) + os.linesep)
             os.chdir(test.abspath)
-            self.responder.displayComparisons(self.failures[test], mailFile)
+            self.responder.displayComparisons(self.failures[test], mailFile, None)
         

@@ -133,8 +133,7 @@ class ApcConfig(optimization.OptimizationConfig):
         if not self.useLSF():
             return localAction
         else:
-            resourceAction = ApcMakeResourceFiles(self.checkPerformance(), self.checkMemory(), self.isSlowdownJob)
-            return plugins.CompositeAction([ lsf.Wait(), self.updaterLSFStatus(), collateAction, resourceAction, localAction ])
+            return plugins.CompositeAction([ lsf.Wait(), self.updaterLSFStatus(), collateAction, localAction ])
     def _getSubPlanDirName(self, test):
         statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
         dirs = statusFile.split(os.sep)[:-2]
@@ -150,8 +149,6 @@ class ApcConfig(optimization.OptimizationConfig):
         return None
     def updaterLSFStatus(self):
         return ApcUpdateLSFStatus()
-    def checkMemory(self):
-        return 0
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -442,33 +439,6 @@ class ApcUpdateLSFStatus(plugins.Action):
              return runStatusHead
          else:
              return "Run status file is not avaliable yet."
-
-class ApcMakeResourceFiles(lsf.MakeResourceFiles):
-    def writeMemoryFile(self, test, textList, resourceDict, explicitFileName = "" ):
-        optRun = optimization.OptimizationRun(test, "", [ optimization.memoryEntryName ], [], 0, 0, 0, test.makeFileName("status", temporary=1))
-        maxMem = optRun.getMaxMemory()
-        if not maxMem == "??":
-            # We save memory performance in steps of 0.5Mb
-            roundedMaxMem = float(int(2*maxMem))/2
-            if explicitFileName:
-                fileName = explicitFileName
-            else:
-                fileName = test.makeFileName("memory", temporary=1)
-                file = open(fileName, "w")
-                file.write(string.lstrip(textList[0] + " :      " + str(roundedMaxMem) + " MB") + os.linesep)
-                file.close()
-
-class ExtractMemoryPerformance(plugins.Action):
-    def __repr__(self):
-        return "Extracting memory performance for"
-    def __call__(self, test):
-        test.writeDirs.append(test.abspath)
-        statusFileName = test.makeFileName("status", temporary = 0)
-        if os.path.isfile(statusFileName):
-            resourceAction = ApcMakeResourceFiles(None, None, None)
-            resourceAction.writeMemoryFile(test, [ "Max Memory" ], None, test.makeFileName("memory", temporary=1) + test.app.versionSuffix())
-        else:
-            self.describe(test, ": No status file for version " + test.app.versionSuffix())
                           
 class RemoveLogs(plugins.Action):
     def __call__(self, test):

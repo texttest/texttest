@@ -73,7 +73,6 @@ signal.signal(signal.SIGUSR2, tenMinutesToGo)
 class LSFConfig(unixConfig.UNIXConfig):
     def getArgumentOptions(self):
         options = unixConfig.UNIXConfig.getArgumentOptions(self)
-        options["r"] = "Select tests by execution time"
         options["R"] = "Request LSF resource"
         options["q"] = "Request LSF queue"
         return options
@@ -82,19 +81,20 @@ class LSFConfig(unixConfig.UNIXConfig):
         switches["l"] = "Run tests locally (not LSF)"
         switches["perf"] = "Run on performance machines only"
         return switches
-    def getFilterList(self):
-        filters = unixConfig.UNIXConfig.getFilterList(self)
-        self.addFilter(filters, "r", performance.TimeFilter)
-        return filters
     def useLSF(self):
         if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l") or self.optionMap.has_key("rundebug"):
             return 0
         return 1
     def getTestRunner(self):
         if not self.useLSF():
-            return default.Config.getTestRunner(self)
+            return unixConfig.UNIXConfig.getTestRunner(self)
         else:
             return SubmitTest(self.findLSFQueue, self.findLSFResource)
+    def getPerformanceFileMaker(self):
+        if self.useLSF():
+            return MakePerformanceFile(self.isSlowdownJob)
+        else:
+            return unixConfig.UNIXConfig.getPerformanceFileMaker(self)
     def queueDecided(self, test):
         return self.optionMap.has_key("q")
     def findLSFQueue(self, test):
@@ -133,19 +133,9 @@ class LSFConfig(unixConfig.UNIXConfig):
         if not self.useLSF():
             return baseCollator
         else:
-            resourceAction = MakeResourceFiles(self.checkPerformance(), self.checkMemory(), self.isSlowdownJob)
-            return plugins.CompositeAction([ Wait(), self.updaterLSFStatus(), resourceAction, baseCollator ])
-    def getTestComparator(self):
-        if self.optionMap.has_key("l"):
-            return default.Config.getTestComparator(self)
-        else:
-            return performance.MakeComparisons(self.optionMap.has_key("n"))
+            return plugins.CompositeAction([ Wait(), self.updaterLSFStatus(), baseCollator ])
     def updaterLSFStatus(self):
         return UpdateLSFStatus()
-    def checkMemory(self):
-        return 0
-    def checkPerformance(self):
-        return 1
     def isSlowdownJob(self, jobUser, jobName):
         return 0
     def printHelpDescription(self):
@@ -204,18 +194,15 @@ class LSFJob:
     def getFile(self, options = ""):
         return os.popen("bjobs -J " + self.name + " " + options + " 2>&1")
     
-class SubmitTest(plugins.Action):
+class SubmitTest(unixConfig.RunTest):
     def __init__(self, queueFunction, resourceFunction):
         self.queueFunction = queueFunction
         self.resourceFunction = resourceFunction
         self.diag = plugins.getDiagnostics("LSF")
     def __repr__(self):
         return "Submitting"
-    def __call__(self, test):
-        if test.state == test.UNRUNNABLE:
-            return
+    def runTest(self, test):
         queueToUse = self.queueFunction(test)
-        self.describe(test, " to LSF queue " + queueToUse)
         testCommand = self.getExecuteCommand(test)
         reportfile =  test.makeFileName("lsfreport", temporary=1, forComparison=0)
         lsfJob = LSFJob(test)
@@ -225,31 +212,18 @@ class SubmitTest(plugins.Action):
             lsfOptions += " -R '" + resource + "'"
         if os.environ.has_key("LSF_PROCESSES"):
             lsfOptions += " -n " + os.environ["LSF_PROCESSES"]
-        unixPerfFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
-        timedTestCommand = '\\time -p sh ' + testCommand + ' 2> ' + unixPerfFile
-        commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile
+        commandLine = "bsub " + lsfOptions + " '" + testCommand + "' > " + reportfile
         self.diag.info("Submitting with command : " + commandLine)
         stdin, stdout, stderr = os.popen3(commandLine)
         errorMessage = stderr.readline()
         if errorMessage and errorMessage.find("still trying") == -1:
             raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
-    def getExecuteCommand(self, test):
-        testCommand = test.getExecuteCommand()
-        inputFileName = test.inputFile
-        if os.path.isfile(inputFileName):
-            testCommand = testCommand + " < " + inputFileName
-        outfile = test.makeFileName("output", temporary=1)
-        errfile = test.makeFileName("errors", temporary=1)
-        # put the command in a file to avoid quoting problems,
-        # also fix env.variables that LSF doesn't reset
-        cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
-        f = open(cmdFile, "w")
-        f.write("HOST=`hostname`; export HOST\n")
-        f.write(testCommand + " > " + outfile + " 2> " + errfile + "\n")
-        f.close()
-        return cmdFile
-    def setUpSuite(self, suite):
-        self.describe(suite)
+    def describe(self, test):
+        queueToUse = self.queueFunction(test)
+        unixConfig.RunTest.describe(self, test, " to LSF queue " + queueToUse)
+    def changeState(self, test):
+        # Don't change state just because we submitted to LSF
+        pass
     def setUpApplication(self, app):
         app.setConfigDefault("lsf_queue", "normal")
         app.setConfigDefault("lsf_processes", "1")
@@ -329,92 +303,36 @@ class UpdateLSFStatus(plugins.Action):
             return 0
         return (tmpSize * 100) / stdSize 
     
-class MakeResourceFiles(plugins.Action):
-    def __init__(self, checkPerformance, checkMemory, isSlowdownJob):
-        self.checkPerformance = checkPerformance
-        self.checkMemory = checkMemory
+class MakePerformanceFile(unixConfig.MakePerformanceFile):
+    def __init__(self, isSlowdownJob):
         self.isSlowdownJob = isSlowdownJob
-    def __repr__(self):
-        return "Making resource files for"
-    def __call__(self, test):
-        if test.state == test.UNRUNNABLE:
-            return
-        textList = [ "Max Memory", "Max Swap", "CPU time", [ "executed on host", "home directory" ], "Real time" ]
+    def findExecutionMachines(self, test):
         tmpFile = test.makeFileName("lsfreport", temporary=1, forComparison=0)
-        resourceDict = self.makeResourceDict(tmpFile, textList)
-        if len(resourceDict) < len(textList):
-            # Race condition with LSF writing the report... wait a bit and try again
+        executionMachines = []
+        activeRegion = 0
+        for line in open(tmpFile).xreadlines():
+            if line.find("executed on host") != -1 or (activeRegion and line.find("home directory") == -1):
+                executionMachines.append(self.parseMachine(line))
+                activeRegion = 1
+            else:
+                activeRegion = 0
+        if len(executionMachines) == 0:
+            # Assume race condition with LSF writing the report... wait a bit and try again
             time.sleep(2)
-            resourceDict = self.makeResourceDict(tmpFile, textList)
+            return self.findExecutionMachines(test)
+
         os.remove(tmpFile)
-        # Read the UNIX performance file, allowing us to discount system time.
-        tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
-        if os.path.isfile(tmpFile):
-            file = open(tmpFile)
-            for line in file.readlines():
-                if line.find("user") != -1:
-                    cpuTime = line.strip().split()[-1]
-                    try:
-                        resourceDict["CPU time"] = "CPU time   : " + self.parseUnixTime(cpuTime) + " sec."
-                    except:
-                        pass
-                if line.find("real") != -1:
-                    realTime = line.strip().split()[-1]
-                    resourceDict["Real time"] = "Real time  : " + self.parseUnixTime(realTime) + " sec." + os.linesep
-            os.remove(tmpFile)
-
-        # remove the command-file created before submitting the command
-        # Note not everybody creates one!
-        cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
-        if os.path.isfile(cmdFile):
-            os.remove(cmdFile)
-        # There was still an error (jobs killed in emergency), so don't write resource files
-        if len(resourceDict) < len(textList):
-            print "Not writing resource files for", test
-            return
-        if self.checkPerformance:
-            self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3][0]], resourceDict[textList[4]], test.makeFileName("performance", temporary=1))
-        if self.checkMemory:
-            self.writeMemoryFile(test, textList, resourceDict)
-    def parseUnixTime(self, timeVal):
-        if timeVal.find(":") == -1:
-            return string.rjust(timeVal, 9)
-
-        parts = timeVal.split(":")
-        floatVal = 60 * float(parts[0]) + float(parts[1])
-        return string.rjust(str(floatVal), 9)
-    def makeResourceDict(self, tmpFile, textList):
-        resourceDict = {}
-        file = open(tmpFile)
-        activeList = 0
-        for line in file.readlines():
-            for text in textList:
-                if type(text) == types.ListType:
-                    if line.find(text[0]) != -1:
-                        resourceDict[text[0]] = [ line ]
-                        activeList = 1
-                    elif activeList and line.find(text[1]) == -1:
-                        resourceDict[text[0]].append(line)
-                    else:
-                        activeList = 0
-                elif string.find(line, text) != -1:
-                    resourceDict[text] = line
-        return resourceDict
-    def writePerformanceFile(self, test, cpuLine, executionLines, realLine, fileName):
-        executionMachines = map(self.findExecutionMachine, executionLines)
-        file = open(fileName, "w")
-        line = string.strip(cpuLine) + " on " + string.join(executionMachines, ",") + os.linesep
-        file.write(line)
-        file.write(realLine)
-        for machine in executionMachines:
-            for jobLine in self.findRunningJobs(machine):
-                file.write(jobLine + os.linesep)
-        file.close()
-    def findExecutionMachine(self, line):
+        return executionMachines
+    def parseMachine(self, line):
         start = string.find(line, "<")
         end = string.find(line, ">", start)
         fullName = line[start + 1:end].replace("1*", "")
         return string.split(fullName, ".")[0]
+    def writeMachineInformation(self, file, executionMachines):
+        # Try and write some information about what's happening on the machine
+        for machine in executionMachines:
+            for jobLine in self.findRunningJobs(machine):
+                file.write(jobLine + os.linesep)
     def findRunningJobs(self, machine):
         # On a multi-processor machine performance can be affected by jobs on other processors,
         # as for example a process can hog the memory bus. Allow subclasses to define how to
@@ -430,10 +348,5 @@ class MakeResourceFiles(plugins.Action):
                 descriptor = "Suspected of SLOWING DOWN "
             jobs.append(descriptor + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
-    def writeMemoryFile(self, test, textList, resourceDict):
-        file = open(test.makeFileName("memory", temporary=1), "w")
-        file.write(string.lstrip(resourceDict[textList[0]]))
-        file.write(string.lstrip(resourceDict[textList[1]]))
-        file.close()
 
 

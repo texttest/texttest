@@ -33,6 +33,8 @@ helpOptions = """
 
 helpScripts = """
 default.CountTest          - produce a brief report on the number of tests in the chosen selection, by application
+
+default.ExtractMemory      - update the memory files from the standard log files
 """
 
 import os, re, shutil, plugins, respond, comparetest, string, predict
@@ -80,7 +82,7 @@ class Config(plugins.Configuration):
         if self.isReconnecting():
             return plugins.Action()
         else:
-            return MakeWriteDirectory();
+            return MakeWriteDirectory()
     def tryGetTestRunner(self):
         if self.isReconnecting():
             return plugins.Action()
@@ -100,6 +102,10 @@ class Config(plugins.Configuration):
     def getCatalogueCreator(self):
         return CreateCatalogue()
     def getTestCollator(self):
+        return plugins.CompositeAction([self.getPerformanceFileMaker(), self.getMemoryFileMaker()])
+    def getMemoryFileMaker(self):
+        return MakeMemoryFile()
+    def getPerformanceFileMaker(self):
         return plugins.Action()
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
@@ -227,15 +233,20 @@ class RunTest(plugins.Action):
         if test.state == test.UNRUNNABLE:
             return
         self.describe(test)
+        self.changeState(test)
+        self.runTest(test)
+    def changeState(self, test):
         test.changeState(test.RUNNING, "Running on local machine")
-        outfile = test.makeFileName("output", temporary=1)
-        stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfile)
+    def runTest(self, test):
+        outfileName = test.makeFileName("output", temporary=1)
+        errfileName = test.makeFileName("errors", temporary=1)
+        stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfileName)
         inputFileName = test.inputFile
         if os.path.isfile(inputFileName):
             inputData = open(inputFileName).read()
             stdin.write(inputData)
         stdin.close()
-        errfile = open(test.makeFileName("errors", temporary=1), "w")
+        errfile = open(errfileName, "w")
         errfile.write(stderr.read())
         errfile.close()
         #needed to be sure command is finished
@@ -348,3 +359,56 @@ class ReconnectTest(plugins.Action):
     def hasUserDependentWriteDir(self, app, userId):
         origWriteDir = app.getConfigValue("write_tmp_files")
         return origWriteDir.find(userId) != -1 or origWriteDir.find("~") != -1
+
+# Relies on the config entry string_before_memory, so looks in the log file for anything reported
+# by the program
+class MakeMemoryFile(plugins.Action):
+    def __init__(self):
+        self.memoryFinder = None
+        self.logFileStem = None
+    def setUpApplication(self, app):
+        app.setConfigDefault("log_file", "output")
+        app.setConfigDefault("string_before_memory", "")
+        self.memoryFinder = app.getConfigValue("string_before_memory")
+        self.logFileStem = app.getConfigValue("log_file")
+    def __call__(self, test, temp=1):
+        self.makeMemoryFile(test, temp=1)
+    def makeMemoryFile(self, test, temp):
+        if not self.memoryFinder:
+            return
+        
+        logFile = test.makeFileName(self.logFileStem, temporary=temp)
+        if not os.path.isfile(logFile):
+            return
+        
+        maxMem = self.findMaxMemory(logFile)
+        if maxMem:
+            # We save memory performance in steps of 0.5Mb
+            roundedMaxMem = float(int(2*maxMem))/2
+            fileName = test.makeFileName("memory", temporary=temp)
+            file = open(fileName, "w")
+            file.write(string.lstrip("Max Memory  :      " + str(roundedMaxMem) + " MB") + os.linesep)
+            file.close()
+    def findMaxMemory(self, logFile):
+        maxMemory = 0.0
+        for line in open(logFile).xreadlines():
+            memory = self.getMemory(line)
+            if memory and memory > maxMemory:
+                maxMemory = memory
+        return maxMemory
+    def getMemory(self, line):
+        pos = line.find(self.memoryFinder)
+        if pos == -1:
+            return None
+        endOfString = pos + len(self.memoryFinder)
+        return float(line[endOfString:].lstrip().split()[0])
+
+# A standalone action, we add description and generate the main file instead...
+class ExtractMemory(MakeMemoryFile):
+    def __repr__(self):
+        return "Extracting memory performance for"
+    def __call__(self, test):
+        self.describe(test)
+        self.makeMemoryFile(test, temp=0)
+    def setUpSuite(self, suite):
+        self.describe(suite)

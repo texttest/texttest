@@ -491,8 +491,14 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
             else:
                 return self.RETRY | self.WAIT
         self.ruleCompilations.append(jobName)
-        errContents = string.join(open(compTmp).readlines(),"")
+        errContents = self.findErrorMessage(compTmp)
         self.raiseFailureWithError(ruleset, errContents)
+    def findErrorMessage(self, compTmp):
+        errContents = string.join(open(compTmp).readlines(),"")
+        if errContents.find("Compiling... failed!") != -1:
+            return "Rave compiler failed in C-compilation phase." + os.linesep + "See " + compTmp + " for details."
+        else:
+            return errContents
     def raiseFailureWithError(self, ruleset, errContents):
         errMsg = "Failed to build ruleset " + ruleset + os.linesep + errContents 
         print errMsg

@@ -56,9 +56,11 @@ class MatadorConfig(optimization.OptimizationConfig):
     def getTestRunner(self):
         basicRunner = optimization.OptimizationConfig.getTestRunner(self)
         if os.environ.has_key("DIAGNOSTICS_IN"):
-            return plugins.CompositeAction([ CopyDiagnostics(), basicRunner ])
+            return plugins.CompositeAction([ CopyDiagnostics(), CopySecretParameter(), basicRunner ])
         else:
-            return basicRunner
+            return plugins.CompositeAction([ CopySecretParameter(), basicRunner ])
+    def getTestCollator(self):
+        return plugins.CompositeAction([ optimization.OptimizationConfig.getTestCollator(self), RemoveSecretParameter() ])
     def checkPerformance(self):
         return not self.optionMap.has_key("diag")
     def getLibraryFile(self, test):
@@ -106,7 +108,20 @@ class MatadorConfig(optimization.OptimizationConfig):
 class CopyDiagnostics(plugins.Action):
     def __call__(self, test):
         os.mkdir("Diagnostics")
-        shutil.copyfile(test.makeFileName("Diagnostics/diagnostics.etab"), "Diagnostics")
+        shutil.copyfile(os.path.join(test.abspath, "Diagnostics", "diagnostics.etab"), "Diagnostics")
+
+class CopySecretParameter(plugins.Action):
+    def __call__(self, test):
+        fileName = "secret_parameters.etab"
+        filePath = os.path.join(test.abspath, fileName)
+        if os.path.isfile(filePath):
+            shutil.copyfile(filePath, fileName)
+
+class RemoveSecretParameter(plugins.Action):
+    def __call__(self, test):
+        fileName = "secret_parameters.etab"
+        if os.path.isfile(fileName):
+            os.remove(fileName)
 
 class MatadorTestCaseInformation(optimization.TestCaseInformation):
     def isComplete(self):

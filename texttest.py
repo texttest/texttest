@@ -73,7 +73,7 @@ class Test:
                 varValue = os.path.expandvars(value)
                 os.environ[var] = self.app.makeAbsPath(varValue)
             else:
-                os.environ[var] = value
+                os.environ[var] = os.path.expandvars(value)
             # Ensure multiple expansion doesn't occur
             self.environment[var] = os.environ[var]
             debugLog.info("Setting " + var + " to " + os.environ[var])

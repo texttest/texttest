@@ -188,11 +188,11 @@ class SubmitApcTest(lsf.SubmitTest):
         verifyLogFileDir(carmen.getArchitecture(test.app))
         return lsf.SubmitTest.__call__(self, test)
         
-class RunApcTest(default.RunTest):
+class RunApcTest(unixConfig.RunTest):
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
         verifyLogFileDir(carmen.getArchitecture(test.app))
-        return default.RunTest.__call__(self, test)
+        return unixConfig.RunTest.__call__(self, test)
 
 class ViewApcLog(guiplugins.InteractiveAction):
     def __repr__(self):
@@ -252,6 +252,7 @@ class RunApcTestInDebugger(default.RunTest):
         # Create a script for gdb to run.
         gdbArgs = test.makeFileName("gdb_args", temporary=1)
         gdbArgsFile = open(gdbArgs, "w")
+        gdbArgsFile.write("set pagination off" + os.linesep)
         gdbArgsFile.write("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep)
         gdbArgsFile.write("run" + os.linesep)
         gdbArgsFile.write("if $_exitcode" + os.linesep)
@@ -277,7 +278,7 @@ class RunApcTestInDebugger(default.RunTest):
             executeCommand = "gdb " + binName + " -silent -x " + gdbArgs
         # Source the CONFIG file to get the environment correct and run gdb with the script.
         configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
-        os.system("source " + configFile + ";" + executeCommand)
+        os.system(". " + configFile + "; " + executeCommand)
         # Remove the temp files, texttest will compare them if we dont remove them.
         os.remove(gdbArgs)
         if not self.keepTmps:

@@ -84,7 +84,7 @@ class Config(plugins.Configuration):
     def printHelpScripts(self):
         print helpScripts
     def printHelpDescription(self):
-        print helpDescription, comparetest.helpDescription, respond.helpDescription
+        print helpDescription, predict.helpDescription, comparetest.helpDescription, respond.helpDescription
     def printHelpOptions(self, builtInOptions):
         print helpOptions, builtInOptions
     def printHelpText(self, builtInOptions):

@@ -52,7 +52,7 @@ batchInfo = """
              Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
              at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
-import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond
+import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, predict
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -147,7 +147,7 @@ class CarmenConfig(lsf.LSFConfig):
         print "(Carmen-specific options...)"
         print helpOptions
     def printHelpDescription(self):
-        print helpDescription, lsf.lsfGeneral, performance.helpDescription, respond.helpDescription 
+        print helpDescription, lsf.lsfGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription 
     
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")

@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, time, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types
+import os, time, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types, predict
 
 # Text only relevant to using the LSF configuration directly
 helpDescription = """
@@ -117,7 +117,7 @@ class LSFConfig(unixConfig.UNIXConfig):
     def checkPerformance(self):
         return 1
     def printHelpDescription(self):
-        print helpDescription, lsfGeneral, performance.helpDescription, respond.helpDescription 
+        print helpDescription, lsfGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription 
     def printHelpOptions(self, builtInOptions):
         print helpOptions + batchInfo
         default.Config.printHelpOptions(self, builtInOptions)

@@ -1,8 +1,10 @@
 #!/usr/local/bin/python
 
 helpDescription = """
-Predictive specification, in general, works by reading the config file list "internal_error_text"
-and searching the resulting log file for it
+It is possible to specify predictively how an application behaves. In general this works by reading
+the config file list "internal_error_text" and searching the resulting log file for it. If this text
+is found, a warning is generated. predict.CheckPredictions can also be run as a standalone action to
+check the standard test results for internal errors.
 """
 
 import os, filecmp, string, plugins

@@ -360,7 +360,15 @@ class SubmitTest(unixConfig.RunTest):
         global emergencyFinish
         if emergencyFinish:
             raise plugins.TextTestError, "Preprocessing not complete by LSF termination time"
-        testCommand = self.getExecuteCommand(test)
+        try:
+            # Involves writing files, can get interrupted system call
+            testCommand = self.getExecuteCommand(test)
+        except IOError:
+            time.sleep(1)
+            if emergencyFinish:
+                raise plugins.TextTestError, "Preprocessing not complete by LSF termination time"
+            else:
+                raise plugins.TextTestError, "Writing command file interrupted by external signal"
         lsfOptions = ""
         if os.environ.has_key("LSF_PROCESSES"):
             lsfOptions += " -n " + os.environ["LSF_PROCESSES"]

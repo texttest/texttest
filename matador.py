@@ -78,8 +78,11 @@ class MatadorConfig(optimization.OptimizationConfig):
         switches = optimization.OptimizationConfig.getSwitches(self)
         switches["diag"] = "Use Matador Codebase diagnostics"
         return switches
-    def checkPerformance(self):
-        return not self.optionMap.has_key("diag")
+    def getPerformanceFileMaker(self):
+        if self.optionMap.has_key("diag"):
+            return plugins.Action()
+        else:
+            return optionMap.OptimizationConfig.getPerformanceFileMaker(self)
     def getLibraryFile(self, test):
         return os.path.join("data", "crc", "MATADOR", carmen.getArchitecture(test.app), "matador.o")
     def _getSubPlanDirName(self, test):

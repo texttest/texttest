@@ -330,8 +330,9 @@ class CollateFiles(plugins.Action):
             self.diag.info("Looking for pattern " + sourcePattern + " in " + writeDir)
             pattern = os.path.join(writeDir, sourcePattern)
             paths = glob.glob(pattern)
-            if len(paths):
-                return paths[0]
+            for path in paths:
+                if os.path.isfile(path):
+                    return path
     def transformToText(self, path, test):
         # By default assume it is text
         pass

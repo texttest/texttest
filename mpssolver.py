@@ -3,7 +3,7 @@ The MpsSolver configuration is a simple extension to the UNIX configuration. The
 purpose of it is to be able to create links to the MPS files, so that two tests using
 the same MPS files will not collide""" 
 
-import unixConfig, carmen, os, shutil, filecmp, string, plugins, comparetest, performance
+import unixConfig, carmen, os
 
 def getConfig(optionMap):
     return MpsSolverConfig(optionMap)

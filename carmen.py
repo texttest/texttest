@@ -73,18 +73,21 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
             return "medium"
 
 class SgeSubmissionRules(CarmenSubmissionRules):
+    def findDefaultQueue(self):
+        category = self.getPerformanceCategory()
+        if category == "short":
+            return "short"
+        else:
+            return ""
     def findResourceList(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
         arch = getArchitecture(self.test.app)
         resources.append("carmarch=\"*" + arch + "*\"")
-        category = self.getPerformanceCategory()
-        if category == "short":
-            resources.append("short")
         return resources
     def getSubmitSuffix(self, name):
         resourceList = self.findResourceList()
-        return name + ", requesting " + string.join(resourceList, ",")
+        return CarmenSubmissionRules.getSubmitSuffix(self, name) + ", requesting " + string.join(resourceList, ",")
 
 class LsfSubmissionRules(CarmenSubmissionRules):
     def findDefaultQueue(self):

@@ -679,7 +679,7 @@ class Application:
     def getVersionFileExtensions(self, baseVersion = 1, forSave = 0):
         versionsToUse = self.versions
         if baseVersion:
-            versionsToUse = self.getConfigValue("base_version") + self.versions
+            versionsToUse = self.versions + self.getConfigValue("base_version")
         if forSave:
             versionsToUse = self.filterUnsaveable(versionsToUse)
             

@@ -86,8 +86,9 @@ class Test:
         root = self.getDirectory(temporary)
         if not forComparison:
             return os.path.join(root, stem)
-        stemWithApp = stem + "." + self.app.name
-        nonVersionName = os.path.join(root, stemWithApp)
+        if stem.find(".") == -1: 
+            stem += "." + self.app.name
+        nonVersionName = os.path.join(root, stem)
         versions = self.app.getVersionFileExtensions()
         debugLog.info("Versions available : " + repr(versions))
         if refVersion != None:
@@ -96,7 +97,7 @@ class Test:
             return nonVersionName
         
         # Prioritise finding earlier versions
-        testNonVersion = os.path.join(self.abspath, stemWithApp)
+        testNonVersion = os.path.join(self.abspath, stem)
         for version in versions:
             versionName = testNonVersion + "." + version
             if os.path.isfile(versionName):

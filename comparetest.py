@@ -126,7 +126,8 @@ class TestComparison:
                 self.makeComparisonsInDir(test, fullPath, makeNew)
             elif self.shouldCompare(file, dir, test.app):
                 self.diag.info("Decided we should compare " + file)
-                stdFile = os.path.normpath(self.findTestDirectory(fullPath, test))
+                stdFile = self.findTestDirectory(fullPath, test)
+                self.diag.info("Using standard file " + stdFile)
                 comparison = self.makeComparison(test, stdFile, fullPath, makeNew)
                 self.addComparison(fullPath, comparison)
             else:
@@ -136,13 +137,19 @@ class TestComparison:
     def findTestDirectory(self, fullPath, test):
         result = os.path.normpath(fullPath.replace(test.app.writeDirectory, test.app.abspath))
         if result != fullPath:
-            return result
+            return self.getStandardFile(result, test)
         # writeDir contains so
         savedir = os.getcwd()
         os.chdir(test.app.writeDirectory)
         result = os.path.normpath(fullPath.replace(os.getcwd(), test.app.abspath))
         os.chdir(savedir)
-        return result
+        return self.getStandardFile(result, test)
+    def getStandardFile(self, fullPath, test):
+        realPath = os.path.normpath(fullPath)
+        local = realPath.replace(test.abspath + os.sep, "")
+        if local.find("." + test.app.name) != -1:
+            return realPath
+        return os.path.join(test.abspath, test.makeFileName(local))
     def makeComparison(self, test, standardFile, tmpFile, makeNew = 0):
         comparison = self.createFileComparison(test, standardFile, tmpFile, makeNew)
         if comparison.newResult() or comparison.hasDifferences():

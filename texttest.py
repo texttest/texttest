@@ -78,10 +78,17 @@ class Test:
         self.setUpEnvironment()
         self.callAction(action)
         self.performOnSubTests(action)
+        self.tearDownEnvironment()
     def setUpEnvironment(self):
         for var, value in self.environment.items():
             os.environ[var] = value
             debugLog.info("Setting " + var + " to " + os.environ[var])
+    def tearDownEnvironment(self):
+        # Note this has no effect on the real environment, but can be useful for internal environment
+        # variables. It would be really nice if Python had a proper "unsetenv" function...
+        for var in self.environment.keys():
+            if os.environ.has_key(var):
+                del os.environ[var]
     def getIndent(self):
         dirCount = string.count(self.getRelPath(), os.sep)
         retstring = ""

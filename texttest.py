@@ -112,6 +112,8 @@ class Test:
                 debugLog.debug("REJECTED")
                 return 0
         return 1
+    def size(self):
+        return 1
         
 class TestCase(Test):
     def __init__(self, name, abspath, app):
@@ -213,6 +215,11 @@ class TestSuite(Test):
             else:
                 debugLog.debug("Refilter loose " + test.name + " for " + self.name)
         self.testcases = testCaseList
+    def size(self):
+        size = 0
+        for testcase in self.testcases:
+            size += testcase.size()
+        return size
 # private:
     def getTestCases(self, filters):
         testCaseList = []
@@ -272,10 +279,9 @@ class Application:
             return "." + self.versions[0]
         return "." + string.join(self.versions, ".")
     def description(self):
-        description = "Using Application " + self.fullName
+        description = "Application " + self.fullName
         if len(self.versions):
             description += ", version " + string.join(self.versions, ".")
-        description += ", checkout " + self.checkout
         return description
     def getVersionFileExtensions(self, baseVersion = 1):
         if len(self.versions) == 0:
@@ -465,6 +471,8 @@ class OptionFinder:
         appList = self._findApps(dirName, 1)
         appList.sort()
         debugLog.info("Found applications : " + repr(appList))
+        if len(appList) == 0:
+            print "Could not find any matching applications (files of the form config.<app>) under", dirName
         return appList
     def _findApps(self, dirName, recursive):
         appList = []
@@ -644,7 +652,11 @@ class ApplicationRunner:
         else:
             tmpSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
             tmpSuite.reFilter(self.filterList)
-            self.testSuite = tmpSuite
+            if tmpSuite.size() == 0:
+                print "No tests found for", app.description()
+                self.valid = 0
+            else:
+                self.testSuite = tmpSuite
     def actionCount(self):
         return len(self.actionSequence)
     def performAction(self, actionNum):
@@ -724,7 +736,7 @@ class TextTest:
             try:
                 appRunner = ApplicationRunner(app, self.inputOptions)
                 if appRunner.valid:
-                    print app.description()
+                    print "Using", app.description() + ", checkout", app.checkout
                     applicationRunners.append(appRunner)
             except (SystemExit, KeyboardInterrupt):
                 printException()

@@ -281,15 +281,11 @@ class FileFilter(TextFilter):
 
 # Standard error redirect is difficult on windows, don't try...
 class RunTest(plugins.Action):
-    def __init__(self):
-        self.brokenApps = {}
     def __repr__(self):
         return "Running"
     def __call__(self, test):
         if test.state == test.UNRUNNABLE:
             return
-        if test.app.name in self.brokenApps.keys():
-            raise plugins.TextTestError, self.brokenApps[test.app.name]
         retValue = self.runTest(test)
         # Change state after we've started running!
         self.changeState(test)
@@ -325,9 +321,9 @@ class RunTest(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
-        for file in app.getVitalFiles():
-            if not os.path.isfile(file):
-                self.brokenApps[app.name] = file + " has not been built"
+        binary = app.getBinary()
+        if not os.path.isfile(binary):
+            raise plugins.TextTestError, binary + " has not been built."
 
 class CreateCatalogue(plugins.Action):
     def __call__(self, test):

@@ -83,18 +83,6 @@ class MatadorConfig(optimization.OptimizationConfig):
             return None
         else:
             return optimization.OptimizationConfig.getPerformanceFileMaker(self)
-    def getLibraryFile(self, app):
-        raveName = app.getConfigValue("rave_name")
-        if raveName == "matador":
-            # Only matador supports dynamic linkage right now
-            return os.path.join("data", "crc", string.upper(raveName), carmen.getArchitecture(app), raveName + ".o")
-        else:
-            return None
-    def getVitalFiles(self, app):
-        return optimization.OptimizationConfig.getVitalFiles(self, app) + \
-               [ os.path.join(os.environ["CARMSYS"], self.getBinaryFile(app)) ]
-    def getBinaryFile(self, app):
-        return os.path.join("bin", carmen.getArchitecture(app), app.getConfigValue("rave_name"))
     def _getLocalPlanPath(self, test):
         path = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN")
         if os.path.isdir(path) or not os.environ.has_key("CARM_LOCALPLAN"):

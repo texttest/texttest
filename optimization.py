@@ -132,13 +132,6 @@ class OptimizationConfig(carmen.CarmenConfig):
         return carmen.CarmenConfig.getActionSequence(self, useGui)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
-    def getVitalFiles(self, app):
-        libFile = self.getLibraryFile(app)
-        baseFiles = carmen.CarmenConfig.getVitalFiles(self, app)
-        if libFile:
-            return baseFiles + [ os.path.join(os.environ["CARMSYS"], libFile) ]
-        else:
-            return baseFiles
     def defaultBuildRules(self):
         # Assume we always want to build at least some rules, by default...
         return 1

@@ -77,6 +77,9 @@ class Test:
         self.observers = []
         self.environment = MultiEntryDictionary()
         self.environment.readValuesFromFile(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
+        if parent == None:
+            for var, value in app.getEnvironment():
+                self.environment[var] = value
         # Single pass to expand all variables (don't want multiple expansion)
         for var, value in self.environment.items():
             expValue = os.path.expandvars(value)
@@ -514,11 +517,11 @@ class ConfigurationWrapper:
             return self.target.printHelpText(builtInOptions)
         except:
             self.raiseException(req = "help text")
-    def getVitalFiles(self, app):
+    def getApplicationEnvironment(self, app):
         try:
-            return self.target.getVitalFiles(app)
+            return self.target.getApplicationEnvironment(app)
         except:
-            self.raiseException(req = "vital files")
+            self.raiseException(req = "application environment")
     def extraReadFiles(self, test):
         try:
             return self.target.extraReadFiles(test)
@@ -830,8 +833,8 @@ class Application:
     def getBinary(self):
         # Assume binaries can relate to checkouts
         return self.makeAbsPath(self.getConfigValue("binary"), checkExists=0)
-    def getVitalFiles(self):
-        return self.configObject.getVitalFiles(self)
+    def getEnvironment(self):
+        return self.configObject.getApplicationEnvironment(self)
             
 class OptionFinder:
     def __init__(self):

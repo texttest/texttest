@@ -15,8 +15,8 @@ class Configuration:
         return []
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options
-    def getVitalFiles(self, app):
-        return [ app.getBinary() ]
+    def getApplicationEnvironment(self, app):
+        return [ ("TEXTTEST_CHECKOUT", app.checkout) ]
     def hasPerformanceComparison(self, app):
         return 0
     def keepTmpFiles(self):

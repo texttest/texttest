@@ -81,11 +81,19 @@ def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
 architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris" ]
+majorReleases = [ "8", "9", "10", "11" ]
+
 def getArchitecture(app):
     for version in app.versions:
         if version in architectures:
             return version
     return app.getConfigValue("default_architecture")
+
+def getMajorReleaseId(app):
+    for version in app.versions:
+        if version in majorReleases:
+            return "carmen_" + version
+    return "master"
 
 class UserFilter(default.TextFilter):
     def acceptsTestSuite(self, suite):
@@ -165,7 +173,7 @@ class CarmenConfig(lsf.LSFConfig):
     def getRuleBuildFilter(self):
         if self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp")) or self.isRaveRun():
             return None
-        return UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
+        return UpdatedLocalRulesetFilter(self.getRuleSetName)
     def getRuleBuilder(self):
         if self.buildRules():
             realBuilder = self.getRealRuleBuilder()
@@ -286,8 +294,12 @@ class CarmenConfig(lsf.LSFConfig):
         lsf.LSFConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux")
         app.setConfigDefault("rave_name", None)
+        app.setConfigDefault("rave_static_library", "")
         # dictionary of lists
         app.setConfigDefault("build_targets", { "" : [] })
+    def getApplicationEnvironment(self, app):
+        return lsf.LSFConfig.getApplicationEnvironment(self, app) + \
+               [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]
 
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
@@ -522,25 +534,22 @@ class RuleSet:
             os.rename(debugVersion, self.targetFile)
         
 class UpdatedLocalRulesetFilter(plugins.Filter):
-    def __init__(self, getRuleSetName, getLibraryFile):
+    def __init__(self, getRuleSetName):
         self.getRuleSetName = getRuleSetName
-        self.getLibraryFile = getLibraryFile
         self.diag = plugins.getDiagnostics("UpdatedLocalRulesetFilter")
     def acceptsTestCase(self, test):
         ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test), getArchitecture(test.app))
         self.diag.info("Checking " + self.getRuleSetName(test))
         self.diag.info("Target file is " + ruleset.targetFile)
-        libFile = self.getLibraryFile(test.app)
-        if libFile:
-            self.diag.info("Library files is " + libFile)
         if not ruleset.isValid():
             self.diag.info("Invalid")
             return 0
         if not ruleset.isCompiled():
             self.diag.info("Not compiled")
             return 1
+        libFile = test.getConfigValue("rave_static_library")
         if libFile:
-            return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], libFile))
+            return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(libFile)
         else:
             return 1
     def acceptsTestSuite(self, suite):

@@ -85,10 +85,8 @@ class ApcConfig(optimization.OptimizationConfig):
         return optimization.OptimizationConfig.getActionSequence(self, useGui)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
-    def getLibraryFile(self, app):
-        return os.path.join("data", "apc", carmen.getArchitecture(app), "libapc.a")
     def getRuleBuildObject(self, testRunner, jobNameCreator):
-        return ApcCompileRules(self.getRuleSetName, jobNameCreator, self.getLibraryFile, self.getRuleBuildFilter(), testRunner, \
+        return ApcCompileRules(self.getRuleSetName, jobNameCreator, self.getRuleBuildFilter(), testRunner, \
                                self.raveMode(), self.optionValue("rulecomp"))
     def getSpecificTestRunner(self):
         subActions = [ self._getApcTestRunner() ]
@@ -304,14 +302,13 @@ class RunApcTestInDebugger(default.RunTest):
         self.describe(suite)
     
 class ApcCompileRules(carmen.CompileRules):
-    def __init__(self, getRuleSetName, jobNameCreator, getLibraryFile, sFilter = None, testRunner = None, \
+    def __init__(self, getRuleSetName, jobNameCreator, sFilter = None, testRunner = None, \
                  modeString = "-optimize", ruleCompFlags = None):
         carmen.CompileRules.__init__(self, getRuleSetName, jobNameCreator, modeString, sFilter, testRunner)
-        self.getLibraryFile = getLibraryFile
         self.ruleCompFlags = ruleCompFlags
         self.diag = plugins.getDiagnostics("ApcCompileRules")
     def compileRulesForTest(self, test):
-        self.apcLib = os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test.app))
+        self.apcLib = test.getConfigValue("rave_static_library")
         # If there is a filter we assume we aren't compelled to build rulesets properly...        
         if self.filter and carmen.getArchitecture(test.app) == "i386_linux" and self.ruleCompFlags == "apc":
             self.linuxRuleSetBuild(test)

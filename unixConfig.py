@@ -80,7 +80,6 @@ class UNIXConfig(default.Config):
 
 class RunTest(default.RunTest):
     def __init__(self):
-        default.RunTest.__init__(self)
         self.process = None
         self.collectStdErr = 1
         self.testDisplay = None

@@ -236,3 +236,27 @@ class ReconnectTest(plugins.Action):
         self.describe(test)
     def setUpSuite(self, suite):
         self.describe(suite)
+
+class CleanTmpFiles(plugins.Action):
+    def __init__(self):
+        self.numFiles = 0
+        self.regExps = []
+        self.regExps.append(re.compile("[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$"))
+        self.regExps.append(re.compile("[0-9][0-9]:[0-9][0-9]:[0-9][0-9]cmp$"))
+    def __del__(self):
+        if self.numFiles > 0:
+            print "Removed " + str(self.numFiles) + " file(s)"
+    def __repr__(self):
+        return "Cleaning tmp files"
+    def __call__(self, test):
+        curNumFiles = self.numFiles
+        for file in os.listdir(test.abspath):
+            for regExp in self.regExps:
+                if regExp.search(file):
+                    os.remove(file)
+                    self.numFiles += 1
+                    break
+        if self.numFiles > curNumFiles:
+            self.describe(test, " " + str(self.numFiles - curNumFiles) + " file(s)")
+    def setUpSuite(self, suite):
+        self.describe(suite)

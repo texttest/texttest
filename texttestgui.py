@@ -358,15 +358,15 @@ class TextTestGUI:
     def viewTestAtIter(self, iter):
         test = self.model.get_value(iter, 2)
         guilog.info("Viewing test " + repr(test))
-        self.recreateTestView(test)
-    def recreateTestView(self, test):
+        self.recreateTestView(test, checkUpToDate=1)
+    def recreateTestView(self, test, checkUpToDate=0):
         if self.rightWindowGUI:
             self.contents.remove(self.rightWindowGUI.getWindow())
             self.rightWindowGUI = None
         if test.classId() == "test-app":
             self.rightWindowGUI = ApplicationGUI(test, self.selection, self.itermap)
         else:
-            if test.state.isComplete() and test.state.needsRecalculation():
+            if checkUpToDate and test.state.isComplete() and test.state.needsRecalculation():
                 guilog.info("Recalculating result info for test: result file changed since created")
                 cmpAction = comparetest.MakeComparisons()
                 cmpAction(test)

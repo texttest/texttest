@@ -537,20 +537,29 @@ class BuildCode(plugins.Action):
         arch = getArchitecture(app)
         if not self.builtDirs.has_key(arch):
             self.builtDirs[arch] = []
-        for relPath in targetDir[self.target]:
+        for optValue in targetDir[self.target]:
+            relPath, makeTargets = self.getPathAndTargets(optValue)
             absPath = app.makeAbsPath(relPath)
             if absPath in self.builtDirs[arch]:
                 print "Already built on", arch, "under", absPath, "- skipping build"
                 return
             self.builtDirs[arch].append(absPath)
             if os.path.isdir(absPath):
-                self.buildLocal(absPath, app)
+                self.buildLocal(absPath, app, makeTargets)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
         if arch == "i386_linux" and self.remote:
             self.buildRemote("sparc", app) 
             self.buildRemote("parisc_2_0", app)
             self.buildRemote("powerpc", app)
+    def getPathAndTargets(self, optValue):
+        relPath = optValue
+        makeTargets = ""
+        optParts = string.split(optValue)
+        if len(optParts) > 1:
+            relPath = optParts[0]
+            makeTargets = string.join(optParts[1:])
+        return (relPath, makeTargets)
     def getMachine(self, app, arch):
         version9 = "9" in app.versions
         if arch == "i386_linux":
@@ -567,12 +576,12 @@ class BuildCode(plugins.Action):
                 return "morlaix"
             else:
                 return "tororo"
-    def buildLocal(self, absPath, app):
+    def buildLocal(self, absPath, app, makeTargets):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."
         arch = getArchitecture(app)
         buildFile = "build.default." + arch
-        commandLine = "cd " + absPath + "; gmake >& " + buildFile
+        commandLine = "cd " + absPath + "; gmake " + makeTargets + " >& " + buildFile
         machine = self.getMachine(app, arch)
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
@@ -601,10 +610,11 @@ class BuildCode(plugins.Action):
         targetDir = app.getConfigValue("build_targets")
         if not targetDir.has_key("codebase"):
             return 1
-        for relPath in targetDir["codebase"]:
+        for optValue in targetDir["codebase"]:
+            relPath, makeTargets = self.getPathAndTargets(optValue)
             absPath = app.makeAbsPath(relPath)
             if os.path.isdir(absPath):    
-                commandLine = "cd " + absPath + "; gmake >& build." + arch
+                commandLine = "cd " + absPath + "; gmake " + makeTargets + " >& build." + arch
                 os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         return 0            
     def checkBuildFile(self, buildFile):
@@ -631,7 +641,8 @@ class CheckBuild(plugins.Action):
             targetDir = app.getConfigValue("build_targets")
             if not targetDir.has_key("codebase"):
                 return
-            for relPath in targetDir["codebase"]:
+            for optValue in targetDir["codebase"]:
+                relPath, makeTargets = self.builder.getPathAndTargets(optValue)
                 absPath = app.makeAbsPath(relPath)
                 self.checkBuild(arch, absPath)
     def checkBuild(self, arch, absPath):

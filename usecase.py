@@ -165,7 +165,12 @@ class ReplayScript:
         return 1
     def write(self, line):
         if self.logger:
-            self.logger.info(line)
+            try:
+                self.logger.info(line)
+            except OSError:
+                # Can get interrupted system call here as it tries to close the file
+                # This isn't worth crashing over!
+                pass
         else:
             print line
     def processCommand(self, scriptCommand):

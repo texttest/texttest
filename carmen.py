@@ -475,7 +475,7 @@ class BuildCode(plugins.Action):
             if version9:
                 return "xanxere"
             else:
-                return "cat"
+                return "reedsville"
         if arch == "sparc":
             return "turin"
         if arch == "parisc_2_0":

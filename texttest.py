@@ -99,7 +99,7 @@ class Test:
         root = self.getDirectory(temporary, forComparison)
         if not forComparison:
             return os.path.join(root, stem)
-        if stem.find(".") == -1: 
+        if os.path.split(stem)[-1].find(".") == -1:
             stem += "." + self.app.name
         nonVersionName = os.path.join(root, stem)
         versions = self.app.getVersionFileExtensions()

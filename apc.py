@@ -175,7 +175,7 @@ def verifyAirportFile(arch):
     raise plugins.TextTestError, "Failed to find AirportFile"
 
 def verifyLogFileDir(arch):
-    if arch == "sparc":
+    if arch == "sparc" or arch == "sparc_64":
         carmTmp = os.environ["CARMTMP"]
         if os.path.isdir(carmTmp):
             logFileDir = carmTmp + "/logfiles"
@@ -232,6 +232,7 @@ guiplugins.interactiveActionHandler.testClasses.append(ViewApcLog)
 class RunApcTestInDebugger(default.RunTest):
     def __init__(self, options, keepTmpFiles):
         self.inXEmacs = None
+        self.runPlain = None
         self.showLogFile = 1
         self.keepTmps = keepTmpFiles;
         opts = options.split(" ")
@@ -242,6 +243,8 @@ class RunApcTestInDebugger(default.RunTest):
                 self.inXEmacs = 1
             elif opt == "nolog":
                 self.showLogFile = None
+            elif opt == "plain":
+                self.runPlain = 1
             else:
                 print "Ignoring unknown option " + opt
     def __repr__(self):
@@ -282,6 +285,8 @@ class RunApcTestInDebugger(default.RunTest):
         if self.inXEmacs:
             gdbStart, gdbWithArgs = self.runInXEmacs(test, binName, gdbArgs)
             executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
+        elif self.runPlain:
+            executeCommand = binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
         else:
             executeCommand = "gdb " + binName + " -silent -x " + gdbArgs
         # Source the CONFIG file to get the environment correct and run gdb with the script.
@@ -968,3 +973,40 @@ class UpdatePerformance(plugins.Action):
         pass
     def setUpApplication(self, app):
         self.statusFileName = app.getConfigValue("log_file")
+
+#
+# Create environment.apc.$ARCH files.
+#
+
+class CopyEnvironment(plugins.Action):
+    def __repr__(self):
+        return "Making environment.apc.ARCH for"
+    def setUpSuite(self, suite):
+        if carmen.isUserSuite(suite):
+            self.describe(suite)
+            oldFile = os.path.join(suite.abspath, "environment.apc")
+            if not os.path.isfile(oldFile):
+                return
+
+            carmTmp = self.getCarmtmp(oldFile)
+            archs = self.getArchs()
+            for arch in archs:
+                targetFile = oldFile + "." + arch
+                if os.path.isfile(targetFile):
+                    continue
+                print "Want to create " + targetFile
+                print "with CARMTMP " + carmTmp + "." + arch
+                self.makeCarmtmpFile(targetFile, carmTmp + "." + arch)
+    def getArchs(self):
+        archs = [ "sparc", "sparc_64"]
+        return archs
+    def makeCarmtmpFile(self, targetFile, carmtmp):
+        file = open(targetFile, "w")
+        print carmtmp
+        file.write("CARMTMP:" + carmtmp + os.linesep)
+        file.close()
+    def getCarmtmp(self, file):
+        for line in open(file).xreadlines():
+            if line.startswith("CARMTMP"):
+                name, carmtmp = line.strip().split(":")
+                return carmtmp

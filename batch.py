@@ -17,12 +17,16 @@ helpOptions = """
              many emails being sent by batch mode if many independent things are tested.
 """
 
-import os, performance, plugins, respond, sys, string, time
+import os, performance, plugins, respond, sys, string, time, types
 
 def getBatchConfigValue(app, entryName, sessionName):
     dict = app.getConfigValue(entryName)
     if dict.has_key(sessionName):
-        return dict[sessionName]
+        retVal = dict[sessionName]
+        if type(retVal) == types.ListType:
+            return retVal + dict["default"]
+        else:
+            return retVal
     elif dict.has_key("default"):
         return dict["default"]
     return None

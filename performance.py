@@ -43,6 +43,13 @@ performance.PerformanceStatistics
                                version1[,version2]
                              - l
                                Print only tests with difference larger than limit
+performance.MemoryStatistics
+                           - Displays 
+                             Currently supports these options:
+                             - v
+                               version1[,version2]
+                             - l
+                               Print only tests with difference larger than limit
 """
 
 # This module won't work without an external module creating a file called performance.app
@@ -267,3 +274,76 @@ class PerformanceStatistics(plugins.Action):
         intMin = int(minFloat)
         secPart = minFloat - intMin
         return str(intMin) + "m" + str(int(secPart * 60)) + "s"
+
+class MemoryStatistics(plugins.Action):
+    def __init__(self, args = []):
+        self.interpretOptions(args)
+        self.limit = 0
+    def interpretOptions(self, args):
+        for ar in args:
+            arr = ar.split("=")
+            if arr[0]=="v":
+                versions = arr[1].split(",")
+                self.referenceVersion = versions[0]
+                self.currentVersion = None
+                if len(versions) > 1:
+                    self.currentVersion = versions[1]
+            elif arr[0]=="l":
+                try:
+                    self.limit = int(arr[1])
+                except:
+                    self.limit = 0
+            else:
+                print "Unknown option " + arr[0]
+    def setUpSuite(self, suite):
+        self.suiteName = suite.name + os.linesep + "   "
+
+    def getOutputMemory(self, fileName):
+        if not os.path.isfile(fileName):
+            return float(-1)
+        try:
+#            memPrefix = test.app.getConfigValue("string_before_memory")
+            memPrefix = "Maximum memory used"
+            if memPrefix == "":
+                return float(-1)
+            line = os.popen("grep '" + memPrefix + "' " + fileName).readline()
+            start = line.find(":")
+            end = line.find("k", start)
+            fullSize = line[start + 1:end - 1]
+            return int((float(string.strip(fullSize)) / 1024.0) * 10.0) / 10.0
+        except:
+            return float(-1)
+    def getTestMemory(self, test, version = None):
+        logFileStem = test.app.getConfigValue("log_file")
+        stemWithApp = logFileStem + "." + test.app.name
+        if version != None and version != "":
+            stemWithApp = stemWithApp + "." + version
+        fileName = os.path.join(test.abspath, stemWithApp)
+        outputMemory = self.getOutputMemory(fileName)
+        if outputMemory > 0.0:
+            return outputMemory
+        return -1.0
+    def __call__(self, test):
+        refMem = self.getTestMemory(test, self.referenceVersion)
+        currMem = self.getTestMemory(test, self.currentVersion)
+        refOutput = 1
+        currOutput = 1
+        if refMem < 0.0:
+            refOutput = 0
+        if currMem < 0.0:
+            currOutput = 0
+        pDiff = percentDiff(currMem, refMem)
+        if self.limit == 0 or pDiff > self.limit:
+            title = self.suiteName + test.name.ljust(30)
+            self.suiteName = "   "
+            if refOutput == 0 and currOutput == 0:
+                print title
+                return
+            pDiff = str(pDiff) + "%"
+            if refOutput == 0:
+                refMem = "(" + str(refMem) + ")"
+                pDiff = "(" + pDiff + ")"
+            if currOutput == 0:
+                currMem = "(" + str(currMem) + ")"
+                pDiff = "(" + pDiff + ")"
+            print title + "\t", refMem, currMem, "\t" + pDiff

@@ -1,10 +1,7 @@
 helpDescription = """
 The MpsSolver configuration is based on the Carmen configuration. """ 
 
-helpOptions = """-memstat version,version:limit    Give memory statistics
-    Print only tests with difference larger than limit
-    
--feasstat version,version          Give infeasibility statistics
+helpOptions = """-feasstat version,version          Give infeasibility statistics
 
 """
 
@@ -88,90 +85,9 @@ class MpsSolverConfig(carmen.CarmenConfig):
         print helpScripts
 
 
-# Returns -1 as error value, if the file is the wrong format
-def getMaxMemory(fileName):
-    try:
-        line = open(fileName).readline()
-        start = line.find(":")
-        end = line.find("M", start)
-        fullName = line[start + 1:end - 1]
-        return float(string.strip(fullName))
-    except:
-        return float(-1)
-
-def getOutputMemory(fileName):
-    if not os.path.isfile(fileName):
-        return float(-1)
-    try:
-        line = os.popen("grep 'Maximum memory used' " + fileName).readline()
-        start = line.find(":")
-        end = line.find("k", start)
-        fullSize = line[start + 1:end - 1]
-        return int((float(string.strip(fullSize)) / 1024.0) * 10.0) / 10.0
-    except:
-        return float(-1)
-
-def percentDiff(perf1, perf2):
-    if perf2 != 0:
-        return int((perf1 / perf2) * 100.0)
-    else:
-        return 0
-
 def pad(str, padSize):
     return str.ljust(padSize)
         
-def getTestMemory(test, version = None):
-    stemWithApp = "output" + "." + test.app.name
-    if version != None and version != "":
-        stemWithApp = stemWithApp + "." + version
-    fileName = os.path.join(test.abspath, stemWithApp)
-    outputMemory = getOutputMemory(fileName)
-    if outputMemory > 0.0:
-        return outputMemory
-    return -1.0
-            
-class MemoryStatisticsBuilder(plugins.Action):
-    def __init__(self, argString):
-        args = argString.split(":")
-        versionString = args[0]
-        try:
-            self.limit = int(args[1])
-        except:
-            self.limit = 0
-        versions = versionString.split(",")
-        self.referenceVersion = versions[0]
-        self.currentVersion = None
-        if len(versions) > 1:
-            self.currentVersion = versions[1]
-    def setUpSuite(self, suite):
-        self.suiteName = suite.name + os.linesep + "   "
-    def __call__(self, test):
-        refMem = getTestMemory(test, self.referenceVersion)
-        currMem = getTestMemory(test, self.currentVersion)
-        refOutput = 1
-        currOutput = 1
-        if refMem < 0.0:
-            refMem = getMaxMemory(test.makeFileName("memory", self.referenceVersion))
-            refOutput = 0
-        if currMem < 0.0:
-            currMem = getMaxMemory(test.makeFileName("memory", self.currentVersion))
-            currOutput = 0
-        pDiff = percentDiff(currMem, refMem)
-        if self.limit == 0 or pDiff > self.limit:
-            title = self.suiteName + pad(test.name, 30)
-            self.suiteName = "   "
-            if refOutput == 0 and currOutput == 0:
-                print title
-                return
-            pDiff = str(pDiff) + "%"
-            if refOutput == 0:
-                refMem = "(" + str(refMem) + ")"
-                pDiff = "(" + pDiff + ")"
-            if currOutput == 0:
-                currMem = "(" + str(currMem) + ")"
-                pDiff = "(" + pDiff + ")"
-            print title + "\t", refMem, currMem, "\t" + pDiff
-
 class FeasibilityStatisticsBuilder(plugins.Action):
     def __init__(self, versionString):
         versions = versionString.split(",")

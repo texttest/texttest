@@ -311,7 +311,7 @@ class Application:
         if fileName.find(globalRunIdentifier) != -1:
             newFileName = fileName + "cmp"
         else:
-            newFileName = fileName + ".original." + globalRunIdentifier + "cmp"
+            newFileName = stem + "." + self.name + self.versionSuffix() + ".original." + globalRunIdentifier + "cmp"
         
         oldFile = open(fileName)
         newFile = open(newFileName, "w")

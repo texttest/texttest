@@ -222,6 +222,8 @@ class AnalyzeLProfData:
 class GenHTML(plugins.Action):
     def setUpApplication(self, app):
         self.htmlDir = "/carm/documents/Development/Optimization/Testing"
+        self.profilesDir = "/carm/documents/Development/Optimization/APC/profiles"
+        self.profilesDirAsHtml = "http://www-oint.carmen.se/Development/Optimization/APC/profiles"
         self.indexFile = self.htmlDir + os.sep + "testindex.html"
         self.timeSpentFile = self.htmlDir + os.sep + "timespent.html"
         self.raveSpentFile = self.htmlDir + os.sep + "ravespent.html"
@@ -354,8 +356,26 @@ class GenHTML(plugins.Action):
                     self.raveBC.createBarChartMeans(data["ravebc"], groups, self.chartRaveglob, name + ".html" + "#" + groups)
                 page.append(data["ravebc"])
                 page.append(HTMLgen.Paragraph())
-                page.append("Used tests for profiling results: " + string.join(data["tests"],", "))
+                self.findProfilingGraph(name, data["tests"])
+                page.append("Used tests for profiling results: ")
+                page.append(self.findProfilingGraph(name, data["tests"]))
                 self.profilingGroups.append(HTMLgen.Href(name + ".html" + "#" + groups, HTMLgen.Text(groups)))
+
+    def findProfilingGraph(self, suite, tests):
+        filesInProfileDir = os.listdir(self.profilesDir)
+        profTests = HTMLgen.Container()
+        for test in tests:
+            foundProfile = 0
+            lookForFileStartingWith = suite + "__" + test + "_t5_prof.ps"
+            for file in filesInProfileDir:
+                if file.find(lookForFileStartingWith) != -1:
+                    foundProfile = 1
+                    break
+            if foundProfile:
+                profTests.append(HTMLgen.Href(self.profilesDirAsHtml + os.sep + file, HTMLgen.Text(test)))
+            else:
+                profTests.append(HTMLgen.Text(test))
+        return profTests
 
     def calcCostAndPerfMeanAndVariation(self, table):
         cost = []
@@ -566,7 +586,7 @@ class GenHTML(plugins.Action):
                 data = self.currentSuitePage["group"][group]["profiling"] = { 'fcns': {}, 'count': 0 , 'tests': [] , 'ravebc': self.raveBC.createBC("RAVE") }
             else:
                 data = self.currentSuitePage["group"][group]["profiling"]
-                
+
             data["tests"].append(test.name)
             rave = self.lprof.analyze(lprofFile, data)
 

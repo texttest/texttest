@@ -138,37 +138,45 @@ class NonPythonAction(Action):
 # Generally useful class to encapsulate a background process, of which TextTest creates
 # a few... seems it only works on UNIX right now.
 class BackgroundProcess:
-    def __init__(self, commandLine):
-        processId = os.fork()
-        if processId == 0:
-            self.resetSignalHandlers()
-            os.system(commandLine)
-            os._exit(0)
+    def __init__(self, commandLine, testRun=0):
+        self.program = commandLine.split()[0].lstrip()
+        self.testRun = testRun
+        if self.testRun or not os.environ.has_key("TEXTTEST_NO_SPAWN"):
+            processId = os.fork()
+            if processId == 0:
+                os.system(commandLine)
+                os._exit(0)
+            else:
+                self.processId = processId
         else:
-            self.processId = processId
+            print "Faking start of external progam: '" + commandLine + "'"
+            self.processId = None
     def hasTerminated(self):
+        if self.processId == None:
+            return 1
         try:
             procId, status = os.waitpid(self.processId, os.WNOHANG)
             return procId > 0 or status > 0
         except OSError:
             return 1
+    def waitForTermination(self):
+        if self.processId == None:
+            return
+        for process in self.findAllProcesses(self.processId):
+            os.waitpid(process, 0)
     def kill(self):
-        self.killProcessAndChildren(str(self.processId))
-    def killProcessAndChildren(self, pid):
-        for line in os.popen("ps -efl | grep " + pid).xreadlines():
+        killSignal = signal.SIGTERM
+        if self.testRun:
+            killSignal = signal.SIGKILL
+        for process in self.findAllProcesses(self.processId):
+            if process != self.processId:
+                print "Killing child process", process
+            os.kill(process, killSignal)
+    def findAllProcesses(self, pid):
+        processes = []
+        processes.append(pid)
+        for line in os.popen("ps -efl | grep " + str(pid)).xreadlines():
             entries = line.split()
             if entries[4] == pid:
-                print "Killing child process", entries[3]
-                self.killProcessAndChildren(entries[3])
-        os.kill(int(pid), signal.SIGKILL)
-    def resetSignalHandlers(self):
-        # Set all signal handlers to default. There is a python bug
-        # that processes started from threads block all signals. This
-        # is very bad.
-        for sigNum in range(1, signal.NSIG):
-            try:
-                signal.signal(sigNum, signal.SIG_DFL)
-            except RuntimeError:
-                # If it's out of range it's probably not very important
-                pass
-            
+                processes += self.findAllProcesses(int(entries[3]))
+        return processes

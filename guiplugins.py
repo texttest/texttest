@@ -3,11 +3,17 @@ import plugins, os, sys, shutil
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
-    allowExternalPrograms = 1
     def __init__(self, test):
         self.test = test
         self.options = {}
         self.switches = {}
+        self.processes = []
+    def killProcesses(self):
+        # Don't leak processes
+        for process in self.processes:
+            if not process.hasTerminated():
+                print "Killing '", process.program + "' interactive process"
+                process.kill()
     def canPerformOnTest(self):
         return self.test
     def getTitle(self):
@@ -20,10 +26,7 @@ class InteractiveAction(plugins.Action):
     # as there's nobody around to delete it afterwards and race conditions easily arise.
     # So we fake it...
     def startExternalProgram(self, commandLine):
-        if self.allowExternalPrograms:
-            os.system(commandLine)
-        else:
-            print "Faking start of external progam: '" + commandLine + "'"
+        self.processes.append(plugins.BackgroundProcess(commandLine))
     def readCommandLineArguments(self, args):
         for arg in args:
             if arg.find("=") != -1:
@@ -134,13 +137,13 @@ class ViewFile(InteractiveAction):
     def viewFile(self, fileName):
         viewProgram = self.test.app.getConfigValue("view_program")
         print "Viewing file", os.path.basename(fileName), "using '" + viewProgram + "'"
-        self.startExternalProgram(viewProgram + " " + fileName + " &")
+        self.startExternalProgram(viewProgram + " " + fileName)
     def followFile(self, fileName):
         baseName = os.path.basename(fileName)
         title = self.test.name + " (" + baseName + ")"
         followProgram = self.test.app.getConfigValue("follow_program")
         print "Following file", title, "using '" + followProgram + "'"
-        commandLine = "xterm -bg white -T '" + title + "' -e " + followProgram + " " + fileName + " &"
+        commandLine = "xterm -bg white -T '" + title + "' -e " + followProgram + " " + fileName
         self.startExternalProgram(commandLine)
     def view(self, comparison, fileName):
         if self.switches.has_key("f") and self.switches["f"].getValue():
@@ -153,7 +156,7 @@ class ViewFile(InteractiveAction):
         else:
             diffProgram = self.test.app.getConfigValue("diff_program")
             print "Comparing file", os.path.basename(newFile), "with previous version using '" + diffProgram + "'"
-            self.startExternalProgram("tkdiff " + self.stdFile(comparison) + " " + newFile + " &")
+            self.startExternalProgram("tkdiff " + self.stdFile(comparison) + " " + newFile)
 
 
 # Placeholder for all classes. Remember to add them!

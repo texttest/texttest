@@ -10,8 +10,6 @@ from Queue import Queue, Empty
 class TextTestGUI:
     def __init__(self, replayScriptName, recordScriptName):
         eventHandler.setScripts(replayScriptName, recordScriptName)
-        if replayScriptName:
-            guiplugins.InteractiveAction.allowExternalPrograms = 0
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.instructions = []
         self.postponedInstructions = []
@@ -176,6 +174,7 @@ class TextTestGUI:
     def quit(self, *args):
         self.quitGUI = 1
         gtk.main_quit()
+        self.testCaseGUI.killProcesses()
         self.actionThread.join()
     def saveAll(self, *args):
         saveTestAction = self.testCaseGUI.getSaveTestAction()
@@ -217,6 +216,9 @@ class TestCaseGUI:
         textview = self.createTextView(test)
         notebook = self.createNotebook(textview, self.actionInstances)
         self.window = self.createWindow(buttons, view, notebook)
+    def killProcesses(self):
+        for instance in self.actionInstances:
+            instance.killProcesses()
     def addFilesToModel(self, test):
         compiter = self.model.insert_before(None, None)
         self.model.set_value(compiter, 0, "Comparison Files")

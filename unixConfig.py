@@ -75,7 +75,7 @@ class RunTest(default.RunTest):
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
         if self.interactive:
-            self.process = plugins.BackgroundProcess(testCommand)
+            self.process = plugins.BackgroundProcess(testCommand, testRun=1)
             return "retry"
         else:
             os.system(testCommand)

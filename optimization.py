@@ -1030,7 +1030,7 @@ class GraphPlot(plugins.Action):
         self.graph = graph
         self.timeRange, self.targetFile, self.colour = plotOptions
     def setUpApplication(self, app):
-        self.graph.plot(self.timeRange, self.targetFile, self.colour)
+        self.graph.plot(self.timeRange, self.targetFile, self.colour, wait=1)
     
 class TestGraph:
     def __init__(self):
@@ -1074,12 +1074,13 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, timeRange, targetFile, colour):
+    def plot(self, timeRange, targetFile, colour, wait=0):
         if len(self.plotLines) == 0:
             return
 
-        stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
-
+        gnuplotFileName = os.path.abspath("gnuplot.input")
+        outputFileName = os.path.abspath("gnuplot.output")
+        gnuplotFile = open(gnuplotFileName, "w")
         plotArguments = self.getPlotArguments()
         
         if targetFile:
@@ -1087,26 +1088,30 @@ class TestGraph:
             if not os.path.isabs(absplotPrint):
                 print "An absolute path must be given."
                 return
-            stdin.write("set terminal postscript")
+            gnuplotFile.write("set terminal postscript")
             if colour:
-                stdin.write(" color")
-            stdin.write(os.linesep)
+                gnuplotFile.write(" color")
+            gnuplotFile.write(os.linesep)
 
-        stdin.write("set ylabel '" + self.getAxisLabel("y") + "'" + os.linesep)
-        stdin.write("set xlabel '" + self.getAxisLabel("x") + "'" + os.linesep)
-        stdin.write("set time" + os.linesep)
-        stdin.write("set title \"" + self.makeTitle() + "\"" + os.linesep)
-        stdin.write("set xtics border nomirror norotate" + os.linesep)
-        stdin.write("set ytics border nomirror norotate" + os.linesep)
-        stdin.write("set border 3" + os.linesep)
-        stdin.write("set xrange [" + timeRange +"];" + os.linesep)
-        stdin.write("plot " + string.join(plotArguments, ",") + os.linesep)
-        stdin.write("quit" + os.linesep)
-        stdin.close()
+        gnuplotFile.write("set ylabel '" + self.getAxisLabel("y") + "'" + os.linesep)
+        gnuplotFile.write("set xlabel '" + self.getAxisLabel("x") + "'" + os.linesep)
+        gnuplotFile.write("set time" + os.linesep)
+        gnuplotFile.write("set title \"" + self.makeTitle() + "\"" + os.linesep)
+        gnuplotFile.write("set xtics border nomirror norotate" + os.linesep)
+        gnuplotFile.write("set ytics border nomirror norotate" + os.linesep)
+        gnuplotFile.write("set border 3" + os.linesep)
+        gnuplotFile.write("set xrange [" + timeRange +"];" + os.linesep)
+        gnuplotFile.write("plot " + string.join(plotArguments, ",") + os.linesep)
+        gnuplotFile.write("quit" + os.linesep)
+        gnuplotFile.close()
+        commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName
+        process = plugins.BackgroundProcess(commandLine)
         if targetFile:
-            tmppf = stdout.read()
+            tmppf = open(outputFileName).read()
             if len(tmppf) > 0:
                 open(absTargetFile, "w").write(tmppf)
+        if wait:
+            process.waitForTermination()
     def getAxisLabel(self, axis):
         label = None
         for plotLine in self.plotLines:

@@ -324,7 +324,7 @@ class RunTests(InteractiveAction):
     def findCommonParentName(self, selTests):
         allParents = self.findAllParents(selTests)
         if len(allParents) == 1:
-            return allParents[0].name
+            return self.checkNotRoot(allParents[0])
 
         descendantMap = {}
         for parent in allParents:
@@ -332,11 +332,13 @@ class RunTests(InteractiveAction):
 
         for suite, descendants in descendantMap.items():
             if len(descendants) == len(allParents):
-                if suite.parent:
-                    return suite.name
-                else:
-                    return None
+                return self.checkNotRoot(suite)
         return None
+    def checkNotRoot(self, suite):
+        if suite.parent:
+            return suite.name
+        else:
+            return None
     def mapSuite(self, descendantMap, suite, descendant):
         if not descendantMap.has_key(suite):
             descendantMap[suite] = []

@@ -120,6 +120,7 @@ class ReplayScript:
         self.commands = []
         self.exitObservers = []
         self.pointer = 0
+        self.name = scriptName
         if not os.path.isfile(scriptName):
             raise UseCaseScriptError, "Cannot replay script " + scriptName + ", no such file or directory"
         for line in open(scriptName).xreadlines():
@@ -127,6 +128,8 @@ class ReplayScript:
                 self.commands.append(line.strip())
     def addExitObserver(self, observer):
         self.exitObservers.append(observer)
+    def getShortcutName(self):
+        return os.path.basename(self.name).split(".")[0].replace("_", " ")
     def getCommand(self):
         if self.pointer >= len(self.commands):
             for observer in self.exitObservers:
@@ -251,15 +254,48 @@ class UseCaseReplayer:
         os.kill(self.processId, signalNum)
         return 1
 
+class ShortcutTracker:
+    def __init__(self, replayScript):
+        self.replayScript = replayScript
+        self.unmatchedCommands = []
+        self.reset()
+    def reset(self):
+        self.replayScript = ReplayScript(self.replayScript.name)
+        self.currCommand = self.replayScript.getCommand()
+    def updateCompletes(self, line):
+        if line == self.currCommand:
+            self.currCommand = self.replayScript.getCommand()
+            return not self.currCommand
+        self.unmatchedCommands.append(line)
+        return 0
+    def getNewCommands(self):
+        self.reset()
+        self.unmatchedCommands.append(self.replayScript.getShortcutName().lower())
+        return self.unmatchedCommands
+    
 # Take care not to record empty files...
 class RecordScript:
     def __init__(self, scriptName):
         self.scriptName = scriptName
         self.fileForAppend = None
+        self.shortcutTrackers = []
     def record(self, line):
+        self._record(line)
+        for tracker in self.shortcutTrackers:
+            if tracker.updateCompletes(line):
+                self.rerecord(tracker.getNewCommands())
+    def _record(self, line):
         if not self.fileForAppend:
             self.fileForAppend = open(self.scriptName, "w")
         self.fileForAppend.write(line + os.linesep)
+    def registerShortcut(self, shortcut):
+        self.shortcutTrackers.append(ShortcutTracker(shortcut))
+    def rerecord(self, newCommands):
+        self.fileForAppend.close()
+        os.remove(self.scriptName)
+        self.fileForAppend = None
+        for command in newCommands:
+            self._record(command)
 
 class UseCaseRecorder:
     def __init__(self):
@@ -362,3 +398,7 @@ class UseCaseRecorder:
         for eventName in self.applicationEvents.values():
             self.record(waitCommandName + " " + eventName)
         self.applicationEvents = seqdict()
+    def registerShortcut(self, replayScript):
+        for script in self.scripts:
+            script.registerShortcut(replayScript)
+    

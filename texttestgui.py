@@ -14,6 +14,7 @@ def destroyDialog(dialog, *args):
 def showError(message):
     guilog.info("ERROR : " + message)
     dialog = gtk.Dialog("TextTest Message", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    dialog.set_modal(gtk.TRUE)
     label = gtk.Label(message)
     dialog.vbox.pack_start(label, expand=gtk.TRUE, fill=gtk.TRUE)
     label.show()

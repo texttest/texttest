@@ -641,8 +641,8 @@ class Application:
     def __init__(self, name, abspath, configFile, version, inputOptions):
         self.name = name
         self.abspath = abspath
-        # Place to store reference to extra_version application
-        self.extra = None
+        # Place to store reference to extra_version applications
+        self.extras = []
         self.versions = version.split(".")
         if self.versions[0] == "":
             self.versions = []
@@ -691,7 +691,7 @@ class Application:
         self.setConfigDefault("full_name", string.upper(self.name))
         self.setConfigDefault("checkout_location", ".")
         self.setConfigDefault("default_checkout", "")
-        self.setConfigDefault("extra_version", "none")
+        self.setConfigDefault("extra_version", [])
         self.setConfigDefault("base_version", [])
         self.setConfigDefault("unsaveable_version", [])
         self.setConfigDefault("diagnostics", {})
@@ -1557,15 +1557,17 @@ class TextTest:
         appList = []
         app = self.createApplication(appName, dirName, pathname, version)
         appList.append(app)
-        extraVersion = app.getConfigValue("extra_version")
-        if extraVersion == "none" or self.inputOptions.slaveRun():
+        if self.inputOptions.slaveRun():
             return appList
-        aggVersion = extraVersion
-        if len(version) > 0:
-            aggVersion = version + "." + extraVersion
-        extraApp = self.createApplication(appName, dirName, pathname, aggVersion)
-        app.extra = extraApp
-        appList.append(extraApp)
+        for extraVersion in app.getConfigValue("extra_version"):
+            if extraVersion == version:
+                continue
+            aggVersion = extraVersion
+            if len(version) > 0:
+                aggVersion = version + "." + extraVersion
+            extraApp = self.createApplication(appName, dirName, pathname, aggVersion)
+            app.extras.append(extraApp)
+            appList.append(extraApp)
         return appList
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names

@@ -570,8 +570,8 @@ class ApplicationGUI(RightWindowGUI):
         newSuite = action.performOn(self.app, self.getSelectedTests())
         if newSuite:
             iterlist = self.getSelectedIters(newSuite)
-            if self.app.extra:
-                extraSuite = action.performOn(self.app.extra, self.getSelectedTests())
+            for extraApp in self.app.extras:
+                extraSuite = action.performOn(extraApp, self.getSelectedTests())
                 iterlist += self.getSelectedIters(extraSuite)
             self.selection.unselect_all()
             for iter in iterlist:

@@ -2,7 +2,7 @@
 <html>
 <head>
    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.20-13.8smp i686) [Netscape]">
+   <meta name="GENERATOR" content="Mozilla/4.77 [en] (X11; U; SunOS 5.9 sun4u) [Netscape]">
 </head>
 <body>
 
@@ -85,6 +85,26 @@ should work anywhere, "unixConfig" for use
 installed. It is expected that you will
 <br>want to extend these configurations to take advantage of local circumstances
 or to add features that you need.
+<p><u>User Interfaces</u>
+<br>TextTest is a command line program:&nbsp;all suitable options must
+be provided on startup as described by
+<br>your configuration. It does however have a GUI for monitoring the tests,
+which is enabled by the -g option
+<br>and requires PyGTK&nbsp;to be installed (the GUI library). Alternatively
+there is a basic text interface provided
+<br>by the default configuration, see the configuration help for details.
+<p>Using the GUI should be fairly self-explanatory. Double clicking on
+tests from the tree view on the left
+<br>window will bring up the details of what's going on in that test. Double
+clicking on files
+<br>from the test view will bring up views of those files, using the config
+file entry "diff_program"
+<br>for viewing differences, the entry "follow_program" for following a
+running test and "view_program"
+<br>for viewing a static file. These default to tkdiff, tail -f and xemacs
+respectively on UNIX systems. The bottom
+<br>right window contains various tabs which allow you to configure viewing
+and saving options, etc.
 <p><u>Test Cases</u>
 <br>A test case is represented in TextTest by a particular directory in
 the file system, and the name of the test case
@@ -192,7 +212,7 @@ based on the version, your user name and the time stamp.
 <br>All temporary files created will be created under a root temporary
 directory with this identifier. The location of this is controlled
 <br>by the config file entry "write_tmp_files", and defaults to ~/texttesttmp
-on UNIX&nbsp;systems.
+on UNIX systems.
 <p>When the run finishes, you will be given an opportunity to save any
 new results that may have been found. If you do not do this, the
 <br>files will be removed when TextTest cleans up the run's temporary directory
@@ -200,8 +220,8 @@ structure. This behaviour is different in version 2.1 from
 <br>previous versions.
 <p>To override this, the command line option -keeptmp will not delete the
 run's directory structure so it can be examined manually
-<br>after TextTest exits. However, beware!&nbsp;In this mode it will clean
-up the run directories of previous runs that it finds. This means
+<br>after TextTest exits. However, beware! In this mode it will clean up
+the run directories of previous runs that it finds. This means
 <br>that you cannot run more than one instance of TextTest on the same
 application with the same version simultaneously if you are
 <br>specifying the -keeptmp flag.

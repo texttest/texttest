@@ -126,7 +126,9 @@ class RemoveLogs(plugins.Action):
         self.removeFile(test, "errors")
         self.removeFile(test, "output")
     def removeFile(self, test, stem):
-        os.remove(test.getTmpFileName(stem, "r"))
+        filePath = test.getTmpFileName(stem, "r")
+        if os.path.isfile(filePath):
+            os.remove(filePath)
     def __repr__(self):
         return "Remove logs"
 

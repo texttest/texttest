@@ -94,7 +94,7 @@ optimization.TraverseSubPlans
 """
 
 
-import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, guiplugins
+import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, guiplugins, copy
 from ndict import seqdict
 
 itemNamesConfigKey = "_itemnames_map"
@@ -794,7 +794,7 @@ class MakeProgressReport(TestReport):
         self.reportLine("Max memory (MB)", currentRun.getMaxMemory(), referenceRun.getMaxMemory())
         self.reportLine("Total time (minutes)     ", currentRun.getPerformance(), referenceRun.getPerformance())
         self.reportLine("Time to cost " + str(worstCost) + " (mins)", currTTWC, refTTWC)
-        self.plotKPI(self.testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi)
+        return kpi
     def calculateWorstCost(self, referenceRun, currentRun, app, groupName):
         currMargin, refMargin = self.getMargins(app, groupName)
         currSol = currentRun.getMeasuredSolution(currMargin)
@@ -827,8 +827,6 @@ class MakeProgressReport(TestReport):
         fieldWidth = 15
         titleWidth = 30
         print string.ljust(title, titleWidth) + ": " + string.rjust(str(currEntry), fieldWidth) + string.rjust(str(refEntry), fieldWidth)
-    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi):
-        pass
     
 # This is for importing new tests and test suites
 #
@@ -1142,14 +1140,22 @@ class PlotTest(plugins.Action):
         return GraphPlot()
 
 class Averager:
-    def __init__(self):
+    def __init__(self, minmax = 0):
         self.average = {}
         self.numberOfGraphs = 0
+        self.minmax = 0
+        if  minmax:
+            self.minmax = 1
+            self.min = {}
+            self.max = {}
 
     def addGraph(self, graph):
         self.numberOfGraphs += 1
         if not self.average:
-            self.average = graph
+            self.average = copy.deepcopy(graph)
+            if self.minmax:
+                self.min = copy.deepcopy(graph)
+                self.max = copy.deepcopy(graph)
             return
         graphXValues = graph.keys()
         graphXValues.sort()
@@ -1158,9 +1164,18 @@ class Averager:
         mergedVals = self.mergeVals(averageXValues, graphXValues)
         extendedGraph = self.extendGraph(graph, mergedVals)
         extendedAverage = self.extendGraph(self.average, mergedVals)
+        if self.minmax:
+            extendedMin = self.extendGraph(self.min, mergedVals)
+            extendedMax = self.extendGraph(self.max, mergedVals)
         for xval in extendedAverage.keys():
             extendedAverage[xval] += extendedGraph[xval]
+            if self.minmax:
+                extendedMin[xval] = min(extendedMin[xval], extendedGraph[xval])
+                extendedMax[xval] = max(extendedMax[xval], extendedGraph[xval])
         self.average = extendedAverage
+        if self.minmax:
+            self.min = extendedMin
+            self.max = extendedMax
 
     def mergeVals(self, values1, values2):
         merged = values1
@@ -1194,13 +1209,16 @@ class Averager:
             pos += 1
         return xvalues[pos-1]
 
-    def getGraph(self):
+    def getAverage(self):
         graph = {}
         xValues = self.average.keys()
         xValues.sort()
         for xVal in xValues:
             graph[xVal] = self.average[xVal]/self.numberOfGraphs
         return graph
+    
+    def getMinMax(self):
+        return self.min, self.max
 
 plotAveragerCount = 0
 

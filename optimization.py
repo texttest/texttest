@@ -983,7 +983,7 @@ class ImportTest(plugins.Action):
 
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
-    def addOptionsFileOption(self):
+    def addOptionsFileOption(self, oldOptionGroup):
         self.optionGroup.addOption("sp", "Subplan name")
     def getSubplanName(self):
         return self.optionGroup.getOptionValue("sp")
@@ -993,7 +993,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
 
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):
-    def addEnvironmentFileOptions(self):
+    def addEnvironmentFileOptions(self, oldOptionGroup):
         self.optionGroup.addOption("usr", "CARMUSR")
     def getCarmusr(self):
         return os.path.normpath(self.optionGroup.getOptionValue("usr"))
@@ -1093,7 +1093,7 @@ class _PlotTest(plugins.Action):
         self.args = args
         self.plotForTest = None
     def __call__(self, test):
-        self.plotForTest = PlotTestInGUI(test, self.testGraph)
+        self.plotForTest = PlotTestInGUI(test, graph=self.testGraph)
         self.plotForTest.optionGroup.readCommandLineArguments(self.args)
         self.plotForTest(test)
     
@@ -1216,15 +1216,15 @@ class TestGraph:
 
 # Same as above, but from GUI. Refactor!
 class PlotTestInGUI(guiplugins.InteractiveAction):
-    def __init__(self, test, graph = None):
-        guiplugins.InteractiveAction.__init__(self, test, "Graph")
-        self.optionGroup.addOption("r", "Horizontal range", "0:")
-        self.optionGroup.addOption("yr", "Vertical range")
-        self.optionGroup.addOption("p", "Absolute file to print to")
-        self.optionGroup.addOption("i", "Log file item to plot", costEntryName)
-        self.optionGroup.addOption("v", "Extra versions to plot")
-        self.optionGroup.addSwitch("pc", "Print in colour")
-        self.optionGroup.addSwitch("s", "Plot against solution number rather than time")
+    def __init__(self, test, oldOptionGroup = None, graph = None):
+        guiplugins.InteractiveAction.__init__(self, test, oldOptionGroup, "Graph")
+        self.addOption(oldOptionGroup, "r", "Horizontal range", "0:")
+        self.addOption(oldOptionGroup, "yr", "Vertical range")
+        self.addOption(oldOptionGroup, "p", "Absolute file to print to")
+        self.addOption(oldOptionGroup, "i", "Log file item to plot", costEntryName)
+        self.addOption(oldOptionGroup, "v", "Extra versions to plot")
+        self.addSwitch(oldOptionGroup, "pc", "Print in colour")
+        self.addSwitch(oldOptionGroup, "s", "Plot against solution number rather than time")
         self.externalGraph = graph
         if graph:
             self.testGraph = graph

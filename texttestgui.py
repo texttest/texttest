@@ -337,7 +337,7 @@ class TextTestGUI:
             if test.state == test.FAILED:
                 currFullVersion = test.app.getFullVersion()
                 if not saveTestAction or fullVersion != currFullVersion:
-                    saveTestAction = guiplugins.SaveTest(test)
+                    saveTestAction = guiplugins.interactiveActionHandler.getInstance(test, guiplugins.SaveTest)
                 saveTestAction(test)
     def viewApp(self, *args):
         self.selection.selected_foreach(self.viewAppFromTest)
@@ -389,7 +389,7 @@ class RightWindowGUI:
     def __init__(self, object, dynamic):
         self.object = object
         self.dynamic = dynamic
-        self.fileViewAction = guiplugins.ViewFile(object)
+        self.fileViewAction = guiplugins.interactiveActionHandler.getInstance(object, guiplugins.ViewFile)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.addFilesToModel()
         view = self.createView()
@@ -796,17 +796,17 @@ class TestCaseGUI(RightWindowGUI):
     
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):
-    def addOptionsFileOption(self):
-        guiplugins.ImportTestCase.addOptionsFileOption(self)
-        self.optionGroup.addSwitch("GUI", "Use TextTest GUI", 1)
-        self.optionGroup.addSwitch("sGUI", "Use TextTest Static GUI", 0)
+    def addOptionsFileOption(self, oldOptionGroup):
+        guiplugins.ImportTestCase.addOptionsFileOption(self, oldOptionGroup)
+        self.addSwitch(oldOptionGroup, "GUI", "Use TextTest GUI", 1)
+        self.addSwitch(oldOptionGroup, "sGUI", "Use TextTest Static GUI", 0)
         targetApp = self.test.makePathName("TargetApp", self.test.abspath)
         root, local = os.path.split(targetApp)
         self.defaultTargetApp = plugins.samefile(root, self.test.app.abspath)
         if self.defaultTargetApp:
-            self.optionGroup.addSwitch("sing", "Only run test A03", 1)
-            self.optionGroup.addSwitch("fail", "Include test failures", 1)
-            self.optionGroup.addSwitch("version", "Run with Version 2.4")
+            self.addSwitch(oldOptionGroup, "sing", "Only run test A03", 1)
+            self.addSwitch(oldOptionGroup, "fail", "Include test failures", 1)
+            self.addSwitch(oldOptionGroup, "version", "Run with Version 2.4")
     def getOptions(self):
         options = guiplugins.ImportTestCase.getOptions(self)
         if self.optionGroup.getSwitchValue("sGUI"):

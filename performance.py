@@ -75,11 +75,15 @@ class MakeComparisons(comparetest.MakeComparisons):
         stem, ext = os.path.splitext(file)
         if stem != "performance":
             return 1
-        self.execHost = getPerformanceHost(os.path.join(dirPath, file))
+        tmpFile = os.path.join(dirPath, file)
+        self.execHost = getPerformanceHost(tmpFile)
+        cmpFlag = 0
         if self.execHost != None:
-            return self.execHost in test.app.getConfigList("performance_test_machine")
-        else:
-            return 0
+            cmpFlag = self.execHost in test.app.getConfigList("performance_test_machine")
+        if cmpFlag == 0:
+            print "Removing: ", tmpFile
+            os.remove(tmpFile)
+        return cmpFlag
     def makeTestComparison(self, test):
         return PerformanceTestComparison(test, self)
 

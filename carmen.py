@@ -415,6 +415,11 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
         # Don't do anything unless we've been put in NEED_PREPROCESS state
         if test.state < test.NOT_STARTED:
             return lsf.UpdateLSFStatus.__call__(self, test)
+        elif test.state == test.UNRUNNABLE:
+            jobName = self.jobNameFunction(test)
+            self.ruleCompilations.append(jobName)
+            ruleset = self.getRuleSetName(test)
+            self.raiseFailureWithError(ruleset, str(test.stateDetails))
     def processStatus(self, test, status, machine):
         ruleset = self.getRuleSetName(test)
         details = "Compiling ruleset " + ruleset
@@ -443,6 +448,8 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
                 return self.RETRY | self.WAIT
         self.ruleCompilations.append(jobName)
         errContents = string.join(open(compTmp).readlines(),"")
+        self.raiseFailureWithError(ruleset, errContents)
+    def raiseFailureWithError(self, ruleset, errContents):
         errMsg = "Failed to build ruleset " + ruleset + os.linesep + errContents 
         print errMsg
         raise plugins.TextTestError, errMsg

@@ -266,9 +266,9 @@ class SubmitTest(unixConfig.RunTest):
         commandLine = "bsub " + lsfOptions + " '" + command + "' > " + reportfile
         self.diag.info("Submitting with command : " + commandLine)
         stdin, stdout, stderr = os.popen3(commandLine)
-        errorMessage = stderr.readline()
-        if errorMessage and errorMessage.find("still trying") == -1:
-            raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
+        for errorMessage in stderr.readlines():
+            if errorMessage and errorMessage.find("still trying") == -1:
+                raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
         return self.WAIT
     def describe(self, test, jobNameFunction = None):
         queueToUse = self.queueFunction(test)

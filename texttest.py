@@ -314,12 +314,6 @@ class TestSuite(Test):
         return len(self.testcases) == 0
     def callAction(self, action):
         return action.setUpSuite(self)
-    def setUpFor(self, action):
-        self.setUpEnvironment()
-        action.setUpSuite(self)
-    def tearDownFor(self, action):
-        action.tearDownSuite(self)
-        self.tearDownEnvironment()
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
     def reFilter(self, filters):
@@ -1018,6 +1012,8 @@ class TestRunner:
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
         for suite in tearDownSuites:
             previousTestRunner.appRunner.tearDownSuite(suite)
+        for suite in setUpSuites:
+            suite.setUpEnvironment()
         while len(self.actionSequence):
             if self.interrupted:
                 raise KeyboardInterrupt, "Interrupted externally"
@@ -1120,7 +1116,7 @@ class ApplicationRunner:
         self.testSuite.tearDownEnvironment()
     def setUpSuite(self, action, suite):
         self.diag.info(str(action) + " set up " + repr(suite))
-        suite.setUpFor(action)
+        action.setUpSuite(suite)
         if self.suitesSetUp.has_key(suite):
             self.suitesSetUp[suite].append(action)
         else:
@@ -1128,7 +1124,8 @@ class ApplicationRunner:
     def tearDownSuite(self, suite):
         for action in self.suitesSetUp[suite]:
             self.diag.info(str(action) + " tear down " + repr(suite))
-            suite.tearDownFor(action)
+            action.tearDownSuite(suite)
+        suite.tearDownEnvironment()
         self.suitesSetUp[suite] = []
 
 class ActionRunner:

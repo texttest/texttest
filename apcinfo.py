@@ -270,6 +270,16 @@ class GenHTML(plugins.Action):
         self.chartreldoc.append(self.chartrelglob)
         self.chartreldoc.append(HTMLgen.Paragraph())
         self.chartreldoc.append(HTMLgen.Href('testindex.html', 'To test set page'))
+
+        # Variation
+        self.variationChart = barchart.BarChart()
+        self.variationChart.datalist = barchart.DataList()
+        self.variationChart.thresholds = (5, 10)
+        self.variationChart.title = "Variation in per mil"
+        self.variationDoc = CarmenDocument(self.RCFile)
+        self.variationDoc.title = "Cost variation for different groups"
+        self.variationDoc.append_file(os.path.join(self.htmlDir, 'variation-intro-txt.html'))
+        self.variationDoc.append(self.variationChart)
         
         self.kpiGroupForTest = {}
         self.kpiGroups = []
@@ -321,6 +331,9 @@ class GenHTML(plugins.Action):
         #self.chartRavedoc.append_file(os.path.join(self.htmlDir, 'timespent-expl-txt.html'))
         self.chartRavedoc.write(self.raveSpentFile)
 
+        # Write variation page
+        self.variationDoc.write(self.variationFile)
+
         # Write most hated page.
         hatedFcnsDoc = CarmenDocument(self.RCFile)
         hatedFcnsDoc.title = "The 10 most time consuming functions in APC"
@@ -348,7 +361,12 @@ class GenHTML(plugins.Action):
                 page.append(suitePage["group"][groups]["info"])
 
             if not groups == "common":
-                meanvar = self.calcCostAndPerfMeanAndVariation(suitePage["group"][groups]["table"])
+                cost_spread, meanvar = self.calcCostAndPerfMeanAndVariation(suitePage["group"][groups]["table"])
+                # append cost_spread to variationChart
+                if cost_spread*1000 <= 20:
+                    linkToTest = HTMLgen.Href(name + ".html" + "#" + groups, groups)
+                    self.variationChart.datalist.load_tuple((linkToTest, cost_spread*1000))
+                
             table = HTMLgen.Table()
             table.body = suitePage["group"][groups]["table"]
             table.heading = ["Test", "Cost", "Perf. (min)", "Mem (MB)", "Uncov", "Overcov", "Illegal", "Date"]
@@ -449,7 +467,7 @@ class GenHTML(plugins.Action):
         meanvar.append("Cost, mean: " + str(int(cost_mean)) + ", scaled std. dev: " + str("%.4f" % cost_var) + ", spread: " + str("%.4f" % (100*cost_spread)) + "%")
         meanvar.append(HTMLgen.BR())
         meanvar.append("Performance, mean: " + str(int(perf_mean)) + ", scaled std. dev: " + str("%.4f" % perf_var) + ", spread: " + str("%.4f" % (100*perf_spread)) + "%")
-        return meanvar
+        return cost_spread, meanvar
         
     def createGroupInfo(self, group, test):
         subplanDir = test.app.configObject.target._getSubPlanDirName(test)

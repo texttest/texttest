@@ -22,11 +22,11 @@ class ActionThread(Thread):
         self.join()
 
 class TextTestGUI:
-    def __init__(self, dynamic, replayScriptName, recordScriptName, stdinScriptName):
+    def __init__(self, dynamic):
         guiplugins.setUpGuiLog()
         global guilog, scriptEngine
         from guiplugins import guilog
-        scriptEngine = ScriptEngine(replayScriptName, recordScriptName, stdinScriptName, guilog)
+        scriptEngine = ScriptEngine(guilog)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic
@@ -397,7 +397,7 @@ class RightWindowGUI:
             hbox = gtk.HBox()
             guilog.info("Creating entry for option '" + option.name + "'")
             label = gtk.Label(option.name + "  ")
-            entry = scriptEngine.createEntry(option.name, option.getValue())
+            entry = scriptEngine.createEntry("enter " + option.name + " =", option.getValue())
             option.setMethods(entry.get_text, entry.set_text)
             hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
             hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)

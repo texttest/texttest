@@ -336,7 +336,7 @@ class LogFileFinder:
         return None, None
 
 class OptimizationRun:
-    def __init__(self, app, definingItems, interestingItems, logFile, scale = 0):
+    def __init__(self, app, definingItems, interestingItems, logFile, scalePerf = 0.0):
         self.diag = plugins.getDiagnostics("optimization")
         self.logFile = logFile
         self.diag.info("Reading data from " + self.logFile)
@@ -345,13 +345,13 @@ class OptimizationRun:
         calculator = OptimizationValueCalculator(allItems, self.logFile, app.getConfigValue(itemNamesConfigKey))
         self.solutions = calculator.getSolutions(definingItems)
         self.diag.debug("Solutions :" + repr(self.solutions))
-        if scale and self.solutions and timeEntryName in allItems:
-            self.scaleTimes()
-    def scaleTimes(self):
+        if scalePerf and self.solutions and timeEntryName in allItems:
+            self.scaleTimes(scalePerf)
+    def scaleTimes(self, scalePerf):
         finalTime = self.solutions[-1][timeEntryName]
         if finalTime == 0.0:
             return
-        scaleFactor = self.performance / finalTime
+        scaleFactor = scalePerf / finalTime
         self.diag.info("Scaling times by factor " + str(scaleFactor))
         for solution in self.solutions:
             solution[timeEntryName] *= scaleFactor    
@@ -577,8 +577,10 @@ class TestReport(plugins.Action):
         interestingValues = [ memoryEntryName, "cost of rosters" ]
         currentLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.currentVersion)
         refLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.referenceVersion)
-        currentRun = OptimizationRun(test.app, definingValues, interestingValues, currentLogFile, 1)
-        referenceRun = OptimizationRun(test.app, definingValues, interestingValues, refLogFile, 1)
+        currPerf = performance.getTestPerformance(test, self.currentVersion)
+        refPerf = performance.getTestPerformance(test, self.referenceVersion)
+        currentRun = OptimizationRun(test.app, definingValues, interestingValues, currentLogFile, currPerf)
+        referenceRun = OptimizationRun(test.app, definingValues, interestingValues, refLogFile, refPerf)
         if currentRun.logFile != referenceRun.logFile:
             self.compare(test, referenceRun, currentRun)
 
@@ -1134,7 +1136,7 @@ class TestGraph:
 class PlotTestInGUI(guiplugins.InteractiveAction):
     def __init__(self, test, graph = None):
         guiplugins.InteractiveAction.__init__(self, test)
-        self.options["r"] = guiplugins.TextOption("Time range in minutes", "0:")
+        self.options["r"] = guiplugins.TextOption("Time range in minutes", "1:")
         self.options["p"] = guiplugins.TextOption("Absolute file to print to")
         self.options["i"] = guiplugins.TextOption("Log file item to plot", costEntryName)
         self.options["v"] = guiplugins.TextOption("Extra versions to plot")

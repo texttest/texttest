@@ -224,6 +224,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("create_catalogues", "false")
         app.setConfigDefault("internal_error_text", [])
         app.setConfigDefault("internal_compulsory_text", [])
+        app.setConfigDefault("performance_logfile", { "default" : [] })
         app.setConfigDefault("performance_logfile_extractor", {})
         app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] })
         app.setConfigDefault("performance_variation_%", { "default" : 10 })
@@ -678,20 +679,26 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
     def setUpApplication(self, app):
         PerformanceFileCreator.setUpApplication(self, app)
         self.entryFinders = app.getConfigValue("performance_logfile_extractor")
+        self.entryFiles = app.getConfigValue("performance_logfile")
         self.logFileStem = app.getConfigValue("log_file")
     def makePerformanceFiles(self, test, temp):
         for fileStem, entryFinder in self.entryFinders.items():
             if not self.allMachinesTestPerformance(test, fileStem):
                 continue
-            logFile = test.makeFileName(self.logFileStem, temporary=temp)
-            if not os.path.isfile(logFile):
-                continue
-            
-            values = self.findValues(logFile, entryFinder)
+            values = []
+            for logFileStem in self.findLogFileStems(fileStem):
+                logFilePattern = test.makeFileName(logFileStem, temporary=temp)
+                for fileName in glob.glob(logFilePattern):
+                    values += self.findValues(fileName, entryFinder)
             if len(values) > 0:
                 fileName = test.makeFileName(fileStem, temporary=temp)
                 lineToWrite = self.makeLine(values, fileStem)
                 self.saveFile(fileName, lineToWrite)
+    def findLogFileStems(self, fileStem):
+        if self.entryFiles.has_key(fileStem):
+            return self.entryFiles[fileStem]
+        else:
+            return [ self.logFileStem ]
     def saveFile(self, fileName, lineToWrite):
         file = open(fileName, "w")
         file.write(lineToWrite + os.linesep)

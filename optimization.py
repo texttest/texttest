@@ -365,14 +365,15 @@ class TestReport(plugins.Action):
         if len(versions) > 1:
             self.currentVersion = versions[1]
     def __call__(self, test):
-        interestingValues = self.getInterestingValues()
-        currentRun = OptimizationRun(test, self.currentVersion, interestingValues)
-        referenceRun = OptimizationRun(test, self.referenceVersion, interestingValues)
+        currentRun, referenceRun = self.getOptimizationRuns(test)
         if currentRun.logFile != referenceRun.logFile:
             self.compare(test, referenceRun, currentRun)
-    def getInterestingValues(self):
-        return [ costEntryName, timeEntryName, memoryEntryName, "cost of rosters" ]
-
+    def getOptimizationRuns(self, test):
+        interestingValues = [ costEntryName, timeEntryName, memoryEntryName, "cost of rosters" ]
+        currentRun = OptimizationRun(test, self.currentVersion, interestingValues)
+        referenceRun = OptimizationRun(test, self.referenceVersion, interestingValues)
+        return currentRun, referenceRun
+    
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):
         TestReport.__init__(self, referenceVersion)

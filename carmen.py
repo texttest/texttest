@@ -251,13 +251,15 @@ class WaitForDispatch(lsf.Wait):
         return len(job.getProcessIds()) >= 4
 
 class RunLProf(plugins.Action):
+    def __init__(self,whichProcessId=-1):
+        self.whichProcessId = whichProcessId;
     def __repr__(self):
         return "Running LProf profiler on"
     def __call__(self, test):
         job = lsf.LSFJob(test)
         executionMachine = job.getExecutionMachine()
         self.describe(test, ", executing on " + executionMachine)
-        processId = job.getProcessIds()[-1]
+        processId = job.getProcessIds()[self.whichProcessId]
         runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId
         outputFile = "prof." + processId
         processLine = "/users/lennart/bin/process_gprof " + outputFile + " > lprof." + test.app.name + test.app.versionSuffix()

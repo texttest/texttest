@@ -85,15 +85,11 @@ class TestComparison:
     def getMostSevereFileComparison(self):
         worstSeverity = None
         worstResult = None
-        for result in self.changedResults:
+        for result in self.getComparisons():
             severity = result.getSeverity()
             if not worstSeverity or severity < worstSeverity:
                 worstSeverity = severity
                 worstResult = result
-        if worstResult:
-            return worstResult
-        else:
-            return self.newResults[0]
         return worstResult
     def getTypeBreakdown(self):
         if self.failedPrediction:
@@ -267,7 +263,7 @@ class FileComparison:
         return ""
     def getSummary(self):
         if self.newResult():
-            return "new files"
+            return self.stem + " new"
         else:
             return self.stem + " different"
     def getSeverity(self):

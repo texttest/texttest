@@ -626,6 +626,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
             wText = "Overall time weighted KPI with respect to version"
             print wText, self.referenceVersion, "=", self.percent(avg)
 
+    def getPerformance(self, test, currentVersion, referenceVersion):
+        return 0.0, 0.0
     def _calculateMargin(self, fcTupleList):
         if len(fcTupleList) < 2:
             return 0.1, 0.1

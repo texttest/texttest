@@ -636,14 +636,17 @@ class TestReport(plugins.Action):
         interestingValues = [ memoryEntryName, "cost of rosters" ]
         currentLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.currentVersion)
         refLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.referenceVersion)
-        currPerf = performance.getTestPerformance(test, self.currentVersion)
-        refPerf = performance.getTestPerformance(test, self.referenceVersion)
+        currPerf, refPerf = self.getPerformance(test, self.currentVersion, self.referenceVersion)
         currentRun = OptimizationRun(test.app, definingValues, interestingValues, currentLogFile, currPerf)
         referenceRun = OptimizationRun(test.app, definingValues, interestingValues, refLogFile, refPerf)
         if currentRun.logFile != referenceRun.logFile:
             self.compare(test, referenceRun, currentRun)
         else:
             print "Skipping test due to same logfile", test.name
+    def getPerformance(self, test, currentVersion, referenceVersion):
+        currPerf = performance.getTestPerformance(test, self.currentVersion)
+        refPerf = performance.getTestPerformance(test, self.referenceVersion)
+        return currPerf, refPerf
 
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):

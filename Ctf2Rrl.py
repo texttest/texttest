@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import os, plugins, respond, string, carmen, checkExtensions
+import os, plugins, respond, string, carmen, checkExtensions, shutil
 
 from checkExtensions import COMPRESS, UNCOMPRESS
 

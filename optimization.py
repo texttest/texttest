@@ -219,7 +219,6 @@ class MakeTmpSubPlan(plugins.Action):
                 file = open(toPath, 'w')
                 for line in open(fromPath).xreadlines():
                     if line.find("<SETS>") != -1:
-                        #print self.raveParameters
                         for overrideItems in self.raveParameters:
                             for override in overrideItems:
                                 file.write(override.strip() + os.linesep)

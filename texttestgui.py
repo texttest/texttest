@@ -631,7 +631,7 @@ class TestCaseGUI(RightWindowGUI):
 
         self.testComparison = test.stateDetails
         if test.state == test.RUNNING:
-            self.testComparison = comparetest.TestComparison(test)
+            self.testComparison = comparetest.TestComparison(test.stateDetails, None)
             self.testComparison.makeComparisons(test, makeNew = 1)
         diagComps = []
         hasNewDiags, hasOldDiags = 0, 0

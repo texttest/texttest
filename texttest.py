@@ -419,14 +419,19 @@ class OptionFinder:
             return None
     def getActionSequence(self, app):
         if self.inputOptions.has_key("s"):
-            actionOption = self.inputOptions["s"].split(".")
+            actionCom = self.inputOptions["s"].split(" ")[0]
+            actionArgs = self.inputOptions["s"].split(" ")[1:]
+            actionOption = actionCom.split(".")
             if len(actionOption) == 2:
                 module, pclass = actionOption
 
                 importCommand = "from " + module + " import " + pclass + " as _pclass"
                 try:
                     exec importCommand
-                    return [ _pclass() ]
+                    if len(actionArgs) > 0:
+                        return [ _pclass(actionArgs) ]
+                    else:
+                        return [ _pclass() ]
                 except:
                     pass
             return [ plugins.NonPythonAction(self.inputOptions["s"]) ]

@@ -122,6 +122,7 @@ class ApcCompileRules(carmen.CompileRules):
     def __call__(self, test):
         self.apcLib = os.path.join(os.environ["CARMSYS"], self.libraryFile)
         carmTmpDir = os.environ["CARMTMP"]
+        self.verifyAirportFile()
         if not os.path.isdir(carmTmpDir):
             os.mkdir(carmTmpDir)
         if self.forcedRuleCompile == 0 and carmen.architecture == "i386_linux":
@@ -186,6 +187,31 @@ class ApcCompileRules(carmen.CompileRules):
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
 
+    def verifyAirportFile(self):
+       etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
+       customerEtab = os.path.join(etabPath, "Customer.etab")
+       if os.path.isfile(customerEtab):
+          etab = carmen.ConfigEtable(customerEtab)
+          airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
+          if os.path.isfile(airportFile):
+             return
+          srcDir = etab.getValue("default", "AirpMaint", "AirportSrcDir")
+          if srcDir == None:
+             srcDir = etab.getValue("default", "AirpMaint", "AirportSourceDir")
+          if srcDir == None:
+             srcDir = os.path.join(os.environ["CARMUSR"], "data", "Airport", "source")
+          srcFile = os.path.join(srcDir, "AirportFile")
+          if os.path.isfile(srcFile):
+             apCompile = os.path.join(os.environ["CARMSYS"], "bin", carmen.architecture, "apcomp")
+             if os.path.isfile(apCompile):
+                print "Missing AirportFile detected, building:", airportFile
+                carmen.ensureDirectoryExists(os.path.dirname(airportFile))
+                os.system(apCompile + " " + srcFile + " > " + airportFile)
+                if os.path.isfile(airportFile):
+                   return
+       raise EnvironmentError, "Failed to find AirportFile"
+
+      
 class RemoveLogs(plugins.Action):
     def __call__(self, test):
         self.removeFile(test, "errors")
@@ -209,25 +235,33 @@ class StartStudio(plugins.Action):
 class MakeProgressReport(optimization.MakeProgressReport):
     def __init__(self, referenceVersion):
         optimization.MakeProgressReport.__init__(self, referenceVersion)
+    def getKPIValues(self, costs, times, totPerf, margin):
+        finalPerf = times[-1]
+        costs, times = filterLastCosts(costs, times, margin)
+        lastCost = costs[-1]
+        lastPerf = times[-1]
+        return lastCost, float(lastPerf / finalPerf * totPerf)
     def compare(self, test, referenceFile, currentFile):
         try:
             margin = float(test.app.getConfigValue("kpi_cost_margin"))
         except:
             margin = 0.0
-        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile, " TOTAL cost", margin)
-        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile, " TOTAL cost", margin)
-        currPerf = int(performance.getTestPerformance(test))
-        refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
-        currTTWC = currPerf
-        refTTWC = refPerf
-        if currentCosts[-1] < referenceCosts[-1]:
-            currTTWC = self.timeToCostFromTimes(curTimes, currPerf, currentCosts, referenceCosts[-1])
-            refTTWC = refTimes[-1]
+        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile, " TOTAL cost")
+        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile, " TOTAL cost")
+        totCurrPerf = int(performance.getTestPerformance(test))
+        totRefPerf = int(performance.getTestPerformance(test, self.referenceVersion))
+        lastCCost, lastCP = self.getKPIValues(currentCosts, curTimes, totCurrPerf, margin)
+        lastRCost, lastRP = self.getKPIValues(referenceCosts, refTimes, totRefPerf, margin)
+        currTTWC = lastCP
+        refTTWC = lastRP
+        if lastCCost < lastRCost:
+            currTTWC = self.timeToCostFromTimes(curTimes, totCurrPerf, currentCosts, lastRCost)
         else:
-            refTTWC = self.timeToCostFromTimes(refTimes, refPerf, referenceCosts, currentCosts[-1])
-            currTTWC = curTimes[-1]
+            refTTWC = self.timeToCostFromTimes(refTimes, totRefPerf, referenceCosts, lastCCost)
         if float(refTTWC) < 1:
             return
+        currTTWC = float(int(currTTWC * 10) / 10.0)
+        refTTWC = float(int(refTTWC * 10) / 10.0)
         kpi = float(currTTWC) / float(refTTWC)
         self.testCount += 1
         self.kpi *= kpi
@@ -235,10 +269,11 @@ class MakeProgressReport(optimization.MakeProgressReport):
         print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.percent(kpi)
         self.reportLine("                         ", "Current", "Version " + self.referenceVersion)
         self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
+        self.reportLine("Measured cost of plan    ", lastCCost, lastRCost)
         self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
         self.reportLine("Memory used (Mb)         ", currentMaxMemory, refMaxMemory)
-        self.reportLine("Total time (minutes)     ", currPerf, refPerf)
-        self.reportLine("Time to worst cost (mins)", int(currTTWC), int(refTTWC))
+        self.reportLine("Total time (minutes)     ", int(totCurrPerf), int(totRefPerf))
+        self.reportLine("Time to worst cost (mins)", currTTWC, refTTWC)
     def getCosts(self, file, type):
         costCommand = "grep '" + type + "' " + file + " | awk '{ print $3 }'"
         return map(self.makeInt, os.popen(costCommand).readlines())
@@ -415,7 +450,7 @@ def filterLastCosts(costs, times, margin):
                 return costs[:-1 * ix], times[:-1 * ix]
     return costs[0:2], times[0:2]
     
-def getSolutionStatistics(currentFile, statistics, margin = 0.0):
+def getSolutionStatistics(currentFile, statistics):
     grepCommand = "grep -E 'memory|" + statistics + "|cpu time' " + currentFile
     grepLines = os.popen(grepCommand).readlines()
     costs = []
@@ -434,7 +469,6 @@ def getSolutionStatistics(currentFile, statistics, margin = 0.0):
         if line.startswith(statistics):
             costs.append(int(line.split()[-1]))
             times.append(lastTime)
-    costs, times = filterLastCosts(costs, times, margin)
     return maxMemory, costs, times
 
 class PlotApcTest(plugins.Action):

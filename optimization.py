@@ -92,6 +92,9 @@ costEntryName = "cost of plan"
 timeEntryName = "cpu time"
 memoryEntryName = "memory"
 methodEntryName = "Running.*\.\.\."
+periodEntryName = "Period"
+dateEntryName = "Date"
+activeMethodEntryName = "Active method"
 newSolutionMarker = "new solution"
 solutionName = "solution"
 
@@ -421,7 +424,7 @@ class OptimizationValueCalculator:
                 continue
             for item, regexp in self.regexps.items():
                 if regexp.search(line):
-                     self.solutions[-1][item] = self.calculateEntry(item, line)
+                    self.solutions[-1][item] = self.calculateEntry(item, line)
     def getSolutions(self, definingItems):
         solutions = []
         for solution in self.solutions:
@@ -448,6 +451,12 @@ class OptimizationValueCalculator:
             return self.getMemory(line)
         elif item == methodEntryName:
             return self.getMethod(line)
+        elif item == activeMethodEntryName:
+            return self.getActiveMethod(line)
+        elif item == periodEntryName:
+            return self.getPeriod(line)
+        elif item == dateEntryName:
+            return self.getDate(line)
         else: # Default assumes a numeric value as the last field of the line
             return self.getFinalNumeric(line)
     def getFinalNumeric(self, line):
@@ -471,6 +480,8 @@ class OptimizationValueCalculator:
     def getMethod(self, methodLine):
         method = methodLine.replace("Running ", "")
         return method.replace("...", "")
+    def getActiveMethod(self, methodLine):
+        return string.join(methodLine.split(" ")[2:])
     def getMemory(self, memoryLine):
         entries = memoryLine.split(" ")
         for index in range(len(entries)):
@@ -482,6 +493,12 @@ class OptimizationValueCalculator:
                 else:
                     return float(memNum)
         return 0
+    def getPeriod(self, periodLine):
+        line = periodLine.split(" ")[-3:]
+        return line[0], line[2]
+    def getDate(self, dateLine):
+        line = dateLine.split(" ")
+        return line[2].strip(',')
 
 class TableTest(plugins.Action):
     def __init__(self, args = []):

@@ -417,8 +417,11 @@ class ApcUpdateLSFStatus(plugins.Action):
          subplanDir = test.writeDirs[-1];
          runStatusHeadFile = os.path.join(subplanDir, "run_status_head")
          if os.path.isfile(runStatusHeadFile):
-             runStatusHead = open(runStatusHeadFile).read()
-             return runStatusHead
+             try:
+                 runStatusHead = open(runStatusHeadFile).read()
+                 return runStatusHead
+             except OSError:
+                 return "Error opening/reading " + runStatusHeadFile                 
          else:
              return "Run status file is not avaliable yet."
                           

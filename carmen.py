@@ -114,7 +114,7 @@ class CarmenConfig(lsf.LSFConfig):
                 return [ self.getWriteDirectoryMaker(), self.getRuleCleanup(), self.getRuleBuilder(0) ]
         else:
             builder = self.getAppBuilder()
-            return [ builder, self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self)
+            return [ builder, self.getWriteDirectoryMaker(), self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self)
     def getRuleCleanup(self):
         return CleanupRules(self.getRuleSetName)
     def getRuleBuilder(self, neededOnly):

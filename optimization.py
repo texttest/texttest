@@ -54,6 +54,10 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
                              - sg
                                Plot all tests chosen on the same graph, rather than one window per test
+                             - title=graphtitle
+                               Sets the title of the graph to graphtitle, rather than the default generated one.
+                             - ts=hours|days|minutes
+                               Used as time scale on the x-axis. Default is minutes.
                                
 optimization.TableTest     - Displays solution data in a table. Works the same as PlotTest in most respects,
                              in terms of which data is displayed and the fact that temporary files are used if possible.
@@ -501,7 +505,7 @@ class OptimizationValueCalculator:
         position = self.regexps[timeEntryName].search(timeLine.strip())
 	cutLine = timeLine[position.start():]
         # Find first pattern after timeEntryName
-        timeEntry = re.findall(r'[0-9]{1,2}:[0-9]{2}:[0-9]{2}', cutLine)
+        timeEntry = re.findall(r'[0-9]{1,3}:[0-9]{2}:[0-9]{2}', cutLine)
 	if len(timeEntry) == 0:
             # No match, return 0
 	    return 0
@@ -512,7 +516,7 @@ class OptimizationValueCalculator:
         method = methodLine.replace("Running ", "")
         return method.replace("...", "")
     def getActiveMethod(self, methodLine):
-        return string.join(methodLine.split(" ")[2:])
+        return methodLine.split(":")[1].split(",")[0].strip()
     def getMemory(self, memoryLine):
         entries = memoryLine.split(" ")
         for index in range(len(entries)):
@@ -1107,10 +1111,10 @@ class _PlotTest(plugins.Action):
 class GraphPlot(plugins.Action):
     def setUpApplication(self, app):
         if commonPlotter.plotForTest:
-            xrange, yrange, targetFile, colour = commonPlotter.plotForTest.getPlotOptions()
+            xrange, yrange, targetFile, colour ,title = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
             os.chdir(app.writeDirectory)
-            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, colour, wait=1)
+            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, colour, title, wait=1)
     
 class TestGraph:
     def __init__(self):
@@ -1154,7 +1158,7 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, writeDir, xrange, yrange, targetFile, colour, wait=0):
+    def plot(self, writeDir, xrange, yrange, targetFile, colour, title = None, wait=0):
         if len(self.plotLines) == 0:
             return
 
@@ -1163,7 +1167,7 @@ class TestGraph:
         gnuplotFile = open(gnuplotFileName, "w")
         if targetFile:
             absTargetFile = os.path.expanduser(targetFile)
-            if not os.path.isabs(absplotPrint):
+            if not os.path.isabs(absTargetFile):
                 print "An absolute path must be given."
                 return
             gnuplotFile.write("set terminal postscript")
@@ -1174,7 +1178,7 @@ class TestGraph:
         gnuplotFile.write("set ylabel '" + self.getAxisLabel("y") + "'" + os.linesep)
         gnuplotFile.write("set xlabel '" + self.getAxisLabel("x") + "'" + os.linesep)
         gnuplotFile.write("set time" + os.linesep)
-        gnuplotFile.write("set title \"" + self.makeTitle() + "\"" + os.linesep)
+        gnuplotFile.write("set title \"" + self.makeTitle(title) + "\"" + os.linesep)
         gnuplotFile.write("set xtics border nomirror norotate" + os.linesep)
         gnuplotFile.write("set ytics border nomirror norotate" + os.linesep)
         gnuplotFile.write("set border 3" + os.linesep)
@@ -1190,6 +1194,7 @@ class TestGraph:
         gnuplotFile.close()
         commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName
         process = plugins.BackgroundProcess(commandLine)
+        process.waitForTermination()
         if targetFile:
             tmppf = open(outputFileName).read()
             if len(tmppf) > 0:
@@ -1205,7 +1210,9 @@ class TestGraph:
             elif label != lineLabel:
                 return ""
         return label
-    def makeTitle(self):
+    def makeTitle(self, title):
+        if title:
+            return title;
         title = ""
         firstApp = self.apps[0]
         if len(self.apps) == 1:
@@ -1227,11 +1234,13 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         guiplugins.InteractiveAction.__init__(self, test, oldOptionGroup, "Graph")
         self.addOption(oldOptionGroup, "r", "Horizontal range", "0:")
         self.addOption(oldOptionGroup, "yr", "Vertical range")
+        self.addOption(oldOptionGroup, "ts", "Time scale to use", "minutes")
         self.addOption(oldOptionGroup, "p", "Absolute file to print to")
         self.addOption(oldOptionGroup, "i", "Log file item to plot", costEntryName)
         self.addOption(oldOptionGroup, "v", "Extra versions to plot")
         self.addSwitch(oldOptionGroup, "pc", "Print in colour")
         self.addSwitch(oldOptionGroup, "s", "Plot against solution number rather than time")
+        self.addOption(oldOptionGroup, "title", "Title of the plot")
         self.externalGraph = graph
         if graph:
             self.testGraph = graph
@@ -1264,15 +1273,16 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):
-        xrange, yrange, fileName, writeColour = self.getPlotOptions()
-        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, writeColour)
+        xrange, yrange, fileName, writeColour, title = self.getPlotOptions()
+        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, writeColour, title)
         self.testGraph = TestGraph()
     def getPlotOptions(self):
         xrange = self.optionGroup.getOptionValue("r")
         yrange = self.optionGroup.getOptionValue("yr")
         fileName = self.optionGroup.getOptionValue("p")
         writeColour = self.optionGroup.getSwitchValue("pc")
-        return xrange, yrange, fileName, writeColour
+        title = self.optionGroup.getOptionValue("title")
+        return xrange, yrange, fileName, writeColour, title
     def writePlotFiles(self, lineName, logFile, test):
         plotItems = self.getItemsToPlot()
         optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
@@ -1280,7 +1290,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             return
 
         for item in plotItems:
-            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"))
+            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"))
             self.testGraph.addLine(plotLine)
 
 class StartStudio(guiplugins.InteractiveAction):
@@ -1309,7 +1319,7 @@ class StartStudio(guiplugins.InteractiveAction):
 guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUI, StartStudio ]
 
 class PlotLine:
-    def __init__(self, test, lineName, item, optRun, plotAgainstSolution):
+    def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale):
         self.test = test
         self.name = lineName
         self.lineType = None
@@ -1317,13 +1327,24 @@ class PlotLine:
         if item != costEntryName:
             self.name += "." + item
         self.axisLabels = {}
+        timeScaleFactor = 0
         if plotAgainstSolution:
             self.axisLabels["x"] = "Solution number"
         else:
-            self.axisLabels["x"] = "CPU time (min)"
+            if plotTimeScale == "hours":
+                timeScaleFactor = 60
+                self.axisLabels["x"] = "CPU time (hours)"
+            elif plotTimeScale == "days":
+                timeScaleFactor = 60*24
+                self.axisLabels["x"] = "CPU time (days)"
+            else:
+                if not plotTimeScale == "minutes":
+                    print "Unknown time scale unit", plotTimeScale, ", using minutes."
+                timeScaleFactor = 1
+                self.axisLabels["x"] = "CPU time (min)"
         self.axisLabels["y"] = item
         self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
-        self.writeFile(optRun, item, plotAgainstSolution)
+        self.writeFile(optRun, item, plotAgainstSolution, timeScaleFactor)
     def getAxisLabel(self, axis):
         return self.axisLabels[axis]
     def getPlotFileName(self, lineName, item):
@@ -1331,7 +1352,7 @@ class PlotLine:
             return "plot-" + lineName.replace(" ", "-")
         else:
             return "plot-" + lineName.replace(" ", "-") + "-" + item.replace(" ", "-")
-    def writeFile(self, optRun, item, plotAgainstSolution):
+    def writeFile(self, optRun, item, plotAgainstSolution, timeScaleFactor):
         dir, localName = os.path.split(self.plotFileName)
         if not os.path.isdir(dir):
             os.makedirs(dir)
@@ -1341,7 +1362,7 @@ class PlotLine:
                 if plotAgainstSolution:
                     plotFile.write(str(solution[item]) + os.linesep)
                 else:
-                    plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[item]) + os.linesep)
+                    plotFile.write(str(solution[timeEntryName]/timeScaleFactor) + "  " + str(solution[item]) + os.linesep)
     def getPlotArguments(self, multipleApps, multipleUsers, multipleLines, multipleTests):
         return "'" + self.plotFileName + "' " + self.getPlotName(multipleApps, multipleUsers, multipleTests) + self.getStyle(multipleLines)
     def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):

@@ -991,6 +991,25 @@ class PlotTest(plugins.Action):
         commonPlotter(test)
     def setUpSuite(self, suite):
         commonPlotter.setUpSuite(suite)
+    # Interactive stuff
+    def getTitle(self):
+        return "Plot Graph"
+    def getArgumentOptions(self):
+        options = {}
+        options["r"] = "Time range in minutes"
+        options["p"] = "Absolute file to print to"
+        options["i"] = "Log file item to plot"
+        options["v"] = "Versions to plot"
+        return options
+    def getSwitches(self):
+        switches = {}
+        switches["pc"] = "Plot in colour"
+        switches["s"] = "Plot against solution number rather than time"
+        switches["nt"] = "Ignore temporary file"
+        switches["b"] = "Plot original and temporary file"
+        switches["ns"] = "Don't scale times"
+        switches["nv"] = "No line type grouping for versions"
+        return switches
         
 # Class for using gnuplot to plot test curves of tests
 #
@@ -1019,25 +1038,6 @@ class _PlotTest(plugins.Action):
             self.plotGraph()
     def setUpSuite(self, suite):
         self.lastSuite = suite.name
-    # Interactive stuff
-    def getTitle(self):
-        return "Plot Graph"
-    def getArgumentOptions(self):
-        options = {}
-        options["r"] = "Time range in minutes"
-        options["p"] = "Absolute file to print to"
-        options["i"] = "Log file item to plot"
-        options["v"] = "Versions to plot"
-        return options
-    def getSwitches(self):
-        switches = {}
-        switches["pc"] = "Plot in colour"
-        switches["s"] = "Plot against solution number rather than time"
-        switches["nt"] = "Ignore temporary file"
-        switches["b"] = "Plot original and temporary file"
-        switches["ns"] = "Don't scale times"
-        switches["nv"] = "No line type grouping for versions"
-        return switches
     def interpretOptions(self, args):
         for ar in args:
             arr = ar.split("=")

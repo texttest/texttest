@@ -205,6 +205,7 @@ class SubmitTest(unixConfig.RunTest):
     def __repr__(self):
         return "Submitting"
     def runTest(self, test):
+        self.describe(test)
         queueToUse = self.queueFunction(test)
         testCommand = self.getExecuteCommand(test)
         reportfile =  test.makeFileName("lsfreport", temporary=1, forComparison=0)
@@ -228,6 +229,7 @@ class SubmitTest(unixConfig.RunTest):
         # Don't change state just because we submitted to LSF
         pass
     def setUpApplication(self, app):
+        unixConfig.RunTest.setUpApplication(self, app)
         app.setConfigDefault("lsf_queue", "normal")
         app.setConfigDefault("lsf_processes", "1")
     def getCleanUpAction(self):

@@ -25,6 +25,8 @@ class CheckLogFilePredictions(plugins.Action):
         logFile = test.makeFileName(stem, self.version, temporary=1)
         if not os.path.isfile(logFile):
             logFile = test.makeFileName(stem, self.version)
+            if not os.path.isfile(logFile):
+                return None
         return logFile
     def insertError(self, test, error):
         test.changeState(test.FAILED, error)
@@ -63,6 +65,8 @@ class CheckPredictions(CheckLogFilePredictions):
     def extractErrorsFrom(self, test, fileStem, compsNotFound):
         errorsFound = 0
         logFile = self.getLogFile(test, fileStem)
+        if not logFile:
+            return 0
         for line in open(logFile).xreadlines():
             for error in self.internalErrorList:
                 if line.find(error) != -1:

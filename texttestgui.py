@@ -147,13 +147,23 @@ class TextTestGUI:
             self.postponedInstructions = []
         self.workQueue.put("actions finished")
     def performAction(self, test, action):
-        if test in self.postponedTests:
-            self.postponedInstructions.append((test, action))
-        else:
-            retValue = test.callAction(action)
-            if retValue != None:
-                self.postponedTests.append(test)
+        while 1:
+            if self.quitGUI:
+                return 0
+
+            if test in self.postponedTests:
                 self.postponedInstructions.append((test, action))
+                return 1
+            else:
+                retValue = test.callAction(action)
+                if retValue == "retry":
+                    # Don't busy-wait
+                    time.sleep(0.1)
+                    continue
+                elif retValue == "wait":
+                    self.postponedTests.append(test)
+                    self.postponedInstructions.append((test, action))
+            return 1
     def notifyChange(self, test):
         if currentThread() == self.actionThread:
             self.workQueue.put(test)

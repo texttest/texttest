@@ -430,7 +430,16 @@ class Application:
         # Don't be somewhere under the directory when it's removed
         os.chdir(self.abspath)
         if not self.keepTmpFiles and os.path.isdir(self.writeDirectory):
-            shutil.rmtree(self.writeDirectory)
+            self._removeDir()
+    def _removeDir(self):
+        for i in range(5):
+            try:
+                shutil.rmtree(self.writeDirectory)
+                return
+            except OSError:
+                print "Write directory still in use, waiting 1 second to remove..."
+                time.sleep(1)
+        print "Something still using write directory", self.writeDirectory, ": leaving it"
     def cleanPreviousWriteDirs(self, rootDir, nameBase = ""):
         if not os.path.isdir(rootDir):
             return

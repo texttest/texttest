@@ -58,29 +58,54 @@ class UNIXConfig(default.Config):
         default.Config.printHelpOptions(self, builtInOptions)
 
 class RunTest(default.RunTest):
+    def __init__(self):
+        self.interactive = 0
+        self.process = None
+        self.collectStdErr = 1
     def runTest(self, test):
         testCommand = self.getExecuteCommand(test)
-        os.system(testCommand)
+        if self.process:
+            # See if the running process is finished
+            if self.process.hasTerminated():
+                self.process = None
+                return
+            else:
+                return "retry"
+
+        self.describe(test)
+        if self.interactive:
+            self.process = plugins.BackgroundProcess(testCommand)
+            return "retry"
+        else:
+            os.system(testCommand)
     def getExecuteCommand(self, test):
-        testCommand = test.getExecuteCommand()
-        inputFileName = test.inputFile
-        if os.path.isfile(inputFileName):
-            testCommand = testCommand + " < " + inputFileName
-        outfile = test.makeFileName("output", temporary=1)
-        errfile = test.makeFileName("errors", temporary=1)
+        testCommand = default.RunTest.getExecuteCommand(self, test)
+        if self.collectStdErr:
+            errfile = test.makeFileName("errors", temporary=1)
+            testCommand += " 2> " + errfile
         # put the command in a file to avoid quoting problems,
         # also fix env.variables that remote login doesn't reset
         cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
         f = open(cmdFile, "w")
-        f.write("HOST=`hostname`; export HOST\n")
-        f.write(testCommand + " > " + outfile + " 2> " + errfile + "\n")
+        f.write("HOST=`hostname`; export HOST" + os.linesep)
+        f.write(testCommand + os.linesep)
         f.close()
         unixPerfFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
         timedTestCommand = '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
         return timedTestCommand
     def changeState(self, test):
         test.changeState(test.RUNNING, "Running on " + hostname())
-
+    def getInstructions(self, test):
+        self.interactive = 1
+        return plugins.Action.getInstructions(self, test)
+    def getCleanUpAction(self):
+        if self.process:
+            print "Killing running test (process id", str(self.process.processId) + ")"
+            self.process.kill()
+    def setUpApplication(self, app):
+        app.setConfigDefault("collect_standard_error", 1)
+        self.collectStdErr = int(app.getConfigValue("collect_standard_error"))
+   
 def hostname():
     if os.environ.has_key("HOST"):
         return os.environ["HOST"]

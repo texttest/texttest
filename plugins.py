@@ -1,5 +1,5 @@
 
-import os, log4py, string
+import os, log4py, string, signal
 from types import FileType
 
 # Generic configuration class
@@ -134,3 +134,34 @@ class NonPythonAction(Action):
         os.system(self.script + " app_level " + app.name)
     def callScript(self, test, level):
         os.system(self.script + " " + level + " " + test.name + " " + test.app.name)
+
+# Generally useful class to encapsulate a background process, of which TextTest creates
+# a few... seems it only works on UNIX right now.
+class BackgroundProcess:
+    def __init__(self, commandLine):
+        processId = os.fork()
+        if processId == 0:
+            self.resetSignalHandlers()
+            os.system(commandLine)
+            os._exit(0)
+        else:
+            self.processId = processId
+    def hasTerminated(self):
+        try:
+            procId, status = os.waitpid(self.processId, os.WNOHANG)
+            return procId > 0 or status > 0
+        except OSError:
+            return 1
+    def kill(self):
+        os.kill(self.processId, signal.SIGTERM)
+    def resetSignalHandlers(self):
+        # Set all signal handlers to default. There is a python bug
+        # that processes started from threads block all signals. This
+        # is very bad.
+        for sigNum in range(1, signal.NSIG):
+            try:
+                signal.signal(sigNum, signal.SIG_DFL)
+            except RuntimeError:
+                # If it's out of range it's probably not very important
+                pass
+            

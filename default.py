@@ -236,39 +236,29 @@ class FileFilter(TextFilter):
             return 0
         self.texts = map(string.strip, open(fullPath).readlines())
         return 1
-    
-# Use communication channels for stdin and stderr (because we don't know how to redirect these on windows).
-# Tried to use communication channels on all three, but read() blocks and deadlock between stderr and stdout can result.
+
+# Standard error redirect is difficult on windows, don't try...
 class RunTest(plugins.Action):
     def __repr__(self):
         return "Running"
     def __call__(self, test):
         if test.state == test.UNRUNNABLE:
             return
-        self.describe(test)
         self.changeState(test)
-        self.runTest(test)
+        return self.runTest(test)
     def changeState(self, test):
         test.changeState(test.RUNNING, "Running on local machine")
     def runTest(self, test):
-        outfileName = test.makeFileName("output", temporary=1)
-        errfileName = test.makeFileName("errors", temporary=1)
-        stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfileName)
+        self.describe(test)
+        testCommand = self.getExecuteCommand(test)
+        os.system(testCommand)
+    def getExecuteCommand(self, test):
+        testCommand = test.getExecuteCommand()
         inputFileName = test.inputFile
         if os.path.isfile(inputFileName):
-            inputData = open(inputFileName).read()
-            stdin.write(inputData)
-        stdin.close()
-        errfile = open(errfileName, "w")
-        errfile.write(stderr.read())
-        errfile.close()
-        #needed to be sure command is finished
-        try:
-            os.wait()
-        except AttributeError:
-            pass # Wait doesn't exist on Windows, but seems necessary on UNIX
-    def getExecuteCommand(self, test):
-        return test.getExecuteCommand()
+            testCommand = testCommand + " < " + inputFileName
+        outfile = test.makeFileName("output", temporary=1)
+        return testCommand + " > " + outfile
     def setUpSuite(self, suite):
         self.describe(suite)
 

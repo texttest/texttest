@@ -168,6 +168,7 @@ class SubmitTest(plugins.Action):
     def __init__(self, queueFunction, resourceFunction):
         self.queueFunction = queueFunction
         self.resourceFunction = resourceFunction
+        self.diag = plugins.getDiagnostics("LSF")
     def __repr__(self):
         return "Submitting"
     def __call__(self, test):
@@ -183,6 +184,7 @@ class SubmitTest(plugins.Action):
         unixPerfFile = test.getTmpFileName("unixperf", "w")
         timedTestCommand = '\\time -p sh ' + testCommand + ' 2> ' + unixPerfFile
         commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile + " 2>&1"
+        self.diag.info("Submitting with command : " + commandLine)
         os.system(commandLine)
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()

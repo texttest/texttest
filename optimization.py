@@ -1166,9 +1166,10 @@ class TestGraph:
         outputFileName = os.path.join(writeDir, "gnuplot.output")
         gnuplotFile = open(gnuplotFileName, "w")
         if targetFile:
-            absTargetFile = os.path.expanduser(targetFile)
+            # The abspath is to get the testing working, I don't like the abspath...
+            absTargetFile = os.path.abspath(os.path.expanduser(targetFile))
             if not os.path.isabs(absTargetFile):
-                print "An absolute path must be given."
+                print "An absolute path must be given.", absTargetFile
                 return
             gnuplotFile.write("set terminal postscript")
             if colour:
@@ -1193,14 +1194,17 @@ class TestGraph:
         gnuplotFile.write("quit" + os.linesep)
         gnuplotFile.close()
         commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName
-        process = plugins.BackgroundProcess(commandLine)
-        process.waitForTermination()
+        # This is ugly! It's only to be able to test it (we must avoid getting windows poping up).
         if targetFile:
+            os.system(commandLine)
             tmppf = open(outputFileName).read()
             if len(tmppf) > 0:
                 open(absTargetFile, "w").write(tmppf)
-        if wait:
+        else:
+            process = plugins.BackgroundProcess(commandLine)
             process.waitForTermination()
+            if wait:
+                process.waitForTermination()
     def getAxisLabel(self, axis):
         label = None
         for plotLine in self.plotLines:

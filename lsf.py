@@ -91,12 +91,16 @@ class LSFConfig(unixConfig.UNIXConfig):
             return MakePerformanceFile(self.isSlowdownJob)
         else:
             return unixConfig.UNIXConfig.getPerformanceFileMaker(self)
-    def queueDecided(self, test):
-        return self.optionMap.has_key("q")
     def findLSFQueue(self, test):
-        if self.queueDecided(test):
+        if self.optionMap.has_key("q"):
             return self.optionMap["q"]
-        return test.app.getConfigValue("lsf_queue")
+        configQueue = test.app.getConfigValue("lsf_queue")
+        if configQueue != "texttest_default":
+            return configQueue
+
+        return self.findDefaultLSFQueue(test)
+    def findDefaultLSFQueue(self, test):
+        return "normal"
     def findLSFResource(self, test):
         resourceList = self.findResourceList(test.app)
         if len(resourceList) == 0:
@@ -145,7 +149,7 @@ class LSFConfig(unixConfig.UNIXConfig):
         default.Config.printHelpOptions(self, builtInOptions)
     def setApplicationDefaults(self, app):
         unixConfig.UNIXConfig.setApplicationDefaults(self, app)
-        app.setConfigDefault("lsf_queue", "normal")
+        app.setConfigDefault("lsf_queue", "texttest_default")
 
 class LSFJob:
     def __init__(self, test, jobNameFunction = None):

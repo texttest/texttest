@@ -187,10 +187,7 @@ class CarmenConfig(lsf.LSFConfig):
             return [ lsf.LSFConfig.getTestCollator(self), ProcessProfilerResults() ]
         else:
             return lsf.LSFConfig.getTestCollator(self)
-    def findLSFQueue(self, test):
-        if self.queueDecided(test):
-            return lsf.LSFConfig.findLSFQueue(self, test)
-
+    def findDefaultLSFQueue(self, test):
         arch = getArchitecture(test.app)
         return self.getQueuePerformancePrefix(test, arch) + self.getArchQueueName(arch) + self.getQueuePlatformSuffix(test.app, arch)
     def getArchQueueName(self, arch):

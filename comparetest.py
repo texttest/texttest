@@ -114,7 +114,9 @@ class TestComparison:
             comparison.overwrite(exact, versionString)
         for comparison in self.newResults:
             comparison.overwrite(1, versionString)
-
+        self.changedResults = []
+        self.newResults = []
+        self.test.changeState(self.test.SUCCEEDED, self)
 
 class MakeComparisons(plugins.Action):
     def __init__(self, overwriteOnSuccess):

@@ -73,21 +73,32 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
             return "medium"
 
 class SgeSubmissionRules(CarmenSubmissionRules):
-    def findDefaultQueue(self):
+    def findQueue(self):
+        # Carmen's queues are all 'hidden', requesting them directly is not allowed.
+        # They must be requested by their 'queue resources', that have the same names...
+        return ""
+    def findQueueResource(self):
+        requestedQueue = CarmenSubmissionRules.findQueue(self)
+        if requestedQueue:
+            return requestedQueue
         category = self.getPerformanceCategory()
         if category == "short":
             return "short"
+        elif category == "medium":
+            return "normal"
         else:
-            return ""
-    def findResourceList(self):
+            return "idle"
+    def findConcreteResources(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
         arch = getArchitecture(self.test.app)
         resources.append("carmarch=\"*" + arch + "*\"")
         return resources
+    def findResourceList(self):
+        return self.findConcreteResources() + [ self.findQueueResource() ]
     def getSubmitSuffix(self, name):
-        resourceList = self.findResourceList()
-        return CarmenSubmissionRules.getSubmitSuffix(self, name) + ", requesting " + string.join(resourceList, ",")
+        resourceList = self.findConcreteResources()
+        return name + " queue " + self.findQueueResource() + ", requesting " + string.join(self.findConcreteResources(), ",")
 
 class LsfSubmissionRules(CarmenSubmissionRules):
     def findDefaultQueue(self):

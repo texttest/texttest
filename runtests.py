@@ -86,7 +86,7 @@ class TestCase(Test):
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):
         Test.__init__(self, name, abspath, app)
-        self.testCaseFile = self.makeFileName("testcases")
+        self.testCaseFile = self.makeFileName("testsuite")
         self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.version)
         self.testcases = self.getTestCases(filters)
         if len(self.testcases):

@@ -478,12 +478,18 @@ class ReconnectTest(plugins.Action):
         else:
             raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + userToFind + " under " + fetchDir
     def findReconnDirectory(self, fetchDir, app, userToFind):
-        for versionSuffix in app.getVersionFileExtensions():
+        versions = app.getVersionFileExtensions()
+        if len(versions) == 0:
+            versions = [""]
+        for versionSuffix in versions:
             reconnDir = self.findReconnDirWithVersion(fetchDir, app, versionSuffix, userToFind)
             if reconnDir:
                 return reconnDir
     def findReconnDirWithVersion(self, fetchDir, app, versionSuffix, userToFind):
-        patternToFind = app.name + "." + versionSuffix + userToFind
+        if versionSuffix:
+            patternToFind = app.name + "." + versionSuffix + userToFind
+        else:
+            patternToFind = app.name + userToFind
         for subDir in os.listdir(fetchDir):
             fullPath = os.path.join(fetchDir, subDir)
             if os.path.isdir(fullPath) and subDir.startswith(patternToFind):

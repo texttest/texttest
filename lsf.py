@@ -102,11 +102,11 @@ class LSFConfig(unixConfig.UNIXConfig):
             resourceList.append(self.optionValue("R"))
         if self.optionMap.has_key("perf"):
             performanceMachines = app.getConfigList("performance_test_machine")
-            resource = "hname == " + performanceMachines[0]
+            resource = "select[hname == " + performanceMachines[0]
             if len(performanceMachines) > 1:
                 for machine in performanceMachines[1:]:
                     resource += " || hname == " + machine
-            resourceList.append(resource)
+            resourceList.append(resource + "]")
         if os.environ.has_key("LSF_RESOURCE"):
             resource = os.getenv("LSF_RESOURCE")
             if len(resource):

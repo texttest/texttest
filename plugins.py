@@ -16,6 +16,8 @@ class Configuration:
         return []
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options
+    def getVitalFiles(self, app):
+        return [ app.getBinary() ]
     def keepTmpFiles(self):
         return 0
     # Useful features that a GUI might like

@@ -260,9 +260,13 @@ class FileFilter(TextFilter):
 
 # Standard error redirect is difficult on windows, don't try...
 class RunTest(plugins.Action):
+    def __init__(self):
+        self.brokenApps = {}
     def __repr__(self):
         return "Running"
     def __call__(self, test):
+        if test.app.name in self.brokenApps.keys():
+            test.changeState(test.UNRUNNABLE, self.brokenApps[test.app.name])
         if test.state == test.UNRUNNABLE:
             return
         self.changeState(test)
@@ -282,6 +286,10 @@ class RunTest(plugins.Action):
         return testCommand + " > " + outfile
     def setUpSuite(self, suite):
         self.describe(suite)
+    def setUpApplication(self, app):
+        for file in app.getVitalFiles():
+            if not os.path.isfile(file):
+                self.brokenApps[app.name] = file + " has not been built"
 
 class CreateCatalogue(plugins.Action):
     def setUpApplication(self, app):

@@ -133,6 +133,8 @@ class OptimizationConfig(carmen.CarmenConfig):
         if self.isNightJob() or self.optionMap.has_key("rulecomp"):
             return None
         return carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
+    def getVitalFiles(self, app):
+        return carmen.CarmenConfig.getVitalFiles(self, app) + [ os.path.join(os.environ["CARMSYS"], self.getLibraryFile(app)) ]
     def getTestRunner(self):
         return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
     def getSpecificTestRunner(self):

@@ -537,14 +537,14 @@ class Application:
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
         return self.makePathName(os.path.join(checkoutLocation, checkout))
     def getExecuteCommand(self, test):
-        binary = self._getBinary()
-        return self.configObject.getExecuteCommand(binary, test)
-    def _getBinary(self):
-        binary = self.makeAbsPath(self.getConfigValue("binary"))
+        binary = self.getBinary()
         if self.configDir.has_key("interpreter"):
-            return self.configDir["interpreter"] + " " + binary
-        else:
-            return binary
+            binary = self.configDir["interpreter"] + " " + binary
+        return self.configObject.getExecuteCommand(binary, test)
+    def getBinary(self):
+        return self.makeAbsPath(self.getConfigValue("binary"))
+    def getVitalFiles(self):
+        return self.configObject.getVitalFiles(self)
             
 class OptionFinder:
     def __init__(self):

@@ -429,7 +429,7 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
         ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test), getArchitecture(test.app))
         self.diag.info("Checking " + self.getRuleSetName(test))
         self.diag.info("Target file is " + ruleset.targetFile)
-        libFile = self.getLibraryFile(test)
+        libFile = self.getLibraryFile(test.app)
         if libFile:
             self.diag.info("Library files is " + libFile)
         if not ruleset.isValid():

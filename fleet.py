@@ -36,6 +36,8 @@ class FleetConfig(matador.MatadorConfig):
     def printHelpDescription(self):
         print helpDescription
         matador.MatadorConfig.printHelpDescription(self)
+    def getBinaryFile(self, test):
+        return os.path.join("bin", carmen.getArchitecture(test.app), "opt_tail")
     def getLibraryFile(self, test):
         # Don't try to use Matador's library file!
         return None

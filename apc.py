@@ -85,8 +85,8 @@ class ApcConfig(optimization.OptimizationConfig):
         return optimization.OptimizationConfig.getActionSequence(self)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
-    def getLibraryFile(self, test):
-        return os.path.join("data", "apc", carmen.getArchitecture(test.app), "libapc.a")
+    def getLibraryFile(self, app):
+        return os.path.join("data", "apc", carmen.getArchitecture(app), "libapc.a")
     def getRuleBuilder(self):
         if self.isNightJob():
             ruleCompile = 1

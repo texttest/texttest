@@ -83,8 +83,14 @@ class MatadorConfig(optimization.OptimizationConfig):
             return plugins.Action()
         else:
             return optimization.OptimizationConfig.getPerformanceFileMaker(self)
-    def getLibraryFile(self, test):
-        return os.path.join("data", "crc", "MATADOR", carmen.getArchitecture(test.app), "matador.o")
+    def getLibraryFile(self, app):
+        raveName = app.getConfigValue("rave_name")
+        return os.path.join("data", "crc", string.upper(raveName), carmen.getArchitecture(app), raveName + ".o")
+    def getVitalFiles(self, app):
+        return optimization.OptimizationConfig.getVitalFiles(self, app) + \
+               [ os.path.join(os.environ["CARMSYS"], self.getBinaryFile(app)) ]
+    def getBinaryFile(self, app):
+        return os.path.join("bin", carmen.getArchitecture(app), app.getConfigValue("rave_name"))
     def _getSubPlanDirName(self, test):
         subPlan = self._subPlanName(test)
         fullPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", subPlan)

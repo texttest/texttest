@@ -13,6 +13,8 @@ class FlamencoConfig(carmen.CarmenConfig):
         carmen.CarmenConfig.__init__(self,optionMap)
         global debugLog
 	debugLog = plugins.getDiagnostics("flamenco")
+    def getVitalFiles(self, app):
+        return [ app.getBinary().replace("ARCHITECTURE", carmen.getArchitecture(app)) ]
     def getExecuteCommand(self, binary, test):
 	prog = binary.replace("ARCHITECTURE", carmen.getArchitecture(test.app))
 	testext = " " + test.app.name + " "

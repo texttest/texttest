@@ -9,8 +9,14 @@ class OptimizationConfig(carmen.CarmenConfig):
         if self.optionMap.has_key("rulecomp"):
             return carmen.CarmenConfig.getActionSequence(self)
         
-        staticFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
-        return [ carmen.CompileRules(self.getRuleSetName, "-optimize", staticFilter) ] + carmen.CarmenConfig.getActionSequence(self)
+        return [ self.getRaveBuildAction() ] + carmen.CarmenConfig.getActionSequence(self)
+    def getRaveBuildAction(self):
+        batchSession = self.optionValue("b")
+        if batchSession == "nightjob" or batchSession == "wkendjob":
+            return carmen.CompileRules(self.getRuleSetName)
+        
+        localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
+        return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
         return carmen.CarmenConfig.getTestCollator(self) + [ ExtractSubPlanFile(self, "best_solution", "solution") ]
 

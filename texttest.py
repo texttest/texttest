@@ -1004,10 +1004,10 @@ class MultiEntryDictionary(seqdict):
                 self.parseConfigLine(line.strip(), insert, errorOnUnknown)
         # Versions are in order of most specific first. We want to update with least specific first.
         versions.reverse()
-        self.updateFor(filename, appName)
+        self.updateFor(filename, appName, insert, errorOnUnknown)
         for version in versions:
-            self.updateFor(filename, version)
-            self.updateFor(filename, appName + "." + version)
+            self.updateFor(filename, version, insert, errorOnUnknown)
+            self.updateFor(filename, appName + "." + version, insert, errorOnUnknown)
     def parseConfigLine(self, line, insert, errorOnUnknown):
         if line.startswith("#") or len(line) == 0:
             return
@@ -1025,13 +1025,13 @@ class MultiEntryDictionary(seqdict):
         if errorOnUnknown:
             print "ERROR : config section name '" + name + "' not recognised."
         return self
-    def updateFor(self, filename, extra):
+    def updateFor(self, filename, extra, ins, errUnk):
         if len(extra) == 0:
             return
         debugLog.debug("Updating " + filename + " for version " + extra) 
         extraFileName = filename + "." + extra
         if os.path.isfile(extraFileName):
-            self.readValuesFromFile(extraFileName)
+            self.readValuesFromFile(extraFileName, insert=ins, errorOnUnknown=errUnk)
     def addLine(self, line, insert, errorOnUnknown, separator = ':'):
         entryName, entry = string.split(line, separator, 1)
         self.addEntry(entryName, entry, "", insert, errorOnUnknown)

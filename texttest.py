@@ -50,7 +50,9 @@ builtInOptions = """
 
 # Base class for TestCase and TestSuite
 class Test:
-    #State names
+    #State names. By default, the negative states are not used. We start in state NOT_STARTED
+    NEED_PREPROCESS = -2
+    RUNNING_PREPROCESS = -1
     NOT_STARTED = 0
     RUNNING = 1
     KILLED = 2
@@ -221,12 +223,15 @@ class TestCase(Test):
             return
         eventName = "test " + self.name + " to " + self.stateChangeDescription(state)
         category = self.name
-        ScriptEngine.instance.applicationEvent(eventName, category)
+        # Files abound here, we wait a little for them to clear up
+        ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=0.5)
     def stateChangeDescription(self, state):
         if state == self.RUNNING:
             return "start"
         if state == self.FAILED or state == self.UNRUNNABLE or state == self.SUCCEEDED:
             return "complete"
+        if state == self.RUNNING_PREPROCESS:
+            return "start preprocessing"
         return "finish preprocessing"
     def performOnSubTests(self, action):
         pass
@@ -572,6 +577,7 @@ class Application:
             self.setConfigDefault("follow_program", None)
     def getGuiColourDictionary(self):
         dict = {}
+        dict["run_preprocess"] = "peach puff"
         dict["success"] = "green"
         dict["failure"] = "red"
         dict["running"] = "yellow"
@@ -1188,7 +1194,7 @@ class ApplicationRunner:
     def setUpApplications(self, sequence):
         self.testSuite.setUpEnvironment()
         for action in sequence:
-            self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.testSuite.app))
+            self.diag.info("Performing " + str(action) + " set up on " + repr(self.testSuite.app))
             try:
                 action.setUpApplication(self.testSuite.app)
             except KeyboardInterrupt:

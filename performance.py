@@ -18,6 +18,11 @@ test ran on a performance test machine and it ran for long enough for performanc
 checking to be worthwhile, the deviation from the standard performance in percentage
 is checked. If it is greater than the config file entry "cputime_variation_%", failure
 is reported.
+
+When differences in performance are reported, you are given the option to save as described below.
+The default behaviour is to save the average of the old result and the new result. In order
+to override this and save the exact result, append a '+' to the save option that you type.
+(so "s+" to save the standard version, "1+" to save the first offered version etc.)
 """ + comparetest.helpDescription
 
 # This module won't work without an external module creating a file called performance.app
@@ -113,6 +118,14 @@ class PerformanceFileComparison(comparetest.FileComparison):
         largest = max(self.oldCPUtime, self.newCPUtime)
         smallest = min(self.oldCPUtime, self.newCPUtime)
         return ((largest - smallest) / smallest) * 100
+    def saveResults(self, destFile):
+        # Here we save the average of the old and new performance, assuming fluctuation
+        avgPerformance = round((self.oldCPUtime + self.newCPUtime) / 2.0, 2)
+        line = open(self.tmpFile).readlines()[0]
+        lineToWrite = line.replace(str(self.newCPUtime), str(avgPerformance))
+        newFile = open(destFile, "w")
+        newFile.write(lineToWrite)
+        os.remove(self.tmpFile)
 
 class TimeFilter(plugins.Filter):
     def __init__(self, timeLimit):

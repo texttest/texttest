@@ -71,6 +71,10 @@ class TestComparison:
         return None
     def createFileComparison(self, test, standardFile, tmpFile):
         return FileComparison(test, standardFile, tmpFile)
+    def save(self, exact = 1, versionString = ""):
+        for comparison in self.comparisons:
+            comparison.overwrite(exact, versionString)
+
 
 class MakeComparisons(plugins.Action):
     def __init__(self, newFiles):
@@ -110,7 +114,7 @@ class FileComparison:
         return "difference"
     def hasDifferences(self):
         return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
-    def overwrite(self, versionString = ""):
+    def overwrite(self, exact, versionString = ""):
         newVersions = versionString.split(".")
         stdFile = self.stdFile
         for version in newVersions:
@@ -119,6 +123,14 @@ class FileComparison:
                 stdFile += ext
         if os.path.isfile(stdFile):
             os.remove(stdFile)
-        os.rename(self.tmpFile, stdFile)
-
+        # Allow for subclasses to differentiate between a literal overwrite and a
+        # more intelligent save, e.g. for performance. Default is the same for exact
+        # and inexact save
+        if exact:
+            os.rename(self.tmpFile, stdFile)
+        else:
+            self.saveResults(stdFile)
+    def saveResults(self, destFile):
+        os.rename(self.tmpFile, destFile)
+        
 

@@ -51,17 +51,17 @@ class Responder(plugins.Action):
 # Uses the python ndiff library, which should work anywhere. Override display method to use other things
 class InteractiveResponder(Responder):
     def handleFailure(self, test, testComparison):
-        performView = self.askUser(test, testComparison.comparisons, 1)
+        performView = self.askUser(test, testComparison, 1)
         if performView:
             self.displayComparisons(testComparison.comparisons, sys.stdout, test.app)
-            self.askUser(test, testComparison.comparisons, 0)
+            self.askUser(test, testComparison, 0)
     def displayComparisons(self, comparisons, displayStream, app):
         for comparison in comparisons:
             displayStream.write("------------------ Differences in " + repr(comparison) + " --------------------\n")
             self.display(comparison, displayStream, app)
     def display(self, comparison, displayStream, app):
         ndiff.fcompare(comparison.stdCmpFile, comparison.tmpCmpFile)
-    def askUser(self, test, comparisons, allowView):      
+    def askUser(self, test, testComparison, allowView):      
         versions = test.app.getVersionFileExtensions()
         options = ""
         for i in range(len(versions)):
@@ -71,17 +71,16 @@ class InteractiveResponder(Responder):
             options = "View details(v), " + options
         print test.getIndent() + options
         response = sys.stdin.readline().strip()
-        if response == 's':
-            for comparison in comparisons:
-                comparison.overwrite()
-        elif allowView and response == 'v':
+        exactSave = response.find('+') != -1
+        if response.startswith('s'):
+            testComparison.save(exactSave)
+        elif allowView and response.startswith('v'):
             return 1
         else:
             for i in range(len(versions)):
                 versionOption = str(i + 1)
-                if response == versionOption:
-                    for comparison in comparisons:
-                        comparison.overwrite(versions[i])
+                if response.startswith(versionOption):
+                    testComparison.save(exactSave, versions[i])
         return 0
             
 # Uses UNIX tkdiff
@@ -129,5 +128,4 @@ class OverwriteOnFailures(Responder):
         diffText = " differences in " + self.comparisonsString(testComparison.comparisons)
         return "- overwriting" + diffText
     def handleFailure(self, test, testComparison):
-        for comparison in testComparison.comparisons:
-            comparison.overwrite(self.version)
+        testComparison.save(self.version)

@@ -38,7 +38,7 @@ apc.UpdatePerformance      - Update the performance file for tests with time fro
 
 """
 
-import default, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2
+import default, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -89,7 +89,7 @@ class ApcConfig(optimization.OptimizationConfig):
     def getTestCollator(self):
         subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
         subActions.append(RemoveLogs())
-        subActions.append(optimization.ExtractSubPlanFile(self, "status", "status"))
+        subActions.append(unixConfig.CollateFile("status", "status", [ self.getSubPlanFileName ]))
         subActions.append(FetchApcCore(self))
         subActions.append(optimization.RemoveTemporarySubplan(self.subplanManager))
         return plugins.CompositeAction(subActions)
@@ -279,7 +279,7 @@ class FetchApcCore(plugins.Action):
         scriptError = self.config.getSubPlanFileName(test, "run_status_script_error")
         if not os.path.isfile(scriptError):
             return
-        extractFile = optimization.ExtractSubPlanFile(self.config, "run_status_script_error", "error")
+        extractFile = unixConfig.CollateFile("run_status_script_error", "error", [ self.config.getSubPlanFileName ])
         extractFile(test)
         logFinder = optimization.LogFileFinder(test)
         foundTmp, tmpStatusFile = logFinder.findFile()

@@ -21,11 +21,16 @@ class UNIXConfig(default.Config):
         filters = default.Config.getFilterList(self)
         self.addFilter(filters, "b", batch.BatchFilter)
         return filters
+    def getActionSequence(self):
+        seq = default.Config.getActionSequence(self)
+        if self.optionMap.has_key("b"):
+            seq.append(batch.MailSender(self.optionValue("b")))
+        return seq
     def getTestResponder(self):
         diffLines = 30
         # If running multiple times, batch mode is assumed
         if self.optionMap.has_key("b") or self.optionMap.has_key("m"):
-            return batch.BatchResponder(diffLines, self.optionValue("b"))
+            return batch.BatchResponder(diffLines)
         elif self.optionMap.has_key("o"):
             return default.Config.getTestResponder(self)
         else:

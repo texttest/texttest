@@ -76,11 +76,6 @@ class BatchCategory:
             if lastIndent == currentIndent:
                 self.text.pop()
         self.text.append(line)
-    def briefText(self):
-        if self.description == "succeeded" or self.count == 0:
-            return ""
-        else:
-            return " " + str(self.count) + " " + self.description + ","
     def describe(self, mailFile):
         lastLine = self.text[-1]
         # If the last line talked about a suite, it's not interesting...
@@ -92,11 +87,11 @@ class BatchCategory:
             mailFile.write(os.linesep)
 
 killedTests = []
+allBatchResponders = []
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):
-    def __init__(self, lineCount, sessionName):
-        self.sessionName = sessionName
+    def __init__(self, lineCount):
         self.failureDetail = {}
         self.crashDetail = {}
         self.deadDetail = {}
@@ -108,39 +103,10 @@ class BatchResponder(respond.Responder):
         self.categories["success"] = BatchCategory("succeeded")
         self.categories["unfinished"] = BatchCategory("were unfinished")
         self.categories["badPredict"] = BatchCategory("had internal errors")
-        self.orderedCategories = self.categories.keys()
-        self.orderedCategories.sort()
+        self.categories["dead"] = BatchCategory("caused exception")
         self.mainSuite = None
         self.responder = respond.UNIXInteractiveResponder(lineCount)
-    def __del__(self):
-        if self.testCount() > 0:
-            self.sendMail()
-    def sendMail(self):
-        mailFile = self.createMail(self.getMailTitle(), self.mainSuite.app)
-        for categoryName in self.orderedCategories:
-            self.categories[categoryName].describe(mailFile)
-        if len(self.deadDetail) > 0:
-            self.writeDeadDetail(mailFile)
-        if len(self.crashDetail) > 0:
-            self.writeCrashDetail(mailFile)
-        if len(self.failureDetail) > 0:
-            self.writeFailureDetail(mailFile)
-        mailFile.close()
-    def createMail(self, title, app):
-        mailFile = os.popen("/usr/lib/sendmail -t", "w")
-        fromAddress = os.environ["USER"]
-        toAddress = self.getRecipient(fromAddress, app)
-        mailFile.write("From: " + fromAddress + os.linesep)
-        mailFile.write("To: " + toAddress + os.linesep)
-        mailFile.write("Subject: " + title + os.linesep)
-        mailFile.write(os.linesep) # blank line separating headers from body
-        return mailFile
-    def getRecipient(self, fromAddress, app):
-        # See if the session name has an entry, if not, send to the user
-        try:
-            return app.getConfigValue(self.sessionName + "_recipients")
-        except:
-            return fromAddress
+        allBatchResponders.append(self)
     def addTestToCategory(self, category, test, postText = ""):
         if category != None:
             self.categories[category].addTest(test, postText)
@@ -157,6 +123,7 @@ class BatchResponder(respond.Responder):
         self.crashDetail[test] = crashText
     def handleDead(self, test):
         self.deadDetail[test] = test.deathReason
+        self.addTestToCategory("dead", test)
     def findFailureCategory(self, test, testComparison):
         successCategory = self.findSuccessCategory(test)
         if successCategory != "success":
@@ -184,26 +151,18 @@ class BatchResponder(respond.Responder):
         count = 0
         for category in self.categories.values():
             count += category.count
-        return count + len(self.deadDetail)
-    def getMailHeader(self, app):
-        versionString = ""
-        if len(app.versions) == 1:
-            versionString = "(version " + app.versions[0] + ") "
-        elif len(app.versions) > 1:
-            versionString = "(versions " + repr(app.versions) + ") "
-        return repr(app) + " Test Suite " + versionString + ": "
-    def getMailTitle(self):
-        title = self.getMailHeader(self.mainSuite.app)
-        title += str(self.testCount()) + " tests ran"
-        if self.failureCount() == 0:
-            return title + ", all successful"
-        title += " :"
-        for categoryName in self.orderedCategories:
-            title += self.categories[categoryName].briefText()
+        return count
+    def writeMailBody(self, mailFile):
+        orderedCategories = self.categories.keys()
+        orderedCategories.sort()
+        for categoryName in orderedCategories:
+            self.categories[categoryName].describe(mailFile)
         if len(self.deadDetail) > 0:
-            title += " " + str(len(self.deadDetail)) + " caused exception,"
-        # Lose trailing comma
-        return title[:-1]
+            self.writeDeadDetail(mailFile)
+        if len(self.crashDetail) > 0:
+            self.writeCrashDetail(mailFile)
+        if len(self.failureDetail) > 0:
+            self.writeFailureDetail(mailFile)
     def writeDeadDetail(self, mailFile):
         mailFile.write(os.linesep + "Exception information for the tests that did not run follows..." + os.linesep)
         for test, exc in self.deadDetail.items():
@@ -223,21 +182,118 @@ class BatchResponder(respond.Responder):
             mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             os.chdir(test.abspath)
             self.responder.displayComparisons(testComparison.getComparisons(), mailFile, self.mainSuite.app)
+        
+class MailSender(plugins.Action):
+    def __init__(self, sessionName):
+        self.sessionName = sessionName
+    def getResponders(self, app):
+        appResponders = []
+        for responder in allBatchResponders:
+           if responder.mainSuite.app.name == app.name and responder.testCount() > 0:
+               appResponders.append(responder)
+        return appResponders
+    def setUpApplication(self, app):
+        appResponders = self.getResponders(app)
+        if len(appResponders) == 0:
+            return
+        mailTitle = self.getMailTitle(app, appResponders)
+        mailFile = self.createMail(mailTitle, app)
+        if len(appResponders) > 1:
+            for resp in appResponders:
+                mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
+            mailFile.write(os.linesep)
+        for resp in appResponders:
+            if len(appResponders) > 1:
+                mailFile.write("------------------------------------------------------------------" + os.linesep)
+                mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
+                mailFile.write(os.linesep)
+            resp.writeMailBody(mailFile)
+            mailFile.write(os.linesep)
+        mailFile.close()
+        for responder in appResponders:
+            allBatchResponders.remove(responder)
+    def createMail(self, title, app):
+        mailFile = os.popen("/usr/lib/sendmail -t", "w")
+        fromAddress = os.environ["USER"]
+        toAddress = self.getRecipient(fromAddress, app)
+        mailFile.write("From: " + fromAddress + os.linesep)
+        mailFile.write("To: " + toAddress + os.linesep)
+        mailFile.write("Subject: " + title + os.linesep)
+        mailFile.write(os.linesep) # blank line separating headers from body
+        return mailFile
+    def getRecipient(self, fromAddress, app):
+        # See if the session name has an entry, if not, send to the user
+        try:
+            return app.getConfigValue(self.sessionName + "_recipients")
+        except:
+            return fromAddress
+    def getMailHeader(self, app, appResponders):
+        title = repr(app) + " Test Suite "
+        versions = self.findCommonVersions(appResponders)
+        return title + self.getVersionString(versions) + ": "
+    def getMailTitle(self, app, appResponders):
+        title = self.getMailHeader(app, appResponders)
+        title += self.getTotalString(appResponders, BatchResponder.testCount) + " tests ran"
+        if self.getTotalString(appResponders, BatchResponder.failureCount) == "0":
+            return title + ", all successful"
+        title += " :"
+        failureCategories = appResponders[0].categories.keys()
+        failureCategories.remove("success")
+        failureCategories.sort()
+        for categoryName in failureCategories:
+            totalInCategory = self.getCategoryCount(categoryName, appResponders)
+            title += self.briefText(totalInCategory, appResponders[0].categories[categoryName].description)
+        # Lose trailing comma
+        return title[:-1]
+    def getTotalString(self, appResponders, method):
+        total = 0
+        for resp in appResponders:
+            total += method(resp)
+        return str(total)
+    def getCategoryCount(self, categoryName, appResponders):
+        total = 0
+        for resp in appResponders:
+            total += resp.categories[categoryName].count
+        return total
+    def getVersionString(self, versions):
+        if len(versions) == 1:
+            return "(version " + versions[0] + ") "
+        elif len(versions) > 1:
+            return "(versions " + repr(versions) + ") "
+        else:
+            return ""
+    def briefText(self, count, description):
+        if count == 0:
+            return ""
+        else:
+            return " " + str(count) + " " + description + ","
+    def findCommonVersions(self, appResponders):
+        versions = appResponders[0].mainSuite.app.versions
+        for resp in appResponders[1:]:
+            for version in versions:
+                if not version in resp.mainSuite.app.versions:
+                    versions.remove(version)
+        return versions
     def getCleanUpAction(self):
         return SendException(self) 
 
 class SendException(plugins.Action):
-    def __init__(self, batchResponder):
-        self.batchResponder = batchResponder
+    def __init__(self, mailSender):
+        self.mailSender = mailSender
     def setUpApplication(self, app):
         type, value, traceback = sys.exc_info()
         excData = str(value)
         if len(excData) == 0:
             excData = "caught exception " + str(type)
-        mailTitle = self.batchResponder.getMailHeader(app) + "did not run : " + excData
-        mailFile = self.batchResponder.createMail(mailTitle, app)
+        appResponders = self.mailSender.getResponders(app)
+        if len(appResponders) == 0:
+            return
+        mailTitle = self.mailSender.getMailHeader(app, appResponders) + "did not run : " + excData
+        mailFile = self.mailSender.createMail(mailTitle, app)
         sys.stderr = mailFile
         sys.excepthook(type, value, traceback)
         sys.stderr = sys.__stderr__
         mailFile.close()
+        for responder in appResponders:
+            allBatchResponders.remove(responder)
         

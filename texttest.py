@@ -863,6 +863,8 @@ class OptionFinder:
         debugLog.debug(repr(self.inputOptions))
     def _setUpLogging(self):
         global debugLog
+        # Don't use the default locations, particularly current directory causes trouble
+        del log4py.CONFIGURATION_FILES[1]
         if self.inputOptions.has_key("x") or os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             diagFile = self._getDiagnosticFile()
             if os.path.isfile(diagFile):

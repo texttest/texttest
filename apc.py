@@ -265,16 +265,12 @@ class MakeProgressReport(optimization.MakeProgressReport):
         print os.linesep
         if self.sumRefTime > 0:
             speedKPI = 1.0 * self.sumCurTime / self.sumRefTime
-            wText = "Average time to cost ratio with respect to version"
+            wText = "PS1 (average time to cost ratio) with respect to version"
             print wText, self.referenceVersion, "=", self.percent(speedKPI)
         if self.qualKPICount > 0:
             avg = math.pow(self.qualKPI, 1.0 / float(self.qualKPICount))
-            if avg > 1.0:
-                changeText = "reduction"
-            else:
-                changeText = "improvement"
-            qNumber = abs(round(avg - 1.0,5) * 100.0)
-            wText = "Average quality (qD) " + changeText + " with respect to version"
+            qNumber = round(avg,5) * 100.0
+            wText = "PQ1 (average cost at time ratio) with respect to version"
             print wText, self.referenceVersion, "=", str(qNumber) + "%"
         optimization.MakeProgressReport.__del__(self)
         if len(self.weightKPI) > 1:

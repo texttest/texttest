@@ -83,9 +83,9 @@ class TestSuiteInformation:
                     return line.split(":")[1].strip()
         return None
     def chooseCarmUsr(self):
-        dirName = self.findCarmUsrFrom(["environment"])
+        dirName = self.findCarmUsrFrom(self.findStems("environment"))
         while dirName == None:
-            print "Please give CARMUSR directory to use for new user '" + self.name + "'"
+            print "Please give CARMUSR directory to use for user " + self.userDesc()
             dirName = sys.stdin.readline().strip();
             if not os.path.isdir(dirName):
                 print "Not found: '" + dirName + "'"
@@ -93,10 +93,23 @@ class TestSuiteInformation:
         return dirName
     def makeFileName(self, stem, version = None):
         return self.suite.makeFileName(self.name + os.sep + stem, version)
-    def makeCarmTmpName(self):
+    def findStems(self, baseName):
+        stems = []
+        totalName = baseName + self.appSuffix()
+        splitName = totalName.split(".")
+        splits = len(splitName)
+        if splits > 1:
+            stems.append(splitName[0])
+        if splits > 2:
+            stems.append(splitName[0] + "." + splitName[1])
+        return stems;
+    def userDesc(self):
+        return "'" + self.name + "'(" + self.appSuffix() + ")"
+    def appSuffix(self):
         asFileName = self.suite.makeFileName("__tmp__")
-        suffix = asFileName.replace(os.path.join(self.suite.abspath, "__tmp__"), "")
-        return self.name + "_tmp" + suffix
+        return asFileName.replace(os.path.join(self.suite.abspath, "__tmp__"), "")
+    def makeCarmTmpName(self):
+        return self.name + "_tmp" + self.appSuffix()
         
 class TestCaseInformation:
     def __init__(self, suite, name):
@@ -113,7 +126,7 @@ class TestCaseInformation:
     def replaceCarmUsr(self, path):
         carmUser = os.environ["CARMUSR"]
         if path[0:len(carmUser)] == carmUser:
-            return "${CARMUSR}/" + path[len(carmUser) : len(path)]
+            return "${CARMUSR}" + os.path.join("/", path[len(carmUser) : len(path)])
         return path
     def chooseDir(self, dirs, suiteDesc, tryName):
         answer = -1
@@ -179,9 +192,7 @@ class ImportTest:
     def __call__(self, test, description):
         pass
     
-    def userSuiteComplete(self, userInfo, carmTmpDirInCarmSys):
-        if not os.path.isdir(carmTmpDirInCarmSys):
-            return 0
+    def userSuiteComplete(self, userInfo):
         if not os.path.isdir(userInfo.testPath()):
             return 0
         if not os.path.isfile(userInfo.makeFileName("testsuite")):
@@ -189,26 +200,31 @@ class ImportTest:
         if not os.path.isfile(userInfo.makeFileName("environment")):
             return 0
         return 1
+
+    def getTestCaseInformation(self, suite, name):
+        return TestCaseInformation(suite, name)
+
+    def getTestSuiteInformation(self, suite, name):
+        return TestSuiteInformation(suite, name)
     
     def setUpSuite(self, suite, description):
         if carmen.isUserSuite(suite):
             for testline in open(suite.testCaseFile).readlines():
                 if testline != '\n' and testline[0] != '#':
-                    testInfo = TestCaseInformation(suite, testline.strip())
+                    testInfo = self.getTestCaseInformation(suite, testline.strip())
                     if self.testForImportTestCase(testInfo) != 0:
                         print description + ", Test: '" + testInfo.name + "'"
         else:
             for testline in open(suite.testCaseFile).readlines():
                 if testline != '\n' and testline[0] != '#':
-                    userInfo = TestSuiteInformation(suite, testline.strip())
+                    userInfo = self.getTestSuiteInformation(suite, testline.strip())
                     if self.testForImportTestSuite(userInfo) != 0:
                         print description + ", User: '" + userInfo.name + "'"
 
     def testForImportTestSuite(self, userInfo):
         if not userInfo.suite.environment.has_key("CARMSYS"):
             return 0
-        carmTmpDirInCarmSys = os.path.join(userInfo.absPathToCarmSys(), userInfo.makeCarmTmpName())
-        if self.userSuiteComplete(userInfo, carmTmpDirInCarmSys):
+        if self.userSuiteComplete(userInfo):
             return 0
         envPath = userInfo.makeFileName("environment")
         if not os.path.isfile(envPath):
@@ -216,10 +232,10 @@ class ImportTest:
         else:
             carmUsrDir = None
         if carmUsrDir != None or os.path.isfile(envPath):
-            return self.makeUser(userInfo, carmUsrDir, carmTmpDirInCarmSys)
+            return self.makeUser(userInfo, carmUsrDir)
         return 0
 
-    def makeUser(self, userInfo, carmUsrDir, carmTmpDirInCarmSys):
+    def makeUser(self, userInfo, carmUsrDir):
         return 0
     
     def testForImportTestCase(self, testInfo):

@@ -181,6 +181,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("minimum_memory_for_test", 5)
         app.setConfigDefault("use_standard_input", 1)
         app.setConfigDefault("collect_standard_output", 1)
+        if self.bugzillaInstalled():
+            app.addConfigEntry("definition_file_stems", "bugzilla")
         
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):

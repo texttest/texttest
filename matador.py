@@ -239,6 +239,8 @@ class ImportTest(optimization.ImportTest):
             optimization.ImportTest.setUpSuite(self, suite)
         else:
             self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
+
+optimization.itemNamesInFile[optimization.memoryEntryName] = "Memory"
     
 class PlotTest(optimization.PlotTest):
     def __init__(self, args = []):
@@ -253,17 +255,9 @@ class PlotTest(optimization.PlotTest):
     def getYlabel(self):
         return "Cost of " + self.plotItem
     def getCostsAndTimes(self, file, plotItem):
-        costCommand = "grep 'cost of " + plotItem + "' " + file + " | awk -F':' '{ print $2 }'"
-        timeCommand = "grep 'cpu time' " + file + " | awk '{ print $6 }'"
-        times = map(self._convertTime, os.popen(timeCommand).readlines())
-        times.insert(0, 0.0)
-        costs = map(self._makeInt, os.popen(costCommand).readlines())
+        optCalc = optimization.OptimizationValueCalculator( [ "cost of " + plotItem, optimization.timeEntryName ], file)
+        costs = optCalc.getValues("cost of " + plotItem)
+        times = optCalc.getValues(optimization.timeEntryName)
         return costs, times
-    def _makeInt(self, val):
-        return int(string.strip(val))
-    def _convertTime(self, timeEntry):
-        entries = timeEntry.split(":")
-        timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip())
-        return float(timeInSeconds) / 60.0
     def getStatusFile(self, test, version):
         return optimization.PlotTest.getStatusFile(self, test, version)

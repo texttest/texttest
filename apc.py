@@ -234,6 +234,9 @@ class StartStudio(plugins.Action):
         commandLine = os.path.join(os.environ["CARMSYS"], "bin", "studio")
         print os.popen(commandLine).readline()
         sys.exit(0)
+        
+optimization.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
+optimization.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
 
 class MakeProgressReport(optimization.MakeProgressReport):
     def __init__(self, referenceVersion):
@@ -246,6 +249,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.weightKPI = []
         self.sumKPITime = 0.0
         self.minKPITime = 0.0
+    def getInterestingValues(self):
+        return [ optimization.costEntryName, optimization.timeEntryName, optimization.memoryEntryName ]
     def __del__(self):
         for groupName in self.finalCostsInGroup.keys():
             fcTupleList = self.finalCostsInGroup[groupName]
@@ -253,21 +258,23 @@ class MakeProgressReport(optimization.MakeProgressReport):
             self.refMargins[groupName] = refMargin
             self.currentMargins[groupName] = currentMargin
         for testTuple in self.testInGroupList:
-            test, referenceFile, currentFile, userName = testTuple
-            self.doCompare(test, referenceFile, currentFile, userName)
+            test, referenceRun, currentRun, userName = testTuple
+            self.doCompare(test, referenceRun, currentRun, userName)
 
-        # The weighted KPI is prodsum(KPIx * Tx / Tmin) ^ (1 / sum(Tx/Tmin))
-        # Tx is the average of the 'time to worst cost' for a specific test case, ie
-        # Tx = (curTTWC + refTTWC) / 2
-        #
-        sumKPI = 1.0
-        sumTimeParts = 0.0
-        for tup in self.weightKPI:
-            kpi, kpiTime = tup
-            sumKPI *= math.pow(kpi, 1.0 * kpiTime / self.minKPITime)
-            sumTimeParts += 1.0 * kpiTime / self.minKPITime
-        avg = math.pow(sumKPI, 1.0 / float(sumTimeParts))
-        print os.linesep, "Overall time weighted KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
+        if len(self.weightKPI) > 1:
+            # The weighted KPI is prodsum(KPIx * Tx / Tmin) ^ (1 / sum(Tx/Tmin))
+            # Tx is the average of the 'time to worst cost' for a specific test case, ie
+            # Tx = (curTTWC + refTTWC) / 2
+            #
+            sumKPI = 1.0
+            sumTimeParts = 0.0
+            for tup in self.weightKPI:
+                kpiS, kpiTime = tup
+                kpi = float(kpiS.split("%")[0]) / 100
+                sumKPI *= math.pow(kpi, 1.0 * kpiTime / self.minKPITime)
+                sumTimeParts += 1.0 * kpiTime / self.minKPITime
+            avg = math.pow(sumKPI, 1.0 / float(sumTimeParts))
+            print os.linesep, "Overall time weighted KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
         optimization.MakeProgressReport.__del__(self)
     def _calculateMargin(self, fcTupleList):
         if len(fcTupleList) < 2:
@@ -285,14 +292,6 @@ class MakeProgressReport(optimization.MakeProgressReport):
         refMargin = round(1.0 * refMaxDiff / refMax, 5) * 100.0
         curMargin = round(1.0 * curMaxDiff / curMax, 5) * 100.0
         return refMargin, curMargin
-    def getKPIValues(self, costs, times, totPerf, margin):
-        finalPerf = times[-1]
-        costs, times = filterLastCosts(costs, times, margin)
-        lastCost = costs[-1]
-        lastPerf = times[-1]
-        if finalPerf * totPerf < 1.0:
-            return -1, 0
-        return lastCost, float(lastPerf / finalPerf * totPerf)
     def setUpSuite(self, suite):
         kpiGroups = suite.makeFileName("kpi_groups")
         if not os.path.isfile(kpiGroups):
@@ -303,74 +302,39 @@ class MakeProgressReport(optimization.MakeProgressReport):
                 continue
             groupName, testname = line.strip().split(":",1)
             self.kpiGroupForTest[testname] = groupName
-    def compare(self, test, referenceFile, currentFile):
+    def compare(self, test, referenceRun, currentRun):
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
         if not self.kpiGroupForTest.has_key(test.name):
-            self.doCompare(test, referenceFile, currentFile, userName)
+            self.doCompare(test, referenceRun, currentRun, userName)
             return
         groupName = self.kpiGroupForTest[test.name]
-        testTuple = test, referenceFile, currentFile, userName
+        testTuple = test, referenceRun, currentRun, userName
         self.testInGroupList.append(testTuple)
-        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile, " TOTAL cost")
-        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile, " TOTAL cost")
-        fcTuple = referenceCosts[-1], currentCosts[-1]
+        fcTuple = referenceRun.getCost(-1), currentRun.getCost(-1)
         if not self.finalCostsInGroup.has_key(groupName):
             self.finalCostsInGroup[groupName] = []
         self.finalCostsInGroup[groupName].append(fcTuple)
-    def doCompare(self, test, referenceFile, currentFile, userName):
+    def getMargins(self, test):
         if self.kpiGroupForTest.has_key(test.name):
             refMargin = self.refMargins[self.kpiGroupForTest[test.name]]
             currentMargin = self.currentMargins[self.kpiGroupForTest[test.name]]
+            return currentMargin, refMargin
         else:
-            try:
-                refMargin = float(test.app.getConfigValue("kpi_cost_margin"))
-            except:
-                refMargin = 0.0
-            currentMargin = refMargin
-        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile, " TOTAL cost")
-        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile, " TOTAL cost")
-        totCurrPerf = int(performance.getTestPerformance(test))
-        totRefPerf = int(performance.getTestPerformance(test, self.referenceVersion))
-        lastCCost, lastCP = self.getKPIValues(currentCosts, curTimes, totCurrPerf, currentMargin)
-        lastRCost, lastRP = self.getKPIValues(referenceCosts, refTimes, totRefPerf, refMargin)
-        if lastCCost < 0 or lastRCost < 0:
-            return
-        currTTWC = lastCP
-        refTTWC = lastRP
-        if lastCCost < lastRCost:
-            currTTWC = self.timeToCostFromTimes(curTimes, totCurrPerf, currentCosts, lastRCost)
-        else:
-            refTTWC = self.timeToCostFromTimes(refTimes, totRefPerf, referenceCosts, lastCCost)
-        if float(refTTWC) < 1:
-            return
-        currTTWC = float(int(currTTWC * 10) / 10.0)
-        refTTWC = float(int(refTTWC * 10) / 10.0)
-        kpi = float(currTTWC) / float(refTTWC)
-        self.testCount += 1
-        self.totalKpi *= kpi
-        if kpi > self.worstKpi:
-            self.worstKpi = kpi
-        if kpi < self.bestKpi:
-            self.bestKpi = kpi
-        kpiTime = (currTTWC + refTTWC) / 2.0
-        self.sumKPITime += kpiTime
-        if len(self.weightKPI) == 0 or kpiTime < self.minKPITime:
-            self.minKPITime = kpiTime
-        weightKPItuple = kpi, kpiTime
-        self.weightKPI.append(weightKPItuple)
-        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.percent(kpi)
-        self.reportLine("                            ", "Current", "Version " + self.referenceVersion)
-        self.reportLine("Initial cost of plan        ", currentCosts[0], referenceCosts[0])
-        self.reportLine("Measured cost of plan       ", lastCCost, lastRCost)
-        self.reportLine("Final cost of plan          ", currentCosts[-1], referenceCosts[-1])
+            return optimization.MakeProgressReport.getMargins(self, test)
+    def computeKPI(self, currTTWC, refTTWC):
+        kpi = optimization.MakeProgressReport.computeKPI(self, currTTWC, refTTWC)
+        if kpi != "NaN%":
+            kpiTime = (currTTWC + refTTWC) / 2.0
+            self.sumKPITime += kpiTime
+            if len(self.weightKPI) == 0 or kpiTime < self.minKPITime:
+                self.minKPITime = kpiTime
+            weightKPItuple = kpi, kpiTime
+            self.weightKPI.append(weightKPItuple)
+        return kpi
+    def reportCosts(self, test, currentRun, referenceRun):
+        optimization.MakeProgressReport.reportCosts(self, test, currentRun, referenceRun)
+        currentMargin, refMargin = self.getMargins(test)
         self.reportLine("Cost variance tolerance (%) ", currentMargin, refMargin)
-        self.reportLine("Memory used (Mb)            ", currentMaxMemory, refMaxMemory)
-        self.reportLine("Total time (minutes)        ", int(totCurrPerf), int(totRefPerf))
-        self.reportLine("Time to worst cost (mins)   ", currTTWC, refTTWC)
-    def getCosts(self, file, type):
-        costCommand = "grep '" + type + "' " + file + " | awk '{ print $3 }'"
-        return map(self.makeInt, os.popen(costCommand).readlines())
-
 
 class ApcTestCaseInformation(optimization.TestCaseInformation):
     def __init__(self, suite, name):
@@ -523,47 +487,6 @@ class PortApcTest(plugins.Action):
     def setUpSuite(self, suite):
         self.suite = suite
 
-def convertTime(timeEntry):
-    entries = timeEntry.split(":")
-    timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip())
-    return float(timeInSeconds) / 60.0
-
-def filterLastCosts(costs, times, margin):
-    if margin == 0.0 or len(costs) < 3:
-        return costs, times
-    
-    lastCost = costs[-1]
-    for ix in range(len(costs) - 2):
-        cost = costs[-1 * (ix + 2)]
-        diff = abs(cost - lastCost)
-        if (1.0 * diff / lastCost) * 100.0 > margin:
-            if ix == 0:
-                return costs, times
-            else:
-                return costs[:-1 * ix], times[:-1 * ix]
-    return costs[0:2], times[0:2]
-    
-def getSolutionStatistics(currentFile, statistics):
-    grepCommand = "grep -E 'memory|" + statistics + "|cpu time' " + currentFile
-    grepLines = os.popen(grepCommand).readlines()
-    costs = []
-    times = []
-    lastTime = 0
-    maxMemory = 0.0
-    for line in grepLines:
-        if line.startswith("Time:"):
-            parts = line.split()
-            if parts[-1].startswith("Mb"):
-                mem = float(parts[-2])
-                if mem > maxMemory:
-                    maxMemory = mem
-        if line.startswith("Total time"):
-            lastTime = convertTime(line.split()[-1])
-        if line.startswith(statistics):
-            costs.append(int(line.split()[-1]))
-            times.append(lastTime)
-    return maxMemory, costs, times
-
 class PlotApcTest(optimization.PlotTest):
     def __init__(self, args = []):
         optimization.PlotTest.__init__(self, args)
@@ -578,7 +501,9 @@ class PlotApcTest(optimization.PlotTest):
             self.plotUseTmpStatus = []
         return 0
     def getCostsAndTimes(self, file, plotItem):
-        maxMem, costs, times = getSolutionStatistics(file, plotItem)
+        optCalc = optimization.OptimizationValueCalculator( [ plotItem, optimization.timeEntryName ], file)
+        costs = optCalc.getValues(plotItem)
+        times = optCalc.getValues(optimization.timeEntryName)
         return costs, times
     def getStatusFile(self, test, version):
         currentFile = findTemporaryStatusFile(test, version)

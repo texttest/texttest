@@ -23,7 +23,7 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
              temporary subplan dirs will be removed, unless you run in parallell mode of course.       
 """
 
-import carmen, os, sys, string, shutil, KPI, plugins, performance, math
+import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re
 
 class OptimizationConfig(carmen.CarmenConfig):
     def getOptionString(self):
@@ -191,6 +191,150 @@ class RemoveTemporarySubplan(plugins.Action):
     def __repr__(self):
         return "Removing temporary subplan for"
 
+# Names of reported entries
+costEntryName = "cost of plan"
+timeEntryName = "cpu time"
+memoryEntryName = "memory"
+
+#Probably different for APC and matador
+itemNamesInFile = {}
+
+class OptimizationRun:
+    def __init__(self, test, version, itemList, margin = 0.0):
+        self.solutions = []
+        self.performance = performance.getTestPerformance(test, version) # float value
+        self.logFile = test.makeFileName(test.app.getConfigValue("log_file"), version)
+        calculator = OptimizationValueCalculator(itemList, self.logFile)
+        for item in itemList:
+            valueList = calculator.getValues(item)
+            if len(valueList) > 0:
+                self.addSolutionData(item, valueList)
+    def addSolutionData(self, item, valueList):
+        for i in range(len(valueList)):
+            if len(self.solutions) <= i:
+                self.solutions.append({})
+            entry = valueList[i]
+            # Scale by performance
+            if item == timeEntryName and valueList[-1] > 0.0:
+                entry = valueList[i] / valueList[-1] * self.performance
+            self.solutions[i][item] = entry
+    def isVeryShort(self):
+        return len(self.solutions) < 3 or self.getPerformance() == 0
+    def getCost(self, solNum = -1):
+        return self.solutions[solNum][costEntryName]
+    def getPerformance(self, solNum = -1): # return int for presentation
+        return int(round(self.solutions[solNum][timeEntryName]))
+    def getMaxMemory(self):
+        maxMemory = 0
+        for solution in self.solutions:
+            if not solution.has_key(memoryEntryName):
+                return "??"
+            memory = solution[memoryEntryName]
+            if memory > maxMemory:
+                maxMemory = memory
+        return maxMemory
+    def timeToCost(self, targetCost):
+        lastCost = 0
+        lastTime = 0
+        for solution in self.solutions:
+            if abs(solution[costEntryName]) < abs(targetCost):
+                costGap = lastCost - solution[costEntryName]
+                percent = float(lastCost - targetCost) / costGap
+                performance = lastTime + (solution[timeEntryName] - lastTime) * percent
+                return int(round(performance))
+            else:
+                lastCost = solution[costEntryName]
+                lastTime = solution[timeEntryName]
+        return self.getPerformance()
+    def getMeasuredSolution(self, margin):
+        if margin == 0.0 or self.isVeryShort():
+            return -1
+    
+        lastCost = self.getCost(-1)
+        for ix in range(len(self.solutions) - 2):
+            solution = self.solutions[-1 * (ix + 2)]
+            diff = abs(solution[costEntryName] - lastCost)
+            if (1.0 * diff / lastCost) * 100.0 > margin:
+                if ix == 0:
+                    return -1
+                else:
+                    return -1 * ix
+        return 2
+
+class OptimizationValueCalculator:
+    def __init__(self, itemList, logfile):
+        command = "grep -E '" + string.join(map(self.getItemName, itemList),"|") + "' " + logfile
+        grepLines = os.popen(command).readlines()
+        self.itemValues = {}
+        lastItemLine = {}
+        rexpItem = {}
+        convertFuncs = {}
+        for item in itemList:
+            self.itemValues[item] = []
+            rexpItem[item] = re.compile(self.getItemName(item))
+            lastItemLine[item] = ""
+            convertFuncs[item] = self.getConversionFunction(item)
+        initial = 1
+        lastItemLine[timeEntryName] = "cpu time:  0:00:00"
+        lastItemLine[memoryEntryName] = "Memory consumption: 0 MB"
+        for line in grepLines:
+            for item in itemList:
+                if rexpItem[item].search(line):
+                    lastItemLine[item] = line
+                    if (initial and self._hasValuesForAll(itemList, lastItemLine)) or item == timeEntryName:
+                        if initial or self._hasValuesForAll(itemList, lastItemLine):
+                            for it in itemList:
+                                self.itemValues[it].append(convertFuncs[it](lastItemLine[it]))
+                        initial = 0
+                        for it in itemList:                                
+                            lastItemLine[it] = ""
+    def _hasValuesForAll(self, itemList, lineMap):
+        for item in itemList:
+            if not lineMap.has_key(item) or lineMap[item] == "":
+                return 0
+        return 1
+    def getItemName(self, item):
+        if itemNamesInFile.has_key(item):
+            return itemNamesInFile[item]
+        else:
+            return item
+    def getValues(self, item):
+        if self.itemValues.has_key(item):
+            return self.itemValues[item]
+        return None
+    def getConversionFunction(self, item):
+        if item == timeEntryName:
+            return self.convertTime
+        elif item == memoryEntryName:
+            return self.getMemory
+        else: # Default assumes a numeric value as the last field of the line
+            return self.getFinalNumeric
+    def getFinalNumeric(self, line):
+        lastField = line.split(" ")[-1]
+        return int(lastField.strip())
+    def convertTime(self, timeLine):
+        timeEntry = self.getTimeEntry(timeLine.strip())
+        entries = timeEntry.split(":")
+        timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip()) 
+        return float(timeInSeconds) / 60.0
+    def getTimeEntry(self, line):
+        entries = line.split(" ")
+        for index in range(len(entries)):
+            if entries[index] == "cpu":
+                sIx = index + 2
+                while sIx < len(entries):
+                    if entries[sIx] != "":
+                        return entries[sIx]
+                    sIx += 1
+        return line
+    def getMemory(self, memoryLine):
+        entries = memoryLine.split(" ")
+        for index in range(len(entries)):
+            entry = entries[index].strip()
+            if entry == "MB" or entry == "Mb" or entry == "Mb)":
+                mem = float(entries[index - 1])
+                return mem
+            
 class TestReport(plugins.Action):
     def __init__(self, versionString):
         versions = versionString.split(",")
@@ -198,14 +342,14 @@ class TestReport(plugins.Action):
         self.currentVersion = None
         if len(versions) > 1:
             self.currentVersion = versions[1]
-        self.statusFileName = None
     def __call__(self, test):
-        currentFile = test.makeFileName(self.statusFileName, self.currentVersion)
-        referenceFile = test.makeFileName(self.statusFileName, self.referenceVersion)
-        if currentFile != referenceFile:
-            self.compare(test, referenceFile, currentFile)
-    def setUpApplication(self, app):
-        self.statusFileName = app.getConfigValue("log_file")
+        interestingValues = self.getInterestingValues()
+        currentRun = OptimizationRun(test, self.currentVersion, interestingValues)
+        referenceRun = OptimizationRun(test, self.referenceVersion, interestingValues)
+        if currentRun.logFile != referenceRun.logFile:
+            self.compare(test, referenceRun, currentRun)
+    def getInterestingValues(self):
+        return [ costEntryName, timeEntryName, memoryEntryName, "cost of rosters" ]
 
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):
@@ -254,7 +398,6 @@ class MakeProgressReport(TestReport):
     def __repr__(self):
         return "Comparison on"
     def setUpApplication(self, app):
-        TestReport.setUpApplication(self, app)
         currentText = ""
         if self.currentVersion != None:
             currentText = " Version " + self.currentVersion
@@ -278,63 +421,60 @@ class MakeProgressReport(TestReport):
             return self.percent(kpi)
         else:
             return "NaN%"
-    def compare(self, test, referenceFile, currentFile):
-        currPerf = int(performance.getTestPerformance(test, self.currentVersion))
-        refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
-        referenceCosts = self.getCosts(referenceFile, "plan")
-        currentCosts =  self.getCosts(currentFile, "plan")
-        if len (currentCosts) < 3 or len(referenceCosts) < 3 or refPerf == 0 or currPerf == 0:
-            return
-        
-        refRosterCosts = self.getCosts(referenceFile, "roster")
-        currRosterCosts = self.getCosts(currentFile, "roster")
-        currTTWC = currPerf
-        refTTWC = refPerf
-        if abs(currentCosts[-1]) < abs(referenceCosts[-1]):
-            currTTWC = self.timeToCost(currentFile, currPerf, currentCosts, referenceCosts[-1])
-        else:
-            refTTWC = self.timeToCost(referenceFile, refPerf, referenceCosts, currentCosts[-1])
-        self.testCount += 1
+    def compare(self, test, referenceRun, currentRun):
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
-        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.computeKPI(currTTWC, refTTWC)
+        self.doCompare(test, referenceRun, currentRun, userName)
+    def doCompare(self, test, referenceRun, currentRun, userName):
+        if currentRun.isVeryShort() or referenceRun.isVeryShort():
+            return
+
+        worstCost = self.calculateWorstCost(test, referenceRun, currentRun)
+        currTTWC = currentRun.timeToCost(worstCost)
+        refTTWC = referenceRun.timeToCost(worstCost)
+        
+        self.testCount += 1
+        kpi = self.computeKPI(currTTWC, refTTWC)
+        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + kpi
         self.reportLine("                         ", self.currentText(), "Version " + self.referenceVersion)
-        self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
-        self.reportLine("Initial cost of rosters  ", currRosterCosts[0], refRosterCosts[0])
-        self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
-        self.reportLine("Final cost of rosters    ", currRosterCosts[-1], refRosterCosts[-1])
-        self.reportLine("Total time (minutes)     ", currPerf, refPerf)
-        self.reportLine("Time to worst cost (mins)", currTTWC, refTTWC)
+        self.reportCosts(test, currentRun, referenceRun)
+        self.reportLine("Max memory (MB)", currentRun.getMaxMemory(), referenceRun.getMaxMemory())
+        self.reportLine("Total time (minutes)     ", currentRun.getPerformance(), referenceRun.getPerformance())
+        self.reportLine("Time to cost " + str(worstCost) + " (mins)", currTTWC, refTTWC)
+    def calculateWorstCost(self, test, referenceRun, currentRun):
+        currMargin, refMargin = self.getMargins(test)
+        currSol = currentRun.getMeasuredSolution(currMargin)
+        refSol = referenceRun.getMeasuredSolution(refMargin)
+        currCost = currentRun.getCost(currSol)
+        refCost = referenceRun.getCost(refSol)
+        if abs(currCost) < abs(refCost):
+            return refCost
+        else:
+            return currCost
+    def getMargins(self, test):
+        try:
+            refMargin = float(test.app.getConfigValue("kpi_cost_margin"))
+        except:
+            refMargin = 0.0
+        return refMargin, refMargin
+    def reportCosts(self, test, currentRun, referenceRun):
+        costEntries = []
+        for entry in currentRun.solutions[0].keys():
+            if entry.find("cost") != -1:
+                costEntries.append(entry)
+        for entry in costEntries:
+            self.reportLine("Initial " + entry, currentRun.solutions[0][entry], referenceRun.solutions[0][entry])
+        for entry in costEntries:
+            self.reportLine("Final " + entry, currentRun.solutions[-1][entry], referenceRun.solutions[-1][entry])
     def currentText(self):
         if self.currentVersion == None:
             return "Current"
         else:
             return "Version " + self.currentVersion
-    def getCosts(self, file, type):
-        costCommand = "grep 'cost of " + type + "' " + file + " | awk -F':' '{ print $2 }'"
-        return map(self.makeInt, os.popen(costCommand).readlines())
-    def makeInt(self, val):
-        return int(string.strip(val))
     def reportLine(self, title, currEntry, refEntry):
         fieldWidth = 15
-        print title + ": " + string.rjust(str(currEntry), fieldWidth) + string.rjust(str(refEntry), fieldWidth)
-    def timeToCost(self, file, performanceScale, costs, targetCost):
-        timeCommand = "grep 'cpu time' " + file + " | awk '{ print $6 }'"
-        times = map(self.convertTime, os.popen(timeCommand).readlines())
-        times.insert(0, 0.0)
-        return self.timeToCostFromTimes(times, performanceScale, costs, targetCost)
-    def timeToCostFromTimes(self, times, performanceScale, costs, targetCost):
-        for index in range(len(costs)):
-            if abs(costs[index]) < abs(targetCost):
-                costGap = costs[index - 1] - costs[index]
-                percent = float(costs[index -1] - targetCost) / costGap
-                performance = times[index - 1] + (times[index] - times[index - 1]) * percent
-                return int(performance / times[-1] * performanceScale)
-        return performanceScale
-    def convertTime(self, timeEntry):
-        entries = timeEntry.split(":")
-        timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip())
-        return float(timeInSeconds) / 60.0
-
+        titleWidth = 30
+        print string.ljust(title, titleWidth) + ": " + string.rjust(str(currEntry), fieldWidth) + string.rjust(str(refEntry), fieldWidth)
+    
 # This is for importing new tests and test suites
 #
 class TestInformation:
@@ -616,7 +756,6 @@ class PlotTest(plugins.Action):
         if totPerf < 1:
             return times
         scaleFactor = float(1.0 * totPerf / times[-1])
-        print times[-1], totPerf, scaleFactor
         ntimes = []
         for t in times:
             ntimes.append(t * scaleFactor)

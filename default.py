@@ -19,15 +19,18 @@ helpOptions = """
             - Reconnect to already run tests, optionally takes a user from which to
               fetch temporary files. If not provided, will look for calling user.
 
--t <text>  - only run tests whose names contain <text> as a substring. Note that <text> may be a comma-separated
-             list
+-reconnfull - Only has an effect with reconnect. Essentially, recompute all filtering rather than trusting the run
+              you are reconnecting to.
 
--ts <text> - only run test suites whose full relative paths contain <text> as a substring. As above this may be
-             a comma-separated list.
+-t <text>   - only run tests whose names contain <text> as a substring. Note that <text> may be a comma-separated
+              list
 
--f <file>  - only run tests whose names appear in the file <file>
--grep <tx> - only run tests whose log file (according to the config file entry "log_file") contains <tx>. Note that
-             this can also be a comma-separated list
+-ts <text>  - only run test suites whose full relative paths contain <text> as a substring. As above this may be
+              a comma-separated list.
+
+-f <file>   - only run tests whose names appear in the file <file>
+-grep <tx>  - only run tests whose log file (according to the config file entry "log_file") contains <tx>. Note that
+              this can also be a comma-separated list
 """
 
 helpScripts = """
@@ -51,6 +54,7 @@ class Config(plugins.Configuration):
             group.addOption("grep", "Log files containing")
         elif group.name.startswith("What"):
             group.addOption("reconnect", "Reconnect to previous run")
+            group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
         elif group.name.startswith("How"):
             group.addSwitch("noperf", "Disable any performance testing")
         elif group.name.startswith("Invisible"):
@@ -94,7 +98,7 @@ class Config(plugins.Configuration):
         return actions
     def getFileExtractor(self):
         if self.isReconnecting():
-            return ReconnectTest(self.optionValue("reconnect"))
+            return ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull"))
         else:
             if self.optionMap.has_key("noperf"):
                 return self.getTestCollator()
@@ -401,10 +405,11 @@ class CountTest(plugins.Action):
         self.appCount[repr(app)] = 0
         
 class ReconnectTest(plugins.Action):
-    def __init__(self, fetchUser):
+    def __init__(self, fetchUser, discardFilterFiles):
         self.fetchUser = fetchUser
         self.userDepWriteDir = self.hasUserDependentWriteDir()
         self.rootDirToCopy = None
+        self.discardFilterFiles = discardFilterFiles
     def __repr__(self):
         return "Reconnect to"
     def __call__(self, test):
@@ -416,6 +421,9 @@ class ReconnectTest(plugins.Action):
         
         print "Reconnecting to test", test.name
         shutil.copytree(reconnLocation, writeDir)
+        if self.discardFilterFiles:
+            self.clearFrameworkTmp(writeDir)
+    def clearFrameworkTmp(self, writeDir):
         # Clear the framework temporary directory, as configuration may be different now
         frameworkTmpDir = os.path.join(writeDir, "framework_tmp")
         for file in os.listdir(frameworkTmpDir):

@@ -1223,14 +1223,14 @@ class TextTest:
         for app in self.allApps:
             try:
                 valid, testSuite = app.createTestSuite()
+                if self.gui:
+                    self.gui.addSuite(testSuite)
                 if testSuite.size() == 0:
                     print "No tests found for", app.description()
                 elif valid:
                     useGui = self.inputOptions.useGUI()
                     actionSequence = self.inputOptions.getActionSequence(app, useGui)
                     actionRunner.addTestActions(testSuite, actionSequence)
-                    if self.gui:
-                        self.gui.addSuite(testSuite)
                     print "Using", app.description() + ", checkout", app.checkout
             except BadConfigError:
                 print "Error in set-up of application", app, "-", sys.exc_value
@@ -1245,7 +1245,8 @@ class TextTest:
             print "Terminated due to interruption"
     def _run(self):
         actionRunner = self.createActionRunner()
-        if not actionRunner.hasTests():
+        # Allow no tests for static GUI
+        if not actionRunner.hasTests() and (not self.gui or self.gui.dynamic):
             return
         try:
             if self.gui:

@@ -75,6 +75,15 @@ def movefile(sourcePath, targetFile):
         shutil.copyfile(sourcePath, targetFile)
         os.remove(sourcePath)
 
+# portable version of os.path.samefile
+def samefile(writeDir, currDir):
+    try:
+        return os.path.samefile(writeDir, currDir)
+    except:
+        # samefile doesn't exist on Windows, but nor do soft links so we can
+        # do a simpler version
+        return os.path.normpath(writeDir) == os.path.normpath(currDir)
+
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):
     pass

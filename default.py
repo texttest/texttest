@@ -330,16 +330,9 @@ class CreateCatalogue(plugins.Action):
         for subDir in subDirs:
             self.listDirectory(app, file, subDir)
         return 1
-    def sameFile(self, writeDir, currDir):
-        try:
-            return os.path.samefile(writeDir, currDir)
-        except:
-            # samefile doesn't exist on Windows, but nor do soft links so we can
-            # do a simpler version
-            return os.path.normpath(writeDir) == os.path.normpath(currDir)
     def getName(self, writeDir):
         currDir = os.getcwd()
-        if self.sameFile(writeDir, currDir):
+        if plugins.samefile(writeDir, currDir):
             return "Test Directory"
         if writeDir.startswith(currDir):
             return "Test subdirectory " + writeDir.replace(currDir + os.sep, "")

@@ -8,6 +8,10 @@ It also uses the temporary subplan concept, such that all tests will actually be
 when the tests are run. These subplans should then be cleaned up afterwards. The point of this is to avoid clashes in
 solution due to two runs of the same test writing to the same subplan.
 
+Also, you can specify a "rave_parameter" entry in your config file, typically in a version file. The value of this
+should be a line to insert into the rules file after the subplan is copied. By doing this you can experiment with a new
+feature on a lot of tests without having to manually create new tests.
+
 In other respects, it follows the usage of the Carmen configuration.""" 
 
 helpOptions = """-diag      - Run with diagnostics on. This will set the environment variables DIAGNOSTICS_IN and DIAGNOSTICS_OUT to

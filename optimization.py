@@ -70,9 +70,15 @@ class SubPlanDirManager:
         tmpDir = self.getTmpSubdir(test, dirName, baseName, "w")
         self.tmpDirs[test] = tmpDir
         os.mkdir(tmpDir)
-        self.makeLinksIn(tmpDir, os.path.join(dirName, baseName))
-    def makeLinksIn(self, inDir, fromDir):
+        parameterOverrides = test.app.getConfigList("rave_parameter")
+        self.makeLinksIn(tmpDir, os.path.join(dirName, baseName), parameterOverrides)
+    def makeLinksIn(self, inDir, fromDir, parameterOverrides):
         for file in os.listdir(fromDir):
+            if file == "APC_FILES":
+                apcFiles = os.path.join(inDir, file)
+                os.mkdir(apcFiles)
+                self.makeLinksIn(apcFiles, os.path.join(fromDir, file), parameterOverrides)
+                continue
             if file.find("Solution_") != -1:
                 continue
             if file.find("status") != -1:
@@ -81,15 +87,19 @@ class SubPlanDirManager:
                 continue
             if file.find("best_solution") != -1:
                 continue
-            if file != "APC_FILES":
-                fromPath = os.path.join(fromDir, file)
-                toPath = os.path.join(inDir, file)
-                os.symlink(fromPath, toPath)
-            else:
-                apcFiles = os.path.join(inDir, file)
-                os.mkdir(apcFiles)
-                self.makeLinksIn(apcFiles, os.path.join(fromDir, file))
 
+            fromPath = os.path.join(fromDir, file)
+            toPath = os.path.join(inDir, file)
+            if len(parameterOverrides) > 0 and file.find("rules") != -1:
+                file = open(toPath, 'w')
+                for line in open(fromPath).xreadlines():
+                    if line.find("<SETS>") != -1:        
+                        for override in parameterOverrides:
+                            file.write(override + os.linesep)
+                    file.write(line)
+            else:
+                os.symlink(fromPath, toPath)
+                
     def removeTemporary(self, test):
         if self.tmpDirs.has_key(test):
             tmpDir = self.tmpDirs[test]

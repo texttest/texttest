@@ -568,7 +568,7 @@ class TestCaseGUI(RightWindowGUI):
             return test.stateDetails
         return ""
     def runInteractive(self, button, action, *args):
-        self.test.performAction(action)
+        self.test.callAction(action)
 
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):

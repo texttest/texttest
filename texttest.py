@@ -117,11 +117,6 @@ class Test:
         return self.makePathName(fileName, parent)
     def extraReadFiles(self):
         return self.app.configObject.extraReadFiles(self)
-    def performAction(self, action):
-        self.setUpEnvironment()
-        retValue = self.callAction(action)
-        self.tearDownEnvironment()
-        return retValue
     def notifyChanged(self):
         for observer in self.observers:
             observer.notifyChange(self)
@@ -233,8 +228,6 @@ class TestCase(Test):
         if state == self.RUNNING_PREPROCESS:
             return "start preprocessing"
         return "finish preprocessing"
-    def performOnSubTests(self, action):
-        pass
     def getExecuteCommand(self):
         return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
@@ -1116,7 +1109,7 @@ class TestRunner:
         while 1:
             if self.interrupted:
                 raise KeyboardInterrupt, "Interrupted externally"
-            retValue = self.handleExceptions(self.test.performAction, action)
+            retValue = self.callAction(action)
             if not retValue:
                 # No return value: we've finished and should proceed
                 return 1, 0
@@ -1128,10 +1121,15 @@ class TestRunner:
                 return completed, tryOthers 
             # Don't busy-wait
             time.sleep(0.1)
+    def callAction(self, action):
+        self.test.setUpEnvironment()
+        retValue = self.handleExceptions(self.test.callAction, action)
+        self.test.tearDownEnvironment()
+        return retValue
     def performCleanUpActions(self):
         for action in self.appRunner.cleanupSequence:
             self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.test))
-            self.test.performAction(action)
+            self.test.callAction(action)
         if not self.test.app.keepTmpFiles:
             self.test.cleanNonBasicWriteDirectories()
     def findSuitesToChange(self, previousTestRunner):

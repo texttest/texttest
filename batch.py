@@ -95,7 +95,8 @@ categoryDescriptions = [ "had internal errors", "CRASHED", "caused exception", "
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):
-    def __init__(self, lineCount, sessionName):
+    def __init__(self, sessionName):
+        respond.Responder.__init__(self, 0)
         self.sessionName = sessionName
         self.failureDetail = {}
         self.crashDetail = {}
@@ -105,7 +106,6 @@ class BatchResponder(respond.Responder):
         for i in range(len(categoryNames)):
             self.categories[categoryNames[i]] = BatchCategory(categoryDescriptions[i])
         self.mainSuite = None
-        self.responder = respond.UNIXInteractiveResponder(lineCount)
         allBatchResponders.append(self)
     def addTestToCategory(self, category, test, postText = ""):
         if category != None:
@@ -174,7 +174,7 @@ class BatchResponder(respond.Responder):
                 mailFile.write("--------------------------------------------------------" + os.linesep)
                 mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
                 os.chdir(test.getDirectory(temporary=1))
-                self.responder.displayComparisons(comparisonList, mailFile, self.mainSuite.app)
+                self.displayComparisons(comparisonList, mailFile, self.mainSuite.app)
     def getCleanUpAction(self):
         return MailSender(self.sessionName) 
 

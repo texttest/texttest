@@ -9,11 +9,17 @@ the results for that version. This will create or override results files of the 
 instead of files of the form <root>.<app>
 """
 
-import comparetest, ndiff, sys, string, os, plugins
+import comparetest, sys, string, os, plugins
 from usecase import ScriptEngine
     
 # Abstract base to make it easier to write test responders
 class Responder(plugins.Action):
+    def __init__(self, overwriteSuccess):
+        self.overwriteSuccess = overwriteSuccess
+        self.lineCount = None
+        self.logFile = None
+        self.graphicalDiffTool = None
+        self.textDiffTool = None
     def __call__(self, test):
         if test.state == test.FAILED:
             testComparison = test.stateDetails
@@ -27,27 +33,19 @@ class Responder(plugins.Action):
             print test.getIndent() + repr(test), "Failed: ", str(test.stateDetails).split(os.linesep)[0]
             self.handleUnrunnable(test)
     def handleSuccess(self, test):
-        pass
+        if self.overwriteSuccess:
+            self.save(test, test.app.getFullVersion(forSave=1))
+    def save(self, test, version, exact=1):
+        test.stateDetails.save(exact, version, self.overwriteSuccess)
     def handleUnrunnable(self, test):
         pass
     def handleKilled(self, test):
         pass
-    def responderText(self, test):
-        testComparison = test.stateDetails
-        diffText = testComparison.getDifferenceSummary()
-        return repr(testComparison) + diffText
-    def __repr__(self):
-        return "Responding to"
-
-# Uses the python ndiff library, which should work anywhere. Override display method to use other things
-class InteractiveResponder(Responder):
-    def handleFailure(self, test, testComparison):
-        if testComparison.failedPrediction:
-            print testComparison.failedPrediction
-        performView = self.askUser(test, testComparison, 1)
-        if performView:
-            self.displayComparisons(testComparison.getComparisons(), sys.stdout, test.app)
-            self.askUser(test, testComparison, 0)
+    def setUpApplication(self, app):
+        self.lineCount = app.getConfigValue("lines_of_text_difference")
+        self.logFile = app.getConfigValue("log_file")
+        self.graphicalDiffTool = app.getConfigValue("diff_program")
+        self.textDiffTool = app.getConfigValue("text_diff_program")
     def displayComparisons(self, comparisons, displayStream, app):
         for comparison in comparisons:
             if comparison.newResult():
@@ -57,11 +55,51 @@ class InteractiveResponder(Responder):
             titleText += " " + repr(comparison)
             displayStream.write("------------------ " + titleText + " --------------------\n")
             self.display(comparison, displayStream, app)
+    def useGraphicalComparison(self, comparison, displayStream, app):
+        if not self.graphicalDiffTool or not os.environ.has_key("DISPLAY") or plugins.BackgroundProcess.fakeProcesses:
+            return 0
+        return displayStream == sys.stdout and repr(comparison) == self.logFile
     def display(self, comparison, displayStream, app):
-        ndiff.fcompare(comparison.stdCmpFile, comparison.tmpCmpFile)
-    def getInstructions(self, test):
-        return []
-    def askUser(self, test, testComparison, allowView):      
+        if comparison.newResult():
+            return self.writePreview(displayStream, open(comparison.tmpFile))
+        
+        argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
+        if self.useGraphicalComparison(comparison, displayStream, app):
+            print "<See " + self.graphicalDiffTool + " window>"
+            process = plugins.BackgroundProcess(self.graphicalDiffTool + argumentString)
+        else:
+            stdin, stdout, stderr = os.popen3(self.textDiffTool + argumentString)
+            try:
+                self.writePreview(displayStream, stdout)
+            finally:
+                # Don't wait for the garbage collector - we risk a lot of failures otherwise...
+                stdin.close()
+                stdout.close()
+                stderr.close()
+    def writePreview(self, displayStream, file):
+        linesWritten = 0
+        for line in file.xreadlines():
+            if linesWritten >= self.lineCount:
+                return
+            displayStream.write(line)
+            linesWritten += 1
+    def responderText(self, test):
+        testComparison = test.stateDetails
+        diffText = testComparison.getDifferenceSummary()
+        return repr(testComparison) + diffText
+    def __repr__(self):
+        return "Responding to"
+
+# Generic interactive responder. Can be configured via the settings in setUpApplication method
+class InteractiveResponder(Responder):
+    def handleFailure(self, test, testComparison):
+        if testComparison.failedPrediction:
+            print testComparison.failedPrediction
+        performView = self.askUser(test, allowView=1)
+        if performView:
+            self.displayComparisons(testComparison.getComparisons(), sys.stdout, test.app)
+            self.askUser(test, allowView=0)
+    def askUser(self, test, allowView):      
         versions = test.app.getVersionFileExtensions(forSave=1)
         options = ""
         for i in range(len(versions)):
@@ -73,46 +111,15 @@ class InteractiveResponder(Responder):
         response = ScriptEngine.instance.readStdin()
         exactSave = response.find('+') != -1
         if response.startswith('s'):
-            testComparison.save(exactSave)
+            self.save(test, version="", exact=exactSave)
         elif allowView and response.startswith('v'):
             return 1
         else:
             for i in range(len(versions)):
                 versionOption = str(i + 1)
                 if response.startswith(versionOption):
-                    testComparison.save(exactSave, versions[i])
+                    self.save(test, versions[i], exactSave)
         return 0
-            
-# Uses UNIX tkdiff
-class UNIXInteractiveResponder(InteractiveResponder):
-    def __init__(self, lineCount):
-        self.lineCount = lineCount
-    def useGraphicalComparison(self, comparison, displayStream, app):
-        if not os.environ.has_key("DISPLAY") or plugins.BackgroundProcess.fakeProcesses:
-            return 0
-        return displayStream == sys.stdout and repr(comparison) == app.getConfigValue("log_file")
-    def display(self, comparison, displayStream, app):
-        if comparison.newResult():
-            argumentString = " /dev/null " + comparison.tmpFile
-        else:
-            argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
-        if self.useGraphicalComparison(comparison, displayStream, app):
-            print "<See tkdiff window>"
-            os.system("tkdiff" + argumentString + " &")
-        else:
-            stdin, stdout, stderr = os.popen3("diff" + argumentString)
-            try:
-                linesWritten = 0
-                for line in stdout.xreadlines():
-                    if linesWritten >= self.lineCount:
-                        return
-                    displayStream.write(line)
-                    linesWritten += 1
-            finally:
-                # Don't wait for the garbage collector - we risk a lot of failures otherwise...
-                stdin.close()
-                stdout.close()
-                stderr.close()
     
 class OverwriteOnFailures(Responder):
     def responderText(self, test):
@@ -120,4 +127,4 @@ class OverwriteOnFailures(Responder):
         diffText = testComparison.getDifferenceSummary()
         return "- overwriting" + diffText
     def handleFailure(self, test, testComparison):
-        testComparison.save(1, test.app.getFullVersion())
+        self.save(test, test.app.getFullVersion(forSave=1))

@@ -47,12 +47,12 @@ class TestComparison:
     scoreTable["slower"] = 1
     scoreTable["larger"] = 0
     scoreTable["smaller"] = 0
-    def __init__(self, test, overwriteOnSuccess):
+    def __init__(self, test):
         self.test = test
-        self.overwriteOnSuccess = overwriteOnSuccess
+        self.allResults = []
         self.changedResults = []
-        self.attemptedComparisons = []
         self.newResults = []
+        self.correctResults = []
         self.failedPrediction = None
         if test.state == test.FAILED:
             self.failedPrediction = test.stateDetails
@@ -102,24 +102,24 @@ class TestComparison:
             return newText
         return newText + "," + diffText
     def getPostText(self):
-        if len(self.attemptedComparisons) == 0:
+        if len(self.allResults) == 0:
             return " - NONE!"
         if len(self.newResults) == 0 and len(self.changedResults) == 0:
             return " - SUCCESS! (on " + self.attemptedComparisonsOutput() + ")"
         return " (on " + self.attemptedComparisonsOutput() + ")"
     def attemptedComparisonsOutput(self):
         baseNames = []
-        for attempt in self.attemptedComparisons:
-            baseNames.append(os.path.basename(attempt))
+        for comparison in self.allResults:
+            baseNames.append(os.path.basename(comparison.tmpFile))
         return string.join(baseNames, ",")
-    def addComparison(self, tmpFile, comparison):
-        self.attemptedComparisons.append(tmpFile)
-        if comparison == None:
-            return
+    def addComparison(self, comparison):
+        self.allResults.append(comparison)
         if comparison.newResult():
             self.newResults.append(comparison)
-        else:
+        elif comparison.hasDifferences():
             self.changedResults.append(comparison)
+        else:
+            self.correctResults.append(comparison)
     def makeComparisons(self, test, makeNew = 0):
         self.makeComparisonsInDir(test, test.getDirectory(temporary=1), makeNew)
         if len(self.changedResults) == 1 and self.changedResults[0].hasExternalExcuse():
@@ -136,8 +136,8 @@ class TestComparison:
                 self.diag.info("Decided we should compare " + file)
                 stdFile = self.findTestDirectory(fullPath, test)
                 self.diag.info("Using standard file " + stdFile)
-                comparison = self.makeComparison(test, stdFile, fullPath, makeNew)
-                self.addComparison(fullPath, comparison)
+                comparison = self.createFileComparison(test, stdFile, fullPath, makeNew)
+                self.addComparison(comparison)
             else:
                 self.diag.info("Rejected " + file)
     def shouldCompare(self, file, dir, app):
@@ -158,21 +158,9 @@ class TestComparison:
         if local.find("." + test.app.name) != -1:
             return realPath
         return os.path.join(test.abspath, test.makeFileName(local))
-    def makeComparison(self, test, standardFile, tmpFile, makeNew = 0):
-        comparison = self.createFileComparison(test, standardFile, tmpFile, makeNew)
-        if comparison.newResult() or comparison.hasDifferences():
-            return comparison
-        if self.overwriteOnSuccess:
-            comparison.overwrite(1, test.app.getFullVersion(forSave=1))
-        return None
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         return FileComparison(test, standardFile, tmpFile, makeNew)
-    def findFileComparison(self, name):
-        for comparison in self.getComparisons():
-            if comparison.tmpFile == name:
-                return comparison
-        return None
-    def save(self, exact = 1, versionString = ""):
+    def save(self, exact = 1, versionString = "", overwriteSuccessFiles = 0):
         # Force exactness unless there is only one difference : otherwise
         # performance is averaged when results have changed as well
         resultCount = len(self.changedResults) + len(self.newResults)
@@ -182,13 +170,15 @@ class TestComparison:
             comparison.overwrite(exact, versionString)
         for comparison in self.newResults:
             comparison.overwrite(1, versionString)
+        if overwriteSuccessFiles:
+            for comparison in self.correctResults:
+                comparison.overwrite(exact, versionString)
+        self.correctResults += self.changedResults + self.newResults
         self.changedResults = []
         self.newResults = []
         self.test.changeState(self.test.SUCCEEDED, self)
 
 class MakeComparisons(plugins.Action):
-    def __init__(self, overwriteOnSuccess):
-        self.overwriteOnSuccess = overwriteOnSuccess
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):
@@ -203,7 +193,7 @@ class MakeComparisons(plugins.Action):
             test.changeState(test.SUCCEEDED, testComparison)
         self.describe(test, testComparison.getPostText())
     def makeTestComparison(self, test):
-        return TestComparison(test, self.overwriteOnSuccess)
+        return TestComparison(test)
     def fileFinders(self, test):
         defaultFinder = test.app.name + test.app.versionSuffix() + test.getTmpExtension(), ""
         return [ defaultFinder ]
@@ -222,6 +212,7 @@ class FileComparison:
             tmpCmpFileName = tmpFile + "partcmp"
         self.tmpCmpFile = filter.filterFile(tmpFile, tmpCmpFileName, makeNew)
         self.test = test
+        self.differenceId = -1
     def __repr__(self):
         return os.path.basename(self.stdFile).split('.')[0]
     def hasExternalExcuse(self):
@@ -232,6 +223,11 @@ class FileComparison:
     def newResult(self):
         return not os.path.exists(self.stdFile)
     def hasDifferences(self):
+        # Cache the result: typically expensive to compute...
+        if self.differenceId == -1:
+            self.differenceId = self._hasDifferences()
+        return self.differenceId
+    def _hasDifferences(self):
         return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
     def overwrite(self, exact, versionString = ""):
         parts = os.path.basename(self.stdFile).split(".")[:2] 
@@ -247,6 +243,10 @@ class FileComparison:
             plugins.movefile(self.tmpFile, stdFile)
         else:
             self.saveResults(stdFile)
+        # Try to get everything to behave normally after a save...
+        self.differenceId = 0
+        self.tmpFile = stdFile
+        self.tmpCmpFile = self.stdCmpFile
     def saveResults(self, destFile):
         plugins.movefile(self.tmpFile, destFile)
         

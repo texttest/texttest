@@ -110,12 +110,13 @@ class Config(plugins.Configuration):
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getTestComparator(self):
-        return performance.MakeComparisons(self.optionMap.has_key("n"))
+        return performance.MakeComparisons()
     def getTestResponder(self):
+        overwriteSuccess = self.optionMap.has_key("n")
         if self.optionMap.has_key("o"):
-            return respond.OverwriteOnFailures()
+            return respond.OverwriteOnFailures(overwriteSuccess)
         else:
-            return respond.InteractiveResponder()
+            return respond.InteractiveResponder(overwriteSuccess)
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         if self.optionMap.has_key(option):
@@ -139,8 +140,16 @@ class Config(plugins.Configuration):
         print "Python scripts: (as given to -s <module>.<class> [args])"
         print "--------------------------------------------------------"
         self.printHelpScripts()
+    def defaultGraphicalDiffTool(self):
+        # Don't know of any that work anywhere with the same name...
+        return None
+    def defaultTextDiffTool(self):
+        return "ndiff.py -q"
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output")
+        app.setConfigDefault("diff_program", self.defaultGraphicalDiffTool())
+        app.setConfigDefault("text_diff_program", self.defaultTextDiffTool())
+        app.setConfigDefault("lines_of_text_difference", 30)
         app.setConfigDefault("collate_file", {})
         app.setConfigDefault("run_dependent_text", { "" : [] })
         app.setConfigDefault("unordered_text", { "" : [] })

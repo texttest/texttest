@@ -6,7 +6,7 @@ class InteractiveAction(plugins.Action):
     processes = []    
     def __init__(self, test, optionName = ""):
         self.test = test
-        self.optionGroup = plugins.OptionGroup(optionName)
+        self.optionGroup = plugins.OptionGroup(optionName, test.getConfigValue("gui_entry_overrides"))
     def getOptionGroups(self):
         return [ self.optionGroup ]
     def canPerformOnTest(self):
@@ -41,6 +41,7 @@ class SaveTest(InteractiveAction):
         if self.canPerformOnTest():
             extensions = test.app.getVersionFileExtensions(forSave = 1)
             self.optionGroup.addOption("v", "Version to save", test.app.getFullVersion(forSave = 1), extensions)
+            self.optionGroup.addSwitch("over", "Replace successfully compared files also", 0)
             try:
                 comparisonList = test.stateDetails.getComparisons()
                 if self.hasPerformance(comparisonList):
@@ -65,10 +66,14 @@ class SaveTest(InteractiveAction):
         return self.optionGroup.getSwitchValue("ex", 1)
     def __call__(self, test):
         version = self.optionGroup.getOptionValue("v")
-        self.describe(test, " - version " + version + ", exactness " + str(self.getExactness()))
+        saveDesc = " - version " + version + ", exactness " + str(self.getExactness())
+        overwriteSuccess = self.optionGroup.getSwitchValue("over")
+        if overwriteSuccess:
+            saveDesc += ", overwriting both failed and succeeded files"
+        self.describe(test, saveDesc)
         testComparison = test.stateDetails
         if testComparison:
-            testComparison.save(self.getExactness(), version)
+            testComparison.save(self.getExactness(), version, overwriteSuccess)
 
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!
@@ -108,23 +113,24 @@ class ViewFile(InteractiveAction):
         if self.optionGroup.getSwitchValue("f"):
             return self.followFile(fileName)
         if not comparison:
-            return self.viewUncomparedFile(fileName)
-        newFile = self.tmpFile(comparison)
+            return self.viewFile(fileName)
+        if self.shouldTakeDiff(comparison):
+            self.takeDiff(comparison)
+        else:
+            self.viewFile(self.tmpFile(comparison))
+    def shouldTakeDiff(self, comparison):
         if comparison.newResult() or not self.optionGroup.getSwitchValue("nf"):
-            self.viewFile(newFile)
-        else:
-            self.takeDiff(self.stdFile(comparison), newFile)
-    def viewUncomparedFile(self, fileName):
-        if self.optionGroup.getSwitchValue("rdt") and self.optionGroup.getSwitchValue("nf"):
-            fileStem = os.path.basename(fileName).split(".")[0]
-            stdFile = self.test.makeFileName(fileStem)
-            self.takeDiff(stdFile, fileName)
-        else:
-            self.viewFile(fileName)
-    def takeDiff(self, stdFile, newFile):
+            return 0
+        if comparison.hasDifferences():
+            return 1
+        # Take diff on succeeded tests if they want run-dependent text
+        return self.optionGroup.getSwitchValue("rdt")
+    def takeDiff(self, comparison):
         diffProgram = self.test.app.getConfigValue("diff_program")
-        guilog.info("Comparing file " + os.path.basename(newFile) + " with previous version using '" + diffProgram + "'")
-        self.startExternalProgram("tkdiff " + stdFile + " " + newFile)
+        stdFile = self.stdFile(comparison)
+        tmpFile = self.tmpFile(comparison)
+        guilog.info("Comparing file " + os.path.basename(tmpFile) + " with previous version using '" + diffProgram + "'")
+        self.startExternalProgram("tkdiff " + stdFile + " " + tmpFile)
 
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveAction):
@@ -141,6 +147,9 @@ class ImportTest(InteractiveAction):
         return ""
     def setUpSuite(self, suite):
         testName = self.optionGroup.getOptionValue("name")
+        if len(testName) == 0:
+            raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + os.linesep + \
+                  "Fill in the 'Adding " + self.testType() + "' tab below."
         guilog.info("Adding " + self.testType() + testName + " under test suite " + repr(suite))
         testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
@@ -166,16 +175,34 @@ class RecordTest(InteractiveAction):
         test.makeBasicWriteDirectory()
         test.setUpEnvironment(parents=1)
         os.chdir(test.writeDirs[0])
-        recordCommand = test.getExecuteCommand() + " --record " + test.useCaseFile + " --recinp " + test.inputFile
+        logFile = os.path.join(test.app.writeDirectory, "record_run.log")
+        errFile = os.path.join(test.app.writeDirectory, "record_errors.log")
+        recordCommand = test.getExecuteCommand() + " --record " + test.useCaseFile + " --recinp " + test.inputFile + " > " + logFile + " 2> " + errFile
         shellTitle = None
         shellOptions = ""
         if test.getConfigValue("use_standard_input"):
             shellTitle = description
         process = self.startExternalProgram(recordCommand, shellTitle)
         process.waitForTermination()
+        if os.path.isfile(errFile):
+            errors = open(errFile).read()
+            if len(errors):
+                raise plugins.TextTestError, "Recording produced following errors: " + os.linesep + errors
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
+        ttOptions = self.getRunOptions(test)
+        commandLine = self.getTextTestName() + " " + ttOptions + " > /dev/null 2>&1"
+        guilog.info("Starting replay TextTest with options : " + ttOptions)
+        process = self.startExternalProgram(commandLine)
+        process.waitForTermination()
         test.changeState(test.UPDATED, "Recorded use case")
+    def getRunOptions(self, test):
+        basicOptions = "-t " + self.test.name + " -a " + self.test.app.name# + " -ts " + self.test.parent.name
+        logFile = test.makeFileName(test.getConfigValue("log_file"))
+        if os.path.isfile(logFile):
+            return "-g " + basicOptions
+        else:
+            return "-o " + basicOptions
     def matchesMode(self, dynamic):
         return not dynamic
     def __repr__(self):

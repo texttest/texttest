@@ -89,8 +89,8 @@ def getPerformanceHost(fileName):
     return None
 
 class PerformanceTestComparison(comparetest.TestComparison):
-    def __init__(self, test, newFiles):
-        comparetest.TestComparison.__init__(self, test, newFiles)
+    def __init__(self, test):
+        comparetest.TestComparison.__init__(self, test)
         self.execHost = None
     def __repr__(self):
         if self.execHost != None and self.hasDifferences():
@@ -162,7 +162,7 @@ class PerformanceTestComparison(comparetest.TestComparison):
 # Does the same as the basic test comparison apart from when comparing the performance file
 class MakeComparisons(comparetest.MakeComparisons):
     def makeTestComparison(self, test):
-        return PerformanceTestComparison(test, self.overwriteOnSuccess)
+        return PerformanceTestComparison(test)
 
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile, descriptors, makeNew):
@@ -192,7 +192,7 @@ class PerformanceFileComparison(comparetest.FileComparison):
             return self.descriptors["goodperf"]
         else:
             return self.descriptors["badperf"]
-    def hasDifferences(self):
+    def _hasDifferences(self):
         configDescriptor = self.descriptors["config"]
         if configDescriptor == "cputime":
             perfList = self.test.app.getConfigValue("performance_test_machine")

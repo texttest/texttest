@@ -151,8 +151,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
     def __init__(self, referenceVersion):
         optimization.MakeProgressReport.__init__(self, referenceVersion)
     def compare(self, test, referenceFile, currentFile):
-        referenceCosts, refTimes = getSolutionStatistics(referenceFile)
-        currentCosts, curTimes = getSolutionStatistics(currentFile)
+        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile)
+        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile)
         currPerf = int(performance.getTestPerformance(test))
         refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
         currTTWC = currPerf
@@ -171,6 +171,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.reportLine("                         ", "Current", "Version " + self.referenceVersion)
         self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
         self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
+        self.reportLine("Memory used (Mb)         ", currentMaxMemory, refMaxMemory)
         self.reportLine("Total time (minutes)     ", currPerf, refPerf)
         self.reportLine("Time to worst cost (mins)", currTTWC, refTTWC)
     def getCosts(self, file, type):
@@ -331,18 +332,25 @@ def convertTime(timeEntry):
     return float(timeInSeconds) / 60.0
 
 def getSolutionStatistics(currentFile):
-    grepCommand = "grep -E 'TOTAL|cpu time' " + currentFile
+    grepCommand = "grep -E 'memory|TOTAL|cpu time' " + currentFile
     grepLines = os.popen(grepCommand).readlines()
     costs = []
     times = []
     lastTime = 0
+    maxMemory = 0.0
     for line in grepLines:
+        if line.startswith("Time:"):
+            parts = line.split()
+            if parts[-1].startswith("Mb"):
+                mem = float(parts[-2])
+                if mem > maxMemory:
+                    maxMemory = mem
         if line.startswith("Total time"):
             lastTime = convertTime(line.split()[-1])
         if line.startswith(" TOTAL cost"):
             costs.append(int(line.split()[-1]))
             times.append(lastTime)
-    return costs, times
+    return maxMemory, costs, times
 
 class PlotApcTest(plugins.Action):
     def __init__(self):
@@ -363,7 +371,7 @@ class PlotApcTest(plugins.Action):
             stdin.write("quit" + os.linesep)
     def __call__(self, test):
         currentFile = test.makeFileName(self.statusFileName)
-        costs, times = getSolutionStatistics(currentFile)
+        maxMem, costs, times = getSolutionStatistics(currentFile)
         plotFileName = test.makeFileName("plot")
         plotFile = open(plotFileName,"w")
         for il in range(len(costs)):

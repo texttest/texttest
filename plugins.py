@@ -214,11 +214,20 @@ class Option:
         self.name = name
         self.defaultValue = value
         self.valueMethod = None
+        self.updateMethod = None
     def getValue(self):
         if self.valueMethod:
             return self.valueMethod()
         else:
             return self.defaultValue
+    def setMethods(self, valueMethod, updateMethod):
+        self.valueMethod = valueMethod
+        self.updateMethod = updateMethod
+    def reset(self):
+        if self.updateMethod:
+            self.updateMethod(self.defaultValue)
+        else:
+            self.valueMethod = None
 
 class TextOption(Option):
     def __init__(self, name, value, possibleValues):
@@ -239,9 +248,9 @@ class OptionGroup:
         return "OptionGroup " + self.name + os.linesep + repr(self.options) + os.linesep + repr(self.switches)
     def reset(self):
         for option in self.options.values():
-            option.valueMethod = None
+            option.reset()
         for switch in self.switches.values():
-            switch.valueMethod = None
+            switch.reset()
     def setValue(self, key, value):
         if self.options.has_key(key):
             self.options[key].defaultValue = value

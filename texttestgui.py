@@ -342,8 +342,8 @@ class RightWindowGUI:
             hbox = gtk.HBox()
             print "Creating entry for option '" + option.name + "'"
             label = gtk.Label(option.name + "  ")
-            entry = eventHandler.createEntry(option.name, option.defaultValue)
-            option.valueMethod = entry.get_text
+            entry = eventHandler.createEntry(option.name, option.getValue())
+            option.setMethods(entry.get_text, entry.set_text)
             hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
             hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)
             label.show()
@@ -352,8 +352,8 @@ class RightWindowGUI:
             vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
         for switch in optionGroup.switches.values():
             print "Creating check button for switch '" + switch.name + "'"
-            checkButton = eventHandler.createCheckButton(switch.name, switch.defaultValue)
-            switch.valueMethod = checkButton.get_active
+            checkButton = eventHandler.createCheckButton(switch.name, switch.getValue())
+            switch.setMethods(checkButton.get_active, checkButton.set_active)
             checkButton.show()
             vbox.pack_start(checkButton, expand=gtk.FALSE, fill=gtk.FALSE)
         vbox.show()    

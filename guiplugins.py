@@ -273,6 +273,15 @@ class SelectTests(InteractiveAction):
         print "Created test suite of size", testSuite.size()
         return testSuite
 
+class ResetGroups(InteractiveAction):
+    def getTitle(self):
+        return "Reset"
+    def getScriptTitle(self):
+        return "Reset running options"
+    def performOn(self, app, selTests):
+        for group in app.optionGroups:
+            group.reset()
+    
 class RunTests(InteractiveAction):
     def __init__(self, app):
         self.app = app
@@ -280,7 +289,6 @@ class RunTests(InteractiveAction):
         self.processes = []
         self.optionGroups = []
         for group in app.optionGroups:
-            group.reset()
             if group.name.startswith("Invisible"):
                 self.invisibleGroup = group
             elif not group.name.startswith("Select"):
@@ -317,7 +325,7 @@ class InteractiveActionHandler:
     def __init__(self):
         self.testClasses =  [ SaveTest ]
         self.suiteClasses = [ ImportTestCase, ImportTestSuite ]
-        self.appClasses = [ SelectTests, RunTests ]
+        self.appClasses = [ SelectTests, RunTests, ResetGroups ]
     def getInstances(self, test):
         instances = []
         classList = self.getClassList(test)

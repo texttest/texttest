@@ -100,7 +100,8 @@ class PerformanceTestComparison(comparetest.TestComparison):
             return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile, makeNew)
         
         stem, ext = baseName.split(".", 1)
-        if stem == "performance" or stem == "memory":
+        extractedPerfStems = test.getConfigValue("performance_logfile_extractor").keys()
+        if stem == "performance" or stem in extractedPerfStems:
             descriptors = self.findDescriptors(stem)
             return PerformanceFileComparison(test, standardFile, tmpFile, descriptors, makeNew)
         else:
@@ -115,6 +116,10 @@ class PerformanceTestComparison(comparetest.TestComparison):
             descriptors["goodperf"] = "faster"
             descriptors["badperf"] = "slower"
             descriptors["config"] = "cputime"
+        else:
+            descriptors["goodperf"] = "smaller-" + stem
+            descriptors["badperf"] = "larger-" + stem
+            descriptors["config"] = stem
         return descriptors
 
 class PerformanceFileComparison(comparetest.FileComparison):
@@ -159,17 +164,8 @@ class PerformanceFileComparison(comparetest.FileComparison):
             return ""
     def _hasDifferences(self, app):
         configDescriptor = self.descriptors["config"]
-        if configDescriptor == "cputime":
-            perfList = app.getConfigValue("performance_test_machine")
-            try:
-                # Hack for queuesystem configuration, which might not be used...
-                perfList += app.getConfigValue("performance_test_resource")
-            except KeyError:
-                pass
-            if perfList == None or len(perfList) == 0 or perfList[0] == "none":
-                return 0
-        longEnough = self.newPerformance > float(app.getConfigValue("minimum_" + configDescriptor + "_for_test"))
-        varianceEnough = self.percentageChange > float(app.getConfigValue(configDescriptor + "_variation_%"))
+        longEnough = self.newPerformance > float(app.getCompositeConfigValue("performance_test_minimum", configDescriptor))
+        varianceEnough = self.percentageChange > float(app.getCompositeConfigValue("performance_variation_%", configDescriptor))
         return longEnough and varianceEnough
     def checkExternalExcuses(self, app):
         if self.getType() != "slower":

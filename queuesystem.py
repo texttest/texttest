@@ -133,7 +133,7 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         app.setConfigDefault("default_queue", "texttest_default")
         app.setConfigDefault("min_time_for_performance_force", -1)
         app.setConfigDefault("queue_system_module", "LSF")
-        app.setConfigDefault("performance_test_resource", [])
+        app.setConfigDefault("performance_test_resource", { "default" : [] })
         app.setConfigDefault("parallel_environment_name", "make")
 
 class SubmissionRules:
@@ -162,7 +162,7 @@ class SubmissionRules:
         if len(self.envResource):
             resourceList.append(self.envResource)
         if self.forceOnPerformanceMachines():
-            resources = self.test.app.getConfigValue("performance_test_resource")
+            resources = self.test.app.getCompositeConfigValue("performance_test_resource", "cputime")
             for resource in resources:
                 resourceList.append(resource)
         return resourceList
@@ -181,7 +181,7 @@ class SubmissionRules:
     def findMachineList(self):
         if not self.forceOnPerformanceMachines():
             return []
-        performanceMachines = self.test.getConfigValue("performance_test_machine")
+        performanceMachines = self.test.app.getCompositeConfigValue("performance_test_machine", "cputime")
         if len(performanceMachines) == 0 or performanceMachines[0] == "none":
             return []
 
@@ -555,10 +555,9 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         perfMachines = []
         for machine in rawPerfMachines:
             perfMachines += self.queueMachineInfo.findActualMachines(machine)
-        resources = app.getConfigValue("performance_test_resource")
+        resources = app.getCompositeConfigValue("performance_test_resource", "cputime")
         for resource in resources:
             perfMachines += self.queueMachineInfo.findResourceMachines(resource)
-        self.diag.info("Found performance machines as " + repr(perfMachines))
         return perfMachines
     def writeMachineInformation(self, file, executionMachines):
         # Try and write some information about what's happening on the machine

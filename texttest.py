@@ -971,6 +971,16 @@ class Application:
             return newDict
         else:
             return value
+    def getCompositeConfigValue(self, key, subKey):
+        dict = self.getConfigValue(key)
+        if dict.has_key(subKey):
+            retVal = dict[subKey]
+            if type(retVal) == types.ListType:
+                return retVal + dict["default"]
+            else:
+                return retVal
+        elif dict.has_key("default"):
+            return dict["default"]
     def addConfigEntry(self, key, value, sectionName = ""):
         self.configDir.addEntry(key, value, sectionName)
     def setConfigDefault(self, key, value):

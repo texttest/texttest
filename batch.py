@@ -21,18 +21,6 @@ import os, performance, plugins, respond, sys, string, time, types
 from ndict import seqdict
 from cPickle import Pickler
 
-def getBatchConfigValue(app, entryName, sessionName):
-    dict = app.getConfigValue(entryName)
-    if dict.has_key(sessionName):
-        retVal = dict[sessionName]
-        if type(retVal) == types.ListType:
-            return retVal + dict["default"]
-        else:
-            return retVal
-    elif dict.has_key("default"):
-        return dict["default"]
-    return None
-
 class BatchFilter(plugins.Filter):
     def __init__(self, batchSession):
         self.batchSession = batchSession
@@ -51,11 +39,11 @@ class BatchFilter(plugins.Filter):
         self.setTimeLimit(app)
         return 1
     def setTimeLimit(self, app):
-        timeLimit = getBatchConfigValue(app, "batch_timelimit", self.batchSession)
+        timeLimit = app.getCompositeConfigValue("batch_timelimit", self.batchSession)
         if timeLimit:
             self.performanceFilter = performance.TimeFilter(timeLimit)
     def findUnacceptableVersion(self, app):
-        allowedVersions = getBatchConfigValue(app, "batch_version", self.batchSession)
+        allowedVersions = app.getCompositeConfigValue("batch_version", self.batchSession)
         for version in app.versions:
             if len(version) and not version in allowedVersions:
                 return version
@@ -237,10 +225,10 @@ class MailSender(plugins.Action):
             mailFile.write(os.linesep) # blank line separating headers from body
             return mailFile
     def useCollection(self, app):
-        return getBatchConfigValue(app, "batch_use_collection", self.sessionName) == "true"
+        return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
     def getRecipient(self, app):
         # See if the session name has an entry, if not, send to the user
-        return os.path.expandvars(getBatchConfigValue(app, "batch_recipients", self.sessionName))
+        return os.path.expandvars(app.getCompositeConfigValue("batch_recipients", self.sessionName))
     def getMailHeader(self, app, appResponders):
         title = time.strftime("%y%m%d") + " " + repr(app)
         versions = self.findCommonVersions(app, appResponders)

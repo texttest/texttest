@@ -444,7 +444,7 @@ def getTestMachine(test):
         machine = job.machines[0]
         diag.info("Test was run using LSF on " + machine)
     else:
-        machine = unixConfig.hostname()
+        machine = default.hostname()
         diag.info("Test was run locally on " + machine)
     return machine
 
@@ -506,7 +506,7 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
         file = open(viewLogScript, "w")
         logFileName = os.path.join(apcTmpDir, "apclog")
-        file.write("xon " + unixConfig.hostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
+        file.write("xon " + default.hostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
         file.close()
     def performParallelAction(self, test, processInfo):
         processId, processName = processInfo[0]

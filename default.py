@@ -13,7 +13,7 @@ helpOptions = """
              overwriting all previous results with new ones.
 
 -n         - run in new-file mode. Tests that succeed will still overwrite the standard file, rather than
-             leaving it, as is the deafult behaviour.
+             leaving it, as is the default behaviour.
 
 -reconnect <user>
             - Reconnect to already run tests, optionally takes a user from which to
@@ -39,7 +39,7 @@ helpOptions = """
 helpScripts = """
 default.CountTest          - produce a brief report on the number of tests in the chosen selection, by application
 
-default.ExtractMemory      - update the memory files from the standard log files
+default.ExtractStandardPerformance     - update the standard performance files from the standard log files
 """
 
 import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, bugzilla
@@ -48,6 +48,16 @@ from cPickle import Unpickler
 
 def getConfig(optionMap):
     return Config(optionMap)
+
+def hostname():
+    if os.environ.has_key("HOST"):
+        return os.environ["HOST"]
+    elif os.environ.has_key("HOSTNAME"):
+        return os.environ["HOSTNAME"]
+    elif os.environ.has_key("COMPUTERNAME"):
+        return os.environ["COMPUTERNAME"]
+    else:
+        raise plugins.TextTestError, "No hostname could be found for local machine!!!"
 
 class Config(plugins.Configuration):
     def addToOptionGroups(self, app, groups):
@@ -136,15 +146,15 @@ class Config(plugins.Configuration):
                 return self.getTestCollator()
             elif self.optionMap.has_key("diag"):
                 print "Note: Running with Diagnostics on, so performance checking is disabled!"
-                return [ self.getTestCollator(), self.getMemoryFileMaker() ] 
+                return [ self.getTestCollator(), self.getPerformanceExtractor() ] 
             else:
-                return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getMemoryFileMaker() ] 
+                return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getPerformanceExtractor() ] 
     def getCatalogueCreator(self):
         return CreateCatalogue()
     def getTestCollator(self):
         return CollateFiles()
-    def getMemoryFileMaker(self):
-        return MakeMemoryFile()
+    def getPerformanceExtractor(self):
+        return ExtractPerformanceFiles()
     def getPerformanceFileMaker(self):
         return None
     def getTestPredictionChecker(self):
@@ -199,7 +209,6 @@ class Config(plugins.Configuration):
         severities["output"] = 1
         severities["usecase"] = 2
         severities["catalogue"] = 2
-        severities["memory"] = 3
         return severities
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output")
@@ -210,12 +219,13 @@ class Config(plugins.Configuration):
         app.setConfigDefault("collate_file", {})
         app.setConfigDefault("run_dependent_text", { "" : [] })
         app.setConfigDefault("unordered_text", { "" : [] })
-        app.setConfigDefault("string_before_memory", "")
         app.setConfigDefault("create_catalogues", "false")
         app.setConfigDefault("internal_error_text", [])
         app.setConfigDefault("internal_compulsory_text", [])
-        app.setConfigDefault("memory_variation_%", 5)
-        app.setConfigDefault("minimum_memory_for_test", 5)
+        app.setConfigDefault("performance_logfile_extractor", {})
+        app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] })
+        app.setConfigDefault("performance_variation_%", { "default" : 10 })
+        app.setConfigDefault("performance_test_minimum", { "default" : 0 })
         app.setConfigDefault("use_standard_input", 1)
         app.setConfigDefault("collect_standard_output", 1)
         if self.bugzillaInstalled():
@@ -374,7 +384,7 @@ class RunTest(plugins.Action):
         self.changeState(test)
         return retValue
     def changeState(self, test):
-        test.changeState(plugins.TestState("running", "Running on local machine", started=1))
+        test.changeState(plugins.TestState("running", "Running on " + hostname(), started = 1))
     def runTest(self, test):
         testCommand = self.getExecuteCommand(test)
         self.runCommand(test, testCommand)
@@ -550,45 +560,87 @@ class ReconnectTest(plugins.Action):
     def hasUserDependentWriteDir(self):
         return os.environ["TEXTTEST_TMP"].find("~") != -1
 
-# Relies on the config entry string_before_memory, so looks in the log file for anything reported
-# by the program
-class MakeMemoryFile(plugins.Action):
+class PerformanceFileCreator(plugins.Action):
     def __init__(self):
-        self.memoryFinder = None
+        self.diag = plugins.getDiagnostics("makeperformance")
+    def findExecutionMachines(self, test):
+        return [ hostname() ]
+    def allMachinesTestPerformance(self, test, executionMachines, performanceMachines):
+        if "any" in performanceMachines:
+            return 1
+        for host in executionMachines:
+            realHost = host
+            # Format support e.g. 2*apple for multi-processor machines
+            if host[1] == "*":
+                realHost = host[2:]
+            if not realHost in performanceMachines:
+                self.diag.info("Real host rejected for performance " + realHost)
+                return 0
+        return 1
+    def __call__(self, test, temp=1):
+        if test.state.isComplete():
+            return
+
+        executionMachines = self.findExecutionMachines(test)
+        return self.makePerformanceFiles(test, executionMachines, temp)
+
+
+# Relies on the config entry performance_logfile_extractor, so looks in the log file for anything reported
+# by the program
+class ExtractPerformanceFiles(PerformanceFileCreator):
+    def __init__(self):
+        PerformanceFileCreator.__init__(self)
+        self.entryFinders = None
         self.logFileStem = None
     def setUpApplication(self, app):
-        self.memoryFinder = app.getConfigValue("string_before_memory")
+        self.entryFinders = app.getConfigValue("performance_logfile_extractor")
         self.logFileStem = app.getConfigValue("log_file")
-    def __call__(self, test, temp=1):
-        self.makeMemoryFile(test, temp=1)
-    def makeMemoryFile(self, test, temp):
-        if not self.memoryFinder:
-            return
-        
-        logFile = test.makeFileName(self.logFileStem, temporary=temp)
-        if not os.path.isfile(logFile):
-            return
-        
-        maxMem = self.findMaxMemory(logFile)
-        if maxMem:
-            # We save memory performance in steps of 0.01Mb
-            roundedMaxMem = float(int(100*maxMem))/100
-            fileName = test.makeFileName("memory", temporary=temp)
-            file = open(fileName, "w")
-            file.write(string.lstrip("Max Memory  :      " + str(roundedMaxMem) + " MB") + os.linesep)
-            file.close()
-    def findMaxMemory(self, logFile):
-        maxMemory = 0.0
+    def makePerformanceFiles(self, test, executionMachines, temp):
+        for fileStem, entryFinder in self.entryFinders.items():
+            perfMachines = test.app.getCompositeConfigValue("performance_test_machine", fileStem)
+            if not self.allMachinesTestPerformance(test, executionMachines, perfMachines):
+                continue
+            logFile = test.makeFileName(self.logFileStem, temporary=temp)
+            if not os.path.isfile(logFile):
+                continue
+            
+            values = self.findValues(logFile, entryFinder)
+            if len(values) > 0:
+                fileName = test.makeFileName(fileStem, temporary=temp)
+                lineToWrite = self.makeLine(values, fileStem)
+                self.saveFile(fileName, lineToWrite)
+    def saveFile(self, fileName, lineToWrite):
+        file = open(fileName, "w")
+        file.write(lineToWrite + os.linesep)
+        file.close()
+    def makeLine(self, values, fileStem):
+        # Round to accuracy 0.01
+        if fileStem.find("mem") != -1:
+            return self.makeMemoryLine(values, fileStem)
+        else:
+            return self.makeTimeLine(values, fileStem)
+    def makeMemoryLine(self, values, fileStem):
+        maxVal = max(values)
+        roundedMaxVal = float(int(100*maxVal))/100
+        return "Max " + string.capitalize(fileStem) + "  :      " + str(roundedMaxVal) + " MB"
+    def makeTimeLine(self, values, fileStem):
+        sum = 0.0
+        for value in values:
+            sum += value
+        roundedSum = float(int(10*sum))/10
+        return "Total " + string.capitalize(fileStem) + "  :      " + str(roundedSum) + " seconds"
+    def findValues(self, logFile, entryFinder):
+        values = []
         for line in open(logFile).xreadlines():
-            memory = self.getMemory(line)
-            if memory and memory > maxMemory:
-                maxMemory = memory
-        return maxMemory
-    def getMemory(self, line):
-        pos = line.find(self.memoryFinder)
+            value = self.getValue(line, entryFinder)
+            if value:
+                values.append(value)
+        return values
+    def getValue(self, line, entryFinder):
+        pos = line.find(entryFinder)
         if pos == -1:
             return None
-        endOfString = pos + len(self.memoryFinder)
+        endOfString = pos + len(entryFinder)
         memString = line[endOfString:].lstrip()
         try:
             memNumber = float(memString.split()[0])
@@ -599,11 +651,11 @@ class MakeMemoryFile(plugins.Action):
             return None
 
 # A standalone action, we add description and generate the main file instead...
-class ExtractMemory(MakeMemoryFile):
+class ExtractStandardPerformance(ExtractPerformanceFiles):
     def __repr__(self):
-        return "Extracting memory performance for"
+        return "Extracting standard performance for"
     def __call__(self, test):
         self.describe(test)
-        self.makeMemoryFile(test, temp=0)
+        ExtractPerformanceFiles.__call__(self, test, temp=0)
     def setUpSuite(self, suite):
         self.describe(suite)

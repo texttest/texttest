@@ -69,11 +69,8 @@ class UNIXConfig(default.Config):
         app.setConfigDefault("collect_standard_error", 1)
         app.setConfigDefault("virtual_display_machine", [])
         # Performance values
-        app.setConfigDefault("performance_test_machine", [])
         app.setConfigDefault("cputime_include_system_time", 0)
         app.setConfigDefault("cputime_slowdown_variation_%", 30)
-        app.setConfigDefault("cputime_variation_%", 10)
-        app.setConfigDefault("minimum_cputime_for_test", 10)
         # Batch values. Maps from session name to values
         app.setConfigDefault("batch_recipients", { "default" : "$USER" })
         app.setConfigDefault("batch_timelimit", { "default" : None })
@@ -149,8 +146,6 @@ class RunTest(default.RunTest):
         f.write(testCommand + os.linesep)
         f.close()
         return cmdFile
-    def changeState(self, test):
-        test.changeState(plugins.TestState("running", "Running on " + hostname(), started = 1))
     def getCleanUpAction(self):
         return KillTest(self)
     def setUpApplication(self, app):
@@ -194,7 +189,7 @@ class VirtualDisplayFinder:
         pidStr = line.split()[3]
         os.system(self.getSysCommand(server, "kill -9 " + pidStr))
     def getSysCommand(self, server, command, background=1):
-        if server == hostname():
+        if server == default.hostname():
             if background:
                 return command + " >& /dev/null &"
             else:
@@ -250,14 +245,6 @@ class KillTest(plugins.Action):
             print "Killing running test (process id", str(process.processId) + ")"
             process.kill()
    
-def hostname():
-    if os.environ.has_key("HOST"):
-        return os.environ["HOST"]
-    elif os.environ.has_key("HOSTNAME"):
-        return os.environ["HOSTNAME"]
-    else:
-        raise plugins.TextTestError, "No hostname could be found for local machine!!!"
-
 def isCompressed(path):
     if os.path.getsize(path) == 0:
         return 0
@@ -355,26 +342,23 @@ class CollateUNIXFiles(default.CollateFiles):
         else:
             plugins.movefile(sourcePath, targetFile)
 
-class MakePerformanceFile(plugins.Action):
+class MakePerformanceFile(default.PerformanceFileCreator):
     def __init__(self):
-        self.includeSystemTime = 0
-        self.diag = plugins.getDiagnostics("makeperformance")
+        default.PerformanceFileCreator.__init__(self)
         self.performanceMachines = []
+        self.includeSystemTime = 0
     def setUpApplication(self, app):
-        self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
         self.performanceMachines = self.findPerformanceMachines(app)
+        self.diag.info("Found performance machines as " + repr(self.performanceMachines))
+        self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
     def __repr__(self):
         return "Making performance file for"
-    def __call__(self, test):
-        if test.state.isComplete():
-            return
-
-        executionMachines = self.findExecutionMachines(test)
+    def makePerformanceFiles(self, test, executionMachines, temp):
         # Ugly hack to work around lack of proper test states
         test.execHost = string.join(executionMachines, ",")
         
         # Check that all of the execution machines are also performance machines
-        if not self.allMachinesTestPerformance(test, executionMachines):
+        if not self.allMachinesTestPerformance(test, executionMachines, self.performanceMachines):
             return
         cpuTime, realTime = self.readTimes(test)
         # There was still an error (jobs killed in emergency), so don't write performance files
@@ -383,22 +367,8 @@ class MakePerformanceFile(plugins.Action):
             return
         fileToWrite = test.makeFileName("performance", temporary=1)
         self.writeFile(test, cpuTime, realTime, executionMachines, fileToWrite)
-    def findExecutionMachines(self, test):
-        return [ hostname() ]
     def findPerformanceMachines(self, app):
-        return app.getConfigValue("performance_test_machine")
-    def allMachinesTestPerformance(self, test, executionMachines):
-        if "any" in self.performanceMachines:
-            return 1
-        for host in executionMachines:
-            realHost = host
-            # Format support e.g. 2*apple for multi-processor machines
-            if host[1] == "*":
-                realHost = host[2:]
-            if not realHost in self.performanceMachines:
-                self.diag.info("Real host rejected for performance " + realHost)
-                return 0
-        return 1
+        return app.getCompositeConfigValue("performance_test_machine", "cputime")
     def readTimes(self, test):
         # Read the UNIX performance file, allowing us to discount system time.
         tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)

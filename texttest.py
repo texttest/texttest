@@ -410,13 +410,13 @@ class ConfigurationWrapper:
         if useOrigException:
             printException()
         raise BadConfigError, message
-    def getFilterList(self, optionGroup = None):
-        if optionGroup:
-            for key, option in optionGroup.options.items():
-                if len(option.getValue()):
-                    self.target.optionMap[key] = option.getValue()
-                elif self.target.optionMap.has_key(key):
-                    del self.target.optionMap[key]
+    def updateOptions(self, optionGroup):
+        for key, option in optionGroup.options.items():
+            if len(option.getValue()):
+                self.target.optionMap[key] = option.getValue()
+            elif self.target.optionMap.has_key(key):
+                del self.target.optionMap[key]
+    def getFilterList(self):
         try:
             return self.target.getFilterList()
         except:
@@ -589,11 +589,17 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
-    def createTestSuite(self, optionGroup = None):
-        valid, filters = self.getFilterList(optionGroup)
+    def createTestSuite(self, filters = None):
+        if not filters:
+            filters = self.configObject.getFilterList()
+
+        success = 1
+        for filter in filters:
+            if not filter.acceptsApplication(self):
+                success = 0
         suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters)
         suite.reFilter(filters)
-        return valid, suite
+        return success, suite
     def description(self):
         description = "Application " + self.fullName
         if len(self.versions):
@@ -706,13 +712,6 @@ class Application:
             header += "-"
         print header
         self.configObject.printHelpText(builtInOptions)
-    def getFilterList(self, optionGroup = None):
-        filters = self.configObject.getFilterList(optionGroup)
-        success = 1
-        for filter in filters:
-            if not filter.acceptsApplication(self):
-                success = 0
-        return success, filters
     def getConfigValue(self, key):
         value = self.configDir[key]
         if type(value) == types.StringType:

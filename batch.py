@@ -55,37 +55,33 @@ class BatchFilter(plugins.Filter):
                 return version
         return None
 
-class BatchCategory:
+class BatchCategory(plugins.Filter):
     def __init__(self, description):
         self.description = description
         self.count = 0
-        self.text = []
+        self.testLines = {}
     def addTest(self, test, postText):
         if not postText:
             postText = ""
         if len(postText) > 0:
             postText = " : " + postText
-        self.text.append(test.getIndent() + "- " + repr(test) + postText + os.linesep)
+        self.testLines[test.getRelPath()] = test.getIndent() + "- " + repr(test) + postText + os.linesep
         self.count += 1
-    def addSuite(self, suite):
-        line = suite.getIndent() + "In " + repr(suite) + ":" + os.linesep
-        currentIndent = len(suite.getIndent())
-        # Remove lines corresponding to suites with no entries
-        if len(self.text) > 0:
-            lastLine = self.text[-1]
-            lastIndent = len(lastLine) - len(lastLine.lstrip())
-            if lastIndent == currentIndent:
-                self.text.pop()
-        self.text.append(line)
-    def describe(self, mailFile):
-        lastLine = self.text[-1]
-        # If the last line talked about a suite, it's not interesting...
-        if lastLine.find("test-suite") != -1:
-            self.text.pop()
+    def acceptsTestCase(self, test):
+        return self.testLines.has_key(test.getRelPath())
+    def describe(self, mailFile, app):
         if self.count > 0:
             mailFile.write("The following tests " + self.description + " : " + os.linesep)
-            mailFile.writelines(self.text)
+            valid, suite = app.createTestSuite([ self ])
+            self.writeTestLines(mailFile, suite)
             mailFile.write(os.linesep)
+    def writeTestLines(self, mailFile, test):
+        if test.classId() == "test-case":
+            mailFile.write(self.testLines[test.getRelPath()])
+        else:
+            mailFile.write(test.getIndent() + "In " + repr(test) + ":" + os.linesep)
+            for subtest in test.testcases:
+                self.writeTestLines(mailFile, subtest)         
 
 allBatchResponders = []
 categoryNames = [ "badPredict", "crash", "dead", "difference", "faster", "slower",\
@@ -129,8 +125,6 @@ class BatchResponder(respond.Responder):
     def setUpSuite(self, suite):
         if self.mainSuite == None:
             self.mainSuite = suite
-        for category in self.categories.values():
-            category.addSuite(suite)
     def failureCount(self):
         return self.testCount() - self.categories["success"].count
     def testCount(self):
@@ -140,7 +134,7 @@ class BatchResponder(respond.Responder):
         return count
     def writeMailBody(self, mailFile):
         for categoryName in categoryNames:
-            self.categories[categoryName].describe(mailFile)
+            self.categories[categoryName].describe(mailFile, self.mainSuite.app)
         if len(self.deadDetail) > 0:
             self.writeDeadDetail(mailFile)
         if len(self.crashDetail) > 0:
@@ -231,7 +225,7 @@ class MailSender(plugins.Action):
         return getBatchConfigValue(app, "batch_use_collection", self.sessionName) == "true"
     def getRecipient(self, app):
         # See if the session name has an entry, if not, send to the user
-        return getBatchConfigValue(app, "batch_recipients", self.sessionName)
+        return os.path.expandvars(getBatchConfigValue(app, "batch_recipients", self.sessionName))
     def getMailHeader(self, app, appResponders):
         title = time.strftime("%y%m%d") + " " + repr(app) + " Test Suite "
         versions = self.findCommonVersions(app, appResponders)

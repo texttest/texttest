@@ -271,7 +271,8 @@ class SelectTests(InteractiveAction):
     def getScriptTitle(self):
         return "Select indicated tests"
     def performOn(self, app, selTests):
-        valid, testSuite = app.createTestSuite(self.optionGroup)
+        app.configObject.updateOptions(self.optionGroup)
+        valid, testSuite = app.createTestSuite()
         guilog.info("Created test suite of size " + str(testSuite.size()))
         return testSuite
 

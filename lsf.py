@@ -157,6 +157,7 @@ class LSFConfig(unixConfig.UNIXConfig):
 class LSFJob:
     def __init__(self, test):
         self.name = test.getTmpExtension() + repr(test.app) + test.app.versionSuffix() + test.getRelPath()
+        self.app = test.app
     def hasStarted(self):
         retstring = self.getFile("-r").readline()
         return retstring.find("not found") == -1
@@ -177,11 +178,28 @@ class LSFJob:
         else:
             execMachine = data[5].split('.')[0]
             return status, execMachine
-    def getProcessIds(self):
+    def getProcessIdWithoutLSF(self, firstpid):
+        status, machine = self.getStatus()
+        if machine:
+            stdout = os.popen("rsh " + machine + " pstree -p -l " + firstpid + " 2>&1")
+            psline = stdout.readlines()[0]
+            batchpos = psline.find(os.path.basename(self.app.getConfigValue("binary")))
+            if batchpos != -1:
+                apcj = psline[batchpos:].split('---')
+                if len(apcj) > 1:
+                    pid = apcj[1].split('(')[-1].split(')')[0]
+                    return pid
+        return []
+    def getProcessId(self):
         for line in self.getFile("-l").xreadlines():
             pos = line.find("PIDs")
             if pos != -1:
-                return line[pos + 6:].strip().split(' ')
+                pids = line[pos + 6:].strip().split(' ')
+                if len(pids) >= 4:
+                    return pids[-1]
+                # Try to figure out the PID, without having to wait for LSF.
+                if len(pids) == 1:
+                    return self.getProcessIdWithoutLSF(pids[0])
         return []
     def getFile(self, options = ""):
         return os.popen("bjobs -J " + self.name + " " + options + " 2>&1")

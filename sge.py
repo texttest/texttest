@@ -20,7 +20,7 @@ class QueueSystem:
         resource = self.getResourceArg(submissionRules)
         if len(resource):
             qsubArgs += " -l " + resource
-        qsubArgs += " -m n -b y -V"
+        qsubArgs += " -w e -m n -b y -V"
         return "qsub " + qsubArgs
     def findSubmitError(self, stderr):
         errLines = stderr.readlines()
@@ -107,10 +107,16 @@ class QueueSystem:
             del self.activeJobs[jobId]
     
 class MachineInfo:
-    def findActualMachines(self, machine):
-        # In LSF this unpacks host groups. Don't know how they work here yet, or whether they'll
-        # be useful
-        return [ machine ]
+    def findActualMachines(self, machineOrGroup):
+        # In LSF this unpacks host groups, taking advantage of the fact that they are
+        # interchangeable with machines. This is not true in SGE anyway, so don't support it.
+        return [ machineOrGroup ]
+    def findModelMachines(self, model):
+        machines = []
+        for line in os.popen("qhost -l 'model=" + model + "' 2>&1"):
+            if not line.startswith("HOSTNAME") and not line.startswith("-----") and not line.startswith("global"):
+                machines.append(line.split()[0].split(".")[0])
+        return machines
     def findRunningJobs(self, machine):
         jobs = []
         fieldInfo = 0

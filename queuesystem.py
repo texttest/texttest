@@ -133,6 +133,7 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         app.setConfigDefault("default_queue", "texttest_default")
         app.setConfigDefault("min_time_for_performance_force", -1)
         app.setConfigDefault("queue_system_module", "LSF")
+        app.setConfigDefault("performance_test_model", [])
 
 class SubmissionRules:
     def __init__(self, optionMap, test, nonTestProcess):
@@ -151,6 +152,9 @@ class SubmissionRules:
             resourceList.append(self.optionMap["R"])
         if len(self.envResource):
             resourceList.append(self.envResource)
+        models = self.test.app.getConfigValue("performance_test_model")
+        for model in models:
+            resourceList.append("model=" + model)
         return resourceList
     def findQueue(self):
         if self.nonTestProcess:
@@ -530,6 +534,9 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         perfMachines = []
         for machine in rawPerfMachines:
             perfMachines += self.queueMachineInfo.findActualMachines(machine)
+        models = app.getConfigValue("performance_test_model")
+        for model in models:
+            perfMachines += self.queueMachineInfo.findModelMachines(model)
         return perfMachines
     def writeMachineInformation(self, file, executionMachines):
         # Try and write some information about what's happening on the machine

@@ -119,10 +119,15 @@ class QueueSystem:
         return 0
 
 class MachineInfo:
-    def findActualMachines(self, machine):
-        # 'machine' may actually be a host group
+    def findActualMachines(self, machineOrGroup):
         machines = []
-        for line in os.popen("bhosts " + machine + " 2>&1"):
+        for line in os.popen("bhosts " + machineOrGroup + " 2>&1"):
+            if not line.startswith("HOST_NAME"):
+                machines.append(line.split()[0].split(".")[0])
+        return machines
+    def findModelMachines(self, model):
+        machines = []
+        for line in os.popen("bhosts -w -R 'model=" + model + "' 2>&1"):
             if not line.startswith("HOST_NAME"):
                 machines.append(line.split()[0].split(".")[0])
         return machines

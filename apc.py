@@ -324,7 +324,6 @@ class MakeProgressReport(optimization.MakeProgressReport):
     def compare(self, test, referenceRun, currentRun):
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
         if not self.kpiGroupForTest.has_key(test.name):
-            self.doCompare(test, referenceRun, currentRun, userName)
             return
         groupName = self.kpiGroupForTest[test.name]
         testTuple = test, referenceRun, currentRun, userName

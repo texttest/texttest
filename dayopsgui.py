@@ -52,8 +52,8 @@ class RecordTest(guiplugins.RecordTest):
         defaultHTTPdir = os.environ["DMG_RECORD_HTTP_DIR"]
         self.test.tearDownEnvironment(1)
         self.props = JavaPropertyReader(propFileInCheckout)
-        self.addOption(oldOptionGroup, "host", "DMServer host", self.props.get("host"))
-        self.addOption(oldOptionGroup, "port", "Port", self.props.get("port"))
+        self.addOption(oldOptionGroup, "desmond_host", "Desmond host", self.props.get("desmond_host"))
+        self.addOption(oldOptionGroup, "desmond_port", "Desmond port", self.props.get("desmond_port"))
         self.addOption(oldOptionGroup, "w", "HTTP dir", defaultHTTPdir)
     def __call__(self, test):
         serverLog = test.makeFileName("input")
@@ -61,17 +61,20 @@ class RecordTest(guiplugins.RecordTest):
         newLogFile = test.makeFileName("dmserverlog")
         if os.path.isfile(test.useCaseFile):
             os.remove(test.useCaseFile)
-        self.props.set("host", self.optionGroup.getOptionValue("host"))
-        self.props.set("port", self.optionGroup.getOptionValue("port"))
+        self.props.set("host", self.optionGroup.getOptionValue("desmond_host"))
+        self.props.set("port", self.optionGroup.getOptionValue("desmond_port"))
         self.props.writeFile(propFileInTest)
         httpServerDir = self.optionGroup.getOptionValue("w")
-        args = [ test.abspath, serverLog, propFileInTest, httpServerDir ]
+        args = [ test.abspath, propFileInTest, serverLog, httpServerDir ]
         os.environ["DMG_RECORD_TEST"] = string.join(args,":")
         guiplugins.RecordTest.__call__(self, test)
         # Use the reran tests 'dmserverlog' as 'input' for the test not the
         # originally recorded 'input' file. i.e. copy 'dmserverlog' to 'input'
         if os.path.isfile(newLogFile):
             shutil.copyfile(newLogFile, serverLog)
+    def getRunOptions(self, test):
+        baseOptions = guiplugins.RecordTest.getRunOptions(self, test)
+        return baseOptions + " -actrep -l "
 
         
 

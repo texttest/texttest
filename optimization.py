@@ -918,7 +918,7 @@ class PlotTest(plugins.Action):
                 optRun = OptimizationRun(test, version, [ self.plotItem, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus)
             except plugins.TextTestError:
                 print "No status file does exist for test " + test.name + "(" + version + ")"
-
+                return
             plotFileName = test.makeFileName("plot")
 #            if len(version) > 0:
             plotFileName += "." + version

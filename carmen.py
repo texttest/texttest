@@ -142,7 +142,11 @@ class RunWithParallelAction(plugins.Action):
         self.diag = plugins.getDiagnostics("Parallel Action")
     def __repr__(self):
         return repr(self.baseRunner)
+    def pstreeExists(self):
+        return os.system("which pstree > /dev/null 2>&1") == 0
     def __call__(self, test):
+        if not self.pstreeExists():
+            return self.baseRunner(test)
         processId = os.fork()
         if processId == 0:
             self.baseRunner(test)

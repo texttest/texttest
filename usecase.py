@@ -36,12 +36,13 @@ These will then be capable of
     available for PyGTK (gtkusecase.py)
 """
 
-import os, string, sys
-from threading import Thread
+import os, string, sys, signal
+from threading import Thread, currentThread
 from ndict import seqdict
 
 # Hard coded commands
 waitCommandName = "wait for"
+signalCommandName = "receive signal"
 
 # Exception to throw when scripts go wrong
 class UseCaseScriptError(RuntimeError):
@@ -82,12 +83,15 @@ class ScriptEngine:
             self.recordScript = UseCaseRecordScript(recordScriptName)
         if stdinScriptName:
             self.stdinScript = RecordScript(stdinScriptName)
+        self.thread = currentThread()
         ScriptEngine.instance = self
     def hasScript(self):
         return self.replayScript or self.recordScript
     def createReplayScript(self, scriptName, logger):
         return ReplayScript(scriptName, logger)
     def applicationEvent(self, name, category = None):
+        if currentThread() != self.thread:
+            raise UseCaseScriptError, "Can only register application events in the same thread as the script engine"
         if self.replayScript:
             self.replayScript.registerApplicationEvent(name)
         if self.recordScript:
@@ -114,6 +118,7 @@ class ReplayScript:
         self.commands = []
         self.pointer = 0
         self.logger = logger
+        self.processId = os.getpid() # So we can generate signals for ourselves...
         if not os.path.isfile(scriptName):
             raise UseCaseScriptError, "Cannot replay script " + scriptName + ", no such file or directory"
         for line in open(scriptName).xreadlines():
@@ -167,6 +172,8 @@ class ReplayScript:
         self.write("")
         if commandName == waitCommandName:
             return self.processWaitCommand(argumentString)
+        elif commandName == signalCommandName:
+            return self.processSignalCommand(argumentString)
         else:
             self.generateEvent(commandName, argumentString)
             return 1
@@ -179,6 +186,8 @@ class ReplayScript:
     def findCommandName(self, command):
         if command.startswith(waitCommandName):
             return waitCommandName
+        if command.startswith(signalCommandName):
+            return signalCommandName
         for eventName in self.events.keys():
             if command.startswith(eventName):
                 return eventName
@@ -198,6 +207,11 @@ class ReplayScript:
             self.waitingForEvent = applicationEventName
             self.write("Waiting for application event '" + applicationEventName + "' to occur.")
             return 0
+    def processSignalCommand(self, signalArg):
+        signalNum = int(signalArg)
+        self.write("Generating signal " + signalArg)
+        os.kill(self.processId, signalNum)
+        return 1
 
 # Take care not to record empty files...
 class RecordScript:
@@ -213,7 +227,32 @@ class UseCaseRecordScript(RecordScript):
     def __init__(self, scriptName):
         RecordScript.__init__(self, scriptName)
         self.events = []
+        self.processId = os.getpid()
         self.applicationEvents = seqdict()
+        self.realSignalHandlers = {}
+        for signum in range(signal.NSIG):
+            try:
+                # Don't record SIGCHLD unless told to, these are generally ignored
+                if signum != signal.SIGCHLD:
+                    self.realSignalHandlers[signum] = signal.signal(signum, self.recordSignal)
+            except:
+                # Various signals aren't really valid here...
+                pass
+    def recordSignal(self, signum, stackFrame):
+        self.writeApplicationEventDetails()
+        self.record(signalCommandName + " " + str(signum))
+        # Reset the handler and send the signal to ourselves again...
+        realHandler = self.realSignalHandlers[signum]
+        # If there was no handler-override installed, resend the signal with the handler reset
+        if realHandler == signal.SIG_DFL:
+            signal.signal(signum, self.realSignalHandlers[signum])
+            print "Killing process", self.processId
+            os.kill(self.processId, signum)
+            # If we're still alive, set the signal handler back again to record future signals
+            signal.signal(signum, self.recordSignal)
+        else:
+            # If there was a handler, just call it
+            realHandler(signum, stackFrame)
     def addEvent(self, event):
         self.events.append(event)
     def writeEvent(self, widget, *args):

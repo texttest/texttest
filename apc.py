@@ -513,6 +513,9 @@ class KeepApcLogs(plugins.Action):
         waitDispatch = carmen.WaitForDispatch()
         waitDispatch.__call__(test)
         job = lsf.LSFJob(test)
+        if job.hasFinished():
+            print "Job has already finished, not keeping APC logs."
+            return
         status, machine = job.getStatus()
         subplanName = test.writeDirs[-1].split(os.sep)[-2]
         apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.

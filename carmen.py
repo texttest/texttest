@@ -580,7 +580,14 @@ class WaitForDispatch(lsf.Wait):
         lsf.Wait.__init__(self)
         self.eventName = "dispatch"
     def checkCondition(self, job):
-        return job.getProcessId()
+        try:
+            # A job can be so quick that we don't catch it running.
+            if job.hasFinished():
+                return 1
+            else:
+                return job.getProcessId()
+        except IOError:
+            return 0
 
 class AttachProfiler(plugins.Action):
     def __repr__(self):
@@ -592,7 +599,10 @@ class AttachProfiler(plugins.Action):
         status, executionMachine = job.getStatus()
         processId = job.getProcessId()
         if not processId:
-            print "Failed to find process id; profiler not attached."
+            if job.hasFinished():
+                print "Job already finished; profiler not attached."
+            else:
+                print "Failed to find process id; profiler not attached."
             return
         self.describe(test, ", executing on " + executionMachine + ", pid " + str(processId))
         runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId + " >& gprof.output"

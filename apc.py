@@ -37,7 +37,8 @@ class ApcSubPlanDirManager(optimization.SubPlanDirManager):
     def __init__(self, config):
         optimization.SubPlanDirManager.__init__(self, config)
     def getSubPlanDirFromTest(self, test):
-        dirs = os.path.expandvars(test.options.split()[1]).split(os.sep)[:-3]
+        statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
+        dirs = statusFile.split(os.sep)[:-2]
         return os.path.normpath(string.join(dirs, os.sep))
     def getExecuteCommand(self, binary, test):
         self.makeTemporary(test)

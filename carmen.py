@@ -393,20 +393,21 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
             return lsf.UpdateLSFStatus.__call__(self, test)
     def processStatus(self, test, status, machine):
         ruleset = self.getRuleSetName(test)
+        details = "Compiling ruleset " + ruleset
+        if machine != None:
+            details += " on " + machine
+        details += os.linesep + "Current LSF status = " + status + os.linesep
+        state = test.state
+        if status == "PEND":
+            test.changeState(test.NEED_PREPROCESS, details)
+        else:
+            test.changeState(test.RUNNING_PREPROCESS, details)
+
         if status == "EXIT":
             return self.raiseFailure(test, ruleset)
         elif status == "DONE":
             self.ruleCompilations.append(self.jobNameFunction(test))
             test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
-        else:
-            details = "Compiling ruleset " + ruleset
-            if machine != None:
-                details += " on " + machine
-            details += os.linesep + "Current LSF status = " + status + os.linesep
-            state = test.state
-            if status == "RUN":
-                state = test.RUNNING_PREPROCESS
-            test.changeState(state, details)
     def raiseFailure(self, test, ruleset):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         jobName = self.jobNameFunction(test)

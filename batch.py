@@ -128,16 +128,16 @@ class BatchResponder(respond.Responder):
             self.addTestToCategory(category, test)
         else:
             self.failureDetail[test] = testComparison
-            category, summary = self.getSummary(category, testComparison.failedPrediction)
+            category, summary = self.getSummary(category, testComparison)
             self.addTestToCategory(category, test, summary)
-    def getSummary(self, category, description):
+    def getSummary(self, category, testComparison):
         if category != "bug":
-            if description:
-                return category, repr(description)
+            if testComparison.failedPrediction:
+                return category, repr(testComparison.failedPrediction)
             else:
-                return category, ""
+                return category, testComparison.getMostSevereFileComparison().getDetails()
         else:
-            bugId, status = self.parseBugDescription(repr(description))
+            bugId, status = self.parseBugDescription(repr(testComparison.failedPrediction))
             newDesc = "(" + status + " bug " + bugId + ")"
             if status == "RESOLVED" or status == "CLOSED":
                 return "badPredict", newDesc

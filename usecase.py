@@ -36,7 +36,7 @@ These will then be capable of
     available for PyGTK (gtkusecase.py)
 """
 
-import os, string, sys, signal
+import os, string, sys, signal, time
 from threading import Thread, currentThread
 from ndict import seqdict
 
@@ -89,11 +89,11 @@ class ScriptEngine:
         return self.replayScript or self.recordScript
     def createReplayScript(self, scriptName, logger):
         return ReplayScript(scriptName, logger)
-    def applicationEvent(self, name, category = None):
+    def applicationEvent(self, name, category = None, timeDelay = 0):
         if currentThread() != self.thread:
             raise UseCaseScriptError, "Can only register application events in the same thread as the script engine"
         if self.replayScript:
-            self.replayScript.registerApplicationEvent(name)
+            self.replayScript.registerApplicationEvent(name, timeDelay)
         if self.recordScript:
             self.recordScript.registerApplicationEvent(name, category)
     def readStdin(self):
@@ -137,9 +137,11 @@ class ReplayScript:
         thread = Thread(target=self.runCommands)
         thread.start()
         #gtk.idle_add(method)
-    def registerApplicationEvent(self, eventName):
+    def registerApplicationEvent(self, eventName, timeDelay = 0):
         if self.waitingForEvent == eventName:
             self.write("Expected application event '" + eventName + "' occurred, proceeding.")
+            if timeDelay:
+                time.sleep(timeDelay)
             self.enableReading()
         self.applicationEventNames.append(eventName)
     def isFinished(self):

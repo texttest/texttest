@@ -409,7 +409,7 @@ class EvaluateRuleBuild(plugins.Action):
         ruleset = self.getRuleSetName(test)
         # The first is C-compilation error, the second generation error...
         # Would be better if there was something unambiguous to look for!
-        success = errContents.find("failed!") == -1 and errContents.find("ERROR:") == -1
+        success = errContents.find("failed!") == -1 and errContents.find("ERROR:") == -1 and errContents.find("Serious error") == -1
         self.rulesCompiled[ruleset] = success
         if success:
             test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")

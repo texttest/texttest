@@ -115,6 +115,8 @@ class PerformanceFileComparison(comparetest.FileComparison):
     def calculatePercentageIncrease(self):
         largest = max(self.oldCPUtime, self.newCPUtime)
         smallest = min(self.oldCPUtime, self.newCPUtime)
+        if smallest == 0.0:
+            return 0.0
         return ((largest - smallest) / smallest) * 100
     def saveResults(self, destFile):
         # Here we save the average of the old and new performance, assuming fluctuation

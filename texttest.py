@@ -309,6 +309,9 @@ class Application:
             raise KeyError, "Error: " + repr(self) + " cannot find config entry " + key
     def getConfigList(self, key):
         return self.configDir.getListValue(key)
+    def setConfigDefault(self, key, value):
+        if not self.configDir.has_key(key):
+            self.configDir[key] = value
     def filterFile(self, fileName):
         stem = fileName.split('.')[0]
         if not self.configDir.has_key(stem) or not os.path.isfile(fileName):
@@ -607,6 +610,7 @@ class ApplicationRunner:
         self._performAction(actionTests, action)
     def _performAction(self, suite, action):
         action.setUpApplication(suite.app)
+        debugLog.debug("Current config dictionary for " + repr(suite.app) + ": " + os.linesep + repr(suite.app.configDir.dict))
         suite.performAction(action)    
 
 def printException():

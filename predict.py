@@ -27,6 +27,7 @@ class CheckLogFilePredictions(plugins.Action):
     def insertError(self, test, error):
         testBrokenPredictionMap[test] = error
     def setUpApplication(self, app):
+        app.setConfigDefault("log_file", "output")
         self.logFile = app.getConfigValue("log_file")   
 
 class CheckPredictions(CheckLogFilePredictions):

@@ -85,6 +85,8 @@ class InteractiveResponder(Responder):
                 if response.startswith(versionOption):
                     testComparison.save(exactSave, versions[i])
         return 0
+    def setUpApplication(self, app):
+        app.setConfigDefault("log_file", "output")
             
 # Uses UNIX tkdiff
 class UNIXInteractiveResponder(InteractiveResponder):

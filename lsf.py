@@ -197,6 +197,8 @@ class SubmitTest(plugins.Action):
         return cmdFile
     def setUpSuite(self, suite):
         self.describe(suite)
+    def setUpApplication(self, app):
+        app.setConfigDefault("lsf_queue", "normal")
     def getCleanUpAction(self):
         return KillTest()
 

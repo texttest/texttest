@@ -61,6 +61,7 @@ class UNIXConfig(default.Config):
     def setApplicationDefaults(self, app):
         default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("collect_standard_error", 1)
+        app.setConfigDefault("virtual_display_machine", [])
         # Performance values
         app.setConfigDefault("performance_test_machine", [])
         app.setConfigDefault("cputime_include_system_time", 0)
@@ -80,6 +81,14 @@ class RunTest(default.RunTest):
         self.interactive = 0
         self.process = None
         self.collectStdErr = 1
+        self.testDisplay = None
+        self.realDisplay = os.getenv("DISPLAY")
+    def __call__(self, test):
+        if self.testDisplay:
+            os.environ["DISPLAY"] = self.testDisplay
+        default.RunTest.__call__(self, test)
+        if self.testDisplay:
+            os.environ["DISPLAY"] = self.realDisplay
     def runTest(self, test):
         if self.process:
             # See if the running process is finished
@@ -125,6 +134,51 @@ class RunTest(default.RunTest):
     def setUpApplication(self, app):
         default.RunTest.setUpApplication(self, app)
         self.collectStdErr = app.getConfigValue("collect_standard_error")
+        virtualDisplayMachines = app.getConfigValue("virtual_display_machine")
+        if len(virtualDisplayMachines) > 0:
+            self.allocateVirtualDisplay(virtualDisplayMachines)
+    def allocateVirtualDisplay(self, virtualDisplayMachines):
+        for machine in virtualDisplayMachines:
+            display = self.findDisplay(machine)
+            if display and display != "":
+                return self.setDisplay(display)
+            if display != None:
+                self.killServer(machine)
+        for machine in virtualDisplayMachines:
+            display = self.startServer(machine)
+            if display and display != "":
+                return self.setDisplay(display)
+    def setDisplay(self, display):
+        self.testDisplay = display
+        print "Tests will run with DISPLAY variable set to", display
+    def killServer(self, server):
+        # Xvfb servers get overloaded after a while. If they do, kill them
+        line = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep 42 | grep -v grep'").readline()
+        # On Linux fourth column of ps output is pid
+        pidStr = line.split()[3]
+        os.system("remsh " + server + " 'kill -9 " + pidStr + " >& /dev/null &' < /dev/null >& /dev/null &")
+    def startServer(self, server):
+        print "Starting Xvfb on machine", server
+        os.system("remsh " + server + " 'Xvfb :42 >& /dev/null &' < /dev/null >& /dev/null &")
+        #
+        # The Xvfb server needs a running X-client and 'xhost +' if it is to receive X clients from
+        # remote hosts.
+        #
+        serverName = server + ":42.0"
+        os.system("remsh " + server + " 'xclock -display " + serverName + " >& /dev/null &' < /dev/null >& /dev/null & ")
+        os.system("remsh " + server + " 'xterm -display " + serverName + " -e xhost + >& /dev/null &'< /dev/null >& /dev/null & ")
+        return serverName
+    def findDisplay(self, server):
+        line = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep -v grep'").readline()
+        if len(line):
+            serverName = server + line.split()[-1] + ".0"
+            (cin, cout, cerr) = os.popen3("remsh " + server + " 'xterm -display " + serverName + " -e echo test'")
+            lines = cerr.readlines()
+            if len(lines) == 0:
+                return serverName
+            else:
+                return ""
+        return None
    
 def hostname():
     if os.environ.has_key("HOST"):
@@ -208,6 +262,7 @@ class CollateUNIXFiles(default.CollateFiles):
 class MakePerformanceFile(plugins.Action):
     def __init__(self):
         self.includeSystemTime = 0
+        self.diag = plugins.getDiagnostics("makeperformance")
     def setUpApplication(self, app):
         self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
     def __repr__(self):
@@ -235,6 +290,7 @@ class MakePerformanceFile(plugins.Action):
     def readTimes(self, test):
         # Read the UNIX performance file, allowing us to discount system time.
         tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
+        self.diag.info("Reading performance file " + tmpFile)
         if not os.path.isfile(tmpFile):
             return None, None
             
@@ -242,6 +298,7 @@ class MakePerformanceFile(plugins.Action):
         cpuTime = None
         realTime = None
         for line in file.readlines():
+            self.diag.info("Parsing line " + line.strip())
             if line.startswith("user"):
                 cpuTime = self.parseUnixTime(line)
             if self.includeSystemTime and line.startswith("sys"):

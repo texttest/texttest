@@ -453,7 +453,6 @@ class Application:
             self.setConfigDefault("follow_program", None)
     def setDependentConfigDefaults(self):
         # Set values which default to other values
-        self.setConfigDefault("display_module", self.getConfigValue("config_module"))
         self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module"))
         if self.getConfigValue("binary").endswith(".py"):
             self.setConfigDefault("interpreter", "python")
@@ -995,7 +994,6 @@ class TextTest:
         self.gui = None
         if useGui:
             try:
-                self.ensureDisplaySet()
                 import texttestgui
                 recordScript = self.inputOptions.recordScript()
                 replayScript = self.inputOptions.replayScript()
@@ -1009,33 +1007,6 @@ class TextTest:
             return "%d%b%H:%M:%S"
         else:
             return "%H%M%S"
-    def shouldFindTestDisplay(self):
-        if not os.environ.has_key("DISPLAY"):
-            return 1
-        if self.inputOptions.useGUI() and self.inputOptions.recordScript() != "":
-            return 0
-        if os.environ.has_key("TEST_DISPLAY") and os.environ["TEST_DISPLAY"] == "TEXTTEST_GETDISPLAY":
-            return 1
-        return 0
-    def ensureDisplaySet(self):
-        # DISPLAY variable must be set if we are to run the GUI on UNIX
-        if os.name == "posix" and self.shouldFindTestDisplay():
-            for app in self.allApps:
-                try:
-                    displayModule = app.getConfigValue("display_module")
-                    importCommand = "from " + displayModule + " import getDisplay"
-                    exec importCommand
-                    display = getDisplay()
-                    if display:
-                        os.environ["DISPLAY"] = display
-                        return
-                    else:
-                        print "Application", app, "searched for a display but could not find one."
-                except ImportError:
-                    print "Failed to import display_module", displayModule
-                except AttributeError:
-                    pass
-            raise plugins.TextTestError, "DISPLAY variable not set and no selected configuration has any way to set one"
     def run(self):
         try:
             self._run()

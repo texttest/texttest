@@ -83,55 +83,6 @@ def getArchitecture(app):
             return version
     return app.getConfigValue("default_architecture")
 
-def findDisplay(maintainer, server):
-    line = os.popen("remsh " + server + " 'ps -efl | grep " + maintainer + " | grep Xvfb | grep -v grep'").readline()
-    if len(line):
-        serverName = server + line.split()[-1] + ".0"
-        (cin, cout, cerr) = os.popen3("remsh " + server + " 'xterm -display " + serverName + " -e echo test'")
-        lines = cerr.readlines()
-        if len(lines) == 0:
-            return serverName
-        else:
-            return ""
-    return None
-        
-
-def getDisplay(trystart = 1):
-    # The nightjob should connect to a virtual X server
-    maintainers = [ "geoff", "johana", "nightjob" ]
-    XServerMachines = [ "reedsville", "singleton", "fougamou" ]
-    badServers = []
-    emptyServers = []
-    for server in XServerMachines:
-        for maintainer in maintainers:
-            display = findDisplay(maintainer, server)
-            if display and display != "":
-                return display
-            if display == None:
-                emptyServers.append(server)
-            else:
-                badServers.append(server)
-    for server in badServers:
-        line = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep 42 | grep -v grep'").readline()
-        # On Linux fourth column of ps output is pid
-        pidStr = line.split()[3]
-        os.system("remsh " + server + " 'kill -9 " + pidStr + " >& /dev/null &' < /dev/null >& /dev/null &")
-    if trystart == 0:
-        return None
-    for server in emptyServers:
-        os.system("remsh " + server + " 'Xvfb :42 >& /dev/null &' < /dev/null >& /dev/null &")
-        #
-        # The Xvfb server needs a running X-client and 'xhost +' if it is to receive X clients from
-        # remote hosts.
-        #
-        serverName = server + ":42.0"
-        os.system("remsh " + server + " 'xclock -display " + serverName + " >& /dev/null &' < /dev/null >& /dev/null & ")
-        os.system("remsh " + server + " 'xterm -display " + serverName + " -e xhost + >& /dev/null &'< /dev/null >& /dev/null & ")
-        display = getDisplay(trystart = 0)
-        if display != None:
-            return display
-    return None
-
 class UserFilter(default.TextFilter):
     def acceptsTestSuite(self, suite):
         if isUserSuite(suite):

@@ -172,7 +172,14 @@ class SubmitTest(plugins.Action):
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
         unixPerfFile = test.getTmpFileName("unixperf", "w")
-        timedTestCommand = '\\time -p sh -c "' + testCommand + '" 2> ' + unixPerfFile
+        # put the command in a file to avoid quoting problems,
+        # also fix env.variables that LSF doesn't reset
+        cmdFile = test.getTmpFileName("cmd", "w")
+        f = open(cmdFile, "w")
+        f.write("HOST=`hostname`; export HOST\n")
+        f.write(testCommand + "\n")
+        f.close()
+        timedTestCommand = '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
         commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile + " 2>&1"
         os.system(commandLine)
     def getExecuteCommand(self, test):
@@ -243,6 +250,9 @@ class MakeResourceFiles(plugins.Action):
                 cpuTime = line.strip().split()[-1]
                 resourceDict["CPU time"] = "CPU time   : " + string.rjust(cpuTime, 9) + " sec."
         os.remove(tmpFile)
+	# remove the command-file created before submitting the command
+        cmdFile = test.getTmpFileName("cmd", "r")
+        os.remove(cmdFile)
         # There was still an error (jobs killed in emergency), so don't write resource files
         if len(resourceDict) < len(textList):
             return

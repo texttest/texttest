@@ -274,9 +274,14 @@ class OptimizationValueCalculator:
             rexpItem[item] = re.compile(self.getItemName(item))
             lastItemLine[item] = ""
             convertFuncs[item] = self.getConversionFunction(item)
+        #
+        # Matador needs this 'inital' hack, because it does not have a time entry for
+        # the inital input analysis.
+        #
         initial = 1
         lastItemLine[timeEntryName] = "cpu time:  0:00:00"
         lastItemLine[memoryEntryName] = "Memory consumption: 0 MB"
+        
         for line in grepLines:
             for item in itemList:
                 if rexpItem[item].search(line):

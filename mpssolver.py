@@ -21,25 +21,12 @@ def getConfig(optionMap):
 class MpsSolverConfig(carmen.CarmenConfig):
     def __init__(self, optionMap):
         carmen.CarmenConfig.__init__(self, optionMap)
-        if self.optionMap.has_key("diag"):
-            os.environ["DIAGNOSTICS_IN"] = "./Diagnostics"
-            os.environ["DIAGNOSTICS_OUT"] = "./Diagnostics"
-        if os.environ.has_key("DIAGNOSTICS_IN"):
-            print "Note: Running with Diagnostics on, so performance checking is disabled!"
-    def __del__(self):
-        if self.optionMap.has_key("diag"):
-            del os.environ["DIAGNOSTICS_IN"]
-            del os.environ["DIAGNOSTICS_OUT"]
     def getArgumentOptions(self):
         options = carmen.CarmenConfig.getArgumentOptions(self)
         options["memstat"] = "Show memory statistics for versions"
         options["perfstat"] = "Show performance statistics for versions"
         options["feasstat"] = "Show feasibility statistics for versions"
         return options
-    def getSwitches(self):
-        switches = carmen.CarmenConfig.getSwitches(self)
-        switches["diag"] = "Use MpsSolver Codebase diagnostics"
-        return switches
     def getActionSequence(self):
         if self.optionMap.has_key("memstat"):
             return [ MemoryStatisticsBuilder(self.optionValue("memstat")) ]
@@ -57,23 +44,15 @@ class MpsSolverConfig(carmen.CarmenConfig):
             return ""
         else:
             return os.environ["MPSSOLVER_LSFQUEUE_PREFIX"] + "_";
-    def getLibPathEnvName(self, archName):
-        if archName == "sparc" or archName == "i386_linux":
-            return "LD_LIBRARY_PATH"
-        elif archName.startswith("parisc"):
-            return "SHLIB_PATH"
-        elif archName == "powerpc":
-            return "LIBPATH"
-        else:
-            return "FOOBAR"
     def getExecuteCommand(self, binary, test):
-        binary = os.path.basename(binary)
-        archName = carmen.getArchitecture(test.app)
-        binary = os.path.join(os.environ["CARMSYS"], "bin", archName, binary)
-        ldPath1 = os.path.join(os.environ["MPSSOLVER_ROOT"], archName + os.environ["MPSSOLVER_LIBVERSION"], "lib")
-        ldPath2 = os.path.join(os.environ["CARMSYS"], "lib", archName)
-        ldEnv = self.getLibPathEnvName(archName)
-        binary = "env " + ldEnv + "=" + "${" + ldEnv + "}:" + ldPath1 + ":" + ldPath2 + " " + binary
+        mpsFiles = self.makeMpsSymLinks(test)
+        return binary + " " + self.getExecuteArguments(test, mpsFiles)
+    def makeMpsSymLinks(self, test):
+        #
+        # We need to symlink in a temp testdir to the actual .mps files
+        # so as to have unique dirs for writing .sol files etc. This is so that two tests
+        # using the same .mps file has its own .sol (and .glb) file
+        #
         mpsFiles = "";
         if os.environ.has_key("MPSDATA_PROBLEMS"):
             mpsFilePath = os.environ["MPSDATA_PROBLEMS"]
@@ -84,9 +63,24 @@ class MpsSolverConfig(carmen.CarmenConfig):
                     if not unixConfig.isCompressed(sourcePath):
                         mpsFiles += " " + file
                         os.symlink(sourcePath, file)
-        return binary + " " + test.options + mpsFiles
-    def checkPerformance(self):
-        return not self.optionMap.has_key("diag")
+        return mpsFiles
+    def getExecuteArguments(self, test, files):
+        solverVersion = "1429"
+        problemType = "ROSTERING"
+        timeoutValue = "60"
+        presolveValue = "0"
+        if os.environ.has_key("MPSSOLVER_VERSION"):
+            solverVersion = os.environ["MPSSOLVER_VERSION"]
+        if os.environ.has_key("MPSSOLVER_PROBLEM_TYPE"):
+            problemType = os.environ["MPSSOLVER_PROBLEM_TYPE"]
+        if len(test.options) > 0:
+            parts = test.options.split(":")
+            if len(parts) > 0:
+                timeoutValue = parts[0]
+            if len(parts) > 1:
+                presolveValue = parts[1]
+        args = solverVersion + " " + problemType + " " + presolveValue + " " + timeoutValue
+        return args + " " + files
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
@@ -96,11 +90,6 @@ class MpsSolverConfig(carmen.CarmenConfig):
     def printHelpScripts(self):
         carmen.CarmenConfig.printHelpScripts(self)
         print helpScripts
-    def setUpApplication(self, app):
-        carmen.CarmenConfig.setUpApplication(self, app)
-        if os.environ.has_key("DIAGNOSTICS_IN"):
-            app.addToConfigList("copy_test_path", "Diagnostics")
-            app.addToConfigList("compare_extension", "diag")
 
 # Does the same as the basic test comparison apart from when comparing
 # the performance file and the memory file
@@ -328,12 +317,4 @@ class FeasibilityStatisticsBuilder(plugins.Action):
             print self.suiteName + pad(test.name, 30) + "\t", refErrors, currErrors
             self.suiteName = "   "
 
-class CopyFile(plugins.Action):
-    def __call__(self, test):
-        self.copy(os.path.join(test.abspath, "output.tip.1428"), os.path.join(test.abspath, "output.tip.1429"))
-        self.copy(os.path.join(test.abspath, "performance.tip.1428"), os.path.join(test.abspath, "performance.tip.1429"))
-        self.copy(os.path.join(test.abspath, "environment.tip.1428"), os.path.join(test.abspath, "environment.tip.1429"))
-    def copy(self, source, target):
-        if (os.path.isfile(source)):
-            shutil.copyfile(source, target)
         

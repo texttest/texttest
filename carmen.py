@@ -38,7 +38,7 @@ class CarmenConfig(default.Config):
             list.append(filterObj(self.optionMap[optionName]))
     def getActionSequence(self):
         if self.optionMap.has_key("rulecomp"):
-            return [ CompileRules() ]
+            return [ CompileRules(self.getRuleSetName) ]
         else:
             return default.Config.getActionSequence(self)
     def getTestRunner(self):
@@ -74,14 +74,15 @@ def getRaveName(test):
     return test.app.getConfigValue("rave_name")
 
 class CompileRules:
-    def __init__(self, filter = None):
+    def __init__(self, getRuleSetName, filter = None):
         self.rulesCompiled = []
         self.raveName = None
+        self.getRuleSetName = getRuleSetName
         self.filter = filter
     def __repr__(self):
         return "Compiling rules for"
     def __call__(self, test, description):
-        ruleset = RuleSet(test, self.raveName)
+        ruleset = RuleSet(self.getRuleSetName(test), self.raveName)
         if ruleset.isValid() and not ruleset.name in self.rulesCompiled:
             print description + " - ruleset " + ruleset.name
             ruleset.backup()
@@ -96,8 +97,8 @@ class CompileRules:
             self.raveName = getRaveName(suite)
 
 class RuleSet:
-    def __init__(self, test, raveName):
-        self.name = self.findName(test)
+    def __init__(self, ruleSetName, raveName):
+        self.name = ruleSetName
         if self.name != None:
             self.targetFile = os.path.join(os.environ["CARMTMP"], "crc", "rule_set", string.upper(raveName), architecture, self.name)
             self.sourceFile = os.path.join(os.environ["CARMUSR"], "crc", "source", self.name)
@@ -105,32 +106,34 @@ class RuleSet:
         return self.name != None and os.path.isfile(self.targetFile)
     def backup(self):
         shutil.copyfile(self.targetFile, self.targetFile + ".bak")
-    def findName(self, test):
-        fileName = test.makeFileName("output")
-        if os.path.isfile(fileName):
-            for line in open(fileName).xreadlines():
-                if line.find("Loading rule set") != -1:
-                    finalWord = string.split(line, " ")[-1]
-                    return finalWord.strip()
-        return None
         
 class UpdatedStaticRulesetFilter:
-    def __init__(self, libraryFile):
+    def __init__(self, getRuleSetName, libraryFile):
+        self.getRuleSetName = getRuleSetName
         self.libraryFile = libraryFile
+        self.defaultAcceptance = 0
     def acceptsTestCase(self, test):
-        ruleset = RuleSet(test, getRaveName(test))
+        ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test))
         return ruleset.isValid() and self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.libraryFile))
     def acceptsTestSuite(self, suite):
+        raveName = getRaveName(suite)
         if not isUserSuite(suite):
+            self.defaultAcceptance = self.isDefaultStatic(raveName)
             return 1       
-        resourceFile = open(os.path.join(suite.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab"))
-        for line in resourceFile.readlines():
-            if line.find(getRaveName(suite)) != -1 and line.find("UseStaticLinking") != -1:
-                entry = line.split(',')[4].strip()
-                return entry[1:-1] == "true"
-        return 0
+        resourceFile = os.path.join(suite.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab")
+        return self.isStaticInFile(resourceFile, raveName)
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
+    def isStaticInFile(self, fileName, raveName):
+        resourceFile = open(fileName)
+        for line in resourceFile.readlines():
+            if line.find(raveName) != -1 and line.find("UseStaticLinking") != -1:
+                entry = line.split(',')[4].strip()
+                return entry[1:-1] == "true"
+        return self.defaultAcceptance
+    def isDefaultStatic(self, raveName):
+        fileName = os.path.join(os.environ["CARMSYS"], "data", "config", "CarmResources", "General.etab")
+        return self.isStaticInFile(fileName, raveName)
 
 class WaitForDispatch(lsf.Wait):
     def __init__(self):

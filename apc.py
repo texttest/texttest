@@ -10,6 +10,15 @@ class ApcConfig(optimization.OptimizationConfig):
         return os.path.join(test.options.split()[0], sourceName)
     def getTestCollator(self):
         return optimization.OptimizationConfig.getTestCollator(self) + [ RemoveLogs(), optimization.ExtractSubPlanFile(self, "status", "status") ]
+    def getRuleSetName(self, test):
+        fileName = test.makeFileName("options")
+        if os.path.isfile(fileName):
+            optionLine = open(fileName).readline()
+            options = optionLine.split();
+            for option in options:
+                if option.find("crc/rule_set") != -1:
+                    return option.split("/")[-1]
+        return None
 
 class RemoveLogs:
     def __repr__(self):

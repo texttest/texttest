@@ -17,6 +17,14 @@ class MatadorConfig(optimization.OptimizationConfig):
         for o, a in opts:
             if o == "-s":
                 return a
+    def getRuleSetName(self, test):
+        fileName = test.makeFileName("output")
+        if os.path.isfile(fileName):
+            for line in open(fileName).xreadlines():
+                if line.find("Loading rule set") != -1:
+                    finalWord = line.split(" ")[-1]
+                    return finalWord.strip()
+        return None
             
 #    def getTestCollator(self):
 #        return optimization.OptimizationConfig.getTestCollator(self) + [ MakeMatadorStatusFile() ]
@@ -31,4 +39,3 @@ class MakeMatadorStatusFile:
         os.rename("status", test.getTmpFileName("status", "w"))
     def setUpSuite(self, suite, description):
         pass
-

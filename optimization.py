@@ -154,6 +154,8 @@ class OptimizationConfig(carmen.CarmenConfig):
                 continue
             if file.find("best_solution") != -1:
                 continue
+            if file.find("core") != -1:
+                continue
             if file == "input":
                 continue
 

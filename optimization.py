@@ -108,6 +108,7 @@ methodEntryName = "Running.*\.\.\."
 periodEntryName = "Period"
 dateEntryName = "Date"
 activeMethodEntryName = "Active method"
+apcLibraryDateName = "APC library date"
 newSolutionMarker = "new solution"
 solutionName = "solution"
 
@@ -373,7 +374,7 @@ class LogFileFinder:
         return None, None
 
 class OptimizationRun:
-    def __init__(self, app, definingItems, interestingItems, logFile, scalePerf = 0.0, solutions = None):
+    def __init__(self, app, definingItems, interestingItems, logFile, scalePerf = 0.0, solutions = None, constantItemsToFind = []):
         self.diag = plugins.getDiagnostics("optimization")
         self.penaltyFactor = 1.0
         if solutions:
@@ -383,8 +384,9 @@ class OptimizationRun:
         self.logFile = logFile
         self.diag.info("Reading data from " + self.logFile)
         allItems = definingItems + interestingItems
-        calculator = OptimizationValueCalculator(allItems, self.logFile, app.getConfigValue(itemNamesConfigKey))
+        calculator = OptimizationValueCalculator(allItems, self.logFile, app.getConfigValue(itemNamesConfigKey), constantItemsToFind)
         self.solutions = calculator.getSolutions(definingItems)
+        self.constantItems = calculator.constantItems
         self.diag.debug("Solutions :" + repr(self.solutions))
         if scalePerf and self.solutions and timeEntryName in allItems:
             self.scaleTimes(scalePerf)
@@ -462,7 +464,7 @@ class OptimizationRun:
         return 2
 
 class OptimizationValueCalculator:
-    def __init__(self, items, logfile, itemNamesInFile):
+    def __init__(self, items, logfile, itemNamesInFile, constantItemsToFind):
         self.diag = plugins.getDiagnostics("optimization")
         self.diag.info("Building calculator for: " + logfile + ", items:" + string.join(items,","))
         self.itemNamesInFile = itemNamesInFile
@@ -471,6 +473,7 @@ class OptimizationValueCalculator:
             self.regexps[item] = self.getItemRegexp(item)
         newSolutionRegexp = self.getItemRegexp(newSolutionMarker)
         self.solutions = [{}]
+        self.constantItems = {}
         for line in open(logfile).xreadlines():
             if newSolutionRegexp.search(line):
                 self.solutions.append({})
@@ -478,6 +481,11 @@ class OptimizationValueCalculator:
             for item, regexp in self.regexps.items():
                 if regexp.search(line):
                     self.solutions[-1][item] = self.calculateEntry(item, line)
+            for item in constantItemsToFind:
+                if not self.constantItems.has_key(item):
+                    if line.find(item) != -1:
+                        self.constantItems[item] = self.calculateEntry(item, line)
+                        constantItemsToFind.remove(item)
     def getSolutions(self, definingItems):
         solutions = []
         for solution in self.solutions:
@@ -510,6 +518,8 @@ class OptimizationValueCalculator:
             return self.getPeriod(line)
         elif item == dateEntryName:
             return self.getDate(line)
+        elif item == apcLibraryDateName:
+            return self.getAPCLibraryDate(line)
         else: # Default assumes a numeric value as the last field of the line
             return self.getFinalNumeric(line)
     def getFinalNumeric(self, line):
@@ -552,6 +562,8 @@ class OptimizationValueCalculator:
     def getDate(self, dateLine):
         line = dateLine.split(" ")
         return line[2].strip(',')
+    def getAPCLibraryDate(self, line):
+        return string.join(line.split(":")[1][1:].split(" ")[:3])
 
 class TableTest(plugins.Action):
     def __init__(self, args = []):
@@ -638,8 +650,8 @@ class TestReport(plugins.Action):
         if not (currentLogFile and refLogFile):
             return
         currPerf, refPerf = self.getPerformance(test, self.currentVersion, self.referenceVersion)
-        currentRun = OptimizationRun(test.app, definingValues, interestingValues, currentLogFile, currPerf)
-        referenceRun = OptimizationRun(test.app, definingValues, interestingValues, refLogFile, refPerf)
+        currentRun = OptimizationRun(test.app, definingValues, interestingValues, currentLogFile, currPerf, None, self.getConstantItemsToExtract())
+        referenceRun = OptimizationRun(test.app, definingValues, interestingValues, refLogFile, refPerf, None, self.getConstantItemsToExtract())
         if currentRun.logFile != referenceRun.logFile:
             self.compare(test, referenceRun, currentRun)
         else:
@@ -652,6 +664,8 @@ class TestReport(plugins.Action):
         currentLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.currentVersion)
         refLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.referenceVersion)
         return currentLogFile, refLogFile
+    def getConstantItemsToExtract(self):
+        return []
 
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):

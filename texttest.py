@@ -222,6 +222,8 @@ class TestCase(Test):
     def cleanFiles(self, keeptmp):
         if self.inputFile.find(globalRunIdentifier) != -1:
             os.remove(self.inputFile)
+        # Don't be in the directory when it's removed...
+        os.chdir(self.abspath)
         for writeDir in self.writeDirs:
             if writeDir == self.abspath or not os.path.isdir(writeDir):
                 continue
@@ -239,19 +241,12 @@ class TestCase(Test):
     def _removeDir(self, subDir):
         for file in os.listdir(subDir):
             fpath = os.path.join(subDir,file)
-            try:
-                # if softlinked dir, remove as file and do not recurse
+            if os.path.islink(fpath) or os.path.isfile(fpath):
                 os.remove(fpath) 
-            except:
+            else:
                 self._removeDir(fpath)
-        try:
-            os.remove(subDir)
-        except:
-            try:
-                os.rmdir(subDir)
-            except:
-                os.system("rm -rf " + subDir);
-        
+        os.rmdir(subDir)
+            
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):
         Test.__init__(self, name, abspath, app)

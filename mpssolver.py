@@ -28,6 +28,13 @@ class MpsSolverConfig(carmen.CarmenConfig):
         switches = carmen.CarmenConfig.getSwitches(self)
         switches["diag"] = "Use MpsSolver Codebase diagnostics"
         return switches
+    def getQueuePerformancePrefix(self, test, arch):
+        if not os.environ.has_key("MPSSOLVER_LSFQUEUE_PREFIX"):
+            return carmen.CarmenConfig.getQueuePerformancePrefix(self, test, arch)
+        if arch == "powerpc" or arch == "parisc_2_0":
+            return ""
+        else:
+            return os.environ["MPSSOLVER_LSFQUEUE_PREFIX"] + "_";
     def getLibPathEnvName(self, archName):
         if archName == "sparc" or archName == "i386_linux":
             return "LD_LIBRARY_PATH"

@@ -185,7 +185,7 @@ class LSFServer:
         self.lsfThread.setDaemon(1)
         self.lsfThread.start()
     def getJobName(self, test, jobNameFunction):
-        jobName = repr(test.app) + test.app.versionSuffix() + test.getRelPath()
+        jobName = repr(test.app).replace(" ", "_") + test.app.versionSuffix() + test.getRelPath()
         if jobNameFunction:
             jobName = jobNameFunction(test)
         return test.getTmpExtension() + jobName

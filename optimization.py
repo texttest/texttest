@@ -1292,7 +1292,8 @@ class TestGraph:
         gnuplotFile.write("quit" + os.linesep)
         gnuplotFile.close()
         commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName
-        # This is ugly! It's only to be able to test it (we must avoid getting windows poping up).
+        # This is ugly! It's only to be able to test it (we must avoid getting windows popping up where gnuplot
+        # produces a window, but must call it for real when we generate a file...).
         if targetFile:
             os.system(commandLine)
             tmppf = open(outputFileName).read()

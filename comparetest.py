@@ -47,9 +47,9 @@ class FileComparison:
         self.tmpCmpFile = test.app.filterFile(tmpFile)
         self.test = test
     def __del__(self):
-        if self.tmpFile != self.tmpCmpFile:
+        if self.tmpFile != self.tmpCmpFile and os.path.isfile(self.tmpCmpFile):
             os.remove(self.tmpCmpFile)
-        if self.stdFile != self.stdCmpFile:
+        if self.stdFile != self.stdCmpFile and os.path.isfile(self.stdCmpFile):
             os.remove(self.stdCmpFile)
     def __repr__(self):
         return self.stdFile.split('.')[0]

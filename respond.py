@@ -80,6 +80,7 @@ class OverwriteOnFailures(Responder):
         for comparison in comparisons:
             comparison.overwrite(self.version)
 
+# Works only on UNIX
 class BatchResponder(Responder):
     def __init__(self, lineCount):
         self.failures = {}
@@ -89,7 +90,7 @@ class BatchResponder(Responder):
     def __del__(self):
         mailFile = os.popen("sendmail -t", "w")
         fromAddress = os.environ["USER"]
-        toAddress = self.mainSuite.app.getConfigValue("batch_recipient")
+        toAddress = self.getRecipient(fromAddress)
         mailFile.write("From: " + fromAddress + os.linesep)
         mailFile.write("To: " + toAddress + os.linesep)
         mailFile.write("Subject: " + self.getMailTitle() + os.linesep)
@@ -100,6 +101,12 @@ class BatchResponder(Responder):
         if self.failureCount() > 0:
             self.reportFailures(mailFile)
         mailFile.close()
+    def getRecipient(self, fromAddress):
+        app = self.mainSuite.app
+        if fromAddress == app.getConfigValue("nightjob_user"):
+            return app.getConfigValue("nightjob_recipient")
+        else:
+            return fromAddress
     def handleSuccess(self, test):
         self.successes.append(self.testLine(test))
     def handleFailure(self, test, comparisons):

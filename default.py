@@ -444,15 +444,22 @@ class ReconnectTest(plugins.Action):
         userToFind = self.fetchUser
         if not self.fetchUser:
             userToFind = userId
-        patternToFind = app.name + app.versionSuffix() + userToFind
-        self.rootDirToCopy = None
+        self.rootDirToCopy = self.findReconnDirectory(fetchDir, app, userToFind)
+        if self.rootDirToCopy:
+            print "Reconnecting to test results in directory", self.rootDirToCopy
+        else:
+            raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + userToFind + " under " + fetchDir
+    def findReconnDirectory(self, fetchDir, app, userToFind):
+        for versionSuffix in app.getVersionFileExtensions():
+            reconnDir = self.findReconnDirWithVersion(fetchDir, app, versionSuffix, userToFind)
+            if reconnDir:
+                return reconnDir
+    def findReconnDirWithVersion(self, fetchDir, app, versionSuffix, userToFind):
+        patternToFind = app.name + "." + versionSuffix + userToFind
         for subDir in os.listdir(fetchDir):
             fullPath = os.path.join(fetchDir, subDir)
             if os.path.isdir(fullPath) and subDir.startswith(patternToFind):
-                print "Reconnecting to test results in directory", fullPath
-                self.rootDirToCopy = fullPath
-        if not self.rootDirToCopy:
-            raise plugins.TextTestError, "Could not find any runs matching " + patternToFind + " under " + fetchDir
+                return fullPath
     def setUpSuite(self, suite):
         os.makedirs(os.path.join(suite.app.writeDirectory, suite.getRelPath()))        
     def hasUserDependentWriteDir(self):

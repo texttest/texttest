@@ -122,6 +122,8 @@ class SubPlanDirManager:
                 continue
             if file.find("best_solution") != -1:
                 continue
+            if file == "input":
+                continue
 
             fromPath = os.path.join(fromDir, file)
             toPath = os.path.join(inDir, file)

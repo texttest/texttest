@@ -14,6 +14,8 @@ class UserFilter(default.TextFilter):
 architecture = os.popen("arch").readline()[:-1]
 
 def findLSFQueue(test):
+    if architecture == "powerpc" or architecture == "parisc_2_0":
+        return architecture
     cpuTime = performance.getTestPerformance(test)
     if cpuTime < 15:
         return "short_" + architecture

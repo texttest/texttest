@@ -360,7 +360,7 @@ class ConfigEtable:
       tup = []
       while len(tup) < len(self.columns):
          tok = self._readConfigToken()
-         if tok == "":
+         if tok == None:
             break
          if tok != ",":
             tup.append(tok)
@@ -394,9 +394,9 @@ class ConfigEtable:
       return numCols
    def _readConfigToken(self):
       tok = self.parser.get_token()
-      while tok.startswith("/*"):
+      while tok != None and tok.startswith("/*"):
          while not tok.endswith("*/"):
-            self.parser.get_token()
+            tok = self.parser.get_token()
          tok = self.parser.get_token()
       return tok
    def _etabExpand(self, value):
@@ -487,6 +487,8 @@ class ConfigEtableParser:
                 if tok != "":
                     return tok
             ch = self._readElement()
+        if tok == "":
+            return None
         return tok
 
 def ensureDirectoryExists(path):

@@ -31,7 +31,12 @@ class FleetConfig(matador.MatadorConfig):
     def printHelpDescription(self):
         print helpDescription
         matador.MatadorConfig.printHelpDescription(self)
-
+    def setUpApplication(self, app):
+        matador.MatadorConfig.setUpApplication(self, app)
+        self.itemNamesInFile[optimization.costEntryName] = "Optimizer cost"
+        # Reset matador values
+        self.noIncreaseExceptMethods = {}
+        self.noIncreaseExceptMethods[optimization.costEntryName] = []
 
 class FleetSubPlanDirManager(optimization.SubPlanDirManager):
     def __init__(self, config):
@@ -63,7 +68,3 @@ class FleetSubPlanDirManager(optimization.SubPlanDirManager):
                 newFile.write(line)
         return binary
     
-optimization.itemNamesInFile[optimization.costEntryName] = "Optimizer cost"
-# Reset matador values
-optimization.noIncreaseExceptMethods = {}
-optimization.noIncreaseExceptMethods[optimization.costEntryName] = []

@@ -16,6 +16,8 @@ class Configuration:
         return binary + " " + test.options
     def printHelpText(self):
         pass
+    def setUpApplication(self, app):
+        pass
     
 # Filter interface: all must provide these three methods
 class Filter:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, string, getopt, types, time, re, plugins, exceptions, stat, log4py
+import os, sys, types, string, getopt, types, time, re, plugins, exceptions, stat, log4py
 from stat import *
 
 helpIntro = """
@@ -233,6 +233,7 @@ class Application:
         # Force exit if something isn't present
         getopt.getopt(sys.argv[1:], allowedOptions)    
 	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
+        self.configObject.setUpApplication(self)
     def __repr__(self):
         return self.fullName
     def __cmp__(self, other):
@@ -317,7 +318,11 @@ class Application:
         return success, filters
     def getConfigValue(self, key):
         if self.configDir.has_key(key):
-            return os.path.expandvars(self.configDir[key])
+            value = self.configDir[key]
+            if type(value) == types.StringType:
+                return os.path.expandvars(self.configDir[key])
+            else:
+                return value
         else:
             raise KeyError, "Error: " + repr(self) + " cannot find config entry " + key
     def getConfigList(self, key):

@@ -115,6 +115,11 @@ class ApcConfig(optimization.OptimizationConfig):
     def printHelpScripts(self):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts
+    def setUpApplication(self, app):
+        optimization.OptimizationConfig.setUpApplication(self, app)
+        self.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
+        self.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
+        self.itemNamesInFile[optimization.newSolutionMarker] = "apc_status Solution"
 
 def verifyAirportFile(arch):
     diag = plugins.getDiagnostics("APC airport")
@@ -306,10 +311,6 @@ class FetchApcCore(plugins.Action):
                 os.system("rsh " + machine + " '" + cmdLine + "'")
     def __repr__(self):
         return "Fetching core for"
-
-optimization.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
-optimization.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
-optimization.itemNamesInFile[optimization.newSolutionMarker] = "apc_status Solution"
 
 #
 # TODO: Check Sami's stuff in /users/sami/work/Matador/Doc/Progress

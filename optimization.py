@@ -33,7 +33,7 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Produces a postscript file instead of displaying the graph.
                              - pc
                                The postscript file will be in color.
-                             - i=item
+                             - i=[appname:]item
                                Which item to plot from the status file. Note that whitespaces are replaced
                                by underscores. Default is TOTAL cost. Example: i=overcover_cost.
                              - s
@@ -49,6 +49,7 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
                                
+optimization.JoinPlot      - As PlotTest above but allows plots of multiple apps in same diag
 optimization.StartStudio   - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
                              This is intended to be used on a single specified test and will terminate
                              the testsuite after it starts Studio. It is a simple shortcut to set the
@@ -58,7 +59,24 @@ optimization.StartStudio   - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTM
 
 import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict
 
+itemNamesConfigKey = "_itemnames_map"
+noIncreasMethodsConfigKey = "_noincrease_methods_map"
+
+# Names of reported entries
+costEntryName = "cost of plan"
+timeEntryName = "cpu time"
+memoryEntryName = "memory"
+methodEntryName = "Running.*\.\.\."
+newSolutionMarker = "new solution"
+
+
 class OptimizationConfig(carmen.CarmenConfig):
+    def __init__(self, optionMap):
+        carmen.CarmenConfig.__init__(self, optionMap)
+        #Probably different for APC and matador : static data for the text in the log file
+        self.itemNamesInFile = {}
+        # Static data for what data to check in CheckOptimizationRun, and what methods to avoid it with
+        self.noIncreaseExceptMethods = {}
     def getOptionString(self):
         return "k:" + carmen.CarmenConfig.getOptionString(self)
     def getActionSequence(self):
@@ -98,6 +116,9 @@ class OptimizationConfig(carmen.CarmenConfig):
     def printHelpScripts(self):
         carmen.CarmenConfig.printHelpScripts(self)
         print helpScripts
+    def setUpApplication(self, app):
+        app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile);
+        app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods);
 
 class ExtractSubPlanFile(plugins.Action):
     def __init__(self, config, sourceName, targetName):
@@ -240,40 +261,29 @@ class RemoveTemporarySubplan(plugins.Action):
     def __repr__(self):
         return "Removing temporary subplan for"
 
-# Names of reported entries
-costEntryName = "cost of plan"
-timeEntryName = "cpu time"
-memoryEntryName = "memory"
-methodEntryName = "Running.*\.\.\."
-newSolutionMarker = "new solution"
-
-#Probably different for APC and matador : static data for the text in the log file
-itemNamesInFile = {}
-
-# Static data for what data to check in CheckOptimizationRun, and what methods to avoid it with
-noIncreaseExceptMethods = {}
 class CheckOptimizationRun(predict.CheckLogFilePredictions):
     def __repr__(self):
         return "Checking optimization values for"
     def __call__(self, test):
         self.describe(test)
+        noIncreaseExceptMethods = test.app.getConfigValue(noIncreasMethodsConfigKey)
         interestingValues = noIncreaseExceptMethods.keys()
         # Note also that CSL parameter changes in rostering can cause the cost to go up
         if test.name.find("CSL_param") != -1:
             interestingValues.remove(costEntryName)
         optRun = OptimizationRun(test, "", [], interestingValues + [ methodEntryName ])
         for value in interestingValues:
-            oldValue, newValue = self.findIncrease(optRun, value)
+            oldValue, newValue = self.findIncrease(optRun, value, noIncreaseExceptMethods)
             if oldValue != None:
                 self.insertError(test, "Increase in " + value + " (from " + str(oldValue) + " to " + str(newValue) + ")")
-    def findIncrease(self, optRun, entry):
+    def findIncrease(self, optRun, entry, noIncreaseExceptMethods):
         lastEntry = None
         for solution in optRun.solutions:
             if not solution.has_key(entry):
                 continue
             currEntry = solution[entry]
             optRun.diag.info("Checking solution " + repr(solution))
-            if lastEntry != None and self.hasIncreased(entry, currEntry, lastEntry) and self.shouldCheckMethod(entry, solution):
+            if lastEntry != None and self.hasIncreased(entry, currEntry, lastEntry) and self.shouldCheckMethod(entry, solution, noIncreaseExceptMethods):
                 return lastEntry, currEntry
             lastEntry = currEntry
         return None, None
@@ -285,7 +295,7 @@ class CheckOptimizationRun(predict.CheckLogFilePredictions):
             return 1
         percIncrease = float(currEntry - lastEntry) / float(lastEntry)
         return percIncrease > 0.00001
-    def shouldCheckMethod(self, entry, solution):
+    def shouldCheckMethod(self, entry, solution, noIncreaseExceptMethods):
         currMethod = solution.get(methodEntryName, "")
         for skipMethod in noIncreaseExceptMethods[entry]:
             if currMethod.find(skipMethod) != -1:
@@ -362,7 +372,7 @@ class OptimizationRun:
         self.diag.info("Reading data from " + self.logFile)
         self.penaltyFactor = 1.0
         allItems = definingItems + interestingItems
-        calculator = OptimizationValueCalculator(allItems, self.logFile)
+        calculator = OptimizationValueCalculator(allItems, self.logFile, test.app.getConfigValue(itemNamesConfigKey))
         self.solutions = calculator.getSolutions(definingItems)
         if scale and self.solutions and timeEntryName in allItems:
             self.scaleTimes()
@@ -437,7 +447,10 @@ class OptimizationRun:
         return 2
 
 class OptimizationValueCalculator:
-    def __init__(self, items, logfile):
+    def __init__(self, items, logfile, itemNamesInFile):
+        self.diag = plugins.getDiagnostics("optimization")
+        self.diag.info("Building calculator for: " + logfile + ", items:" + string.join(items,","))
+        self.itemNamesInFile = itemNamesInFile
         regexps = {}
         for item in items:
             regexps[item] = self.getItemRegexp(item)
@@ -450,6 +463,7 @@ class OptimizationValueCalculator:
             for item, regexp in regexps.items():
                 if regexp.search(line):
                      self.solutions[-1][item] = self.calculateEntry(item, line)
+
     def getSolutions(self, definingItems):
         solutions = []
         for solution in self.solutions:
@@ -465,8 +479,8 @@ class OptimizationValueCalculator:
                     return 0
         return 1
     def getItemRegexp(self, item):
-        if itemNamesInFile.has_key(item):
-            return re.compile(itemNamesInFile[item])
+        if self.itemNamesInFile.has_key(item):
+            return re.compile(self.itemNamesInFile[item])
         else:
             return re.compile(item)
     def calculateEntry(self, item, line):
@@ -856,12 +870,36 @@ class ImportTest(plugins.Action):
     def testForImportTestCase(self, testInfo):
         return 0
 
+#
+#
+commonPlotter = 0
+commonPlotCount = 0
+
+class JoinPlot(plugins.Action):
+    def __init__(self, args = []):
+        global commonPlotCount, commonPlotter
+        if commonPlotter == 0:
+            commonPlotter = PlotTest(args)
+            commonPlotCount = 1
+        else:
+            commonPlotCount += 1
+    def __del__(self):
+        global commonPlotCount, commonPlotter
+        commonPlotCount -= 1
+        if commonPlotCount == 0:
+            commonPlotter = []
+    def __repr__(self):
+        return "Plotting"
+    def __call__(self, test):
+        commonPlotter(test)
+
 # Class for using gnuplot to plot test curves of tests
 #
 class PlotTest(plugins.Action):
     def __init__(self, args = []):
         self.plotFiles = []
         self.plotItem = costEntryName
+        self.plotItemApp = {}
         self.plotrange = "0:"
         self.plotPrint = None
         self.plotPrintColor = None
@@ -872,6 +910,7 @@ class PlotTest(plugins.Action):
         self.plotUseTmpStatus = 1
         self.plotStates = [ "" ]
         self.interpretOptions(args)
+        self.yLabel = ""
     def interpretOptions(self, args):
         for ar in args:
             arr = ar.split("=")
@@ -894,14 +933,23 @@ class PlotTest(plugins.Action):
             elif arr[0]=="nv":
                 self.plotVersionColoring = 0
             elif arr[0]=="i":
-                self.plotItem = arr[1].replace("_"," ")
+                parts = arr[1].split(":")
+                if len(parts) < 2:
+                    self.plotItem = arr[1].replace("_"," ")
+                else:
+                    self.plotItemApp[parts[0]] = parts[1].replace("_"," ")
             else:
                 print "Unknown option " + arr[0]
     def getYlabel(self):
+        return self.yLabel
+    def addYLabel(self, itemNamesInFile):
+        nLabel = self.plotItem
         if itemNamesInFile.has_key(self.plotItem):
-            return itemNamesInFile[self.plotItem]
-        else:
-            return self.plotItem
+            nLabel = itemNamesInFile[self.plotItem]
+        if self.yLabel.find(nLabel) == -1:
+            if self.yLabel != "":
+                self.yLabel += ", "
+            self.yLabel += nLabel
     def setPointandLineTypes(self):
         if len(self.plotVersions)>1 or len(self.plotStates)>1:
             # Choose line type.
@@ -935,9 +983,10 @@ class PlotTest(plugins.Action):
             fileList = []
             for file in self.plotFiles:
                 ver = file.split(os.sep)[-1].split(".")[-2]
+                appname = file.split(os.sep)[-1].split(".")[-3]
                 state = file.split(os.sep)[-1].split(".")[-1]
                 name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
-                title = " title \"" + name + " " + ver + " " + state + "\" "
+                title = " title \"" + name + " " + appname + "." + ver + " " + state + "\" "
                 fileList.append("'" + file + "' " + title + self.getStyle(ver,state,name))
 
             if self.plotPrint:
@@ -968,20 +1017,25 @@ class PlotTest(plugins.Action):
                 if len(tmppf) > 0:
                     open(absplotPrint,"w").write(tmppf)
     def __call__(self, test):
+        if self.plotItemApp.has_key(test.app.name):
+            usePlotItem = self.plotItemApp[test.app.name]
+        else:
+            usePlotItem = self.plotItem
+        self.addYLabel(test.app.getConfigValue(itemNamesConfigKey))
         for version in self.plotVersions:
             for state in self.plotStates:
                 try:
-                    optRun = OptimizationRun(test, version, [ self.plotItem, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus, state)
+                    optRun = OptimizationRun(test, version, [ usePlotItem, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus, state)
                 except plugins.TextTestError:
-                    print "No status file does exist for test " + test.name + "(" + version + ")"
+                    print "No status file does exist for test " + test.app.name + "::" + test.name + "(" + version + ")"
                     continue
 
                 plotFileName = test.makeFileName("plot") + "." + version + "." + state
                 plotFile = open(plotFileName, "w")
                 for solution in optRun.solutions:
                     if self.plotAgainstSolNum:
-                        plotFile.write(str(solution[self.plotItem]) + os.linesep)
+                        plotFile.write(str(solution[usePlotItem]) + os.linesep)
                     else:
-                        plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[self.plotItem]) + os.linesep)
+                        plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[usePlotItem]) + os.linesep)
                 self.plotFiles.append(plotFileName)
 

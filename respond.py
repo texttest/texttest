@@ -104,7 +104,7 @@ class BatchResponder(Responder):
     def getRecipient(self, fromAddress):
         app = self.mainSuite.app
         if fromAddress == app.getConfigValue("nightjob_user"):
-            return app.getConfigValue("nightjob_recipient")
+            return app.getConfigValue("nightjob_recipients")
         else:
             return fromAddress
     def handleSuccess(self, test):

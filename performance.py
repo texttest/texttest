@@ -73,7 +73,7 @@ class MakeComparisons(comparetest.MakeComparisons):
     def shouldCompare(self, file, testComparison, tmpExt, dirPath):
         if not comparetest.MakeComparisons.shouldCompare(self, file, testComparison, tmpExt, dirPath):
             return 0
-        stem, ext = os.path.splitext(file)
+        stem, ext = file.split(".",1)
         if stem != "performance":
             return 1
         tmpFile = os.path.join(dirPath, file)

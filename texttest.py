@@ -500,6 +500,9 @@ class Application:
         return self.fullName
     def __cmp__(self, other):
         return cmp(self.name, other.name)
+    def getIndent(self):
+        # Useful for printing with tests
+        return ""
     def setConfigDefaults(self):
         self.setConfigDefault("binary", None)
         self.setConfigDefault("config_module", "default")
@@ -1223,11 +1226,15 @@ class TextTest:
         for app in self.allApps:
             try:
                 valid, testSuite = app.createTestSuite()
-                if self.gui:
+                if not valid:
+                    continue
+
+                empty = testSuite.size() == 0
+                if self.gui and (not empty or not self.gui.dynamic):
                     self.gui.addSuite(testSuite)
-                if testSuite.size() == 0:
+                if empty:
                     print "No tests found for", app.description()
-                elif valid:
+                else:
                     useGui = self.inputOptions.useGUI()
                     actionSequence = self.inputOptions.getActionSequence(app, useGui)
                     actionRunner.addTestActions(testSuite, actionSequence)

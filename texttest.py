@@ -1003,12 +1003,12 @@ class MultiEntryDictionary(seqdict):
             self.currDict[entryName] = entry        
 
 class TestRunner:
-    def __init__(self, test, actionSequence, cleanupSequence, diag):
+    def __init__(self, test, actionSequence, appRunner, diag):
         self.test = test
         self.diag = diag
         self.interrupted = 0
         self.actionSequence = []
-        self.cleanupSequence = cleanupSequence
+        self.appRunner = appRunner
         # Copy the action sequence, so we can edit it and mark progress
         for action in actionSequence:
             self.actionSequence.append(action)
@@ -1016,6 +1016,8 @@ class TestRunner:
         self.interrupted = 1
     def performActions(self, previousTestRunner, runToCompletion):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
+        for suite in tearDownSuites:
+            previousTestRunner.appRunner.tearDownSuite(suite)
         while len(self.actionSequence):
             if self.interrupted:
                 raise KeyboardInterrupt, "Interrupted externally"
@@ -1023,12 +1025,8 @@ class TestRunner:
             retValue = None
             try:
                 self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
-                for suite in tearDownSuites:
-                    self.diag.info("Tear down " + repr(suite))
-                    suite.tearDownFor(action)
                 for suite in setUpSuites:
-                    suite.setUpFor(action)
-                    self.diag.info("Set up " + repr(suite))
+                    self.appRunner.setUpSuite(action, suite)
                 retValue = self.test.performAction(action)
                 self.diag.info("<-End Performing action " + str(action) + " returned " + str(retValue))
             except plugins.TextTestError, e:
@@ -1051,7 +1049,7 @@ class TestRunner:
                 self.actionSequence.pop(0)
         return 1
     def performCleanUpActions(self):
-        for action in self.cleanupSequence:
+        for action in self.appRunner.cleanupSequence:
             self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.test))
             self.test.performAction(action)
         if not self.test.app.keepTmpFiles:
@@ -1099,6 +1097,7 @@ class ApplicationRunner:
         self.testSuite = testSuite
         self.actionSequence = actionSequence
         self.cleanupSequence = self.getCleanUpSequence(actionSequence)
+        self.suitesSetUp = {}
         self.diag = diag
     def getCleanUpSequence(self, actionSequence):
         cleanupSequence = []
@@ -1119,6 +1118,18 @@ class ApplicationRunner:
             self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.testSuite.app))
             action.setUpApplication(self.testSuite.app)
         self.testSuite.tearDownEnvironment()
+    def setUpSuite(self, action, suite):
+        self.diag.info(str(action) + " set up " + repr(suite))
+        suite.setUpFor(action)
+        if self.suitesSetUp.has_key(suite):
+            self.suitesSetUp[suite].append(action)
+        else:
+            self.suitesSetUp[suite] = [ action ]
+    def tearDownSuite(self, suite):
+        for action in self.suitesSetUp[suite]:
+            self.diag.info(str(action) + " tear down " + repr(suite))
+            suite.tearDownFor(action)
+        self.suitesSetUp[suite] = []
 
 class ActionRunner:
     def __init__(self):
@@ -1135,7 +1146,7 @@ class ActionRunner:
         self.appRunners.append(appRunner)
         for test in testSuite.testCaseList():
             self.diag.info("Adding test runner for test " + test.getRelPath())
-            testRunner = TestRunner(test, actionSequence, appRunner.cleanupSequence, self.diag)
+            testRunner = TestRunner(test, actionSequence, appRunner, self.diag)
             self.testQueue.append(testRunner)
             self.allTests.append(testRunner)
     def hasTests(self):

@@ -60,8 +60,9 @@ class Test:
         self.environment = MultiEntryDictionary()
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
-        if parent == None:
-            for var, value in app.getEnvironment():
+    def readEnvironment(self):
+        if self.parent == None:
+            for var, value in self.app.getEnvironment():
                 self.environment[var] = value
         diagDict = self.getConfigValue("diagnostics")
         if diagDict.has_key("input_directory_variable"):
@@ -69,7 +70,8 @@ class Test:
             if os.path.isfile(diagConfigFile):
                 inVarName = diagDict["input_directory_variable"]
                 self.environment[inVarName] = self.abspath
-        self.environment.readValuesFromFile(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
+        envFile = os.path.join(self.abspath, "environment")
+        self.environment.readValuesFromFile(envFile, self.app.name, self.app.getVersionFileExtensions())
         # Should do this, but not quite yet...
         # self.properties.readValuesFromFile(os.path.join(self.abspath, "properties"), app.name, app.getVersionFileExtensions())
     def expandEnvironmentReferences(self, referenceVars = []):
@@ -198,14 +200,18 @@ class Test:
         return 1
 
 class TestCase(Test):
-    def __init__(self, name, abspath, app, parent):
+    def __init__(self, name, abspath, app, filters, parent):
         Test.__init__(self, name, abspath, app, parent)
         self.inputFile = self.makeFileName("input")
         self.useCaseFile = self.makeFileName("usecase")
         self._setOptions()
         # List of directories where this test will write files. First is where it executes from
         self.writeDirs = [ os.path.join(app.writeDirectory, self.getRelPath()) ]
-        self.setTestEnvironment()
+        if self.valid and self.isAcceptedByAll(filters):
+            self.readEnvironment()
+            self.setTestEnvironment()
+        else:
+            self.valid = 0
     def setTestEnvironment(self):
         diagDict = self.app.getConfigValue("diagnostics")
         basicWriteDir = self.writeDirs[0]
@@ -447,8 +453,12 @@ class TestSuite(Test):
     def __init__(self, name, abspath, app, filters, parent=None):
         Test.__init__(self, name, abspath, app, parent)
         self.testCaseFile = self.makeFileName("testsuite")
-        if not os.path.isfile(self.testCaseFile):
+        if self.valid and os.path.isfile(self.testCaseFile) and self.isAcceptedByAll(filters):
+            self.readEnvironment()
+            self.readTestCases(filters)
+        else:
             self.valid = 0
+    def readTestCases(self, filters):
         debugLog.info("Reading test suite file " + self.testCaseFile)
         self.testcases = self.getTestCases(filters)
         if len(self.testcases):
@@ -491,17 +501,16 @@ class TestSuite(Test):
         debugLog.debug("Refilter for " + self.name)
         for test in self.testcases:
             debugLog.debug("Refilter check of " + test.name + " for " + self.name)
-            if test.size() == 0:
+            if test.size() == 0 or not test.isAcceptedByAll(filters):
+                debugLog.debug("Refilter loose " + test.name + " for " + self.name)
                 continue
             if test.classId() == self.classId():
                 test.reFilter(filters)
                 if test.size() > 0:
                     testCaseList.append(test)
-            elif test.isAcceptedByAll(filters):
+            else:
                 debugLog.debug("Refilter ok of " + test.name + " for " + self.name)
                 testCaseList.append(test)
-            else:
-                debugLog.debug("Refilter loose " + test.name + " for " + self.name)
         self.testcases = testCaseList
     def size(self):
         size = 0
@@ -511,12 +520,6 @@ class TestSuite(Test):
 # private:
     def getTestCases(self, filters):
         testCaseList = []
-        if not self.isAcceptedByAll(filters):
-            self.valid = 0
-            
-        if not self.valid:
-            return testCaseList
-
         allowEmpty = 1
         for testline in open(self.testCaseFile).xreadlines():
             testName = testline.strip()
@@ -532,14 +535,14 @@ class TestSuite(Test):
             if testSuite.valid:
                 testCaseList.append(testSuite)
             else:
-                testCase = TestCase(testName, testPath, self.app, self)
-                if testCase.valid and testCase.isAcceptedByAll(filters):
+                testCase = TestCase(testName, testPath, self.app, filters, self)
+                if testCase.valid:
                     testCaseList.append(testCase)
         if not allowEmpty and len(testCaseList) == 0:
             self.valid = 0
         return testCaseList
     def addTest(self, testName, testPath):
-        testCase = TestCase(testName, testPath, self.app, self)
+        testCase = TestCase(testName, testPath, self.app, [], self)
         if testCase.valid:
             return self.newTest(testCase)
         else:

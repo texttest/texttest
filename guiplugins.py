@@ -186,24 +186,25 @@ class RecordTest(InteractiveAction):
         test.makeBasicWriteDirectory()
         test.setUpEnvironment(parents=1)
         os.chdir(test.writeDirs[0])
-        logFile = os.path.join(test.app.writeDirectory, "record_run.log")
-        errFile = os.path.join(test.app.writeDirectory, "record_errors.log")
-        recordCommand = test.getExecuteCommand() + " --record " + test.useCaseFile + " --recinp " + test.inputFile + " > " + logFile + " 2> " + errFile
+        recordCommand = test.getExecuteCommand() + " --record " + test.useCaseFile + " --recinp " + test.inputFile
         shellTitle = None
         shellOptions = ""
         if test.getConfigValue("use_standard_input"):
             shellTitle = description
+        else:
+            logFile = os.path.join(test.app.writeDirectory, "record_run.log")
+            errFile = os.path.join(test.app.writeDirectory, "record_errors.log")
+            recordCommand +=  " > " + logFile + " 2> " + errFile
         shellOptions = ""
         if self.optionGroup.getSwitchValue("hold"):
             shellOptions = "-hold"
         process = self.startExternalProgram(recordCommand, shellTitle, shellOptions)
         process.waitForTermination()
-        if os.path.isfile(errFile):
-            errors = open(errFile).read()
-            if len(errors):
-                raise plugins.TextTestError, "Recording produced following errors: " + os.linesep + errors
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
+        if not os.path.isfile(test.useCaseFile):
+            if not plugins.BackgroundProcess.fakeProcesses: # do not make this check when running self tests
+                raise plugins.TextTestError, "Recording did not produce a usecase file"
         ttOptions = self.getRunOptions(test)
         commandLine = self.getTextTestName() + " " + ttOptions + " > /dev/null 2>&1"
         guilog.info("Starting replay TextTest with options : " + ttOptions)

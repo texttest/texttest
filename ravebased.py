@@ -484,6 +484,7 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
 class BuildCode(plugins.Action):
     builtDirs = {}
     buildFailedDirs = {}
+    builtDirsBackground = {}
     def __init__(self, target, remote = 1):
         self.target = target
         self.remote = remote
@@ -569,28 +570,36 @@ class BuildCode(plugins.Action):
             os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
             print "Making install from", absPath ,"to", os.environ["CARMSYS"]
     def buildRemote(self, arch, app):
+        targetDir = app.getConfigValue("build_targets")
+        if not targetDir.has_key("codebase"):
+            return
+        if not self.builtDirsBackground.has_key(arch):
+            self.builtDirsBackground[arch] = []
+        buildDirs = []
         machine = self.getMachine(app, arch)
-        print "Building remotely in parallel on " + machine + " ..."
+        for optValue in targetDir["codebase"]:
+            absPath, makeTargets = self.getPathAndTargets(optValue)
+            if os.path.isdir(absPath) and not absPath in self.builtDirsBackground[arch]:
+                buildDirs.append((absPath, makeTargets))
+                print "Building", absPath, "remotely in parallel on", machine, "..."
+                self.builtDirsBackground[arch].append(absPath)
+        if len(buildDirs) == 0:
+            return
         processId = os.fork()
         if processId == 0:
-            result = self.buildRemoteInChild(machine, arch, app)
+            result = self.buildRemoteInChild(machine, arch, buildDirs)
             os._exit(result)
         else:
             tuple = processId, arch
             self.childProcesses.append(tuple)
-    def buildRemoteInChild(self, machine, arch, app):
+    def buildRemoteInChild(self, machine, arch, buildDirs):
         sys.stdin = open("/dev/null")
         signal.signal(1, self.killBuild)
         signal.signal(2, self.killBuild)
-        signal.signal(15, self.killBuild) 
-        targetDir = app.getConfigValue("build_targets")
-        if not targetDir.has_key("codebase"):
-            return 1
-        for optValue in targetDir["codebase"]:
-            absPath, makeTargets = self.getPathAndTargets(optValue)
-            if os.path.isdir(absPath):
-                commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& build." + arch)
-                os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
+        signal.signal(15, self.killBuild)
+        for absPath, makeTargets in buildDirs:
+            commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& build." + arch)
+            os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         return 0            
     def checkBuildFile(self, buildFile):
         for line in open(buildFile).xreadlines():
@@ -606,10 +615,12 @@ class BuildCode(plugins.Action):
             return None
 
 class CheckBuild(plugins.Action):
+    checkedDirs = {}
     def __init__(self, builder):
         self.builder = builder
     def setUpApplication(self, app):
-        print "Waiting for remote builds..." 
+        if len(self.builder.childProcesses) > 0:
+            print "Waiting for remote builds..." 
         for process, arch in self.builder.childProcesses:
             pid, status = os.waitpid(process, 0)
             # In theory we should be able to trust the status. In practice, it seems to be 0, even when the build failed.
@@ -622,7 +633,16 @@ class CheckBuild(plugins.Action):
     def checkBuild(self, arch, absPath):
         if os.path.isdir(absPath):
             os.chdir(absPath)
+            if not self.checkedDirs.has_key(arch):
+                self.checkedDirs[arch] = []
+            if absPath in self.checkedDirs[arch]:
+                return
+            else:
+                self.checkedDirs[arch].append(absPath)
             fileName = "build." + arch
+            if not os.path.isfile(fileName):
+                print "FILE NOT FOUND: ", os.path.join(absPath, fileName)
+                return
             result = self.builder.checkBuildFile(fileName)
             resultString = " SUCCEEDED!"
             if result:

@@ -116,10 +116,10 @@ class TestComparison:
         fileList.sort()
         for file in fileList:
             fullPath = os.path.join(dir, file)
-            stdFile = os.path.normpath(self.findTestDirectory(fullPath, test))
             if os.path.isdir(file):
-                self.makeComparisons(test, stdFile)
+                self.makeComparisons(test, fullPath)
             elif self.shouldCompare(file, dir, test.app):
+                stdFile = os.path.normpath(self.findTestDirectory(fullPath, test))
                 comparison = self.makeComparison(test, stdFile, fullPath, makeNew)
                 self.addComparison(fullPath, comparison)
     def shouldCompare(self, file, dir, app):
@@ -128,7 +128,7 @@ class TestComparison:
         result = os.path.normpath(fullPath.replace(test.app.writeDirectory, test.app.abspath))
         if result != fullPath:
             return result
-        # writeDir contains softlinks?
+        # writeDir contains so
         savedir = os.getcwd()
         os.chdir(test.app.writeDirectory)
         result = os.path.normpath(fullPath.replace(os.getcwd(), test.app.abspath))

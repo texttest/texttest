@@ -33,6 +33,7 @@ is interpreted as a test failure.
 """
 
 import os, filecmp, string, plugins, re
+from ndict import seqdict
 
 class TestComparison:
     scoreTable = {}
@@ -247,13 +248,21 @@ class FileComparison:
 class RunDependentTextFilter:
     def __init__(self, app, stem):
         self.diag = plugins.getDiagnostics("Run Dependent Text")
-        self.lineFilters = []
+        self.contentFilters = []
+        self.orderFilters = seqdict()
         dict = app.getConfigValue("run_dependent_text")
         if dict.has_key(stem):
             for text in dict[stem]:
-                self.lineFilters.append(LineFilter(text, self.diag))
+                self.contentFilters.append(LineFilter(text, self.diag))
+        dict = app.getConfigValue("unordered_text")
+        if dict.has_key(stem):
+            for text in dict[stem]:
+                orderFilter = LineFilter(text, self.diag)
+                self.orderFilters[orderFilter] = []
+    def hasFilters(self):
+        return len(self.contentFilters) > 0 or len(self.orderFilters) > 0
     def filterFile(self, fileName, newFileName, makeNew = 0):
-        if not len(self.lineFilters) or not os.path.isfile(fileName):
+        if not self.hasFilters() or not os.path.isfile(fileName):
             self.diag.info("No filter for " + fileName)
             return fileName
 
@@ -271,20 +280,39 @@ class RunDependentTextFilter:
             filteredLine = self.getFilteredLine(line, lineNumber)
             if filteredLine:
                 newFile.write(filteredLine)
+        self.writeUnorderedText(newFile)
         self.diag.info("Filter for " + fileName + " returned " + newFileName)
         return newFileName
     def getFilteredLine(self, line, lineNumber):
-        for lineFilter in self.lineFilters:
-            changed, filteredLine = lineFilter.applyTo(line, lineNumber)
+        for contentFilter in self.contentFilters:
+            changed, filteredLine = contentFilter.applyTo(line, lineNumber)
             if changed:
                 return filteredLine
+        for orderFilter in self.orderFilters.keys():
+            changed, filteredLine = orderFilter.applyTo(line, lineNumber)
+            if changed:
+                if not filteredLine:
+                    filteredLine = line
+                self.orderFilters[orderFilter].append(filteredLine)
+                return ""
         return line
+    def writeUnorderedText(self, newFile):
+        for filter, linesFiltered in self.orderFilters.items():
+            if len(linesFiltered) == 0:
+                continue
+            linesFiltered.sort()
+            newFile.write("-- Unordered text as found by filter '" + filter.originalText + "' --" + os.linesep)
+            for line in linesFiltered:
+                newFile.write(line)
+            newFile.write(os.linesep)
+            self.orderFilters[filter] = []
 
 class LineFilter:
     # Order is important here: word processing first, line number last.
     # This is because WORD can be combined with the others, and LINE screws up the model...
     syntaxStrings = [ "{WORD ", "{LINES ", "{->}", "{LINE " ]
     def __init__(self, text, diag):
+        self.originalText = text
         self.diag = diag
         self.trigger = text
         self.untrigger = None

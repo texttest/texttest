@@ -143,6 +143,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("log_file", "output")
         app.setConfigDefault("collate_file", {})
         app.setConfigDefault("run_dependent_text", { "" : [] })
+        app.setConfigDefault("unordered_text", { "" : [] })
         app.setConfigDefault("string_before_memory", "")
         app.setConfigDefault("create_catalogues", "false")
         app.setConfigDefault("internal_error_text", [])

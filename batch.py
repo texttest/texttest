@@ -104,6 +104,7 @@ class BatchResponder(respond.Responder):
         self.failureDetail = {}
         self.crashDetail = {}
         self.deadDetail = {}
+        self.orderedTests = []
         self.categories = {}
         for i in range(len(categoryNames)):
             self.categories[categoryNames[i]] = BatchCategory(categoryDescriptions[i])
@@ -112,6 +113,7 @@ class BatchResponder(respond.Responder):
         allBatchResponders.append(self)
     def addTestToCategory(self, category, test, postText = ""):
         if category != None:
+            self.orderedTests.append(test)
             self.categories[category].addTest(test, postText)
     def handleSuccess(self, test):
         self.addTestToCategory("success", test)
@@ -151,19 +153,28 @@ class BatchResponder(respond.Responder):
             self.writeFailureDetail(mailFile)
     def writeDeadDetail(self, mailFile):
         mailFile.write(os.linesep + "Exception information for the tests that did not run follows..." + os.linesep)
-        for test, exc in self.deadDetail.items():
+        for test in self.orderedTests:
+            if not self.deadDetail.has_key(test):
+                continue
+            exc = self.deadDetail[test]
             mailFile.write("--------------------------------------------------------" + os.linesep)
             mailFile.write("TEST UNRUNNABLE -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             mailFile.write(str(exc) + os.linesep)
     def writeCrashDetail(self, mailFile):
         mailFile.write(os.linesep + "Crash information for the tests that crashed follows..." + os.linesep)
-        for test, stackTrace in self.crashDetail.items():
+        for test in self.orderedTests:
+            if not self.crashDetail.has_key(test):
+                continue
+            stackTrace = self.crashDetail[test]
             mailFile.write("--------------------------------------------------------" + os.linesep)
             mailFile.write("TEST CRASHED -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             mailFile.write(stackTrace)
     def writeFailureDetail(self, mailFile):
         mailFile.write(os.linesep + "Failure information for the tests that failed follows..." + os.linesep)
-        for test, testComparison in self.failureDetail.items():
+        for test in self.orderedTests:
+            if not self.failureDetail.has_key(test):
+                continue
+            testComparison = self.failureDetail[test]
             mailFile.write("--------------------------------------------------------" + os.linesep)
             mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             os.chdir(test.getDirectory(temporary=1))

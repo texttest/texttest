@@ -39,7 +39,9 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                              - nt
                                Do not use status file from the currently running test.
                              - ns
-                               Do not scale times with the performance of the test
+                               Do not scale times with the performance of the test.
+                             - nv
+                               No color grouping for different versions of the test.
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
                                
@@ -292,6 +294,7 @@ class LogFileFinder:
         if self.tryTmpFile:
             logFile = self.findTempFile(self.test, version) 
             if logFile and os.path.isfile(logFile):
+                print "Using temporary log file for test " + self.test.name + " version " + version
                 return logFile
         logFile = self.test.makeFileName(self.logStem, version)
         if os.path.isfile(logFile):
@@ -316,7 +319,7 @@ class LogFileFinder:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
     def findTempFileInTest(self, version, stem):                           
         for file in os.listdir(self.test.abspath):
-            if file.startswith(stem) and file.find(version + self.test.getTestUser()) != -1:
+            if file.startswith(stem) and file.find(self.test.app.name + "." + version + self.test.getTestUser()) != -1:
                 return file
         return None
 
@@ -833,6 +836,7 @@ class PlotTest(plugins.Action):
         self.plotAgainstSolNum = 0
         self.plotVersions = [ "" ]
         self.plotScaleTime = 1
+        self.plotVersionColoring = 1
         self.plotUseTmpStatus = 1
         self.interpretOptions(args)
     def interpretOptions(self, args):
@@ -850,6 +854,8 @@ class PlotTest(plugins.Action):
                 self.plotScaleTime = 0
             elif arr[0]=="nt":
                 self.plotUseTmpStatus = 0
+            elif arr[0]=="nv":
+                self.plotVersionColoring = 0
             elif arr[0]=="i":
                 self.plotItem = arr[1].replace("_"," ")
             else:
@@ -883,7 +889,7 @@ class PlotTest(plugins.Action):
                 ver = file.split(os.sep)[-1].split(".",1)[-1]
                 name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
                 title = " title \"" + name + " " + ver + "\" "
-                if len(self.plotVersions)>1:
+                if len(self.plotVersions)>1 and self.plotVersionColoring:
                     style = " with linespoints lt " +  str(versionLineType[file.split(".")[-1]]) + " pt " + str(testPointType[name])
                 else:
                     style = " with linespoints "

@@ -164,7 +164,7 @@ class CompileRules(plugins.Action):
                 os.mkdir(os.environ["CARMTMP"])
             ruleset.backup()
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-            commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile
+            commandLine = compiler + " -" + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile
             self.rulesCompiled.append(ruleset.name)
             returnValue = os.system(commandLine)
             if returnValue:

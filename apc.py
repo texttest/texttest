@@ -152,7 +152,7 @@ class ApcCompileRules(carmen.CompileRules):
     def ruleCompileCommand(self, sourceFile):
        compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
        params = " -optimize -makelib -archs " + carmen.architecture
-       return compiler + " " + self.raveName + params + " " + sourceFile
+       return compiler + " -" + self.raveName + params + " " + sourceFile
                     
     def linkLibs(self, apcLib, ruleLib):
        path1 = os.path.join(os.environ["CARMSYS"], "data", "crc", carmen.architecture)

@@ -95,9 +95,14 @@ class MatadorConfig(optimization.OptimizationConfig):
                [ os.path.join(os.environ["CARMSYS"], self.getBinaryFile(app)) ]
     def getBinaryFile(self, app):
         return os.path.join("bin", carmen.getArchitecture(app), app.getConfigValue("rave_name"))
+    def _getLocalPlanPath(self, test):
+        path = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN")
+        if os.path.isdir(path) or not os.environ.has_key("CARM_LOCALPLAN"):
+            return path
+        return os.environ["CARM_LOCALPLAN"]
     def _getSubPlanDirName(self, test):
         subPlan = self._subPlanName(test)
-        fullPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", subPlan)
+        fullPath = os.path.join(self._getLocalPlanPath(test), subPlan)
         return os.path.normpath(fullPath)
     def _subPlanName(self, test):
         subPlan = getOption(test.options, "-s")            

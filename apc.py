@@ -221,7 +221,7 @@ class RunApcTestInDebugger(default.RunTest):
         apcLogFile.write("")
         apcLogFile.close()
         if self.showLogFile:
-            os.system("xon " + os.environ["HOST"] + " 'xterm -bg white -T " + test.name + " -e 'less +F " + apcLog + "''")
+            os.system("xon " + os.environ["HOST"] + " 'xterm -bg white -fg black -T " + "APCLOG-" + test.name + "" + " -e 'less +F " + apcLog + "''")
         # Create a script for gdb to run.
         gdbArgs = test.makeFileName("gdb_args", temporary=1)
         gdbArgsFile = open(gdbArgs, "w")

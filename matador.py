@@ -416,31 +416,32 @@ class CopyEnvironment(plugins.Action):
         if carmen.isUserSuite(suite):
             self.describe(suite)
             for version in versions:
-                oldFile = os.path.join(suite.abspath, "environment" + version)
+                oldFile = os.path.join(suite.abspath, "environment.cas" + version)
                 if not os.path.isfile(oldFile):
                     return
 
+                if len(version) == 0:
+                    oldcarmtmp = self.getCarmtmp(oldFile)
+                    root, local = os.path.split(os.path.normpath(oldcarmtmp))
+                    newcarmtmp = self.getNewCarmtmp(oldcarmtmp, local)
+                    self.replaceInFile(oldFile, oldcarmtmp, newcarmtmp)
+                else:
+                    os.system("cvs rm -f " + oldFile)
                 archs = self.getArchs(version)
-                oldcarmtmp = self.getCarmtmp(oldFile)
-                root, local = os.path.split(os.path.normpath(oldcarmtmp))
-                newcarmtmp = self.getNewCarmtmp(oldcarmtmp, version, "i386_linux", local)
-                self.replaceInFile(oldFile, oldcarmtmp, newcarmtmp)
                 for arch in archs:
                     targetFile = oldFile + "." + arch
                     if os.path.isfile(targetFile):
-                        continue
-                    newcarmtmp = self.getNewCarmtmp(oldcarmtmp, version, arch, local)
-                    self.makeCarmtmpFile(targetFile, newcarmtmp)
+                        os.system("cvs rm -f " + targetFile)
     def getArchs(self, version):
         archs = [ "sparc", "parisc_2_0", "powerpc" ]
         if len(version) == 0:
             archs.append("sparc_64")
         return archs
-    def getNewCarmtmp(self, oldcarmtmp, version, arch, local):
+    def getNewCarmtmp(self, oldcarmtmp, local):
         basePath = "${CARMSYS}"
         if oldcarmtmp.find("CARMSYS") == -1:
-            basePath = os.path.join("/carm/proj/matador/carmtmps/", self.getDirVersion(version))
-        return os.path.join(basePath, arch, local)
+            basePath = "/carm/proj/matador/carmtmps/${MAJOR_RELEASE_ID}"
+        return os.path.join(basePath, "${ARCHITECTURE}", local)
     def makeCarmtmpFile(self, targetFile, carmtmp):
         file = open(targetFile, "w")
         print carmtmp
@@ -452,11 +453,6 @@ class CopyEnvironment(plugins.Action):
             if line.startswith("CARMTMP"):
                 name, carmtmp = line.strip().split(":")
                 return carmtmp
-    def getDirVersion(self, version):
-        if version == "":
-            return "master"
-        else:
-            return "carmen_" + version[1:]
     def replaceInFile(self, oldFile, oldVal, newVal):
         newFileName = oldFile + ".new"
         newFile = open(newFileName, "w")

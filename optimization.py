@@ -286,11 +286,9 @@ class LogFileFinder:
         if len(specFile):
             return 0, self.findSpecifiedFile(version, specFile)
         if self.tryTmpFile:
-            if not version:
-                version = string.join(self.test.app.versions, ".")
             logFile, tmpDir = self.findTempFile(self.test, version) 
             if logFile and os.path.isfile(logFile):
-                print "Using temporary log file (from " + tmpDir + ") for test " + self.test.name + " version " + version
+                print "Using temporary log file (from " + tmpDir + ") for test " + self.test.name + " version " + str(version)
                 return 1, logFile
         logFile = self.test.makeFileName(self.logStem, version)
         if os.path.isfile(logFile):
@@ -314,10 +312,10 @@ class LogFileFinder:
             print "Wrong spec"
             return None
     def findTempFile(self, test, version):
-        self.diag.info("Looking for tmp file for " + test.name + " version " + version)
+        self.diag.info("Looking for tmp file for " + test.name + " version " + str(version))
         fileInTest, tmpDir = self.findTempFileInTest(version, self.logStem)
         if fileInTest or self.logStem == "output":
-            self.diag.info("Found " + fileInTest)
+            self.diag.info("Found " + str(fileInTest))
             return fileInTest, tmpDir
         # Look for output, find appropriate temp subplan, and look there
         outputInTest, tmpDir = self.findTempFileInTest(version, "output")
@@ -341,6 +339,8 @@ class LogFileFinder:
             self.diag.info("Looked for " + fromThisRun)
             if os.path.isfile(fromThisRun):
                 return fromThisRun, app.writeDirectory
+        if not version:
+            version = string.join(self.test.app.versions, ".")
         versionMod = ""
         if version:
             versionMod = "." + version

@@ -590,6 +590,8 @@ class Application:
         return self.fullName
     def __cmp__(self, other):
         return cmp(self.name, other.name)
+    def __hash__(self):
+        return id(self)
     def getIndent(self):
         # Useful for printing with tests
         return ""

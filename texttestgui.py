@@ -90,13 +90,10 @@ class TextTestGUI:
         test = self.model.get_value(iter, 2)
         guilog.info("-> " + test.getIndent() + "Added " + repr(test) + " to test tree view.")
         childIter = self.model.iter_children(iter)
-        try:
+        if test.classId() != "test-app":
             self.itermap[test] = iter.copy()
             if newTest:
                 test.observers.append(self)
-        except TypeError:
-            # Applications aren't hashable, but they don't change state anyway
-            pass
         if childIter:
             self.createSubIterMap(childIter, newTest)
         nextIter = self.model.iter_next(iter)
@@ -559,7 +556,9 @@ class ApplicationGUI(RightWindowGUI):
         self.selection = selection
         self.itermap = {}
         for test, iter in itermap.items():
-            self.itermap[test.abspath] = iter
+            if not self.itermap.has_key(test.app):
+                self.itermap[test.app] = {}
+            self.itermap[test.app][test.abspath] = iter
     def addFilesToModel(self):
         confiter = self.model.insert_before(None, None)
         self.model.set_value(confiter, 0, "Configuration Files")
@@ -581,6 +580,7 @@ class ApplicationGUI(RightWindowGUI):
                 iterlist += self.getSelectedIters(extraSuite)
             scriptEngine.setSelection(self.selection, iterlist)
             self.selection.get_tree_view().grab_focus()
+            guilog.info("Marking " + str(len(self.getSelectedTests())) + " tests as selected")
     def getSelectedIters(self, suite):
         iters = []
         try:
@@ -588,7 +588,7 @@ class ApplicationGUI(RightWindowGUI):
                 iters += self.getSelectedIters(test)
             return iters
         except AttributeError:
-            return [ self.itermap[suite.abspath] ]    
+            return [ self.itermap[suite.app][suite.abspath] ]    
     def getSelectedTests(self):
         tests = []
         self.selection.selected_foreach(self.addSelTest, tests)

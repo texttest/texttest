@@ -368,7 +368,8 @@ class RunTests(InteractiveAction):
             ttOptions += group.getCommandLines()
         selTestNames = []
         for test in selTests:
-            selTestNames.append(test.name)
+            if not test.name in selTestNames:
+                selTestNames.append(test.name)
         ttOptions.append("-t " + string.join(selTestNames, ","))
         commonParentName = self.findCommonParentName(selTests)
         if commonParentName:

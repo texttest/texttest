@@ -7,10 +7,11 @@ def getConfig(optionMap):
 globalJobName = ""
 
 def killJobs(signal, stackFrame):
-    for job in os.popen("bjobs -w").readlines():
-        if job.find(globalJobName) != -1:
-            jobId = string.split(job, " ")[0]
-            os.system("bkill " + jobId)
+    if len(globalJobName):
+        for job in os.popen("bjobs -w").readlines():
+            if job.find(globalJobName) != -1:
+                jobId = string.split(job, " ")[0]
+                os.system("bkill " + jobId)
     print "Test run terminated due to interrupt"
     sys.exit(2)
 

@@ -15,7 +15,7 @@ class DayOPsGUIConfig(unixConfig.UNIXConfig):
     def getExecuteCommand(self, binary, test):
         propFile = test.makeFileName("properties")
         logFile = test.makeFileName("dmserverlog", temporary=1)
-        os.environ["DMG_RUN_TEST"] = propFile + "#" + logFile
+        os.environ["DMG_RUN_TEST"] = test.abspath + "#" + propFile + "#" + logFile
         return unixConfig.UNIXConfig.getExecuteCommand(self, binary, test)
 
 class JavaPropertyReader:

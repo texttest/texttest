@@ -466,19 +466,23 @@ class ReconnectTest(plugins.Action):
     def __call__(self, test):
         self.performReconnection(test)
         self.loadStoredState(test)
-        if self.fullRecalculate:
-            self.clearFrameworkTmp(test)
     def performReconnection(self, test):
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
-        writeDir = test.writeDirs[0]
         if not self.canReconnectTo(reconnLocation):
             raise plugins.TextTestError, "No test results found to reconnect to"
 
         if self.fullRecalculate:
-            shutil.rmtree(writeDir)
-            shutil.copytree(reconnLocation, writeDir)
+            self.copyFiles(reconnLocation, test)
         else:
             test.writeDirs[0] = reconnLocation
+    def copyFiles(self, reconnLocation, test):
+        for file in os.listdir(reconnLocation):
+            fullPath = os.path.join(reconnLocation, file)
+            if os.path.isfile(fullPath):
+                shutil.copyfile(fullPath, os.path.join(test.writeDirs[0], file))
+        testStateFile = os.path.join(reconnLocation, "framework_tmp", "teststate")
+        if os.path.isfile(testStateFile):
+            shutil.copyfile(testStateFile, test.getStateFile())
     def loadStoredState(self, test):
         loaded = test.loadState(self.fullRecalculate)
         if loaded:
@@ -490,13 +494,6 @@ class ReconnectTest(plugins.Action):
             if not self.fullRecalculate:
                 raise plugins.TextTestError, "No teststate file found, cannot do fast reconnect. Maybe try full recalculation to see what happened"
             self.describe(test)
-    def clearFrameworkTmp(self, test):
-        # Clear the framework temporary directory, as configuration may be different now
-        frameworkTmpDir = os.path.join(test.writeDirs[0], "framework_tmp")
-        for file in os.listdir(frameworkTmpDir):
-            fullPath = os.path.join(frameworkTmpDir, file)
-            if os.path.isfile(fullPath):
-                os.remove(fullPath)
     def canReconnectTo(self, dir):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0

@@ -40,6 +40,8 @@ class CheckPredictions(CheckLogFilePredictions):
     def __repr__(self):
         return "Checking predictions for"
     def __call__(self, test):
+        self.collectErrors(test)
+    def collectErrors(self, test):
         # Hard-coded prediction: check test didn't crash
         stackTraceFile = test.makeFileName("stacktrace", temporary=1)
         if os.path.isfile(stackTraceFile):
@@ -89,10 +91,10 @@ class PredictionStatistics(plugins.Action):
     def setUpSuite(self, suite):
         self.suiteName = suite.name + os.linesep + "   "
     def __call__(self, test):
-        refErrors = self.referenceChecker(test)
+        refErrors = self.referenceChecker.collectErrors(test)
         currErrors = 0
         if self.currentChecker:
-            currErrors = self.currentChecker(test)
+            currErrors = self.currentChecker.collectErrors(test)
         if refErrors + currErrors > 0:
             print self.suiteName + test.name.ljust(30) + "\t", refErrors, currErrors
             self.suiteName = "   "

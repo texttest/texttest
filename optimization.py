@@ -5,10 +5,10 @@ class OptimizationConfig(carmen.CarmenConfig):
         return "k:" + carmen.CarmenConfig.getOptionString(self)
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
-            return [ CalculateKPI(self.optionValue("kpi")) ]
+	    listKPIs = [KPI.cSimpleRosteringOptTimeKPI, KPI.cFullRosteringOptTimeKPI, KPI.cWorstBestRosteringOptTimeKPI]
+            return [ CalculateKPIs(self.optionValue("kpi"), listKPIs) ]
         if self.optionMap.has_key("prrep"):
             return [ MakeProgressReport(self.optionValue("prrep")) ]
-
         return carmen.CarmenConfig.getActionSequence(self)
     def getRuleBuilder(self, neededOnly):
         if self.isNightJob() or not neededOnly:
@@ -146,26 +146,36 @@ class TestReport(plugins.Action):
     def setUpApplication(self, app):
         self.statusFileName = app.getConfigValue("log_file")
 
-class CalculateKPI(TestReport):
-    def __init__(self, referenceVersion):
+class CalculateKPIs(TestReport):
+    def __init__(self, referenceVersion, listKPIs):
         TestReport.__init__(self, referenceVersion)
-        self.totalKPI = 0
-        self.numberOfValues = 0
+	self.KPIHandler = KPI.KPIHandler()
+	self.listKPIs = listKPIs
     def __del__(self):
-        if self.numberOfValues > 0:
-            print "Overall average KPI with respect to version", self.referenceVersion, "=", float(self.totalKPI / self.numberOfValues)
+        if self.KPIHandler.getNrOfKPIs() > 0:
+            print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, ":", os.linesep, self.KPIHandler.getAllGroupsKPIAverageText()
         else:
-            print "No KPI tests were found with respect to version " + self.referenceVersion
+            print os.linesep, "No KPI tests were found with respect to version " + self.referenceVersion
     def __repr__(self):
-        return "Calculating KPI for"
+        return "KPI calc. for"
     def compare(self, test, referenceFile, currentFile):
-        kpiValue = KPI.calculate(referenceFile, currentFile)
-        self.describe(test, ", with respect to version " + self.referenceVersion + " - returns " + str(kpiValue))
-        if kpiValue != None:
-            self.totalKPI += kpiValue
-            self.numberOfValues += 1
+        floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion)
+        floatNowPerfScale = performance.getTestPerformance(test)
+	#print 'ref: %f, now: %f' %(floatRefPerfScale, floatNowPerfScale)
+        if currentFile != referenceFile:
+	    aKPI = None
+	    listKPIs = []
+	    for aKPIConstant in self.listKPIs:
+		if floatRefPerfScale > 0.0 and floatNowPerfScale > 0.0:
+		    aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile, floatRefPerfScale, floatNowPerfScale)
+		else:
+		    aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile)
+		self.KPIHandler.addKPI(aKPI)
+		listKPIs.append(aKPI.getTextKPI())
+            self.describe(test, ' vs ver. %s, (%d sol. KPIs: %s)' %(self.referenceVersion, aKPI.getNofSolutions(), ', '.join(listKPIs)))
     def setUpSuite(self, suite):
         self.describe(suite)
+
 
 class MakeProgressReport(TestReport):
     def __init__(self, referenceVersion):

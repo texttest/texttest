@@ -1,141 +1,204 @@
 #!/usr/local/bin/python
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/KPI.py,v 1.3 2003/03/04 11:26:46 johana Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/KPI.py,v 1.4 2003/03/07 07:59:21 henrike Exp $
 #
-# Script to calculate the KPI (Key Performance Indicator)
+# Classes to calculate the KPI (Key Performance Indicator)
 #
 # Created 2003-02-03 /Henrik
 #
+# ../TextTest/texttest.py -a cas -u sia -kpi 9
 
 import sys, os, re, string, time, shutil
 from encodings import raw_unicode_escape
 # Test suite imports
 import default, carmen, lsf, stat, optimization, plugins
 
+# Constants to use in listKPIs for creating the class CalculateKPIs(referenceVersion, listKPIs)
+cSimpleRosteringOptTimeKPI    = 0
+cFullRosteringOptTimeKPI      = 1
+cWorstBestRosteringOptTimeKPI = 2
+
 
 class KPIHandler:
     def __init__(self):
-	self.listKPIs = []
-	self.intCurrentId = 0
-    def addKPI(self, KPI):
-	if not self.listKPIs.count(KPI):
-	    if not KPI.getId():
-		KPI.setId(self._getNextId())
-	    self.listKPIs.append(KPI)
+	self.mapKPIs = {}
+	self.mapKPIClasses = {cSimpleRosteringOptTimeKPI    : SimpleRosteringOptTimeKPI,
+			      cFullRosteringOptTimeKPI      : FullRosteringOptTimeKPI,
+			      cWorstBestRosteringOptTimeKPI : WorstBestRosteringOptTimeKPI}
+    def addKPI(self, KPI, strGroupName = None):
+	if not strGroupName:
+	    strGroupName = self._generateGroupName(KPI)
+	if not strGroupName in self.mapKPIs.keys():
+	    self.mapKPIs[strGroupName] = []
+	listKPIs = self.mapKPIs[strGroupName]
+	if not listKPIs.count(KPI):
+	    listKPIs.append(KPI)
 	else:
-	    raise KPIAlreadyExistError('<Name: %s, Id: %d>' %(KPI.getName(), KPI.getId()))
-    def _getNextId(self):
-	self.intCurrentId += 1
-	return self.intCurrentId
-    def removeKPI(self, KPI):
+	    raise KPIAlreadyExistError('<Name: %s, Id: %d, Group: %s>' %(KPI.getName(), KPI.getId(), strGroupName))
+    def _generateGroupName(self, KPI):
+	return KPI.getName()
+    def removeKPI(self, KPI, strGroupName = None):
+	if not strGroupName:
+	    strGroupName = self._generateGroupName(KPI)
 	try:
-	    self.listKPIs.remove(KPI)
+	    self.mapKPIs[strGroupName].remove(KPI)
 	except ValueError:
-	    raise RemovalOfNonexistingKPIError('<Name: %s>' %(KPI.getName()))
-    def getKPIAverage(self):
-	"""Returns a tuple (<KPI Average>, <Nr of Valid KPIs>, <Nr of Failed KPIs>)"""
+	    raise RemovalOfNonexistingKPIError('<Name: %s, Group: %s>' %(KPI.getName(), strGroupName))
+    def getAllGroupsKPIAverage(self):
+	"""Returns a map of tuples: {<Group name>: (<KPI average>, <Nr of valid KPIs>, <Nr of failed KPIs>), ...}"""
+	mapAverage = {}
+	for strGroupName in self.getGroupNames():
+	    mapAverage[strGroup] = self.getKPIAverage(strGroupName)
+	return mapAverage
+    def getKPIAverage(self, strGroupName):
+	"""Returns the tuple of the specified group: (<KPI average>, <Nr of valid KPIs>, <Nr of failed KPIs>)"""
+	if not strGroupName in self.getGroupNames():
+	    raise KPIHandlerError('Group "%s" does not exist' %(strGroupName))
 	intNofKPIs = 0
 	floatTotalKPI = 0.0
-	for aKPI in self.listKPIs:
+	for aKPI in self.mapKPIs[strGroupName]:
 	    floatCurrKPI = aKPI.getFloatKPI()
 	    if floatCurrKPI:
 		intNofKPIs += 1
 		floatTotalKPI += floatCurrKPI
 	if intNofKPIs > 0:
-	    return (floatTotalKPI / float(intNofKPIs), intNofKPIs, self.getNrOfKPIs() - intNofKPIs)
+	    return (floatTotalKPI / float(intNofKPIs), intNofKPIs, self.getNrOfKPIs(strGroupName) - intNofKPIs)
 	else:
-	    return (None, 0, self.getNrOfKPIs())
-    def getNrOfKPIs(self):
-	return len(self.listKPIs)
-
+	    return (None, 0, self.getNrOfKPIs(strGroupName))
+    def getAllGroupsKPIAverageText(self):
+	strText = ''
+	for strGroupName in self.getGroupNames():
+	    strText += self.getKPIAverageText(strGroupName) + os.linesep
+	return strText
+    def getKPIAverageText(self, strGroupName):
+	(floatAverage, intValidKPIs, intFailedKPIs) = self.getKPIAverage(strGroupName)
+	return '%s: Average = %s (%d valid, %d failed)' %(strGroupName, floatAverage, intValidKPIs, intFailedKPIs)
+    def getGroupNames(self):
+	return self.mapKPIs.keys()
+    def getNrOfKPIs(self, strGroupName = None):
+	if strGroupName:
+	    return len(self.mapKPIs[strGroupName])
+	intNrOfKPIs = 0
+	for strGroupName in self.getGroupNames():
+	    intNrOfKPIs += len(self.mapKPIs[strGroupName])
+	return intNrOfKPIs
+    def createKPI(self, intKPIConstant, strRefFile, strNowFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	return self.mapKPIClasses[intKPIConstant](strRefFile, strNowFile, floatRefScale, floatNowScale)
 
 
 class KPI:
-    def __init__(self):
+    def __init__(self, strRefStatusFile, strNowStatusFile):
 	self.iBasics = Basics()
 	self.strName = 'KPI'
-	self.intId = None
+	self.cStrRefStatusFile = strRefStatusFile
+	self.cStrNowStatusFile = strNowStatusFile
     def getId(self):
-	return self.intId
-    def setId(self, intId):
-	self.intId = intId
+	return id(self)
     def getName(self):
 	return self.strName
     def getFloatKPI(self):
 	raise NotImplementedError()
+    def getTextKPI(self):
+	floatKPI = self.getFloatKPI()
+	if floatKPI == None:
+	    return 'None'
+	return '%0.1f' %(floatKPI)
+    def getRefValue(self):
+	raise NotImplementedError()
+    def getNowValue(self):
+	raise NotImplementedError()
 
 
 class CurveKPI(KPI):
-    def __init__(self, strRefStatusFile, strNowStatusFile):
-	KPI.__init__(self)
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	KPI.__init__(self, strRefStatusFile, strNowStatusFile)
+	#print 'ref: %f, now: %f' %(floatRefScale, floatNowScale)
 	self.strName = 'Curve KPI'
-	self.cStrRefStatusFile = strRefStatusFile
-	self.cStrNowStatusFile = strNowStatusFile
-
 	self.cReCPUTimeParts = re.compile(r'^(?P<hours>\d+):(?P<minutes>\d\d):(?P<seconds>\d\d)$')
-
+	self.mapSeriesRef = {}
+	self.mapSeriesNow = {}
+	self.floatRefScale = floatRefScale
+	self.floatNowScale = floatNowScale
+	self.floatScaleFactor = 1.0
     def _setListRegExps(self, listRegExps):
 	self.listRegExps = listRegExps
+	self.floatScaleFactor = self.floatRefScale
+	self.mapSeriesRef = self.iBasics.statusFileToMapOfSeries(self.cStrRefStatusFile, self.listRegExps)
+	self.floatScaleFactor = self.floatNowScale
+	self.mapSeriesNow = self.iBasics.statusFileToMapOfSeries(self.cStrNowStatusFile, self.listRegExps)
     def _setKeyPoints(self, listKeyPoints):
 	self.listKeyPoints = listKeyPoints
 
     def _convertCPUtoSecs(self, strCPUTime):
 	matchCPUTime = self.cReCPUTimeParts.match(strCPUTime)
 	if matchCPUTime:
-	    return string.atoi(matchCPUTime.group('hours')) * 3600 + string.atoi(matchCPUTime.group('minutes')) * 60 + string.atoi(matchCPUTime.group('seconds'))
+	    return self.floatScaleFactor * (string.atoi(matchCPUTime.group('hours')) * 3600 + string.atoi(matchCPUTime.group('minutes')) * 60 + string.atoi(matchCPUTime.group('seconds')))
 	else:
 	    #return int(string.atof(strCPUTime)/1000.0)
-	    return -1
-
-    def _getKeyPointComponent(self, tupKeyPoint, mapSeriesRef, mapSeriesNow):
-	return float(tupKeyPoint[2]) * apply(tupKeyPoint[1], (mapSeriesRef, mapSeriesNow))
-
-    def _getTotalTime(self, listKeyPoints, mapSeriesRef, mapSeriesNow):
-	floatTotalTime = 0.0
-	for aKeyPoint in listKeyPoints:
-	    floatTotalTime += self._getKeyPointComponent(aKeyPoint, mapSeriesRef, mapSeriesNow)
-	return floatTotalTime
-
-    def _getIndex(self, listKeyPoints, mapSeriesRef, mapSeriesNow):
-	floatNowTime = self._getTotalTime(listKeyPoints, mapSeriesRef, mapSeriesNow)
-	floatRefTime  = self._getTotalTime(listKeyPoints, mapSeriesRef, mapSeriesRef)
-        if floatRefTime > 0:
-            return 100.0 * (floatNowTime / floatRefTime)
-        else:
-            return 100
-
-    def getFloatKPI(self):
-	mapSeriesRef = self.iBasics.statusFileToMapOfSeries(self.cStrRefStatusFile, self.listRegExps)
-	mapSeriesNow = self.iBasics.statusFileToMapOfSeries(self.cStrNowStatusFile, self.listRegExps)
-	try:
-	    floatIndex = self._getIndex(self.listKeyPoints, mapSeriesRef, mapSeriesNow)
-	    return floatIndex
-	except KPIQualityNotReachedError, e:
-	    self.iBasics.printWarning(e)
 	    return None
 
+    def _getKeyPointComponent(self, tupKeyPoint):
+	(fRef, fNow) = apply(tupKeyPoint[1], ())
+	return (float(tupKeyPoint[2]) * fRef, float(tupKeyPoint[2]) * fNow)
 
-class InvertableCurveKPI(CurveKPI):
-    def __init__(self, strStatusFile, strUniqueTestString):
-	CurveKPI.__init__(self, strStatusFile, strStatusFile)
-	self.strUniqueTestString = strUniqueTestString
-	self.fCompareMarginPercent = 0.0
-    def getUniqueTestString():
-	return self.strUniqueTestString
-    def setcompareMarginPercent(floatPercent):
-	self.fCompareMarginPercent = floatPercent
-    def isComparableTo(otherInvertableKPI):
-	#!!!Not finished yet!!!
-	return self.getUniqueTestString() == otherInvertableKPI.getUniqueTestString()
+    def _getTotalTime(self, listKeyPoints):
+	floatRefTime = 0.0
+	floatNowTime = 0.0
+	for aKeyPoint in listKeyPoints:
+	    (fRef, fNow) = self._getKeyPointComponent(aKeyPoint)
+	    floatRefTime += fRef
+	    floatNowTime += fNow
+	return (floatRefTime, floatNowTime)
+
+    def getRefValue(self):
+	pass
+
+    def _getIndex(self, listKeyPoints):
+	(floatRefTime, floatNowTime) = self._getTotalTime(listKeyPoints)
+	if floatRefTime <= 0.0:
+	    return None
+	return 100.0 * (floatNowTime / floatRefTime)
+
+    def getFloatKPI(self):
+	if len(self.mapSeriesRef.keys()) == 0:
+	    return None
+	if len(self.mapSeriesRef[self.mapSeriesRef.keys()[0]]) == 0 or len(self.mapSeriesNow[self.mapSeriesNow.keys()[0]]) == 0:
+	    return None
+	try:
+	    floatIndex = self._getIndex(self.listKeyPoints)
+	    return floatIndex
+	except KPIQualityNotReachedError, e:
+	    #self.iBasics.printWarning(e)
+	    return None
+    def getNofSolutions(self):
+	if len(self.mapSeriesRef.keys()) == 0:
+	    return 0
+	return min(len(self.mapSeriesRef[self.mapSeriesRef.keys()[0]]), len(self.mapSeriesNow[self.mapSeriesNow.keys()[0]]))
 
 
-class RosteringKPI(CurveKPI):
-    def __init__(self, strRefStatusFile, strNowStatusFile):
-	CurveKPI.__init__(self, strRefStatusFile, strNowStatusFile)
-	self.strName = 'Rostering KPI'
+class MemoryKPI(CurveKPI):
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	CurveKPI.__init__(self, strRefStatusFile, strNowStatusFile, floatRefScale, floatNowScale)
+	self.strName = 'Memory KPI'
+	self.cReMemory = re.compile(r'^Time:[^d]*d (?P<value>[\d]+) memory$')
 
-	self.cReRosterCost = self.iBasics.getStatusRegExpFromLabel('Total cost of rosters|')
-	self.cReUnassignedCost = self.iBasics.getStatusRegExpFromLabel('Total cost of unassigned slots|unassigned rotations')
+class AverageMemoryKPI(MemoryKPI):
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	MemoryKPI.__init__(self, strRefStatusFile, strNowStatusFile, floatRefScale, floatNowScale)
+	self.strName = 'Average memory KPI'
+
+
+class MaxMemoryKPI(MemoryKPI):
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	MemoryKPI.__init__(self, strRefStatusFile, strNowStatusFile, floatRefScale, floatNowScale)
+	self.strName = 'Max memory KPI'
+
+
+class PairingKPI(CurveKPI):
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	CurveKPI.__init__(self, strRefStatusFile, strNowStatusFile, floatRefScale, floatNowScale)
+	self.strName = 'Pairing KPI'
+
 	self.cReTotalCost = self.iBasics.getStatusRegExpFromLabel('Total cost of plan|APC total rule cost')
 	self.cReCPUTime = re.compile(r'^Total time:\D*([\d:]+)\W*cpu time:\D*(?P<value>[\d:]+)$')
 
@@ -147,31 +210,56 @@ class RosteringKPI(CurveKPI):
 	    ]
 	self._setListRegExps(listRegExps)
 
-    def _getInitialSolutionTime(self, mapSeriesRef, mapSeriesNow):
-	return mapSeriesNow['CPU time'][0]
 
-    def _getFirstReasonableTime(self, mapSeriesRef, mapSeriesNow):
-	return 0
+class RosteringKPI(CurveKPI):
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	CurveKPI.__init__(self, strRefStatusFile, strNowStatusFile, floatRefScale, floatNowScale)
+	self.strName = 'Rostering KPI'
 
-    def _getProductionQualityTime(self, mapSeriesRef, mapSeriesNow):
-	return 0
+	self.cReRosterCost = self.iBasics.getStatusRegExpFromLabel('Total cost of rosters')
+	self.cReUnassignedCost = self.iBasics.getStatusRegExpFromLabel('Total cost of unassigned slots|unassigned rotations')
+	self.cReTotalCost = self.iBasics.getStatusRegExpFromLabel('Total cost of plan|APC total rule cost')
+	#Total time:(s) 00:23:37  cpu time:  00:21:35#
+	self.cReCPUTime = re.compile(r'^Total time\D*[\d:]+\D*(?P<value>[\d:]+).*')
 
-    def _getFinalQualityTime(self, mapSeriesRef, mapSeriesNow):
-	intFinalQuality = min(mapSeriesRef['Total cost'])
-	listSeriesNow = mapSeriesNow['Total cost']
-	ixSeriesNow = 0
-	while listSeriesNow[ixSeriesNow] > intFinalQuality and ixSeriesNow < len(listSeriesNow) - 1:
-	    ixSeriesNow += 1
-	if listSeriesNow[ixSeriesNow] <= intFinalQuality:
-	    return mapSeriesNow['CPU time'][ixSeriesNow]
+	listRegExps = [
+	    ('CPU time',        self.cReCPUTime,        self._convertCPUtoSecs),
+	    ('Total cost',      self.cReTotalCost,      string.atoi),
+	    ('Unassigned cost',  self.cReUnassignedCost, string.atoi),
+	    ('Cost of rosters',  self.cReRosterCost,     string.atoi)
+	    ]
+	self._setListRegExps(listRegExps)
+    def _getInitialSolutionTime(self):
+	return (self.mapSeriesRef['CPU time'][0], self.mapSeriesNow['CPU time'][0])
+    def _getFirstReasonableTime(self):
+	return (0, 0)
+    def _getProductionQualityTime(self):
+	return (0, 0)
+    def _getFinalQualityTime(self):
+	floatFinalQuality = min(self.mapSeriesRef['Total cost'])
+	ixFinalQualityRef = self._getFirstLowerIx(self.mapSeriesRef['Total cost'], floatFinalQuality)
+	ixFinalQualityNow = self._getFirstLowerIx(self.mapSeriesNow['Total cost'], floatFinalQuality)
+	if not ixFinalQualityRef or not ixFinalQualityNow:
+	    raise KPIQualityNotReachedError(self.getName(), 'Final quality')
+	return (self.mapSeriesRef['CPU time'][ixFinalQualityRef], self.mapSeriesNow['CPU time'][ixFinalQualityNow])
+    def _getWorstBestQualityTime(self):
+	floatWorstBestQuality = max(min(self.mapSeriesNow['Total cost']), min(self.mapSeriesRef['Total cost']))
+	ixWorstBestQualityRef = self._getFirstLowerIx(self.mapSeriesRef['Total cost'], floatWorstBestQuality)
+	ixWorstBestQualityNow = self._getFirstLowerIx(self.mapSeriesNow['Total cost'], floatWorstBestQuality)
+	return (self.mapSeriesRef['CPU time'][ixWorstBestQualityRef], self.mapSeriesNow['CPU time'][ixWorstBestQualityNow])	
+    def _getFirstLowerIx(self, listSeries, floatLimit):
+	ixSeries = 0
+	while listSeries[ixSeries] > floatLimit and ixSeries < len(listSeries) - 1:
+	    ixSeries += 1
+	if listSeries[ixSeries] <= floatLimit:
+	    return ixSeries
 	else:
-	    #return gVeryLargeInt
-	    raise KPIQualityNotReachedError('Final quality')
-
+	    return None
+	
 
 class FullRosteringOptTimeKPI(RosteringKPI):
-    def __init__(self, strRefStatusFile, strNowStatusFile):
-	RosteringKPI.__init__(self, strRefStatusFile, strNowStatusFile)
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	RosteringKPI.__init__(self, strRefStatusFile, strNowStatusFile, floatRefScale, floatNowScale)
 	self.strName = 'Full Rostering Optimization Time KPI'
 	listKeyPoints = [
 	    ('Initial solution',         self._getInitialSolutionTime,   2),
@@ -182,22 +270,22 @@ class FullRosteringOptTimeKPI(RosteringKPI):
 	self._setKeyPoints(listKeyPoints)
 
 
-class InvertableFullRosteringOptTimeKPI(FullRosteringOptTimeKPI):
-    def __init__(self, strStatusFile):
-	FullRosteringOptTimeKPI.__init__(self, strStatusFile, strStatusFile)
-
-
-## class TestInvertableRosteringKPI(InvertableCurveKPI, RosteringKPI):
-##     def __init__(self, strStatusFile, strUniqueTestString):
-## 	InvertableCurveKPI.__init__(self, strStatusFile, strStatusFile)
-
-
 class SimpleRosteringOptTimeKPI(RosteringKPI):
-    def __init__(self, strRefStatusFile, strNowStatusFile):
-	RosteringKPI.__init__(self, strRefStatusFile, strNowStatusFile)
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	RosteringKPI.__init__(self, strRefStatusFile, strNowStatusFile, floatRefScale, floatNowScale)
 	self.strName = 'Simple Rostering Optimization Time KPI'
 	listKeyPoints = [
 	    ('Final quality',           self._getFinalQualityTime,      1),
+	    ]
+	self._setKeyPoints(listKeyPoints)
+
+
+class WorstBestRosteringOptTimeKPI(RosteringKPI):
+    def __init__(self, strRefStatusFile, strNowStatusFile, floatRefScale = 1.0, floatNowScale = 1.0):
+	RosteringKPI.__init__(self, strRefStatusFile, strNowStatusFile, floatRefScale, floatNowScale)
+	self.strName = 'Worst Best Rostering Optimization Time KPI'
+	listKeyPoints = [
+	    ('Worst best cost',           self._getWorstBestQualityTime,      1),
 	    ]
 	self._setKeyPoints(listKeyPoints)
 
@@ -218,12 +306,12 @@ class Basics:
     def writeFile(self, filename, lines):
 	outFile = open(filename, 'w')
 	for line in lines:
-	    outFile.write(line + '\n')
+	    outFile.write(line + os.linesep)
 	outFile.close
 
     # print warning
     def printWarning(self, strWarning):
-	print '  *** Warning: %s\n' %(strWarning)
+	sys.stderr.write('  *** Warning: %s%s' %(strWarning, os.linesep))
 
     #listRegExps = [('CPU time', REGEXP, convertFunc), ...]
     #mapSeries example: {'Total cost': [28692758, 27888892, 27044010], 'CPU time': [2087, 2229, 2405]}
@@ -246,24 +334,27 @@ class Basics:
 		for ixRegExp in range(len(listRegExps)):
 		    matchRegExp = listRegExps[ixRegExp][1].match(aLine)
 		    if matchRegExp:
-			#print 'matchRegExp.group(\'value\'): %s' %(matchRegExp.group('value'))
-			#print 'ixRegExp: %d, ixSection: %d' %(ixRegExp, ixSection)
 			listValues[ixRegExp][ixSection] = apply(listRegExps[ixRegExp][2], (matchRegExp.group('value'),))
 	mapSeries = {}
 	for ixRegExp in range(len(listRegExps)):
 	    mapSeries[listRegExps[ixRegExp][0]] = listValues[ixRegExp][:]
-	self._removeNegatives(mapSeries)
+	self._removeNoneValues(mapSeries)
 	return mapSeries
 
-    def _removeNegatives(self, mapSeries):
-	for ixSolution in range(len(mapSeries[mapSeries.keys()[0]])):
+    def _removeNoneValues(self, mapSeries):
+	if not mapSeries.keys():
+	    return
+	ixSolution = 0
+	while ixSolution < len(mapSeries[mapSeries.keys()[0]]):
 	    boolRemoveSolution = 0
 	    for keySeries in mapSeries.keys():
-		if mapSeries[keySeries][ixSolution] < 0:
+		if mapSeries[keySeries][ixSolution] == None:
 		    boolRemoveSolution = 1
 	    if boolRemoveSolution:
 		for keySeries in mapSeries.keys():
 		    del mapSeries[keySeries][ixSolution]
+	    else:
+		ixSolution += 1
 
     def getStatusRegExpFromLabel(self, strLabel):
 	strRegExp = self.rawCodec.encode('^\W*(%s)[^\d]*(?P<value>\d+).*$' %(strLabel))[0]
@@ -271,68 +362,47 @@ class Basics:
 
 
 class KPIQualityNotReachedError(Exception):
-    def __init__(self, args=None):
-	self.args = args
+    def __init__(self, strName, strError):
+	self.strName = strName
+	self.strError = strError
     def __str__(self):
-	return 'KPI could not be calculated since acceptable result for "%s" was not reached.' %(self.args)
-
-
+	return 'KPI %s could not be calculated (%s)' %(self.strName, self.strError)
 class KPIAlreadyExistError(Exception):
     pass
-
 class RemovalOfNonexistingKPIError(Exception):
+    pass
+class KPIHandlerError(Exception):
     pass
 
 
-class MeasureKPI(plugins.Action):
-    def __repr__(self):
-        return "Porting old"
-    def __call__(self, test):
-        testInfo = ApcTestCaseInformation(self.suite, test.name)
-        hasPorted = 0
-        if test.options[0] == "-":
-            hasPorted = 1
-            subPlanDirectory = test.options.split()[3]
-            carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDirectory)
-            ruleSetName = testInfo.getRuleSetName(subPlanDirectory)
-            newOptions = testInfo.buildOptions(carmUsrSubPlanDirectory, ruleSetName)
-            fileName = test.makeFileName("options")
-            shutil.copyfile(fileName, fileName + ".oldts")
-            os.remove(fileName)
-            optionFile = open(fileName,"w")
-            optionFile.write(newOptions + "\n")
-        else:
-            subPlanDirectory = test.options.split()[0]
-            carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDirectory)
-        envFileName = test.makeFileName("environment")
-        if not os.path.isfile(envFileName):
-            hasPorted = 1
-            envContent = testInfo.buildEnvironment(carmUsrSubPlanDirectory)
-            open(envFileName,"w").write(envContent + os.linesep)
-        perfFileName = test.makeFileName("performance")
-        if not os.path.isfile(perfFileName):
-            hasPorted = 1
-            perfContent = testInfo.buildPerformance(carmUsrSubPlanDirectory)
-            open(envFileName,"w").write(perfContent + os.linesep)
-        else:
-            lines = open(perfFileName).readlines()
-            if len(lines) > 1:
-                line1 = lines[0]
-                line2 = lines[1]
-                if line1[0:4] == "real" and line2[0:4] == "user":
-                    sec = line2.split(" ")[1]
-                    perfContent = "CPU time   :     " + str(float(sec)) + " sec. on heathlands"
-                    open(perfFileName,"w").write(perfContent + os.linesep)
-                    hasPorted = 1
-        if hasPorted != 0:
-            self.describe(test, " in " + testInfo.suiteDescription())
-    def setUpSuite(self, suite):
-        self.suite = suite
+##         # Performance file handling
+##         perfFileName = test.makeFileName("performance")
+##         if not os.path.isfile(perfFileName):
+##             perfContent = testInfo.buildPerformance(carmUsrSubPlanDirectory)
+##             open(envFileName,"w").write(perfContent + os.linesep)
+##         else:
+##             lines = open(perfFileName).readlines()
+##             if len(lines) > 1:
+##                 line1 = lines[0]
+##                 line2 = lines[1]
+##                 if line1[0:4] == "real" and line2[0:4] == "user":
+##                     sec = line2.split(" ")[1]
+##                     perfContent = "CPU time   :     " + str(float(sec)) + " sec. on heathlands"
+##                     open(perfFileName,"w").write(perfContent + os.linesep)
+##                     hasPorted = 1
 
+## class KPIPart:
+##     def __init__(self, strStatusFile, strUniqueTestString):
+## 	self.strUniqueTestString = strUniqueTestString
+## 	self.fCompareMarginPercent = 0.0
+##     def getUniqueTestString():
+## 	return self.strUniqueTestString
+##     def setcompareMarginPercent(floatPercent):
+## 	self.fCompareMarginPercent = floatPercent
+##     def isComparableTo(otherKPIPart):
+## 	#!!!Not finished yet!!!
+## 	return self.getUniqueTestString() == otherKPIPart.getUniqueTestString()
 
-def calculate(file1, file2):
-    iKPI = SimpleRosteringOptTimeKPI(file1, file2)
-    return iKPI.getFloatKPI()
 
 if __name__ == '__main__':
     cStrFlag = sys.argv[1]
@@ -343,16 +413,17 @@ if __name__ == '__main__':
     elif cStrFlag == '-testHandler' and len(sys.argv) == 4:
 	iKPIHandler = KPIHandler()
 	iKPIHandler.addKPI(SimpleRosteringOptTimeKPI(sys.argv[2], sys.argv[3]))
+	iKPIHandler.addKPI(WorstBestRosteringOptTimeKPI(sys.argv[2], sys.argv[3]))
 	iKPI = FullRosteringOptTimeKPI(sys.argv[2], sys.argv[3])
 	iKPIHandler.addKPI(iKPI)
 	#iKPIHandler.addKPI(iKPI)
 	iKPIHandler.removeKPI(iKPI)
 	iKPIHandler.addKPI(iKPI)
-	print iKPIHandler.getKPIAverage()
+	print iKPIHandler.getAllGroupsKPIAverageText()
     else:
 	# print usage
-	print '\n   Usage: %s refStatusFile thisStatusFile' %(os.path.basename(sys.argv[0]))
-	print """   This is a script to calculate the KPI (Key Performance Indicator)\n"""
+	print '%s   Usage: %s refStatusFile thisStatusFile' %(os.linesep, os.path.basename(sys.argv[0]))
+	print """   This is a script to calculate the KPI (Key Performance Indicator)""", os.linesep
 	sys.exit(1)
 
     print '%s: %s' %(iKPI.getName(), iKPI.getFloatKPI())

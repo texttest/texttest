@@ -281,7 +281,10 @@ class RunTests(InteractiveAction):
         commandLine = self.getTextTestName() + " " + ttOptions
         print "Starting dynamic TextTest with options :", ttOptions
         shellTitle = app.fullName + " Tests"
-        self.startExternalProgram(commandLine, shellTitle)
+        shellOptions = ""
+        if ttOptions.find("-build ") != -1:
+            shellOptions = "-hold"
+        self.startExternalProgram(commandLine, shellTitle, shellOptions)
     def getTextTestOptions(self, app, selTests):
         ttOptions = [ "-a " + app.name ]
         ttOptions += self.invisibleGroup.getCommandLines()

@@ -260,7 +260,7 @@ class TextTestGUI:
                 test.stateChangeEvent(state)
         else:
             self.redrawSuite(test)
-        if self.rightWindowGUI and self.rightWindowGUI.test == test:
+        if self.rightWindowGUI and self.rightWindowGUI.object == test:
             self.recreateTestView(test)
     def notifyChange(self, test):
         if currentThread() == self.actionThread:

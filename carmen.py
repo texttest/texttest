@@ -482,6 +482,7 @@ class ProcessProfilerResults(plugins.Action):
         return "Profiling"    
 
 class BuildCode(plugins.Action):
+    builtDirs = []
     def __init__(self, target, remote = 1):
         self.target = target
         self.remote = remote
@@ -489,6 +490,10 @@ class BuildCode(plugins.Action):
     def setUpApplication(self, app):
         for relPath in app.getConfigList("build_" + self.target):
             absPath = app.makeAbsPath(relPath)
+            if absPath in self.builtDirs:
+                print "Already built under", absPath, "- skipping build"
+                return
+            self.builtDirs.append(absPath)
             if os.path.isdir(absPath):
                 self.buildLocal(absPath, app)
             else:

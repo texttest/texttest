@@ -25,6 +25,10 @@ helpOptions = """
 
 -rulecomp  - Instead of running normally, compile all rule sets that are relevant to the tests selected (if any)
 
+-rulecomp clean
+           - As '-rulecomp' above, but will attempt to remove ruleset files first, such that ruleset is
+             rebuilt 'from scratch'. This is sometimes useful when the RAVE compiler has depenedency bugs
+
 -build <t> - Prior to running any tests, build in the appropriate location specified by <t>. This is specified in
              the config file as the entries "build_xxx". So if my config file contains the lines
              build_codebase:Rules_and_Reports
@@ -104,10 +108,15 @@ class CarmenConfig(lsf.LSFConfig):
         return filters
     def getActionSequence(self):
         if self.optionMap.has_key("rulecomp"):
-            return [ self.getRuleBuilder(0) ]
+            if self.optionValue("rulecomp") != "clean":
+                return [ self.getRuleBuilder(0) ]
+            else:
+                return [ self.getRuleCleanup(), self.getRuleBuilder(0) ]
         else:
             builder = self.getAppBuilder()
             return [ builder, self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self)
+    def getRuleCleanup(self):
+        return CleanupRules(self.getRuleSetName)
     def getRuleBuilder(self, neededOnly):
         if neededOnly:
             return plugins.Action()
@@ -174,6 +183,57 @@ class CarmenConfig(lsf.LSFConfig):
     
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
+
+class CleanupRules(plugins.Action):
+    def __init__(self, getRuleSetName):
+        self.rulesCleaned = []
+        self.raveName = None
+        self.getRuleSetName = getRuleSetName
+    def __repr__(self):
+        return "Cleanup rules for"
+    def __call__(self, test):
+        arch = getArchitecture(test.app)
+        ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
+        if self.shouldCleanup(ruleset):
+            self.describe(test, " - ruleset " + ruleset.name)
+            self.rulesCleaned.append(ruleset.name)
+            self.removeRuleSet(arch, ruleset.name)
+            self.removeRuleCompileFiles(arch)
+            self.removeRulePrecompileFiles(ruleset.name)
+    def removeRuleSet(self, arch, name):
+        carmTmp = os.environ["CARMTMP"]
+        targetPath = os.path.join(carmTmp, "crc", "rule_set", string.upper(self.raveName), arch, name)
+        self.removeFile(targetPath)
+        self.removeFile(targetPath + ".bak")
+    def removeRuleCompileFiles(self, arch):
+        carmTmp = os.environ["CARMTMP"]
+        targetPath = os.path.join(carmTmp, "compile", string.upper(self.raveName), arch + "_opt")
+        if os.path.isdir(targetPath):
+            for file in os.listdir(targetPath):
+                if file.endswith(".o"):
+                    self.removeFile(os.path.join(targetPath, file))
+    def removeRulePrecompileFiles(self, name):
+        carmTmp = os.environ["CARMTMP"]
+        targetPath = os.path.join(carmTmp, "compile", string.upper(self.raveName), name)
+        self.removeFile(targetPath + "_recompile.xml")
+        targetPath = os.path.join(carmTmp, "crc", "rule_set", string.upper(self.raveName), name)
+        self.removeFile(targetPath + ".xml")
+    def removeFile(self, fullPath):
+        if os.path.isfile(fullPath):
+            os.remove(fullPath)
+    def shouldCleanup(self, ruleset):
+        if not ruleset.isValid():
+            return 0
+        if not os.path.isdir(os.environ["CARMTMP"]):
+            return 0
+        if ruleset.name in self.rulesCleaned:
+            return 0
+        return 1
+    def setUpSuite(self, suite):
+        self.describe(suite)
+        self.rulesCleaned = []
+        if self.raveName == None:
+            self.raveName = getRaveName(suite)
 
 class CompileRules(plugins.Action):
     def __init__(self, getRuleSetName, modeString = "-optimize", filter = None):

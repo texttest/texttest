@@ -131,7 +131,7 @@ class TestSuite(Test):
                     testCaseList.append(testSuite)
             else:
                 testCase = TestCase(testName, testPath, self.app)
-                if testCase.isAcceptedByAll(filters):
+                if testCase.isValid() and testCase.isAcceptedByAll(filters):
                     testCaseList.append(testCase)
         return testCaseList
             
@@ -354,16 +354,12 @@ def extraFilter(action):
 # --- MAIN ---
 
 def main():
-    localDir = os.path.abspath(os.path.dirname(sys.argv[0]))
-
-    sys.path.append(localDir)
     # Declared global for debugPrint() above
     global inputOptions
     inputOptions = OptionFinder()
     global globalRunIdentifier
     globalRunIdentifier = os.environ["USER"] + time.strftime("%H:%M:%S", time.localtime())
 
-    debugPrint("Adding " + localDir + " to sys.path")
     for app in inputOptions.findApps():
         actionSequence = inputOptions.getActionSequence(app)
         allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, app.getFilterList())

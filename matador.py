@@ -14,7 +14,7 @@ class MatadorConfig(carmen.CarmenConfig):
         staticFilter = carmen.UpdatedStaticRulesetFilter(libraryFile, "matador")
         return [ carmen.CompileRules(staticFilter) ] + carmen.CarmenConfig.getActionSequence(self)
     def getTestCollator(self):
-        return carmen.CarmenConfig.getTestCollator(self) + [ MakeMatadorStatusFile(), MakeSolutionFile() ]
+        return carmen.CarmenConfig.getTestCollator(self) + [ MakeSolutionFile() ]
 
 class MakeMatadorStatusFile:
     def __repr__(self):

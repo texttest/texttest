@@ -38,10 +38,12 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Plot against solution number instead of cpu time.
                              - nt
                                Do not use status file from the currently running test.
+                             - b
+                               Plots both the original and the currently running test. 
                              - ns
                                Do not scale times with the performance of the test.
                              - nv
-                               No color grouping for different versions of the test.
+                               No line type grouping for different versions of the test.
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
                                
@@ -301,6 +303,22 @@ class LogFileFinder:
             return logFile
         else:
             raise plugins.TextTestError, "Could not find log file for Optimization Run in test" + repr(self.test)
+    def findSpecifiedFile(self, version, spec):
+        if spec == "run":
+            logFile = self.findTempFile(self.test, version)
+            if logFile and os.path.isfile(logFile):
+                return logFile
+            else:
+                raise plugins.TextTestError, ""
+        elif spec == "orig":
+            logFile = self.test.makeFileName(self.logStem, version)
+            if os.path.isfile(logFile):
+                return logFile
+            else:
+                raise plugins.TextTestError, ""
+        else:
+            print "Wrong spec"
+            return None
     def findTempFile(self, test, version):
         fileInTest = self.findTempFileInTest(version, self.logStem)
         if fileInTest or self.logStem == "output":
@@ -319,16 +337,22 @@ class LogFileFinder:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
     def findTempFileInTest(self, version, stem):                           
         for file in os.listdir(self.test.abspath):
-            if file.startswith(stem) and file.find(self.test.app.name + "." + version + self.test.getTestUser()) != -1:
+            versionMod = ""
+            if version:
+                versionMod = "." + version
+            if file.startswith(stem) and file.find(self.test.app.name + versionMod + self.test.getTestUser()) != -1:
                 return file
         return None
 
 class OptimizationRun:
-    def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0):
+    def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0, specFile = ""):
         self.diag = plugins.getDiagnostics("optimization")
         self.performance = performance.getTestPerformance(test, version) # float value
         logFinder = LogFileFinder(test, tryTmpFile)
-        self.logFile = logFinder.findFile(version)
+        if specFile == "":
+            self.logFile = logFinder.findFile(version)
+        else:
+            self.logFile = logFinder.findSpecifiedFile(version, specFile)
         self.diag.info("Reading data from " + self.logFile)
         self.penaltyFactor = 1.0
         allItems = definingItems + interestingItems
@@ -838,6 +862,7 @@ class PlotTest(plugins.Action):
         self.plotScaleTime = 1
         self.plotVersionColoring = 1
         self.plotUseTmpStatus = 1
+        self.plotStates = [ "" ]
         self.interpretOptions(args)
     def interpretOptions(self, args):
         for ar in args:
@@ -850,6 +875,8 @@ class PlotTest(plugins.Action):
                 self.plotAgainstSolNum = 1
             elif arr[0]=="v":
                 self.plotVersions = arr[1].split(",")
+            elif arr[0]=="b":
+                self.plotStates = [ "run" , "orig" ]
             elif arr[0]=="ns":
                 self.plotScaleTime = 0
             elif arr[0]=="nt":
@@ -865,35 +892,44 @@ class PlotTest(plugins.Action):
             return itemNamesInFile[self.plotItem]
         else:
             return self.plotItem
+    def setPointandLineTypes(self):
+        if len(self.plotVersions)>1 or len(self.plotStates)>1:
+            # Choose line type.
+            self.versionLineType = {}
+            counter = 2
+            for versionIndex in range(len(self.plotVersions)):
+                for stateIndex in range(len(self.plotStates)):
+                    self.versionLineType[self.plotVersions[versionIndex],self.plotStates[stateIndex]] = counter
+                    counter = counter + 1
+            # Choose point type.
+            self.testPointType = {}
+            counter = 0
+            for file in self.plotFiles:
+                name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
+                if not self.testPointType.has_key(name):
+                    self.testPointType[name] = counter
+                    counter = counter + 1
+    def getStyle(self,ver,state,name):
+        if (len(self.plotVersions)>1 or len(self.plotStates)>1) and self.plotVersionColoring:
+            style = " with linespoints lt " +  str(self.versionLineType[ver,state]) + " pt " + str(self.testPointType[name])
+        else:
+            style = " with linespoints "
+        return style
     def __repr__(self):
         return "Plotting"
     def __del__(self):
         if len(self.plotFiles) > 0:
             stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
+            self.setPointandLineTypes()
+
             fileList = []
-            if len(self.plotVersions)>1:
-                versionLineType = {}
-                counter = 1
-                for index in range(len(self.plotVersions)):
-                    versionLineType[self.plotVersions[index]] = counter
-                    counter = counter + 1
-                testPointType = {}
-                counter = 0
-                for file in self.plotFiles:
-                    name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
-                    if not testPointType.has_key(name):
-                        testPointType[name] = counter
-                        counter = counter + 1
-                    
             for file in self.plotFiles:
-                ver = file.split(os.sep)[-1].split(".",1)[-1]
+                ver = file.split(os.sep)[-1].split(".")[-2]
+                state = file.split(os.sep)[-1].split(".")[-1]
                 name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
-                title = " title \"" + name + " " + ver + "\" "
-                if len(self.plotVersions)>1 and self.plotVersionColoring:
-                    style = " with linespoints lt " +  str(versionLineType[file.split(".")[-1]]) + " pt " + str(testPointType[name])
-                else:
-                    style = " with linespoints "
-                fileList.append("'" + file + "' " + title + style)
+                title = " title \"" + name + " " + ver + " " + state + "\" "
+                fileList.append("'" + file + "' " + title + self.getStyle(ver,state,name))
+
             if self.plotPrint:
                 absplotPrint = os.path.expanduser(self.plotPrint)
                 if not os.path.isabs(absplotPrint):
@@ -906,7 +942,7 @@ class PlotTest(plugins.Action):
                 stdin.write("set xlabel 'Solution number'" + os.linesep)
             else: 
                 stdin.write("set xlabel 'CPU time (min)'" + os.linesep)
-                stdin.write("set time" + os.linesep)
+            stdin.write("set time" + os.linesep)
             stdin.write("set xtics border nomirror norotate" + os.linesep)
             stdin.write("set ytics border nomirror norotate" + os.linesep)
             stdin.write("set border 3" + os.linesep)
@@ -920,21 +956,19 @@ class PlotTest(plugins.Action):
                     open(absplotPrint,"w").write(tmppf)
     def __call__(self, test):
         for version in self.plotVersions:
-            try:
-                optRun = OptimizationRun(test, version, [ self.plotItem, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus)
-            except plugins.TextTestError:
-                print "No status file does exist for test " + test.name + "(" + version + ")"
-                return
-            plotFileName = test.makeFileName("plot")
-#            if len(version) > 0:
-            plotFileName += "." + version
-#            else:
-#                plotFileName += "." + "main"
-            plotFile = open(plotFileName, "w")
-            for solution in optRun.solutions:
-                if self.plotAgainstSolNum:
-                    plotFile.write(str(solution[self.plotItem]) + os.linesep)
-                else:
-                    plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[self.plotItem]) + os.linesep)
-            self.plotFiles.append(plotFileName)
+            for state in self.plotStates:
+                try:
+                    optRun = OptimizationRun(test, version, [ self.plotItem, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus, state)
+                except plugins.TextTestError:
+                    print "No status file does exist for test " + test.name + "(" + version + ")"
+                    continue
+
+                plotFileName = test.makeFileName("plot") + "." + version + "." + state
+                plotFile = open(plotFileName, "w")
+                for solution in optRun.solutions:
+                    if self.plotAgainstSolNum:
+                        plotFile.write(str(solution[self.plotItem]) + os.linesep)
+                    else:
+                        plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[self.plotItem]) + os.linesep)
+                self.plotFiles.append(plotFileName)
 

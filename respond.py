@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import comparetest, ndiff, sys, string, os
+import comparetest, ndiff, sys, string, os, performance
     
 # Abstract base to make it easier to write test responders
 class Responder:
@@ -104,6 +104,33 @@ class OverwriteOnFailures(Responder):
         for comparison in comparisons:
             comparison.overwrite(self.version)
 
+class BatchFilter:
+    def __init__(self, batchSession):
+        self.recipientEntry = batchSession + "_recipients"
+        self.timeEntry = batchSession + "_timelimit"
+        self.currentApp = None
+        self.performanceFilter = None
+    def acceptsTestCase(self, test):
+        if self.performanceFilter == None:
+            return 1
+        else:
+            return self.performanceFilter.acceptsTestCase(test)
+    def acceptsTestSuite(self, suite):
+        if suite.app == self.currentApp:
+            return 1
+        self.currentApp = suite.app
+        # Check if the recipients are none...
+        try:
+            if suite.app.getConfigValue(self.recipientEntry) == "none":
+                return 0
+        except:
+            pass
+        try:
+            self.performanceFilter = performance.TimeFilter(suite.app.getConfigValue(self.timeEntry))
+        except:
+            self.performanceFilter = None
+        return 1
+
 class BatchCategory:
     def __init__(self, description):
         self.description = description
@@ -141,7 +168,8 @@ class BatchCategory:
 class BatchResponder(Responder):
     def __repr__(self):
         return "In"
-    def __init__(self, lineCount):
+    def __init__(self, lineCount, sessionName):
+        self.sessionName = sessionName
         self.failureDetail = {}
         self.crashDetail = {}
         self.categories = {}
@@ -155,6 +183,9 @@ class BatchResponder(Responder):
         self.mainSuite = None
         self.responder = UNIXInteractiveResponder(lineCount)
     def __del__(self):
+        if self.testCount() > 0:
+            self.sendMail()
+    def sendMail(self):
         mailFile = os.popen("sendmail -t", "w")
         fromAddress = os.environ["USER"]
         toAddress = self.getRecipient(fromAddress)
@@ -170,10 +201,10 @@ class BatchResponder(Responder):
             self.writeFailureDetail(mailFile)
         mailFile.close()
     def getRecipient(self, fromAddress):
-        app = self.mainSuite.app
-        if fromAddress == app.getConfigValue("nightjob_user"):
-            return app.getConfigValue("nightjob_recipients")
-        else:
+        # See if the session name has an entry, if not, send to the user
+        try:
+            return self.mainSuite.app.getConfigValue(self.sessionName + "_recipients")
+        except:
             return fromAddress
     def handleSuccess(self, test):
         category = self.findSuccessCategory(test)

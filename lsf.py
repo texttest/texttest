@@ -20,10 +20,11 @@ signal.signal(15, killJobs)
 
 class LSFConfig(default.Config):
     def getOptionString(self):
-        return "lbr:R:" + default.Config.getOptionString(self)
+        return "lb:r:R:" + default.Config.getOptionString(self)
     def getFilterList(self):
         filters = default.Config.getFilterList(self)
         self.addFilter(filters, "r", performance.TimeFilter)
+        self.addFilter(filters, "b", respond.BatchFilter)
         return filters
     def getTestRunner(self):
         if self.optionMap.has_key("l"):
@@ -47,7 +48,7 @@ class LSFConfig(default.Config):
         diffLines = 30
         # If running multiple times, batch mode is assumed
         if self.optionMap.has_key("b") or self.optionMap.has_key("m"):
-            return [ respond.BatchResponder(diffLines) ]
+            return [ respond.BatchResponder(diffLines, self.optionValue("b")) ]
         elif self.optionMap.has_key("o"):
             return default.Config.getTestResponder(self)
         else:

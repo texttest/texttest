@@ -139,7 +139,8 @@ class CarmenConfig(lsf.LSFConfig):
                 return [ self.getWriteDirectoryMaker(), self.getRuleCleanup(), self.getRuleBuilder(0) ]
         else:
             builder = self.getAppBuilder()
-            return [ builder, self.getWriteDirectoryMaker(), self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self)
+            # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
+            return [ builder, self.getWriteDirectoryMaker(), self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self)[1:]
     def getRuleCleanup(self):
         return CleanupRules(self.getRuleSetName)
     def getRuleBuilder(self, neededOnly):
@@ -279,6 +280,9 @@ class CompileRules(plugins.Action):
     def __repr__(self):
         return "Compiling rules for"
     def __call__(self, test):
+        if self.raveName and (not self.filter or self.filter.acceptsTestCase(test)):
+            self.compileRulesForTest(test)
+    def compileRulesForTest(self, test):
         arch = getArchitecture(test.app)
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
         if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
@@ -308,13 +312,6 @@ class CompileRules(plugins.Action):
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
     def performCompile(self, test, commandLine):
-        #
-        # This is a LARGE hack, to get around the nasty design of making new test(suite) instances
-        # when an action has a filter. 
-        #
-        if len(test.writeDirs) < 1:
-            test.makeBasicWriteDirectory()
-        os.chdir(test.writeDirs[0])
         compTmp = test.makeFileName("ravecompile", temporary=1)
         # Hack to work around crc_compile bug which fails if ":" in directory
         os.chdir(test.abspath)
@@ -330,6 +327,9 @@ class CompileRules(plugins.Action):
         os.remove(compTmp)
         return ""
     def setUpSuite(self, suite):
+        if self.filter and not self.filter.acceptsTestSuite(suite):
+            self.raveName = None
+            return
         self.describe(suite)
         self.rulesCompiled = []
         if self.raveName == None:
@@ -383,8 +383,10 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
         self.diag.info("Target file is " + ruleset.targetFile)
         self.diag.info("Library files is " + self.getLibraryFile(test))
         if not ruleset.isValid():
+            self.diag.info("Invalid")
             return 0
         if not ruleset.isCompiled():
+            self.diag.info("Not compiled")
             return 1
         return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test)))
     def acceptsTestSuite(self, suite):

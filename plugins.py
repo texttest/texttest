@@ -16,6 +16,8 @@ class Configuration:
         return []
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options
+    def keepTmpFiles(self):
+        return 0
     # Useful features that a GUI might like
     def getInteractiveActions(self):
         return []
@@ -41,8 +43,6 @@ class Action:
         pass
     def setUpApplication(self, app):
         pass
-    def getFilter(self):
-        return None
     def getCleanUpAction(self):
         return None
     # Return a list of atomic instructions of action, test pairs that can be applied
@@ -112,13 +112,6 @@ class TearDownEnvironment(Action):
         test.tearDownEnvironment()
     def setUpSuite(self, suite):
         suite.tearDownEnvironment()
-
-# Action for wrapping the calls to cleanFiles
-class CleanTestFiles(Action):
-    def __init__(self, keeptmp):
-        self.keeptmp = keeptmp
-    def __call__(self, test):
-        test.cleanFiles(self.keeptmp)
 
 # Action for wrapping an executable that isn't Python, or can't be imported in the usual way
 class NonPythonAction(Action):

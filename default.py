@@ -134,6 +134,8 @@ class MakeWriteDirectory(plugins.Action):
         os.chdir(test.writeDirs[0])
     def __repr__(self):
         return "Make write directory for"
+    def setUpApplication(self, app):
+        app.makeWriteDirectory()
 
 class CollateFile(plugins.Action):
     def __init__(self, sourcePattern, targetStem):

@@ -95,7 +95,10 @@ class Test:
                 return nonVersionName + "." + version
         return nonVersionName
     def getRelPath(self):
-        return string.replace(self.abspath, self.app.abspath, "")
+        relPath = self.abspath.replace(self.app.abspath, "")
+        if relPath.startswith(os.sep):
+            return relPath[1:]
+        return relPath
     def getDirectory(self, temporary):
         return self.abspath
     def getInstructions(self, action):
@@ -124,7 +127,10 @@ class Test:
                     debugLog.info("Removed variable " + var)
                     del os.environ[var]
     def getIndent(self):
-        dirCount = string.count(self.getRelPath(), os.sep)
+        relPath = self.getRelPath()
+        if not len(relPath):
+            return ""
+        dirCount = string.count(relPath, os.sep) + 1
         retstring = ""
         for i in range(dirCount):
             retstring = retstring + "  "
@@ -189,8 +195,6 @@ class TestCase(Test):
         return globalRunIdentifier
     def getTestUser(self):
         return tmpString()
-    def getTmpIdentifier(self):
-        return self.app.name + self.app.versionSuffix() + globalRunIdentifier
     def isOutdated(self, filename):
         modTime = os.stat(filename)[stat.ST_MTIME]
         currTime = time.time()
@@ -205,8 +209,7 @@ class TestCase(Test):
         parent, current = os.path.split(startDir)
         return self.makePathName(fileName, parent)
     def makeBasicWriteDirectory(self):
-        self.cleanPreviousWriteDirs(self.abspath)
-        writeDir = self.createDir(self.abspath)
+        writeDir = self.createDirs(os.path.join(self.app.writeDirectory, self.getRelPath()))
         for copyTestPath in self.app.getConfigList("copy_test_path"):
             fullPath = self.makePathName(copyTestPath, self.abspath)
             target = os.path.join(writeDir, copyTestPath)
@@ -215,25 +218,20 @@ class TestCase(Test):
             if os.path.isdir(fullPath):
                 shutil.copytree(fullPath, target)
     def createDir(self, rootDir, nameBase = "", subDir = None):
-        writeDir = os.path.join(rootDir, nameBase + self.getTmpIdentifier())
+        writeDir = os.path.join(rootDir, nameBase + self.app.getTmpIdentifier())
         fullWriteDir = writeDir
         if subDir:
             fullWriteDir = os.path.join(writeDir, subDir)
+        self.createDirs(fullWriteDir)
+        return writeDir
+    def createDirs(self, fullWriteDir):
         os.makedirs(fullWriteDir)
         debugLog.info("Created write directory " + fullWriteDir)
         self.writeDirs.append(fullWriteDir)
-        return writeDir
-    def cleanPreviousWriteDirs(self, rootDir, nameBase = ""):
-        currTmpString = nameBase + self.app.name + self.app.versionSuffix() + self.getTestUser()
-        for file in os.listdir(rootDir):
-            fpath = os.path.join(rootDir, file)
-            if not os.path.isdir(fpath):
-                continue
-            if fpath.find(currTmpString) != -1:
-                self._removeDir(os.path.join(rootDir, file))
+        return fullWriteDir
     def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
         nameBase = basicDir + "."
-        self.cleanPreviousWriteDirs(rootDir, nameBase)
+        self.app.cleanPreviousWriteDirs(rootDir, nameBase)
         writeDir = self.createDir(rootDir, nameBase, subDir)
         newBasic = os.path.basename(writeDir)
         debugLog.info("Replacing " + basicDir + " with " + newBasic)
@@ -247,39 +245,6 @@ class TestCase(Test):
             self.inputFile = tmpFileName
             debugLog.info("Input file now '" + self.inputFile + "'")
         return writeDir
-    def cleanFiles(self, keeptmp):
-        if self.inputFile.find(self.getTmpIdentifier()) != -1:
-            os.remove(self.inputFile)
-        # Don't be in the directory when it's removed...
-        os.chdir(self.abspath)
-        for writeDir in self.writeDirs:
-            if writeDir == self.abspath or not os.path.isdir(writeDir):
-                continue
-            if keeptmp:
-                print self.getIndent() + "Keeping write-directory for", self.name, "in", writeDir
-            elif self.state != self.FAILED:
-                debugLog.info("Removing write-directory for " + self.name + " in " + writeDir)
-                self.removeAtRightLevel(writeDir)
-    def removeAtRightLevel(self, writeDir):
-        root, basename = os.path.split(writeDir)
-        if basename.find(globalRunIdentifier) != -1:
-            self._removeDir(writeDir)
-        else:
-            self.removeAtRightLevel(root)
-    def _removeDir(self, subDir):
-        for file in os.listdir(subDir):
-            fpath = os.path.join(subDir,file)
-            if os.path.islink(fpath) or os.path.isfile(fpath):
-                os.remove(fpath) 
-            else:
-                self._removeDir(fpath)
-        try:
-            os.rmdir(subDir)
-        except OSError:
-            # Seem to get "directory not empty here".
-            # Assume this is a race condition, so wait and try again
-            time.sleep(1)
-            self._removeDir(subDir)
             
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):
@@ -377,8 +342,13 @@ class Application:
         self.checkout = self.makeCheckout(optionMap)
         debugLog.info("Checkout set to " + self.checkout)
         self.configObject = self.makeConfigObject(optionMap)
+        self.setConfigDefault("keeptmp_default", 0)
+        self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
         self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
         self.setConfigDefault("extra_version", "none")
+        self.setConfigDefault("write_tmp_files", "~/texttesttmp")
+        root = os.path.expanduser(self.getConfigValue("write_tmp_files"))
+        self.writeDirectory = os.path.join(os.path.abspath(root), self.getTmpIdentifier())
         self.configObject.setUpApplication(self)
     def __repr__(self):
         return self.fullName
@@ -420,6 +390,28 @@ class Application:
         fullList.append(current)
         fullList += fromRemaining
         return fullList
+    def makeWriteDirectory(self):
+        root, tmpId = os.path.split(self.writeDirectory)
+        self.cleanPreviousWriteDirs(root)
+        os.makedirs(self.writeDirectory)
+        debugLog.info("Made root directory at " + self.writeDirectory)
+    def removeWriteDirectory(self):
+        # Don't be somewhere under the directory when it's removed
+        os.chdir(self.abspath)
+        if not self.keepTmpFiles and os.path.isdir(self.writeDirectory):
+            shutil.rmtree(self.writeDirectory)
+    def cleanPreviousWriteDirs(self, rootDir, nameBase = ""):
+        if not os.path.isdir(rootDir):
+            return
+        currTmpString = nameBase + self.name + self.versionSuffix() + tmpString()
+        for file in os.listdir(rootDir):
+            fpath = os.path.join(rootDir, file)
+            if not os.path.isdir(fpath):
+                continue
+            if fpath.find(currTmpString) != -1:
+                shutil.rmtree(os.path.join(rootDir, file))
+    def getTmpIdentifier(self):
+        return self.name + self.versionSuffix() + globalRunIdentifier
     def hasREpattern(self, txt):
     	# return 1 if txt contains a regular expression meta character
 	return self.specialChars.search(txt) != None
@@ -706,8 +698,6 @@ class OptionFinder:
             return 1
     def helpMode(self):
         return self.inputOptions.has_key("help")
-    def keepWriteDirectories(self):
-        return self.inputOptions.has_key("keeptmp")
     def useGUI(self):
         return self.inputOptions.has_key("g")
     def recordScript(self):
@@ -852,7 +842,6 @@ class ApplicationRunner:
             app.printHelpText()
             self.valid = 0
             return
-        self.keeptmp = inputOptions.keepWriteDirectories()
         tmpSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
         tmpSuite.reFilter(self.filterList)
         self.gui = gui
@@ -870,11 +859,7 @@ class ApplicationRunner:
         debugLog.debug("Performing action number " + str(actionNum) + " of " + str(self.actionCount()))
         if actionNum < self.actionCount():
             action = self.actionSequence[actionNum]
-            if action.getFilter() != None:
-                debugLog.debug("Performing action with filter " + repr(action.getFilter()))
-                self._performActionWithFilter(action)
-            else:
-                self._performAction(self.testSuite, action)
+            self._performAction(self.testSuite, action)
     def performCleanUp(self):
         self.valid = 0 # Make sure no future runs are made
         self.gui = None # The GUI has been exited
@@ -884,14 +869,7 @@ class ApplicationRunner:
             if cleanUp != None:
                 self._performAction(self.testSuite, cleanUp)
         # Hardcoded destructor-like cleanup (the destructor isn't called for some reason)
-        self.testSuite.performAction(plugins.CleanTestFiles(self.keeptmp))
-    def _performActionWithFilter(self, action):
-        newFilterList = self.filterList
-        newFilterList.append(action.getFilter())
-        debugLog.info("Creating extra test suite from new filter " + repr(action.getFilter()))
-        debugLog.info(os.getcwd())
-        actionTests = TestSuite(os.path.basename(self.app.abspath), self.app.abspath, self.app, newFilterList)
-        self._performAction(actionTests, action)
+        self.app.removeWriteDirectory()
     def _performAction(self, suite, action):
         debugLog.debug("Performing action " + repr(action))
         suite.setUpEnvironment()

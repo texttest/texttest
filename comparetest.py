@@ -85,7 +85,7 @@ class TestComparison:
                 self.makeComparisons(test, os.path.join(dir, file))
             elif self.shouldCompare(file, dir, test.app):
                 fullPath = os.path.join(dir, file)
-                stdFile = os.path.normpath(fullPath.replace(test.getTmpIdentifier(), ""))
+                stdFile = os.path.normpath(fullPath.replace(test.app.writeDirectory, test.app.abspath))
                 comparison = self.makeComparison(test, stdFile, fullPath)
                 self.addComparison(stdFile, comparison)
     def shouldCompare(self, file, dir, app):

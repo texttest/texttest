@@ -171,10 +171,10 @@ class LSFJob:
         self.name = test.getTmpExtension() + jobName
         self.app = test.app
     def hasStarted(self):
-        retstring = self.getFile("-r").readline()
+        retstring = self.getStringFromLSF("-r")
         return retstring.find("not found") == -1
     def hasFinished(self):
-        retstring = self.getFile().readline()
+        retstring = self.getStringFromLSF()
         return retstring.find("not found") != -1
     def kill(self):
         os.system("bkill -J " + self.name + " > /dev/null 2>&1")
@@ -185,15 +185,13 @@ class LSFJob:
             # Assume this is interrupted system call and keep trying
             return self.getStatus()
     def _getStatus(self):
-        file = self.getFile("-w -a")
-        lines = file.readlines()
-        if len(lines) == 0:
+        lsfOutput = self.getStringFromLSF("-w -a")
+        if len(lsfOutput) == 0:
             return "DONE", None
-        lastLine = lines[-1].strip()
-        if lastLine.find("not found") != -1:
+        if lsfOutput.find("not found") != -1:
             # If it doesn't exist we can assume it's done, it's the same effect...
             return "DONE", None
-        data = lastLine.split()
+        data = lsfOutput.split()
         status = data[2]
         if status == "EXIT":
             if self._requeueTest(data):
@@ -255,6 +253,12 @@ class LSFJob:
         return []
     def getFile(self, options = ""):
         return os.popen("bjobs -J " + self.name + " " + options + " 2>&1")
+    def getStringFromLSF(self, options = ""):
+        file = self.getFile(options)
+        lines = file.readlines()
+        if len(lines) == 0:
+            return ""
+        return lines[-1].strip()        
     
 class SubmitTest(unixConfig.RunTest):
     def __init__(self, loginShell, queueFunction, resourceFunction):

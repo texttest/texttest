@@ -33,6 +33,8 @@ class UNIXConfig(default.Config):
         return self.batchMode()
     def getTestCollator(self):
         return CollateUNIXFiles()
+    def hasPerformanceComparison(self, app):
+        return default.Config.hasPerformanceComparison(self, app) or len(app.getConfigValue("performance_test_machine")) > 0
     def getPerformanceFileMaker(self):
         return MakePerformanceFile()
     def getTestRunner(self):

@@ -101,6 +101,8 @@ class Config(plugins.Configuration):
         return MakeMemoryFile()
     def getPerformanceFileMaker(self):
         return None
+    def hasPerformanceComparison(self, app):
+        return len(app.getConfigValue("string_before_memory")) > 0
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getTestComparator(self):

@@ -17,6 +17,8 @@ class Configuration:
         return binary + " " + test.options
     def getVitalFiles(self, app):
         return [ app.getBinary() ]
+    def hasPerformanceComparison(self, app):
+        return 0
     def keepTmpFiles(self):
         return 0
     def printHelpText(self):

@@ -27,8 +27,10 @@ class TextTestGUI:
         global guilog
         from guiplugins import guilog
         eventHandler.setScripts(replayScriptName, recordScriptName, guilog)
-        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
+                                   gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic
+        self.performanceColumn = 0
         self.itermap = seqdict()
         self.actionThread = None
         self.rightWindowGUI = None
@@ -42,10 +44,16 @@ class TextTestGUI:
         vbox = self.createWindowContents(testWins)
         win.add(vbox)
         win.show()
-        screenWidth = gtk.gdk.screen_width()
-        screenHeight = gtk.gdk.screen_height()
-        win.resize((screenWidth * 2) / 5, (screenHeight * 4) / 5)
+        win.resize(self.getWindowWidth(), self.getWindowHeight())
         return win
+    def getWindowHeight(self):
+        return (gtk.gdk.screen_height() * 4) / 5
+    def getWindowWidth(self):
+        screenWidth = gtk.gdk.screen_width()
+        if self.performanceColumn:
+            return (screenWidth * 5) / 11
+        else:
+            return (screenWidth * 2) / 5
     def createIterMap(self):
         guilog.info("Mapping tests in tree view...")
         iter = self.model.get_iter_root()
@@ -67,13 +75,16 @@ class TextTestGUI:
         if nextIter:
             self.createSubIterMap(nextIter)
     def addApplication(self, app):
+        colour = app.getConfigValue("test_colours")["app_static"]
         iter = self.model.insert_before(None, None)
         self.model.set_value(iter, 0, "Application " + app.fullName)
-        self.model.set_value(iter, 1, "purple")
+        self.model.set_value(iter, 1, colour)
         self.model.set_value(iter, 2, app)
     def addSuite(self, suite):
         if not self.dynamic:
             self.addApplication(suite.app)
+        if self.dynamic and suite.app.hasPerformanceComparison():
+            self.performanceColumn = 1
         self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
         iter = self.model.insert_before(parent, None)
@@ -84,32 +95,46 @@ class TextTestGUI:
                 nodeName += " (" + appName + ")"
         self.model.set_value(iter, 0, nodeName)
         self.model.set_value(iter, 2, suite)
+        self.updateStateInModel(suite, iter)
         try:
             for test in suite.testcases:
                 self.addSuiteWithParent(test, iter)
         except:
             pass
-        self.model.set_value(iter, 1, self.getTestColour(suite))
         return iter
-    def getTestColour(self, test):
-        if test.state == test.FAILED or test.state == test.UNRUNNABLE:
-            return "red"
-        if test.state == test.SUCCEEDED:
-            return "green"
-        if test.state == test.RUNNING:
-            return "yellow"
-        return self.staticColour()
-    def stateChangeDescription(self, test):
-        if test.state == test.RUNNING:
+    def getTypeBreakdown(self, test):
+        try:
+            return test.stateDetails.getTypeBreakdown()
+        except AttributeError:
+            return "failure", "success"
+    def updateStateInModel(self, test, iter, state = None):
+        colours = test.getConfigValue("test_colours")
+        if not self.dynamic:
+            return self.modelUpdate(iter, colours["static"])
+        if state == test.FAILED or state == test.UNRUNNABLE:
+            behaviourType, performanceType = self.getTypeBreakdown(test)
+            if performanceType == "success":
+                return self.modelUpdate(iter, colours[behaviourType])
+            else:
+                return self.modelUpdate(iter, colours[behaviourType], performanceType, colours["failure"])
+        if state == test.SUCCEEDED:
+            return self.modelUpdate(iter, colours["success"])
+        if state == test.RUNNING:
+            return self.modelUpdate(iter, colours["running"])
+        return self.modelUpdate(iter, colours["not_started"])
+    def modelUpdate(self, iter, colour, details="", colour2=None):
+        if not colour2:
+            colour2 = colour
+        self.model.set_value(iter, 1, colour)
+        if self.performanceColumn:
+            self.model.set_value(iter, 3, details)
+            self.model.set_value(iter, 4, colour2)
+    def stateChangeDescription(self, test, state):
+        if state == test.RUNNING:
             return "start"
-        if test.state == test.FAILED or test.state == test.UNRUNNABLE or test.state == test.SUCCEEDED:
+        if state == test.FAILED or state == test.UNRUNNABLE or state == test.SUCCEEDED:
             return "complete"
         return "finish preprocessing"
-    def staticColour(self):
-        if self.dynamic:
-            return "white"
-        else:
-            return "pale green"
     def createWindowContents(self, testWins):
         self.contents = gtk.HBox(homogeneous=gtk.TRUE)
         testCaseWin = self.rightWindowGUI.getWindow()
@@ -145,8 +170,11 @@ class TextTestGUI:
         if not self.dynamic:
             self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("All Tests", renderer, text=0, background=1)
+        column = gtk.TreeViewColumn("Test Behaviour", renderer, text=0, background=1)
         view.append_column(column)
+        if self.performanceColumn:
+            perfColumn = gtk.TreeViewColumn("Performance", renderer, text=3, background=4)
+            view.append_column(perfColumn)
         view.expand_all()
         eventHandler.connect("select test", "row_activated", view, self.viewTest, argumentParseData=(column, 0))
         eventHandler.connect("add to test selection", "changed", self.selection, sense=1, argumentParseData=(column, 0))
@@ -175,9 +203,9 @@ class TextTestGUI:
         self.viewTestAtIter(iter)
     def pickUpChange(self):
         try:
-            test = self.workQueue.get_nowait()
+            test, state = self.workQueue.get_nowait()
             if test:
-                self.testChanged(test, byAction = 1)
+                self.testChanged(test, state, byAction = 1)
             return gtk.TRUE
         except Empty:
             # Maybe it's empty because the action thread has terminated
@@ -189,28 +217,31 @@ class TextTestGUI:
             time.sleep(0.1)
             return gtk.TRUE
     
-    def stateChangeEvent(self, test):
-        eventName = "test " + test.name + " to " + self.stateChangeDescription(test)
+    def stateChangeEvent(self, test, state):
+        eventName = "test " + test.name + " to " + self.stateChangeDescription(test, state)
         category = test.name
         eventHandler.nonGuiEvent(eventName, category)
-    def testChanged(self, test, byAction):
+    def testChanged(self, test, state, byAction):
         if test.classId() == "test-case":
-            self.redrawTest(test)
+            self.redrawTest(test, state)
             if byAction:
-                self.stateChangeEvent(test)
+                self.stateChangeEvent(test, state)
         else:
             self.redrawSuite(test)
         if self.rightWindowGUI and self.rightWindowGUI.test == test:
             self.recreateTestView(test)
     def notifyChange(self, test):
         if currentThread() == self.actionThread:
-            self.workQueue.put(test)
+            self.workQueue.put((test, test.state))
         else:
-            self.testChanged(test, byAction = 0)
+            self.testChanged(test, test.state, byAction = 0)
     # We assume that test-cases have changed state, while test suites have changed contents
-    def redrawTest(self, test):
+    def redrawTest(self, test, state):
         iter = self.itermap[test]
-        self.model.set_value(iter, 1, self.getTestColour(test))
+        self.updateStateInModel(test, iter, state)
+        guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
+        if self.performanceColumn:
+            guilog.info("(Second column '" + self.model.get_value(iter, 3) + "' coloured " + self.model.get_value(iter, 4) + ")")
     def redrawSuite(self, suite):
         newTest = suite.testcases[-1]
         suiteIter = self.itermap[suite]
@@ -239,10 +270,10 @@ class TextTestGUI:
     def recreateTestView(self, test, colour = ""):
         if self.rightWindowGUI:
             self.contents.remove(self.rightWindowGUI.getWindow())
-        if colour == "purple":
+        if colour == test.getConfigValue("test_colours")["app_static"]:
             self.rightWindowGUI = ApplicationGUI(test, self.selection, self.itermap)
         else:
-            self.rightWindowGUI = TestCaseGUI(test, self.staticColour())
+            self.rightWindowGUI = TestCaseGUI(test, self.dynamic)
         if self.contents:
             self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=gtk.TRUE, fill=gtk.TRUE)
             self.contents.show()
@@ -380,9 +411,10 @@ class ApplicationGUI(RightWindowGUI):
             if self.app.ownsFile(file) and file.startswith("config."):
                 configFiles.append(file)
         configFiles.sort()
+        colour = self.app.getConfigValue("file_colours")["app_static"]
         for file in configFiles:
             fullPath = os.path.join(self.app.abspath, file)
-            self.addFileToModel(confiter, fullPath, None, "purple")
+            self.addFileToModel(confiter, fullPath, None, colour)
     def runInteractive(self, button, action, *args):
         newSuite = action.performOn(self.app, self.getSelectedTests())
         if newSuite:
@@ -403,9 +435,10 @@ class ApplicationGUI(RightWindowGUI):
         tests.append(model.get_value(iter, 0))
             
 class TestCaseGUI(RightWindowGUI):
-    def __init__(self, test, staticColour):
+    def __init__(self, test, dynamic):
         self.test = test
-        self.staticColour = staticColour
+        self.dynamic = dynamic
+        self.colours = test.getConfigValue("file_colours")
         RightWindowGUI.__init__(self, test)
         self.testComparison = None
     def getHardcodedNotebookPages(self):
@@ -460,12 +493,15 @@ class TestCaseGUI(RightWindowGUI):
             self.addFilesUnderIter(exiter, filelist)
     def addFilesUnderIter(self, iter, files, dir = None):
         files.sort()
+        colour = self.colours["static"]
+        if self.dynamic:
+            colour = self.colours["not_started"]
         for file in files:
             if dir:
                 fullPath = os.path.join(dir, file)
             else:
                 fullPath = file
-            newiter = self.addFileToModel(iter, fullPath, None, self.staticColour)
+            newiter = self.addFileToModel(iter, fullPath, None, colour)
     def isDefinitionFile(self, file):
         definitions = [ "options.", "input.", "environment", "testsuite" ]
         for defin in definitions:
@@ -474,14 +510,14 @@ class TestCaseGUI(RightWindowGUI):
         return 0
     def getSuccessColour(self):
         if self.test.state == self.test.RUNNING:
-            return "yellow"
+            return self.colours["running"]
         else:
-            return "green"
+            return self.colours["success"]
     def getFailureColour(self):
         if self.test.state == self.test.RUNNING:
-            return "yellow"
+            return self.colours["running"]
         else:
-            return "red"
+            return self.colours["failure"]
     def getSaveTestAction(self):
         for instance in self.actionInstances:
             if isinstance(instance, guiplugins.SaveTest):

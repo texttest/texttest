@@ -77,6 +77,8 @@ class TestComparison:
             return worstType
         else:
             return self.newResults[0].getType()
+    def getTypeBreakdown(self):
+        return "failure", ""
     def isWorseThan(self, type, worstType):
         return self.scoreTable[type] > self.scoreTable[worstType]
     def getComparisons(self):

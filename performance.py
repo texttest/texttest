@@ -116,6 +116,18 @@ class PerformanceTestComparison(comparetest.TestComparison):
             descriptors["badperf"] = "slower"
             descriptors["config"] = "cputime"
         return descriptors
+    def getTypeBreakdown(self):
+        behaviourType = "success"
+        performanceType = "success"
+        for result in self.changedResults:
+            type = result.getType()
+            if type == "difference":
+                behaviourType = "failure"
+            else:
+                performanceType = str(int(result.calculatePercentageIncrease())) + "% " + type
+        if self.hasNewResults() or self.failedPrediction:
+            behaviourType = "failure"
+        return behaviourType, performanceType
     def shouldCompare(self, file, dir, app):
         if not comparetest.TestComparison.shouldCompare(self, file, dir, app):
             return 0

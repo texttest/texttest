@@ -431,6 +431,11 @@ class ConfigurationWrapper:
             return self.target.setApplicationDefaults(app)
         except:
             self.raiseException(req = "set defaults")
+    def hasPerformanceComparison(self, app):
+        try:
+            return self.target.hasPerformanceComparison(app)
+        except:
+            self.raiseException(req = "perf comparison")
     def addToOptionGroup(self, group):
         try:
             return self.target.addToOptionGroup(group)
@@ -529,6 +534,8 @@ class Application:
         # External viewing tools
         # Do this here rather than from the GUI: if applications can be run with the GUI
         # anywhere it needs to be set up
+        self.setConfigDefault("test_colours", self.getGuiColourDictionary())
+        self.setConfigDefault("file_colours", self.getGuiColourDictionary())
         if os.name == "posix":
             self.setConfigDefault("view_program", "xemacs")
             self.setConfigDefault("diff_program", "tkdiff")
@@ -537,6 +544,15 @@ class Application:
             self.setConfigDefault("view_program", "wordpad.exe")
             self.setConfigDefault("diff_program", "tkdiff.tcl")
             self.setConfigDefault("follow_program", None)
+    def getGuiColourDictionary(self):
+        dict = {}
+        dict["success"] = "green"
+        dict["failure"] = "red"
+        dict["running"] = "yellow"
+        dict["not_started"] = "white"
+        dict["static"] = "pale green"
+        dict["app_static"] = "purple"
+        return dict
     def setDependentConfigDefaults(self):
         binary = self.getConfigValue("binary")
         if not binary:
@@ -602,6 +618,8 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
+    def hasPerformanceComparison(self):
+        return self.configObject.hasPerformanceComparison(self)
     def createTestSuite(self, filters = None):
         if not filters:
             filters = self.configObject.getFilterList()

@@ -53,6 +53,10 @@ class Action:
 def getDiagnostics(diagName):
     return log4py.Logger().get_instance(diagName)
 
+# Exception to throw. It's generally good to throw this internally
+class TextTestError(RuntimeError):
+    pass
+
 # Action composed of other sub-parts
 class CompositeAction(Action):
     def __init__(self, subActions):

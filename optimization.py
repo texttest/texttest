@@ -294,7 +294,7 @@ class LogFileFinder:
         if os.path.isfile(logFile):
             return logFile
         else:
-            raise EnvironmentError, "Could not find log file for Optimization Run in test" + repr(self.test)
+            raise plugins.TextTestError, "Could not find log file for Optimization Run in test" + repr(self.test)
     def findTempFile(self, test, version):
         fileInTest = self.findTempFileInTest(version, self.logStem)
         if fileInTest or self.logStem == "output":
@@ -913,7 +913,7 @@ class PlotTest(plugins.Action):
         for version in self.plotVersions:
             try:
                 optRun = OptimizationRun(test, version, [ self.plotItem, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus)
-            except EnvironmentError:
+            except plugins.TextTestError:
                 print "No status file does exist for test " + test.name + "(" + version + ")"
 
             plotFileName = test.makeFileName("plot")

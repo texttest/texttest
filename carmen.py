@@ -137,7 +137,7 @@ class CarmenConfig(lsf.LSFConfig):
             supportedArchs = app.getConfigList("supported_architecture")
             # In batch mode, don't throw exceptions. Let the Batch Filter deal with it
             if len(supportedArchs) and not architecture in supportedArchs and not self.optionMap.has_key("b"):
-                raise EnvironmentError, "Unsupported architecture " + architecture + "!!!"
+                raise plugins.TextTestError, "Unsupported architecture " + architecture + "!!!"
             else:
                 print "Non-default architecture: using version", architecture
                 return [ architecture ] 
@@ -165,7 +165,7 @@ class CompileRules(plugins.Action):
     def __call__(self, test):
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName)
         if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
-            raise EnvironmentError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
+            raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
         if ruleset.isValid() and not ruleset.name in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name)
             if not os.path.isdir(os.environ["CARMTMP"]):
@@ -182,7 +182,7 @@ class CompileRules(plugins.Action):
                 errContents = string.join(open(compTmp).readlines(),"")
                 os.remove(compTmp)
                 print "Failed to build ruleset " + ruleset.name + os.linesep + errContents
-                raise EnvironmentError, "Failed to build ruleset " + ruleset.name + os.linesep + errContents
+                raise plugins.TextTestError, "Failed to build ruleset " + ruleset.name + os.linesep + errContents
             os.remove(compTmp)
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()

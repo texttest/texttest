@@ -114,7 +114,7 @@ class TestCase(Test):
                 action.processUnRunnable(self)
             else:
                 action(self)
-        except (EnvironmentError), e:
+        except plugins.TextTestError, e:
             self.isDead = 1
             self.deathReason = e
     def performOnSubTests(self, action):

@@ -166,7 +166,7 @@ class ApcCompileRules(carmen.CompileRules):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
             returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile))
             if returnValue:
-                raise EnvironmentError, "Failed to build library for APC ruleset " + ruleset.name
+                raise plugins.TextTestError, "Failed to build library for APC ruleset " + ruleset.name
         commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib)
         commandLine += "-o " + apcExecutable
         si, so, se = os.popen3(commandLine)
@@ -176,7 +176,7 @@ class ApcCompileRules(carmen.CompileRules):
                 print "Building", ruleset.name, "failed!"
                 for line in lastErrors:
                     print "   ", line.strip()
-                raise EnvironmentError, "Failed to link APC ruleset " + ruleset.name
+                raise plugins.TextTestError, "Failed to link APC ruleset " + ruleset.name
 
     def getRuleLib(self, ruleSetName):
         optArch = carmen.architecture + "_opt"
@@ -233,7 +233,7 @@ class ApcCompileRules(carmen.CompileRules):
                     os.system(apCompile + " " + srcFile + " > " + airportFile)
                     if os.path.isfile(airportFile):
                         return
-        raise EnvironmentError, "Failed to find AirportFile"
+        raise plugins.TextTestError, "Failed to find AirportFile"
 
       
 class RemoveLogs(plugins.Action):

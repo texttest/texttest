@@ -59,7 +59,7 @@ class Config(plugins.Configuration):
         switches["nv"] = "No line type grouping for versions"
         return switches
     def getActionSequence(self):
-        actions = [ self.tryGetTestRunner(), self.getTestEvaluator() ]
+        actions = [ self.getWriteDirectoryMaker(), self.tryGetTestRunner(), self.getTestEvaluator() ]
         if self.optionMap.has_key("i"):
             return [ plugins.CompositeAction(actions) ]
         else:
@@ -72,8 +72,10 @@ class Config(plugins.Configuration):
         return filters
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
+    def getWriteDirectoryMaker(self):
+        return MakeWriteDirectory();
     def tryGetTestRunner(self):
-        if self.optionMap.has_key("reconnect"):
+        if self.isReconnecting():
             return plugins.Action()
         else:
             return self.getTestRunner()
@@ -124,6 +126,10 @@ class Config(plugins.Configuration):
         print "Python scripts: (as given to -s <module>.<class> [args])"
         print "--------------------------------------------------------"
         self.printHelpScripts()
+
+class MakeWriteDirectory(plugins.Action):
+    def __call__(self, test):
+        test.makeBasicWriteDirectory()
 
 class CollateFile(plugins.Action):
     def __init__(self, sourcePattern, targetStem):

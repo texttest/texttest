@@ -614,7 +614,10 @@ class MakeProgressReport(TestReport):
         print os.linesep + header
         print underline
     def percent(self, fValue):
-        return str(int(round(100.0 * fValue))) + "% or x" + str(round(1.0 / fValue, 2))
+        if fValue != 0:
+            return str(int(round(100.0 * fValue))) + "% or x" + str(round(1.0 / fValue, 2))
+        else:
+            return "100% or x1.0"
     def computeKPI(self, currTTWC, refTTWC):
         if refTTWC > 0:
             kpi = float(currTTWC) / float(refTTWC)
@@ -967,6 +970,7 @@ class PlotTest(plugins.Action):
         self.plotStates = [ "" ]
         self.yLabel = ""
         self.plotInSameGraph = 0
+        self.testWritedir = {}
         # Must be last in the constructor
         self.interpretOptions(args)
     def __del__(self):
@@ -1100,6 +1104,16 @@ class PlotTest(plugins.Action):
                     open(absplotPrint,"w").write(tmppf)
             self.plotFiles = []
     def __call__(self, test):
+        if not self.testWritedir.has_key(test):
+            rootPath = os.path.join(os.environ["HOME"], ".texttestplot")
+            if os.path.isdir(rootPath):
+                test.cleanPreviousWriteDirs(rootPath);
+            test.createDir(rootPath);
+            self.testWritedir[test] = test.writeDirs[0]
+        else:
+            test.writeDirs = []
+            test.writeDirs.append(self.testWritedir[test])
+        os.chdir(test.writeDirs[0])
         if self.plotItemApp.has_key(test.app.name):
             usePlotItem = self.plotItemApp[test.app.name]
         else:
@@ -1113,7 +1127,7 @@ class PlotTest(plugins.Action):
                     print "No status file does exist for test " + test.app.name + "::" + test.name + "(" + version + ")"
                     continue
 
-                plotFileName = test.makeFileName("plot") + "." + version + "." + state
+                plotFileName = test.makeFileName("plot" + "." + version + "." + state, temporary = 1)
                 plotFile = open(plotFileName, "w")
                 for solution in optRun.solutions:
                     if self.plotAgainstSolNum:
@@ -1123,3 +1137,4 @@ class PlotTest(plugins.Action):
                 self.plotFiles.append(plotFileName)
         if not self.plotInSameGraph:
             self.plotGraph()
+        test.writeDirs = []

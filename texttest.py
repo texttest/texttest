@@ -155,7 +155,8 @@ class TestCase(Test):
         else:
             return self.abspath
     def callAction(self, action):
-        os.chdir(self.writeDirs[0])
+        if len(self.writeDirs) > 0:
+            os.chdir(self.writeDirs[0])
         try:
             return action(self)
         except plugins.TextTestError, e:
@@ -342,7 +343,6 @@ class TestSuite(Test):
                 testCase = TestCase(testName, testPath, self.app)
                 testCase.tearDownEnvironment()
                 if testCase.isValid() and testCase.isAcceptedByAll(filters):
-                    testCase.makeBasicWriteDirectory()
                     testCaseList.append(testCase)
         return testCaseList
     def alreadyContains(self, testCaseList, testName):

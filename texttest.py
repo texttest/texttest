@@ -212,7 +212,7 @@ class TestCase(Test):
             self.options = self.options.replace(basicDir, newBasic)
             debugLog.info("Options string now '" + self.options + "'") 
             if os.path.isfile(self.inputFile):
-                tmpFileName = self.getTmpFileName("input", "w")
+                tmpFileName = self.makeFileName("input", temporary=1)
                 tmpFile = open(tmpFileName, "w")
                 for line in open(self.inputFile).xreadlines():
                     tmpFile.write(line.replace(basicDir, newBasic))

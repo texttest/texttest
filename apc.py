@@ -574,6 +574,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.sumRefTime = 0
         self.qualKPI = 1.0
         self.qualKPICount = 0
+        self.spreadKPI = 1.0
+        self.spreadKPICount = 0
         self.lastKPITime = 0
     def __del__(self):
         for groupName in self.finalCostsInGroup.keys():
@@ -615,6 +617,11 @@ class MakeProgressReport(optimization.MakeProgressReport):
             qNumber = round(avg,5) * 100.0
             wText = "PQ1 (average cost at time ratio) with respect to version"
             print wText, self.referenceVersion, "=", str(qNumber) + "%"
+        if self.spreadKPICount > 0:
+            avg = math.pow(self.spreadKPI, 1.0 / float(self.spreadKPICount))
+            qNumber = round(avg,5) * 100.0
+            wText = "PUT_A_CODE_HERE (spread at end) with respect to version"
+            print wText, self.referenceVersion, "=", str(qNumber) + "%"
         optimization.MakeProgressReport.__del__(self)
         if len(self.weightKPI) > 1:
             # The weighted KPI is prod(KPIx ^ (Tx / Ttot)) (weighted geometric average)
@@ -635,7 +642,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
             wText = "Overall time weighted KPI with respect to version"
             print wText, self.referenceVersion, "=", self.percent(self.prodKPI)
     def doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition = "test", minMaxRuns = None):
-        kpi = optimization.MakeProgressReport.doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition)
+        kpi = optimization.MakeProgressReport.doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition,minMaxRuns)
 
         worstCost = self.calculateWorstCost(referenceRun, currentRun, app, groupName)
         currTTWC = currentRun.timeToCost(worstCost)
@@ -741,7 +748,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
             weightKPItuple = kpi, kpiTime
             self.weightKPI.append(weightKPItuple)
         return kpi
-    def reportCosts(self, currentRun, referenceRun, app, groupName):
+    def reportCosts(self, currentRun, referenceRun, app, groupName, minMaxRuns=None):
         optimization.MakeProgressReport.reportCosts(self, currentRun, referenceRun, app, groupName)
         if self.groupTimeLimit.has_key(groupName):
             qualTime = self.groupTimeLimit[groupName]
@@ -755,6 +762,16 @@ class MakeProgressReport(optimization.MakeProgressReport):
             self.reportLine("Cost at " + str(qualTime) + " mins, qD=" + qKPI, curCost, refCost)
         currentMargin, refMargin = self.getMargins(app, groupName)
         self.reportLine("Cost variance tolerance (%) ", currentMargin, refMargin)
+        if minMaxRuns:
+            referenceMinRun, referenceMaxRun, currentMinRun, currentMaxRun = minMaxRuns
+            referenceSpreadAtEnd=float(referenceMaxRun.getCost(-1))/float(referenceMinRun.getCost(-1))-1;
+            endtime=currentRun.solutions[-1][optimization.timeEntryName]
+            currentSpreadAtEnd=float(currentMaxRun.getCost(-1))/float(currentMinRun.getCost(-1))-1;
+            spreadKPI=(currentSpreadAtEnd)/(max(referenceSpreadAtEnd,0.0000000001))
+            self.reportLine("Relative spread (%)", "%f"%(100*currentSpreadAtEnd), "%f"%(referenceSpreadAtEnd*100))
+            self.spreadKPI *= spreadKPI;
+            self.spreadKPICount += 1;
+        
         
     # Extracts data from an OptimizationRun and adds it to the appropriate averager.
     def addRunToAverage(self, optRun, averagerMap, groupName):

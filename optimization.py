@@ -241,7 +241,7 @@ class StartStudio(plugins.Action):
         print "CARMSYS:", os.environ["CARMSYS"]
         print "CARMUSR:", os.environ["CARMUSR"]
         print "CARMTMP:", os.environ["CARMTMP"]
-        fullSubPlanPath = test.app.configObject._getSubPlanDirName(test)
+        fullSubPlanPath = test.app.configObject.target._getSubPlanDirName(test)
         lPos = fullSubPlanPath.find("LOCAL_PLAN/")
         subPlan = fullSubPlanPath[lPos + 11:]
         localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
@@ -1055,7 +1055,7 @@ class TraverseSubPlans(plugins.Action):
         sys.stdout.flush()
         # Save the old dir, so we can restore it later.
         saveDir = os.getcwd()
-        subplanDir = test.app.configObject._getSubPlanDirName(test)
+        subplanDir = test.app.configObject.target._getSubPlanDirName(test)
         try:
             os.chdir(subplanDir)
             os.system(self.Command)

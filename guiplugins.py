@@ -40,7 +40,11 @@ class InteractiveAction(plugins.Action):
         exitHandler = None
         if refresh:
             exitHandler = self.test.filesChanged
-        process = self.startExternalProgram(viewProgram + " " + fileName, exitHandler=exitHandler)
+        commandLine = viewProgram + " " + fileName
+        if viewProgram.endswith("emacs"):
+            # Emacs dumps junk on standard error - this is annoying!
+            commandLine += " 2> /dev/null"
+        process = self.startExternalProgram(commandLine, exitHandler=exitHandler)
         if wait:
             process.waitForTermination()
     def getTextTestName(self):

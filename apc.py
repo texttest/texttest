@@ -323,7 +323,7 @@ class ApcCompileRules(carmen.CompileRules):
         if self.filter and carmen.getArchitecture(test.app) == "i386_linux":
             self.linuxRuleSetBuild(test)
         else:
-            carmen.CompileRules.compileRulesForTest(self, test)
+            return carmen.CompileRules.compileRulesForTest(self, test)
     def linuxRuleSetBuild(self, test):
         ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
         if not self.ensureCarmTmpDirExists():

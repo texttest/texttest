@@ -134,12 +134,12 @@ class Application:
         self.name = name
         self.abspath = abspath
         self.configDir = MultiEntryDictionary(configFile, name, version)
-        self.version = version
         debugPrint("Found application " + repr(self))
         self.checkout = self.makeCheckout()
         debugPrint("Checkout set to " + self.checkout)
         self.configObject = self.makeConfigObject(optionMap)
         allowedOptions = self.configObject.getOptionString() + builtInOptions
+        self.version = self.configObject.interpretVersion(self, version)
         # Force exit if something isn't present
         getopt.getopt(sys.argv[1:], allowedOptions)    
 	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
@@ -229,7 +229,7 @@ class Application:
         return os.path.join(checkoutLocation, checkout)
     def getExecuteCommand(self):
         binaryString = self.makeAbsPath(self.getConfigValue("binary"))
-        binary = self.configObject.interpret(binaryString)
+        binary = self.configObject.interpretBinary(binaryString)
         if self.configDir.has_key("interpreter"):
             return self.configDir["interpreter"] + " " + binary
         else:

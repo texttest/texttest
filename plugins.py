@@ -11,8 +11,10 @@ class Configuration:
         return []
     def getFilterList(self):
         return []
-    def interpret(self, binaryString):
+    def interpretBinary(self, binaryString):
         return binaryString
+    def interpretVersion(self, app, versionString):
+        return versionString
 
 # Filter interface: all must provide these three methods
 class Filter:

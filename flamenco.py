@@ -4,7 +4,8 @@ def getConfig(optionMap):
     return FlamencoConfig(optionMap)
 
 class FlamencoConfig(carmen.CarmenConfig):
-    def interpret(self, binaryString):
+    def interpretBinary(self, binaryString):
+        os.system(os.path.join(os.environ["CARMSYS"], "CONFIG"))
         return binaryString.replace("ARCHITECTURE", carmen.architecture)
     def getTestCollator(self):
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), MakeSQLErrorFile() ])

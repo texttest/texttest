@@ -242,6 +242,9 @@ class SubmitTest(unixConfig.RunTest):
     def __repr__(self):
         return "Submitting"
     def runTest(self, test):
+        global emergencyFinish
+        if emergencyFinish:
+            raise plugins.TextTestError, "Preprocessing not complete by LSF termination time"
         testCommand = self.getExecuteCommand(test)
         lsfOptions = ""
         if os.environ.has_key("LSF_PROCESSES"):
@@ -345,8 +348,11 @@ class UpdateLSFStatus(plugins.Action):
         self.jobNameFunction = jobNameFunction
         self.diag = plugins.getDiagnostics("LSF Status")
     def __repr__(self):
-        return "Updating LSF status for"
+        return "Killing"
     def __call__(self, test):
+        # Don't look for unrunnable tests...
+        if test.state == test.UNRUNNABLE:
+            return
         job = LSFJob(test, self.jobNameFunction)
         status, machine = job.getStatus()
         self.diag.info("Job " + job.name + " in state " + status + " for test " + test.name)
@@ -356,9 +362,12 @@ class UpdateLSFStatus(plugins.Action):
 
         global emergencyFinish
         if emergencyFinish:
-            print "Emergency finish: killing job!"
+            if self.jobNameFunction:
+                print test.getIndent() + "Killing", self.jobNameFunction(test), "(Emergency finish)"
+            else:
+                self.describe(test, " (Emergency finish)")
+                test.changeState(test.KILLED, "Killed by LSF emergency finish")
             job.kill()
-            test.changeState(test.KILLED, "Killed by LSF emergency finish")
             return
         return self.WAIT | self.RETRY
     def processStatus(self, test, status, machine):

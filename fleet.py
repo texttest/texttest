@@ -23,15 +23,30 @@ def getOption(options, optionVal):
             nextWanted = 0
     return None
 
+def usingOptionFile():
+    if os.environ.has_key("FLEET_SUBPLAN_IN_INPUT"):
+        return 0
+    else:
+        return 1
+
+def subPlanInput(inputFile):
+    for line in open(inputFile).xreadlines():
+        entries = line.split()
+        if entries[0] == "loadsp":
+            return string.join(entries[1:], os.sep)
+
 class FleetConfig(matador.MatadorConfig):
     def __init__(self, optionMap):
         matador.MatadorConfig.__init__(self, optionMap)
         self.subplanManager = FleetSubPlanDirManager(self)
     def subPlanName(self, test):
-        subPlan = getOption(test.options, "-s")
+        if usingOptionFile():
+          subPlan = getOption(test.options, "-s")
+        else:
+          subPlan = subPlanInput(test.inputFile)
         if subPlan == None:
             # print help information and exit:
-            return ""
+            return "" 
         return subPlan
     def printHelpDescription(self):
         print helpDescription
@@ -50,16 +65,11 @@ class FleetSubPlanDirManager(matador.MatadorSubPlanDirManager):
         self.makeTemporary(test)
         tmpDir = self.tmpDirs[test]
         tmpDir = tmpDir.replace(self.getFullPath("") + os.sep, "")
-        if self.usesOptionFile(test):
+        if usingOptionFile():
             return binary + " " + self.setupOptions(test, tmpDir)
         else:
             self.setupTemporaryInputFile(test, tmpDir)
             return binary;
-    def usesOptionFile(self, test):
-        if os.environ.has_key("FLEET_SUBPLAN_IN_INPUT"):
-            return 0
-        else:
-            return 1
     def setupOptions(self, test, tmpDir):
         optparts = test.options.split()
         for ix in range(len(optparts) - 1):
@@ -81,7 +91,7 @@ class FleetSubPlanDirManager(matador.MatadorSubPlanDirManager):
                 newFile.write(line)
     def removeTemporary(self, test):
         optimization.SubPlanDirManager.removeTemporary(self, test)
-        if not self.usesOptionFile(test):
+        if not usingOptionFile():
             tmpInputFile = test.getTmpFileName("input", "r")
             if os.path.isfile(tmpInputFile):
                 os.remove(tmpInputFile)

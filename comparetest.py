@@ -112,13 +112,18 @@ class TestComparison:
             self.newResults.append(comparison)
         else:
             self.changedResults.append(comparison)
-    def makeComparisons(self, test, dir, makeNew = 0):
+    def makeComparisons(self, test, makeNew = 0):
+        self.makeComparisonsInDir(test, test.getDirectory(temporary=1), makeNew)
+        if len(self.changedResults) == 1 and self.changedResults[0].hasExternalExcuse():
+            # If the only difference has an excuse, remove it...
+            del self.changedResults[0]
+    def makeComparisonsInDir(self, test, dir, makeNew = 0):
         fileList = os.listdir(dir)
         fileList.sort()
         for file in fileList:
             fullPath = os.path.join(dir, file)
             if os.path.isdir(file):
-                self.makeComparisons(test, fullPath)
+                self.makeComparisonsInDir(test, fullPath, makeNew)
             elif self.shouldCompare(file, dir, test.app):
                 self.diag.info("Decided we should compare " + file)
                 stdFile = os.path.normpath(self.findTestDirectory(fullPath, test))
@@ -173,7 +178,7 @@ class MakeComparisons(plugins.Action):
         return "Comparing differences for"
     def __call__(self, test):
         testComparison = self.makeTestComparison(test)
-        testComparison.makeComparisons(test, os.getcwd())
+        testComparison.makeComparisons(test)
         if testComparison.hasDifferences() or testComparison.hasNewResults() or testComparison.failedPrediction:
             test.changeState(test.FAILED, testComparison)
         else:
@@ -201,6 +206,9 @@ class FileComparison:
         self.test = test
     def __repr__(self):
         return os.path.basename(self.stdFile).split('.')[0]
+    def hasExternalExcuse(self):
+        # No excuses here...
+        return 0
     def getType(self):
         return "difference"
     def newResult(self):

@@ -230,7 +230,7 @@ class TestCaseGUI:
         self.testComparison = test.stateDetails
         if test.state == test.RUNNING:
             self.testComparison = comparetest.TestComparison(test, 0)
-            self.testComparison.makeComparisons(test, test.getDirectory(temporary = 1), makeNew = 1)
+            self.testComparison.makeComparisons(test, makeNew = 1)
         try:
             for fileName in self.testComparison.attemptedComparisons:
                 fileComparison = self.testComparison.findFileComparison(fileName)

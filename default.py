@@ -264,8 +264,10 @@ class RunTest(plugins.Action):
             test.changeState(test.UNRUNNABLE, self.brokenApps[test.app.name])
         if test.state == test.UNRUNNABLE:
             return
+        retValue = self.runTest(test)
+        # Change state after we've started running!
         self.changeState(test)
-        return self.runTest(test)
+        return retValue
     def changeState(self, test):
         test.changeState(test.RUNNING, "Running on local machine")
     def runTest(self, test):
@@ -277,11 +279,17 @@ class RunTest(plugins.Action):
         useCaseFileName = test.useCaseFile
         if os.path.isfile(useCaseFileName):
             testCommand += " -replay " + useCaseFileName
-        inputFileName = test.inputFile
-        if os.path.isfile(inputFileName):
-            testCommand = testCommand + " < " + inputFileName
+        testCommand += " < " + self.getInputFile(test)
         outfile = test.makeFileName("output", temporary=1)
         return testCommand + " > " + outfile
+    def getInputFile(self, test):
+        inputFileName = test.inputFile
+        if os.path.isfile(inputFileName):
+            return inputFileName
+        if os.name == "posix":
+            return "/dev/null"
+        else:
+            return "nul"
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):

@@ -12,13 +12,16 @@ IDs, timestamps etc., and ensure that false failures are avoided in this way.
 Various extensions are available. The following is a summary of what will happen...
 
 output:remove this          - Lines containing the text "remove this" in the file output are filtered out
-output:remove this{LINES:3} - Any line containing the text "remove this" will cause 3 lines starting
+                              Note that the text may be a regular expression, which will be matched
+output:remove this{LINES 3} - Any line containing the text "remove this" will cause 3 lines starting
                               with it to be filtered out
 output:{LINE 5}             - will cause the fifth line to be filtered out
 my_file:remove this{WORD 1} - Lines containing the text "remove this" in my_file will have their 1st word
-                              filtered out
+                              filtered out. Use negative numbers to count from the end of the line: i.e.
+                              {WORD -2} will remove the second-to-last word.
 output:start{->}end         - On encountering the text "start", all lines are filtered out until the text
-                              "end" is encountered.
+                              "end" is encountered. Neither the line containing "start" nor the line containing
+                              "end" are themselves filtered.
 
 If standard results have not already been collected, the results are reported as new results
 and must be checked carefully by hand and saved if correct. If standard results have been
@@ -209,7 +212,7 @@ class RunDependentTextFilter:
         self.diag = plugins.getDiagnostics("Run Dependent Text")
         self.lineFilters = []
         for text in app.getConfigList(stem):
-            self.lineFilters.append(LineFilter(text))
+            self.lineFilters.append(LineFilter(text, self.diag))
     def filterFile(self, fileName, newFileName, makeNew = 0):
         if not len(self.lineFilters) or not os.path.isfile(fileName):
             self.diag.info("No filter for " + fileName)
@@ -241,8 +244,9 @@ class RunDependentTextFilter:
 class LineFilter:
     # Order is important here: word processing first, line number last.
     # This is because WORD can be combined with the others, and LINE screws up the model...
-    syntaxStrings = [ "{WORD ", "{LINES:", "{->}", "{LINE " ]
-    def __init__(self, text):
+    syntaxStrings = [ "{WORD ", "{LINES ", "{->}", "{LINE " ]
+    def __init__(self, text, diag):
+        self.diag = diag
         self.trigger = text
         self.untrigger = None
         self.triggerNumber = 0
@@ -263,7 +267,10 @@ class LineFilter:
         if syntaxString == "{WORD ":
             self.trigger = beforeText
             self.wordNumber = int(afterText[:-1])
-        elif syntaxString == "{LINES:":
+            # Somewhat non-intuitive to count from 0...
+            if self.wordNumber > 0:
+                self.wordNumber -= 1
+        elif syntaxString == "{LINES ":
             self.trigger = beforeText
             self.linesToRemove = int(afterText[:-1])
         elif syntaxString == "{LINE ":
@@ -301,11 +308,34 @@ class LineFilter:
             return 0
     def filterWords(self, line):
         if self.wordNumber:
-            words = line.split()
+            words = line.rstrip().split(" ")
+            self.diag.info("Removing word " + str(self.wordNumber) + " from " + repr(words))
+            realNumber = self.findRealWordNumber(words)
+            self.diag.info("Real number was " + str(realNumber))
             try:
-                words.remove(words[self.wordNumber])
-                return string.join(words).strip() + os.linesep
+                del words[realNumber]
+                return string.join(words).rstrip() + os.linesep
             except IndexError:
                 return line
         else:
             return None
+    def findRealWordNumber(self, words):
+        if self.wordNumber < 0:
+            return self.findRealWordNumberBackwards(words)
+        wordNumber = 0
+        for realWordNumber in range(len(words)):
+            if len(words[realWordNumber]):
+                if wordNumber == self.wordNumber:
+                    return realWordNumber
+                wordNumber += 1
+        return len(words) + 1
+    def findRealWordNumberBackwards(self, words):
+        wordNumber = -1
+        for index in range(len(words)):
+            realWordNumber = -1 - index
+            word = words[realWordNumber]
+            if len(words[realWordNumber]):
+                if wordNumber == self.wordNumber:
+                    return realWordNumber
+                wordNumber -= 1
+        return len(words) + 1

@@ -1049,9 +1049,19 @@ class ImportTest(plugins.Action):
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
     def addOptionsFileOption(self, oldOptionGroup):
-        self.optionGroup.addOption("sp", "Subplan name")
+        self.addOption(oldOptionGroup, "sp", "Subplan name")
     def getSubplanName(self):
         return self.optionGroup.getOptionValue("sp")
+    def getNewTestName(self):
+        nameEntered = guiplugins.ImportTestCase.getNewTestName(self)
+        if len(nameEntered) > 0:
+            return nameEntered
+        # Default test name to subplan name
+        subplan = self.getSubplanName()
+        if len(subplan) == 0:
+            return nameEntered
+        root, local = os.path.split(subplan)
+        return local
     def getOptions(self, suite):
         pass
     # getOptions implemented in subclasses
@@ -1072,9 +1082,11 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
         guiplugins.guilog.info(line)
     def getCarmtmpDirName(self, carmUsr):
         return os.path.basename(carmUsr).replace("_user", "_tmp")
+    def getEnvironmentFileName(self, suite):
+        return "environment"
     def writeEnvironmentFiles(self, suite, testDir):
         carmUsr = self.getCarmusr()
-        envFile = os.path.join(testDir, "environment")
+        envFile = os.path.join(testDir, self.getEnvironmentFileName(suite))
         file = self.openFile(envFile)
         self.writeLine(file, "CARMUSR:" + carmUsr)
         carmtmp = self.getCarmtmpDirName(carmUsr)

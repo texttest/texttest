@@ -301,11 +301,12 @@ class ReplayScript:
         if not eventName:
             raise GtkScriptError, "Could not parse script command '" + scriptCommand + "'"
         argumentString = scriptCommand.replace(eventName, "").strip()
-        print "'" + eventName + "' event created with arguments '" + argumentString + "'"
+        print os.linesep + "'" + eventName + "' event created with arguments '" + argumentString + "'"
         event = self.events[eventName]
         if event.generate(argumentString):
             # Can be useful to uncomment if you want a slow-motion replay...
-            #time.sleep(1)
+            #import time
+            #time.sleep(2)
             return gtk.TRUE
         else:
             self.waitingForHandler = event

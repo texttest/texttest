@@ -348,6 +348,7 @@ class TestCaseGUI:
         pages.append((textview, "Text Info"))
         for instance in interactiveActions:
             if instance.options or instance.switches:
+                print os.linesep + "Creating notebook page for '" + instance.getOptionTitle() + "'"
                 display = createDisplay(instance.options.values(), instance.switches.values())
                 pages.append((display, instance.getOptionTitle()))
         notebook = eventHandler.createNotebook("notebook", pages)
@@ -366,6 +367,7 @@ def createDisplay(options, switches):
     vbox = gtk.VBox()
     for option in options:
         hbox = gtk.HBox()
+        print "Creating entry for option '" + option.name + "'"
         label = gtk.Label(option.name + "  ")
         entry = eventHandler.createEntry(option.name, option.defaultValue)
         option.valueMethod = entry.get_text
@@ -376,6 +378,7 @@ def createDisplay(options, switches):
         hbox.show()
         vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
     for switch in switches:
+        print "Creating check button for switch '" + switch.name + "'"
         checkButton = eventHandler.createCheckButton(switch.name, switch.defaultValue)
         switch.valueMethod = checkButton.get_active
         checkButton.show()

@@ -1,12 +1,13 @@
 
 import plugins, os, sys, shutil
+from ndict import seqdict
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
     def __init__(self, test):
         self.test = test
-        self.options = {}
-        self.switches = {}
+        self.options = seqdict()
+        self.switches = seqdict()
         self.processes = []
     def killProcesses(self):
         # Don't leak processes

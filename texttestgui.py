@@ -2,7 +2,7 @@
 
 # GUI for TextTest written with PyGTK
 
-import guiplugins, comparetest, gtk, gobject, os, string, time, sys
+import guiplugins, plugins, comparetest, gtk, gobject, os, string, time, sys
 from threading import Thread, currentThread
 from gtkscript import eventHandler
 from Queue import Queue, Empty
@@ -391,20 +391,28 @@ class ImportTestCase(guiplugins.ImportTestCase):
     def addOptionsFileOption(self):
         guiplugins.ImportTestCase.addOptionsFileOption(self)
         self.switches["GUI"] = guiplugins.Switch("Use TextTest GUI", 1)
-        self.switches["sing"] = guiplugins.Switch("Only run test A03", 1)
-        self.switches["fail"] = guiplugins.Switch("Include test failures", 1)
-        self.switches["version"] = guiplugins.Switch("Run with Version 2.4")
+        self.switches["sGUI"] = guiplugins.Switch("Use TextTest Static GUI", 0)
+        targetApp = self.test.makePathName("TargetApp", self.test.abspath)
+        root, local = os.path.split(targetApp)
+        self.defaultTargetApp = plugins.samefile(root, self.test.app.abspath)
+        if self.defaultTargetApp:
+            self.switches["sing"] = guiplugins.Switch("Only run test A03", 1)
+            self.switches["fail"] = guiplugins.Switch("Include test failures", 1)
+            self.switches["version"] = guiplugins.Switch("Run with Version 2.4")
     def getOptions(self):
         options = guiplugins.ImportTestCase.getOptions(self)
-        if self.appIsGUI():
+        if self.switches["sGUI"].getValue():
+            options += " -gx"
+        elif self.appIsGUI():
             options += " -g"
-        if self.switches["sing"].getValue():
-            options += " -t A03"
-        if self.switches["fail"].getValue():
-            options += " -c CodeFailures"
-        if self.switches["version"].getValue():
-            options += " -v 2.4"
+        if self.defaultTargetApp:
+            if self.switches["sing"].getValue():
+                options += " -t A03"
+            if self.switches["fail"].getValue():
+                options += " -c CodeFailures"
+            if self.switches["version"].getValue():
+                options += " -v 2.4"
         return options
     def appIsGUI(self):
         return self.switches["GUI"].getValue()
-    
+        

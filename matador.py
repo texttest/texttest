@@ -57,8 +57,8 @@ class MatadorConfig(optimization.OptimizationConfig):
             return optimization.OptimizationConfig.getTestComparator(self)
     def checkPerformance(self):
         return not self.optionMap.has_key("diag")
-    def getLibraryFile(self):
-        return os.path.join("data", "crc", "MATADOR", carmen.architecture, "matador.o")
+    def getLibraryFile(self, test):
+        return os.path.join("data", "crc", "MATADOR", carmen.getArchitecture(test.app), "matador.o")
     def getSubPlanFileName(self, test, sourceName):
         return self.subplanManager.getSubPlanFileName(test, sourceName)
     def subPlanName(self, test):

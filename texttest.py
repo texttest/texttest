@@ -230,11 +230,6 @@ class Application:
         debugLog.info("Checkout set to " + self.checkout)
         self.configObject = self.makeConfigObject(optionMap)
         allowedOptions = self.configObject.getOptionString() + builtInOptions
-        newVersions = self.configObject.getVersions(self)
-        self.versions += newVersions
-        if len(newVersions) > 0:
-            # Get config files for configuration versions... (though we can't iterate here!)
-            self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions())
         # Force exit if something isn't present
         getopt.getopt(sys.argv[1:], allowedOptions)    
 	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")

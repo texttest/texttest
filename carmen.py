@@ -4,18 +4,15 @@ helpDescription = """
 The Carmen configuration is based on the LSF configuration. Its default operation is therefore to
 submit all jobs to LSF, rather than run them locally.
 
+Execution architectures are now determined by versions, not by which architecture TextTest is run on as before.
+If any version is specified which is the name of a Carmen architecture, that architecture will be used.
+Otherwise the entry "default_architecture" is read from the config file and used. "supported_architecture" is now
+deprecated.
+
 It determines the queue as follows: if a test takes less than 10 minutes, it will be submitted
-to short_<arch>, where <arch> is the architecture where TextTest was called from. If it takes
+to short_<arch>, where <arch> is the architecture as determined above. If it takes
 more than 2 hours, it will go to idle_<arch>. If neither of these, or if the specified queue
 does not exist, it will be submitted to the queue <arch>.
-
-The Carmen configuration is also somewhat architecture-conscious in other ways. It reads the required config file
-entry "default_architecture", to determine where the basic results are created. It also reads
-"supported_architecture" to determine if the currently run architecture is OK. If the supported_architecture
-list is present and the current one does not match, the configuration will exit with an error.
-
-Running on an architecture other than default_architecture will cause the test suite to automatically
-use the version <arch>, as well as any versions it was originally running.
 """
 
 helpOptions = """
@@ -41,7 +38,7 @@ helpOptions = """
 """
 
 batchInfo = """
-             Note that, because the Carmen configuration converts non-default architectures to versions, you can also
+             Note that, because the Carmen configuration converts infers architectures from versions, you can also
              enable and disable architectures using <bname>_version.
 
              The Carmen nightjob will run TextTest on all versions and on all architectures. It will do so with the batch
@@ -67,14 +64,19 @@ def isCompressed(path):
     else:
         return 0
 
+architectures = [ "i386_linux", "sparc", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris" ]
+def getArchitecture(app):
+    for version in app.versions:
+        if version in architectures:
+            return version
+    return app.getConfigValue("default_architecture")
+
 class UserFilter(default.TextFilter):
     def acceptsTestSuite(self, suite):
         if isUserSuite(suite):
             return self.containsText(suite)
         else:
             return 1
-
-architecture = os.popen("arch").readline()[:-1]
 
 class CarmenConfig(lsf.LSFConfig):
     def getOptionString(self):
@@ -114,9 +116,10 @@ class CarmenConfig(lsf.LSFConfig):
         if self.queueDecided(test):
             return lsf.LSFConfig.findLSFQueue(self, test)
 
-        return self.getQueuePerformancePrefix(test) + architecture + self.getQueuePlatformSuffix(test.app)
-    def getQueuePerformancePrefix(self, test):
-        if architecture == "powerpc" or architecture == "parisc_2_0":
+        arch = getArchitecture(test.app)
+        return self.getQueuePerformancePrefix(test, arch) + arch + self.getQueuePlatformSuffix(test.app, arch)
+    def getQueuePerformancePrefix(self, test, arch):
+        if arch == "powerpc" or arch == "parisc_2_0":
             return ""
         cpuTime = performance.getTestPerformance(test)
         if cpuTime < 10:
@@ -125,12 +128,12 @@ class CarmenConfig(lsf.LSFConfig):
             return ""
         else:
             return "idle_"
-    def getQueuePlatformSuffix(self, app):
-        if architecture == "i386_linux":
+    def getQueuePlatformSuffix(self, app, arch):
+        if arch == "i386_linux":
             return "_RH8"
-        elif architecture == "sparc":
+        elif arch == "sparc":
             return "_sol8"
-        elif architecture == "powerpc":
+        elif arch == "powerpc":
             if "9" in app.versions:
                 return "_aix4"
             else:
@@ -139,18 +142,6 @@ class CarmenConfig(lsf.LSFConfig):
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob"
-    def getVersions(self, app):
-        defaultArch = app.getConfigValue("default_architecture")
-        if architecture == defaultArch:
-            return []
-        else:
-            supportedArchs = app.getConfigList("supported_architecture")
-            # In batch mode, don't throw exceptions. Let the Batch Filter deal with it
-            if len(supportedArchs) and not architecture in supportedArchs and not self.optionMap.has_key("b"):
-                raise plugins.TextTestError, "Unsupported architecture " + architecture + "!!!"
-            else:
-                print "Non-default architecture: using version", architecture
-                return [ architecture ] 
     def printHelpOptions(self, builtInOptions):
         print lsf.helpOptions + batchInfo
         default.Config.printHelpOptions(self, builtInOptions)
@@ -173,7 +164,8 @@ class CompileRules(plugins.Action):
     def __repr__(self):
         return "Compiling rules for"
     def __call__(self, test):
-        ruleset = RuleSet(self.getRuleSetName(test), self.raveName)
+        arch = getArchitecture(test.app)
+        ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
         if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
             raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
         if ruleset.isValid() and not ruleset.name in self.rulesCompiled:
@@ -183,7 +175,7 @@ class CompileRules(plugins.Action):
                 os.mkdir(os.environ["CARMTMP"])
             ruleset.backup()
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-            commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile
+            commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + arch + " " + ruleset.sourceFile
             self.rulesCompiled.append(ruleset.name)
             errorMessage = self.performCompile(test, commandLine)
             if errorMessage:
@@ -214,10 +206,10 @@ class CompileRules(plugins.Action):
         return self.filter
     
 class RuleSet:
-    def __init__(self, ruleSetName, raveName):
+    def __init__(self, ruleSetName, raveName, arch):
         self.name = ruleSetName
         if self.name != None:
-            self.targetFile = os.path.join(os.environ["CARMTMP"], "crc", "rule_set", string.upper(raveName), architecture, self.name)
+            self.targetFile = os.path.join(os.environ["CARMTMP"], "crc", "rule_set", string.upper(raveName), arch, self.name)
             self.sourceFile = os.path.join(os.environ["CARMUSR"], "crc", "source", self.name)
     def isValid(self):
         return self.name != None and os.path.isfile(self.sourceFile)
@@ -236,16 +228,16 @@ class RuleSet:
             os.rename(debugVersion, self.targetFile)
         
 class UpdatedLocalRulesetFilter(plugins.Filter):
-    def __init__(self, getRuleSetName, libraryFile):
+    def __init__(self, getRuleSetName, getLibraryFile):
         self.getRuleSetName = getRuleSetName
-        self.libraryFile = libraryFile
+        self.getLibraryFile = getLibraryFile
     def acceptsTestCase(self, test):
-        ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test))
+        ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test), getArchitecture(test.app))
         if not ruleset.isValid():
             return 0
         if not ruleset.isCompiled():
             return 1
-        return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.libraryFile))
+        return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test)))
     def acceptsTestSuite(self, suite):
         if not isUserSuite(suite):
             return 1
@@ -313,7 +305,7 @@ class BuildCode(plugins.Action):
         print "Building", app, "in", absPath, "..."
         buildFile = "build.default"
         commandLine = "cd " + absPath + "; gmake >& " + buildFile
-        machine = self.getMachine(app, architecture)
+        machine = self.getMachine(app, getArchitecture(app))
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
             raise "Product " + repr(app) + " did not build, exiting"

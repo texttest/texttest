@@ -79,7 +79,7 @@ class OptimizationConfig(carmen.CarmenConfig):
         if self.isNightJob() or not neededOnly:
             return self.getCompileRules(None)
         else:
-            localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
+            localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
             return self.getCompileRules(localFilter)
     def getCompileRules(self, localFilter):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)

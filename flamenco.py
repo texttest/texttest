@@ -14,7 +14,7 @@ class FlamencoConfig(carmen.CarmenConfig):
         global debugLog
 	debugLog = plugins.getDiagnostics("flamenco")
     def getExecuteCommand(self, binary, test):
-	prog = binary.replace("ARCHITECTURE", carmen.architecture)
+	prog = binary.replace("ARCHITECTURE", carmen.getArchitecture(test.app))
 	if prog == binary:#not architecture dependent, probably is a script
 	    debugLog.info("binary is a script: set binary to '" + prog + " " + test.options + "'" )
 	    return prog + " " + test.options
@@ -84,7 +84,7 @@ class FlamencoConfig(carmen.CarmenConfig):
 	return ""
     def findResourceList(self, app):
 	req_resource = self._findReqResource(app)
-	req_resource = req_resource.replace("ARCHITECTURE", carmen.architecture)
+	req_resource = req_resource.replace("ARCHITECTURE", carmen.getArchitecture(app))
 	resourceList = carmen.CarmenConfig.findResourceList(self, app)
 	if req_resource != "":
 	    debugLog.info( "adding required resource: " + req_resource )

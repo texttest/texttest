@@ -55,7 +55,7 @@ def isCompressed(path):
 
 class CheckExtConfig(carmen.CarmenConfig):   
     def getExecuteCommand(self, binary, test):
-        return binary.replace("ARCHITECTURE", carmen.architecture) + " " + test.options
+        return binary.replace("ARCHITECTURE", carmen.getArchitecture(test.app)) + " " + test.options
 
     def getTestCollator(self):
         return plugins.CompositeAction([ HandleCompressedFiles(UNCOMPRESS,'check_extension'),

@@ -65,8 +65,8 @@ class ApcConfig(optimization.OptimizationConfig):
         return optimization.OptimizationConfig.getActionSequence(self)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
-    def getLibraryFile(self):
-        return os.path.join("data", "apc", carmen.architecture, "libapc.a")
+    def getLibraryFile(self, test):
+        return os.path.join("data", "apc", carmen.getArchitecture(test.app), "libapc.a")
     def getSubPlanFileName(self, test, sourceName):
         return self.subplanManager.getSubPlanFileName(test, sourceName)
     def getCompileRules(self, staticFilter):
@@ -117,7 +117,7 @@ class ApcConfig(optimization.OptimizationConfig):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts
 
-def verifyAirportFile():
+def verifyAirportFile(arch):
     diag = plugins.getDiagnostics("APC airport")
     etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
     customerEtab = os.path.join(etabPath, "Customer.etab")
@@ -135,7 +135,7 @@ def verifyAirportFile():
             srcDir = os.path.join(os.environ["CARMUSR"], "data", "Airport", "source")
         srcFile = os.path.join(srcDir, "AirportFile")
         if os.path.isfile(srcFile) and airportFile != None:
-            apCompile = os.path.join(os.environ["CARMSYS"], "bin", carmen.architecture, "apcomp")
+            apCompile = os.path.join(os.environ["CARMSYS"], "bin", arch, "apcomp")
             if os.path.isfile(apCompile):
                 print "Missing AirportFile detected, building:", airportFile
                 carmen.ensureDirectoryExists(os.path.dirname(airportFile))
@@ -146,14 +146,14 @@ def verifyAirportFile():
 
 class RunApcTest(default.RunTest):
     def __call__(self, test):
-        verifyAirportFile()
+        verifyAirportFile(carmen.getArchitecture(test.app))
         default.RunTest.__call__(self, test)
         
 class SubmitApcTest(lsf.SubmitTest):
     def __init__(self, queueFunction, resourceFunction):
         lsf.SubmitTest.__init__(self, queueFunction, resourceFunction)
     def __call__(self, test):
-        verifyAirportFile()
+        verifyAirportFile(carmen.getArchitecture(test.app))
         lsf.SubmitTest.__call__(self, test)
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()
@@ -191,7 +191,7 @@ class ApcCompileRules(carmen.CompileRules):
         carmTmpDir = os.environ["CARMTMP"]
         if not os.path.isdir(carmTmpDir):
             os.mkdir(carmTmpDir)
-        if self.forcedRuleCompile == 0 and carmen.architecture == "i386_linux":
+        if self.forcedRuleCompile == 0 and carmen.getArchitecture(test.app) == "i386_linux":
             self.linuxRuleSetBuild(test)
         else:
             carmen.CompileRules.__call__(self, test)
@@ -224,18 +224,18 @@ class ApcCompileRules(carmen.CompileRules):
                 raise plugins.TextTestError, "Failed to link APC ruleset " + ruleset.name
 
     def getRuleLib(self, ruleSetName):
-        optArch = carmen.architecture + "_opt"
+        optArch = "i386_linux_opt"
         ruleLib = ruleSetName + ".a"
         return os.path.join(os.environ["CARMTMP"], "compile", self.raveName.upper(), optArch, ruleLib)
         
     def ruleCompileCommand(self, sourceFile):
        compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-       params = " -optimize -makelib -archs " + carmen.architecture
+       params = " -optimize -makelib -archs i386_linux"
        return compiler + " " + self.raveName + params + " " + sourceFile
                     
     def linkLibs(self, apcLib, ruleLib):
-       path1 = os.path.join(os.environ["CARMSYS"], "data", "crc", carmen.architecture)
-       path2 = os.path.join(os.environ["CARMSYS"], "lib", carmen.architecture)
+       path1 = os.path.join(os.environ["CARMSYS"], "data", "crc", "i386_linux")
+       path2 = os.path.join(os.environ["CARMSYS"], "lib", "i386_linux")
        paths = " -L" + path1 + " -L" + path2
        basicLibs = " -lxprs -lxprl -lm -ldl -lrave_rts -lBasics_STACK -lrave_private "
        extraLib = " `xml2-config --libs` -ldl "
@@ -289,7 +289,7 @@ class FetchApcCore(plugins.Action):
             machine = grepLines[0].split()[-1]
             testDirEnd = test.app.name + test.app.versionSuffix() + "_" + test.name + "_" + test.getTmpExtension()
             self.describe(test, " from " + machine)
-            binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.architecture)
+            binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
             binCmd = "echo ' " + binName +  "' >> core"
             apcHostTmp = getApcHostTmp()
             cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*;" + binCmd + ";compress -c core > " + coreFileName

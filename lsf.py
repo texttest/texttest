@@ -102,7 +102,7 @@ class LSFConfig(unixConfig.UNIXConfig):
     def findDefaultLSFQueue(self, test):
         return "normal"
     def findLSFResource(self, test):
-        resourceList = self.findResourceList(test.app)
+        resourceList = self.findResourceList(test)
         if len(resourceList) == 0:
             return ""
         elif len(resourceList) == 1:
@@ -112,12 +112,18 @@ class LSFConfig(unixConfig.UNIXConfig):
             for res in resourceList[1:]:
                 resource += " && (" + res + ")"
             return resource
-    def findResourceList(self, app):
+    def forceOnPerformanceMachines(self, test):
+        if self.optionMap.has_key("perf"):
+            return 1
+        # If we haven't got a log_file yet, we should do this so we collect performance reliably
+        logFile = test.makeFileName(test.getConfigValue("log_file"))
+        return not os.path.isfile(logFile)
+    def findResourceList(self, test):
         resourceList = []
         if self.optionMap.has_key("R"):
             resourceList.append(self.optionValue("R"))
-        if self.optionMap.has_key("perf"):
-            performanceMachines = app.getConfigValue("performance_test_machine")
+        if self.forceOnPerformanceMachines(test):
+            performanceMachines = test.getConfigValue("performance_test_machine")
             if len(performanceMachines) > 0 and performanceMachines[0] != "none":
                 resource = "select[hname == " + performanceMachines[0]
                 if len(performanceMachines) > 1:
@@ -433,7 +439,3 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
             jobs.append(descriptor + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
 
-
-class ImportTestCase(guiplugins.ImportTestCase):
-    def getStdResultOptions(self):
-        return " -perf"

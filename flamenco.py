@@ -86,10 +86,11 @@ class FlamencoConfig(carmen.CarmenConfig):
 	    debugLog.info( "lsfres not set")
 	#no lsfres config value was set
 	return ""
-    def findResourceList(self, app):
+    def findResourceList(self, test):
+        app = test.app
 	req_resource = self._findReqResource(app)
 	req_resource = req_resource.replace("ARCHITECTURE", carmen.getArchitecture(app))
-	resourceList = carmen.CarmenConfig.findResourceList(self, app)
+	resourceList = carmen.CarmenConfig.findResourceList(self, test)
 	if req_resource != "":
 	    debugLog.info( "adding required resource: " + req_resource )
 	    resourceList.append(req_resource)

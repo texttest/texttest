@@ -39,6 +39,9 @@ helpOptions = """
              It is expected that this option is used on linux. Note that in addition, a build is kicked off in parallel
              on sparc (sundance) and parisc_2_0 (ramechap), which run in the background while your tests run,
              and are reported on at the end. This should ensure that they don't delay the appearance of test information.
+
+-buildl <t>
+           - As above, but no parallel builds are done.             
 """
 
 batchInfo = """
@@ -121,6 +124,7 @@ class CarmenConfig(lsf.LSFConfig):
         options = lsf.LSFConfig.getArgumentOptions(self)
         options["u"] = "Select CARMUSRs containing"
         options["build"] = "Build application target"
+        options["buildl"] = "Build application target locally"
         return options
     def getSwitches(self):
         switches = lsf.LSFConfig.getSwitches(self)
@@ -151,6 +155,8 @@ class CarmenConfig(lsf.LSFConfig):
     def getAppBuilder(self):
         if self.optionMap.has_key("build"):
             return BuildCode(self.optionValue("build"))
+        elif self.optionMap.has_key("buildl"):
+            return BuildCode(self.optionValue("buildl"), remote = 0)
         else:
             return plugins.Action()
     def getTestRunner(self):
@@ -429,8 +435,9 @@ class ProcessProfilerResults(plugins.Action):
         return "Profiling"    
 
 class BuildCode(plugins.Action):
-    def __init__(self, target):
+    def __init__(self, target, remote = 1):
         self.target = target
+        self.remote = remote
         self.childProcesses = []
     def setUpApplication(self, app):
         for relPath in app.getConfigList("build_" + self.target):
@@ -439,7 +446,7 @@ class BuildCode(plugins.Action):
                 self.buildLocal(absPath, app)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
-        if getArchitecture(app) == "i386_linux":
+        if getArchitecture(app) == "i386_linux" and self.remote:
             self.buildRemote("sparc", app) 
             self.buildRemote("parisc_2_0", app)
             self.buildRemote("powerpc", app)
@@ -502,7 +509,10 @@ class BuildCode(plugins.Action):
     def killBuild(self):
         print "Terminating remote build."
     def getCleanUpAction(self):
-        return CheckBuild(self)
+        if self.remote:
+            return CheckBuild(self)
+        else:
+            return plugins.Action()
 
 class CheckBuild(plugins.Action):
     def __init__(self, builder):

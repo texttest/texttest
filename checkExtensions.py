@@ -19,6 +19,12 @@ from glob import glob
 #run_log:text to be filtered out
 #run_log:text to be filtered out2
 
+#The plugin will automatcally compress the comparison files if they have
+#a size over 50000 or a over size defined by your entry in "config.app"
+#like this:
+#compress_bytesize_over:15000
+#If this size is set to 0 no compression is made
+
 #by Christian Sandborg 2003-02-19
 
 def getConfig(optionMap):
@@ -37,8 +43,42 @@ class CheckExtConfig(carmen.CarmenConfig):
     def interpretBinary(self, binaryString):
         return binaryString.replace("ARCHITECTURE", carmen.architecture)
     def getTestCollator(self):
-        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self),  createCompareFiles() ])
-    
+        return plugins.CompositeAction([ HandleCompressedFiles(0), carmen.CarmenConfig.getTestCollator(self),  createCompareFiles() ])
+
+    def getTestEvaluator(self):
+        return plugins.CompositeAction([  carmen.CarmenConfig.getTestEvaluator(self) , HandleCompressedFiles(1) ])
+        
+class HandleCompressedFiles(plugins.Action):
+    def __init__(self,compress=0):
+        self.compressIfOverSize=50000
+        self.zext=".Z"
+        if compress:
+            self.zext=""
+    def __call__(self, test):
+        checkExtensions=[]
+        files=[]
+        if test.app.configDir.has_key('compress_bytesize_over'):
+            self.compressIfOverSize=int(test.app.configDir['compress_bytesize_over'])
+        if test.app.configDir.has_key('check_extension'):
+            checkExtensions=test.app.configDir.getListValue('check_extension')
+        if not checkExtensions:
+            return
+        checkExtensions=[ x.replace('.','_')+"."+ test.app.name+self.zext for x in checkExtensions ]
+        for ext in checkExtensions:
+            files+=glob('*'+ext)
+        #print test.app.name, os.path.basename(os.getcwd()), os.listdir('.'), files, self.zext
+        for file in files:
+            if self.zext :
+                if isCompressed(file):
+                    #print "uncompressing:", file
+                    os.system('uncompress '+file)
+            elif os.stat(file)[6] > self.compressIfOverSize:
+                #0 as size means do not compress at all
+                if 0 == self.compressIfOverSize:
+                    return
+                #print "compressing:", file
+                os.system('compress '+file)
+                
 class createCompareFiles(plugins.Action):
     def __call__(self, test):
         checkExtensions=[]
@@ -46,7 +86,6 @@ class createCompareFiles(plugins.Action):
         if test.app.configDir.has_key('check_extension'):
             checkExtensions=test.app.configDir.getListValue('check_extension')
         if not checkExtensions:
-            print "(No file extensions for comparison.)"
             return
         #print "Extensions to be compared:",checkExtensions
         for ext in checkExtensions:

@@ -238,19 +238,6 @@ class MakeTmpSubPlan(plugins.Action):
         self.raveParameters.pop()
         self.diag.info("Removed from list : " + repr(self.raveParameters))
         
-class StartStudio(plugins.Action):
-    def __call__(self, test):
-        print "CARMSYS:", os.environ["CARMSYS"]
-        print "CARMUSR:", os.environ["CARMUSR"]
-        print "CARMTMP:", os.environ["CARMTMP"]
-        fullSubPlanPath = test.app.configObject.target._getSubPlanDirName(test)
-        lPos = fullSubPlanPath.find("LOCAL_PLAN/")
-        subPlan = fullSubPlanPath[lPos + 11:]
-        localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
-        studioCommand = "studio -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'"
-        commandLine = os.path.join(os.environ["CARMSYS"], "bin", studioCommand)
-        print os.popen(commandLine).readline()
-        sys.exit(0)
 
 class CheckOptimizationRun(predict.CheckLogFilePredictions):
     def __repr__(self):
@@ -1232,7 +1219,7 @@ class TestGraph:
         if len(self.pointTypes) == 1:
             title += ": Test " + firstTestName
         return title
-        
+
 # Same as above, but from GUI. Refactor!
 class PlotTestInGUI(guiplugins.InteractiveAction):
     def __init__(self, test, graph = None):
@@ -1293,7 +1280,30 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"))
             self.testGraph.addLine(plotLine)
 
-guiplugins.interactiveActionHandler.testClasses.append(PlotTestInGUI)
+class StartStudio(guiplugins.InteractiveAction):
+    def __repr__(self):
+        return "Studio"
+    def getTitle(self):
+        return "Studio"
+    def getScriptTitle(self):
+        return "Start Studio"
+    def matchesMode(self, dynamic):
+        return not dynamic
+    def __call__(self, test):
+        test.setUpEnvironment(parents=1)
+        print "CARMSYS:", os.environ["CARMSYS"]
+        print "CARMUSR:", os.environ["CARMUSR"]
+        print "CARMTMP:", os.environ["CARMTMP"]
+        fullSubPlanPath = test.app.configObject.target._getSubPlanDirName(test)
+        lPos = fullSubPlanPath.find("LOCAL_PLAN/")
+        subPlan = fullSubPlanPath[lPos + 11:]
+        localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
+        studioCommand = "studio -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'"
+        commandLine = os.path.join(os.environ["CARMSYS"], "bin", studioCommand)
+        self.startExternalProgram(commandLine)
+        test.tearDownEnvironment(parents=1)
+
+guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUI, StartStudio ]
 
 class PlotLine:
     def __init__(self, test, lineName, item, optRun, plotAgainstSolution):

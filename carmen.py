@@ -289,23 +289,41 @@ class BuildCode(plugins.Action):
                 self.buildLocal(absPath, app)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
-        self.buildRemote("turin", "sparc", app) 
-        self.buildRemote("ramechap", "parisc_2_0", app)
-        self.buildRemote("naxos", "powerpc", app)
+        self.buildRemote("sparc", app) 
+        self.buildRemote("parisc_2_0", app)
+        self.buildRemote("powerpc", app)
+    def getMachine(self, app, arch):
+        version9 = "9" in app.versions
+        if arch == "i386_linux":
+            if version9:
+                return "xanxere"
+            else:
+                return "cat"
+        if arch == "sparc":
+            return "turin"
+        if arch == "parisc_2_0":
+            return "ramechap"
+        if arch == "powerpc":
+            if version9:
+                return "morlaix"
+            else:
+                return "naxos"
     def buildLocal(self, absPath, app):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."
         buildFile = "build.default"
         commandLine = "cd " + absPath + "; gmake >& " + buildFile
-        os.system("rsh cat '" + commandLine + "' < /dev/null")
+        machine = self.getMachine(app, architecture)
+        os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
             raise "Product " + repr(app) + " did not build, exiting"
         print "Product", app, "built correctly in", absPath
         os.remove(buildFile)
         commandLine = "cd " + absPath + "; gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"
-        os.system("rsh cat '" + commandLine + "' < /dev/null")
+        os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         print "Making install from", absPath ,"to", os.environ["CARMSYS"]
-    def buildRemote(self, machine, arch, app):
+    def buildRemote(self, arch, app):
+        machine = self.getMachine(app, arch)
         print "Building remotely in parallel on " + machine + " ..."
         processId = os.fork()
         if processId == 0:

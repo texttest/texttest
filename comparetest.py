@@ -162,7 +162,7 @@ class TestComparison(plugins.TestState):
         if not makeNew:
             self.categorise()
     def categorise(self):
-        if not self.hasResults():
+        if not self.hasResults() and (not self.failedPrediction or not self.failedPrediction.hasResults()):
             raise plugins.TextTestError, "No output files at all produced, presuming problems running test"
         if self.failedPrediction:
             # Keep the category we had before

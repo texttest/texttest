@@ -34,7 +34,7 @@ batchInfo = """
              Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
              at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
-import lsf, default, performance, os, string, shutil, plugins, respond, predict
+import lsf, default, performance, os, string, shutil, plugins, respond, predict, time
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -143,6 +143,8 @@ class AttachProfiler(plugins.Action):
     def __call__(self, test):
         waitDispatch = WaitForDispatch()
         waitDispatch(test)
+        # Seems like race conditions plague us here, this seems like a quick-hack fix that shouldn't do too much harm
+        time.sleep(3)
         job = lsf.LSFServer.instance.findJob(test)
         processId = job.getProcessId(test.app)
         if not processId:

@@ -49,5 +49,13 @@ class RenamePlans(plugins.Action):
             decompressAndRename(subPlan,"./subplan.rrl")
         if os.path.isfile(subPlanHeader):
             decompressAndRename(subPlanHeader,"./subplanHeader.rrl")
-
-
+        # Environment plan
+        envPlanName = os.getenv("TESTCASE_EP")
+        if envPlanName == None:
+            return
+        envPlan = localPlanDir + "/" + envPlanName + "/subplan"
+        envPlanHeader = envPlan + "Header"
+        if os.path.isfile(envPlan):
+            decompressAndRename(envPlan,"./envplan.rrl")
+        if os.path.isfile(envPlanHeader):
+            decompressAndRename(envPlanHeader,"./envplanHeader.rrl")

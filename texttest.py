@@ -89,6 +89,7 @@ class TestCase(Test):
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):
         Test.__init__(self, name, abspath, app)
+        self.rejected = 0
         self.testCaseFile = self.makeFileName("testsuite")
         self.testcases = self.getTestCases(filters)
         if len(self.testcases):
@@ -115,6 +116,7 @@ class TestSuite(Test):
     def getTestCases(self, filters):
         testCaseList = []
         if not self.isValid() or not self.isAcceptedByAll(filters):
+            self.rejected = 1
             return testCaseList
 
         self.setUpEnvironment()
@@ -125,7 +127,7 @@ class TestSuite(Test):
             testPath = os.path.join(self.abspath, testName)
             testSuite = TestSuite(testName, testPath, self.app, filters)
             if testSuite.isValid():
-                if not testSuite.isEmpty():
+                if not testSuite.rejected:
                     testCaseList.append(testSuite)
             else:
                 testCase = TestCase(testName, testPath, self.app)

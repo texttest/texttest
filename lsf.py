@@ -257,7 +257,11 @@ class Wait(plugins.Action):
     def getInstructions(self, test):
         return []
     def checkCondition(self, job):
-        return job.hasFinished()
+        try:
+            return job.hasFinished()
+        # Can get interrupted system call here, which is bad. Assume not finished.
+        except IOError:
+            return 0
 
 class UpdateLSFStatus(plugins.Action):
     def __init__(self):

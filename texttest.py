@@ -137,7 +137,7 @@ class TestSuite(Test):
             for test in self.testcases:
                 test.paddedName = string.ljust(test.name, maxNameLength) 
     def __repr__(self):
-        return repr(self.app) + " " + self.classId() + " " + self.name + ", checkout " + self.app.checkout
+        return repr(self.app) + " " + self.classId() + " " + self.name
     def classId(self):
         return "test-suite"
     def isValidSpecific(self):
@@ -196,6 +196,12 @@ class Application:
             return self.configDir["full_name"]
         else:
             return string.upper(self.name)
+    def description(self):
+        description = "Using Application " + self.fullName
+        if len(self.version):
+            description += ", version " + self.version
+        description += ", checkout " + self.checkout
+        return description
     def hasREpattern(self, txt):
     	# return 1 if txt contains a regular expression meta character
 	return self.specialChars.search(txt) != None
@@ -536,6 +542,7 @@ class TextTest:
             print "Terminated tests of application", app, "due to exception:"
             printException()
     def performActionSequence(self, suite, actionSequence, app, filterList):
+        print app.description()
         for action in actionSequence:
             if action.getFilter() != None:
                 self.performActionWithFilter(app, action, action.getFilter(), filterList)

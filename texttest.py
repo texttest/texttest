@@ -1075,6 +1075,7 @@ class OptionFinder:
 class MultiEntryDictionary(seqdict):
     def readValuesFromFile(self, filename, appName = "", versions = [], insert=1, errorOnUnknown=0):
         self.currDict = self
+        debugLog.info("Reading values from file " + os.path.basename(filename))
         if os.path.isfile(filename):
             configFile = open(filename)
             for line in configFile.xreadlines():
@@ -1085,6 +1086,8 @@ class MultiEntryDictionary(seqdict):
         for version in versions:
             self.updateFor(filename, version, insert, errorOnUnknown)
             self.updateFor(filename, appName + "." + version, insert, errorOnUnknown)
+        # Must reset it for addConfigEntry, so that doesn't go wrong
+        self.currDict = self
     def parseConfigLine(self, line, insert, errorOnUnknown):
         if line.startswith("#") or len(line) == 0:
             return

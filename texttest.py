@@ -193,22 +193,36 @@ class TestCase(Test):
         elif diagDict.has_key("write_directory_variable"):
             outVarName = diagDict["write_directory_variable"]
             self.environment[outVarName] = basicWriteDir
-        if os.path.isfile(self.useCaseFile):
-            self.setUseCaseEnvironment()
+        self.setUseCaseEnvironment()
     def setUseCaseEnvironment(self):
         # Here we assume the application uses either PyUseCase or JUseCase
         # PyUseCase reads environment variables, but you can't do that from java,
         # so we have a "properties file" set up as well. Do both always, to save forcing
         # apps to tell us which to do...
+        root, local = os.path.split(self.app.writeDirectory)
+        recordRuns = local.startswith("static_gui")
+        if not recordRuns and not os.path.isfile(self.useCaseFile):
+            return
         jusecaseEntries = {}
-        replayScript = self.useCaseFile
-        recordScript = self.makeFileName("usecase", temporary=1)
-        replaySpeed = self.app.slowMotionReplaySpeed
-
-        self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
-        jusecaseEntries["replay"] = replayScript
-        self.environment["USECASE_RECORD_SCRIPT"] = recordScript
-        jusecaseEntries["record"] = recordScript
+        if recordRuns:
+            replayScript = None
+            recordScript = self.useCaseFile
+            recinpScript = self.inputFile
+            replaySpeed = None
+        else:
+            replayScript = self.useCaseFile
+            recordScript = self.makeFileName("usecase", temporary=1)
+            recinpScript = None
+            replaySpeed = self.app.slowMotionReplaySpeed
+        if recordScript:
+            self.environment["USECASE_RECORD_SCRIPT"] = recordScript
+            jusecaseEntries["record"] = recordScript
+        if recinpScript:
+            self.environment["USECASE_RECORD_STDIN"] = recinpScript
+            jusecaseEntries["record_stdin"] = recinpScript
+        if replayScript:
+            self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
+            jusecaseEntries["replay"] = replayScript
         if replaySpeed:
             self.environment["USECASE_REPLAY_DELAY"] = str(replaySpeed)
             jusecaseEntries["delay"] = str(replaySpeed)
@@ -272,7 +286,7 @@ class TestCase(Test):
         return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
-    def makeBasicWriteDirectory(self, copyAll = 1):
+    def makeBasicWriteDirectory(self, copyAll = 1, forRecord = 0):
         fullPathToMake = os.path.join(self.writeDirs[0], "framework_tmp")
         os.makedirs(fullPathToMake)
         if self.app.useDiagnostics:

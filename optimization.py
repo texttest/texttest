@@ -281,6 +281,7 @@ class LogFileFinder:
         self.tryTmpFile = tryTmpFile
         self.test = test
         self.logStem = test.app.getConfigValue("log_file")
+        self.diag = plugins.getDiagnostics("Log File Finder")
     def findFile(self, version = None, specFile = ""):
         if len(specFile):
             return 0, self.findSpecifiedFile(version, specFile)
@@ -313,17 +314,21 @@ class LogFileFinder:
             print "Wrong spec"
             return None
     def findTempFile(self, test, version):
+        self.diag.info("Looking for tmp file for " + test.name + " version " + version)
         fileInTest, tmpDir = self.findTempFileInTest(version, self.logStem)
         if fileInTest or self.logStem == "output":
+            self.diag.info("Found " + fileInTest)
             return fileInTest, tmpDir
         # Look for output, find appropriate temp subplan, and look there
         outputInTest, tmpDir = self.findTempFileInTest(version, "output")
         if outputInTest == None:
             return None, None
         grepCommand = "grep -E 'SUBPLAN' " + outputInTest
+        self.diag.info(grepCommand)
         grepLines = os.popen(grepCommand).readlines()
         if len(grepLines) > 0:
             currentFile = os.path.join(grepLines[0].split()[1], self.logStem)
+            self.diag.info(currentFile)
             if os.path.isfile(currentFile):
                 return currentFile, tmpDir
         else:
@@ -333,6 +338,7 @@ class LogFileFinder:
         app = self.test.app
         if thisRun:
             fromThisRun = self.test.makeFileName(stem, version, temporary=1)
+            self.diag.info("Looked for " + fromThisRun)
             if os.path.isfile(fromThisRun):
                 return fromThisRun, app.writeDirectory
         versionMod = ""

@@ -208,7 +208,7 @@ class RecordTest(InteractiveAction):
         test.makeBasicWriteDirectory()
         test.setUpEnvironment(parents=1)
         os.chdir(test.writeDirs[0])
-        recordCommand = test.getExecuteCommand() + " --record " + test.useCaseFile + " --recinp " + test.inputFile
+        recordCommand = test.getExecuteCommand()
         shellTitle = None
         shellOptions = ""
         if test.getConfigValue("use_standard_input"):

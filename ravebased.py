@@ -46,7 +46,7 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
                              the specified time. Default time is 1440 minutes.
 """
 
-import carmen, lsf, default, os, string, shutil, plugins, sys, signal
+import carmen, queuesystem, default, os, string, shutil, plugins, sys, signal
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -136,9 +136,8 @@ class Config(carmen.CarmenConfig):
             return None
     def getRealRuleBuilder(self):
         jobNameCreator = RulesetJobBuildNameCreator(self.getRuleSetName)
-        if self.useLSF():
-            ruleRunner = lsf.SubmitTest(self.findRaveCompilationLSFQueue, \
-                                        self.findLSFResource, self.findLSFMachine, self.optionMap)
+        if self.useQueueSystem():
+            ruleRunner = queuesystem.SubmitTest(self.getSubmissionRules, self.optionMap)
             return [ self.getRuleBuildObject(ruleRunner, jobNameCreator), \
                      UpdateRulesetBuildStatus(self.getRuleSetName, jobNameCreator) ]
         else:
@@ -167,9 +166,6 @@ class Config(carmen.CarmenConfig):
             return BuildCode(self.optionValue("buildl"), remote = 0)
         else:
             return None
-    def findRaveCompilationLSFQueue(self, test):
-        arch = carmen.getArchitecture(test.app)
-        return self.getQueuePerformancePrefix(test, arch, rave = 1) + self.getArchQueueName(arch) + self.getQueuePlatformSuffix(test.app, arch)
     def isSlowdownJob(self, user, jobName):
         # APC is observed to slow down the other job on its machine by up to 20%. Detect it
         apcDevelopers = [ "curt", "lennart", "johani", "rastjo", "tomasg", "fredrik", "henrike" ]
@@ -360,15 +356,15 @@ class RunningRuleCompilation(plugins.TestState):
     def timeElapsedSince(self, oldState):
         return oldState.category == "need_rulecompile"
 
-class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
+class UpdateRulesetBuildStatus(queuesystem.UpdateStatus):
     ruleCompilations = []
     def __init__(self, getRuleSetName, jobNameCreator):
-        lsf.UpdateLSFStatus.__init__(self, jobNameCreator.getName)
+        queuesystem.UpdateStatus.__init__(self, jobNameCreator.getName)
         self.getRuleSetName = getRuleSetName
     def __call__(self, test):
         # Don't do anything unless we've been put in need_rulecompile state
         if test.state.category.endswith("rulecompile"):
-            return lsf.UpdateLSFStatus.__call__(self, test)
+            return queuesystem.UpdateStatus.__call__(self, test)
         elif test.state.isComplete():
             jobName = self.jobNameFunction(test)
             self.ruleCompilations.append(jobName)

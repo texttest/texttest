@@ -67,7 +67,7 @@ apc.CVSBranchTests         - This script is useful when two versions of a test s
 
 """
 
-import default, ravebased, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
+import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
 from time import sleep
 
 def getConfig(optionMap):
@@ -146,8 +146,8 @@ class ApcConfig(optimization.OptimizationConfig):
                 if option.find("crc" + os.sep + "rule_set") != -1:
                     return option.split(os.sep)[-1]
         return None
-    def updaterLSFStatus(self):
-        return ApcUpdateLSFStatus()
+    def statusUpdater(self):
+        return ApcUpdateStatus()
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -408,7 +408,7 @@ class ApcCompileRules(ravebased.CompileRules):
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
 
-class ApcUpdateLSFStatus(lsf.UpdateTestLSFStatus):
+class ApcUpdateStatus(queuesystem.UpdateTestStatus):
     def getExtraRunData(self, test):
          subplanDir = test.writeDirs[-1]
          runStatusHeadFile = os.path.join(subplanDir, "run_status_head")

@@ -34,7 +34,7 @@ batchInfo = """
              Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
              at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
-import lsf, default, performance, os, string, shutil, plugins, respond, predict, time
+import queuesystem, default, performance, os, string, shutil, plugins, respond, predict, time
 from ndict import seqdict
 
 def getConfig(optionMap):
@@ -55,14 +55,59 @@ def getMajorReleaseId(app):
             return "carmen_" + version
     return "master"
 
-class CarmenConfig(lsf.LSFConfig):
+class LsfSubmissionRules(queuesystem.SubmissionRules):
+    def findDefaultQueue(self):
+        arch = getArchitecture(self.test.app)
+        if arch == "i386_linux" and not self.nonTestProcess:
+            cpuTime = performance.getTestPerformance(self.test)
+            chunkLimit = float(self.test.app.getConfigValue("maximum_cputime_for_chunking"))
+            if cpuTime > 0 and cpuTime < chunkLimit:
+                return "short_rd_testing_chunked"
+        return self.getQueuePerformancePrefix(arch, self.nonTestProcess) + self.getArchQueueName(arch) +\
+               self.getQueuePlatformSuffix(arch)
+    def getArchQueueName(self, arch):
+        if arch == "sparc_64":
+            return "sparc"
+        else:
+            return arch
+    def getQueuePerformancePrefix(self, arch, rave = 0):
+        cpuTime = performance.getTestPerformance(self.test)
+        usePrefix = None
+        if not rave and os.environ.has_key("LSF_QUEUE_PREFIX"):
+            usePrefix = os.environ["LSF_QUEUE_PREFIX"]
+        # Currently no short queue for powerpc_aix4
+        if arch == "powerpc" and "9" in self.test.app.versions:
+            return ""
+        if usePrefix == None and (cpuTime < self.test.getConfigValue("maximum_cputime_for_short_queue") or rave):
+            return "short_"
+        elif arch == "powerpc" or arch == "parisc_2_0":
+            return ""
+        elif usePrefix == None and cpuTime < 120:
+            return ""
+        elif usePrefix == None:
+            return "idle_"
+        elif usePrefix == "":
+            return ""
+        else:
+            return usePrefix + "_"
+    def getQueuePlatformSuffix(self, arch):
+        if arch == "i386_linux":
+            return "_RHEL"
+        elif arch == "sparc" or arch == "sparc_64":
+            return "_sol8"
+        elif arch == "powerpc":
+            return "_aix5"
+        return ""
+
+
+class CarmenConfig(queuesystem.QueueSystemConfig):
     def addToOptionGroups(self, app, groups):
-        lsf.LSFConfig.addToOptionGroups(self, app, groups)
+        queuesystem.QueueSystemConfig.addToOptionGroups(self, app, groups)
         for group in groups:
             if group.name.startswith("How"):
                 group.addSwitch("lprof", "Run with LProf profiler")
     def getTestRunner(self):
-        baseRunner = lsf.LSFConfig.getTestRunner(self)
+        baseRunner = queuesystem.QueueSystemConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):
             return RunLprof(baseRunner, self.isExecutable)
         else:
@@ -81,63 +126,24 @@ class CarmenConfig(lsf.LSFConfig):
         else:
             return self.getFileCollator()
     def getFileCollator(self):
-        return lsf.LSFConfig.getTestCollator(self)
-    def findDefaultLSFQueue(self, test):
-        arch = getArchitecture(test.app)
-        if arch == "i386_linux":
-            cpuTime = performance.getTestPerformance(test)
-            chunkLimit = float(test.app.getConfigValue("maximum_cputime_for_chunking"))
-            if cpuTime > 0 and cpuTime < chunkLimit:
-                return "short_rd_testing_chunked"
-        return self.getQueuePerformancePrefix(test, arch) + self.getArchQueueName(arch) + self.getQueuePlatformSuffix(test.app, arch)
-    def getArchQueueName(self, arch):
-        if arch == "sparc_64":
-            return "sparc"
+        return queuesystem.QueueSystemConfig.getTestCollator(self)
+    def getSubmissionRules(self, test, nonTestProcess):
+        if queuesystem.queueSystemName(test.app) == "LSF":
+            return LsfSubmissionRules(self.optionMap, test, nonTestProcess)
         else:
-            return arch
-    def getQueuePerformancePrefix(self, test, arch, rave = 0):
-        cpuTime = performance.getTestPerformance(test)
-        usePrefix = None
-        if not rave and os.environ.has_key("LSF_QUEUE_PREFIX"):
-            usePrefix = os.environ["LSF_QUEUE_PREFIX"]
-        # Currently no short queue for powerpc_aix4
-        if arch == "powerpc" and "9" in test.app.versions:
-            return ""
-        if usePrefix == None and (cpuTime < test.getConfigValue("maximum_cputime_for_short_queue") or rave):
-            return "short_"
-        elif arch == "powerpc" or arch == "parisc_2_0":
-            return ""
-        elif usePrefix == None and cpuTime < 120:
-            return ""
-        elif usePrefix == None:
-            return "idle_"
-        elif usePrefix == "":
-            return ""
-        else:
-            return usePrefix + "_"
-    def getQueuePlatformSuffix(self, app, arch):
-        if arch == "i386_linux":
-            return "_RHEL"
-        elif arch == "sparc" or arch == "sparc_64":
-            return "_sol8"
-        elif arch == "powerpc":
-            if "9" in app.versions:
-                return "_aix4"
-            else:
-                return "_aix5"
-        return ""
+            return SgeSubmissionRules(self.optionMap, test, nonTestProcess)
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob"
     def printHelpOptions(self, builtInOptions):
-        print lsf.helpOptions + batchInfo
+        print queuesystem.helpOptions + batchInfo
         default.Config.printHelpOptions(self, builtInOptions)
         print "(Carmen-specific options...)"
         print helpOptions
     def printHelpDescription(self):
-        print helpDescription, lsf.lsfGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription
+        print helpDescription, queuesystem.queueGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription
     def setApplicationDefaults(self, app):
-        lsf.LSFConfig.setApplicationDefaults(self, app)
+        queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10)
         app.setConfigDefault("maximum_cputime_for_chunking", 0.0)
@@ -145,7 +151,7 @@ class CarmenConfig(lsf.LSFConfig):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"
     def getApplicationEnvironment(self, app):
-        return lsf.LSFConfig.getApplicationEnvironment(self, app) + \
+        return queuesystem.QueueSystemConfig.getApplicationEnvironment(self, app) + \
                [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]
     
 class RunWithParallelAction(plugins.Action):

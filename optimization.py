@@ -754,24 +754,24 @@ class MakeProgressReport(TestReport):
     def compare(self, test, referenceRun, currentRun):
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
         self.doCompare(referenceRun, currentRun, test.app, test.name, userName)
-    def doCompare(self, referenceRun, currentRun, app, testName, userName):
+    def doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition = "test"):
         if currentRun.isVeryShort() or referenceRun.isVeryShort():
             return
 
-        worstCost = self.calculateWorstCost(app, referenceRun, currentRun)
+        worstCost = self.calculateWorstCost(referenceRun, currentRun, app, groupName)
         currTTWC = currentRun.timeToCost(worstCost)
         refTTWC = referenceRun.timeToCost(worstCost)
         
         self.testCount += 1
         kpi = self.computeKPI(currTTWC, refTTWC)
-        print os.linesep, "Comparison on", app, "test", testName, "(in user " + userName + ") : K.P.I. = " + kpi
+        print os.linesep, "Comparison on", app, groupNameDefinition, groupName, "(in user " + userName + ") : K.P.I. = " + kpi
         self.reportLine("                         ", self.currentText(), "Version " + self.referenceVersion)
-        self.reportCosts(currentRun, referenceRun)
+        self.reportCosts(currentRun, referenceRun, app, groupName)
         self.reportLine("Max memory (MB)", currentRun.getMaxMemory(), referenceRun.getMaxMemory())
         self.reportLine("Total time (minutes)     ", currentRun.getPerformance(), referenceRun.getPerformance())
         self.reportLine("Time to cost " + str(worstCost) + " (mins)", currTTWC, refTTWC)
-    def calculateWorstCost(self, app, referenceRun, currentRun):
-        currMargin, refMargin = self.getMargins(app)
+    def calculateWorstCost(self, referenceRun, currentRun, app, groupName):
+        currMargin, refMargin = self.getMargins(app, groupName)
         currSol = currentRun.getMeasuredSolution(currMargin)
         refSol = referenceRun.getMeasuredSolution(refMargin)
         currCost = currentRun.getCost(currSol)
@@ -780,10 +780,10 @@ class MakeProgressReport(TestReport):
             return refCost
         else:
             return currCost
-    def getMargins(self, app):
+    def getMargins(self, app, groupName = None):
         refMargin = float(app.getConfigValue("kpi_cost_margin"))
         return refMargin, refMargin
-    def reportCosts(self, currentRun, referenceRun):
+    def reportCosts(self, currentRun, referenceRun, app, groupName):
         costEntries = []
         for entry in currentRun.solutions[0].keys():
             if entry.find("cost") != -1 and entry in referenceRun.solutions[0].keys():

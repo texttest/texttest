@@ -129,7 +129,15 @@ class Test:
         parent, current = os.path.split(startDir)
         return self.makePathName(fileName, parent)
     def extraReadFiles(self):
-        return self.app.configObject.extraReadFiles(self)
+        localFiles = []
+        knownDataFiles = self.app.getConfigValue("link_test_path") + self.app.getConfigValue("copy_test_path")
+        for file in knownDataFiles:
+            fullPath = os.path.join(self.abspath, file)
+            if os.path.exists(fullPath):
+                localFiles.append(fullPath)
+        readFiles = seqdict()
+        readFiles[""] = localFiles
+        return readFiles + self.app.configObject.extraReadFiles(self)
     def notifyChanged(self):
         for observer in self.observers:
             observer.notifyChange(self)
@@ -614,6 +622,7 @@ class Application:
         self.setConfigDefault("add_shortcut_bar", 1)
         self.setConfigDefault("test_colours", self.getGuiColourDictionary())
         self.setConfigDefault("file_colours", self.getGuiColourDictionary())
+        self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ])
         self.setConfigDefault("gui_entry_overrides", {})
         if os.name == "posix":
             self.setConfigDefault("view_program", "xemacs")

@@ -137,7 +137,7 @@ class CarmenConfig(lsf.LSFConfig):
             supportedArchs = app.getConfigList("supported_architecture")
             # In batch mode, don't throw exceptions. Let the Batch Filter deal with it
             if len(supportedArchs) and not architecture in supportedArchs and not self.optionMap.has_key("b"):
-                raise "Unsupported architecture " + architecture + "!!!"
+                raise EnvironmentError, "Unsupported architecture " + architecture + "!!!"
             else:
                 print "Non-default architecture: using version", architecture
                 return [ architecture ] 

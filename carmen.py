@@ -136,7 +136,7 @@ class CarmenConfig(lsf.LSFConfig):
     def isRaveRun(self):
         return self.optionValue("a").find("rave") != -1 or self.optionValue("v").find("rave") != -1
     def getRuleBuildFilter(self):
-        if self.isNightJob() or self.optionMap.has_key("rulecomp") or self.isRaveRun():
+        if self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp")) or self.isRaveRun():
             return None
         return UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
     def getRuleBuilder(self):

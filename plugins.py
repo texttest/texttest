@@ -72,6 +72,10 @@ def getSelfTestDiagnostics(diagName, fileName):
         diag.set_formatstring("%M")
     return diag
 
+# Hacking around os.path.getcwd not working with AMD automounter
+def abspath(relpath):
+    return os.path.join(os.environ["PWD"], relpath)
+
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
     return map(string.strip, input.split(","))

@@ -661,7 +661,7 @@ class Application:
             else:
                 os.environ["TEXTTEST_TMP"] = os.environ["TEMP"]
         root = os.path.expanduser(os.environ["TEXTTEST_TMP"])
-        absroot = os.path.abspath(root)
+        absroot = plugins.abspath(root)
         if not os.path.isdir(absroot):
             os.makedirs(absroot)
         localName = self.getTmpIdentifier()
@@ -973,9 +973,9 @@ class OptionFinder:
             return os.path.join(self.directoryName, "Diagnostics", "log4py.conf")
     def findDirectoryName(self):
         if self.inputOptions.has_key("d"):
-            return os.path.abspath(self.inputOptions["d"])
+            return plugins.abspath(self.inputOptions["d"])
         elif os.environ.has_key("TEXTTEST_HOME"):
-            return os.path.abspath(os.environ["TEXTTEST_HOME"])
+            return plugins.abspath(os.environ["TEXTTEST_HOME"])
         else:
             return os.getcwd()
     def getActionSequence(self, app, useGui):

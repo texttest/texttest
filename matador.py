@@ -8,8 +8,7 @@ helpOptions = """-diag      - Run with diagnostics on. This will set the environ
              compare the diagnostics found in the ./Diagnostics subdirectory.
 """
 
-helpScripts = """
-matador.ImportTest         - Import new test cases and test users.
+helpScripts = """matador.ImportTest         - Import new test cases and test users.
                              The general principle is to add entries to the "testsuite.<app>" file and then
                              run this action, typcally 'texttest -a <app> -s matador.ImportTest'. The action
                              will then find the new entries (as they have no corresponding subdirs) and

@@ -27,6 +27,10 @@ helpOptions = """
 -f <file>  - only run tests whose names appear in the file <file>
 """
 
+helpScripts = """
+default.CountTest          - produce a brief report on the number of tests in the chosen selection, by application
+"""
+
 import os, re, shutil, plugins, respond, comparetest, string
 
 def getConfig(optionMap):
@@ -76,7 +80,7 @@ class Config(plugins.Configuration):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
     def printHelpScripts(self):
-        pass
+        print helpScripts
     def printHelpDescription(self):
         print helpDescription, comparetest.helpDescription, respond.helpDescription
     def printHelpOptions(self, builtInOptions):
@@ -87,7 +91,7 @@ class Config(plugins.Configuration):
         print "--------------------------------"
         self.printHelpOptions(builtInOptions)
         print "Python scripts: (as given to -s <module>.<class> [args])"
-        print "--------------------------------"
+        print "--------------------------------------------------------"
         self.printHelpScripts()
 
 class TextFilter(plugins.Filter):
@@ -138,6 +142,22 @@ class RunTest(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 
+class CountTest(plugins.Action):
+    def __init__(self):
+        self.appCount = {}
+    def __del__(self):
+        for app, count in self.appCount.items():
+            print "Application", app, "has", count, "tests"
+    def __repr__(self):
+        return "Counting"
+    def __call__(self, test):
+        self.describe(test)
+        self.appCount[repr(test.app)] += 1
+    def setUpSuite(self, suite):
+        self.describe(suite)
+    def setUpApplication(self, app):
+        self.appCount[repr(app)] = 0
+        
 class ReconnectTest(plugins.Action):
     def __init__(self, fetchOption):
         self.fetchDir = None

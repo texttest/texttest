@@ -13,8 +13,7 @@ comparison as the file status.<app> after each test has run."""
 helpOptions = """
 """
 
-helpScripts = """
-apc.ImportTest             - Import new test cases and test users.
+helpScripts = """apc.ImportTest             - Import new test cases and test users.
                              The general principle is to add entries to the "testsuite.apc" file and then
                              run this action, typcally 'texttest -a apc -s apc.ImportTest'. The action
                              will then find the new entries (as they have no corresponding subdirs) and

@@ -3,6 +3,7 @@ import os, sys, types, string, getopt, types, time, plugins, exceptions, stat, l
 from stat import *
 from usecase import ScriptEngine, UseCaseScriptError
 from ndict import seqdict
+from copy import copy
 
 helpIntro = """
 Note: the purpose of this help is primarily to document the configuration you currently have,
@@ -70,15 +71,30 @@ class Test:
         self.environment.readValuesFromFile(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
         # Should do this, but not quite yet...
         # self.properties.readValuesFromFile(os.path.join(self.abspath, "properties"), app.name, app.getVersionFileExtensions())
-        # Single pass to expand all variables (don't want multiple expansion)
+    def expandEnvironmentReferences(self, referenceVars = []):
+        childReferenceVars = copy(referenceVars)
         for var, value in self.environment.items():
             expValue = os.path.expandvars(value)
-            # If it constaints a separator, try to make it into an absolute path by pre-pending the checkout
-            self.environment[var] = expValue
-            debugLog.info("Expanded variable " + var + " to " + expValue + " in " + self.name)
-            if os.environ.has_key(var):
-                self.previousEnv[var] = os.environ[var]
-            os.environ[var] = self.environment[var]
+            if expValue != value:
+                debugLog.info("Expanded variable " + var + " to " + expValue + " in " + self.name)
+                # Check for self-referential variables: don't multiple-expand
+                if value.find(var) == -1:
+                    childReferenceVars.append((var, value))
+                self.environment[var] = expValue
+            self.setUpEnvVariable(var, expValue)
+        for var, value in referenceVars:
+            if self.environment.has_key(var):
+                childReferenceVars.remove((var, value))
+                continue
+            expValue = os.path.expandvars(value)
+            if expValue != os.getenv(var):
+                self.environment[var] = expValue
+                debugLog.info("Adding reference variable " + var + " as " + expValue + " in " + self.name)
+                self.setUpEnvVariable(var, expValue)
+        self.expandChildEnvironmentReferences(childReferenceVars)
+        self.tearDownEnvironment()
+    def expandChildEnvironmentReferences(self, referenceVars):
+        pass
     def makeFileName(self, stem, refVersion = None, temporary = 0, forComparison = 1):
         root = self.getDirectory(temporary, forComparison)
         if not forComparison:
@@ -129,14 +145,16 @@ class Test:
         return relPath
     def getDirectory(self, temporary, forComparison = 1):
         return self.abspath
+    def setUpEnvVariable(self, var, value):
+        if os.environ.has_key(var):
+            self.previousEnv[var] = os.environ[var]
+        os.environ[var] = value
+        debugLog.debug("Setting " + var + " to " + os.environ[var])
     def setUpEnvironment(self, parents=0):
         if parents and self.parent:
             self.parent.setUpEnvironment(1)
         for var, value in self.environment.items():
-            if os.environ.has_key(var):
-                self.previousEnv[var] = os.environ[var]
-            os.environ[var] = value
-            debugLog.debug("Setting " + var + " to " + os.environ[var])
+            self.setUpEnvVariable(var, value)
     def tearDownEnvironment(self, parents=0):
         # Note this has no effect on the real environment, but can be useful for internal environment
         # variables. It would be really nice if Python had a proper "unsetenv" function...
@@ -386,7 +404,6 @@ class TestSuite(Test):
             maxNameLength = max([len(test.name) for test in self.testcases])
             for test in self.testcases:
                 test.paddedName = string.ljust(test.name, maxNameLength)
-        self.tearDownEnvironment()
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
     def testCaseList(self):
@@ -415,6 +432,9 @@ class TestSuite(Test):
                     break
         self.testcases = newList
         self.notifyChanged()
+    def expandChildEnvironmentReferences(self, referenceVars):
+        for case in self.testcases:
+            case.expandEnvironmentReferences(referenceVars)
     def reFilter(self, filters):
         testCaseList = []
         debugLog.debug("Refilter for " + self.name)
@@ -762,6 +782,7 @@ class Application:
                 success = 0
         suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters)
         suite.reFilter(filters)
+        suite.expandEnvironmentReferences()
         return success, suite
     def description(self):
         description = "Application " + self.fullName

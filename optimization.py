@@ -1283,7 +1283,6 @@ class GraphPlot(plugins.Action):
         if commonPlotter.plotForTest:
             xrange, yrange, targetFile, colour, onlyAverage, title = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
-            os.chdir(app.writeDirectory)
             commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, colour, onlyAverage, commonPlotter.plotAveragers, title, wait=1)
     
 class TestGraph:
@@ -1332,6 +1331,7 @@ class TestGraph:
         if len(self.plotLines) == 0:
             return
 
+        os.chdir(writeDir)
         gnuplotFileName = os.path.join(writeDir, "gnuplot.input")
         outputFileName = os.path.join(writeDir, "gnuplot.output")
         gnuplotFile = open(gnuplotFileName, "w")
@@ -1357,16 +1357,14 @@ class TestGraph:
         if yrange:
             gnuplotFile.write("set yrange [" + yrange +"];" + os.linesep)
         plotArguments = self.getPlotArguments()
-        plotCommand = "plot "
-        if not onlyAverage:
-            for plotArgument in plotArguments:
-                gnuplotFile.write(plotCommand + plotArgument + os.linesep)
-                plotCommand = "replot "
         if plotAveragers:
-            for plotAverager in plotAveragers:
-                plotArgument = plotAveragers[plotAverager].plotArgument()
-                gnuplotFile.write(plotCommand + plotArgument + os.linesep)
-                plotCommand = "replot "
+            avgArguments = [ plotAveragers[plotAverager].plotArgument() for plotAverager in plotAveragers ]
+            if onlyAverage:
+                plotArguments = avgArguments
+            else:
+                plotArguments += avgArguments
+        relPlotArgs = [ arg.replace(writeDir, ".") for arg in plotArguments ]
+        gnuplotFile.write("plot " + string.join(relPlotArgs, ", ") + os.linesep)
         gnuplotFile.write("quit" + os.linesep)
         gnuplotFile.close()
         commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName
@@ -1379,7 +1377,6 @@ class TestGraph:
                 open(absTargetFile, "w").write(tmppf)
         else:
             process = plugins.BackgroundProcess(commandLine)
-            process.waitForTermination()
             if wait:
                 process.waitForTermination()
     def getAxisLabel(self, axis):

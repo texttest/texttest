@@ -154,7 +154,7 @@ class ReplayScript:
             return self.processCommand(nextCommand)
         except UseCaseScriptError:
             type, value, traceback = sys.exc_info()
-            self.write("ERROR: " + value)
+            self.write("ERROR: " + str(value))
             # We don't terminate scripts if they contain errors
         return 1
     def write(self, line):

@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/KPI.py,v 1.2 2003/03/04 11:06:51 henrike Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/KPI.py,v 1.3 2003/03/04 11:26:46 johana Exp $
 #
 # Script to calculate the KPI (Key Performance Indicator)
 #
@@ -99,7 +99,10 @@ class CurveKPI(KPI):
     def _getIndex(self, listKeyPoints, mapSeriesRef, mapSeriesNow):
 	floatNowTime = self._getTotalTime(listKeyPoints, mapSeriesRef, mapSeriesNow)
 	floatRefTime  = self._getTotalTime(listKeyPoints, mapSeriesRef, mapSeriesRef)
-	return 100.0 * (floatNowTime / floatRefTime)
+        if floatRefTime > 0:
+            return 100.0 * (floatNowTime / floatRefTime)
+        else:
+            return 100
 
     def getFloatKPI(self):
 	mapSeriesRef = self.iBasics.statusFileToMapOfSeries(self.cStrRefStatusFile, self.listRegExps)

@@ -305,7 +305,7 @@ class MakeComparisons(plugins.Action):
                 raise plugins.TextTestError, errMsg
         if state.failedPrediction:
             # Keep the category we had before
-            state.freeText += os.linesep + os.linesep + self.getFreeTextInfo(state)
+            state.freeText += "\n\n" + self.getFreeTextInfo(state)
             return
         worstResult = state.getMostSevereFileComparison()
         if not worstResult:
@@ -316,7 +316,7 @@ class MakeComparisons(plugins.Action):
     def getFreeTextInfo(self, state):
         fullText = ""
         for comparison in state.getComparisons():
-            fullText += self.fileComparisonTitle(comparison) + os.linesep
+            fullText += self.fileComparisonTitle(comparison) + "\n"
             fullText += self.fileComparisonBody(comparison)
         return fullText
     def fileComparisonTitle(self, comparison):
@@ -346,7 +346,7 @@ class MakeComparisons(plugins.Action):
         if len(line) <= self.maxLineWidth:
             return line
         truncatedLine = line[:self.maxLineWidth]
-        return truncatedLine + os.linesep + self.getWrappedLine(line[self.maxLineWidth:])
+        return truncatedLine + "\n" + self.getWrappedLine(line[self.maxLineWidth:])
     def setUpApplication(self, app):
         self.lineCount = app.getConfigValue("lines_of_text_difference")
         self.maxLineWidth = app.getConfigValue("max_width_text_difference")
@@ -512,10 +512,10 @@ class RunDependentTextFilter:
             if len(linesFiltered) == 0:
                 continue
             linesFiltered.sort()
-            newFile.write("-- Unordered text as found by filter '" + filter.originalText + "' --" + os.linesep)
+            newFile.write("-- Unordered text as found by filter '" + filter.originalText + "' --" + "\n")
             for line in linesFiltered:
                 newFile.write(line)
-            newFile.write(os.linesep)
+            newFile.write("\n")
             self.orderFilters[filter] = []
 
 class LineFilter:
@@ -594,7 +594,7 @@ class LineFilter:
             self.diag.info("Real number was " + str(realNumber))
             if realNumber < len(words):
                 del words[realNumber]
-            return string.join(words).rstrip() + os.linesep
+            return string.join(words).rstrip() + "\n"
         else:
             return None
     def findRealWordNumber(self, words):

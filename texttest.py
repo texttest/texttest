@@ -379,7 +379,7 @@ class TestCase(Test):
             debugLog.info("Writing " + propFileName + " for " + var + " : " + repr(value))
             file = open(propFileName, "w")
             for subVar, subValue in value.items():
-                file.write(subVar + "=" + subValue + os.linesep)            
+                file.write(subVar + "=" + subValue + "\n")            
     def cleanNonBasicWriteDirectories(self):
         if len(self.writeDirs) > 0:
             for writeDir in self.writeDirs[1:]:
@@ -707,7 +707,7 @@ class Application:
         self.optionGroups = self.createOptionGroups(inputOptions)
         self.useDiagnostics = self.setDiagnosticSettings(inputOptions)
         self.slowMotionReplaySpeed = self.setSlowMotionSettings(inputOptions)
-        debugLog.info("Config file settings are: " + os.linesep + repr(self.configDir.dict))
+        debugLog.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
     def __repr__(self):
         return self.fullName
     def __cmp__(self, other):
@@ -762,14 +762,13 @@ class Application:
         self.setConfigDefault("gui_entry_overrides", {})
         self.setConfigDefault("gui_entry_options", { "" : [] })
         self.setConfigDefault("use_case_recorder", "")
+        self.setConfigDefault("diff_program", "tkdiff")
         if os.name == "posix":
             self.setConfigDefault("view_program", "xemacs")
             self.setConfigDefault("follow_program", "tail -f")
-            self.setConfigDefault("diff_program", "tkdiff")
         elif os.name == "dos" or os.name == "nt":
-            self.setConfigDefault("view_program", "wordpad.exe")
+            self.setConfigDefault("view_program", "notepad")
             self.setConfigDefault("follow_program", None)
-            self.setConfigDefault("diff_program", "tkdiff.tcl")
     def getGuiColourDictionary(self):
         dict = {}
         dict["success"] = "green"
@@ -986,7 +985,7 @@ class Application:
         print helpIntro
         header = "Description of the " + self.getConfigValue("config_module") + " configuration"
         length = len(header)
-        header += os.linesep
+        header += "\n"
         for x in range(length):
             header += "-"
         print header
@@ -1495,7 +1494,7 @@ class ActionRunner:
             self.currentTestRunner.interrupt()
 
 def printException():
-    sys.stderr.write("Description of exception thrown :" + os.linesep)
+    sys.stderr.write("Description of exception thrown :" + "\n")
     type, value, traceback = sys.exc_info()
     sys.excepthook(type, value, traceback)
     
@@ -1625,7 +1624,7 @@ class TextTest:
                 except (SystemExit, KeyboardInterrupt):
                     raise sys.exc_type, sys.exc_value
                 except BadConfigError:
-                    sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + os.linesep)
+                    sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + "\n")
                     raisedError = 1
             elif os.path.isdir(pathname) and recursive:
                 subRaisedError, subApps = self._findApps(pathname, 0)
@@ -1682,11 +1681,11 @@ class TextTest:
                     actionRunner.addTestActions(testSuite, actionSequence)
                     print "Using", app.description() + ", checkout", app.checkout
             except BadConfigError:
-                sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + os.linesep)
+                sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + "\n")
         if allEmpty and len(appSuites) > 0:
-            sys.stderr.write("No tests matched the selected applications/versions. The following were tried: " + os.linesep)
+            sys.stderr.write("No tests matched the selected applications/versions. The following were tried: \n")
             for app, testSuite in appSuites:
-                sys.stderr.write(app.description() + os.linesep)
+                sys.stderr.write(app.description() + "\n")
         return actionRunner
     def run(self):
         try:

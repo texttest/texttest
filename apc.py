@@ -232,6 +232,7 @@ guiplugins.interactiveActionHandler.testClasses.append(ViewApcLog)
 #
 class RunApcTestInDebugger(default.RunTest):
     def __init__(self, options, keepTmpFiles):
+        default.RunTest.__init__(self)
         self.inXEmacs = None
         self.runPlain = None
         self.showLogFile = 1

@@ -72,10 +72,13 @@ def queueSystemName(app):
 
 signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
-# Use the non-monitoring version of run test, but the rest from unix
+# Use a non-monitoring runTest, but the rest from unix
 class RunTestInSlave(unixConfig.RunTest):
     def runTest(self, test):
-        default.RunTest.runTest(self, test)
+        command = self.getExecuteCommand(test)
+        self.describe(test)
+        self.diag.info("Running test with command '" + command + "'")
+        os.system(command)
     def setUpVirtualDisplay(self, app):
         # Assume the master sets DISPLAY for us
         pass
@@ -242,10 +245,10 @@ class QueueSystemServer:
             return ""
         name = queueSystemName(test)
         if exceededLimit == "cpu":
-            return "Test hit " + name + "'s CPU time limit, and was killed." + os.linesep + \
+            return "Test hit " + name + "'s CPU time limit, and was killed." + "\n" + \
                    "Maybe it went into an infinite loop or maybe it needs to be run in another queue."
         elif exceededLimit == "real":
-            return "Test hit " + name + "'s total run time limit, and was killed." + os.linesep + \
+            return "Test hit " + name + "'s total run time limit, and was killed." + "\n" + \
                    "Maybe it was hanging or maybe it needs to be run in another queue."
         else:
             return "Test exceeded limit " + exceededLimit
@@ -486,9 +489,9 @@ class UpdateTestStatus(UpdateStatus):
         machineStr = ""
         if len(machines):
             machineStr = string.join(machines, ',')
-            details += "Executing on " + machineStr + os.linesep
+            details += "Executing on " + machineStr + "\n"
             summary += " (" + machineStr + ")"
-        details += "Current " + queueSystemName(test.app) + " status = " + status + os.linesep
+        details += "Current " + queueSystemName(test.app) + " status = " + status + "\n"
         details += self.getExtraRunData(test)
         if status == "PEND":
             pendState = plugins.TestState("pending", freeText=details, briefText=summary)
@@ -513,12 +516,12 @@ class UpdateTestStatus(UpdateStatus):
     def slaveFailed(self, test, machineStr):
         limitMessage = QueueSystemServer.instance.findJobLimitMessage(test, self.jobNameFunction)
         if limitMessage:
-            raise plugins.TextTestError, limitMessage + os.linesep
+            raise plugins.TextTestError, limitMessage + "\n"
         slaveErrFile = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
         if os.path.isfile(slaveErrFile):
             errStr = open(slaveErrFile).read()
             if errStr:
-                raise plugins.TextTestError, "Slave exited on " + machineStr + " : " + os.linesep + errStr
+                raise plugins.TextTestError, "Slave exited on " + machineStr + " : " + "\n" + errStr
         raise plugins.TextTestError, "No results produced on " + machineStr + ", presuming problems running test there"
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
@@ -582,7 +585,7 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         # Try and write some information about what's happening on the machine
         for machine in executionMachines:
             for jobLine in self.findRunningJobs(machine):
-                file.write(jobLine + os.linesep)
+                file.write(jobLine + "\n")
     def findRunningJobs(self, machine):
         try:
             return self._findRunningJobs(machine)

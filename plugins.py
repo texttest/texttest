@@ -135,7 +135,10 @@ def getDiagnostics(diagName):
 
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):
-    return os.path.join(os.environ["PWD"], relpath)
+    if os.name == "posix":
+        return os.path.join(os.environ["PWD"], relpath)
+    else:
+        return os.path.abspath(relpath)
 
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
@@ -224,10 +227,70 @@ class TextTrigger:
         else:
             return line.find(self.text) != -1
 
+class UNIXProcessHandler:
+    def spawnProcess(self, commandLine):
+        processId = os.fork()   
+        if processId == 0:
+            os.system(commandLine)
+            os._exit(0)
+        else:
+            return processId
+    def hasTerminated(self, processId):
+        # Works on child processes only. Do not use while killing...
+        try:
+            procId, status = os.waitpid(processId, os.WNOHANG)
+            return procId > 0 or status > 0
+        except OSError:
+            return 1
+    def kill(self, process, killSignal):
+        return os.kill(process, killSignal)
+
+
+class WindowsProcessHandler:
+    def __init__(self):
+        for dir in os.environ["PATH"].split(";"):
+            fullPath = os.path.join(dir, "cmd.exe")
+            if os.path.isfile(fullPath):
+                self.cmdStarter = fullPath
+    def spawnProcess(self, commandLine):
+        # Start the process in a subshell so redirection works correctly
+        args = [self.cmdStarter, "/C", commandLine ]
+        processHandle = os.spawnv(os.P_NOWAIT, self.cmdStarter, args)
+        return self.findProcessId(processHandle)
+    def findProcessId(self, processHandle):
+        stdout = os.popen("handle -a -p " + str(os.getpid()))
+        for line in stdout.readlines():
+            words = line.split()
+            handleId = self.getHandleId(words)
+            if handleId == processHandle:
+                processInfo = words[-1]
+                idStart = processInfo.find("(")
+                return processInfo[idStart + 1:-1]
+    def getHandleId(self, words):
+        if len(words) == 0:
+            return
+        try:
+            # Drop trailing colon
+            return int(words[0][:-1], 16)
+        except ValueError:
+            return
+    def hasTerminated(self, processId):
+        stdout = os.popen("pslist " + str(processId))
+        for line in stdout.readlines():
+            if line.find("was not found") != -1:
+                return 1
+        return 0
+    def kill(self, process, killSignal):
+        return os.system("pskill " + str(process))
+
 # Generally useful class to encapsulate a background process, of which TextTest creates
 # a few... seems it only works on UNIX right now.
 class BackgroundProcess:
     fakeProcesses = os.environ.has_key("TEXTTEST_NO_SPAWN")
+    if os.name == "posix":
+        processHandler = UNIXProcessHandler()
+    else:
+        processHandler = WindowsProcessHandler()
     def __init__(self, commandLine, testRun=0, exitHandler=None, exitHandlerArgs=()):
         self.commandLine = commandLine
         self.processId = None
@@ -243,12 +306,7 @@ class BackgroundProcess:
     def __repr__(self):
         return self.commandLine.split()[0].lstrip()
     def doFork(self):
-        processId = os.fork()
-        if processId == 0:
-            os.system(self.commandLine)
-            os._exit(0)
-        else:
-            self.processId = processId
+        self.processId = self.processHandler.spawnProcess(self.commandLine)
     def waitForStart(self):
         while self.processId == None:
             time.sleep(0.1)
@@ -261,22 +319,12 @@ class BackgroundProcess:
     def hasTerminated(self):
         if self.processId == None:
             return 1
-        if not self._hasTerminated(self.processId):
+        if not self.processHandler.hasTerminated(self.processId):
             return 0
         for process in findAllProcesses(self.processId):
-            if process != self.processId and not self._hasTerminated(process):
+            if process != self.processId and not self.processHandler.hasTerminated(process):
                 return 0
         return 1
-    def _hasTerminated(self, processId):
-        # Works on child processes only. Do not use while killing...
-        try:
-            procId, status = os.waitpid(processId, os.WNOHANG)
-            return procId > 0 or status > 0
-        except OSError:
-            return 1
-    def _hasTerminatedNotChild(self, processId):
-        lines = os.popen("ps -p " + str(processId)).readlines()
-        return len(lines) < 2
     def waitForTermination(self):
         if self.processId == None:
             return
@@ -300,7 +348,7 @@ class BackgroundProcess:
         self.tryKillProcessWithSignal(process, signal.SIGKILL)
     def tryKillProcessWithSignal(self, process, killSignal):
         try:
-            os.kill(process, killSignal)
+            self.processHandler.kill(process, killSignal)
             print "Killed process", process, "with signal", killSignal
         except OSError:
             print "Process", process, "already terminated, could not kill with signal", killSignal
@@ -310,6 +358,10 @@ class BackgroundProcess:
             if self._hasTerminatedNotChild(process):
                 return 1
         return 0
+    def _hasTerminatedNotChild(self, processId):
+        lines = os.popen("ps -p " + str(processId)).readlines()
+        return len(lines) < 2
+
 
 # Find child processes. Note that this concept doesn't really exist on Windows, so we just return the process
 def findAllProcesses(pid):
@@ -374,7 +426,7 @@ class OptionGroup:
         self.defaultDict = defaultDict
         self.possibleValueDict = possibleValueDict
     def __repr__(self):
-        return "OptionGroup " + self.name + os.linesep + repr(self.options) + os.linesep + repr(self.switches)
+        return "OptionGroup " + self.name + "\n" + repr(self.options) + "\n" + repr(self.switches)
     def reset(self):
         for option in self.options.values():
             option.reset()

@@ -191,7 +191,7 @@ class ImportTest(InteractiveAction):
     def setUpSuite(self, suite):
         testName = self.getNewTestName()
         if len(testName) == 0:
-            raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + os.linesep + \
+            raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + "\n" + \
                   "Fill in the 'Adding " + self.testType() + "' tab below."
         guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + repr(suite))
         testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
@@ -203,9 +203,9 @@ class ImportTest(InteractiveAction):
         pass
     def createTest(self, suite, testName, description):
         file = open(suite.testCaseFile, "a")
-        file.write(os.linesep)
-        file.write("# " + description + os.linesep)
-        file.write(testName + os.linesep)
+        file.write("\n")
+        file.write("# " + description + "\n")
+        file.write(testName + "\n")
         testDir = os.path.join(suite.abspath, testName.strip())
         if os.path.isdir(testDir):
             return testDir
@@ -249,7 +249,7 @@ class RecordTest(InteractiveAction):
                 raise plugins.TextTestError, "Recording did not produce a usecase file"
 
         test.state.freeText = "Recorded use case - now attempting to replay in the background to collect standard files" + \
-                              os.linesep + "These will appear shortly. You do not need to submit the test manually."
+                              "\n" + "These will appear shortly. You do not need to submit the test manually."
         test.notifyChanged()
         ttOptions = self.getRunOptions(test)
         commandLine = self.getTextTestName() + " " + ttOptions + " > /dev/null 2>&1"
@@ -297,13 +297,13 @@ class ImportTestCase(ImportTest):
         envFile = self.getWriteFile("environment", suite, testDir)
         for var, value in envDir.items():
             guilog.info("Setting test env: " + var + " = " + value)
-            envFile.write(var + ":" + value + os.linesep)
+            envFile.write(var + ":" + value + "\n")
         envFile.close()
     def writeOptionFile(self, suite, testDir):
         optionString = self.getOptions(suite)
         guilog.info("Using option string : " + optionString)
         optionFile = self.getWriteFile("options", suite, testDir)
-        optionFile.write(optionString + os.linesep)
+        optionFile.write(optionString + "\n")
         return optionString
     def getOptions(self, suite):
         return self.optionGroup.getOptionValue("opt")
@@ -326,14 +326,14 @@ class ImportTestSuite(ImportTest):
     def writeTestcasesFile(self, suite, testDir):
         testCasesFile = os.path.join(testDir, "testsuite." + suite.app.name)        
         file = open(testCasesFile, "w")
-        file.write("# Ordered list of tests in test suite. Add as appropriate" + os.linesep + os.linesep)
+        file.write("# Ordered list of tests in test suite. Add as appropriate" + "\n" + "\n")
     def addEnvironmentFileOptions(self, oldOptionGroup):
         self.addSwitch(oldOptionGroup, "env", "Add environment file")
     def writeEnvironmentFiles(self, suite, testDir):
         if self.optionGroup.getSwitchValue("env"):
             envFile = os.path.join(testDir, "environment")
             file = open(envFile, "w")
-            file.write("# Dictionary of environment to variables to set in test suite" + os.linesep)
+            file.write("# Dictionary of environment to variables to set in test suite" + "\n")
 
 class SelectTests(InteractiveAction):
     def __init__(self, app, oldOptionGroup):
@@ -408,7 +408,7 @@ class RunTests(InteractiveAction):
         if os.path.isfile(errFile):
             errText = open(errFile).read()
             if len(errText):
-                raise plugins.TextTestError, "Dynamic run failed, with the following errors:" + os.linesep + errText
+                raise plugins.TextTestError, "Dynamic run failed, with the following errors:\n" + errText
     def getTextTestOptions(self, app, selTests):
         ttOptions = [ "-a " + app.name ]
         ttOptions += self.invisibleGroup.getCommandLines()

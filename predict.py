@@ -56,7 +56,7 @@ class CheckPredictions(CheckLogFilePredictions):
     def findCrashSummary(self, errInfo):
         prevLine = ""
         crashType = "CRASH"
-        for line in errInfo.split(os.linesep):
+        for line in errInfo.split("\n"):
             if line.find("Program terminated with") != -1:
                 crashType = line.split(",")[-1].strip().replace(".", "")
             if prevLine.find("Stack trace from") != -1:
@@ -116,7 +116,7 @@ class PredictionStatistics(plugins.Action):
         if len(versions) > 1:
             self.currentChecker = CheckPredictions(versions[1])
     def setUpSuite(self, suite):
-        self.suiteName = suite.name + os.linesep + "   "
+        self.suiteName = suite.name + "\n   "
     def __call__(self, test):
         refErrors = self.referenceChecker.collectErrors(test)
         currErrors = 0

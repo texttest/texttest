@@ -65,38 +65,38 @@ class BatchCategory(plugins.Filter):
             postText = ""
         elif len(postText) > 0:
             postText = " : " + postText
-        self.testLines[test.getRelPath()] = test.getIndent() + "- " + repr(test) + postText + os.linesep
+        self.testLines[test.getRelPath()] = test.getIndent() + "- " + repr(test) + postText + "\n"
         self.allTests.append(test)
     def acceptsTestCase(self, test):
         return self.testLines.has_key(test.getRelPath())
     def describeBrief(self, mailFile, app):
         if len(self.allTests) > 0:
-            mailFile.write("The following tests " + self.longDescription + " : " + os.linesep)
+            mailFile.write("The following tests " + self.longDescription + " : " + "\n")
             valid, suite = app.createTestSuite([ self ])
             self.writeTestLines(mailFile, suite)
-            mailFile.write(os.linesep)
+            mailFile.write("\n")
     def writeTestLines(self, mailFile, test):
         if test.classId() == "test-case":
             mailFile.write(self.testLines[test.getRelPath()])
         else:
-            mailFile.write(test.getIndent() + "In " + repr(test) + ":" + os.linesep)
+            mailFile.write(test.getIndent() + "In " + repr(test) + ":" + "\n")
             for subtest in test.testcases:
                 self.writeTestLines(mailFile, subtest)
     def describeFull(self, mailFile):
         fullDescriptionString = self.getFullDescription()
         if fullDescriptionString:
-            mailFile.write(os.linesep + "Detailed information for the tests that " + self.longDescription + " follows..." + os.linesep)
+            mailFile.write("\n" + "Detailed information for the tests that " + self.longDescription + " follows..." + "\n")
             mailFile.write(fullDescriptionString)
     def getFullDescription(self):
         fullText = ""
         for test in self.allTests:
             freeText = test.state.freeText
             if freeText:
-                fullText += "--------------------------------------------------------" + os.linesep
-                fullText += "TEST " + repr(test.state) + " " + repr(test) + " (under " + test.getRelPath() + ")" + os.linesep
+                fullText += "--------------------------------------------------------" + "\n"
+                fullText += "TEST " + repr(test.state) + " " + repr(test) + " (under " + test.getRelPath() + ")" + "\n"
                 fullText += freeText
-                if not freeText.endswith(os.linesep):
-                    fullText += os.linesep
+                if not freeText.endswith("\n"):
+                    fullText += "\n"
         return fullText
 
 allBatchResponders = []
@@ -183,8 +183,8 @@ class MailSender(plugins.Action):
         mailFile = self.createMail(mailTitle, app, appResponders)
         if len(appResponders) > 1:
             for resp in appResponders:
-                mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
-            mailFile.write(os.linesep)
+                mailFile.write(self.getMailTitle(app, [ resp ]) + "\n")
+            mailFile.write("\n")
         if not self.isAllSuccess(appResponders):
             self.performForAll(mailFile, app, appResponders, BatchResponder.writeFailuresBrief, sectionHeaders[0])
             self.performForAll(mailFile, app, appResponders, BatchResponder.writeDetails, sectionHeaders[1])
@@ -193,18 +193,18 @@ class MailSender(plugins.Action):
         mailFile.close()
         for responder in appResponders:
             allBatchResponders.remove(responder)
-        sys.stdout.write("done." + os.linesep)
+        sys.stdout.write("done." + "\n")
     def performForAll(self, mailFile, app, appResponders, method, headline):
-        mailFile.write(headline + " follows..." + os.linesep)
-        mailFile.write("---------------------------------------------------------------------------------" + os.linesep)
+        mailFile.write(headline + " follows..." + "\n")
+        mailFile.write("---------------------------------------------------------------------------------" + "\n")
         for resp in appResponders:
             if len(appResponders) > 1:
                 if headline.find("Details") != -1 and not resp is appResponders[0]:
-                    mailFile.write("---------------------------------------------------------------------------------" + os.linesep)
-                mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
-                mailFile.write(os.linesep)
+                    mailFile.write("---------------------------------------------------------------------------------" + "\n")
+                mailFile.write(self.getMailTitle(app, [ resp ]) + "\n")
+                mailFile.write("\n")
             method(resp, mailFile)
-            mailFile.write(os.linesep)
+            mailFile.write("\n")
     def createMail(self, title, app, appResponders):
         fromAddress = os.environ["USER"]
         toAddress = self.getRecipient(app)
@@ -216,17 +216,17 @@ class MailSender(plugins.Action):
             collFile = os.path.join(writeDir, "batchreport." + app.name + app.versionSuffix())
             self.diag.info("Sending mail to", collFile)
             mailFile = open(collFile, "w")
-            mailFile.write(toAddress + os.linesep)
-            mailFile.write(self.getMachineTitle(app, appResponders) + os.linesep)
-            mailFile.write(title + os.linesep)
-            mailFile.write(os.linesep) # blank line separating headers from body
+            mailFile.write(toAddress + "\n")
+            mailFile.write(self.getMachineTitle(app, appResponders) + "\n")
+            mailFile.write(title + "\n")
+            mailFile.write("\n") # blank line separating headers from body
             return mailFile
         else:
             mailFile = os.popen("/usr/lib/sendmail -t", "w")
-            mailFile.write("From: " + fromAddress + os.linesep)
-            mailFile.write("To: " + toAddress + os.linesep)
-            mailFile.write("Subject: " + title + os.linesep)
-            mailFile.write(os.linesep) # blank line separating headers from body
+            mailFile.write("From: " + fromAddress + "\n")
+            mailFile.write("To: " + toAddress + "\n")
+            mailFile.write("Subject: " + title + "\n")
+            mailFile.write("\n") # blank line separating headers from body
             return mailFile
     def useCollection(self, app):
         return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
@@ -384,7 +384,7 @@ class CollectFiles(plugins.Action):
         # Lose trailing comma
         return title[:-1]
     def extractHeader(self, body, mailFile):
-        firstSep = body.find(os.linesep) + 1
+        firstSep = body.find("\n") + 1
         header = body[0:firstSep]
         mailFile.write(header)
         return header, body[firstSep:]
@@ -392,9 +392,9 @@ class CollectFiles(plugins.Action):
         headerLoc = body.find(sectionHeader)
         if headerLoc == -1:
             return body.strip(), ""
-        nextLine = body.find(os.linesep, headerLoc) + 1
+        nextLine = body.find("\n", headerLoc) + 1
         if body[nextLine] == "-":
-            nextLine = body.find(os.linesep, nextLine) + 1
+            nextLine = body.find("\n", nextLine) + 1
         section = body[0:headerLoc].strip()
         newBody = body[nextLine:].strip()
         return section, newBody
@@ -403,7 +403,7 @@ class CollectFiles(plugins.Action):
             return mailFile.write(bodies[0])
 
         parsedBodies = [ self.extractHeader(body, mailFile) for body in bodies ]
-        mailFile.write(os.linesep)
+        mailFile.write("\n")
 
         sectionMap = {}
         prevSectionHeader = ""
@@ -424,13 +424,13 @@ class CollectFiles(plugins.Action):
     def writeSection(self, mailFile, sectionHeader, parsedSections):
         if len(sectionHeader) == 0 or len(parsedSections) == 0:
             return
-        mailFile.write(sectionHeader + " follows..." + os.linesep)
+        mailFile.write(sectionHeader + " follows...\n")
         detailSection = sectionHeader.find("Details") != -1
         if not detailSection or len(parsedSections) == 1: 
-            mailFile.write("=================================================================================" + os.linesep)
+            mailFile.write("=================================================================================\n")
         for header, section in parsedSections:
             if len(parsedSections) > 1:
                 if detailSection:
-                    mailFile.write("=================================================================================" + os.linesep)
-                mailFile.write(header + os.linesep)
-            mailFile.write(section + os.linesep + os.linesep)
+                    mailFile.write("=================================================================================\n")
+                mailFile.write(header + "\n")
+            mailFile.write(section + "\n\n")

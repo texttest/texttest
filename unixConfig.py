@@ -10,7 +10,6 @@ The default behaviour is to run all tests locally.
 """
 
 import default, batch, respond, performance, predict, os, shutil, plugins, string, time
-from threading import currentThread
 
 def getConfig(optionMap):
     return UNIXConfig(optionMap)
@@ -66,7 +65,6 @@ class UNIXConfig(default.Config):
         default.Config.printHelpOptions(self, builtInOptions)
     def setApplicationDefaults(self, app):
         default.Config.setApplicationDefaults(self, app)
-        app.setConfigDefault("collect_standard_error", 1)
         app.setConfigDefault("virtual_display_machine", [])
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0)
@@ -82,25 +80,11 @@ class UNIXConfig(default.Config):
         batchSession = self.optionValue("b")
         if batchSession:
             app.addConfigEntry("base_version", batchSession)
-        app.addConfigEntry("pending", "white", "test_colours")
-
-# Workaround for python bug 853411: tell main thread to start the process
-# if we aren't it...
-class Pending(plugins.TestState):
-    def __init__(self, process):
-        plugins.TestState.__init__(self, "pending")
-        self.process = process
-        if currentThread().getName() == "MainThread":
-            self.notifyInMainThread()
-    def notifyInMainThread(self):
-        self.process.doFork()
-
+        
 class RunTest(default.RunTest):
     def __init__(self):
         default.RunTest.__init__(self)
-        self.process = None
         self.loginShell = None
-        self.collectStdErr = 1
         self.testDisplay = None
         self.realDisplay = os.getenv("DISPLAY")
     def __call__(self, test):
@@ -110,30 +94,9 @@ class RunTest(default.RunTest):
         if self.testDisplay and self.realDisplay:
             os.environ["DISPLAY"] = self.realDisplay
         return retValue
-    def runTest(self, test):
-        if self.process:
-            # See if the running process is finished
-            if self.process.hasTerminated():
-                self.process = None
-                return
-            else:
-                return self.RETRY
-
-        testCommand = self.getExecuteCommand(test)
-        self.describe(test)
-        self.process = plugins.BackgroundProcess(testCommand, testRun=1)
-        test.changeState(Pending(self.process))
-        self.process.waitForStart()
-        return self.RETRY
     def getExecuteCommand(self, test):
         testCommand = default.RunTest.getExecuteCommand(self, test)
-        if self.collectStdErr:
-            errfile = test.makeFileName("errors", temporary=1)
-            # C-shell based shells have different syntax here...
-            if self.loginShell.find("csh") != -1:
-                testCommand = "( " + testCommand + " ) >& " + errfile
-            else:
-                testCommand += " 2> " + errfile
+
         # put the command in a file to avoid quoting problems,
         # also fix env.variables that remote login doesn't reset
         cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
@@ -141,16 +104,19 @@ class RunTest(default.RunTest):
         unixPerfFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
         timedTestCommand = '\\time -p ' + self.loginShell + ' ' + cmdFile + ' 2> ' + unixPerfFile
         return timedTestCommand
+    def getStdErrRedirect(self, command, file):
+        # C-shell based shells have different syntax here...
+        if self.loginShell.find("csh") != -1:
+            return "( " + command + " ) >& " + file
+        else:
+            return default.RunTest.getStdErrRedirect(self, command, file)        
     def buildCommandFile(self, test, cmdFile, testCommand):
         f = open(cmdFile, "w")
-        f.write(testCommand + os.linesep)
+        f.write(testCommand + "\n")
         f.close()
         return cmdFile
-    def getCleanUpAction(self):
-        return KillTest(self)
     def setUpApplication(self, app):
         default.RunTest.setUpApplication(self, app)
-        self.collectStdErr = app.getConfigValue("collect_standard_error")
         self.loginShell = app.getConfigValue("login_shell")
         self.setUpVirtualDisplay(app)
     def setUpVirtualDisplay(self, app):
@@ -221,7 +187,7 @@ class VirtualDisplayFinder:
     def findDisplay(self, server):
         line = self.getPsOutput(server, ownProcesses=0)
         if len(line):
-            self.diag.info("Found Xvfb process running:" + os.linesep + line)
+            self.diag.info("Found Xvfb process running:" + "\n" + line)
             serverName = server + line.split()[-1] + ".0"
             testCommandLine = self.getSysCommand(server, "xterm -display " + serverName + " -e echo test", background=0)
             self.diag.info("Testing with command '" + testCommandLine + "'")
@@ -235,15 +201,6 @@ class VirtualDisplayFinder:
                     print line.strip()
                 return ""
         return None
-
-class KillTest(plugins.Action):
-    def __init__(self, testRunner):
-        self.runner = testRunner
-    def setUpApplication(self, app):
-        process = self.runner.process
-        if process and process.processId:
-            print "Killing running test (process id", str(process.processId) + ")"
-            process.kill()
    
 def isCompressed(path):
     if os.path.getsize(path) == 0:
@@ -276,7 +233,7 @@ class CollateUNIXFiles(default.CollateFiles):
         if os.path.getsize(path) == 0:
             os.remove(path)
             file = open(path, "w")
-            file.write("Core file of zero size written - Stack trace not produced for crash\nCheck your coredumpsize limit" + os.linesep)
+            file.write("Core file of zero size written - Stack trace not produced for crash\nCheck your coredumpsize limit" + "\n")
             file.close()
             return
         fileName = "coreCommands.gdb"
@@ -304,7 +261,7 @@ class CollateUNIXFiles(default.CollateFiles):
             os.remove(stdoutFile)
             os.remove(stderrFile)
         else:
-            writeFile.write("Could not find binary name '" + binary + "' from core file : Stack trace not produced for crash" + os.linesep)
+            writeFile.write("Could not find binary name '" + binary + "' from core file : Stack trace not produced for crash" + "\n")
             os.rename(path, "core")
         os.remove(fileName)
         os.rename(newPath, path)
@@ -312,7 +269,7 @@ class CollateUNIXFiles(default.CollateFiles):
         # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
         # Unfortunately running gdb is not the answer, because it truncates the data...
         finalWord = os.popen("csh -c 'echo `tail -c 1024 " + path + "`' 2> /dev/null").read().split(" ")[-1].strip()
-        return finalWord.split(os.linesep)[-1]
+        return finalWord.split("\n")[-1]
     def writeStackTrace(self, stdoutFile, writeFile):
         prevLine = ""
         foundStack = 0
@@ -320,23 +277,23 @@ class CollateUNIXFiles(default.CollateFiles):
         for line in open(stdoutFile).xreadlines():
             if line.find("Program terminated") != -1:
                 writeFile.write(line)
-                writeFile.write("Stack trace from gdb :" + os.linesep)
+                writeFile.write("Stack trace from gdb :" + "\n")
                 foundStack = 1
             if line[0] == "#" and line != prevLine:
                 startPos = line.find("in ") + 3
                 endPos = line.rfind("(")
-                writeFile.write(line[startPos:endPos] + os.linesep)
+                writeFile.write(line[startPos:endPos] + "\n")
                 printedStackLines += 1
             prevLine = line
             # Sometimes you get enormous stacktraces from GDB, for example, if you have
             # an infinite recursive loop.
             if printedStackLines >= 30:
-                writeFile.write("Stack trace print-out aborted after 30 function calls" + os.linesep)
+                writeFile.write("Stack trace print-out aborted after 30 function calls" + "\n")
                 break
         return foundStack
     def writeGdbErrors(self, stderrFile, writeFile):
-        writeFile.write("GDB backtrace command failed : Stack trace not produced for crash" + os.linesep)
-        writeFile.write("Errors from GDB:" + os.linesep)
+        writeFile.write("GDB backtrace command failed : Stack trace not produced for crash" + "\n")
+        writeFile.write("Errors from GDB:" + "\n")
         for line in open(stderrFile).xreadlines():
             writeFile.write(line)
     def extract(self, sourcePath, targetFile):
@@ -401,9 +358,9 @@ class MakePerformanceFile(default.PerformanceFileCreator):
         return 60 * float(parts[0]) + float(parts[1])
     def writeFile(self, test, cpuTime, realTime, executionMachines, fileName):
         file = open(fileName, "w")
-        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. on " + test.execHost + os.linesep
+        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. on " + test.execHost + "\n"
         file.write(cpuLine)
-        realLine = "Real time  : " + self.timeString(realTime) + " sec." + os.linesep
+        realLine = "Real time  : " + self.timeString(realTime) + " sec.\n"
         file.write(realLine)
         self.writeMachineInformation(file, executionMachines)
     def writeMachineInformation(self, file, executionMachines):

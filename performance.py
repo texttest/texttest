@@ -270,7 +270,7 @@ class PerformanceStatistics(plugins.Action):
             else:
                 print "Unknown option " + arr[0]
     def setUpSuite(self, suite):
-        self.suiteName = suite.name + os.linesep + "   "
+        self.suiteName = suite.name + "\n" + "   "
     def __call__(self, test):
         refPerf = getTestPerformance(test, self.referenceVersion)
         currPerf = getTestPerformance(test, self.currentVersion)
@@ -304,8 +304,7 @@ class MemoryStatistics(plugins.Action):
             else:
                 print "Unknown option " + arr[0]
     def setUpSuite(self, suite):
-        self.suiteName = suite.name + os.linesep + "   "
-
+        self.suiteName = suite.name + "\n   "
     def getOutputMemory(self, fileName):
         if not os.path.isfile(fileName):
             return float(-1)

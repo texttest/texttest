@@ -22,7 +22,7 @@ class KnownBug(FailedPrediction):
                 return 0
         return 1
     def findStatus(self, description):
-        for line in description.split(os.linesep):
+        for line in description.split("\n"):
             words = line.split()
             if len(words) < 4:
                 continue

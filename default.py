@@ -44,6 +44,7 @@ default.ExtractStandardPerformance     - update the standard performance files f
 
 import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, knownbugs
 import glob
+from threading import currentThread
 from cPickle import Unpickler
 
 def getConfig(optionMap):
@@ -231,6 +232,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("performance_test_minimum", { "default" : 0 })
         app.setConfigDefault("use_standard_input", 1)
         app.setConfigDefault("collect_standard_output", 1)
+        app.setConfigDefault("collect_standard_error", 1)
+        app.addConfigEntry("pending", "white", "test_colours")
         app.addConfigEntry("definition_file_stems", "knownbugs")
         
 class MakeWriteDirectory(plugins.Action):
@@ -313,7 +316,7 @@ class CollateFiles(plugins.Action):
         if self.hasAnyFiles(test):
             for sourcePattern, targetFile in errorWrites:
                 errText = self.getErrorText(sourcePattern)
-                open(targetFile, "w").write(errText + os.linesep)
+                open(targetFile, "w").write(errText + "\n")
     def hasAnyFiles(self, test):
         for file in os.listdir(test.getDirectory(temporary=1)):
             if os.path.isfile(file) and test.app.ownsFile(file):
@@ -405,9 +408,21 @@ class FileFilter(TextFilter):
         self.texts = map(string.strip, open(fullPath).readlines())
         return 1
 
-# Standard error redirect is difficult on windows, don't try...
+# Workaround for python bug 853411: tell main thread to start the process
+# if we aren't it...
+class Pending(plugins.TestState):
+    def __init__(self, process):
+        plugins.TestState.__init__(self, "pending")
+        self.process = process
+        if currentThread().getName() == "MainThread":
+            self.notifyInMainThread()
+    def notifyInMainThread(self):
+        self.process.doFork()
+
 class RunTest(plugins.Action):
     def __init__(self):
+        self.process = None
+        self.collectStdErr = 1
         self.diag = plugins.getDiagnostics("run test")
     def __repr__(self):
         return "Running"
@@ -423,19 +438,31 @@ class RunTest(plugins.Action):
     def changeState(self, test):
         test.changeState(plugins.TestState("running", "Running on " + hostname(), started = 1))
     def runTest(self, test):
+        if self.process:
+            # See if the running process is finished
+            if self.process.hasTerminated():
+                self.process = None
+                return
+            else:
+                return self.RETRY
+
         testCommand = self.getExecuteCommand(test)
-        self.runCommand(test, testCommand)
+        self.describe(test)
+        self.process = plugins.BackgroundProcess(testCommand, testRun=1)
+        test.changeState(Pending(self.process))
+        self.process.waitForStart()
+        return self.RETRY
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand() + " < " + self.getInputFile(test)
         outfile = test.makeFileName("output", temporary=1)
-        return testCommand + " > " + outfile
-    def runCommand(self, test, command, jobNameFunction = None, options = ""):
-        if jobNameFunction:
-            print test.getIndent() + "Running", jobNameFunction(test), "locally"
+        testCommand += " > " + outfile
+        if self.collectStdErr:
+            errfile = test.makeFileName("errors", temporary=1)
+            return self.getStdErrRedirect(testCommand, errfile)
         else:
-            self.describe(test)
-        self.diag.info("Running test with command '" + command + "'")
-        os.system(command)
+            return testCommand
+    def getStdErrRedirect(self, command, file):
+        return command + " 2> " + file
     def getInputFile(self, test):
         inputFileName = test.inputFile
         if os.path.isfile(inputFileName):
@@ -444,10 +471,22 @@ class RunTest(plugins.Action):
             return "/dev/null"
         else:
             return "nul"
+    def getCleanUpAction(self):
+        return KillTest(self)
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
         app.checkBinaryExists()
+        self.collectStdErr = app.getConfigValue("collect_standard_error")
+
+class KillTest(plugins.Action):
+    def __init__(self, testRunner):
+        self.runner = testRunner
+    def setUpApplication(self, app):
+        process = self.runner.process
+        if process and process.processId:
+            print "Killing running test (process id", str(process.processId) + ")"
+            process.kill()        
 
 class CreateCatalogue(plugins.Action):
     def __init__(self):
@@ -470,10 +509,10 @@ class CreateCatalogue(plugins.Action):
         
         fileName = test.makeFileName("catalogue", temporary=1)
         file = open(fileName, "w")
-        file.write("The following new files were created:" + os.linesep)
+        file.write("The following new files were created:" + "\n")
         self.writeFileStructure(file, filesGained)
         if len(filesLost) > 0:
-            file.write(os.linesep + "The following existing files were deleted:" + os.linesep)
+            file.write("\n" + "The following existing files were deleted:" + "\n")
             self.writeFileStructure(file, filesLost)
         file.close()
     def writeFileStructure(self, file, fileNames):
@@ -487,7 +526,7 @@ class CreateCatalogue(plugins.Action):
                 indent += tabSize
                 if index >= len(prevParts) or part != prevParts[index]:
                     prevParts = []
-                    file.write(part + os.linesep)
+                    file.write(part + "\n")
                     if index != len(parts) - 1:
                         file.write(("-" * indent))
                 else:
@@ -498,7 +537,7 @@ class CreateCatalogue(plugins.Action):
         for writeDir in test.writeDirs:
             if os.path.isdir(writeDir):
                 fileList += self.listDirectory(test.app, writeDir, firstLevel = 1)
-        self.diag.info("Found all files present as follows : " + os.linesep + repr(fileList))
+        self.diag.info("Found all files present as follows : " + "\n" + repr(fileList))
         return fileList
     def listDirectory(self, app, writeDir, firstLevel = 0):
         subDirs = []
@@ -701,7 +740,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
             return [ self.logFileStem ]
     def saveFile(self, fileName, lineToWrite):
         file = open(fileName, "w")
-        file.write(lineToWrite + os.linesep)
+        file.write(lineToWrite + "\n")
         file.close()
     def makeLine(self, values, fileStem):
         # Round to accuracy 0.01

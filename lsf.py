@@ -274,11 +274,16 @@ class LSFServer:
     def parseErrors(self, stderr):
         # Assume anything we can't find any more has completed OK
         for errorMessage in stderr.readlines():
-            if errorMessage and errorMessage.find("still trying") == -1:
-                jobId = self.getJobId(errorMessage)
-                job = self.activeJobs[jobId]
-                job.status = "DONE"
-                del self.activeJobs[jobId]
+            if not errorMessage or errorMessage.find("still trying") != -1:
+                continue
+            jobId = self.getJobId(errorMessage)
+            if not self.activeJobs.has_key(jobId):
+                print "ERROR: unexpected output from bjobs :", errorMessage.strip()
+                continue
+            
+            job = self.activeJobs[jobId]
+            job.status = "DONE"
+            del self.activeJobs[jobId]
     def _requeueTest(self, jobInfoList): # REQUEUE if last two log message bhist lines contains REQUEUE_PEND and Exited
         jobId = jobInfoList[0]
         std = os.popen("bhist -l " + jobId + " 2>&1")

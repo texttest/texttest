@@ -126,7 +126,7 @@ class Config(plugins.Configuration):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
     def printHelpScripts(self):
-        print helpScripts
+        print helpScripts, predict.helpScripts
     def printHelpDescription(self):
         print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
     def printHelpOptions(self, builtInOptions):

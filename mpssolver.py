@@ -1,12 +1,7 @@
 helpDescription = """
-The MpsSolver configuration is based on the Carmen configuration. """ 
-
-helpOptions = """-feasstat version,version          Give infeasibility statistics
-
-"""
-
-helpScripts = """
-"""
+The MpsSolver configuration is a simple extension to the UNIX configuration. The main
+purpose of it is to be able to create links to the MPS files, so that two tests using
+the same MPS files will not collide""" 
 
 import unixConfig, carmen, os, shutil, filecmp, string, plugins, comparetest, performance
 
@@ -14,22 +9,6 @@ def getConfig(optionMap):
     return MpsSolverConfig(optionMap)
 
 class MpsSolverConfig(carmen.CarmenConfig):
-    def __init__(self, optionMap):
-        carmen.CarmenConfig.__init__(self, optionMap)
-    def getArgumentOptions(self):
-        options = carmen.CarmenConfig.getArgumentOptions(self)
-        options["memstat"] = "Show memory statistics for versions"
-        options["perfstat"] = "Show performance statistics for versions"
-        options["feasstat"] = "Show feasibility statistics for versions"
-        return options
-    def getActionSequence(self):
-        if self.optionMap.has_key("memstat"):
-            return [ MemoryStatisticsBuilder(self.optionValue("memstat")) ]
-        if self.optionMap.has_key("perfstat"):
-            return [ PerformanceStatisticsBuilder(self.optionValue("perfstat")) ]
-        if self.optionMap.has_key("feasstat"):
-            return [ FeasibilityStatisticsBuilder(self.optionValue("feasstat")) ]
-        return carmen.CarmenConfig.getActionSequence(self)
     def getQueuePerformancePrefix(self, test, arch):
         if not os.environ.has_key("MPSSOLVER_LSFQUEUE_PREFIX"):
             return carmen.CarmenConfig.getQueuePerformancePrefix(self, test, arch)
@@ -77,37 +56,6 @@ class MpsSolverConfig(carmen.CarmenConfig):
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
-    def printHelpOptions(self, builtInOptions):
-        carmen.CarmenConfig.printHelpOptions(self, builtInOptions)
-        print helpOptions
-    def printHelpScripts(self):
-        carmen.CarmenConfig.printHelpScripts(self)
-        print helpScripts
 
-
-def pad(str, padSize):
-    return str.ljust(padSize)
-        
-class FeasibilityStatisticsBuilder(plugins.Action):
-    def __init__(self, versionString):
-        versions = versionString.split(",")
-        self.referenceVersion = versions[0]
-        self.currentVersion = None
-        if len(versions) > 1:
-            self.currentVersion = versions[1]
-    def setUpSuite(self, suite):
-        self.suiteName = suite.name + os.linesep + "   "
-    def numInfeasibilities(self, test, version):
-        fileName = test.makeFileName("errors", version)
-        if not os.path.isfile(fileName):
-            return 0
-        grepCommand = "grep -E 'Solver fail' " + fileName
-        return len(os.popen(grepCommand).readlines())
-    def __call__(self, test):
-        refErrors = self.numInfeasibilities(test, self.referenceVersion)
-        currErrors = self.numInfeasibilities(test, self.currentVersion)
-        if refErrors + currErrors > 0:
-            print self.suiteName + pad(test.name, 30) + "\t", refErrors, currErrors
-            self.suiteName = "   "
 
         

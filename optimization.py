@@ -1092,7 +1092,6 @@ class _PlotTest(plugins.Action):
         self.plotStates = [ "" ]
         self.yLabel = ""
         self.plotInSameGraph = 0
-        self.testWritedir = {}
         self.lastSuite = ""
         # Must be last in the constructor
         self.interpretOptions(args)
@@ -1279,16 +1278,8 @@ class _PlotTest(plugins.Action):
             self.plotFiles = []
     def __call__(self, test):
         # In GUI mode we can rely on existing dirs
-        if len(test.writeDirs) == 0:
-            if not self.testWritedir.has_key(test):
-                rootPath = os.path.join(os.environ["HOME"], ".texttestplot", self.lastSuite, test.name)
-                if os.path.isdir(rootPath):
-                    test.cleanPreviousWriteDirs(rootPath);
-                test.createDir(rootPath);
-                self.testWritedir[test] = test.writeDirs[0]
-            else:
-                test.writeDirs = []
-                test.writeDirs.append(self.testWritedir[test])
+        if not os.path.isdir(test.writeDirs[0]):
+            os.makedirs(test.writeDirs[0])
         os.chdir(test.writeDirs[0])
         for version in self.plotVersions:
             for state in self.plotStates:
@@ -1317,6 +1308,4 @@ class _PlotTest(plugins.Action):
                     self.plotFiles.append(plotFileName)
         if not self.plotInSameGraph:
             self.plotGraph()
-        if self.testWritedir.has_key(test):
-            test.writeDirs = []
         

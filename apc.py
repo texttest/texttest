@@ -642,13 +642,9 @@ class MakeProgressReport(optimization.MakeProgressReport):
             wText = "Overall time weighted KPI with respect to version"
             print wText, self.referenceVersion, "=", self.percent(self.prodKPI)
     def doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition = "test", minMaxRuns = None):
-        kpi = optimization.MakeProgressReport.doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition,minMaxRuns)
+        kpiData = optimization.MakeProgressReport.doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition,minMaxRuns)
 
-        worstCost = self.calculateWorstCost(referenceRun, currentRun, app, groupName)
-        currTTWC = currentRun.timeToCost(worstCost)
-        refTTWC = referenceRun.timeToCost(worstCost)
-        
-        self.plotKPI(self.testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns)
+        self.plotKPI(self.testCount, currentRun, referenceRun, groupName, userName, kpiData, minMaxRuns)
 
     def getPerformance(self, test, currentVersion, referenceVersion):
         return 0.0, 0.0
@@ -749,12 +745,14 @@ class MakeProgressReport(optimization.MakeProgressReport):
             self.weightKPI.append(weightKPItuple)
         return kpi
     def reportCosts(self, currentRun, referenceRun, app, groupName, minMaxRuns=None):
-        optimization.MakeProgressReport.reportCosts(self, currentRun, referenceRun, app, groupName)
+        retVal = optimization.MakeProgressReport.reportCosts(self, currentRun, referenceRun, app, groupName)
         if self.groupTimeLimit.has_key(groupName):
             qualTime = self.groupTimeLimit[groupName]
             curCost = currentRun.costAtTime(qualTime)
             refCost = referenceRun.costAtTime(qualTime)
             kpi = float(curCost) / float(refCost)
+            # add a line for the plot
+            retVal["qualKPILine"]=((qualTime,curCost),(qualTime,refCost),1)
             if kpi > 0:
                 self.qualKPI *= kpi
                 self.qualKPICount += 1
@@ -765,13 +763,17 @@ class MakeProgressReport(optimization.MakeProgressReport):
         if minMaxRuns:
             referenceMinRun, referenceMaxRun, currentMinRun, currentMaxRun = minMaxRuns
             referenceSpreadAtEnd=float(referenceMaxRun.getCost(-1))/float(referenceMinRun.getCost(-1))-1;
-            endtime=currentRun.solutions[-1][optimization.timeEntryName]
             currentSpreadAtEnd=float(currentMaxRun.getCost(-1))/float(currentMinRun.getCost(-1))-1;
             spreadKPI=(currentSpreadAtEnd)/(max(referenceSpreadAtEnd,0.0000000001))
             self.reportLine("Relative spread (%)", "%f"%(100*currentSpreadAtEnd), "%f"%(referenceSpreadAtEnd*100))
             self.spreadKPI *= spreadKPI;
             self.spreadKPICount += 1;
-        
+            # add lines for the plot
+            endTime = referenceMinRun.getTime(-1);
+            retVal["refEndLine"]=((endTime,referenceMinRun.getCost(-1)),(endTime,referenceMaxRun.getCost(-1)),0)
+            endTime=currentMinRun.getTime(-1);
+            retVal["currEndLine"]=((endTime,currentMinRun.getCost(-1)),(endTime,currentMaxRun.getCost(-1)),0)
+        return retVal;
         
     # Extracts data from an OptimizationRun and adds it to the appropriate averager.
     def addRunToAverage(self, optRun, averagerMap, groupName):
@@ -817,7 +819,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
                 map[optimization.memoryEntryName] = memGraph[time]
                 solution.append(map)
         return optimization.OptimizationRun("","","","", 0.0, solution)
-    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns):
+    def plotKPI(self, testCount, currentRun, referenceRun, groupName, userName, kpiData, minMaxRuns):
         pass
 
 # Produces graphical output for the progress report.
@@ -879,15 +881,37 @@ class MakeProgressReportGraphical(MakeProgressReport):
             yVals.append(solution[optimization.costEntryName])
             solutionPrev = solution
         axes.fill(xVals, yVals, color , linewidth = 0, edgecolor = options)
-    def plotKPILimits(self, worstCost, currTTWC, refTTWC):
-        self.plot([0,1.1*max(currTTWC,refTTWC)],[worstCost, worstCost],"r")
-        self.plot([currTTWC,currTTWC], [worstCost*1.01,worstCost*0.99],"r")
-        self.plot([refTTWC,refTTWC], [worstCost*1.01,worstCost*0.99],"r")
-    def plotPost(self, ax, lowestCost, worstCost, currTTWC, refTTWC):
-        self.plotKPILimits(worstCost, currTTWC, refTTWC)
-        ax.set_ylim( (lowestCost*0.999, lowestCost * 1.05) )
+    def plotLine(self,axis,line,col="r"):
+        (ax,ay),(bx,by),pullTo0=line;
+        ax,bx = min(ax,bx),max(ax,bx)
+        ay,by = min(ay,by),max(ay,by)
+        ylim = axis.get_ylim()
+        xlim = axis.get_xlim()
+
+        dy = (ylim[1]-ylim[0])*0.07;
+        dx = (xlim[1]-xlim[0])*0.07;
+        if ay == by:
+            dx = 0;
+            if pullTo0:
+                self.plot([0,bx],[ay,by],col,linewidth=1.5)
+        if ax == bx:
+            dy = 0
+            if pullTo0:
+                self.plot([ax,bx],[0,by],col,linewidth=1.5)
+        self.plot([ax,bx],[ay,by],col,linewidth=1.5)
+        self.plot([ax-dx,ax+dx],[ay+dy,ay-dy],col,linewidth=1.5)
+        self.plot([bx-dx,bx+dx],[by+dy,by-dy],col,linewidth=1.5)
+        #retain the limits (hold does not work)
+        axis.set_ylim(ylim),
+        axis.set_xlim(xlim)
+    def plotPost(self, ax,lowestCost,maxend,kpiData):
+        ax.set_ylim( (lowestCost*0.999, max(lowestCost * 1.05, maxend*1.001)) )
+        self.plotLine(ax,kpiData["KPILine"],"r")
+        for k,c in [("qualKPILine","k"),("refEndLine","b"),("currEndLine","g")]:
+            if kpiData.has_key(k):
+                self.plotLine(ax,kpiData[k],c)
         self.legend([self.referenceVersion,self.currentVersion])
-    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns):
+    def plotKPI(self, testCount, currentRun, referenceRun, groupName, userName, kpiData, minMaxRuns):
         if not self.matplotlibPresent:
             return
         self.figure(testCount, facecolor = 'w', figsize = (12,5))
@@ -914,8 +938,9 @@ class MakeProgressReportGraphical(MakeProgressReport):
             self.plotRun(currentMaxRun ,"g--", 1)
         self.plotRun(referenceRun, "b", 1.5)
         self.plotRun(currentRun, "g", 1.5)
-        self.plotPost(ax, lowestCostInGroup, worstCost, currTTWC, refTTWC)
-        self.title("User " + userName + ", KPI group " + groupName + ": " + str(kpi))
+        maxFinal=max(map(lambda x:max(x),self.finalCostsInGroup[groupName]))
+        self.plotPost(ax, lowestCostInGroup,maxFinal, kpiData)
+        self.title("User " + userName + ", KPI group " + groupName + ": " + str(kpiData["kpi"]))
         # Plot the individual curves on the right axes.
         ax = self.axes([0.585, up, width, height], axisbg = axesBG)
         ax.yaxis.set_major_formatter(majorFormatter)
@@ -924,7 +949,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
                 test, referenceIndividualRun, currentIndividualRun, userName = self.testInGroup[testName]
                 self.plotRun(referenceIndividualRun, "b")
                 self.plotRun(currentIndividualRun, "g")
-        self.plotPost(ax, lowestCostInGroup, worstCost, currTTWC, refTTWC)
+        self.plotPost(ax, lowestCostInGroup, maxFinal,kpiData)
         self.title("Individual runs")
     # Tiny class to provide a UNIQUE formatter function carrying the lowest
     # value for each group (which corresponds to a plot)
@@ -979,8 +1004,8 @@ class MakeProgressReportHTML(MakeProgressReportGraphical):
             self.summaryContainer.append((self.htmlHeading(2, "Worst KPI = " + self.percent(self.worstKpi))))
             self.indexDoc.append(self.htmlHR())
             self.indexDoc.write(os.path.join(self.dirForPlots, "index.html"))
-    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns):
-        MakeProgressReportGraphical.plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns)
+    def plotKPI(self, testCount, currentRun, referenceRun, groupName, userName, kpiData, minMaxRuns):
+        MakeProgressReportGraphical.plotKPI(self, testCount, currentRun, referenceRun, groupName, userName, kpiData, minMaxRuns)
         if self.savePlots:
             self.savefig(os.path.join(self.dirForPlots, groupName))
             if self.writeHTML:

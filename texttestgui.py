@@ -420,7 +420,10 @@ class TestCaseGUI:
                 self.addButton(self.save, buttonbox, option, option)
         for intvAction in interactiveActions:
             instance = intvAction()
-            self.addButton(self.runInteractive, buttonbox, instance.getTitle() + "...", instance)
+            buttonTitle = instance.getTitle()
+            if len(instance.getSwitches()) or len(instance.getArgumentOptions()):
+                buttonTitle += "..."
+            self.addButton(self.runInteractive, buttonbox, buttonTitle, instance)
         buttonbox.show()
         return buttonbox
     def hasPerformance(self, comparisonList):
@@ -473,6 +476,9 @@ class TestCaseGUI:
             self.test.callAction(action)
             return
         action.describe(self.test)
+        if len(action.getArgumentOptions()) == 0 and len(action.getSwitches()) == 0:
+            self.test.callAction(action)
+            return
         self.dataWindow.remove(self.dataWindow.get_child())
         self.optionChooser = OptionChooser(button, action, self.test)
         self.dataWindow.add_with_viewport(self.optionChooser.display)

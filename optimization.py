@@ -124,7 +124,7 @@ class OptimizationConfig(carmen.CarmenConfig):
         solutionCollator = unixConfig.CollateFile("best_solution", "solution")
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])
     def getInteractiveActions(self):
-        return [ PlotTest, TableTest, ViewLog ]
+        return [ ViewLog, PlotTest, TableTest ]
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)

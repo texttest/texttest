@@ -121,6 +121,8 @@ class TextTestGUI:
             return self.modelUpdate(iter, colours["success"])
         if state == test.RUNNING:
             return self.modelUpdate(iter, colours["running"])
+        if state == test.RUNNING_PREPROCESS:
+            return self.modelUpdate(iter, colours["run_preprocess"])
         return self.modelUpdate(iter, colours["not_started"])
     def modelUpdate(self, iter, colour, details="", colour2=None):
         if not colour2:

@@ -74,9 +74,6 @@ helpScripts = """carmen.TraverseCarmUsers   - Traverses all CARMUSR's associated
 
 import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, time, predict
 
-# Extra states for tests to be in!
-RULESET_NOT_BUILT = -1
-
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
 
@@ -324,7 +321,7 @@ class CompileRules(plugins.Action):
         jobName = self.getRulesetBuildJobName(test)
         if jobName in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name + " already being compiled")
-            test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + ruleset.name)
+            test.changeState(test.NEED_PREPROCESS, "Compiling ruleset " + ruleset.name)
             return
         self.describe(test, " - ruleset " + ruleset.name)
         self.ensureCarmTmpDirExists()
@@ -370,7 +367,7 @@ class CompileRules(plugins.Action):
         os.chdir(test.abspath)
         self.diag.info("Compiling with command '" + commandLine + "'")
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
-        test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + self.getRuleSetName(test))
+        test.changeState(test.NEED_PREPROCESS, "Compiling ruleset " + self.getRuleSetName(test))
         return self.ruleRunner.runCommand(test, fullCommand, self.getRulesetBuildJobName)
     def setUpSuite(self, suite):
         if self.filter and not self.filter.acceptsTestSuite(suite):
@@ -388,7 +385,8 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
         lsf.UpdateLSFStatus.__init__(self, jobNameFunction)
         self.getRuleSetName = getRuleSetName
     def __call__(self, test):
-        if test.state == RULESET_NOT_BUILT:
+        # Don't do anything unless we've been put in NEED_PREPROCESS state
+        if test.state < test.NOT_STARTED:
             return lsf.UpdateLSFStatus.__call__(self, test)
     def processStatus(self, test, status, machine):
         ruleset = self.getRuleSetName(test)
@@ -402,7 +400,10 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
             if machine != None:
                 details += " on " + machine
             details += os.linesep + "Current LSF status = " + status + os.linesep
-            test.changeState(RULESET_NOT_BUILT, details)
+            state = test.state
+            if status == "RUN":
+                state = test.RUNNING_PREPROCESS
+            test.changeState(state, details)
     def raiseFailure(self, test, ruleset):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         jobName = self.jobNameFunction(test)

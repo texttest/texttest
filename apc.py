@@ -387,26 +387,8 @@ class ApcCompileRules(carmen.CompileRules):
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
 
-class ApcUpdateLSFStatus(plugins.Action):
-    def __init__(self):
-        self.logFile = None
-    def __repr__(self):
-        return "Updating LSF status for"
-    def __call__(self, test):
-        job = lsf.LSFJob(test)
-        status, machine = job.getStatus()
-        if status == "DONE" or status == "EXIT":
-            return
-        if status != "PEND":
-            details = ""
-            if machine != None:
-                details += "Executing on " + machine + os.linesep
-
-            details += "Current LSF status = " + status + os.linesep
-            details += self.showRunStatusHead(test)
-            test.changeState(test.RUNNING, details)
-        return self.WAIT | self.RETRY
-    def showRunStatusHead(self, test):
+class ApcUpdateLSFStatus(lsf.UpdateTestLSFStatus):
+    def getExtraRunData(self, test):
          subplanDir = test.writeDirs[-1];
          runStatusHeadFile = os.path.join(subplanDir, "run_status_head")
          if os.path.isfile(runStatusHeadFile):

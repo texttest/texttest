@@ -293,19 +293,22 @@ class SubmitTest(unixConfig.RunTest):
     def changeState(self, test):
         # Don't change state just because we submitted to LSF
         pass
-    def getCleanUpAction(self):
-        return KillTest()
 
 class KillTest(plugins.Action):
+    def __init__(self, jobNameFunction):
+        self.jobNameFunction = jobNameFunction
     def __repr__(self):
         return "Cancelling"
     def __call__(self, test):
         if test.state > test.RUNNING:
             return
-        job = LSFJob(test)
+        job = LSFJob(test, self.jobNameFunction)
         if job.hasFinished():
             return
-        self.describe(test, " in LSF")
+        if self.jobNameFunction:
+            print test.getIndent() + repr(self), self.jobNameFunction(test), "in LSF"
+        else:
+            self.describe(test, " in LSF")
         job.kill()
         
 class Wait(plugins.Action):
@@ -355,26 +358,32 @@ class UpdateLSFStatus(plugins.Action):
         return self.WAIT | self.RETRY
     def processStatus(self, test, status, machine):
         pass
+    def getCleanUpAction(self):
+        return KillTest(self.jobNameFunction)
 
 class UpdateTestLSFStatus(UpdateLSFStatus):
     def __init__(self):
         UpdateLSFStatus.__init__(self)
         self.logFile = None
     def processStatus(self, test, status, machine):
-        perc = self.calculatePercentage(test)
         details = ""
         if machine != None:
             details += "Executing on " + machine + os.linesep
             
         details += "Current LSF status = " + status + os.linesep
-        if perc > 0:
-            details += "From log file reckoned to be " + str(perc) + "% complete."
+        details += self.getExtraRunData(test)
         if status == "PEND":
             test.changeState(test.NOT_STARTED, details)
         else:
             test.changeState(test.RUNNING, details)
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
+    def getExtraRunData(self, test):
+        perc = self.calculatePercentage(test)
+        if perc > 0:
+            return "From log file reckoned to be " + str(perc) + "% complete."
+        else:
+            return ""
     def calculatePercentage(self, test):
         stdFile = test.makeFileName(self.logFile)
         tmpFile = test.makeFileName(self.logFile, temporary=1)

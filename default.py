@@ -209,7 +209,7 @@ class ReconnectTest(plugins.Action):
             translateUser = 1
         else:
             pattern += test.getTestUser()
-        rexp = re.compile(pattern + "[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$")
+        rexp = re.compile(pattern + "[0-9][0-9]:[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$")
         stemsFound = []
         mtimeForStem = {}
         for file in os.listdir(testDir):

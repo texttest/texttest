@@ -275,6 +275,13 @@ class CompileRules(plugins.Action):
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
     def performCompile(self, test, commandLine):
+        #
+        # This is a LARGE hack, to get around the nasty design of making new test(suite) instances
+        # when an action has a filter. 
+        #
+        if len(test.writeDirs) < 1:
+            test.makeBasicWriteDirectory()
+        os.chdir(test.writeDirs[0])
         compTmp = test.makeFileName("ravecompile", temporary=1)
         # Hack to work around crc_compile bug which fails if ":" in directory
         os.chdir(test.abspath)

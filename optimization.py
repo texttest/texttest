@@ -28,17 +28,15 @@ class ExtractSubPlanFile(plugins.Action):
         return "Extracting subplan file " + self.sourceName + " to " + self.targetName + " on"
     def __call__(self, test):
         sourcePath = self.config.getSubPlanFileName(test, self.sourceName)
+        targetFile = test.getTmpFileName(self.targetName, "w")
         if os.path.isfile(sourcePath):
-            if carmen.isCompressed(sourcePath):
-                targetFile = test.getTmpFileName(self.targetName, "w") + ".Z"
-                shutil.copyfile(sourcePath, targetFile)
-                os.system("uncompress " + targetFile)
-            else:
-                targetFile = test.getTmpFileName(self.targetName, "w")
-                shutil.copyfile(sourcePath, targetFile)
+            shutil.copyfile(sourcePath, targetFile)
+            if carmen.isCompressed(targetFile):
+                targetFileZ = targetFile + ".Z"
+                os.rename(targetFile, targetFileZ)
+                os.system("uncompress " + targetFileZ)
             return
         if os.path.isfile(test.makeFileName(self.targetName)):
-            targetFile = test.getTmpFileName(self.targetName, "w")
             errText = "Expected file '" + sourcePath + "'not created by test"
             open(targetFile,"w").write(errText + os.linesep)
             

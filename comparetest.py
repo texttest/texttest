@@ -160,11 +160,8 @@ class FileComparison:
         return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
     def overwrite(self, exact, versionString = ""):
         newVersions = versionString.split(".")
-        stdFile = self.stdFile
-        for version in newVersions:
-            ext = "." + version
-            if self.stdFile.find(ext) == -1:
-                stdFile += ext
+        parts = self.stdFile.split(".")[:2] + newVersions
+        stdFile = string.join(parts, ".")
         if os.path.isfile(stdFile):
             os.remove(stdFile)
         # Allow for subclasses to differentiate between a literal overwrite and a

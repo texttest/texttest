@@ -9,7 +9,7 @@ the results for that version. This will create or override results files of the 
 instead of files of the form <root>.<app>
 """
 
-import comparetest, ndiff, sys, string, os, plugins
+import comparetest, ndiff, sys, string, os, plugins, predict
     
 # Abstract base to make it easier to write test responders
 class Responder(plugins.Action):
@@ -19,6 +19,10 @@ class Responder(plugins.Action):
         if os.path.isfile("core"):
             self.handleCoreFile(test)
             os.remove("core")
+        if predict.testBrokenPredictionMap.has_key(test):
+            predictionText = predict.testBrokenPredictionMap[test]
+            print test.getIndent() + "WARNING :", predictionText, "in", repr(test)
+            self.handleFailedPrediction(test, predictionText)
         if comparetest.testComparisonMap.has_key(test):
             testComparison = comparetest.testComparisonMap[test]
             print test.getIndent() + repr(test), self.responderText(test)
@@ -27,6 +31,8 @@ class Responder(plugins.Action):
         else:
             self.handleSuccess(test)
     def handleSuccess(self, test):
+        pass
+    def handleFailedPrediction(self, test, desc):
         pass
     def comparisonsString(self, comparisons):
         return string.join([repr(x) for x in comparisons], ",")

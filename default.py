@@ -31,7 +31,7 @@ helpScripts = """
 default.CountTest          - produce a brief report on the number of tests in the chosen selection, by application
 """
 
-import os, re, shutil, plugins, respond, comparetest, string
+import os, re, shutil, plugins, respond, comparetest, string, predict
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -58,11 +58,13 @@ class Config(plugins.Configuration):
         else:
             return RunTest()
     def getTestEvaluator(self):
-        subParts = [ self.getTestCollator(), self.getTestComparator(), self.getTestResponder() ]
+        subParts = [ self.getTestCollator(), self.getTestPredictionChecker(), self.getTestComparator(), self.getTestResponder() ]
         return plugins.CompositeAction(subParts)
     def getTestCollator(self):
         # Won't do anything, of course
         return plugins.Action()
+    def getTestPredictionChecker(self):
+        return predict.CheckPredictions()
     def getTestComparator(self):
         return comparetest.MakeComparisons(self.optionMap.has_key("n"))
     def getTestResponder(self):

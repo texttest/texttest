@@ -14,7 +14,7 @@ helpOptions = """
              If the list is empty, all versions are allowed.
 """
 
-import os, performance, plugins, respond, sys
+import os, performance, plugins, respond, sys, predict
 
 class BatchFilter(plugins.Filter):
     def __init__(self, batchSession):
@@ -61,8 +61,10 @@ class BatchCategory:
         self.description = description
         self.count = 0
         self.text = []
-    def addTest(self, test):
-        self.text.append(test.getIndent() + "- " + repr(test) + os.linesep)
+    def addTest(self, test, postText):
+        if len(postText) > 0:
+            postText = " : " + postText
+        self.text.append(test.getIndent() + "- " + repr(test) + postText + os.linesep)
         self.count += 1
     def addSuite(self, suite):
         line = suite.getIndent() + "In " + repr(suite) + ":" + os.linesep
@@ -105,6 +107,7 @@ class BatchResponder(respond.Responder):
         self.categories["slower"] = BatchCategory("ran slower")
         self.categories["success"] = BatchCategory("succeeded")
         self.categories["unfinished"] = BatchCategory("were unfinished")
+        self.categories["badPredict"] = BatchCategory("had internal errors")
         self.orderedCategories = self.categories.keys()
         self.orderedCategories.sort()
         self.mainSuite = None
@@ -138,12 +141,22 @@ class BatchResponder(respond.Responder):
             return app.getConfigValue(self.sessionName + "_recipients")
         except:
             return fromAddress
+    def addTestToCategory(self, category, test, postText = ""):
+        if category != None:
+            self.categories[category].addTest(test, postText)
     def handleSuccess(self, test):
         category = self.findSuccessCategory(test)
-        self.categories[category].addTest(test)
+        self.addTestToCategory(category, test)
     def handleFailure(self, test, testComparison):
         category = self.findFailureCategory(test, testComparison)
-        self.categories[category].addTest(test)
+        self.addTestToCategory(category, test)
+    def handleFailedPrediction(self, test, desc):
+        self.addTestToCategory("badPredict", test, desc)
+    def handleCoreFile(self, test):
+        crashText = self.responder.getCrashText(test)
+        self.crashDetail[test] = crashText
+    def handleDead(self, test):
+        self.deadDetail[test] = test.deathReason
     def findFailureCategory(self, test, testComparison):
         successCategory = self.findSuccessCategory(test)
         if successCategory != "success":
@@ -158,19 +171,17 @@ class BatchResponder(respond.Responder):
             return "unfinished"
         if test in self.crashDetail.keys():
             return "crash"
+        # Already added it in this case
+        if predict.testBrokenPredictionMap.has_key(test):
+            return None
         return "success"
-    def handleCoreFile(self, test):
-        crashText = self.responder.getCrashText(test)
-        self.crashDetail[test] = crashText
-    def handleDead(self, test):
-        self.deadDetail[test] = test.deathReason
     def setUpSuite(self, suite):
         if self.mainSuite == None:
             self.mainSuite = suite
         for category in self.categories.values():
             category.addSuite(suite)
     def failureCount(self):
-        return len(self.failureDetail) + len(self.crashDetail) + len(self.deadDetail)
+        return len(self.failureDetail) + len(self.crashDetail) + len(self.deadDetail) + self.categories["badPredict"].count
     def testCount(self):
         count = 0
         for category in self.categories.values():

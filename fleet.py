@@ -37,7 +37,10 @@ class FleetConfig(matador.MatadorConfig):
         print helpDescription
         matador.MatadorConfig.printHelpDescription(self)
     def getBinaryFile(self, app):
-        return os.path.join("bin", carmen.getArchitecture(app), "opt_tail")
+        if "9" in app.versions:
+            return os.path.join("bin", carmen.getArchitecture(app), "opt_route")
+        else:
+            return os.path.join("bin", carmen.getArchitecture(app), "opt_tail")
     def setUpApplication(self, app):
         matador.MatadorConfig.setUpApplication(self, app)
         self.itemNamesInFile[optimization.costEntryName] = "Optimizer cost"

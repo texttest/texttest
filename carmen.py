@@ -207,7 +207,6 @@ class BuildCode(plugins.Action):
         os.remove(buildFile)
         os.system("gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& build.install")
         print "Making install from", absPath ,"to", os.environ["CARMSYS"]
-        sys.exit(1)
     def buildRemote(self, machine, arch, absPath):
         print "Building remotely in parallel on " + machine + "..."
         processId = os.fork()

@@ -260,6 +260,8 @@ class Wait(plugins.Action):
         return job.hasFinished()
 
 class UpdateLSFStatus(plugins.Action):
+    def __init__(self):
+        self.logFile = None
     def __repr__(self):
         return "Updating LSF status for"
     def __call__(self, test):
@@ -268,9 +270,23 @@ class UpdateLSFStatus(plugins.Action):
         if status == "DONE" or status == "EXIT":
             return
         if status != "PEND":
-            details = "Executing on " + machine + os.linesep + "Current LSF status = " + status
+            perc = self.calculatePercentage(test)
+            details = "Executing on " + machine + os.linesep + "Current LSF status = " + status + os.linesep
+            if perc > 0:
+                details += "From log file reckoned to be " + str(perc) + "% complete."
             test.changeState(test.RUNNING, details)
         return "wait"
+    def setUpApplication(self, app):
+        app.setConfigDefault("log_file", "output")
+        self.logFile = app.getConfigValue("log_file")
+    def calculatePercentage(self, test):
+        stdFile = test.makeFileName(self.logFile)
+        tmpFile = test.getTmpFileName(self.logFile, "r")
+        if not os.path.isfile(tmpFile):
+            return 0
+        stdSize = os.path.getsize(stdFile)
+        tmpSize = os.path.getsize(tmpFile)
+        return (tmpSize * 100) / stdSize 
     
 class MakeResourceFiles(plugins.Action):
     def __init__(self, checkPerformance, checkMemory, isSlowdownJob):

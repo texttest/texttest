@@ -8,6 +8,19 @@ helpOptions = """-diag      - Run with diagnostics on. This will set the environ
              compare the diagnostics found in the ./Diagnostics subdirectory.
 """
 
+helpScripts = """
+matador.ImportTest         - Import new test cases and test users.
+                             The general principle is to add entries to the "testsuite.<app>" file and then
+                             run this action, typcally 'texttest -a <app> -s matador.ImportTest'. The action
+                             will then find the new entries (as they have no corresponding subdirs) and
+                             ask you for either new CARMUSR and CARMTMP (for new user) or new subplan
+                             directory (for new tests). Also for new tests it is neccessary to have an
+                             'APC_FILES' subdirectory created by Studio which is to be used as the
+                             'template' for temporary subplandirs as created when the test is run.
+                             The action will look for available subplandirectories under
+                             CARMUSR and present them to you.
+"""
+
 import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest
 
 def getConfig(optionMap):
@@ -75,6 +88,9 @@ class MatadorConfig(optimization.OptimizationConfig):
     def printHelpOptions(self, builtInOptions):
         optimization.OptimizationConfig.printHelpOptions(self, builtInOptions)
         print helpOptions
+    def printHelpScripts(self):
+        optimization.OptimizationConfig.printHelpScripts(self)
+        print helpScripts
 
 class MakeMatadorStatusFile(plugins.Action):
     def __call__(self, test):
@@ -199,4 +215,9 @@ class ImportTest(optimization.ImportTest):
         return MatadorTestCaseInformation(suite, name)
     def getTestSuiteInformation(self, suite, name):
         return MatadorTestSuiteInformation(suite, name)
+    def setUpSuite(self, suite):
+        if suite.app.name == "cas":
+            optimization.ImportTest.setUpSuite(self, suite)
+        else:
+            self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
     

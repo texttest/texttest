@@ -1,5 +1,7 @@
 helpDescription = """
-The Fleet configuration is the same as the Matador configuration."""
+The Fleet configuration is the same as the Matador configuration.
+
+Note though that the 'matador.ImportTest' script is not implemeted for Fleet yet."""
 
 helpOptions = """
 """

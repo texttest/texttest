@@ -72,6 +72,8 @@ class Config(plugins.Configuration):
     def addFilter(self, list, optionName, filterObj):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
+    def printHelpScripts(self):
+        pass
     def printHelpDescription(self):
         print helpDescription, comparetest.helpDescription, respond.helpDescription
     def printHelpOptions(self, builtInOptions):
@@ -81,6 +83,9 @@ class Config(plugins.Configuration):
         print "Command line options supported :"
         print "--------------------------------"
         self.printHelpOptions(builtInOptions)
+        print "Python scripts: (as given to -s <module>.<class> [args])"
+        print "--------------------------------"
+        self.printHelpScripts()
 
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):

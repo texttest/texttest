@@ -13,6 +13,29 @@ comparison as the file status.<app> after each test has run."""
 helpOptions = """
 """
 
+helpScripts = """
+apc.ImportTest             - Import new test cases and test users.
+                             The general principle is to add entries to the "testsuite.apc" file and then
+                             run this action, typcally 'texttest -a apc -s apc.ImportTest'. The action
+                             will then find the new entries (as they have no corresponding subdirs) and
+                             ask you for either new CARMUSR (for new user) or new subplan directory
+                             (for new tests). Note that CARMTMP is assigned for you. Also for new tests
+                             it is neccessary to have an 'APC_FILES' subdirectory created by Studio which
+                             is to be used as the 'template' for temporary subplandirs as created when
+                             the test is run. The action will look for available subplandirectories under
+                             CARMUSR and present them to you.
+
+apc.PlotApcTest [range]    - Create a gnuplot diagram with x-time, y-cost from the status file of test(s)
+                             This extracts costs and times from the status file of the tests you apply
+                             it to. It then displays a plot of how the cost changes over time in each
+                             test run. All plots end up in the same diagram.
+
+apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
+                             This is intended to be used on a single specified test and will terminate
+                             the testsuite after it starts Studio. It is a simple shortcut to set the
+                             correct CARMSYS etc. environment variables for the test and run Studio.
+"""
+
 import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins
 
 def getConfig(optionMap):
@@ -58,6 +81,9 @@ class ApcConfig(optimization.OptimizationConfig):
     def printHelpOptions(self, builtInOptions):
         optimization.OptimizationConfig.printHelpOptions(self, builtInOptions)
         print helpOptions
+    def printHelpScripts(self):
+        optimization.OptimizationConfig.printHelpScripts(self)
+        print helpScripts
 
 class ApcSubPlanDirManager(optimization.SubPlanDirManager):
     def __init__(self, config):
@@ -306,7 +332,11 @@ class ImportTest(optimization.ImportTest):
         return ApcTestCaseInformation(suite, name)
     def getTestSuiteInformation(self, suite, name):
         return ApcTestSuiteInformation(suite, name)
-
+    def setUpSuite(self, suite):
+        if suite.app.name == "apc":
+            optimization.ImportTest.setUpSuite(self, suite)
+        else:
+            self.describe(suite, " failed: Only imports APC test suites!")
 
 class PortApcTest(plugins.Action):
     def __repr__(self):

@@ -163,6 +163,12 @@ class LSFJob:
     def kill(self):
         os.system("bkill -J " + self.name + " > /dev/null 2>&1")
     def getStatus(self):
+        try:
+            return self._getStatus()
+        except IOError:
+            # Assume this is interrupted system call and try once more
+            return self._getStatus()
+    def _getStatus(self):
         file = self.getFile("-w -a")
         lines = file.readlines()
         if len(lines) == 0:
@@ -256,6 +262,7 @@ class SubmitTest(unixConfig.RunTest):
         else:
             unixConfig.RunTest.describe(self, test, " to LSF queue " + queueToUse)
     def buildCommandFile(self, test, cmdFile, testCommand):
+        self.diag.info("Building command file at " + cmdFile)
         f = open(cmdFile, "w")
         f.write("HOST=`hostname`; export HOST" + os.linesep)
         if os.environ.has_key("LSF_ENVIRONMENT"):
@@ -304,13 +311,7 @@ class Wait(plugins.Action):
         if self.jobNameFunction:
             postText += "(" + self.jobNameFunction(test) + ")"
         self.describe(test, postText)
-        while not self.checkCondition(job):
-            global emergencyFinish
-            if emergencyFinish:
-                print "Emergency finish: killing job!"
-                job.kill()
-                test.changeState(test.KILLED, "Killed by LSF emergency finish")
-                return
+        while not self.checkCondition(job):           
             time.sleep(2)
     def checkCondition(self, job):
         try:
@@ -336,8 +337,15 @@ class UpdateLSFStatus(plugins.Action):
         self.diag.info("Job " + job.name + " in state " + status + " for test " + test.name)
         if status == "DONE" or status == "EXIT":
             return
-        if status != "PEND" and not self.jobNameFunction:
+        if status != "PEND":
             self.getRunningInformation(test, status, machine)
+
+        global emergencyFinish
+        if emergencyFinish:
+            print "Emergency finish: killing job!"
+            job.kill()
+            test.changeState(test.KILLED, "Killed by LSF emergency finish")
+            return
         return "wait"
     def getRunningInformation(self, test, status, machine):
         pass

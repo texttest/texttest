@@ -53,7 +53,7 @@ class MatadorConfig(optimization.OptimizationConfig):
             del os.environ["DIAGNOSTICS_OUT"]
     def getTestComparator(self):
         if self.optionMap.has_key("diag"):
-            return CompareTestWithDiagnostics()
+            return CompareTestWithDiagnostics(self.optionMap.has_key("n"))
         else:
             return optimization.OptimizationConfig.getTestComparator(self)
     def checkPerformance(self):
@@ -100,6 +100,8 @@ class MakeMatadorStatusFile(plugins.Action):
         os.rename("status", test.getTmpFileName("status", "w"))
 
 class CompareTestWithDiagnostics(comparetest.MakeComparisons):
+    def __init__(self, newFiles):
+        comparetest.MakeComparisons.__init__(self, newFiles)
     def fileFinders(self, test):
         diagFinder = "diag", "Diagnostics"
         return comparetest.MakeComparisons.fileFinders(self, test) + [ diagFinder ]

@@ -47,10 +47,13 @@ class TextTestGUI:
         win.resize((screenWidth * 2) / 5, (screenHeight * 4) / 5)
         return win
     def createIterMap(self):
+        guilog.info("Mapping tests in tree view...")
         iter = self.model.get_iter_root()
         self.createSubIterMap(iter)
+        guilog.info("")
     def createSubIterMap(self, iter):
         test = self.model.get_value(iter, 2)
+        guilog.info("-> " + test.getIndent() + "Added " + repr(test) + " to test tree view.")
         childIter = self.model.iter_children(iter)
         try:
             self.itermap[test] = iter.copy()

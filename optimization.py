@@ -778,7 +778,7 @@ class MakeProgressReport(TestReport):
     def compare(self, test, referenceRun, currentRun):
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
         self.doCompare(referenceRun, currentRun, test.app, test.name, userName)
-    def doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition = "test"):
+    def doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition = "test",appSpecificData=None):
         if currentRun.isVeryShort() or referenceRun.isVeryShort():
             return
 
@@ -790,7 +790,7 @@ class MakeProgressReport(TestReport):
         kpi = self.computeKPI(currTTWC, refTTWC)
         print os.linesep, "Comparison on", app, groupNameDefinition, groupName, "(in user " + userName + ") : K.P.I. = " + kpi
         self.reportLine("                         ", self.currentText(), "Version " + self.referenceVersion)
-        self.reportCosts(currentRun, referenceRun, app, groupName)
+        self.reportCosts(currentRun, referenceRun, app, groupName,appSpecificData)
         self.reportLine("Max memory (MB)", currentRun.getMaxMemory(), referenceRun.getMaxMemory())
         self.reportLine("Total time (minutes)     ", currentRun.getPerformance(), referenceRun.getPerformance())
         self.reportLine("Time to cost " + str(worstCost) + " (mins)", currTTWC, refTTWC)
@@ -808,7 +808,7 @@ class MakeProgressReport(TestReport):
     def getMargins(self, app, groupName = None):
         refMargin = float(app.getConfigValue("kpi_cost_margin"))
         return refMargin, refMargin
-    def reportCosts(self, currentRun, referenceRun, app, groupName):
+    def reportCosts(self, currentRun, referenceRun, app, groupName,appSpecificData=None):
         costEntries = []
         for entry in currentRun.solutions[0].keys():
             if entry.find("cost") != -1 and entry in referenceRun.solutions[0].keys():

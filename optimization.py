@@ -18,9 +18,6 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
 -kpi <ver> - Generate a Key Performance Indicator ("KPI") relative to the version <ver>. This will try to apply
              some formula to boil down the results of the tests given to a single-number "performance indicator".
              Please note that the results so far are not very reliable, as the formula itself is still under development.
-
--keeptmp   - Keep the temporary subplan directories of the test(s). Note that once you run the test again the old
-             temporary subplan dirs will be removed, unless you run in parallell mode of course.       
 """
 helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the cpu time (in minutes) versus total cost. 
                              The data is extracted from the status file of test(s), and if the test is
@@ -115,12 +112,8 @@ class OptimizationConfig(carmen.CarmenConfig):
     def getCompileRules(self, localFilter):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
-        solutionCollator = unixConfig.CollateFile("best_solution", "solution", [ self.getSubPlanFileName ])
+        solutionCollator = unixConfig.CollateFile("best_solution", "solution")
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])
-    def keepTemporarySubplans(self):
-        if self.optionMap.has_key("keeptmp"):
-            return 1
-        return 0
     def getInteractiveActions(self):
         return [ PlotTest, TableTest ]
     def printHelpDescription(self):
@@ -133,38 +126,22 @@ class OptimizationConfig(carmen.CarmenConfig):
         carmen.CarmenConfig.printHelpScripts(self)
         print helpScripts
     def setUpApplication(self, app):
-        app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile);
-        app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods);
-            
-# Abstract base class for handling running tests in temporary subplan dirs
-# see example usage in apc.py
-#
-class SubPlanDirManager:
-    def __init__(self, config):
-        self.config = config
-        self.tmpDirs = {}
-    def getSubPlaDirFromTest(self, test):
-        pass
-    def getExecuteCommand(self, test):
-        pass
-    def getSubPlanFileName(self, test, sourceName):
-        if not self.tmpDirs.has_key(test):
-            return os.path.join(self.getSubPlanDirFromTest(test), "APC_FILES", sourceName)
-        else:
-            return os.path.join(self.tmpDirs[test], "APC_FILES", sourceName)
-    def makeTemporary(self, test):
-        dirName = self.getSubPlanDirName(test)
-        baseName = self.getSubPlanBaseName(test)
-        tmpDir = self.getTmpSubdir(test, dirName, baseName, "w")
-        self.tmpDirs[test] = tmpDir
-        os.mkdir(tmpDir)
+        app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile)
+        app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods)
+    def getExecuteCommand(self, binary, test):
+        # Something of a hack to fit things in here: setting up is really a separate action
+        self.makeTemporarySubplan(test)
+        return carmen.CarmenConfig.getExecuteCommand(self, binary, test)
+    def makeTemporarySubplan(self, test):
+        dirName = self._getSubPlanDirName(test)
+        rootDir, baseDir = os.path.split(dirName)
+        tmpDir = test.makeWriteDirectory(rootDir, baseDir, "APC_FILES")
         parameterOverrides = test.app.getConfigList("rave_parameter")
-        self.makeLinksIn(tmpDir, os.path.join(dirName, baseName), parameterOverrides)
+        self.makeLinksIn(tmpDir, dirName, parameterOverrides)
     def makeLinksIn(self, inDir, fromDir, parameterOverrides):
         for file in os.listdir(fromDir):
             if file == "APC_FILES":
                 apcFiles = os.path.join(inDir, file)
-                os.mkdir(apcFiles)
                 self.makeLinksIn(apcFiles, os.path.join(fromDir, file), parameterOverrides)
                 continue
             if file.find("Solution_") != -1:
@@ -188,53 +165,8 @@ class SubPlanDirManager:
                             file.write(override + os.linesep)
                     file.write(line)
             else:
-                os.symlink(fromPath, toPath)
-                
-    def removeTemporary(self, test):
-        if self.tmpDirs.has_key(test):
-            tmpDir = self.tmpDirs[test]
-            if os.path.isdir(tmpDir):
-                if self.config.keepTemporarySubplans():
-                    print test.getIndent() + "Keeping subplan dir for", repr(test), "in", tmpDir
-                    return
-                self._removeDir(tmpDir)
-    def getSubPlanDirName(self, test):
-        subPlanDir = self.getSubPlanDirFromTest(test)
-        dirs = subPlanDir.split(os.sep)[:-1]
-        return os.path.normpath(string.join(dirs, os.sep))
-    def getSubPlanBaseName(self, test):
-        subPlanDir = self.getSubPlanDirFromTest(test)
-        baseName =  subPlanDir.split(os.sep)[-1]
-        return baseName
-    def getTmpSubdir(self, test, subDir, baseName, mode):
-        prefix = os.path.join(subDir, baseName) + "."
-        prefix += test.app.name + test.app.versionSuffix() + "_" + test.name + "_"
-        dirName = prefix + test.getTmpExtension()
-        if not test.app.parallelMode:
-            currTmpString = prefix + test.getTestUser()
-            for file in os.listdir(subDir):
-                fpath = os.path.join(subDir,file)
-                if not os.path.isdir(fpath):
-                    continue
-                if fpath.find(currTmpString) != -1:
-                    self._removeDir(os.path.join(subDir, file))
-        return dirName
-    def _removeDir(self, subDir):
-        for file in os.listdir(subDir):
-            fpath = os.path.join(subDir,file)
-            try:
-                # if softlinked dir, remove as file and do not recurse
-                os.remove(fpath) 
-            except:
-                self._removeDir(fpath)
-        try:
-            os.remove(subDir)
-        except:
-            try:
-                os.rmdir(subDir)
-            except:
-                os.system("rm -rf " + subDir);
-
+                os.symlink(fromPath, toPath)            
+            
 class StartStudio(plugins.Action):
     def __call__(self, test):
         print "CARMSYS:", os.environ["CARMSYS"]
@@ -243,14 +175,6 @@ class StartStudio(plugins.Action):
         commandLine = os.path.join(os.environ["CARMSYS"], "bin", "studio")
         print os.popen(commandLine).readline()
         sys.exit(0)
-
-class RemoveTemporarySubplan(plugins.Action):
-    def __init__(self, subplanManager):
-        self.subplanManager = subplanManager
-    def __call__(self, test):
-        self.subplanManager.removeTemporary(test)
-    def __repr__(self):
-        return "Removing temporary subplan for"
 
 class CheckOptimizationRun(predict.CheckLogFilePredictions):
     def __repr__(self):

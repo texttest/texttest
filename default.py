@@ -109,13 +109,9 @@ class Config(plugins.Configuration):
         self.printHelpScripts()
 
 class CollateFile(plugins.Action):
-    def __init__(self, sourcePattern, targetStem, dirFunctions = []):
+    def __init__(self, sourcePattern, targetStem):
         self.sourcePattern = sourcePattern
         self.targetStem = targetStem
-        if len(dirFunctions):
-            self.dirFunctions = dirFunctions
-        else:
-            self.dirFunctions = [ self.currDir ]
     def __call__(self, test):
         if test.state > test.RUNNING:
             return
@@ -128,8 +124,8 @@ class CollateFile(plugins.Action):
             errText = "Expected file '" + self.sourcePattern + "' not created by test"
             open(targetFile, "w").write(errText + os.linesep)
     def findPath(self, test):
-        for dirFunction in self.dirFunctions:
-            pattern = dirFunction(test, self.sourcePattern)
+        for writeDir in test.writeDirs:
+            pattern = os.path.join(writeDir, self.sourcePattern)
             paths = glob(pattern)
             if len(paths):
                 return paths[0]
@@ -192,7 +188,7 @@ class RunTest(plugins.Action):
         self.describe(test)
         outfile = test.getTmpFileName("output", "w")
         stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfile)
-        inputFileName = test.getInputFileName()
+        inputFileName = test.inputFile
         if os.path.isfile(inputFileName):
             inputData = open(inputFileName).read()
             stdin.write(inputData)

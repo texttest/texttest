@@ -29,6 +29,9 @@ builtInOptions = """
 -p         - run in parallel mode. Do not clean up any temporary files looking like they belong to other TextTest
              runs.
 
+-keeptmp   - Keep any temporary directories where test(s) write files. Note that once you run the test again the old
+             temporary dirs will be removed, unless you run in parallel mode of course.       
+
 -help      - Do not run anything. Instead, generate useful text, such as this.
 
 -x         - Enable log4py diagnostics for the framework. This will use a diagnostic directory from the environment
@@ -135,6 +138,8 @@ class TestCase(Test):
         self.options = ""
         if (os.path.isfile(optionsFile)):
             self.options = os.path.expandvars(open(optionsFile).readline().strip())
+        # List of directories where this test will write files
+        self.writeDirs = [ self.abspath ]
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -184,11 +189,67 @@ class TestCase(Test):
         return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
-    def getInputFileName(self):
-        tmpFile = self.getTmpFileName("input", "r")
-        if os.path.isfile(tmpFile):
-            return tmpFile
-        return self.inputFile
+    def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
+        prefix = os.path.join(rootDir, basicDir) + "."
+        prefix += self.app.name + self.app.versionSuffix() + "_" + self.name + "_"
+        dirName = prefix + globalRunIdentifier
+        if not self.app.parallelMode:
+            currTmpString = prefix + self.getTestUser()
+            for file in os.listdir(rootDir):
+                fpath = os.path.join(rootDir, file)
+                if not os.path.isdir(fpath):
+                    continue
+                if fpath.find(currTmpString) != -1:
+                    self._removeDir(os.path.join(rootDir, file))
+        writeDir = dirName
+        if subDir:
+            writeDir = os.path.join(dirName, subDir)
+        os.makedirs(writeDir)
+        debugLog.info("Created write directory " + writeDir)
+        self.writeDirs.append(writeDir)
+        newBasic = os.path.basename(dirName)
+        debugLog.info("Replacing " + basicDir + " with " + newBasic)
+        self.options = self.options.replace(basicDir, newBasic)
+        debugLog.info("Options string now '" + self.options + "'") 
+        if os.path.isfile(self.inputFile):
+            tmpFileName = self.getTmpFileName("input", "w")
+            tmpFile = open(tmpFileName, "w")
+            for line in open(self.inputFile).xreadlines():
+                tmpFile.write(line.replace(basicDir, newBasic))
+            self.inputFile = tmpFileName
+            debugLog.info("Input file now '" + self.inputFile + "'")
+        return dirName
+    def cleanFiles(self, keeptmp):
+        if self.inputFile.find(globalRunIdentifier) != -1:
+            os.remove(self.inputFile)
+        for writeDir in self.writeDirs:
+            if writeDir == self.abspath or not os.path.isdir(writeDir):
+                continue
+            if keeptmp:
+                print self.getIndent() + "Keeping write-directory for", self.name, "in", writeDir
+            else:
+                self.removeAtRightLevel(writeDir)
+    def removeAtRightLevel(self, writeDir):
+        root, basename = os.path.split(writeDir)
+        if basename.find(globalRunIdentifier) != -1:
+            self._removeDir(writeDir)
+        else:
+            self.removeAtRightLevel(root)
+    def _removeDir(self, subDir):
+        for file in os.listdir(subDir):
+            fpath = os.path.join(subDir,file)
+            try:
+                # if softlinked dir, remove as file and do not recurse
+                os.remove(fpath) 
+            except:
+                self._removeDir(fpath)
+        try:
+            os.remove(subDir)
+        except:
+            try:
+                os.rmdir(subDir)
+            except:
+                os.system("rm -rf " + subDir);
         
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):
@@ -556,6 +617,8 @@ class OptionFinder:
             return 1
     def helpMode(self):
         return self.inputOptions.has_key("help")
+    def keepWriteDirectories(self):
+        return self.inputOptions.has_key("keeptmp")
     def guiSettings(self):
         if self.inputOptions.has_key("g"):
             scriptFile = self.inputOptions["g"]
@@ -693,6 +756,7 @@ class ApplicationRunner:
             app.printHelpText()
             self.valid = 0
             return
+        self.keeptmp = inputOptions.keepWriteDirectories()
         tmpSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
         tmpSuite.reFilter(self.filterList)
         self.gui = gui
@@ -722,7 +786,9 @@ class ApplicationRunner:
         for action in self.actionSequence:
             cleanUp = action.getCleanUpAction()
             if cleanUp != None:
-                self._performAction(self.testSuite, cleanUp)        
+                self._performAction(self.testSuite, cleanUp)
+        # Hardcoded destructor-like cleanup (the destructor isn't called for some reason)
+        self.testSuite.performAction(plugins.CleanTestFiles(self.keeptmp))
     def _performActionWithFilter(self, action):
         newFilterList = self.filterList
         newFilterList.append(action.getFilter())

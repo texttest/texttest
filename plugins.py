@@ -111,6 +111,13 @@ class TearDownEnvironment(Action):
     def setUpSuite(self, suite):
         suite.tearDownEnvironment()
 
+# Action for wrapping the calls to cleanFiles
+class CleanTestFiles(Action):
+    def __init__(self, keeptmp):
+        self.keeptmp = keeptmp
+    def __call__(self, test):
+        test.cleanFiles(self.keeptmp)
+
 # Action for wrapping an executable that isn't Python, or can't be imported in the usual way
 class NonPythonAction(Action):
     def __init__(self, actionText):

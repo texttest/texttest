@@ -51,9 +51,6 @@ def getApcHostTmp():
     return "/tmp"
 
 class ApcConfig(optimization.OptimizationConfig):
-    def __init__(self, optionMap):
-        optimization.OptimizationConfig.__init__(self, optionMap)
-        self.subplanManager = ApcSubPlanDirManager(self)
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
 	    listKPIs = [KPI.cSimplePairingOptTimeKPI,
@@ -67,8 +64,6 @@ class ApcConfig(optimization.OptimizationConfig):
         return MakeProgressReport(self.optionValue("prrep"))
     def getLibraryFile(self, test):
         return os.path.join("data", "apc", carmen.getArchitecture(test.app), "libapc.a")
-    def getSubPlanFileName(self, test, sourceName):
-        return self.subplanManager.getSubPlanFileName(test, sourceName)
     def getCompileRules(self, staticFilter):
         if self.isNightJob():
             ruleCompile = 1
@@ -87,12 +82,23 @@ class ApcConfig(optimization.OptimizationConfig):
         else:
             return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
     def getTestCollator(self):
-        subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
-        subActions.append(RemoveLogs())
-        subActions.append(unixConfig.CollateFile("status", "status", [ self.getSubPlanFileName ]))
+        baseCollator = unixConfig.UNIXConfig.getTestCollator(self)
+        subActions = []
+        subActions.append(unixConfig.CollateFile("status", "status"))
+        subActions.append(unixConfig.CollateFile("run_status_script_error", "error"))        
         subActions.append(FetchApcCore(self))
-        subActions.append(optimization.RemoveTemporarySubplan(self.subplanManager))
-        return plugins.CompositeAction(subActions)
+        subActions.append(baseCollator)
+        subActions.append(RemoveLogs())
+        localAction = plugins.CompositeAction(subActions)
+        if not self.useLSF():
+            return localAction
+        else:
+            resourceAction = lsf.MakeResourceFiles(self.checkPerformance(), self.checkMemory(), self.isSlowdownJob)
+            return plugins.CompositeAction([ lsf.Wait(), lsf.UpdateLSFStatus(), resourceAction, localAction ])
+    def _getSubPlanDirName(self, test):
+        statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
+        dirs = statusFile.split(os.sep)[:-2]
+        return os.path.normpath(string.join(dirs, os.sep))
     def getRuleSetName(self, test):
         fileName = test.makeFileName("options")
         if os.path.isfile(fileName):
@@ -102,8 +108,6 @@ class ApcConfig(optimization.OptimizationConfig):
                 if option.find("crc" + os.sep + "rule_set") != -1:
                     return option.split(os.sep)[-1]
         return None
-    def getExecuteCommand(self, binary, test):
-        return self.subplanManager.getExecuteCommand(binary, test)
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -159,29 +163,12 @@ class SubmitApcTest(lsf.SubmitTest):
         lsf.SubmitTest.__call__(self, test)
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()
-        inputFileName = test.getInputFileName()
+        inputFileName = test.inputFile
         if os.path.isfile(inputFileName):
             testCommand = testCommand + " < " + inputFileName
         outfile = test.getTmpFileName("output", "w")
         errfile = test.getTmpFileName("errors", "w")
         return testCommand + " | tee " + outfile + " 2> " + errfile
-
-class ApcSubPlanDirManager(optimization.SubPlanDirManager):
-    def __init__(self, config):
-        optimization.SubPlanDirManager.__init__(self, config)
-    def getSubPlanDirFromTest(self, test):
-        statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
-        dirs = statusFile.split(os.sep)[:-2]
-        return os.path.normpath(string.join(dirs, os.sep))
-    def getExecuteCommand(self, binary, test):
-        self.makeTemporary(test)
-        options = test.options.split(" ")
-        tmpDir = self.tmpDirs[test]
-        dirName = os.path.join(self.getSubPlanDirName(test), self.getSubPlanBaseName(test))
-        dirName = os.path.normpath(dirName)
-        options[0] = os.path.normpath(options[0]).replace(dirName, tmpDir)
-        options[1] = os.path.normpath(options[1]).replace(dirName, tmpDir)
-        return binary + " " + string.join(options, " ")
     
 class ApcCompileRules(carmen.CompileRules):
     def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, forcedRuleCompile = 0):
@@ -276,11 +263,8 @@ class FetchApcCore(plugins.Action):
         coreFileName = os.path.join(test.abspath, "core.Z")
         if os.path.isfile(coreFileName):
             os.remove(coreFileName)
-        scriptError = self.config.getSubPlanFileName(test, "run_status_script_error")
-        if not os.path.isfile(scriptError):
-            return
-        extractFile = unixConfig.CollateFile("run_status_script_error", "error", [ self.config.getSubPlanFileName ])
-        extractFile(test)
+        if not os.path.isfile(test.getTmpFileName("error", "r")):
+            return            
         logFinder = optimization.LogFileFinder(test)
         foundTmp, tmpStatusFile = logFinder.findFile()
         if not foundTmp:
@@ -296,14 +280,13 @@ class FetchApcCore(plugins.Action):
             apcHostTmp = getApcHostTmp()
             cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*;" + binCmd + ";compress -c core > " + coreFileName
             os.system("rsh " + machine + " '" + cmdLine + "'")
-            if self.config.keepTemporarySubplans() and self.config.subplanManager.tmpDirs.has_key(test):
-                tmpDir = self.config.subplanManager.tmpDirs[test]
-                if os.path.isdir(tmpDir):
-                    tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
-                    if os.path.isfile(tgzFile):
-                        os.remove(tgzFile)
-                    cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; tar cf - . | gzip -c > " + tgzFile
-                    os.system("rsh " + machine + " '" + cmdLine + "'")
+            tmpDir = test.writeDirs[-1]
+            if os.path.isdir(tmpDir):
+                tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
+                if os.path.isfile(tgzFile):
+                    os.remove(tgzFile)
+                cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; tar cf - . | gzip -c > " + tgzFile
+                os.system("rsh " + machine + " '" + cmdLine + "'")
             if self.config.isNightJob():
                 cmdLine = "rm -rf " + apcHostTmp + "/*" + testDirEnd + "_*"
                 os.system("rsh " + machine + " '" + cmdLine + "'")

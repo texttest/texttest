@@ -11,18 +11,6 @@ import os, string, optimization, matador
 def getConfig(optionMap):
     return FleetConfig(optionMap)
 
-def getOption(options, optionVal):
-    optparts = options.split()
-    nextWanted = 0
-    for option in optparts:
-        if nextWanted:
-            return option
-        if option == optionVal:
-            nextWanted = 1
-        else:
-            nextWanted = 0
-    return None
-
 def usingOptionFile():
     if os.environ.has_key("FLEET_SUBPLAN_IN_INPUT"):
         return 0
@@ -36,12 +24,9 @@ def subPlanInput(inputFile):
             return string.join(entries[1:], os.sep)
 
 class FleetConfig(matador.MatadorConfig):
-    def __init__(self, optionMap):
-        matador.MatadorConfig.__init__(self, optionMap)
-        self.subplanManager = FleetSubPlanDirManager(self)
-    def subPlanName(self, test):
+    def _subPlanName(self, test):
         if usingOptionFile():
-          subPlan = getOption(test.options, "-s")
+          subPlan = matador.MatadorConfig._subPlanName(self, test)
         else:
           subPlan = subPlanInput(test.inputFile)
         if subPlan == None:
@@ -57,43 +42,4 @@ class FleetConfig(matador.MatadorConfig):
         # Reset matador values
         self.noIncreaseExceptMethods = {}
         self.noIncreaseExceptMethods[optimization.costEntryName] = []
-
-class FleetSubPlanDirManager(matador.MatadorSubPlanDirManager):
-    def __init__(self, config):
-        matador.MatadorSubPlanDirManager.__init__(self, config)
-    def getExecuteCommand(self, binary, test):
-        self.makeTemporary(test)
-        tmpDir = self.tmpDirs[test]
-        tmpDir = tmpDir.replace(self.getFullPath("") + os.sep, "")
-        if usingOptionFile():
-            return binary + " " + self.setupOptions(test, tmpDir)
-        else:
-            self.setupTemporaryInputFile(test, tmpDir)
-            return binary;
-    def setupOptions(self, test, tmpDir):
-        optparts = test.options.split()
-        for ix in range(len(optparts) - 1):
-            if optparts[ix] == "-s" and (ix + 1) < len(optparts):
-                optparts[ix + 1] = tmpDir
-            if optparts[ix] == "-c" and (ix + 1) < len(optparts):
-                optparts[ix + 1] = test.abspath + os.sep + optparts[ix + 1]
-        return string.join(optparts, " ")
-    def setupTemporaryInputFile(self, test, tmpDir):
-        loadspEntry = string.join(tmpDir.split(os.sep))
-        tmpInputFile = test.getTmpFileName("input", "w")
-        oldFile = open(test.inputFile)
-        newFile = open(tmpInputFile, "w")
-        for line in oldFile.readlines():
-            entries = line.split()
-            if len(entries) > 1 and entries[0] == "loadsp":
-                newFile.write("loadsp " + loadspEntry + os.linesep)
-            else:
-                newFile.write(line)
-    def removeTemporary(self, test):
-        optimization.SubPlanDirManager.removeTemporary(self, test)
-        if not usingOptionFile():
-            tmpInputFile = test.getTmpFileName("input", "r")
-            if os.path.isfile(tmpInputFile):
-                os.remove(tmpInputFile)
-
 

@@ -206,7 +206,7 @@ class SubmitTest(plugins.Action):
             raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()
-        inputFileName = test.getInputFileName()
+        inputFileName = test.inputFile
         if os.path.isfile(inputFileName):
             testCommand = testCommand + " < " + inputFileName
         outfile = test.getTmpFileName("output", "w")

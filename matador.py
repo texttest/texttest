@@ -40,7 +40,6 @@ def getOption(options, optionVal):
 class MatadorConfig(optimization.OptimizationConfig):
     def __init__(self, optionMap):
         optimization.OptimizationConfig.__init__(self, optionMap)
-        self.subplanManager = MatadorSubPlanDirManager(self)
         if self.optionMap.has_key("diag"):
             os.environ["DIAGNOSTICS_IN"] = "./Diagnostics"
             os.environ["DIAGNOSTICS_OUT"] = "./Diagnostics"
@@ -59,9 +58,11 @@ class MatadorConfig(optimization.OptimizationConfig):
         return not self.optionMap.has_key("diag")
     def getLibraryFile(self, test):
         return os.path.join("data", "crc", "MATADOR", carmen.getArchitecture(test.app), "matador.o")
-    def getSubPlanFileName(self, test, sourceName):
-        return self.subplanManager.getSubPlanFileName(test, sourceName)
-    def subPlanName(self, test):
+    def _getSubPlanDirName(self, test):
+        subPlan = self._subPlanName(test)
+        fullPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", subPlan)
+        return os.path.normpath(fullPath)
+    def _subPlanName(self, test):
         subPlan = getOption(test.options, "-s")            
         if subPlan == None:
             # print help information and exit:
@@ -75,12 +76,6 @@ class MatadorConfig(optimization.OptimizationConfig):
                     finalWord = line.split(" ")[-1]
                     return finalWord.strip()
         return getOption(test.options, "-r")
-    def getExecuteCommand(self, binary, test):
-        return self.subplanManager.getExecuteCommand(binary, test)
-    def getTestCollator(self):
-        subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
-        subActions.append(optimization.RemoveTemporarySubplan(self.subplanManager))
-        return plugins.CompositeAction(subActions)
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -117,26 +112,6 @@ class CompareTestWithDiagnostics(comparetest.MakeComparisons):
         diagFinder = "diag", "Diagnostics"
         return comparetest.MakeComparisons.fileFinders(self, test) + [ diagFinder ]
     
-class MatadorSubPlanDirManager(optimization.SubPlanDirManager):
-    def __init__(self, config):
-        optimization.SubPlanDirManager.__init__(self, config)
-    def getSubPlanDirFromTest(self, test):
-        fullPath = self.getFullPath(self.config.subPlanName(test))
-        return fullPath
-    def getFullPath(self, path):
-        fullPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", path)
-        return os.path.normpath(fullPath)
-    def getExecuteCommand(self, binary, test):
-        self.makeTemporary(test)
-        tmpDir = self.tmpDirs[test]
-        tmpDir = tmpDir.replace(self.getFullPath("") + os.sep,"")
-        optparts = test.options.split()
-        for ix in range(len(optparts) - 1):
-            if optparts[ix] == "-s" and (ix + 1) < len(optparts):
-                optparts[ix+1] = tmpDir
-        options = string.join(optparts, " ")
-        return binary + " " + options
-
 class MatadorTestCaseInformation(optimization.TestCaseInformation):
     def __init__(self, suite, name):
         optimization.TestCaseInformation.__init__(self, suite, name)

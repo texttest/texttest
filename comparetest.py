@@ -89,7 +89,7 @@ class TestComparison:
                 comparison = self.makeComparison(test, standardPath, os.path.join(subDirectory, file))
                 self.addComparison(standardPath, comparison)
     def shouldCompare(self, file, tmpExt, dirPath):
-        return file.endswith(tmpExt)
+        return file.endswith(tmpExt) and not file.startswith("input.")
     def makeComparison(self, test, standardFile, tmpFile):
         comparison = self.createFileComparison(test, standardFile, tmpFile)
         if comparison.newResult() or comparison.hasDifferences():

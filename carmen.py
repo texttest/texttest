@@ -109,9 +109,9 @@ class CarmenConfig(lsf.LSFConfig):
     def getActionSequence(self):
         if self.optionMap.has_key("rulecomp"):
             if self.optionValue("rulecomp") != "clean":
-                return [ self.getRuleBuilder(0) ]
+                return [ self.getWriteDirectoryMaker(), self.getRuleBuilder(0) ]
             else:
-                return [ self.getRuleCleanup(), self.getRuleBuilder(0) ]
+                return [ self.getWriteDirectoryMaker(), self.getRuleCleanup(), self.getRuleBuilder(0) ]
         else:
             builder = self.getAppBuilder()
             return [ builder, self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self)

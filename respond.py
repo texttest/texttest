@@ -89,9 +89,10 @@ class BatchResponder(Responder):
         self.responder = UNIXInteractiveResponder(lineCount)
     def __del__(self):
         mailFile = os.popen("sendmail -t", "w")
-        address = os.environ["USER"]
-        mailFile.write("From: " + address + os.linesep)
-        mailFile.write("To: " + address + os.linesep)
+        fromAddress = os.environ["USER"]
+        toAddress = self.mainSuite.app.getConfigValue("batch_recipient")
+        mailFile.write("From: " + fromAddress + os.linesep)
+        mailFile.write("To: " + toAddress + os.linesep)
         mailFile.write("Subject: " + self.getMailTitle() + os.linesep)
         mailFile.write(os.linesep) # blank line separating headers from body
         if len(self.successes) > 0:

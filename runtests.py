@@ -68,7 +68,7 @@ class TestCase(Test):
     def performOnSubTests(self, action):
         pass
     def getExecuteCommand(self):
-        return self.app.executeCommand + " " + self.options
+        return self.app.getExecuteCommand() + " " + self.options
     def getTmpExtension(self):
         return globalRunIdentifier
     def getTmpFileName(self, text, mode):
@@ -144,12 +144,10 @@ class Application:
         debugPrint("Found application " + repr(self))
         self.checkout = self.makeCheckout()
         debugPrint("Checkout set to " + self.checkout)
-        self.executeCommand = self.setExecuteCommand()
         self.configObject = self.makeConfigObject(optionMap)
         allowedOptions = self.configObject.getOptionString() + builtInOptions
         # Force exit if something isn't present
         getopt.getopt(sys.argv[1:], allowedOptions)    
-        debugPrint("Execute command set to " + self.executeCommand)
     def __repr__(self):
         return string.upper(self.name)
     def makeAbsPath(self, path):
@@ -171,7 +169,7 @@ class Application:
         return self.configObject.getFilterList()
     def getConfigValue(self, key):
         if self.configDir.has_key(key):
-            return self.configDir[key]
+            return os.path.expandvars(self.configDir[key])
         else:
             raise "Error: " + repr(self) + " cannot find config entry " + key
     def getConfigList(self, key):
@@ -202,7 +200,7 @@ class Application:
             checkout = self.getConfigValue("default_checkout")
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
         return os.path.join(checkoutLocation, checkout)
-    def setExecuteCommand(self):
+    def getExecuteCommand(self):
         binary = self.makeAbsPath(self.getConfigValue("binary"))
         if self.configDir.has_key("interpreter"):
             return self.configDir["interpreter"] + " " + binary

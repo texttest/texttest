@@ -70,6 +70,9 @@ class CarmenConfig(default.Config):
         else:
             return [ respond.UNIXInteractiveResponder(diffLines) ]
 
+def getRaveName(test):
+    return test.app.getConfigValue("rave_name")
+
 class CompileRules:
     def __init__(self, filter = None):
         self.rulesCompiled = []
@@ -90,10 +93,7 @@ class CompileRules:
         print description
         self.rulesCompiled = []
         if self.raveName == None:
-            if suite.name == "fleet":
-                self.raveName = "afc"
-            else:
-                self.raveName = suite.name
+            self.raveName = getRaveName(suite)
 
 class RuleSet:
     def __init__(self, test, raveName):
@@ -113,18 +113,17 @@ class RuleSet:
         return None
         
 class UpdatedStaticRulesetFilter:
-    def __init__(self, libraryFile, raveName):
-        self.raveName = raveName
+    def __init__(self, libraryFile):
         self.libraryFile = libraryFile
     def acceptsTestCase(self, test):
-        ruleset = RuleSet(test, self.raveName)
+        ruleset = RuleSet(test, getRaveName(test))
         return ruleset.isValid() and self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.libraryFile))
     def acceptsTestSuite(self, suite):
         if not isUserSuite(suite):
             return 1       
         resourceFile = open(os.path.join(suite.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab"))
         for line in resourceFile.readlines():
-            if line.find(self.raveName) != -1 and line.find("UseStaticLinking") != -1:
+            if line.find(getRaveName(suite)) != -1 and line.find("UseStaticLinking") != -1:
                 entry = line.split(',')[4].strip()
                 return entry[1:-1] == "true"
         return 0

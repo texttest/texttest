@@ -11,7 +11,7 @@ class MatadorConfig(carmen.CarmenConfig):
             return [ CalculateKPI(self.optionValue("kpi")) ]
         
         libraryFile = os.path.join("data", "crc", "MATADOR", carmen.architecture, "matador.o")
-        staticFilter = carmen.UpdatedStaticRulesetFilter(libraryFile, "matador")
+        staticFilter = carmen.UpdatedStaticRulesetFilter(libraryFile)
         return [ carmen.CompileRules(staticFilter) ] + carmen.CarmenConfig.getActionSequence(self)
     def getTestCollator(self):
         return carmen.CarmenConfig.getTestCollator(self) + [ MakeSolutionFile() ]

@@ -51,12 +51,22 @@ class CheckPredictions(CheckLogFilePredictions):
     def __call__(self, test):
         if not test.state.isComplete():
             self.collectErrors(test)
+    def findCrashSummary(self, errInfo):
+        prevLine = ""
+        crashType = "CRASH"
+        for line in errInfo.split(os.linesep):
+            if line.find("Program terminated with") != -1:
+                crashType = line.split(",")[-1].strip().replace(".", "")
+            if prevLine.find("Stack trace from") != -1:
+                return crashType + " in " + line.strip()
+            prevLine = line
+        return "unknown " + crashType
     def collectErrors(self, test):
         # Hard-coded prediction: check test didn't crash
         stackTraceFile = test.makeFileName("stacktrace", temporary=1)
         if os.path.isfile(stackTraceFile):
             errorInfo = open(stackTraceFile).read()
-            self.insertError(test, "crash", "CRASH", errorInfo)
+            self.insertError(test, "crash", self.findCrashSummary(errorInfo), errorInfo)
             os.remove(stackTraceFile)
             return 1
         

@@ -33,68 +33,30 @@ class Responder(plugins.Action):
         self.handleAll(test)
     def handleAll(self, test):
         pass
+    def handleFailure(self, test):
+        pass
     def handleSuccess(self, test):
         if self.overwriteSuccess:
             self.save(test, test.app.getFullVersion(forSave=1))
     def save(self, test, version, exact=1):
         test.state.save(exact, version, self.overwriteSuccess)
     def setUpApplication(self, app):
-        self.lineCount = app.getConfigValue("lines_of_text_difference")
-        self.maxLineWidth = app.getConfigValue("max_width_text_difference")
         self.logFile = app.getConfigValue("log_file")
         self.graphicalDiffTool = app.getConfigValue("diff_program")
-        self.textDiffTool = app.getConfigValue("text_diff_program")
-    def testComparisonOutput(self, test):
-        fullText = ""
-        for comparison in test.state.getComparisons():
-            fullText += self.fileComparisonTitle(comparison) + os.linesep
-            fullText += self.fileComparisonBody(comparison)
-        return fullText
-    def fileComparisonTitle(self, comparison):
-        if comparison.newResult():
-            titleText = "New result in"
-        else:
-            titleText = "Differences in"
-        titleText += " " + repr(comparison)
-        return "------------------ " + titleText + " --------------------"
-    def useGraphicalComparison(self, comparison):
-        if not self.graphicalDiffTool or plugins.BackgroundProcess.fakeProcesses:
-            return 0
-        return repr(comparison) == self.logFile
-    def fileComparisonBody(self, comparison):
-        if comparison.newResult():
-            return self.getPreview(open(comparison.tmpFile))
         
-        argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
-        if self.useGraphicalComparison(comparison):
-            process = plugins.BackgroundProcess(self.graphicalDiffTool + argumentString)
-            return "<See " + self.graphicalDiffTool + " window>" + os.linesep
-        else:
-            stdout = os.popen(self.textDiffTool + argumentString)
-            return self.getPreview(stdout)
-    def getPreview(self, file):
-        linesWritten = 0
-        fullText = ""
-        for line in file.xreadlines():
-            if linesWritten < self.lineCount:
-                fullText += self.getWrappedLine(line)
-                linesWritten += 1
-        file.close()
-        return fullText
-    def getWrappedLine(self, line):
-        if len(line) <= self.maxLineWidth:
-            return line
-        truncatedLine = line[:self.maxLineWidth]
-        return truncatedLine + os.linesep + self.getWrappedLine(line[self.maxLineWidth:])
-
-
 # Generic interactive responder. Can be configured via the settings in setUpApplication method
 class InteractiveResponder(Responder):
     def handleFailure(self, test):
         performView = self.askUser(test, allowView=1)
         if performView:
-            outputText = self.testComparisonOutput(test)
+            outputText = test.state.freeText
             sys.stdout.write(outputText)
+            if self.graphicalDiffTool:
+                logFileComparison, list = test.state.findComparison(self.logFile)
+                if logFileComparison:
+                    cmdLine = self.graphicalDiffTool + " " + logFileComparison.stdCmpFile + " " +\
+                              logFileComparison.tmpCmpFile
+                    plugins.BackgroundProcess(cmdLine)
             self.askUser(test, allowView=0)
     def askUser(self, test, allowView):      
         versions = test.app.getVersionFileExtensions(forSave=1)

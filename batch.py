@@ -136,10 +136,6 @@ class BatchResponder(respond.Responder):
                 self.failureCategories.append(batchCategory)
             self.categories[category] = batchCategory
         self.categories[category].addTest(test)
-    def handleFailure(self, test):
-        # If free text is brief, override it with difference details
-        if test.state.freeText.find(os.linesep) == -1:
-            test.state.freeText = self.testComparisonOutput(test)
     def useGraphicalComparison(self, comparison):
         return 0
     def setUpSuite(self, suite):

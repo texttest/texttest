@@ -69,7 +69,10 @@ class TestComparison(plugins.TestState):
         # Cache this only so it gets output when we pickle, so we can re-interpret if needed...
         self.appAbsPath = appAbs
     def __repr__(self):
-        if len(self.changedResults) > 0 or self.failedPrediction:
+        if self.failedPrediction:
+            briefDescription, longDescription = self.categoryDescriptions[self.category]
+            return longDescription + " (" + self.failedPrediction.briefText + ") :"
+        elif len(self.changedResults) > 0:
             return plugins.TestState.__repr__(self)
         elif len(self.newResults) > 0:
             return ":"
@@ -132,11 +135,7 @@ class TestComparison(plugins.TestState):
     def _comparisonsString(self, comparisons):
         return string.join([repr(x) for x in comparisons], ",")
     def getDifferenceSummary(self, actionDesc):
-        basicSummary = repr(self) + actionDesc + self._getDifferenceSummary()
-        if self.failedPrediction:
-            return basicSummary + os.linesep + str(self.failedPrediction)
-        else:
-            return basicSummary
+        return repr(self) + actionDesc + self._getDifferenceSummary()
     def _getDifferenceSummary(self):
         diffText = ""
         if len(self.changedResults) > 0:
@@ -173,24 +172,6 @@ class TestComparison(plugins.TestState):
             fileComparison = self.changedResults[0]
             del self.changedResults[0]
             self.correctResults.append(fileComparison)
-        # No point categorising if we're overriding everything anyway...
-        if not makeNew:
-            self.categorise()
-    def categorise(self):
-        if not self.hasResults():
-            errMsg = "No output files at all produced, presuming problems running test" 
-            if self.execHost:
-                raise plugins.TextTestError, errMsg + " on " + self.execHost
-            else:
-                raise plugins.TextTestError, errMsg
-        if self.failedPrediction:
-            # Keep the category we had before
-            return
-        worstResult = self.getMostSevereFileComparison()
-        if not worstResult:
-            self.category = "success"
-        else:
-            self.category = worstResult.getType()
     def makeComparisonsInDir(self, test, dir, makeNew = 0):
         fileList = os.listdir(dir)
         fileList.sort()
@@ -258,9 +239,14 @@ class TestComparison(plugins.TestState):
         self.changedResults = []
         self.newResults = []
         self.category = "success"
+        self.freeText = ""
 
 class MakeComparisons(plugins.Action):
     testComparisonClass = TestComparison
+    def __init__(self):
+        self.lineCount = None
+        self.maxLineWidth = None
+        self.textDiffTool = None
     def __repr__(self):
         return "Comparing differences for"
     def execHost(self, test):
@@ -274,6 +260,7 @@ class MakeComparisons(plugins.Action):
             return
         testComparison = self.testComparisonClass(test.state, self.execHost(test), test.app.abspath)
         testComparison.makeComparisons(test)
+        self.categorise(testComparison)
         self.describe(test, testComparison.getPostText())
         test.changeState(testComparison)
     def fileFinders(self, test):
@@ -281,6 +268,61 @@ class MakeComparisons(plugins.Action):
         return [ defaultFinder ]
     def setUpSuite(self, suite):
         self.describe(suite)
+    def categorise(self, state):
+        if not state.hasResults():
+            errMsg = "No output files at all produced, presuming problems running test" 
+            if state.execHost:
+                raise plugins.TextTestError, errMsg + " on " + state.execHost
+            else:
+                raise plugins.TextTestError, errMsg
+        if state.failedPrediction:
+            # Keep the category we had before
+            state.freeText += os.linesep + os.linesep + self.getFreeTextInfo(state)
+            return
+        worstResult = state.getMostSevereFileComparison()
+        if not worstResult:
+            state.category = "success"
+        else:
+            state.category = worstResult.getType()
+            state.freeText = self.getFreeTextInfo(state)
+    def getFreeTextInfo(self, state):
+        fullText = ""
+        for comparison in state.getComparisons():
+            fullText += self.fileComparisonTitle(comparison) + os.linesep
+            fullText += self.fileComparisonBody(comparison)
+        return fullText
+    def fileComparisonTitle(self, comparison):
+        if comparison.newResult():
+            titleText = "New result in"
+        else:
+            titleText = "Differences in"
+        titleText += " " + repr(comparison)
+        return "------------------ " + titleText + " --------------------"
+    def fileComparisonBody(self, comparison):
+        if comparison.newResult():
+            return self.getPreview(open(comparison.tmpFile))
+        
+        cmdLine = self.textDiffTool + " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
+        stdout = os.popen(cmdLine)
+        return self.getPreview(stdout)
+    def getPreview(self, file):
+        linesWritten = 0
+        fullText = ""
+        for line in file.xreadlines():
+            if linesWritten < self.lineCount:
+                fullText += self.getWrappedLine(line)
+                linesWritten += 1
+        file.close()
+        return fullText
+    def getWrappedLine(self, line):
+        if len(line) <= self.maxLineWidth:
+            return line
+        truncatedLine = line[:self.maxLineWidth]
+        return truncatedLine + os.linesep + self.getWrappedLine(line[self.maxLineWidth:])
+    def setUpApplication(self, app):
+        self.lineCount = app.getConfigValue("lines_of_text_difference")
+        self.maxLineWidth = app.getConfigValue("max_width_text_difference")
+        self.textDiffTool = app.getConfigValue("text_diff_program")
 
 class FileComparison:
     def __init__(self, test, standardFile, tmpFile, makeNew = 0):

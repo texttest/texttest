@@ -235,6 +235,37 @@ class StartStudio(plugins.Action):
 class MakeProgressReport(optimization.MakeProgressReport):
     def __init__(self, referenceVersion):
         optimization.MakeProgressReport.__init__(self, referenceVersion)
+        self.refMargins = {}
+        self.currentMargins = {}
+        self.kpiGroupForTest = {}
+        self.testInGroupList = []
+        self.finalCostsInGroup = {}
+    def __del__(self):
+        for groupName in self.finalCostsInGroup.keys():
+            fcTupleList = self.finalCostsInGroup[groupName]
+            refMargin, currentMargin = self._calculateMargin(fcTupleList)
+            self.refMargins[groupName] = refMargin
+            self.currentMargins[groupName] = currentMargin
+        for testTuple in self.testInGroupList:
+            test, referenceFile, currentFile, userName = testTuple
+            self.doCompare(test, referenceFile, currentFile, userName)
+        optimization.MakeProgressReport.__del__(self)
+    def _calculateMargin(self, fcTupleList):
+        if len(fcTupleList) < 2:
+            return 0.1, 0.1
+        refMax = 0
+        curMax = 0
+        for refCost, curCost in fcTupleList:
+            refMax = max(refMax, refCost)
+            curMax = max(curMax, curCost)
+        refMaxDiff = 0
+        curMaxDiff = 0
+        for refCost, curCost in fcTupleList:
+            refMaxDiff = max(refMaxDiff, abs(refMax - refCost))
+            curMaxDiff = max(curMaxDiff, abs(curMax - curCost))
+        refMargin = round(1.0 * refMaxDiff / refMax, 5) * 100.0
+        curMargin = round(1.0 * curMaxDiff / curMax, 5) * 100.0
+        return refMargin, curMargin
     def getKPIValues(self, costs, times, totPerf, margin):
         finalPerf = times[-1]
         costs, times = filterLastCosts(costs, times, margin)
@@ -243,17 +274,46 @@ class MakeProgressReport(optimization.MakeProgressReport):
         if finalPerf * totPerf < 1.0:
             return -1, 0
         return lastCost, float(lastPerf / finalPerf * totPerf)
+    def setUpSuite(self, suite):
+        kpiGroups = suite.makeFileName("kpi_groups")
+        if not os.path.isfile(kpiGroups):
+            return
+        groupFile = open(kpiGroups)
+        for line in groupFile.readlines():
+            if line[0] == '#' or not ':' in line:
+                continue
+            groupName, testname = line.strip().split(":",1)
+            self.kpiGroupForTest[testname] = groupName
     def compare(self, test, referenceFile, currentFile):
-        try:
-            margin = float(test.app.getConfigValue("kpi_cost_margin"))
-        except:
-            margin = 0.0
+        userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
+        if not self.kpiGroupForTest.has_key(test.name):
+            self.doCompare(test, referenceFile, currentFile, userName)
+            return
+        groupName = self.kpiGroupForTest[test.name]
+        testTuple = test, referenceFile, currentFile, userName
+        self.testInGroupList.append(testTuple)
+        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile, " TOTAL cost")
+        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile, " TOTAL cost")
+        fcTuple = referenceCosts[-1], currentCosts[-1]
+        if not self.finalCostsInGroup.has_key(groupName):
+            self.finalCostsInGroup[groupName] = []
+        self.finalCostsInGroup[groupName].append(fcTuple)
+    def doCompare(self, test, referenceFile, currentFile, userName):
+        if self.kpiGroupForTest.has_key(test.name):
+            refMargin = self.refMargins[self.kpiGroupForTest[test.name]]
+            currentMargin = self.currentMargins[self.kpiGroupForTest[test.name]]
+        else:
+            try:
+                refMargin = float(test.app.getConfigValue("kpi_cost_margin"))
+            except:
+                refMargin = 0.0
+            currentMargin = refMargin
         refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile, " TOTAL cost")
         currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile, " TOTAL cost")
         totCurrPerf = int(performance.getTestPerformance(test))
         totRefPerf = int(performance.getTestPerformance(test, self.referenceVersion))
-        lastCCost, lastCP = self.getKPIValues(currentCosts, curTimes, totCurrPerf, margin)
-        lastRCost, lastRP = self.getKPIValues(referenceCosts, refTimes, totRefPerf, margin)
+        lastCCost, lastCP = self.getKPIValues(currentCosts, curTimes, totCurrPerf, currentMargin)
+        lastRCost, lastRP = self.getKPIValues(referenceCosts, refTimes, totRefPerf, refMargin)
         if lastCCost < 0 or lastRCost < 0:
             return
         currTTWC = lastCP
@@ -268,16 +328,20 @@ class MakeProgressReport(optimization.MakeProgressReport):
         refTTWC = float(int(refTTWC * 10) / 10.0)
         kpi = float(currTTWC) / float(refTTWC)
         self.testCount += 1
-        self.kpi *= kpi
-        userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
+        self.totalKpi *= kpi
+        if kpi > self.worstKpi:
+            self.worstKpi = kpi
+        if kpi < self.bestKpi:
+            self.bestKpi = kpi
         print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.percent(kpi)
-        self.reportLine("                         ", "Current", "Version " + self.referenceVersion)
-        self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
-        self.reportLine("Measured cost of plan    ", lastCCost, lastRCost)
-        self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
-        self.reportLine("Memory used (Mb)         ", currentMaxMemory, refMaxMemory)
-        self.reportLine("Total time (minutes)     ", int(totCurrPerf), int(totRefPerf))
-        self.reportLine("Time to worst cost (mins)", currTTWC, refTTWC)
+        self.reportLine("                            ", "Current", "Version " + self.referenceVersion)
+        self.reportLine("Initial cost of plan        ", currentCosts[0], referenceCosts[0])
+        self.reportLine("Measured cost of plan       ", lastCCost, lastRCost)
+        self.reportLine("Final cost of plan          ", currentCosts[-1], referenceCosts[-1])
+        self.reportLine("Cost variance tolerance (%) ", currentMargin, refMargin)
+        self.reportLine("Memory used (Mb)            ", currentMaxMemory, refMaxMemory)
+        self.reportLine("Total time (minutes)        ", int(totCurrPerf), int(totRefPerf))
+        self.reportLine("Time to worst cost (mins)   ", currTTWC, refTTWC)
     def getCosts(self, file, type):
         costCommand = "grep '" + type + "' " + file + " | awk '{ print $3 }'"
         return map(self.makeInt, os.popen(costCommand).readlines())

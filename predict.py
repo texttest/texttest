@@ -49,7 +49,8 @@ class CheckPredictions(CheckLogFilePredictions):
     def __repr__(self):
         return "Checking predictions for"
     def __call__(self, test):
-        self.collectErrors(test)
+        if not test.state.isComplete():
+            self.collectErrors(test)
     def collectErrors(self, test):
         # Hard-coded prediction: check test didn't crash
         stackTraceFile = test.makeFileName("stacktrace", temporary=1)

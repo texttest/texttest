@@ -28,6 +28,7 @@ to override this and save the exact result, append a '+' to the save option that
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing
 # CPU time   :      30.31 sec. on heathlands
+# 
 
 # Returns -1 as error value, if the file is the wrong format
 def getPerformance(fileName):
@@ -57,12 +58,9 @@ class PerformanceTestComparison(comparetest.TestComparison):
         comparetest.TestComparison.__init__(self, test, newFiles)
         self.execHost = None
     def __repr__(self):
-        if self.execHost == None:
-            return comparetest.TestComparison.__repr__(self)
-        if len(self.comparisons) > 0:
+        if self.execHost != None and self.hasDifferences():
             return "FAILED on " + self.execHost + " :"
-        else:
-            return ""
+        return comparetest.TestComparison.__repr__(self)
     def createFileComparison(self, test, standardFile, tmpFile):
         stem, ext = standardFile.split(".", 1)
         if (stem == "performance"):
@@ -88,7 +86,7 @@ class PerformanceTestComparison(comparetest.TestComparison):
 # Does the same as the basic test comparison apart from when comparing the performance file
 class MakeComparisons(comparetest.MakeComparisons):
     def makeTestComparison(self, test):
-        return PerformanceTestComparison(test, self.newFiles)
+        return PerformanceTestComparison(test, self.overwriteOnSuccess)
 
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile):

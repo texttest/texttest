@@ -163,9 +163,7 @@ class BatchResponder(respond.Responder):
             return successCategory
         # Don't provide failure information on crashes and unfinished tests, it's confusing...
         self.failureDetail[test] = testComparison
-        if len(testComparison.comparisons) > 1:
-            return "difference"
-        return testComparison.comparisons[0].getType()
+        return testComparison.getType()
     def findSuccessCategory(self, test):
         if test in killedTests:
             return "unfinished"
@@ -224,7 +222,7 @@ class BatchResponder(respond.Responder):
             mailFile.write("--------------------------------------------------------" + os.linesep)
             mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             os.chdir(test.abspath)
-            self.responder.displayComparisons(testComparison.comparisons, mailFile, self.mainSuite.app)
+            self.responder.displayComparisons(testComparison.getComparisons(), mailFile, self.mainSuite.app)
     def getCleanUpAction(self):
         return SendException(self) 
 

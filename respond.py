@@ -34,11 +34,9 @@ class Responder(plugins.Action):
         pass
     def handleFailedPrediction(self, test, desc):
         pass
-    def comparisonsString(self, comparisons):
-        return string.join([repr(x) for x in comparisons], ",")
     def responderText(self, test):
         testComparison = comparetest.testComparisonMap[test]
-        diffText = " differences in " + self.comparisonsString(testComparison.comparisons)
+        diffText = testComparison.getDifferenceSummary()
         return repr(testComparison) + diffText
     def processUnRunnable(self, test):
         print test.getIndent() + repr(test), "Failed: ", str(test.deathReason).split(os.linesep)[0]
@@ -53,11 +51,16 @@ class InteractiveResponder(Responder):
     def handleFailure(self, test, testComparison):
         performView = self.askUser(test, testComparison, 1)
         if performView:
-            self.displayComparisons(testComparison.comparisons, sys.stdout, test.app)
+            self.displayComparisons(testComparison.getComparisons(), sys.stdout, test.app)
             self.askUser(test, testComparison, 0)
     def displayComparisons(self, comparisons, displayStream, app):
         for comparison in comparisons:
-            displayStream.write("------------------ Differences in " + repr(comparison) + " --------------------\n")
+            if comparison.newResult():
+                titleText = "New result in"
+            else:
+                titleText = "Differences in"
+            titleText += " " + repr(comparison)
+            displayStream.write("------------------ " + titleText + " --------------------\n")
             self.display(comparison, displayStream, app)
     def display(self, comparison, displayStream, app):
         ndiff.fcompare(comparison.stdCmpFile, comparison.tmpCmpFile)
@@ -107,7 +110,10 @@ class UNIXInteractiveResponder(InteractiveResponder):
         os.remove(fileName)
         return crashText
     def display(self, comparison, displayStream, app):
-        argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
+        if comparison.newResult():
+            argumentString = " /dev/null " + comparison.tmpFile
+        else:
+            argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
         if displayStream == sys.stdout and repr(comparison) == app.getConfigValue("log_file"):
             print "<See tkdiff window>"
             os.system("tkdiff" + argumentString + " &")
@@ -119,13 +125,14 @@ class UNIXInteractiveResponder(InteractiveResponder):
                     return
                 displayStream.write(line)
                 linesWritten += 1
+
     
 class OverwriteOnFailures(Responder):
     def __init__(self, version):
         self.version = version
     def responderText(self, test):
         testComparison = comparetest.testComparisonMap[test]
-        diffText = " differences in " + self.comparisonsString(testComparison.comparisons)
+        diffText = testComparison.getDifferenceSummary()
         return "- overwriting" + diffText
     def handleFailure(self, test, testComparison):
         testComparison.save(self.version)

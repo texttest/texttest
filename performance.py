@@ -82,8 +82,6 @@ class PerformanceTestComparison(comparetest.TestComparison):
         
 # Does the same as the basic test comparison apart from when comparing the performance file
 class MakeComparisons(comparetest.MakeComparisons):
-    def __init__(self, newFiles):
-        comparetest.MakeComparisons.__init__(self, newFiles)
     def makeTestComparison(self, test):
         return PerformanceTestComparison(test, self.newFiles)
 

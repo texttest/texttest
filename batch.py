@@ -142,9 +142,13 @@ class BatchResponder(respond.Responder):
         if self.mainSuite == None:
             self.mainSuite = suite
     def failureCount(self):
-        return self.totalTests(self.errorCategories + self.failureCategories)
+        return self.totalTests(self.failCategories())
+    def successCount(self):
+        return self.totalTests(self.successCategories)
+    def failCategories(self):
+        return self.errorCategories + self.failureCategories
     def allCategories(self):
-        return self.errorCategories + self.failureCategories + self.successCategories
+        return self.failCategories() + self.successCategories
     def testCount(self):
         return self.totalTests(self.allCategories())
     def totalTests(self, categoryList):
@@ -152,13 +156,19 @@ class BatchResponder(respond.Responder):
         for category in categoryList:
             count += len(category.allTests)
         return count
-    def writeMailBody(self, mailFile):
-        for category in self.allCategories():
-            category.describeBrief(mailFile, self.mainSuite.app)
+    def writeFailuresBrief(self, mailFile):
+        for category in self.failCategories():
+            category.describeBrief(mailFile, self.mainSuite.app)        
+    def writeSuccessBrief(self, mailFile):
+        for category in self.successCategories:
+            category.describeBrief(mailFile, self.mainSuite.app)        
+    def writeDetails(self, mailFile):
         for category in self.allCategories():
             category.describeFull(mailFile)
     def getCleanUpAction(self):
-        return MailSender(self.sessionName) 
+        return MailSender(self.sessionName)
+
+sectionHeaders = [ "Summary of all Unsuccessful tests", "Details of all Unsuccessful tests", "Summary of all Successful tests" ]
 
 class MailSender(plugins.Action):
     def __init__(self, sessionName):
@@ -187,17 +197,26 @@ class MailSender(plugins.Action):
             for resp in appResponders:
                 mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
             mailFile.write(os.linesep)
-        for resp in appResponders:
-            if len(appResponders) > 1:
-                mailFile.write("---------------------------------------------------------------------------------" + os.linesep)
-                mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
-                mailFile.write(os.linesep)
-            resp.writeMailBody(mailFile)
-            mailFile.write(os.linesep)
+        if not self.isAllSuccess(appResponders):
+            self.performForAll(mailFile, app, appResponders, BatchResponder.writeFailuresBrief, sectionHeaders[0])
+            self.performForAll(mailFile, app, appResponders, BatchResponder.writeDetails, sectionHeaders[1])
+        if not self.isAllFailure(appResponders):
+            self.performForAll(mailFile, app, appResponders, BatchResponder.writeSuccessBrief, sectionHeaders[2])
         mailFile.close()
         for responder in appResponders:
             allBatchResponders.remove(responder)
         sys.stdout.write("done." + os.linesep)
+    def performForAll(self, mailFile, app, appResponders, method, headline):
+        mailFile.write(headline + " follows..." + os.linesep)
+        mailFile.write("---------------------------------------------------------------------------------" + os.linesep)
+        for resp in appResponders:
+            if len(appResponders) > 1:
+                if headline.find("Details") != -1 and not resp is appResponders[0]:
+                    mailFile.write("---------------------------------------------------------------------------------" + os.linesep)
+                mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
+                mailFile.write(os.linesep)
+            method(resp, mailFile)
+            mailFile.write(os.linesep)
     def createMail(self, title, app, appResponders):
         fromAddress = os.environ["USER"]
         toAddress = self.getRecipient(app)
@@ -241,10 +260,14 @@ class MailSender(plugins.Action):
                 if not cat.name in names:
                     names.append(cat.name)
         return names
+    def isAllSuccess(self, appResponders):
+        return self.getTotalString(appResponders, BatchResponder.failureCount) == "0"
+    def isAllFailure(self, appResponders):
+        return self.getTotalString(appResponders, BatchResponder.successCount) == "0"
     def getMailTitle(self, app, appResponders):
         title = self.getMailHeader(app, appResponders)
         title += self.getTotalString(appResponders, BatchResponder.testCount) + " tests"
-        if self.getTotalString(appResponders, BatchResponder.failureCount) == "0":
+        if self.isAllSuccess(appResponders):
             return title + ", all successful"
         title += " :"
         for categoryName in self.getCategoryNames(appResponders):
@@ -355,13 +378,54 @@ class CollectFiles(plugins.Action):
             title += self.mailSender.briefText(count, catName)
         # Lose trailing comma
         return title[:-1]
+    def extractHeader(self, body, mailFile):
+        firstSep = body.find(os.linesep) + 1
+        header = body[0:firstSep]
+        mailFile.write(header)
+        return header, body[firstSep:]
+    def extractSection(self, sectionHeader, body):
+        headerLoc = body.find(sectionHeader)
+        if headerLoc == -1:
+            return body.strip(), ""
+        nextLine = body.find(os.linesep, headerLoc) + 1
+        if body[nextLine] == "-":
+            nextLine = body.find(os.linesep, nextLine) + 1
+        section = body[0:headerLoc].strip()
+        newBody = body[nextLine:].strip()
+        return section, newBody
     def writeBody(self, mailFile, bodies):
-        if len(bodies) > 1:
-            for body in bodies:
-                firstSep = body.find(os.linesep) + 1
-                mailFile.write(body[0:firstSep])
-            mailFile.write(os.linesep)
-        for body in bodies:
-            if len(bodies) > 1:
-                mailFile.write("================================================================================" + os.linesep + os.linesep)
-            mailFile.write(body)
+        if len(bodies) == 1:
+            return mailFile.write(bodies[0])
+
+        parsedBodies = [ self.extractHeader(body, mailFile) for body in bodies ]
+        mailFile.write(os.linesep)
+
+        sectionMap = {}
+        prevSectionHeader = ""
+        for sectionHeader in sectionHeaders:
+            parsedSections = []
+            newParsedBodies = []
+            for header, body in parsedBodies:
+                section, newBody = self.extractSection(sectionHeader, body)
+                if len(newBody) != 0:
+                    newParsedBodies.append((header, newBody))
+                if len(section) != 0:
+                    parsedSections.append((header, section))
+
+            self.writeSection(mailFile, prevSectionHeader, parsedSections)
+            parsedBodies = newParsedBodies
+            prevSectionHeader = sectionHeader
+        self.writeSection(mailFile, prevSectionHeader, parsedBodies)
+    def writeSection(self, mailFile, sectionHeader, parsedSections):
+        if len(sectionHeader) == 0 or len(parsedSections) == 0:
+            return
+        mailFile.write(sectionHeader + " follows..." + os.linesep)
+        detailSection = sectionHeader.find("Details") != -1
+        if not detailSection or len(parsedSections) == 1: 
+            mailFile.write("=================================================================================" + os.linesep)
+        for header, section in parsedSections:
+            if len(parsedSections) > 1:
+                if detailSection:
+                    mailFile.write("=================================================================================" + os.linesep)
+                mailFile.write(header + os.linesep)
+            mailFile.write(section + os.linesep + os.linesep)

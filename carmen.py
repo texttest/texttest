@@ -231,7 +231,7 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
             return 1
 
         carmtmp = suite.environment["CARMTMP"]
-        return carmtmp.find("$CARMSYS") != -1 or carmtmp.find("${CARMSYS}") != -1
+        return carmtmp.find(os.environ["CARMSYS"]) != -1
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
 

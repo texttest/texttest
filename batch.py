@@ -318,12 +318,15 @@ class CollectFiles(plugins.Action):
         for filename in os.listdir(app.abspath):
             prefix = "batchreport." + app.name + app.versionSuffix()
             if filename.startswith(prefix):
-                file = open(os.path.join(app.abspath, filename))
+                fullname = os.path.join(app.abspath, filename)
+                file = open(fullname)
                 app.setConfigDefault("collection_recipients", file.readline().strip())
                 catValues = file.readline().strip().split(",")
                 for i in range(len(categoryNames)):
                     totalValues[i] += int(catValues[i])
                 fileBodies.append(file.read())
+                file.close()
+                os.remove(fullname)
         mailTitle = self.getTitle(app, totalValues)
         mailFile = self.mailSender.createMail(mailTitle, app, [])
         self.writeBody(mailFile, fileBodies)

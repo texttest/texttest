@@ -169,9 +169,11 @@ class CollateUNIXFiles(default.CollateFiles):
                     endPos = line.rfind("(")
                     writeFile.write(line[startPos:endPos] + os.linesep)
                 prevLine = line
+            os.remove(path)
         else:
             writeFile.write("Could not find binary name from core file - no stack trace for crash" + os.linesep)
-        os.remove(path)
+            # Keep the core file for later viewing
+            os.rename(path, "core")
         os.remove(fileName)
         os.rename(newPath, path)
     def extract(self, sourcePath, targetFile):
@@ -233,7 +235,8 @@ class MakePerformanceFile(plugins.Action):
                 cpuTime = cpuTime + self.parseUnixTime(line)
             if line.startswith("real"):
                 realTime = self.parseUnixTime(line)
-        os.remove(tmpFile)
+        if cpuTime != None:
+            os.remove(tmpFile)
         return cpuTime, realTime
     def timeString(self, timeVal):
         return str(round(float(timeVal), 1)).rjust(9)

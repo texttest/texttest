@@ -522,7 +522,7 @@ class BuildCode(plugins.Action):
             if version9:
                 return "xanxere"
             else:
-                return "frankfort"
+                return "taylor"
         if arch == "sparc":
             return "turin"
         if arch == "sparc_64":

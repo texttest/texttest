@@ -203,13 +203,8 @@ class BuildCode(plugins.Action):
                 self.buildLocal(absPath, app)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
-        for relPath in app.getConfigList("build_codebase"):
-            absPath = app.makeAbsPath(relPath)
-            if os.path.isdir(absPath):
-                self.buildRemote("sundance", "sparc", absPath) 
-                self.buildRemote("ramechap", "parisc_2_0", absPath)
-            else:
-                print "Not building in", absPath, "which doesn't exist!"
+        self.buildRemote("sundance", "sparc", app) 
+        self.buildRemote("ramechap", "parisc_2_0", app)
     def buildLocal(self, absPath, app):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."
@@ -221,21 +216,26 @@ class BuildCode(plugins.Action):
         os.remove(buildFile)
         os.system("gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null")
         print "Making install from", absPath ,"to", os.environ["CARMSYS"]
-    def buildRemote(self, machine, arch, absPath):
-        print "Building remotely in parallel on " + machine + "..."
+    def buildRemote(self, machine, arch, app):
+        print "Building remotely in parallel on " + machine + " ..."
         processId = os.fork()
         if processId == 0:
-            sys.stdin = open("/dev/null")
-            signal.signal(1, self.killBuild)
-            signal.signal(2, self.killBuild)
-            signal.signal(15, self.killBuild)
-            commandLine = "cd " + absPath + "; gmake >& build." + arch
-            os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
-            os.chdir(absPath)
-            sys.exit(self.checkBuildFile("build." + arch))
+            result = self.buildRemoteInChild(machine, arch, app)
+            sys.exit(result)
         else:
             tuple = processId, arch
             self.childProcesses.append(tuple)
+    def buildRemoteInChild(self, machine, arch, app):
+        sys.stdin = open("/dev/null")
+        signal.signal(1, self.killBuild)
+        signal.signal(2, self.killBuild)
+        signal.signal(15, self.killBuild) 
+        for relPath in app.getConfigList("build_codebase"):
+            absPath = app.makeAbsPath(relPath)
+            if os.path.isdir(absPath):    
+                commandLine = "cd " + absPath + "; gmake >& build." + arch
+                os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
+        return 0            
     def checkBuildFile(self, buildFile):
         for line in open(buildFile).xreadlines():
             if line.find("***") != -1 and line.find("Error") != -1:
@@ -251,15 +251,21 @@ class CheckBuild(plugins.Action):
         print "Waiting for remote builds..." 
         for process, arch in self.builder.childProcesses:
             pid, status = os.waitpid(process, 0)
-            if status:
-                print "Build on", arch, "FAILED!"
-            else:
-                print "Build on", arch, "SUCCEEDED!"
-                for relPath in app.getConfigList("build_codebase"):
-                    absPath = app.makeAbsPath(relPath)
-                    fullPath = os.path.join(absPath, "build." + arch)
-                    if os.path.isfile(fullPath):
-                        os.remove(fullPath)
+            # In theory we should be able to trust the status. In practice, it seems to be 0, even when the build failed.
+            for relPath in app.getConfigList("build_codebase"):
+                absPath = app.makeAbsPath(relPath)
+                self.checkBuild(arch, absPath)
+    def checkBuild(self, arch, absPath):
+        if os.path.isdir(absPath):
+            os.chdir(absPath)
+            fileName = "build." + arch
+            result = self.builder.checkBuildFile(fileName)
+            resultString = " SUCCEEDED!"
+            if result:
+                resultString = " FAILED!"
+            print "Build on " + arch + " in " + absPath + resultString
+            if result == 0:
+                os.remove(fileName)
 
 def ensureDirectoryExists(path):
     if len(path) == 0:

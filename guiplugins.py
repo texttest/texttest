@@ -343,10 +343,19 @@ class SelectTests(InteractiveAction):
     def getScriptTitle(self):
         return "Select indicated tests"
     def performOn(self, app, selTests):
-        app.configObject.updateOptions(self.optionGroup)
-        valid, testSuite = app.createTestSuite()
+        version = self.optionGroup.getOptionValue("vs")
+        appToUse = app
+        fullVersion = app.getFullVersion()
+        if fullVersion.find(version) == -1:
+            if len(fullVersion) > 0:
+                version += "." + fullVersion
+            appToUse = app.createCopy(version)
+        appToUse.configObject.updateOptions(self.optionGroup)
+        valid, testSuite = appToUse.createTestSuite()
+        for test in testSuite.testCaseList():
+            test.app = app
         guilog.info("Created test suite of size " + str(testSuite.size()))
-        return testSuite    
+        return testSuite
 
 class ResetGroups(InteractiveAction):
     def getTitle(self):

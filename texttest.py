@@ -457,17 +457,23 @@ class TestCase(Test):
         return writeDir
             
 class TestSuite(Test):
-    def __init__(self, name, abspath, app, filters, parent=None):
+    def __init__(self, name, abspath, app, filters, parent=None, allVersions=0):
         Test.__init__(self, name, abspath, app, parent)
         self.testCaseFile = self.makeFileName("testsuite")
+        self.testcases = []
         if self.valid and os.path.isfile(self.testCaseFile) and self.isAcceptedByAll(filters):
             self.readEnvironment()
-            self.readTestCases(filters)
+            self.readTestCases(filters, allVersions)
         else:
             self.valid = 0
-    def readTestCases(self, filters):
-        debugLog.info("Reading test suite file " + self.testCaseFile)
-        self.testcases = self.getTestCases(filters)
+    def readTestCases(self, filters, allVersions):
+        self.testcases = self.getTestCases(filters, self.testCaseFile, allVersions)
+        debugLog.info("Test suite file " + self.testCaseFile + " had " + str(len(self.testcases)) + " tests")
+        if allVersions:
+            for fileName in self.findVersionTestSuiteFiles():
+                newCases = self.getTestCases(filters, fileName, allVersions)
+                self.testcases += newCases
+                debugLog.info("Added " + str(len(newCases)) + " from " + fileName)
         if len(self.testcases):
             maxNameLength = max([len(test.name) for test in self.testcases])
             for test in self.testcases:
@@ -487,6 +493,21 @@ class TestSuite(Test):
         return action.setUpSuite(self)
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
+    def findVersionTestSuiteFiles(self):
+        allFiles = os.listdir(self.abspath)
+        allFiles.sort()
+        localFiles = filter(self.isVersionTestSuiteFile, allFiles)
+        return map(lambda file: os.path.join(self.abspath, file), localFiles)
+    def isVersionTestSuiteFile(self, file):
+        if not file.startswith("testsuite") or file == os.path.basename(self.testCaseFile):
+            return 0
+        if file.find(self.app.getFullVersion()) == -1:
+            return 0
+        # Don't do this for extra versions, they appear anyway...
+        for extraApp in self.app.extras:
+            if file.find(extraApp.getFullVersion()) != -1:
+                return 0
+        return 1
     def filesChanged(self):
         # Here we assume that only order can change and suites be removed...
         newList = []
@@ -525,12 +546,14 @@ class TestSuite(Test):
             size += testcase.size()
         return size
 # private:
-    def getTestCases(self, filters):
+    def getTestCases(self, filters, fileName, allVersions):
         testCaseList = []
         allowEmpty = 1
-        for testline in open(self.testCaseFile).xreadlines():
+        for testline in open(fileName).xreadlines():
             testName = testline.strip()
             if len(testName) == 0  or testName[0] == '#':
+                continue
+            if allVersions and self.alreadyContains(self.testcases, testName):
                 continue
             if self.alreadyContains(testCaseList, testName):
                 print "WARNING: the test", testName, "was included several times in the test suite file - please check!"
@@ -538,14 +561,14 @@ class TestSuite(Test):
 
             allowEmpty = 0
             testPath = os.path.join(self.abspath, testName)
-            testSuite = TestSuite(testName, testPath, self.app, filters, self)
+            testSuite = TestSuite(testName, testPath, self.app, filters, self, allVersions)
             if testSuite.valid:
                 testCaseList.append(testSuite)
             else:
                 testCase = TestCase(testName, testPath, self.app, filters, self)
                 if testCase.valid:
                     testCaseList.append(testCase)
-        if not allowEmpty and len(testCaseList) == 0:
+        if fileName == self.testCaseFile and (not allowEmpty and len(testCaseList) == 0):
             self.valid = 0
         return testCaseList
     def addTest(self, testName, testPath):
@@ -662,6 +685,7 @@ class Application:
         self.versions = version.split(".")
         if self.versions[0] == "":
             self.versions = []
+        self.inputOptions = inputOptions
         self.configDir = MultiEntryDictionary()
         self.setConfigDefaults()
         extensions = self.getVersionFileExtensions(baseVersion=0)
@@ -695,6 +719,9 @@ class Application:
         return ""
     def classId(self):
         return "test-app"
+    def createCopy(self, version):
+        configFile = os.path.join(self.abspath, "config." + self.name)
+        return Application(self.name, self.abspath, configFile, version, self.inputOptions)
     def getPersonalConfigFile(self):
         if os.environ.has_key("TEXTTEST_PERSONAL_CONFIG"):
             return os.path.join(os.environ["TEXTTEST_PERSONAL_CONFIG"], ".texttest")
@@ -782,7 +809,9 @@ class Application:
         else:
             return 0
     def addToOptionGroup(self, group):
-        if group.name.startswith("What"):
+        if group.name.startswith("Select"):
+            group.addOption("vs", "Version to select", self.getFullVersion())
+        elif group.name.startswith("What"):
             group.addOption("c", "Use checkout")
             group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("How"):
@@ -840,7 +869,7 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
-    def createTestSuite(self, filters = None):
+    def createTestSuite(self, filters = None, allVersions = 0):
         if not filters:
             filters = self.configObject.getFilterList()
 
@@ -848,7 +877,7 @@ class Application:
         for filter in filters:
             if not filter.acceptsApplication(self):
                 success = 0
-        suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters)
+        suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters, allVersions=allVersions)
         suite.reFilter(filters)
         suite.expandEnvironmentReferences()
         return success, suite
@@ -1624,7 +1653,8 @@ class TextTest:
         appSuites = []
         for app in self.allApps:
             try:
-                valid, testSuite = app.createTestSuite()
+                allVersions = self.gui and not self.gui.dynamic
+                valid, testSuite = app.createTestSuite(allVersions=allVersions)
                 if valid:
                     appSuites.append((app, testSuite))
                     uniqueNameFinder.addSuite(testSuite)

@@ -1,4 +1,30 @@
 #!/usr/local/bin/python
+
+helpDescription = """
+The default configuration, with no modifications, will run all tests on the local machine,
+sending standard output to output.<app> and standard error to errors.<app>. These files
+will then be filtered using the list entries "output" and "error" from the config file,
+to remove run-dependent text.
+
+Failure is reported on any differences with the standard versions of those files, and displayed
+using Python's ndiff module. A simple interactive dialogue is then produced, allowing the changes
+to be saved as new standard results.
+
+The default configuration is intended to be usable on any platform.
+"""
+
+helpOptions = """
+-i         - run in interactive mode. This means that the framework will interleave running and comparing
+             the tests, so that test 2 is not run until test 1 has been run and compared.
+
+-o         - run in overwrite mode. This means that the interactive dialogue is replaced by simply
+             overwriting all previous results with new ones.
+
+-t <text>  - only run tests whose names contain <text> as a substring
+
+-f <file>  - only run tests whose names appear in the file <file>
+"""
+
 import os, plugins, respond, comparetest, string
 
 def getConfig(optionMap):
@@ -42,6 +68,15 @@ class Config(plugins.Configuration):
     def addFilter(self, list, optionName, filterObj):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
+    def printHelpDescription(self):
+        print helpDescription
+    def printHelpOptions(self, builtInOptions):
+        print helpOptions, builtInOptions
+    def printHelpText(self, builtInOptions):
+        self.printHelpDescription()
+        print "Command line options supported :"
+        print "--------------------------------"
+        self.printHelpOptions(builtInOptions)
 
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):

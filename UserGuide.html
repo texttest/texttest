@@ -1,0 +1,229 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.18-19.7.xsmp i686) [Netscape]">
+</head>
+<body>
+
+<center><b><u><font size=+4>TextTest User Guide</font></u></b></center>
+
+<p><b><u>The framework</u></b>
+<p><u>The purpose and philosophy</u>
+<br>TextTest is an application-independent configurable framework for text-based
+functional testing,
+<br>primarily regression and performance, but also stress testing. It is
+written in Python, and comes
+<br>with many different configurations. These configurations can add features
+of their own, and need to be
+<br>documented separately. This document will only document the core framework.
+<p>TextTest is not designed for unit testing. If you want to do unit testing,
+look at JUnit and similar products.
+<p>The expectation is that tests are written, run and configured using
+simple text files only, and that
+<br>information in the file system itself is used wherever possible. New
+configurations should only need to be
+<br>written for new applications, and similar applications may well use
+the same configuration. It is <i>not</i>
+<br>intended that new code should need to be written when a new test is
+created.
+<p>To be tested using TextTest, an application needs to be runnable from
+the command line using
+<br>standard options and/or information in standard input. It needs to
+be runnable in batch mode so that
+<br>fully automatic tests can be created. It also needs to produce meaningful
+output that is, or can be converted
+<br>to plain text. It will then use this text to monitor and control the
+behaviour of the application.
+<p><u>The Root Directory</u>
+<br>This is the first thing determined by TextTest on being called, and
+is where in your file system it will
+<br>start to look for tests. It is determined as follows:
+<br>(1)&nbsp;If the command line option "-d" has been set, use the value
+of that.
+<br>(2)&nbsp;If not, but the environment variable "TEXTTEST_HOME" is set,
+use that.
+<br>(3)&nbsp;If neither of the above, use the current working directory.
+<p><u>Applications</u>
+<br>To test an application under TextTest, the first thing to do is to
+choose a unique identifier to be
+<br>used as an extension for all files relevant to that application. It
+does not matter what this is. For the
+<br>next few paragraphs this variable is indicated by &lt;app>.
+<p>Basic information about an application and how to run it appears in
+a file called "config.&lt;app>". TextTest
+<br>will look for files with names of this format to determine which applications
+it will run. It will start at the root
+<br>directory and look in that directory and one level down in the directory
+structure, and all files
+<br>beginning with "config." are considered. This file is written in&nbsp;
+<a href="#Appendix - TextTest file formats">Standard Dictionary Format</a>,
+and its contents
+<br>will vary depending on the configuration used.
+<p>To tell TextTest to run just one particular application, specify "-a
+&lt;app>" on the command line.
+<p><u>Configurations</u>
+<br>A configuration is a Python module which determines what TextTest will
+do. This is important to bear
+<br>in mind. TextTest does not, on its own, do anything. It interprets
+a directory structure and the files in it
+<br>a certain way, and passes these things to its configuration module
+to perform actions (such as running
+<br>tests and evaluating the results).
+<p>In your application's config file, you must therefore specify a configuration
+by using the "config_module"
+<br>entry. What this configuration will do is up to the person who wrote
+it, and hence in order to find this information out
+<br>for a particular application, run "texttest -a &lt;app> -help".&nbsp;This
+will ask the configuration to write out what
+<br>it does by default and how you can change what it does.
+<p>A configuration can both extend the range of command line options available,
+and the config file entries that
+<br>will be interpreted and acted upon.
+<p><u>Test Cases</u>
+<br>A test case is represented in TextTest by a particular directory in
+the file system, and the name of the test case
+<br>is always the same as the name of the directory. Many applications
+may share the same test case if desired.
+<br>To define a test case for an application, a file called "options.&lt;app>"
+or "input.&lt;app>" must be present.
+<br>"options.&lt;app>", if present, will be interpreted as command line
+options to be given to the application.
+<br>"input.app" will be interpreted as intended for use as standard input.
+<p>All files produced when running this test case are written to its directory,
+with the .app extension.
+<p><u>Test Suites</u>
+<br>A Test Suite is a recursive collection of test cases arranged in a
+particular order. It is defined for an application
+<br>by a directory in the file system containing a local file called "testsuite.&lt;app>".
+This file is read by the framework
+<br>and lists subdirectories in the order in which they should be considered.
+These subdirectories may correspond
+<br>to test cases or may themselves be test suites. The file is in <a href="#Appendix - TextTest file formats">Standard
+List Format</a>.
+<p>TextTest, having found an application "app" by finding config.app, will
+then look at testsuite.app in the same
+<br>directory to determine what the full test suite consists of.&nbsp;
+It will then look, in the order given, at all the subdirectories
+<br>specified, and where they are themselves test suites, will repeat this
+process recursively until all specified test cases
+<br>have been found.
+<p><u>Setting Environment Variables (using environment files)</u>
+<br>Any test suite or test case can tell TextTest to set environment variables
+by providing an environment file.
+<br>This is a file called "environment.app" or just "environment" (it has
+been found that applications often
+<br>need to share environment variables). This file is in&nbsp; <a href="#Appendix - TextTest file formats">Standard
+Dictionary Format</a> , with the environment
+<br>variable names as keys and their values as entries. If the environment
+file is provided in a test case these variables
+<br>will be set just for that test case. If in a test suite it will be
+set for all test suites and test cases containing in that test suite, operating
+recursively.
+<p>The values of the variables may themselves contain environment variables:&nbsp;if
+so, this should be done in standard UNIX
+<br>format using $&lt;var_name>.
+<p><u>Versions of Applications</u>
+<br>It is often needed to define different versions of an application which
+may not be quite the same in all respects, but which
+<br>want to share some portion of the test suite structure of the parent
+application. To specify a version, use -v &lt;version> on
+<br>the command line. For each file type described so far, the framework
+will then look also for files called &lt;root>.&lt;app>.&lt;version>
+<br>where &lt;root> is environment, config, testsuite etc. in each case.
+If such a file does not exist, &lt;root>.&lt;app> is then always used.
+If the
+<br>file does exist, it is used instead of &lt;root>.&lt;app> in the case
+of files in test cases (which are interpreted by the client application)
+and
+<br>Standard List Format files (i.e. the testsuite.&lt;app> files). In
+the case of Standard Dictionary Format (i.e. the config and environment
+files),
+<br>however, they are interpreted as overriding particular entries in the
+dictionary, so that entries not present in &lt;root>.&lt;app>.&lt;version>
+are
+<br>read from &lt;root>.&lt;app>.
+<p><u>Checkouts of Applications</u>
+<br>It is expected that TextTest test suites will want to be version-controlled,
+and hence an easy means of switching between
+<br>different "checkouts" of the version-control system is needed. A checkout
+is different to a version in that all checkouts
+<br>are expected to produce the same results, and making sure that last
+night's central checkout does the same as a developer's local
+<br>code is an essential part of verifying development work.
+<p>There are thus two compulsory entries in the config file, "checkout_location"
+and "default_checkout". Unless the -c
+<br>option is specified, these two paths will be appended to determine
+the checkout. To change the checkout on the
+<br>command line, one of two things can happen:
+<br>-c &lt;relative path> will set the checkout to the contents of "checkout_location"
+appended to &lt;relative path>
+<br>-c &lt;absolute path> will set the checkout to &lt;absolute path>
+<p>Note that the framework, having determined the checkout, will assume
+that all dictionary entries in the environment
+<br>and config files which are relative path names (contain, but do not
+start with,&nbsp; the operating system path separator) are paths relative
+to the checkout, and
+<br>hence the checkout name will be pre-pended to these before they are
+used.
+<p><u>File Management and Parallel Mode</u>
+<br>Each time you call TextTest, your run is assigned a unique identifier
+based on your user name and the time stamp.
+<br>All temporary files created will use this identifier.
+<p>The framework will generally clean up any files created by previous
+runs. If you wish to run the same tests in parallel, you must
+<br>specify -p on the command line, which essentially tells the framework
+to leave alone files and directories created by previous runs.
+<p><u>Repeating things</u>
+<br>It can be useful to detect unreliable behaviour to repeat the test
+runs several times. To do this, specify -m &lt;number_of_times> on
+<br>the command line. This applies whatever your configuration does.
+<p><b><u>Some Examples</u></b>
+<br><i>texttest</i>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Runs all applications and
+all tests it can find, starting at the current directory
+<br><i>texttest -a dip -p&nbsp;</i>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Searches for a file called
+"config.dip", and runs that application if found. Do not delete other temporary
+files.
+<br><i>texttest -d ~/work/MyTests -c /carm/master</i>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Run all applications found,
+starting at ~/work/MyTests. Use the central checkout /carm/master instead
+of my local one
+<br><i>texttest -a cas -v 9 -m 3</i>
+<br><i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </i>Run all tests for
+the application with extension "cas", using version 9 of that application.
+Do everything 3 times.
+<p><a NAME="Appendix - TextTest file formats"></a><b><u>Appendix - TextTest
+file formats</u></b>
+<br>TextTest reads two file formats - Standard List Format and Standard&nbsp;Dictionary
+Format. These are designed to be
+<br>as human readable as possible.
+<p>Both will filter out blank lines and lines beginning with "#", the latter
+being interpreted as comments. It's good
+<br>practice to use the latter feature to document things about your application
+and its tests in the TextTest files themselves.
+<p>Both will also expand environment variables, indicated by "$".
+<p>Standard&nbsp;List Format is simple:&nbsp;each entry is a complete line.
+So a Standard List File is simply interpreted as a list
+<br>of the lines in it which are not blank and do not start with "#".
+<p>Standard&nbsp;Dictionary&nbsp;Format has entries in the form &lt;variable>:&lt;value>,
+where &lt;variable> indicates an environment
+<br>variable to be set in the case of the environment file, and a variable
+understood by TextTest or its configurations in
+<br>the case of the config file.
+<p>In the case of the config file, it can be useful to have the value be
+a list itself. This is achieved by adding several entries
+<br>for the same &lt;variable>. So if we need to set variable V to a list
+consisting of A,B, this is done by
+<br>V:A
+<br>V:B
+<p>Where TextTest is itself interpreting the variables it generally expects
+either a list or a single value. Its behaviour
+<br>will thus be different when that variable is not present. A list value
+that is not present will just be understood as an
+<br>empty list. A single value that is not present will generally result
+in an error and an exit.
+<br>&nbsp;
+</body>
+</html>

@@ -15,6 +15,8 @@ class Configuration:
         return versionString
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options
+    def printHelpText(self):
+        pass
     
 # Filter interface: all must provide these three methods
 class Filter:

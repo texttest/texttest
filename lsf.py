@@ -1,4 +1,44 @@
 #!/usr/local/bin/python
+
+helpDescription = """
+The LSF configuration, with no modifications, will submit all tests to LSF's "normal" queue.
+It will then wait for each test in turn, and provide comparison when each has finished.
+
+sending standard output to output.<app> and standard error to errors.<app>. These files
+will then be filtered using the list entries "output" and "error" from the config file,
+to remove run-dependent text.
+
+Failure is reported on any differences with the standard versions of those files, and displayed
+using Python's ndiff module. A simple interactive dialogue is then produced, allowing the changes
+to be saved as new standard results.
+
+The default configuration is intended to be usable on any platform.
+"""
+
+helpOptions = """
+-l         - run in local mode. This means that the framework will not use LSF, but will behave as
+             if the default configuration was being used, and run on the local machine.
+
+-r <mins>  - run only tests which are expected to complete in less than <mins> minutes.
+
+-b <bname> - run in batch mode, using batch session name <bname>. This will replace the interactive
+             dialogue with an email report, which is sent to $USER if the session name <bname> is
+             not recognised by the config file.
+
+             There is also a possibility to define batch sessions in the config file. The following
+             entries are understood:
+             <bname>_timelimit,  if present, will run only tests up to that limit
+             <bname>_recipients, if present, ensures that mail is sent to those addresses instead of $USER.
+             If set to "none", it ensures that that batch session will ignore that application.
+             <bname>_version, these entries form a list and ensure that only the versions listed are accepted.
+             If the list is empty, all versions are allowed.
+
+-R <resrc> - Use the LSF resource <resrc>. This is essentially forwarded to LSF's bsub command, so for a full
+             list of its capabilities, consult the LSF manual. However, it is particularly useful to use this
+             to force a test to go to certain machines, using -R "hname == hostname", or to avoid similar machines
+             using -R "hname != hostname"
+"""
+
 import os, time, string, signal, sys, default, performance, respond, batch, plugins, types
 
 def getConfig(optionMap):
@@ -54,6 +94,10 @@ class LSFConfig(default.Config):
         return 0
     def checkPerformance(self):
         return 1
+    def printHelpDescription(self):
+        print default.helpDescription
+    def printHelpOptions(self, builtInOptions):
+        print helpOptions, default.helpOptions, builtInOptions
 
 class LSFJob:
     def __init__(self, test):

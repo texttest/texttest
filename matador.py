@@ -179,6 +179,7 @@ class MatadorTestSuiteInformation(optimization.TestSuiteInformation):
             if self.onlyEnvIsLacking == 1:
                 return 0
         return 1
+    
 class ImportTest(optimization.ImportTest):
     def getTestCaseInformation(self, suite, name):
         return MatadorTestCaseInformation(suite, name)

@@ -2,6 +2,36 @@
 import os, sys, string, getopt, types, time, re, plugins, exceptions
 from stat import *
 
+helpIntro = """
+Note: the purpose of this help is primarily to document the configuration you currently have,
+though also to provide a full list of options supported by both your framework and your configuration.
+A user guide (UserGuide.html) is available to document the framework itself.
+"""
+
+builtInOptions = """
+-a <app>   - run only the application with extension <app>
+
+-v <vers>  - use <vers> as the version name (see User Guide)
+
+-c <chkt>  - use <chkt> as the checkout instead of the "default_checkout" entry (see User Guide)
+
+-d <root>  - use <root> as the root directory instead of the value of TEXTTEST_HOME,
+             or the current working directory, which are used otherwise.
+
+-s <scrpt> - instead of the normal actions performed by the configuration, use the script <scpt>. If this contains
+             a ".", an attempt will be made to understand it as the Python class <module>.<classname>. If this fails,
+             it will be interpreted as an external script.
+
+-m <times> - perform the actions usually performed by the configuration, but repeated <times> times.
+
+-p         - run in parallel mode. Do not clean up any temporary files looking like they belon to other TextTest
+             runs.
+
+-help      - Do not run anything. Instead, generate useful text, such as this.
+
+-x         - debug the framework (produces lots of output)
+"""
+
 # Base class for TestCase and TestSuite
 class Test:
     def __init__(self, name, abspath, app):
@@ -183,6 +213,15 @@ class Application:
         return getConfig(optionMap)
     def getActionSequence(self):
         return self.configObject.getActionSequence()
+    def printHelpText(self):
+        print helpIntro
+        header = "Description of the " + self.getConfigValue("config_module") + " configuration"
+        length = len(header)
+        header += os.linesep
+        for x in range(length):
+            header += "-"
+        print header
+        self.configObject.printHelpText(builtInOptions)
     def getFilterList(self):
         filters = self.configObject.getFilterList()
         success = 1
@@ -459,8 +498,7 @@ class TextTest:
         if not acceptsApp:
             return
         if inputOptions.helpMode():
-            print "No documentation yet available for application", app
-            return
+            return app.printHelpText()
         allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
         try:
             self.performActionSequence(allTests, actionSequence, app, filterList)

@@ -289,12 +289,22 @@ class MakeResourceFiles(plugins.Action):
         line = string.strip(cpuLine) + " on " + executionMachine + os.linesep
         file.write(line)
         file.write(realLine)
+        for jobLine in self.findRunningJobs(executionMachine):
+            file.write(jobLine + os.linesep)
         file.close()
     def findExecutionMachine(self, line):
         start = string.find(line, "<")
         end = string.find(line, ">", start)
         fullName = line[start + 1:end]
         return string.split(fullName, ".")[0]
+    def findRunningJobs(self, machine):
+        jobs = []
+        for line in os.popen("bjobs -m " + machine + " -u all -w 2>&1 | grep RUN").xreadlines():
+            fields = line.split()
+            user = fields[1]
+            jobName = fields[6]
+            jobs.append("Also on " + machine + " : " + user + "'s job '" + jobName + "'")
+        return jobs
     def writeMemoryFile(self, memLine, swapLine, fileName):
         file = open(fileName, "w")
         file.write(string.lstrip(memLine))

@@ -634,8 +634,9 @@ class TestReport(plugins.Action):
         definingValues = [ costEntryName, timeEntryName ]
         # Values that should be reported if present, but should not be fatal if not
         interestingValues = [ memoryEntryName, "cost of rosters" ]
-        currentLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.currentVersion)
-        refLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.referenceVersion)
+        currentLogFile, refLogFile = self.getLogFilesForComparison(test)
+        if not (currentLogFile and refLogFile):
+            return
         currPerf, refPerf = self.getPerformance(test, self.currentVersion, self.referenceVersion)
         currentRun = OptimizationRun(test.app, definingValues, interestingValues, currentLogFile, currPerf)
         referenceRun = OptimizationRun(test.app, definingValues, interestingValues, refLogFile, refPerf)
@@ -647,6 +648,10 @@ class TestReport(plugins.Action):
         currPerf = performance.getTestPerformance(test, self.currentVersion)
         refPerf = performance.getTestPerformance(test, self.referenceVersion)
         return currPerf, refPerf
+    def getLogFilesForComparison(self, test):
+        currentLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.currentVersion)
+        refLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.referenceVersion)
+        return currentLogFile, refLogFile
 
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):

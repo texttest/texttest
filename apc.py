@@ -637,6 +637,19 @@ class MakeProgressReport(optimization.MakeProgressReport):
 
     def getPerformance(self, test, currentVersion, referenceVersion):
         return 0.0, 0.0
+    def getLogFilesForComparison(self, test):
+        return self.getLogFile(test, self.currentVersion), self.getLogFile(test, self.referenceVersion)
+    def getLogFile(self, test, version):
+        logFileStem = test.app.getConfigValue("log_file")
+        root = test.getDirectory(0, 1)
+        ver = ""
+        if version:
+            ver = "." + version
+        logFile = os.path.join(root, logFileStem + "." + test.app.name + ver)
+        if not os.path.isfile(logFile):
+            print "Test", test.name, "has no status file version", version, "Skipping this test."
+            logFile = None
+        return logFile
     def _calculateMargin(self, fcTupleList):
         if len(fcTupleList) < 2:
             return 0.1, 0.1
@@ -878,6 +891,9 @@ class MakeProgressReportHTML(MakeProgressReportGraphical):
             else:
                 print "The directory", self.dirForPlots, "doesn't exist. No plots will be saved."
                 self.writeHTML = 0
+        else:
+            print "No directory specified for html and plots."
+            self.writeHTML = 0
     def __del__(self):
         MakeProgressReport.__del__(self)
         if self.writeHTML:
@@ -885,7 +901,7 @@ class MakeProgressReportHTML(MakeProgressReportGraphical):
             if len(self.weightKPI) > 1:
                 self.summaryContainer.append((self.htmlHeading(2, "Overall time weighted average KPI = " + self.percent(self.prodKPI))))
             self.summaryContainer.append((self.htmlHeading(2, "Best KPI = " + self.percent(self.bestKpi))))
-            self.summaryContainer.append((self.htmlHeading(2, "Worst KPI = " + self.percent(self.worstKpi))))            
+            self.summaryContainer.append((self.htmlHeading(2, "Worst KPI = " + self.percent(self.worstKpi))))
             self.indexDoc.append(self.htmlHR())
             self.indexDoc.write(os.path.join(self.dirForPlots, "index.html"))
     def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi):

@@ -86,9 +86,10 @@ class SubPlanDirManager:
                 self.makeLinksIn(apcFiles, os.path.join(fromDir, file))
 
     def removeTemporary(self, test):
-        tmpDir = self.tmpDirs[test]
-        if os.path.isdir(tmpDir):
-            self._removeDir(tmpDir)
+        if self.tmpDirs.has_key(test):
+            tmpDir = self.tmpDirs[test]
+            if os.path.isdir(tmpDir):
+                self._removeDir(tmpDir)
     def getSubPlanDirName(self, test):
         subPlanDir = self.getSubPlanDirFromTest(test)
         dirs = subPlanDir.split(os.sep)[:-1]

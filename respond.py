@@ -67,7 +67,7 @@ class Responder(plugins.Action):
         argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
         if self.useGraphicalComparison(comparison):
             process = plugins.BackgroundProcess(self.graphicalDiffTool + argumentString)
-            return "<See " + self.graphicalDiffTool + " window>"
+            return "<See " + self.graphicalDiffTool + " window>" + os.linesep
         else:
             stdout = os.popen(self.textDiffTool + argumentString)
             return self.getPreview(stdout)

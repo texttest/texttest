@@ -99,6 +99,12 @@ class TextTestGUI:
         if test.state == test.RUNNING:
             return "yellow"
         return self.staticColour()
+    def stateChangeDescription(self, test):
+        if test.state == test.RUNNING:
+            return "start"
+        if test.state == test.FAILED or test.state == test.UNRUNNABLE or test.state == test.SUCCEEDED:
+            return "complete"
+        return "finish preprocessing"
     def staticColour(self):
         if self.dynamic:
             return "white"
@@ -161,7 +167,7 @@ class TextTestGUI:
         if self.dynamic:
             self.actionThread = ActionThread(actionRunner)
             self.actionThread.start()
-            eventHandler.addIdle("test actions", self.pickUpChange)
+            gtk.idle_add(self.pickUpChange)
         # Run the Gtk+ main loop.
         gtk.main()
     def createDefaultRightGUI(self):
@@ -171,19 +177,27 @@ class TextTestGUI:
         try:
             test = self.workQueue.get_nowait()
             if test:
-                self.testChanged(test)
+                self.testChanged(test, byAction = 1)
             return gtk.TRUE
         except Empty:
             # Maybe it's empty because the action thread has terminated
             if not self.actionThread.isAlive():
                 self.actionThread.join()
+                eventHandler.nonGuiEvent("completion of test actions")
                 return gtk.FALSE
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
             return gtk.TRUE
-    def testChanged(self, test):
+    
+    def stateChangeEvent(self, test):
+        eventName = "test " + test.name + " to " + self.stateChangeDescription(test)
+        category = test.name
+        eventHandler.nonGuiEvent(eventName, category)
+    def testChanged(self, test, byAction):
         if test.classId() == "test-case":
             self.redrawTest(test)
+            if byAction:
+                self.stateChangeEvent(test)
         else:
             self.redrawSuite(test)
         if self.rightWindowGUI and self.rightWindowGUI.test == test:
@@ -192,7 +206,7 @@ class TextTestGUI:
         if currentThread() == self.actionThread:
             self.workQueue.put(test)
         else:
-            self.testChanged(test)
+            self.testChanged(test, byAction = 0)
     # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test):
         iter = self.itermap[test]
@@ -530,3 +544,13 @@ class ImportTestCase(guiplugins.ImportTestCase):
     def appIsGUI(self):
         return self.optionGroup.getSwitchValue("GUI")
         
+class UpdateScripts(plugins.Action):
+    def __call__(self, test):
+        fileName = os.path.join(test.abspath, "gui_script")
+        if os.path.isfile(fileName):
+            newFile = open(fileName + ".new", "w")
+            for line in open(fileName).xreadlines():
+                newFile.write(line.replace("test actions", "completion of test actions"))
+            newFile.close()
+            os.rename(fileName + ".new", fileName)
+                              

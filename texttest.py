@@ -1637,7 +1637,7 @@ class TextTest:
                 if self.gui and (not empty or not self.gui.dynamic):
                     self.gui.addSuite(testSuite)
                 if empty:
-                    print "No tests found for", app.description()
+                    sys.stderr.write("No tests found for " + app.description() + os.linesep)
                 else:
                     actionSequence = self.inputOptions.getActionSequence(app)
                     actionRunner.addTestActions(testSuite, actionSequence)

@@ -171,7 +171,7 @@ class CollateUNIXFiles(default.CollateFiles):
                 prevLine = line
             os.remove(path)
         else:
-            writeFile.write("Could not find binary name from core file - no stack trace for crash" + os.linesep)
+            writeFile.write("Could not find binary name from core file : Stack trace not produced for crash" + os.linesep)
             # Keep the core file for later viewing
             os.rename(path, "core")
         os.remove(fileName)

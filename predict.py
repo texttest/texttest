@@ -23,11 +23,7 @@ plugins.addCategory("crash", "CRASHED")
 
 # For backwards compatibility...
 class FailedPrediction(plugins.TestState):
-    def getTypeBreakdown(self):
-        if self.freeText.find(os.linesep) != -1:
-            return self.category, self.category.upper()
-        else:
-            return self.category, self.freeText
+    pass
 
 class CheckLogFilePredictions(plugins.Action):
     def __init__(self, version = None):
@@ -40,8 +36,8 @@ class CheckLogFilePredictions(plugins.Action):
             if not os.path.isfile(logFile):
                 return None
         return logFile
-    def insertError(self, test, errType, error):
-        test.changeState(FailedPrediction(errType, error, started=1))
+    def insertError(self, test, errType, briefError, error):
+        test.changeState(FailedPrediction(errType, briefText=briefError, freeText=error, started=1))
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")   
 
@@ -59,7 +55,7 @@ class CheckPredictions(CheckLogFilePredictions):
         stackTraceFile = test.makeFileName("stacktrace", temporary=1)
         if os.path.isfile(stackTraceFile):
             errorInfo = open(stackTraceFile).read()
-            self.insertError(test, "crash", errorInfo)
+            self.insertError(test, "crash", "CRASH", errorInfo)
             os.remove(stackTraceFile)
             return 1
         
@@ -71,7 +67,7 @@ class CheckPredictions(CheckLogFilePredictions):
         errorsFound += self.extractErrorsFrom(test, "errors", compsNotFound)
         errorsFound += len(compsNotFound)
         for comp in compsNotFound:
-            self.insertError(test, "badPredict", "ERROR : Compulsory message missing (" + comp + ")")
+            self.insertError(test, "badPredict", "missing '" + comp + "'", "ERROR : Compulsory message missing (" + comp + ")")
         return errorsFound
     def extractErrorsFrom(self, test, fileStem, compsNotFound):
         errorsFound = 0
@@ -82,7 +78,7 @@ class CheckPredictions(CheckLogFilePredictions):
             for error in self.internalErrorList:
                 if line.find(error) != -1:
                     errorsFound += 1
-                    self.insertError(test, "badPredict", "Internal ERROR (" + error + ")")
+                    self.insertError(test, "badPredict", error, "Internal ERROR (" + error + ")")
             for comp in compsNotFound:
                 if line.find(comp) != -1:
                     compsNotFound.remove(comp)

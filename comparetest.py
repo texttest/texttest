@@ -72,6 +72,7 @@ class TestComparison(plugins.TestState):
     def setFailedPrediction(self, prediction):
         self.failedPrediction = prediction
         self.freeText = str(prediction)
+        self.briefText = prediction.briefText
         self.category = prediction.category
     def hasNewResults(self):
         return len(self.newResults) > 0
@@ -390,7 +391,9 @@ class RunDependentTextFilter:
         for contentFilter in self.contentFilters:
             changed, filteredLine = contentFilter.applyTo(line, lineNumber)
             if changed:
-                return filteredLine
+                if not filteredLine:
+                    return filteredLine
+                line = filteredLine
         for orderFilter in self.orderFilters.keys():
             changed, filteredLine = orderFilter.applyTo(line, lineNumber)
             if changed:

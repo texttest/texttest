@@ -493,15 +493,19 @@ class UpdateTestLSFStatus(UpdateLSFStatus):
         self.logFile = None
     def processStatus(self, test, status, machines):
         details = ""
+        summary = status
         if len(machines):
-            details += "Executing on " + string.join(machines, ',') + os.linesep
-            
+            machineStr = string.join(machines, ',')
+            details += "Executing on " + machineStr + os.linesep
+            summary += " (" + machineStr + ")"
         details += "Current LSF status = " + status + os.linesep
         details += self.getExtraRunData(test)
         if status == "PEND":
-            test.state.freeText = details
+            pendState = plugins.TestState("pending", freeText=details, briefText=summary)
+            test.changeState(pendState)
         else:
-            test.changeState(plugins.TestState("running", details, started=1))
+            runState = plugins.TestState("running", freeText=details, briefText=summary, started=1)
+            test.changeState(runState)
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
     def getExtraRunData(self, test):

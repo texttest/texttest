@@ -65,11 +65,16 @@ def addCategory(name, briefDesc, longDesc = ""):
 
 # Generic state which tests can be in, should be overridden by subclasses
 # Acts as a static state for tests which have not run (yet)
+# Free text is text of arbitrary length: it will appear in the "Text Info" GUI window when the test is viewed
+# and the "details" section in batch mode
+# Brief text should be at most two or three words: it appears in the details column in the main GUI window and in
+# the summary of batch mode
 class TestState:
     categoryDescriptions = seqdict()
-    def __init__(self, category, freeText = "", started = 0, completed = 0):
+    def __init__(self, category, freeText = "", briefText = "", started = 0, completed = 0):
         self.category = category
         self.freeText = freeText
+        self.briefText = briefText
         self.started = started
         self.completed = completed
     def __str__(self):
@@ -83,6 +88,8 @@ class TestState:
     def needsRecalculation(self):
         # Is some aspect of the state out of date
         return 0
+    def displayDataChange(self, oldState):
+        return self.category != oldState.category or self.briefText != oldState.briefText
     def timeElapsedSince(self, oldState):
         return (self.isComplete() != oldState.isComplete()) or (self.hasStarted() != oldState.hasStarted())
     # Used by text interface to print states
@@ -91,12 +98,8 @@ class TestState:
             return "not compared:  " + self.freeText.split(os.linesep)[0]
         else:
             return "not compared"
-    # Used by GUI to represent them graphically
     def getTypeBreakdown(self):
-        if self.hasFailed():
-            return self.category, self.category.upper()
-        else:
-            return self.category, ""
+        return self.category, self.briefText
     def hasStarted(self):
         return self.started or self.completed
     def isComplete(self):

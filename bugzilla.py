@@ -11,7 +11,8 @@ class KnownBug(FailedPrediction):
         self.bugNumber = bugNum
         fullBugText = os.popen("bugcli -b " + bugNum).read()
         self.bugStatus = self.findStatus(fullBugText)
-        FailedPrediction.__init__(self, self.findCategory(), fullBugText, completed = 1)
+        briefBugText = "bug " + self.bugNumber + " (" + self.bugStatus + ")"
+        FailedPrediction.__init__(self, self.findCategory(), briefText=briefBugText, freeText=fullBugText, completed = 1)
     def findStatus(self, description):
         for line in description.split(os.linesep):
             words = line.split()
@@ -25,7 +26,7 @@ class KnownBug(FailedPrediction):
         else:
             return "bug"
     def getTypeBreakdown(self):
-        return "success", "bug " + self.bugNumber + " (" + self.bugStatus + ")"
+        return "success", self.briefText
 
 class CheckForBugs(plugins.Action):
     def __init__(self):

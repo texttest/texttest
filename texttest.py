@@ -232,7 +232,7 @@ class TestCase(Test):
         oldState = self.state
         self.state = state
         # Notify GUI of all category changes
-        if state.category != oldState.category:
+        if state.displayDataChange(oldState):
             self.notifyChanged()
         # Check that the state change involved moving on in time, not just re-classifying
         # Tests changing state are reckoned to be significant enough to wait for...
@@ -1154,7 +1154,7 @@ class TestRunner:
             printException()
             self.failTest(str(sys.exc_type) + ": " + str(sys.exc_value))
     def failTest(self, excString):
-        self.test.changeState(plugins.TestState("unrunnable", excString, completed=1))
+        self.test.changeState(plugins.TestState("unrunnable", briefText="UNRUNNABLE", freeText=excString, completed=1))
     def performActions(self, previousTestRunner, runToCompletion):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
         for suite in tearDownSuites:

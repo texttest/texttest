@@ -32,6 +32,8 @@ class Test:
     def setUpEnvironment(self):
         for var, value in self.environment.items():
             os.environ[var] = self.app.makeAbsPath(os.path.expandvars(value))
+            # Ensure multiple expansion doesn't occur
+            self.environment[var] = os.environ[var]
             debugPrint("Setting " + var + " to " + os.environ[var])
     def getIndent(self):
         dirCount = string.count(self.getRelPath(), os.sep)

@@ -685,6 +685,7 @@ class Application:
         self.optionGroups = self.createOptionGroups(inputOptions)
         self.useDiagnostics = self.setDiagnosticSettings(inputOptions)
         self.slowMotionReplaySpeed = self.setSlowMotionSettings(inputOptions)
+        debugLog.info("Config file settings are: " + os.linesep + repr(self.configDir.dict))
     def __repr__(self):
         return self.fullName
     def __cmp__(self, other):

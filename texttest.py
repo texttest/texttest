@@ -251,10 +251,8 @@ class Application:
         return "." + string.join(self.versions, ".")
     def description(self):
         description = "Using Application " + self.fullName
-        if len(self.versions) == 1:
-            description += ", version " + self.versions[0]
-        elif len(self.versions) > 1:
-            description += ", aggregated versions " + repr(self.versions)
+        if len(self.versions):
+            description += ", version " + string.join(self.versions, ".")
         description += ", checkout " + self.checkout
         return description
     def getVersionFileExtensions(self, baseVersion = 1):

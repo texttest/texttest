@@ -19,6 +19,7 @@ class Responder(plugins.Action):
         self.lineCount = None
         self.logFile = None
         self.graphicalDiffTool = None
+        self.graphicalViewTool = None
         self.textDiffTool = None
     def __repr__(self):
         # Default, don't comment what we're doing with failures
@@ -43,6 +44,7 @@ class Responder(plugins.Action):
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
         self.graphicalDiffTool = app.getConfigValue("diff_program")
+        self.graphicalViewTool = app.getConfigValue("view_program")
         
 # Generic interactive responder. Can be configured via the settings in setUpApplication method
 class InteractiveResponder(Responder):
@@ -51,11 +53,16 @@ class InteractiveResponder(Responder):
         if performView:
             outputText = test.state.freeText
             sys.stdout.write(outputText)
-            if self.graphicalDiffTool:
-                logFileComparison, list = test.state.findComparison(self.logFile)
-                if logFileComparison:
-                    cmdLine = self.graphicalDiffTool + " " + logFileComparison.stdCmpFile + " " +\
-                              logFileComparison.tmpCmpFile
+            logFileComparison, list = test.state.findComparison(self.logFile)
+            if logFileComparison:
+                tool = self.graphicalDiffTool
+                cmdLine = tool + " " + logFileComparison.stdCmpFile + " " +\
+                          logFileComparison.tmpCmpFile
+                if logFileComparison.newResult():
+                    tool = self.graphicalViewTool
+                    cmdLine = tool + " " + logFileComparison.tmpCmpFile
+                if tool:
+                    print "<See also " + tool + " window for details of " + self.logFile + ">"
                     plugins.BackgroundProcess(cmdLine)
             self.askUser(test, allowView=0)
     def askUser(self, test, allowView):      

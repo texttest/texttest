@@ -144,4 +144,4 @@ class OverwriteOnFailures(Responder):
         diffText = testComparison.getDifferenceSummary()
         return "- overwriting" + diffText
     def handleFailure(self, test, testComparison):
-        testComparison.save(self.version)
+        testComparison.save(1, self.version)

@@ -190,6 +190,8 @@ class ApcCompileRules(carmen.CompileRules):
     def linuxRuleSetBuild(self, test):
         ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
         self.diag.info("Using linuxRuleSetBuild for building rule set " + ruleset.name)
+        if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
+            raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
         if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
             return
         apcExecutable = ruleset.targetFile
@@ -208,19 +210,25 @@ class ApcCompileRules(carmen.CompileRules):
             self.diag.debug("Building rule set library using the command " + self.ruleCompileCommand(ruleset.sourceFile, test))
             returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile, test))
             if returnValue:
-                raise plugins.TextTestError, "Failed to build library for APC ruleset " + ruleset.name
+                self.rulesCompileFailed.append(ruleset.name)
+                raise plugins.TextTestError, "Failed to build rule library for APC ruleset " + ruleset.name
         commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib, test)
         commandLine += "-o " + apcExecutable
         self.diag.debug("Linking APC binary using the command " + commandLine)
-        po = popen2.Popen3(commandLine,"t")
-        returnValue = po.wait()
+        # We create a temporary file that the output goes to.
+        if len(test.writeDirs) < 1:
+            test.makeBasicWriteDirectory()
+        compTmp = test.makeFileName("ravecompile", temporary=1)
+        returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
         if returnValue:
+            self.rulesCompileFailed.append(ruleset.name)
             print "Building", ruleset.name, "failed:"
-            se = po.childerr
+            se = open(compTmp)
             lastErrors = se.readlines()
             for line in lastErrors:
                 print "   ", line.strip()
-            raise plugins.TextTestError, "Failed to link APC ruleset " + ruleset.name        
+            raise plugins.TextTestError, "Failed to link APC ruleset " + ruleset.name
+        os.remove(compTmp)
 
     def getRuleLib(self, ruleSetName):
         optArch = "i386_linux_opt"

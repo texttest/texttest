@@ -294,6 +294,8 @@ class UpdateLSFStatus(plugins.Action):
             return 0
         stdSize = os.path.getsize(stdFile)
         tmpSize = os.path.getsize(tmpFile)
+        if stdSize == 0:
+            return 0
         return (tmpSize * 100) / stdSize 
     
 class MakeResourceFiles(plugins.Action):

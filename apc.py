@@ -225,7 +225,7 @@ class ViewApcLog(guiplugins.InteractiveAction):
         #switches["st"] = "APC status file"
         return switches
 
-guiplugins.interactiveActionClasses.append(ViewApcLog)
+guiplugins.interactiveActionHandler.testClasses.append(ViewApcLog)
 
 #
 # Runs the test in gdb and displays the log file. 

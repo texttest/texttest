@@ -396,7 +396,7 @@ class ReconnectTest(plugins.Action):
         if not os.path.isdir(app.writeDirectory):
             raise plugins.TextTestError, "Could not find any runs matching " + patternToFind + " under " + fetchDir
     def hasUserDependentWriteDir(self, app, userId):
-        origWriteDir = app.getConfigValue("write_tmp_files")
+        origWriteDir = os.environ["TEXTTEST_TMP"]
         return origWriteDir.find(userId) != -1 or origWriteDir.find("~") != -1
 
 # Relies on the config entry string_before_memory, so looks in the log file for anything reported

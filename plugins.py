@@ -149,10 +149,11 @@ class NonPythonAction(Action):
 # Generally useful class to encapsulate a background process, of which TextTest creates
 # a few... seems it only works on UNIX right now.
 class BackgroundProcess:
+    fakeProcesses = os.environ.has_key("TEXTTEST_NO_SPAWN")
     def __init__(self, commandLine, testRun=0):
         self.program = commandLine.split()[0].lstrip()
         self.testRun = testRun
-        if self.testRun or not os.environ.has_key("TEXTTEST_NO_SPAWN"):
+        if self.testRun or not self.fakeProcesses:
             processId = os.fork()
             if processId == 0:
                 os.system(commandLine)

@@ -1230,7 +1230,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             plotLine = PlotLine(test, lineName, item, optRun, self.switches["s"].getValue())
             self.testGraph.addLine(plotLine)
 
-guiplugins.interactiveActionClasses += [ PlotTestInGUI ]
+guiplugins.interactiveActionHandler.testClasses.append(PlotTestInGUI)
 
 class PlotLine:
     def __init__(self, test, lineName, item, optRun, plotAgainstSolution):

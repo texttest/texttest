@@ -22,6 +22,9 @@ builtInOptions = """
 
 -g         - run with GUI instead of text interface. Will only work if PyGTK is installed.
 
+-gx        - run static GUI, which won't run tests unless instructed. Useful for creating new tests
+             and viewing the test suite.
+             
 -record <s>- record all user actions in the GUI to the script <s>
 
 -replay <s>- replay the script <s> created previously in the GUI. No effect without -g.
@@ -52,14 +55,18 @@ class Test:
     SUCCEEDED = 3
     FAILED = 4
     UNRUNNABLE = 5
-    def __init__(self, name, abspath, app):
+    def __init__(self, name, abspath, app, parent = None):
         self.name = name
         self.app = app
+        self.parent = parent
         self.abspath = abspath
+        self.valid = os.path.isdir(abspath)
         self.paddedName = self.name
         self.state = self.NOT_STARTED 
         self.stateDetails = None
         self.previousEnv = {}
+        # List of objects observing this test, to be notified when it changes state
+        self.observers = []
         self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
         # Single pass to expand all variables (don't want multiple expansion)
         for var, value in self.environment.items():
@@ -73,8 +80,6 @@ class Test:
             if os.environ.has_key(var):
                 self.previousEnv[var] = os.environ[var]
             os.environ[var] = self.environment[var]
-    def isValid(self):
-        return os.path.isdir(self.abspath) and self.isValidSpecific()
     def makeFileName(self, stem, refVersion = None, temporary = 0, forComparison = 1):
         root = self.getDirectory(temporary)
         if not forComparison:
@@ -102,6 +107,9 @@ class Test:
             return fullPath
         parent, current = os.path.split(startDir)
         return self.makePathName(fileName, parent)
+    def notifyChanged(self):
+        for observer in self.observers:
+            observer.notifyChange(self)
     def getRelPath(self):
         relPath = self.abspath.replace(self.app.abspath, "")
         if relPath.startswith(os.sep):
@@ -117,13 +125,15 @@ class Test:
         self.callAction(action)
         self.performOnSubTests(action)
         self.tearDownEnvironment()
-    def setUpEnvironment(self):
+    def setUpEnvironment(self, parents=0):
+        if parents and self.parent:
+            self.parent.setUpEnvironment(1)
         for var, value in self.environment.items():
             if os.environ.has_key(var):
                 self.previousEnv[var] = os.environ[var]
             os.environ[var] = value
             debugLog.info("Setting " + var + " to " + os.environ[var])
-    def tearDownEnvironment(self):
+    def tearDownEnvironment(self, parents=0):
         # Note this has no effect on the real environment, but can be useful for internal environment
         # variables. It would be really nice if Python had a proper "unsetenv" function...
         debugLog.info("Restoring environment for " + self.name + " to " + repr(self.previousEnv))
@@ -134,6 +144,8 @@ class Test:
                 else:
                     debugLog.info("Removed variable " + var)
                     del os.environ[var]
+        if parents and self.parent:
+            self.parent.tearDownEnvironment(1)
     def getIndent(self):
         relPath = self.getRelPath()
         if not len(relPath):
@@ -154,24 +166,22 @@ class Test:
         return 1
 
 class TestCase(Test):
-    def __init__(self, name, abspath, app):
-        Test.__init__(self, name, abspath, app)
+    def __init__(self, name, abspath, app, parent):
+        Test.__init__(self, name, abspath, app, parent)
         self.inputFile = self.makeFileName("input")
         optionsFile = self.makeFileName("options")
         self.options = ""
         if (os.path.isfile(optionsFile)):
             self.options = os.path.expandvars(open(optionsFile).readline().strip())
+        elif not os.path.isfile(self.inputFile):
+            self.valid = 0
         # List of directories where this test will write files. First is where it executes from
         self.writeDirs = []
         self.writeDirs.append(os.path.join(app.writeDirectory, self.getRelPath()))
-        # List of objects observing this test, to be notified when it changes state
-        self.observers = []
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
         return "test-case"
-    def isValidSpecific(self):
-        return os.path.isfile(self.inputFile) or len(self.options) > 0
     def getDirectory(self, temporary):
         if temporary:
             return self.writeDirs[0]
@@ -192,8 +202,7 @@ class TestCase(Test):
         self.state = state
         self.stateDetails = details
         if state != oldState:
-            for observer in self.observers:
-                observer.notifyChange(self)
+            self.notifyChanged()
     def performOnSubTests(self, action):
         pass
     def getSubInstructions(self, action):
@@ -262,10 +271,11 @@ class TestCase(Test):
         return writeDir
             
 class TestSuite(Test):
-    def __init__(self, name, abspath, app, filters):
-        Test.__init__(self, name, abspath, app)
-        self.rejected = 0
+    def __init__(self, name, abspath, app, filters, parent=None):
+        Test.__init__(self, name, abspath, app, parent)
         self.testCaseFile = self.makeFileName("testsuite")
+        if not os.path.isfile(self.testCaseFile):
+            self.valid = 0
         debugLog.info("Reading test suite file " + self.testCaseFile)
         self.testcases = self.getTestCases(filters)
         if len(self.testcases):
@@ -277,8 +287,6 @@ class TestSuite(Test):
         return repr(self.app) + " " + self.classId() + " " + self.name
     def classId(self):
         return "test-suite"
-    def isValidSpecific(self):
-        return os.path.isfile(self.testCaseFile)
     def isEmpty(self):
         return len(self.testcases) == 0
     def callAction(self, action):
@@ -298,6 +306,8 @@ class TestSuite(Test):
         debugLog.debug("Refilter for " + self.name)
         for test in self.testcases:
             debugLog.debug("Refilter check of " + test.name + " for " + self.name)
+            if test.size() == 0:
+                continue
             if test.classId() == self.classId():
                 test.reFilter(filters)
                 if test.size() > 0:
@@ -316,10 +326,13 @@ class TestSuite(Test):
 # private:
     def getTestCases(self, filters):
         testCaseList = []
-        if not self.isValid() or not self.isAcceptedByAll(filters):
-            self.rejected = 1
+        if not self.isAcceptedByAll(filters):
+            self.valid = 0
+            
+        if not self.valid:
             return testCaseList
 
+        allowEmpty = 1
         for testline in open(self.testCaseFile).xreadlines():
             testName = testline.strip()
             if len(testName) == 0  or testName[0] == '#':
@@ -327,17 +340,32 @@ class TestSuite(Test):
             if self.alreadyContains(testCaseList, testName):
                 print "WARNING: the test", testName, "was included several times in the test suite file - please check!"
                 continue
+
+            allowEmpty = 0
             testPath = os.path.join(self.abspath, testName)
-            testSuite = TestSuite(testName, testPath, self.app, filters)
-            if testSuite.isValid():
-                if not testSuite.rejected and testSuite.size() > 0:
-                    testCaseList.append(testSuite)
+            testSuite = TestSuite(testName, testPath, self.app, filters, self)
+            if testSuite.valid:
+                testCaseList.append(testSuite)
             else:
-                testCase = TestCase(testName, testPath, self.app)
-                if testCase.isValid() and testCase.isAcceptedByAll(filters):
+                testCase = TestCase(testName, testPath, self.app, self)
+                if testCase.valid and testCase.isAcceptedByAll(filters):
                     testCaseList.append(testCase)
                 testCase.tearDownEnvironment()
+        if not allowEmpty and len(testCaseList) == 0:
+            self.valid = 0
         return testCaseList
+    def addTest(self, testName, testPath):
+        testCase = TestCase(testName, testPath, self.app, self)
+        if testCase.valid:
+            return self.newTest(testCase)
+        else:
+            testSuite = TestSuite(testName, testPath, self.app, [], self)
+            if testSuite.valid:
+                return self.newTest(testSuite)
+    def newTest(self, test):
+        self.testcases.append(test)
+        self.notifyChanged()
+        return test
     def alreadyContains(self, testCaseList, testName):
         for test in testCaseList:
             if test.name == testName:
@@ -360,7 +388,6 @@ class Application:
         self.setConfigDefault("keeptmp_default", 0)
         self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
         self.setConfigDefault("extra_version", "none")
-        self.setConfigDefault("write_tmp_files", "~/texttesttmp")
         self.writeDirectory = self._getWriteDirectory()
         self.configObject.setUpApplication(self)
     def __repr__(self):
@@ -373,7 +400,12 @@ class Application:
         else:
             return string.upper(self.name)
     def _getWriteDirectory(self):
-        root = os.path.expanduser(self.getConfigValue("write_tmp_files"))
+        if not os.environ.has_key("TEXTTEST_TMP"):
+            if os.name == "posix":
+                os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
+            else:
+                os.environ["TEXTTEST_TMP"] = os.environ["TEMP"]
+        root = os.path.expanduser(os.environ["TEXTTEST_TMP"])
         absroot = os.path.abspath(root)
         if not os.path.isdir(absroot):
             os.makedirs(absroot)
@@ -651,6 +683,7 @@ class OptionFinder:
         switches["x"] = "Write TextTest diagnostics"
         switches["keeptmp"] = "Keep write-directories on success"
         switches["g"] = "use GUI"
+        switches["gx"] = "use static GUI"
         switches.update(app.configObject.getSwitches())
         return switches
     def createApplication(self, appName, dirName, pathname, version):
@@ -691,7 +724,9 @@ class OptionFinder:
     def helpMode(self):
         return self.inputOptions.has_key("help")
     def useGUI(self):
-        return self.inputOptions.has_key("g")
+        return self.inputOptions.has_key("g") or self.inputOptions.has_key("gx")
+    def guiRunTests(self):
+        return not self.inputOptions.has_key("gx")
     def recordScript(self):
         if self.inputOptions.has_key("record"):
             return self.findGuiScript(self.inputOptions["record"])
@@ -720,6 +755,9 @@ class OptionFinder:
         else:
             return os.getcwd()
     def getActionSequence(self, app):
+        if self.inputOptions.has_key("gx"):
+            return []
+        
         if not self.inputOptions.has_key("s"):
             return app.getActionSequence()
             

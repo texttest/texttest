@@ -16,6 +16,7 @@ class TextTestGUI:
         self.postponedTests = []
         self.allTests = []
         self.itermap = {}
+        self.actionThread = None
         self.quitGUI = 0
         self.workQueue = Queue()
     def createTopWindow(self):
@@ -35,12 +36,11 @@ class TextTestGUI:
         self.createSubIterMap(iter)
     def createSubIterMap(self, iter):
         test = self.model.get_value(iter, 2)
-        self.itermap[test] = iter.copy()
         childIter = self.model.iter_children(iter)
+        self.itermap[test] = iter.copy()
         if childIter:
             self.createSubIterMap(childIter)
-        if test.classId() == "test-case":
-            test.observers.append(self)
+        test.observers.append(self)
         nextIter = self.model.iter_next(iter)
         if nextIter:
             self.createSubIterMap(nextIter)
@@ -55,6 +55,7 @@ class TextTestGUI:
         except:
             self.allTests.append(suite)
             self.model.set_value(iter, 1, self.getTestColour(suite))
+        return iter
     def getTestColour(self, test):
         if test.state == test.FAILED or test.state == test.UNRUNNABLE:
             return "red"
@@ -112,9 +113,10 @@ class TextTestGUI:
         self.createIterMap()
         self.testCaseGUI = TestCaseGUI(None)
         topWindow = self.createTopWindow()
-        self.actionThread = Thread(None, self.runActionThread, "action", ())
-        self.actionThread.start()
-        eventHandler.addIdle("test actions", self.pickUpChange)
+        if len(self.instructions) > 0:
+            self.actionThread = Thread(None, self.runActionThread, "action", ())
+            self.actionThread.start()
+            eventHandler.addIdle("test actions", self.pickUpChange)
         # Run the Gtk+ main loop.
         gtk.main()
     def pickUpChange(self):
@@ -131,7 +133,10 @@ class TextTestGUI:
             time.sleep(0.1)
             return gtk.TRUE
     def testChanged(self, test):
-        self.redrawTest(test)
+        if test.classId() == "test-case":
+            self.redrawTest(test)
+        else:
+            self.redrawSuite(test)
         if self.testCaseGUI and self.testCaseGUI.test == test:
             self.recreateTestView(test)
     def runActionThread(self):
@@ -167,15 +172,22 @@ class TextTestGUI:
             self.workQueue.put(test)
         else:
             self.testChanged(test)
+    # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test):
         iter = self.itermap[test]
         self.model.set_value(iter, 1, self.getTestColour(test))
-        self.model.row_changed(self.model.get_path(iter), iter)
+    def redrawSuite(self, suite):
+        newTest = suite.testcases[-1]
+        suiteIter = self.itermap[suite]
+        iter = self.addSuite(newTest, suiteIter)
+        self.itermap[newTest] = iter.copy()
+        newTest.observers.append(self)
     def quit(self, *args):
         self.quitGUI = 1
         gtk.main_quit()
         self.testCaseGUI.killProcesses()
-        self.actionThread.join()
+        if self.actionThread:
+            self.actionThread.join()
     def saveAll(self, *args):
         saveTestAction = self.testCaseGUI.getSaveTestAction()
         for test in self.allTests:
@@ -319,15 +331,10 @@ class TestCaseGUI:
         comparison = self.model.get_value(iter, 3)
         self.fileViewAction.view(comparison, fileName)
     def makeActionInstances(self, test):
-        instances = []
-        if not test or test.classId() != "test-case":
-            return instances
-        # A special one that we "hardcode" so we can find it...
-        instances.append(self.fileViewAction)
-        for intvActionClass in guiplugins.interactiveActionClasses:
-            instance = intvActionClass(test)
-            instances.append(instance)
-        return instances
+        if not test:
+            return []
+        # The file view action is a special one that we "hardcode" so we can find it...
+        return [ self.fileViewAction ] + guiplugins.interactiveActionHandler.getInstances(test)
     def makeButtons(self, interactiveActions):
         executeButtons = gtk.HBox()
         for instance in interactiveActions:
@@ -376,3 +383,25 @@ def createDisplay(options, switches):
     vbox.show()    
     return vbox
 
+# Class for importing self tests
+class ImportTestCase(guiplugins.ImportTestCase):
+    def addOptionsFileOption(self):
+        guiplugins.ImportTestCase.addOptionsFileOption(self)
+        self.switches["GUI"] = guiplugins.Switch("Use TextTest GUI", 1)
+        self.switches["sing"] = guiplugins.Switch("Only run test A03", 1)
+        self.switches["fail"] = guiplugins.Switch("Include test failures", 1)
+        self.switches["version"] = guiplugins.Switch("Run with Version 2.4")
+    def getOptions(self):
+        options = guiplugins.ImportTestCase.getOptions(self)
+        if self.appIsGUI():
+            options += " -g"
+        if self.switches["sing"].getValue():
+            options += " -t A03"
+        if self.switches["fail"].getValue():
+            options += " -c CodeFailures"
+        if self.switches["version"].getValue():
+            options += " -v 2.4"
+        return options
+    def appIsGUI(self):
+        return self.switches["GUI"].getValue()
+    

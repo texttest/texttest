@@ -291,10 +291,10 @@ class ReplayScript:
         try:
             return self.generateEvent(nextCommand)
         except GtkScriptError:
-            print "Script terminated due to exception : "
             type, value, traceback = sys.exc_info()
-            sys.excepthook(type, value, traceback)
-            return gtk.FALSE
+            print "ERROR:", value
+            # We don't terminate scripts if they contain errors
+            return gtk.TRUE
         return gtk.TRUE
     def generateEvent(self, scriptCommand):
         eventName = self.findEvent(scriptCommand)

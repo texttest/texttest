@@ -26,7 +26,15 @@ class InteractiveAction(plugins.Action):
     # as there's nobody around to delete it afterwards and race conditions easily arise.
     # So we fake it...
     def startExternalProgram(self, commandLine):
-        self.processes.append(plugins.BackgroundProcess(commandLine))
+        process = plugins.BackgroundProcess(commandLine)
+        self.processes.append(process)
+        return process
+    def viewFile(self, fileName, wait = 0):
+        viewProgram = self.test.app.getConfigValue("view_program")
+        print "Viewing file", os.path.basename(fileName), "using '" + viewProgram + "'"
+        process = self.startExternalProgram(viewProgram + " " + fileName)
+        if wait:
+            process.waitForTermination()
     def readCommandLineArguments(self, args):
         for arg in args:
             if arg.find("=") != -1:
@@ -108,8 +116,9 @@ class ViewFile(InteractiveAction):
     def __init__(self, test):
         InteractiveAction.__init__(self, test)
         if test:
-            self.switches["rdt"] = Switch("Include Run-dependent Text", 0)
-            self.switches["nf"] = Switch("Show differences where present", 1)
+            if test and test.state >= test.RUNNING:
+                self.switches["rdt"] = Switch("Include Run-dependent Text", 0)
+                self.switches["nf"] = Switch("Show differences where present", 1)
             if test and test.state == test.RUNNING:
                 self.switches["f"] = Switch("Follow file rather than view it", 1)
             self.setProgramDefaults(test.app)
@@ -134,10 +143,6 @@ class ViewFile(InteractiveAction):
             return comparison.stdFile
         else:
             return comparison.stdCmpFile
-    def viewFile(self, fileName):
-        viewProgram = self.test.app.getConfigValue("view_program")
-        print "Viewing file", os.path.basename(fileName), "using '" + viewProgram + "'"
-        self.startExternalProgram(viewProgram + " " + fileName)
     def followFile(self, fileName):
         baseName = os.path.basename(fileName)
         title = self.test.name + " (" + baseName + ")"
@@ -158,61 +163,163 @@ class ViewFile(InteractiveAction):
             print "Comparing file", os.path.basename(newFile), "with previous version using '" + diffProgram + "'"
             self.startExternalProgram("tkdiff " + self.stdFile(comparison) + " " + newFile)
 
-
-# Placeholder for all classes. Remember to add them!
-interactiveActionClasses = [ SaveTest ]
-
-# And an import test for GUI tests
-class ImportTest(plugins.Action):
+# And a generic import test. Note acts on test suites
+class ImportTest(InteractiveAction):
+    def __init__(self, suite):
+        InteractiveAction.__init__(self, suite)
+        if self.canPerformOnTest():
+            self.options["name"] = TextOption(self.testType() + " Name")
+            self.options["desc"] = TextOption(self.testType() + " Description")
+    def canPerformOnTest(self):
+        return self.test and self.test.state == self.test.NOT_STARTED
+    def getTitle(self):
+        return "Add " + self.testType()
+    def getOptionTitle(self):
+        return "Adding " + self.testType()
+    def testType(self):
+        return ""
     def setUpSuite(self, suite):
-        if suite.name.find("GUI") == -1:
-            return
-
-        testDir = self.createTest(suite)
-        optionString = self.writeOptionFile(suite, testDir)
-        print "Record your actions using the GUI..."
-        targetApp = suite.makePathName("TargetApp", suite.abspath)
-        targetAppDir = os.path.join(testDir, "TargetApp")
-        shutil.copytree(targetApp, targetAppDir)
-        recordOptions = optionString.replace("-replay", "-record") + " -d " + testDir
-        os.system("texttest " + recordOptions)
-        guiScript = os.path.join(testDir, "gui_script")
-        shutil.rmtree(targetAppDir)
-        print "GUI script looks like:"
-        for line in open(guiScript).xreadlines():
-            print line.strip()
-        print "OK?"
-        response = sys.stdin.readline()
-        print "Running test to get standard behaviour..."
-        os.system("texttest -a texttest -g -t " + os.path.basename(testDir))
-    def writeOptionFile(self, suite, testDir):
-        optionString = self.getOptions() + " -g -replay gui_script"
-        print "Using option string :", optionString
-        optionFile = open(os.path.join(testDir, "options." + suite.app.name), "w")
-        optionFile.write(optionString + os.linesep)
-        return optionString
-    def getOptions(self):
-        print "Choose target tests: (f) Single failure (v) Single failure, version 2.4"
-        print "(s) Single success (m) Many tests, mixed success/failure"
-        selection = sys.stdin.readline().strip()
-        if selection == "f":
-            return "-c CodeFailures -t A03"
-        if selection == "v":
-            return "-c CodeFailures -t A03 -v 2.4"
-        if selection == "s":
-            return "-t A02"
-        return "-c CodeFailures"
-    def createTest(self, suite):
-        print "Enter name of test:"
-        testName = sys.stdin.readline()
-        print "Describe test in words:"
-        description = sys.stdin.readline()
+        testName = self.options["name"].getValue()
+        print "Adding", self.testType(), testName, "under test suite", suite
+        testDir = self.createTest(suite, testName, self.options["desc"].getValue())
+        self.createTestContents(suite, testDir)
+        newTest = suite.addTest(testName, testDir)
+        self.recordResults(newTest)
+    def createTestContents(self, suite, testDir):
+        pass
+    def recordResults(self, newTest):
+        pass
+    def createTest(self, suite, testName, description):
         file = open(suite.testCaseFile, "a")
         file.write(os.linesep)
-        file.write("# " + description)
-        file.write(testName)
+        file.write("# " + description + os.linesep)
+        file.write(testName + os.linesep)
         testDir = os.path.join(suite.abspath, testName.strip())
         os.mkdir(testDir)
         return testDir
+    
+class ImportTestCase(ImportTest):
+    def __init__(self, suite):
+        ImportTest.__init__(self, suite)
+        if self.canPerformOnTest():
+            self.addOptionsFileOption()
+            suite.app.setConfigDefault("use_standard_input", not self.appIsGUI())
+            if self.appIsGUI():
+                self.switches["editsc"] = Switch("Change user abilities (edit GUI script)")
+            if suite.app.getConfigValue("use_standard_input"):
+                self.switches["editin"] = Switch("Create standard input file", not self.appIsGUI())
+            self.switches["editlog"] = Switch("Change system behaviour (edit log file)")
+    def testType(self):
+        return "Test"
+    def appIsGUI(self):
+        return 0
+    def addOptionsFileOption(self):
+        self.options["opt"] = TextOption("Command line options")
+    def createTestContents(self, suite, testDir):
+        self.writeOptionFile(suite, testDir)
+        self.writeInputFile(suite, testDir)
+    def recordResults(self, newTest):
+        if self.appIsGUI():
+            self.recordGUIActions(newTest)
+
+        self.recordStandardResult(newTest)
+    def recordGUIActions(self, test):
+        print "Record your actions using the", test.app.fullName, "GUI..."
+        test.app.makeWriteDirectory()
+        test.makeBasicWriteDirectory()
+        test.setUpEnvironment(parents=1)
+        os.chdir(test.writeDirs[0])
+        command = test.getExecuteCommand()
+        recordCommand = self.getRecordCommand(command, test.abspath)
+        os.system(recordCommand)
+        test.tearDownEnvironment(parents=1)
+        test.app.removeWriteDirectory()
+        if self.switches["editsc"].getValue():
+            self.viewFile(os.path.join(test.abspath, "gui_script"), wait=1)
+    def recordStandardResult(self, test):
+        print "Running test", test, "to get standard behaviour..."
+        progName = sys.argv[0]
+        stdout = os.popen("python " + progName + " -a " + test.app.name + " -o -t " + test.name)
+        for line in stdout.readlines():
+            sys.stdout.write("> " + line)
+        if self.switches["editlog"].getValue():
+            test.app.setConfigDefault("log_file", "output")
+            logFile = test.makeFileName(test.app.getConfigValue("log_file"))
+            self.viewFile(logFile, wait=1)
+    def writeOptionFile(self, suite, testDir):
+        optionString = self.getOptions()
+        print "Using option string :", optionString
+        optionFile = open(os.path.join(testDir, "options." + suite.app.name), "w")
+        optionFile.write(optionString)
+        if self.appIsGUI():
+            optionFile.write(" " + self.getReplayOption())
+        optionFile.write(os.linesep)
+        return optionString
+    def writeInputFile(self, suite, testDir):
+        if not self.switches.has_key("editin") or not self.switches["editin"].getValue():
+            return
+        inputFile = os.path.join(testDir, "input." + suite.app.name)
+        file = open(inputFile, "w")
+        file.write("<Enter standard input lines in this file>" + os.linesep)
+        file.close()
+        self.viewFile(inputFile, wait=1)
+    def getOptions(self):
+        return self.options["opt"].getValue()
+    # We assume tested GUIs support record and replay. These default to command
+    # line -replay and -record
+    def getReplayOption(self):
+        return "-replay gui_script"
+    def getRecordCommand(self, command, testDir):
+        return command.replace(self.getReplayOption(), "-record " + os.path.join(testDir, "gui_script"))
+
+class ImportTestSuite(ImportTest):
+    def __init__(self, suite):
+        ImportTest.__init__(self, suite)
+        if self.canPerformOnTest():
+            self.switches["env"] = Switch("Add environment file")
+    def testType(self):
+        return "Suite"
+    def createTestContents(self, suite, testDir):
+        self.writeTestcasesFile(suite, testDir)
+        if self.switches["env"].getValue():
+            self.writeEnvironmentFile(suite, testDir)
+    def writeTestcasesFile(self, suite, testDir):
+        testCasesFile = os.path.join(testDir, "testsuite." + suite.app.name)        
+        file = open(testCasesFile, "w")
+        file.write("# Ordered list of tests in test suite. Add as appropriate" + os.linesep + os.linesep)
+    def writeEnvironmentFile(self, suite, testDir):
+        envFile = os.path.join(testDir, "environment")
+        file = open(envFile, "w")
+        file.write("# Dictionary of environment to variables to set in test suite" + os.linesep)
+
+# Placeholder for all classes. Remember to add them!
+class InteractiveActionHandler:
+    def __init__(self):
+        self.testClasses =  [ SaveTest ]
+        self.suiteClasses = [ ImportTestCase, ImportTestSuite ]
+    def getInstances(self, test):
+        instances = []
+        classList = self.getClassList(test)
+        for intvActionClass in classList:
+            instance = self.makeInstance(intvActionClass, test)
+            instances.append(instance)
+        return instances
+    def getClassList(self, test):
+        if test.classId() == "test-case":
+            return self.testClasses
+        else:
+            return self.suiteClasses
+    def makeInstance(self, className, test):
+        test.app.setConfigDefault("interactive_action_module", test.app.getConfigValue("config_module"))
+        module = test.app.getConfigValue("interactive_action_module")
+        command = "from " + module + " import " + className.__name__ + " as realClassName"
+        try:
+            exec command
+            return realClassName(test)
+        except ImportError:
+            return className(test)
+        
+interactiveActionHandler = InteractiveActionHandler()
+
         
 

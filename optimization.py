@@ -298,6 +298,8 @@ class TestCaseInformation(TestInformation):
             fullPath = os.path.join(subPlanTree, name)
             if os.path.isfile(fullPath):
                 continue
+            if fullPath.find(".aborted.") != -1:
+                continue
             if os.path.isdir(os.path.join(fullPath, "APC_FILES")):
                 if fullPath.find(testName) != -1:
                     possibleDirs.append(fullPath)

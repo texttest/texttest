@@ -172,6 +172,8 @@ class MatadorTestSuiteInformation(optimization.TestSuiteInformation):
         stemEnvPath = self.filePath("environment")
         if envPath == stemEnvPath:
             return 1
+        if not os.path.isfile(stemEnvPath):
+            shutil.copyfile(envPath, stemEnvPath)
         if filecmp.cmp(envPath, stemEnvPath, 0) == 1:
             os.remove(envPath)
             if self.onlyEnvIsLacking == 1:

@@ -132,6 +132,8 @@ class MakeWriteDirectory(plugins.Action):
         if len(test.writeDirs) < 1:
             test.makeBasicWriteDirectory()
         os.chdir(test.writeDirs[0])
+    def __repr__(self):
+        return "Make write directory for"
 
 class CollateFile(plugins.Action):
     def __init__(self, sourcePattern, targetStem):

@@ -1594,9 +1594,11 @@ class TextTest:
         appList.append(app)
         if self.inputOptions.slaveRun():
             return appList
-        for extraVersion in app.getConfigValue("extra_version"):
-            if extraVersion == version:
-                continue
+        extraVersions = app.getConfigValue("extra_version")
+        for appVersion in app.versions:
+            if appVersion in extraVersions:
+                return appList
+        for extraVersion in extraVersions:
             aggVersion = extraVersion
             if len(version) > 0:
                 aggVersion = version + "." + extraVersion

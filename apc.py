@@ -259,6 +259,7 @@ class RunApcTestInDebugger(default.RunTest):
         gdbArgsFile.write("run" + os.linesep)
         gdbArgsFile.write("if $_exitcode" + os.linesep)
         gdbArgsFile.write("print fflush(0)" + os.linesep)
+        gdbArgsFile.write("where" + os.linesep)
         gdbArgsFile.write("else" + os.linesep)
         gdbArgsFile.write("quit" + os.linesep)
         gdbArgsFile.write("end" + os.linesep)
@@ -318,11 +319,11 @@ class ApcCompileRules(carmen.CompileRules):
     def linuxRuleSetBuild(self, test):
         ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
         if not self.ensureCarmTmpDirExists():
-            self.rulesCompileFailed.append(ruleset.name)
+            #self.rulesCompileFailed.append(ruleset.name)
             raise plugins.TextTestError, "Non-existing CARMTMP"
         self.diag.info("Using linuxRuleSetBuild for building rule set " + ruleset.name)
-        if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
-            raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
+        #if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
+        #    raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
         if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
             return
         apcExecutable = ruleset.targetFile
@@ -341,7 +342,7 @@ class ApcCompileRules(carmen.CompileRules):
             self.diag.debug("Building rule set library using the command " + self.ruleCompileCommand(ruleset.sourceFile, test))
             returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile, test))
             if returnValue:
-                self.rulesCompileFailed.append(ruleset.name)
+                #self.rulesCompileFailed.append(ruleset.name)
                 raise plugins.TextTestError, "Failed to build rule library for APC ruleset " + ruleset.name
         commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib, test)
         commandLine += "-o " + apcExecutable
@@ -352,7 +353,7 @@ class ApcCompileRules(carmen.CompileRules):
         compTmp = test.makeFileName("ravecompile", temporary=1)
         returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
         if returnValue:
-            self.rulesCompileFailed.append(ruleset.name)
+            #self.rulesCompileFailed.append(ruleset.name)
             print "Building", ruleset.name, "failed:"
             se = open(compTmp)
             lastErrors = se.readlines()

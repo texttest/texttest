@@ -99,12 +99,12 @@ class Pending(plugins.TestState):
 
 class RunTest(default.RunTest):
     def __init__(self, loginShell):
+        default.RunTest.__init__(self)
         self.process = None
         self.loginShell = loginShell
         self.collectStdErr = 1
         self.testDisplay = None
         self.realDisplay = os.getenv("DISPLAY")
-        self.virtualDisplayDiag = plugins.getDiagnostics("virtual display")
     def __call__(self, test):
         if self.testDisplay:
             os.environ["DISPLAY"] = self.testDisplay
@@ -155,24 +155,33 @@ class RunTest(default.RunTest):
     def setUpApplication(self, app):
         default.RunTest.setUpApplication(self, app)
         self.collectStdErr = app.getConfigValue("collect_standard_error")
-        virtualDisplayMachines = app.getConfigValue("virtual_display_machine")
-        if len(virtualDisplayMachines) > 0 and app.slowMotionReplaySpeed == 0:
-            self.allocateVirtualDisplay(virtualDisplayMachines)
-    def allocateVirtualDisplay(self, virtualDisplayMachines):
-        for machine in virtualDisplayMachines:
-            self.virtualDisplayDiag.info("Looking for virtual display on " + machine)
+        self.setUpVirtualDisplay(app)
+    def setUpVirtualDisplay(self, app):
+        finder = VirtualDisplayFinder(app)
+        display = finder.getDisplay()
+        if display:
+            self.testDisplay = display
+            print "Tests will run with DISPLAY variable set to", display
+
+class VirtualDisplayFinder:
+    def __init__(self, app):
+        self.machines = app.getConfigValue("virtual_display_machine")
+        self.slowMotionReplay = app.slowMotionReplaySpeed != 0
+        self.diag = plugins.getDiagnostics("virtual display")
+    def getDisplay(self):
+        if len(self.machines) == 0 or self.slowMotionReplay:
+            return
+        for machine in self.machines:
+            self.diag.info("Looking for virtual display on " + machine)
             display = self.findDisplay(machine)
             if display and display != "":
-                return self.setDisplay(display)
+                return display
             if display != None:
                 self.killServer(machine)
         for machine in virtualDisplayMachines:
             display = self.startServer(machine)
             if display and display != "":
-                return self.setDisplay(display)
-    def setDisplay(self, display):
-        self.testDisplay = display
-        print "Tests will run with DISPLAY variable set to", display
+                return display
     def killServer(self, server):
         # Xvfb servers get overloaded after a while. If they do, kill them
         line = self.getPsOutput(server, ownProcesses=1)
@@ -215,10 +224,10 @@ class RunTest(default.RunTest):
     def findDisplay(self, server):
         line = self.getPsOutput(server, ownProcesses=0)
         if len(line):
-            self.virtualDisplayDiag.info("Found Xvfb process running:" + os.linesep + line)
+            self.diag.info("Found Xvfb process running:" + os.linesep + line)
             serverName = server + line.split()[-1] + ".0"
             testCommandLine = self.getSysCommand(server, "xterm -display " + serverName + " -e echo test", background=0)
-            self.virtualDisplayDiag.info("Testing with command '" + testCommandLine + "'")
+            self.diag.info("Testing with command '" + testCommandLine + "'")
             (cin, cout, cerr) = os.popen3(testCommandLine)
             lines = cerr.readlines()
             if len(lines) == 0:
@@ -261,17 +270,19 @@ class CollateUNIXFiles(default.CollateFiles):
     def __init__(self):
         default.CollateFiles.__init__(self)
         self.collations["stacktrace"] = "core*"
-    def transformToText(self, path):
+    def transformToText(self, path, test):
         if isCompressed(path):
             toUse = path + ".Z"
             os.rename(path, toUse)
             os.system("uncompress " + toUse)
-        if self.isCoreFile(path):
+        if self.isCoreFile(path) and self.extractCoreFor(test):
             # Extract just the stack trace rather than the whole core
-            self.interpretCoreFile(path)
+            self.interpretCoreFile(path, test)
     def isCoreFile(self, path):
         return os.path.basename(path).startswith("stacktrace")
-    def interpretCoreFile(self, path):
+    def extractCoreFor(self, test):
+        return 1
+    def interpretCoreFile(self, path, test):
         if os.path.getsize(path) == 0:
             os.remove(path)
             file = open(path, "w")
@@ -282,9 +293,7 @@ class CollateUNIXFiles(default.CollateFiles):
         file = open(fileName, "w")
         file.write("bt\n")
         file.close()
-        # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
-        # Unfortunately running gdb is not the answer, because it truncates the data...
-        binary = self.getBinaryFromCore(path)
+        binary = self.getBinaryFromCore(path, test)
         newPath = path + "tmp" 
         writeFile = open(newPath, "w")
         if os.path.isfile(binary):
@@ -302,11 +311,13 @@ class CollateUNIXFiles(default.CollateFiles):
             os.remove(stdoutFile)
             os.remove(stderrFile)
         else:
-            writeFile.write("Could not find binary name from core file : Stack trace not produced for crash" + os.linesep)
+            writeFile.write("Could not find binary name '" + binary + "' from core file : Stack trace not produced for crash" + os.linesep)
             os.rename(path, "core")
         os.remove(fileName)
         os.rename(newPath, path)
-    def getBinaryFromCore(self, path):
+    def getBinaryFromCore(self, path, test):
+        # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
+        # Unfortunately running gdb is not the answer, because it truncates the data...
         finalWord = os.popen("csh -c 'echo `tail -c 1024 " + path + "`' 2> /dev/null").read().split(" ")[-1].strip()
         return finalWord.split(os.linesep)[-1]
     def writeStackTrace(self, stdoutFile, writeFile):

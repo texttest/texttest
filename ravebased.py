@@ -105,6 +105,9 @@ class Config(carmen.CarmenConfig):
         self.addFilter(filters, "u", UserFilter)
         return filters
     def getActionSequence(self):
+        if self.optionMap.slaveRun():
+            return carmen.CarmenConfig.getActionSequence(self)
+        
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
         return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleBuilder() ] + \
                  carmen.CarmenConfig._getActionSequence(self, makeDirs = 0)
@@ -133,7 +136,7 @@ class Config(carmen.CarmenConfig):
     def getRealRuleBuilder(self):
         jobNameCreator = RulesetJobBuildNameCreator(self.getRuleSetName)
         if self.useLSF():
-            ruleRunner = lsf.SubmitTest(self.getLoginShell(), self.findRaveCompilationLSFQueue, self.findLSFResource, self.findLSFMachine)
+            ruleRunner = lsf.SubmitTest(self.findRaveCompilationLSFQueue, self.findLSFResource, self.findLSFMachine, self.optionMap)
             return [ self.getRuleBuildObject(ruleRunner, jobNameCreator), \
                      UpdateRulesetBuildStatus(self.getRuleSetName, jobNameCreator) ]
         else:

@@ -4,6 +4,7 @@ from stat import *
 from usecase import ScriptEngine, UseCaseScriptError
 from ndict import seqdict
 from copy import copy
+from cPickle import Pickler, Unpickler, UnpicklingError
 
 helpIntro = """
 Note: the purpose of this help is primarily to document the configuration you currently have,
@@ -83,6 +84,7 @@ class Test:
                 self.environment[var] = expValue
             self.setUpEnvVariable(var, expValue)
         for var, value in referenceVars:
+            debugLog.info("Trying reference variable " + var + " in " + self.name)
             if self.environment.has_key(var):
                 childReferenceVars.remove((var, value))
                 continue
@@ -91,6 +93,8 @@ class Test:
                 self.environment[var] = expValue
                 debugLog.info("Adding reference variable " + var + " as " + expValue + " in " + self.name)
                 self.setUpEnvVariable(var, expValue)
+            else:
+                debugLog.info("Not adding reference " + var + " as same as local value " + expValue + " in " + self.name)
         self.expandChildEnvironmentReferences(childReferenceVars)
         self.tearDownEnvironment()
     def expandChildEnvironmentReferences(self, referenceVars):
@@ -213,38 +217,45 @@ class TestCase(Test):
             self.environment[outVarName] = basicWriteDir
         self.setUseCaseEnvironment()
     def setUseCaseEnvironment(self):
-        # Here we assume the application uses either PyUseCase or JUseCase
-        # PyUseCase reads environment variables, but you can't do that from java,
-        # so we have a "properties file" set up as well. Do both always, to save forcing
-        # apps to tell us which to do...
-        root, local = os.path.split(self.app.writeDirectory)
-        recordRuns = local.startswith("static_gui")
-        if not recordRuns and not os.path.isfile(self.useCaseFile):
-            return
-        jusecaseEntries = {}
-        if recordRuns:
-            replayScript = None
-            recordScript = self.useCaseFile
-            recinpScript = self.inputFile
-            replaySpeed = None
-        else:
-            replayScript = self.useCaseFile
-            recordScript = self.makeFileName("usecase", temporary=1)
-            recinpScript = None
-            replaySpeed = self.app.slowMotionReplaySpeed
-        if recordScript:
-            self.environment["USECASE_RECORD_SCRIPT"] = recordScript
-            jusecaseEntries["record"] = recordScript
-        if recinpScript:
-            self.environment["USECASE_RECORD_STDIN"] = recinpScript
-            jusecaseEntries["record_stdin"] = recinpScript
+        if self.useJavaRecorder():
+            self.properties.addEntry("jusecase", {}, insert=1)
+        if os.path.isfile(self.useCaseFile):
+            self.setReplayEnvironment()
+    def useJavaRecorder(self):
+        return self.app.getConfigValue("use_case_recorder") == "jusecase"
+    # Here we assume the application uses either PyUseCase or JUseCase
+    # PyUseCase reads environment variables, but you can't do that from java,
+    # so we have a "properties file" set up as well. Do both always, to save forcing
+    # apps to tell us which to do...
+    def setReplayEnvironment(self):
+        self.setReplay(self.useCaseFile, self.app.slowMotionReplaySpeed)
+        self.setRecord(self.makeFileName("usecase", temporary=1))
+    def setRecordEnvironment(self):
+        self.setRecord(self.useCaseFile, self.inputFile)
+    def addJusecaseProperty(self, name, value):
+        self.properties.addEntry(name, value, sectionName="jusecase", insert=1)
+    def setReplay(self, replayScript, replaySpeed):
         if replayScript:
-            self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
-            jusecaseEntries["replay"] = replayScript
+            if self.useJavaRecorder():
+                self.addJusecaseProperty("replay", replayScript)
+            else:
+                self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
         if replaySpeed:
-            self.environment["USECASE_REPLAY_DELAY"] = str(replaySpeed)
-            jusecaseEntries["delay"] = str(replaySpeed)
-        self.properties["jusecase"] = jusecaseEntries
+            if self.useJavaRecorder():
+                self.addJusecaseProperty("delay", str(replaySpeed))
+            else:
+                self.environment["USECASE_REPLAY_DELAY"] = str(replaySpeed)
+    def setRecord(self, recordScript, recinpScript = None):
+        if recordScript:
+            if self.useJavaRecorder():
+                self.addJusecaseProperty("record", recordScript)
+            else:
+                self.environment["USECASE_RECORD_SCRIPT"] = recordScript
+        if recinpScript:
+            if self.useJavaRecorder():
+                self.addJusecaseProperty("record_stdin", recinpScript)
+            else:
+                self.environment["USECASE_RECORD_STDIN"] = recinpScript
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -293,6 +304,36 @@ class TestCase(Test):
             # This will be raised if we're in a subthread, i.e. if the GUI is running
             # Rely on the GUI to report the same event
             pass
+    def getStateFile(self):
+        return self.makeFileName("teststate", temporary=1, forComparison=0)
+    def loadState(self, retrieveErrorsOnly = 0):
+        stateFile = self.getStateFile()
+        if not os.path.isfile(stateFile):
+            return 0
+        
+        file = open(stateFile)
+        try:
+            unpickler = Unpickler(file)
+            state = unpickler.load()
+        except UnpicklingError:
+            return 0
+        if retrieveErrorsOnly and state.hasResults():
+            return 0
+        self.changeState(state)
+        return 1
+    def saveState(self):
+        stateFile = self.getStateFile()
+        # Ensure directory exists, it may not
+        dir, local = os.path.split(stateFile)
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
+        if os.path.isfile(stateFile):
+            # Don't overwrite previous saved state
+            return
+        file = open(stateFile, "w")
+        pickler = Pickler(file)
+        pickler.dump(self.state)
+        file.close()
     def getExecuteCommand(self):
         return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
@@ -304,18 +345,19 @@ class TestCase(Test):
         return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
-    def makeBasicWriteDirectory(self, copyAll = 1, forRecord = 0):
+    def makeBasicWriteDirectory(self):
         fullPathToMake = os.path.join(self.writeDirs[0], "framework_tmp")
         os.makedirs(fullPathToMake)
+    def prepareBasicWriteDirectory(self):
         if self.app.useDiagnostics:
             os.mkdir(os.path.join(self.writeDirs[0], "Diagnostics"))
-        if copyAll:
-            self.collatePaths("copy_test_path", self.copyTestPath)
+        self.collatePaths("copy_test_path", self.copyTestPath)
         self.collatePaths("link_test_path", self.linkTestPath)
         self.createPropertiesFiles()
     def createPropertiesFiles(self):
         for var, value in self.properties.items():
             propFileName = os.path.join(self.writeDirs[0], var + ".properties")
+            debugLog.info("Writing " + propFileName + " for " + var + " : " + repr(value))
             file = open(propFileName, "w")
             for subVar, subValue in value.items():
                 file.write(subVar + "=" + subValue + os.linesep)            
@@ -609,7 +651,7 @@ class Application:
         debugLog.info("Found application " + repr(self))
         self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), inputOptions)
         self.cleanMode = self.configObject.getCleanMode()
-        self.writeDirectory = self._getWriteDirectory(inputOptions.useStaticGUI())
+        self.writeDirectory = self._getWriteDirectory(inputOptions)
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
@@ -662,6 +704,7 @@ class Application:
         self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ])
         self.setConfigDefault("gui_entry_overrides", {})
         self.setConfigDefault("gui_entry_options", { "" : [] })
+        self.setConfigDefault("use_case_recorder", "")
         if os.name == "posix":
             self.setConfigDefault("view_program", "xemacs")
             self.setConfigDefault("follow_program", "tail -f")
@@ -735,10 +778,12 @@ class Application:
             group.addOption("a", "Applications containing")
             group.addOption("s", "Run this script")
             group.addOption("d", "Run tests at")
+            group.addOption("tmp", "Write test-tmp files at")
             group.addOption("delay", "Between replayed actions, delay this long")
             group.addOption("record", "Record user actions to this script")
             group.addOption("replay", "Replay user actions from this script")
             group.addOption("recinp", "Record standard input to this script")
+            group.addOption("slave", "Private: used to submit slave runs remotely")
             group.addOption("help", "Print help text")
             group.addSwitch("g", "use GUI", 1)
             group.addSwitch("gx", "use static GUI")
@@ -747,7 +792,9 @@ class Application:
             if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):
                 return optionGroup
         return None
-    def _getWriteDirectory(self, staticGUI):
+    def _getWriteDirectory(self, inputOptions):
+        if inputOptions.has_key("tmp"):
+            os.environ["TEXTTEST_TMP"] = inputOptions["tmp"]
         if not os.environ.has_key("TEXTTEST_TMP"):
             if os.name == "posix":
                 os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
@@ -758,7 +805,7 @@ class Application:
         if not os.path.isdir(absroot):
             os.makedirs(absroot)
         localName = self.getTmpIdentifier()
-        if staticGUI:
+        if inputOptions.useStaticGUI():
             localName = "static_gui." + localName
         return os.path.join(absroot, localName)
     def getFullVersion(self, forSave = 0):
@@ -918,6 +965,10 @@ class Application:
         if self.configDir.has_key("interpreter"):
             binary = self.configDir["interpreter"] + " " + binary
         return self.configObject.getExecuteCommand(binary, test)
+    def checkBinaryExists(self):
+        binary = self.getConfigValue("binary")
+        if not os.path.isfile(binary):
+            raise plugins.TextTestError, binary + " has not been built."
     def getEnvironment(self):
         env = [ ("TEXTTEST_CHECKOUT", self.checkout) ]
         return env + self.configObject.getApplicationEnvironment(self)
@@ -927,7 +978,6 @@ class OptionFinder(seqdict):
         seqdict.__init__(self)
         self.buildOptions()
         self.directoryName = os.path.normpath(self.findDirectoryName())
-        os.environ["TEXTTEST_HOME"] = self.directoryName
         self._setUpLogging()
         debugLog.debug(repr(self))
     def _setUpLogging(self):
@@ -937,13 +987,15 @@ class OptionFinder(seqdict):
         if self.has_key("x") or os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             diagFile = self._getDiagnosticFile()
             if os.path.isfile(diagFile):
-                diagDir = os.path.dirname(diagFile)
                 if not os.environ.has_key("TEXTTEST_DIAGDIR"):
-                    os.environ["TEXTTEST_DIAGDIR"] = diagDir
-                print "TextTest will write diagnostics in", diagDir
-                for file in os.listdir(diagDir):
-                    if file.endswith("diag"):
-                        os.remove(os.path.join(diagDir, file))
+                    os.environ["TEXTTEST_DIAGDIR"] = os.path.dirname(diagFile)
+                writeDir = os.getenv("TEXTTEST_DIAGDIR")
+                if not os.path.isdir(writeDir):
+                    os.makedirs(writeDir)
+                print "TextTest will write diagnostics in", writeDir, "based on file at", diagFile
+                for file in os.listdir(writeDir):
+                    if file.endswith(".diag"):
+                        os.remove(os.path.join(writeDir, file))
                 # To set new config files appears to require a constructor...
                 rootLogger = log4py.Logger(log4py.TRUE, diagFile)
             else:
@@ -1009,16 +1061,18 @@ class OptionFinder(seqdict):
         return self.has_key("g") or self.useStaticGUI()
     def useStaticGUI(self):
         return self.has_key("gx")
+    def slaveRun(self):
+        return self.has_key("slave")
     def _getDiagnosticFile(self):
-        if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
-            return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
-        else:
-            return os.path.join(self.directoryName, "Diagnostics", "log4py.conf")
+        if not os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
+            os.environ["TEXTTEST_DIAGNOSTICS"] = os.path.join(self.directoryName, "Diagnostics")
+        return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
     def findDirectoryName(self):
         if self.has_key("d"):
             return plugins.abspath(self["d"])
         elif os.environ.has_key("TEXTTEST_HOME"):
-            return plugins.abspath(os.environ["TEXTTEST_HOME"])
+            os.environ["TEXTTEST_HOME"] = plugins.abspath(os.environ["TEXTTEST_HOME"])
+            return os.environ["TEXTTEST_HOME"]
         else:
             return os.getcwd()
     def getActionSequence(self, app):
@@ -1054,6 +1108,9 @@ class OptionFinder(seqdict):
         return [ plugins.NonPythonAction(self["s"]) ]
             
 class MultiEntryDictionary(seqdict):
+    def __init__(self):
+        seqdict.__init__(self)
+        self.currDict = self
     def readValuesFromFile(self, filename, appName = "", versions = [], insert=1, errorOnUnknown=0):
         self.currDict = self
         debugLog.info("Reading values from file " + os.path.basename(filename))
@@ -1427,8 +1484,7 @@ class UniqueNameFinder:
 class TextTest:
     def __init__(self):
         self.inputOptions = OptionFinder()
-        global globalRunIdentifier
-        globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
+        self.setRunId()
         self.allApps = self.findApps()
         self.gui = None
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
@@ -1444,6 +1500,12 @@ class TextTest:
         if not self.gui:
             logger = plugins.getDiagnostics("Use-case log")
             self.scriptEngine = ScriptEngine(logger)
+    def setRunId(self):
+        global globalRunIdentifier
+        if self.inputOptions.slaveRun():
+            globalRunIdentifier = self.inputOptions["slave"]
+        else:
+            globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
     def findApps(self):
         dirName = self.inputOptions.directoryName
         os.chdir(dirName)
@@ -1493,7 +1555,7 @@ class TextTest:
         app = self.createApplication(appName, dirName, pathname, version)
         appList.append(app)
         extraVersion = app.getConfigValue("extra_version")
-        if extraVersion == "none":
+        if extraVersion == "none" or self.inputOptions.slaveRun():
             return appList
         aggVersion = extraVersion
         if len(version) > 0:

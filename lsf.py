@@ -1,8 +1,9 @@
 #!/usr/local/bin/python
 
-import os, time, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types, predict, guiplugins
+import os, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types, predict, guiplugins
 from Queue import Queue, Empty
 from threading import Thread
+from time import sleep
 from copy import deepcopy
 
 # Text only relevant to using the LSF configuration directly
@@ -73,6 +74,14 @@ def tenMinutesToGo(signal, stackFrame):
 
 signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
+# Use the non-monitoring version of run test, but the rest from unix
+class RunTestInSlave(unixConfig.RunTest):
+    def runTest(self, test):
+        default.RunTest.runTest(self, test)
+    def setUpVirtualDisplay(self, app):
+        # Assume the master sets DISPLAY for us
+        pass
+        
 class LSFConfig(unixConfig.UNIXConfig):
     def addToOptionGroup(self, group):
         unixConfig.UNIXConfig.addToOptionGroup(self, group)
@@ -85,16 +94,28 @@ class LSFConfig(unixConfig.UNIXConfig):
         if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l") or self.optionMap.has_key("rundebug"):
             return 0
         return 1
-    def getTestRunner(self):
+    def _getActionSequence(self, makeDirs):
+        if self.optionMap.slaveRun():
+            return unixConfig.UNIXConfig._getActionSequence(self, 0)
         if not self.useLSF():
-            return unixConfig.UNIXConfig.getTestRunner(self)
+            return unixConfig.UNIXConfig._getActionSequence(self, makeDirs)
+
+        submitter = SubmitTest(self.findLSFQueue, self.findLSFResource, self.findLSFMachine, self.optionMap)
+        actions = [ submitter, self.updaterLSFStatus(), default.SaveState() ]
+        if makeDirs:
+            actions = [ self.getWriteDirectoryMaker() ] + actions
+        if not self.optionMap.useGUI():
+            actions.append(self.getTestResponder())
+        return actions
+    def getTestRunner(self):
+        if self.optionMap.slaveRun():
+            return RunTestInSlave(self.getLoginShell())
         else:
-            return SubmitTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource, self.findLSFMachine)
-    def _getWriteDirectoryMaker(self):
-        copyAll = not self.useLSF()
-        return default.MakeWriteDirectory(copyAll)
+            return unixConfig.UNIXConfig.getTestRunner(self)
+    def updaterLSFStatus(self):
+        return UpdateTestLSFStatus()
     def getPerformanceFileMaker(self):
-        if self.useLSF():
+        if self.optionMap.slaveRun():
             return MakePerformanceFile(self.isSlowdownJob)
         else:
             return unixConfig.UNIXConfig.getPerformanceFileMaker(self)
@@ -150,17 +171,6 @@ class LSFConfig(unixConfig.UNIXConfig):
             if len(resource):
                 resourceList.append(resource)
         return resourceList
-    def getTestCollator(self):
-        return [ self.getWaitingAction(), self.getFileCollator() ]
-    def getFileCollator(self):
-        return unixConfig.UNIXConfig.getTestCollator(self)
-    def getWaitingAction(self):
-        if not self.useLSF():
-            return None
-        else:
-            return self.updaterLSFStatus()
-    def updaterLSFStatus(self):
-        return UpdateTestLSFStatus()
     def isSlowdownJob(self, jobUser, jobName):
         return 0
     def printHelpDescription(self):
@@ -175,7 +185,8 @@ class LSFConfig(unixConfig.UNIXConfig):
 
 class LSFServer:
     instance = None
-    def __init__(self):
+    def __init__(self, origEnv):
+        self.envString = self.getEnvironmentString(origEnv)
         self.submissionQueue = Queue()
         self.allJobs = {}
         self.activeJobs = {}
@@ -189,10 +200,13 @@ class LSFServer:
         if jobNameFunction:
             jobName = jobNameFunction(test)
         return test.getTmpExtension() + jobName
-    def submitJob(self, test, jobNameFunction, lsfOptions, command):
+    def submitJob(self, test, jobNameFunction, lsfOptions, command, copyEnv):
         jobName = self.getJobName(test, jobNameFunction)
-        envCopy = deepcopy(os.environ)
-        self.submissionQueue.put((jobName, "-J " + jobName + " " + lsfOptions + " '" + command + "'", envCopy))
+        envCopy = None
+        if copyEnv:
+            envCopy = deepcopy(os.environ)
+        bsubArgs = "-J " + jobName + " " + lsfOptions + " -u nobody '" + command + "'"
+        self.submissionQueue.put((jobName, bsubArgs, envCopy))
     def findJob(self, test, jobNameFunction = None):
         jobName = self.getJobName(test, jobNameFunction)
         if self.allJobs.has_key(jobName):
@@ -211,15 +225,17 @@ class LSFServer:
             if len(self.activeJobs):
                 self.updateJobs()
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
-            time.sleep(0.1)
+            sleep(0.1)
     def getEnvironmentString(self, envDict):
         envStr = "env -i "
         for key, value in envDict.items():
             envStr += "'" + key + "=" + value + "' "
         return envStr
     def createJobFromQueue(self):
-        jobName, bsubArgs, envDict = self.submissionQueue.get_nowait()
-        envString = self.getEnvironmentString(envDict)
+        jobName, bsubArgs, envCopy = self.submissionQueue.get_nowait()
+        envString = self.envString
+        if envCopy:
+            envString = self.getEnvironmentString(envCopy)
         command = envString + "bsub " + bsubArgs
         self.diag.info("Creating job " + jobName + " with command : " + command)
         stdin, stdout, stderr = os.popen3(command)
@@ -248,7 +264,7 @@ class LSFServer:
         print "ERROR: unexpected output from bsub!!!"
         return ""
     def updateJobs(self):
-        commandLine = "bjobs -a -w " + string.join(self.activeJobs.keys())
+        commandLine = self.envString + "bjobs -a -w " + string.join(self.activeJobs.keys())
         stdin, stdout, stderr = os.popen3(commandLine)
         self.parseOutput(stdout)
         self.parseErrors(stderr)
@@ -329,20 +345,6 @@ class LSFJob:
         return self.isSubmitted() and not self.hasFinished()
     def kill(self):
         os.system("bkill " + self.jobId + " > /dev/null 2>&1")
-    def getProcessIdWithoutLSF(self, firstpid, app):
-        if len(self.machines):
-            machine = self.machines[0]
-            pslines = os.popen("rsh " + machine + " pstree -p -l " + firstpid + " 2>&1").readlines()
-            if len(pslines) == 0:
-                return []
-            psline = pslines[0]
-            batchpos = psline.find(os.path.basename(app.getConfigValue("binary")))
-            if batchpos != -1:
-                apcj = psline[batchpos:].split('---')
-                if len(apcj) > 1:
-                    pid = apcj[1].split('(')[-1].split(')')[0]
-                    return pid
-        return []
     def getProcessId(self, app):
         for line in os.popen("bjobs -l " + self.jobId).xreadlines():
             pos = line.find("PIDs")
@@ -355,41 +357,44 @@ class LSFJob:
                     return self.getProcessIdWithoutLSF(pids[0], app)
         return []
     
-class SubmitTest(unixConfig.RunTest):
-    def __init__(self, loginShell, queueFunction, resourceFunction, machineFunction):
-        unixConfig.RunTest.__init__(self, loginShell)
+class SubmitTest(plugins.Action):
+    def __init__(self, queueFunction, resourceFunction, machineFunction, optionMap):
         self.queueFunction = queueFunction
         self.resourceFunction = resourceFunction
         self.machineFunction = machineFunction
+        self.optionMap = optionMap
+        self.runOptions = ""
+        self.origEnv = {}
+        for var, value in os.environ.items():
+            self.origEnv[var] = value
         self.diag = plugins.getDiagnostics("LSF")
     def __repr__(self):
         return "Submitting"
-    def runTest(self, test):
+    def __call__(self, test):
+        if test.state.isComplete():
+            return
+        
         global emergencyFinish
         if emergencyFinish:
             raise plugins.TextTestError, "Preprocessing not complete by LSF termination time"
-        try:
-            # Involves writing files, can get interrupted system call
-            testCommand = self.getExecuteCommand(test)
-        except IOError:
-            time.sleep(1)
-            if emergencyFinish:
-                raise plugins.TextTestError, "Preprocessing not complete by LSF termination time"
-            else:
-                raise plugins.TextTestError, "Writing command file interrupted by external signal"
+
+        testCommand = self.getExecuteCommand(test)
         lsfOptions = ""
         if os.environ.has_key("LSF_PROCESSES"):
             lsfOptions += " -n " + os.environ["LSF_PROCESSES"]
-        return self.runCommand(test, testCommand, None, lsfOptions)
-    def runCommand(self, test, command, jobNameFunction = None, commandLsfOptions = ""):
+        return self.runCommand(test, testCommand, None, lsfOptions, copyEnv=0)
+    def getExecuteCommand(self, test):
+        tmpDir, local = os.path.split(test.app.writeDirectory)
+        slaveLog = test.makeFileName("slavelog", temporary=1, forComparison=0)
+        slaveErrs = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
+        return "python " + sys.argv[0] + " -d " + test.app.abspath + " -a " + test.app.name + test.app.versionSuffix() \
+               + " -c " + test.app.checkout + " -t " + test.getRelPath() + " -slave " + test.getTmpExtension() \
+               + " -tmp " + tmpDir + " " + self.runOptions + " > " + slaveLog + " 2> " + slaveErrs
+    def runCommand(self, test, command, jobNameFunction = None, commandLsfOptions = "", copyEnv = 1):
         self.describe(test, jobNameFunction)
         
         queueToUse = self.queueFunction(test)
-        repFileName = "lsfreport"
-        if jobNameFunction:
-            repFileName += jobNameFunction(test)
-        reportfile =  test.makeFileName(repFileName, temporary=1, forComparison=0)
-        lsfOptions = " -q " + queueToUse + " -o " + reportfile + " -u nobody" + commandLsfOptions
+        lsfOptions = " -q " + queueToUse + commandLsfOptions
         resource = self.resourceFunction(test)
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
@@ -397,37 +402,43 @@ class SubmitTest(unixConfig.RunTest):
         if len(machine):
             lsfOptions += " -m '" + machine + "'"
         if not LSFServer.instance:
-            LSFServer.instance = LSFServer()
-        LSFServer.instance.submitJob(test, jobNameFunction, lsfOptions, command)
+            LSFServer.instance = LSFServer(self.origEnv)
+        LSFServer.instance.submitJob(test, jobNameFunction, lsfOptions, command, copyEnv)
         return self.WAIT
+    def setRunOptions(self, app):
+        runOptions = []
+        runGroup = self.findRunGroup(app)
+        for switch in runGroup.switches.keys():
+            if self.optionMap.has_key(switch):
+                runOptions.append("-" + switch)
+        for option in runGroup.options.keys():
+            if self.optionMap.has_key(option):
+                runOptions.append("-" + option)
+                runOptions.append(self.optionMap[option])
+        return string.join(runOptions)
+    def findRunGroup(self, app):
+        for group in app.optionGroups:
+            if group.name.startswith("How"):
+                return group
     def describe(self, test, jobNameFunction = None):
         queueToUse = self.queueFunction(test)
         if jobNameFunction:
             print test.getIndent() + "Submitting", jobNameFunction(test), "to LSF queue", queueToUse
         else:
-            unixConfig.RunTest.describe(self, test, " to LSF queue " + queueToUse)
-    def buildCommandFile(self, test, cmdFile, testCommand):
-        self.diag.info("Building command file at " + cmdFile)
-        f = open(cmdFile, "w")
-        curDir = test.getDirectory(temporary=1)
-        f.write("cd " + curDir + os.linesep)
-        # LSF is meant to ensure that directories are transferred,
-        # but this is error prone with the AMD automounter. Best to make sure...
-        test.collatePaths("copy_test_path", CopyPathWriter(f))
-        f.write(testCommand + os.linesep)
-        f.close()
-        return cmdFile
-    def changeState(self, test):
-        # Don't change state just because we submitted to LSF
-        pass
-
-class CopyPathWriter:
-    def __init__(self, outFile):
-        self.outFile = outFile
-    def __call__(self, source, target):
-        self.outFile.write("cp -pr " + source + " ." + os.linesep)
-        self.outFile.write("chmod -R +w " + os.path.basename(target) + os.linesep)
-
+            plugins.Action.describe(self, test, " to LSF queue " + queueToUse)
+    def setUpSuite(self, suite):
+        self.describe(suite)
+    def setUpApplication(self, app):
+        app.checkBinaryExists()
+        finder = unixConfig.VirtualDisplayFinder(app)
+        display = finder.getDisplay()
+        if display:
+            self.origEnv["DISPLAY"] = display
+            print "Tests will run with DISPLAY variable set to", display
+        if os.environ.has_key("TEXTTEST_DIAGDIR"):
+            self.origEnv["TEXTTEST_DIAGDIR"] = os.path.join(os.getenv("TEXTTEST_DIAGDIR"), "slave")
+        self.runOptions = self.setRunOptions(app)
+    
 class KillTest(plugins.Action):
     jobsKilled = []
     def __init__(self, jobNameFunction):
@@ -463,7 +474,7 @@ class Wait(plugins.Action):
             postText += "(" + self.jobNameFunction(test) + ")"
         self.describe(test, postText)
         while not self.checkCondition(job):           
-            time.sleep(2)
+            sleep(2)
             # Object is renewed when job is submitted
             job = LSFServer.instance.findJob(test, self.jobNameFunction)
     def checkCondition(self, job):
@@ -493,7 +504,7 @@ class UpdateLSFStatus(plugins.Action):
             if self.jobNameFunction:
                 print test.getIndent() + "Killing", self.jobNameFunction(test), "(Emergency finish)"
             else:
-                self.describe(test, " (Emergency finish)")
+                print test.getIndent() + "Killing", repr(test), "(Emergency finish)"
                 test.changeState(plugins.TestState("killed", completed=1))
             job.kill()
             return
@@ -504,12 +515,16 @@ class UpdateLSFStatus(plugins.Action):
         return KillTest(self.jobNameFunction)
 
 class UpdateTestLSFStatus(UpdateLSFStatus):
+    def __repr__(self):
+        return "Reading slave results for"
     def __init__(self):
         UpdateLSFStatus.__init__(self)
         self.logFile = None
+        self.testsWaitingForFiles = {}
     def processStatus(self, test, status, machines):
         details = ""
         summary = status
+        machineStr = ""
         if len(machines):
             machineStr = string.join(machines, ',')
             details += "Executing on " + machineStr + os.linesep
@@ -519,11 +534,29 @@ class UpdateTestLSFStatus(UpdateLSFStatus):
         if status == "PEND":
             pendState = plugins.TestState("pending", freeText=details, briefText=summary)
             test.changeState(pendState)
+        elif status == "DONE" or status == "EXIT":
+            if test.loadState():
+                self.describe(test, self.getPostText(test))
+            else:
+                return self.handleFileWaiting(test, machineStr)
         else:
             runState = plugins.TestState("running", freeText=details, briefText=summary, started=1)
             test.changeState(runState)
+    def handleFileWaiting(self, test, machineStr):
+        if not self.testsWaitingForFiles.has_key(test):
+            self.testsWaitingForFiles[test] = 0
+        if self.testsWaitingForFiles[test] > 10:
+            raise plugins.TextTestError, "No results produced on " + machineStr + ", presuming problems running test there"
+        
+        self.testsWaitingForFiles[test] += 1
+        return self.WAIT | self.RETRY
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
+    def getPostText(self, test):
+        try:
+            return test.state.getPostText()
+        except AttributeError:
+            return " (" + test.state.category + ")"
     def getExtraRunData(self, test):
         perc = self.calculatePercentage(test)
         if perc > 0:
@@ -547,8 +580,8 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         self.isSlowdownJob = isSlowdownJob
         self.timesWaitedForLSF = 0
     def findExecutionMachines(self, test):
-        job = LSFServer.instance.findJob(test)
-        return job.machines
+        hosts = os.environ["LSB_HOSTS"].split(":")
+        return [ host.split(".")[0] for host in hosts ] 
     def findPerformanceMachines(self, app):
         rawPerfMachines = unixConfig.MakePerformanceFile.findPerformanceMachines(self, app)
         perfMachines = []
@@ -563,11 +596,6 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
                 continue
             machines.append(line.split()[0].split(".")[0])
         return machines
-    def parseMachine(self, line):
-        start = string.find(line, "<")
-        end = string.find(line, ">", start)
-        fullName = line[start + 1:end].replace("1*", "")
-        return string.split(fullName, ".")[0]
     def writeMachineInformation(self, file, executionMachines):
         # Try and write some information about what's happening on the machine
         for machine in executionMachines:

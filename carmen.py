@@ -63,16 +63,20 @@ class CarmenConfig(lsf.LSFConfig):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"
     def getTestRunner(self):
+        baseRunner = lsf.LSFConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):
-            subActions = [ lsf.LSFConfig.getTestRunner(self), AttachProfiler() ]
-            return subActions
+            return RunLprof(baseRunner, self.isExecutable)
         else:
-            return lsf.LSFConfig.getTestRunner(self)
+            return baseRunner
+    def isExecutable(self, process, test):
+        return process.find(".") == -1 and process.find("arch") == -1
     def getTestCollator(self):
         if self.optionMap.has_key("lprof"):
-            return [ lsf.LSFConfig.getTestCollator(self), ProcessProfilerResults() ]
+            return [ self.getFileCollator(), ProcessProfilerResults() ]
         else:
-            return lsf.LSFConfig.getTestCollator(self)
+            return self.getFileCollator()
+    def getFileCollator(self):
+        return lsf.LSFConfig.getTestCollator(self)
     def findDefaultLSFQueue(self, test):
         arch = getArchitecture(test.app)
         return self.getQueuePerformancePrefix(test, arch) + self.getArchQueueName(arch) + self.getQueuePlatformSuffix(test.app, arch)
@@ -130,39 +134,69 @@ class CarmenConfig(lsf.LSFConfig):
         return lsf.LSFConfig.getApplicationEnvironment(self, app) + \
                [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]
     
-class WaitForDispatch(lsf.Wait):
-    def __init__(self):
-        lsf.Wait.__init__(self)
-        self.eventName = "dispatch"
-    def checkCondition(self, job):
-        return job.status != "PEND"
-        
-class AttachProfiler(plugins.Action):
+class RunWithParallelAction(plugins.Action):
+    def __init__(self, baseRunner, isExecutable):
+        self.baseRunner = baseRunner
+        self.binaryName = None
+        self.isExecutable = isExecutable
+        self.diag = plugins.getDiagnostics("Parallel Action")
     def __repr__(self):
-        return "Attaching lprof on"
+        return repr(self.baseRunner)
     def __call__(self, test):
-        waitDispatch = WaitForDispatch()
-        waitDispatch(test)
-        # Seems like race conditions plague us here, this seems like a quick-hack fix that shouldn't do too much harm
-        time.sleep(3)
-        job = lsf.LSFServer.instance.findJob(test)
-        processId = job.getProcessId(test.app)
-        if not processId:
-            if job.hasFinished():
-                print "Job already finished; profiler not attached."
+        processId = os.fork()
+        if processId == 0:
+            self.baseRunner(test)
+            os._exit(0)
+        else:
+            processInfo = self.findProcessInfo(str(processId), test)
+            self.performParallelAction(test, processInfo)
+            os.waitpid(processId, 0)
+    def findProcessInfo(self, firstpid, test):
+        while 1:
+            processInfo = self._findProcessInfo(firstpid, test)
+            if processInfo:
+                return processInfo
             else:
-                print "Failed to find process id; profiler not attached."
+                time.sleep(0.1)
+    def _findProcessInfo(self, firstpid, test):
+        self.diag.info("Looking for info from process " + firstpid)
+        # Look for the binary process, or a child of it, that is a pure executable not a script
+        pslines = os.popen("pstree -p -l " + firstpid + " 2>&1").readlines()
+        if len(pslines) == 0:
+            raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
+        psline = pslines[0]
+        batchpos = psline.find(self.binaryName)
+        if batchpos == -1:
+            self.diag.info("Failed to find '" + self.binaryName + "' in '" + psline + "'")
             return
-        self.describe(test, ", executing on " + string.join(job.machines, ",") + ", pid " + str(processId))
-        runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId + " >& gprof.output"
-        os.spawnlp(os.P_NOWAIT, "rsh", "rsh", job.machines[0], runLine)
-
+        binaryWithChildren = psline[batchpos:].split('---')
+        if self.isExecutable(binaryWithChildren[-1], test):
+            self.diag.info("Chose process as executable : " + binaryWithChildren[-1])
+            return map(self.parseProcess, binaryWithChildren)
+        else:
+            self.diag.info("Rejected process as executable : " + binaryWithChildren[-1])
+    def parseProcess(self, process):
+        openBracket = process.find("(")
+        closeBracket = process.find(")")
+        processName = process[:openBracket]
+        processId = process[openBracket + 1:closeBracket]
+        return processName, processId
+    def setUpApplication(self, app):
+        self.binaryName = os.path.basename(app.getConfigValue("binary"))
+                
+class RunLprof(RunWithParallelAction):
+    def performParallelAction(self, test, processInfo):
+        processName, processId = processInfo[-1]
+        self.describe(test, ", profiling process '" + processName + "'")
+        runLine = "/users/lennart/bin/gprofile " + processId + " >& gprof.output"
+        os.system(runLine)
+    
 class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):
         processLine = "/users/lennart/bin/process_gprof -t 0.5 prof.*" + " > " + test.makeFileName("lprof", temporary = 1)
         os.system(processLine)
         # Compress and save the raw data.
-        cmdLine = "gzip prof.[0-9]*;mv prof.[0-9]*.gz " + test.makeFileName("prof", temporary = 1)
+        cmdLine = "gzip prof.[0-9]*;mv prof.[0-9]*.gz " + test.makeFileName("prof", temporary = 1, forComparison=0)
         os.system(cmdLine)
     def __repr__(self):
         return "Profiling"    

@@ -57,16 +57,10 @@ apc.UpdatePerformance      - Update the performance file for tests with time fro
 """
 
 import default, ravebased, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
+from time import sleep
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
-
-def getApcHostTmp():
-    configFile = os.path.join(os.environ["CARMSYS"],"CONFIG")
-    resLine = os.popen("source " + configFile + "; echo ${APC_TEMP_DIR}").readlines()[-1].strip()
-    if resLine.find("/") != -1:
-        return resLine
-    return "/tmp"
 
 class ApcConfig(optimization.OptimizationConfig):
     def addToOptionGroup(self, group):
@@ -92,26 +86,28 @@ class ApcConfig(optimization.OptimizationConfig):
         return ApcCompileRules(self.getRuleSetName, jobNameCreator, self.getRuleBuildFilter(), testRunner, \
                                self.raveMode(), self.optionValue("rulecomp"))
     def getSpecificTestRunner(self):
-        subActions = [ self._getApcTestRunner() ]
-        if self.optionMap.has_key("lprof"):
-            subActions.append(carmen.AttachProfiler())
-        if self.optionMap.has_key("extractlogs"):
-            subActions.append(KeepApcLogs())
-        return subActions
+        return [ CheckFilesForApc(), self._getApcTestRunner() ]
     def _getApcTestRunner(self):
-        if self.useLSF():
-            return SubmitApcTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource, self.findLSFMachine)
-        elif self.optionMap.has_key("rundebug"):
+        if self.optionMap.has_key("rundebug"):
             return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
         else:
-            return RunApcTest(self.getLoginShell())
+            baseRunner = optimization.OptimizationConfig.getSpecificTestRunner(self)
+            if self.optionMap.slaveRun():
+                return MarkApcLogDir(baseRunner, self.isExecutable, self.optionMap.has_key("extractlogs"))
+            else:
+                return baseRunner
+    def isExecutable(self, process, test):
+        # Process name starts with a dot, ends with the process ID in brackets and may be truncated or have
+        # extra junk at the end added by APCbatch.sh
+        openBracket = process.find("(")
+        processData = process[1:openBracket]
+        rulesetName = self.getRuleSetName(test)
+        return processData.startswith(rulesetName) or rulesetName.startswith(processData)
     def getFileCollator(self):
-        baseCollator = optimization.OptimizationConfig.getFileCollator(self)
         subActions = []
-        subActions.append(FetchApcCore(self))
-        subActions.append(baseCollator)
+        subActions.append(FetchApcCore())
         subActions.append(RemoveLogs())
-        if self.optionMap.has_key("extractlogs"):
+        if self.optionMap.slaveRun():
             subActions.append(ExtractApcLogs(self.optionValue("extractlogs")))
         return subActions
     def _getSubPlanDirName(self, test):
@@ -184,26 +180,19 @@ def verifyLogFileDir(arch):
         logFileDir = carmTmp + "/logfiles"
         if not os.path.isdir(logFileDir):
             os.makedirs(logFileDir)
-        
 
-class SubmitApcTest(lsf.SubmitTest):
+class CheckFilesForApc(plugins.Action):
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
-        verifyLogFileDir(carmen.getArchitecture(test.app))
-        return lsf.SubmitTest.__call__(self, test)
-        
-class RunApcTest(unixConfig.RunTest):
-    def __call__(self, test):
-        verifyAirportFile(carmen.getArchitecture(test.app))
-        verifyLogFileDir(carmen.getArchitecture(test.app))
-        return unixConfig.RunTest.__call__(self, test)
+        verifyLogFileDir(carmen.getArchitecture(test.app))        
 
 class ViewApcLog(guiplugins.InteractiveAction):
     def __repr__(self):
         return "Viewing log of"
     def __call__(self, test):
-        machine, apcTmpDir = getTestMachineAndApcLogDir(test)
-        self.showLogFile(test, machine, apcTmpDir + "/apclog")
+        machine = getTestMachine(test)
+        apcTmpDir = test.writeDirs[-1]
+        self.showLogFile(test, machine, os.path.join(apcTmpDir, "apclog"))
     def showLogFile(self, test, machine, logFileName):
         command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''"
         self.startExternalProgram(command)
@@ -243,7 +232,6 @@ class RunApcTestInDebugger(default.RunTest):
     def __repr__(self):
         return "Debugging"
     def __call__(self, test):
-        verifyAirportFile(carmen.getArchitecture(test.app))
         if test.state.isComplete():
             return
         self.describe(test)
@@ -423,7 +411,7 @@ class RemoveLogs(plugins.Action):
     def __repr__(self):
         return "Remove logs"
 
-def getTestMachineAndApcLogDir(test):
+def getTestMachine(test):
     diag = plugins.getDiagnostics("getTestMachineAndApcLogDir")
     # Find which machine the job was run on.
     if test.app.configObject.target.useLSF():
@@ -433,107 +421,63 @@ def getTestMachineAndApcLogDir(test):
     else:
         machine = unixConfig.hostname()
         diag.info("Test was run locally on " + machine)
-    # Logfile dir
-    subplanName = test.writeDirs[-1].split(os.sep)[-2]
-    apcHostTmp = getApcHostTmp() 
-    apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
-    diag.info("APC log directory is " + apcTmpDir)
-    
-    return machine, apcTmpDir
+    return machine
 
-class FetchApcCore(plugins.Action):
-    def __init__(self, config):
-        self.config = config
-        self.diag = plugins.getDiagnostics("FetchApcCore")
+class FetchApcCore(unixConfig.CollateUNIXFiles):
     def isApcLogFileKept(self, errorFileName):
         for line in open(errorFileName).xreadlines():
             if line.find("*** Keeping the logfiles in") != -1:
                 return "Yes"
-        return []
-    def __call__(self, test):
-        self.diag.info("Calling FetchApcCore")
-        if self.config.isReconnecting():
-            return
-        coreFileName = os.path.join(test.getDirectory(temporary=1), "core.Z")
-        subplanDir = test.writeDirs[-1];
+    def extractCoreFor(self, test):
+        subplanDir = test.writeDirs[1]
         scriptErrorsFileName = os.path.join(subplanDir, "run_status_script_error")
         self.diag.info(scriptErrorsFileName)
         if not os.path.isfile(scriptErrorsFileName):
-            return
+            return 0
         self.diag.info("Error file found.")
         # An error file can be created even if there are no kept log files
         if not self.isApcLogFileKept(scriptErrorsFileName):
             self.diag.info("APC log files are NOT kept, exiting.")
-            return
+            return 0
         self.diag.info("APC log files are kept.")
-        #Find which machine the job was run on.
-        if self.config.useLSF():
-            job = lsf.LSFServer.instance.findJob(test)
-            if len(job.machines) == 0:
-                print "Failed to find exec host for job from LSF!"
-                return
-            machine = job.machines[0]
-        else:
-            machine = unixConfig.hostname()
-        self.diag.info("Job was ran on machine " + machine)
         #Find out APC tmp directory.
-        subplanName = test.writeDirs[-1].split(os.sep)[-2]
-        apcHostTmp = getApcHostTmp() 
-        apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
+        apcTmpDir = test.writeDirs[-1]
         # Check if there is a apc_debug file.
-        stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls apc_debug"  + "'")
-        stderrlines = stderr.readlines()
-        if not stderrlines:
+        if os.path.isfile(os.path.join(apcTmpDir, "apc_debug")):
             self.diag.info("apc_debug file is found. Aborting.")
-            return
-        self.describe(test, " from " + machine)
-        # Check if there really is a core file! One don't get a core if APC does a scream for example.
-        stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls core.*"  + "'")
-        stderrlines = stderr.readlines()
-        if stderrlines:
-            print "No core file present."
-        else:
-            binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
-            binCmd = "echo ' " + binName +  "' >> core.*"
-            cmdLine = "cd " + apcTmpDir + "; " + binCmd + ";compress -c core.* > " + coreFileName
-            os.system("rsh " + machine + " '" + cmdLine + "'")
-        # Show log file!
-        if not self.config.isNightJob():
-            command = "xon " + machine + " 'xterm -bg white -fg black -T " + test.name + " -e 'less +F " + apcTmpDir + os.sep + "apclog" + "''"
-            process = plugins.BackgroundProcess(command)
-        tmpDir = test.writeDirs[0]
-        if os.path.isdir(tmpDir):
-            tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
-            if os.path.isfile(tgzFile):
-                os.remove(tgzFile)
-            cmdLine = "cd " + apcTmpDir + "; tar cf - . | gzip -c > " + tgzFile
-            self.diag.info("Crash is saved in " + tgzFile)
-            os.system("rsh " + machine + " '" + cmdLine + "'")
-        if self.config.isNightJob():
-            cmdLine = "rm -rf " + apcTmpDir 
-            os.system("rsh " + machine + " '" + cmdLine + "'")
-    def __repr__(self):
-        return "Fetching crash for"
+            return 0
+        return 1
+    def getBinaryFromCore(self, path, test):
+        return os.path.expandvars(test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app)))
 
-class KeepApcLogs(plugins.Action):
-    def __init__(self):
-        pass
-    def __call__(self, test):
-        waitDispatch = carmen.WaitForDispatch()
-        waitDispatch(test)
-        job = lsf.LSFServer.instance.findJob(test)
-        if job.hasFinished():
-            print "Job has already finished, not keeping APC logs."
-            return
-        machine = job.machines[0]
-        subplanName = test.writeDirs[-1].split(os.sep)[-2]
-        apcHostTmp = getApcHostTmp()
-        apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
-        cmdLine = "cd " + apcTmpDir + ";touch apc_debug"
-        os.system("rsh " + machine + " '" + cmdLine + "'")
-        self.describe(test, " on " + machine)
-    def __repr__(self):
-        return "Keeping APC logfile for"
+class MarkApcLogDir(carmen.RunWithParallelAction):
+    def __init__(self, baseRunner, isExecutable, keepLogs):
+        carmen.RunWithParallelAction.__init__(self, baseRunner, isExecutable)
+        self.keepLogs = keepLogs
+    def getApcHostTmp(self):
+        configFile = os.path.join(os.environ["CARMSYS"],"CONFIG")
+        resLine = os.popen("source " + configFile + "; echo ${APC_TEMP_DIR}").readlines()[-1].strip()
+        if resLine.find("/") != -1:
+            return resLine
+        return "/tmp"
+    def getApcLogDir(self, test, processId):
+        # Logfile dir
+        subplanName, apcFiles = os.path.split(test.writeDirs[1])
+        baseSubPlan = os.path.basename(subplanName)
+        return os.path.join(self.getApcHostTmp(), baseSubPlan + "_" + processId)
+    def performParallelAction(self, test, processInfo):
+        processName, processId = processInfo[0]
+        runProcessName, runProcessId = processInfo[-1]
+        apcTmpDir = self.getApcLogDir(test, processId)
+        self.diag.info("APC log directory is " + apcTmpDir + " based on process " + processName)
+        if not os.path.isdir(apcTmpDir):
+            raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + runProcessName
+        test.writeDirs.append(apcTmpDir)
+        self.describe(test)
+        if self.keepLogs:
+            fileName = os.path.join(apcTmpDir, "apc_debug")
+            file = open(fileName, "w")
+            file.close()
 
 class ExtractApcLogs(plugins.Action):
     def __init__(self, args):
@@ -542,6 +486,10 @@ class ExtractApcLogs(plugins.Action):
             print "No argument given, using default value for extract_logs"
             self.args = "default"
     def __call__(self, test):
+        apcTmpDir = test.writeDirs[-1]
+        if not os.path.isdir(apcTmpDir):
+            return
+
         dict = test.app.getConfigValue("extract_logs")
         if not dict.has_key(self.args):
             print "Config value " + self.args + " does not exist, using default value extract_logs"
@@ -552,22 +500,20 @@ class ExtractApcLogs(plugins.Action):
         else:
             saveName = self.args
 
-        machine, apcTmpDir = getTestMachineAndApcLogDir(test)
         self.describe(test)
         # Extract from the apclog
         cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + test.makeFileName(saveName, temporary = 1)
-        os.system("rsh " + machine + " '" + cmdLine + "'")
+        os.system(cmdLine)
         # Remove dir
-        cmdLine = "rm -rf " + apcTmpDir 
-        os.system("rsh " + machine + " '" + cmdLine + "'")
+        plugins.rmtree(apcTmpDir)
         # Remove the error file (which is create because we are keeping the logfiles,
         # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***")
-        os.system("rm -f script_errors*")
+        errFile = test.makeFileName("script_errors", temporary=1)
+        if os.path.isfile(errFile):
+            os.remove(errFile)
     def __repr__(self):
         return "Extracting APC logfile for"
         
-
-
 #
 # TODO: Check Sami's stuff in /users/sami/work/Matador/Doc/Progress
 #

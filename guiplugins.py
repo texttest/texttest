@@ -206,6 +206,8 @@ class RecordTest(InteractiveAction):
         guilog.info(description)
         test.app.makeWriteDirectory()
         test.makeBasicWriteDirectory()
+        test.setRecordEnvironment()
+        test.prepareBasicWriteDirectory()
         test.setUpEnvironment(parents=1)
         os.chdir(test.writeDirs[0])
         recordCommand = test.getExecuteCommand()

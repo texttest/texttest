@@ -70,7 +70,7 @@ class Config(plugins.Configuration):
     def getActionSequence(self):
         return self._getActionSequence(makeDirs=1)
     def _getActionSequence(self, makeDirs):
-        actions = [ self.tryGetTestRunner(), self.getTestEvaluator() ]
+        actions = [ PrepareWriteDirectory(), self.tryGetTestRunner(), self.getTestEvaluator() ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
@@ -82,7 +82,7 @@ class Config(plugins.Configuration):
         self.addFilter(filters, "grep", GrepFilter)
         return filters
     def getCleanMode(self):
-        if self.isReconnectingFast():
+        if self.isReconnectingFast() or self.optionMap.slaveRun():
             return self.CLEAN_NONE
         elif self.optionMap.has_key("keeptmp"):
             return self.CLEAN_PREVIOUS
@@ -109,8 +109,9 @@ class Config(plugins.Configuration):
     def getTestEvaluator(self):
         actions = [ self.getFileExtractor() ]
         if not self.isReconnectingFast():
-            actions += [ self.getCatalogueCreator(), self.getTestPredictionChecker(), self.getTestComparator(), self.getFailureExplainer() ]
-        if not self.optionMap.useGUI():
+            actions += [ self.getCatalogueCreator(), self.getTestPredictionChecker(), \
+                         self.getTestComparator(), self.getFailureExplainer(), SaveState() ]
+        if not self.optionMap.useGUI() and not self.optionMap.slaveRun():
             actions.append(self.getTestResponder())
         return actions
     def getFileExtractor(self):
@@ -206,15 +207,23 @@ class Config(plugins.Configuration):
             app.addConfigEntry("definition_file_stems", "bugzilla")
         
 class MakeWriteDirectory(plugins.Action):
-    def __init__(self, copyAll = 1):
-        self.copyAll = copyAll
     def __call__(self, test):
-        test.makeBasicWriteDirectory(self.copyAll)
+        test.makeBasicWriteDirectory()
         os.chdir(test.writeDirs[0])
     def __repr__(self):
         return "Make write directory for"
     def setUpApplication(self, app):
         app.makeWriteDirectory()
+
+class PrepareWriteDirectory(plugins.Action):
+    def __call__(self, test):
+        test.prepareBasicWriteDirectory()
+    def __repr__(self):
+        return "Prepare write directory for"
+
+class SaveState(plugins.Action):
+    def __call__(self, test):
+        test.saveState()
 
 class CollateFiles(plugins.Action):
     def __init__(self):
@@ -233,7 +242,7 @@ class CollateFiles(plugins.Action):
             if fullpath:
                 self.diag.info("Extracting " + fullpath + " to " + targetFile) 
                 self.extract(fullpath, targetFile)
-                self.transformToText(targetFile)
+                self.transformToText(targetFile, test)
             elif os.path.isfile(test.makeFileName(targetStem)):
                 errorWrites.append((sourcePattern, targetFile))
 
@@ -257,7 +266,7 @@ class CollateFiles(plugins.Action):
             paths = glob(pattern)
             if len(paths):
                 return paths[0]
-    def transformToText(self, path):
+    def transformToText(self, path, test):
         # By default assume it is text
         pass
     def extract(self, sourcePath, targetFile):
@@ -279,8 +288,13 @@ class TextFilter(plugins.Filter):
         return test.name in self.texts
     
 class TestNameFilter(TextFilter):
+    def __init__(self, filterText):
+        TextFilter.__init__(self, filterText)
+        self.useRelPath = filterText.find(os.sep) != -1
     def acceptsTestCase(self, test):
-        if self.containsText(test):
+        if self.useRelPath:
+            return test.getRelPath() in self.texts
+        elif self.containsText(test):
             if not test.name in self.allTestCaseNames:
                 self.allTestCaseNames.append(test.name)
             return 1
@@ -326,6 +340,8 @@ class FileFilter(TextFilter):
 
 # Standard error redirect is difficult on windows, don't try...
 class RunTest(plugins.Action):
+    def __init__(self):
+        self.diag = plugins.getDiagnostics("run test")
     def __repr__(self):
         return "Running"
     def __call__(self, test):
@@ -349,6 +365,7 @@ class RunTest(plugins.Action):
             print test.getIndent() + "Running", jobNameFunction(test), "locally"
         else:
             self.describe(test)
+        self.diag.info("Running test with command '" + command + "'")
         os.system(command)
     def getInputFile(self, test):
         inputFileName = test.inputFile
@@ -361,9 +378,7 @@ class RunTest(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
-        binary = app.getConfigValue("binary")
-        if not os.path.isfile(binary):
-            raise plugins.TextTestError, binary + " has not been built."
+        app.checkBinaryExists()
 
 class CreateCatalogue(plugins.Action):
     def __call__(self, test):
@@ -440,49 +455,39 @@ class ReconnectTest(plugins.Action):
         else:
             return "Reconnecting to"
     def __call__(self, test):
+        self.performReconnection(test)
+        self.loadStoredState(test)
+        if self.fullRecalculate:
+            self.clearFrameworkTmp(test)
+    def performReconnection(self, test):
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
         writeDir = test.writeDirs[0]
         if not self.canReconnectTo(reconnLocation):
             os.makedirs(writeDir)
             raise plugins.TextTestError, "No test results found to reconnect to"
-        
-        storedState = self.findStoredState(reconnLocation, test.app.abspath)
-        useStoredState = storedState and (not storedState.hasResults() or not self.fullRecalculate)
-        self.describe(test, self.postText(useStoredState, storedState))
-        if useStoredState:
-            test.changeState(storedState)
+
         if self.fullRecalculate:
             shutil.copytree(reconnLocation, writeDir)
-            self.clearFrameworkTmp(writeDir)
         else:
-            if not storedState:
-                raise plugins.TextTestError, "No teststate file found, cannot do fast reconnect. Maybe try full recalculation to see what happened"
             test.writeDirs[0] = reconnLocation
-    def postText(self, useStoredState, storedState):
-        if useStoredState:
-            return " (state " + storedState.category + ")"
+    def loadStoredState(self, test):
+        loaded = test.loadState(self.fullRecalculate)
+        if loaded:
+            # State will refer to TEXTTEST_HOME in the original (which we may not have now,
+            # and certainly don't want to save), try to fix this...
+            test.state.updateAbsPath(test.app.abspath)
+            self.describe(test, " (state " + test.state.category + ")")
         else:
-            return ""
-    def clearFrameworkTmp(self, writeDir):
+            if not self.fullRecalculate:
+                raise plugins.TextTestError, "No teststate file found, cannot do fast reconnect. Maybe try full recalculation to see what happened"
+            self.describe(test)
+    def clearFrameworkTmp(self, test):
         # Clear the framework temporary directory, as configuration may be different now
-        frameworkTmpDir = os.path.join(writeDir, "framework_tmp")
+        frameworkTmpDir = os.path.join(test.writeDirs[0], "framework_tmp")
         for file in os.listdir(frameworkTmpDir):
             fullPath = os.path.join(frameworkTmpDir, file)
             if os.path.isfile(fullPath):
                 os.remove(fullPath)
-    def findStoredState(self, reconnLocation, absPath):
-        frameworkTmpDir = os.path.join(reconnLocation, "framework_tmp")
-        stateFile = os.path.join(frameworkTmpDir, "teststate")
-        if not os.path.isfile(stateFile):
-            return
-        
-        file = open(stateFile)
-        unpickler = Unpickler(file)
-        state = unpickler.load()
-        # State will refer to TEXTTEST_HOME in the original (which we may not have now,
-        # and certainly don't want to save), try to fix this...
-        state.updateAbsPath(absPath)
-        return state
     def canReconnectTo(self, dir):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0

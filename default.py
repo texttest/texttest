@@ -152,6 +152,7 @@ class MakeWriteDirectory(plugins.Action):
 class CollateFiles(plugins.Action):
     def __init__(self):
         self.collations = []
+        self.diag = plugins.getDiagnostics("Collate Files")
     def setUpApplication(self, app):
         for entry in app.getConfigList("collate_file"):
             if entry.find("->") == -1:
@@ -168,6 +169,7 @@ class CollateFiles(plugins.Action):
             targetFile = test.makeFileName(targetStem, temporary=1)
             fullpath = self.findPath(test, sourcePattern)
             if fullpath:
+                self.diag.info("Extracting " + fullpath + " to " + targetFile) 
                 self.extract(fullpath, targetFile)
                 self.transformToText(targetFile)
             elif os.path.isfile(test.makeFileName(targetStem)):
@@ -177,6 +179,7 @@ class CollateFiles(plugins.Action):
         return "Expected file '" + sourcePattern + "' not created by test"
     def findPath(self, test, sourcePattern):
         for writeDir in test.writeDirs:
+            self.diag.info("Looking for pattern " + sourcePattern + " in " + writeDir)
             pattern = os.path.join(writeDir, sourcePattern)
             paths = glob(pattern)
             if len(paths):

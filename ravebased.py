@@ -506,6 +506,7 @@ class BuildCode(plugins.Action):
             self.buildRemote("sparc", app)
             if not "9" in app.versions and not "10" in app.versions:
                 self.buildRemote("sparc_64", app)
+                self.buildRemote("ia64_hpux", app)
             self.buildRemote("parisc_2_0", app)
             self.buildRemote("powerpc", app)
     def getPathAndTargets(self, optValue):

@@ -57,6 +57,8 @@ class QueueSystem:
                 resource += " && (" + self.formatResource(res) + ")"
             return resource
     def formatResource(self, res):
+        if res.find("rusage") != -1:
+            return res
         if res.find("==") == -1 and res.find("!=") == -1 and res.find("<=") == -1 and \
            res.find(">=") == -1 and res.find("=") != -1:
             return res.replace("=", "==")

@@ -38,7 +38,9 @@ class MakeComparisons(plugins.Action):
         return [ defaultFinder ]
     def makeComparisons(self, test, tmpExt, subDirectory, comparisons, attemptedComparisons):
         dirPath = os.path.join(test.abspath, subDirectory)
-        for file in os.listdir(dirPath):
+        fileList = os.listdir(dirPath)
+        fileList.sort()
+        for file in fileList:
             if file.endswith(tmpExt):
                 stem, ext = os.path.splitext(file)
                 standardFile = os.path.basename(test.makeFileName(stem))

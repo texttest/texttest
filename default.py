@@ -501,8 +501,7 @@ class ReconnectTest(plugins.Action):
             return None
 
         versions = app.getVersionFileExtensions()
-        if len(versions) == 0:
-            versions = [""]
+        versions.append("")
         for versionSuffix in versions:
             reconnDir = self.findReconnDirWithVersion(fetchDir, app, versionSuffix, userToFind)
             if reconnDir:

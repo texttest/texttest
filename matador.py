@@ -1,9 +1,27 @@
-import carmen, os, shutil, getopt, optimization, string, plugins
+import carmen, os, shutil, getopt, optimization, string, plugins, comparetest
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
 
 class MatadorConfig(optimization.OptimizationConfig):
+    def __init__(self, optionMap):
+        optimization.OptimizationConfig.__init__(self, optionMap)
+        if self.optionMap.has_key("diag"):
+            os.environ["DIAGNOSTICS_IN"] = "./Diagnostics"
+            os.environ["DIAGNOSTICS_OUT"] = "./Diagnostics"
+        if os.environ.has_key("DIAGNOSTICS_IN"):
+            print "Note: Running with Diagnostics on, so performance checking is disabled!"
+    def __del__(self):
+        if self.optionMap.has_key("diag"):
+            del os.environ["DIAGNOSTICS_IN"]
+            del os.environ["DIAGNOSTICS_OUT"]
+    def getTestComparator(self):
+        if self.optionMap.has_key("diag"):
+            return CompareTestWithDiagnostics()
+        else:
+            return optimization.OptimizationConfig.getTestComparator(self)
+    def checkPerformance(self):
+        return not self.optionMap.has_key("diag")
     def getLibraryFile(self):
         return os.path.join("data", "crc", "MATADOR", carmen.architecture, "matador.o")
     def getSubPlanFileName(self, test, sourceName):
@@ -45,3 +63,9 @@ class MakeMatadorStatusFile(plugins.Action):
         outputFile = test.getTmpFileName("output", "r")
         os.system(scriptPath + " . " + outputFile)
         os.rename("status", test.getTmpFileName("status", "w"))
+
+class CompareTestWithDiagnostics(comparetest.MakeComparisons):
+    def fileFinders(self, test):
+        diagFinder = "diag", "Diagnostics"
+        return comparetest.MakeComparisons.fileFinders(self, test) + [ diagFinder ]
+    

@@ -9,14 +9,8 @@ class MakeComparisons(plugins.Action):
     def __call__(self, test):
         comparisons = []
         attemptedComparisons = []
-        for file in os.listdir(test.abspath):
-            if file.endswith(test.getTmpExtension()):
-                stem, ext = os.path.splitext(file)
-                standardFile = os.path.basename(test.makeFileName(stem))
-                comparison = self.makeComparison(test, standardFile, file)
-                attemptedComparisons.append(standardFile)
-                if comparison != None:
-                    comparisons.append(comparison)
+        for tmpExt, subDir in self.fileFinders(test):
+            self.makeComparisons(test, tmpExt, subDir, comparisons, attemptedComparisons)
         postText = ""
         if len(comparisons) > 0:
             testComparisonMap[test] = comparisons
@@ -24,6 +18,19 @@ class MakeComparisons(plugins.Action):
             postText += " - SUCCESS!"
         postText +=  " (on " + string.join(attemptedComparisons, ",") + ")"
         self.describe(test, postText)
+    def fileFinders(self, test):
+        defaultFinder = test.getTmpExtension(), ""
+        return [ defaultFinder ]
+    def makeComparisons(self, test, tmpExt, subDirectory, comparisons, attemptedComparisons):
+        dirPath = os.path.join(test.abspath, subDirectory)
+        for file in os.listdir(dirPath):
+            if file.endswith(tmpExt):
+                stem, ext = os.path.splitext(file)
+                standardFile = os.path.basename(test.makeFileName(stem))
+                comparison = self.makeComparison(test, os.path.join(subDirectory, standardFile), os.path.join(subDirectory, file))
+                attemptedComparisons.append(standardFile)
+                if comparison != None:
+                    comparisons.append(comparison)
     def setUpSuite(self, suite):
         self.describe(suite)
 #private:
@@ -53,7 +60,7 @@ class FileComparison:
         if self.stdFile != self.stdCmpFile and os.path.isfile(self.stdCmpFile):
             os.remove(self.stdCmpFile)
     def __repr__(self):
-        return self.stdFile.split('.')[0]
+        return os.path.basename(self.stdFile).split('.')[0]
     def getType(self):
         return "difference"
     def hasDifferences(self):

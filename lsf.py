@@ -40,7 +40,7 @@ class LSFConfig(default.Config):
         if self.optionMap.has_key("l"):
             return default.Config.getTestCollator(self)
         else:
-            return plugins.CompositeAction([ Wait(), MakeResourceFiles() ])
+            return plugins.CompositeAction([ Wait(), MakeResourceFiles(self.checkPerformance(), self.checkMemory()) ])
     def getTestComparator(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestComparator(self)
@@ -55,6 +55,10 @@ class LSFConfig(default.Config):
             return default.Config.getTestResponder(self)
         else:
             return respond.UNIXInteractiveResponder(diffLines)
+    def checkMemory(self):
+        return 0
+    def checkPerformance(self):
+        return 1
 
 class LSFJob:
     def __init__(self, test):
@@ -129,6 +133,9 @@ class Wait(plugins.Action):
         return job.hasFinished()
 
 class MakeResourceFiles(plugins.Action):
+    def __init__(self, checkPerformance, checkMemory):
+        self.checkPerformance = checkPerformance
+        self.checkMemory = checkMemory
     def __call__(self, test):
         textList = [ "Max Memory", "Max Swap", "CPU time", "executed on host" ]
         tmpFile = test.getTmpFileName("report", "r")
@@ -138,8 +145,10 @@ class MakeResourceFiles(plugins.Action):
             time.sleep(2)
             resourceDict = self.makeResourceDict(tmpFile, textList)
         os.remove(tmpFile)
-        self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3]], test.getTmpFileName("performance", "w"))
-        #self.writeMemoryFile(resourceDict[textList[0]], resourceDict[textList[1]], test.getTmpFileName("memory", "w"))
+        if self.checkPerformance:
+            self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3]], test.getTmpFileName("performance", "w"))
+        if self.checkMemory:
+            self.writeMemoryFile(resourceDict[textList[0]], resourceDict[textList[1]], test.getTmpFileName("memory", "w"))
 #private
     def makeResourceDict(self, tmpFile, textList):
         resourceDict = {}

@@ -109,6 +109,8 @@ class TestComparison:
             return "failure", details
         else:
             return "success", details
+    def hasResults(self):
+        return len(self.allResults) > 0
     def getComparisons(self):
         return self.changedResults + self.newResults
     def _comparisonsString(self, comparisons):
@@ -124,7 +126,7 @@ class TestComparison:
             return newText
         return newText + "," + diffText
     def getPostText(self):
-        if len(self.allResults) == 0:
+        if not self.hasResults():
             return " - NONE!"
         if len(self.newResults) == 0 and len(self.changedResults) == 0:
             return " - SUCCESS! (on " + self.attemptedComparisonsOutput() + ")"
@@ -228,11 +230,13 @@ class MakeComparisons(plugins.Action):
             return
         testComparison = self.testComparisonClass(test)
         testComparison.makeComparisons(test)
-        if testComparison.hasDifferences() or testComparison.hasNewResults() or testComparison.failedPrediction:
+        self.describe(test, testComparison.getPostText())
+        if not testComparison.hasResults():
+            raise plugins.TextTestError, "No output files at all produced, presuming problems running test"
+        elif testComparison.hasDifferences() or testComparison.hasNewResults() or testComparison.failedPrediction:
             test.changeState(test.FAILED, testComparison)
         else:
             test.changeState(test.SUCCEEDED, testComparison)
-        self.describe(test, testComparison.getPostText())
     def fileFinders(self, test):
         defaultFinder = test.app.name + test.app.versionSuffix() + test.getTmpExtension(), ""
         return [ defaultFinder ]

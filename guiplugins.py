@@ -175,12 +175,15 @@ class ImportTest(InteractiveAction):
         return "Add " + self.testType()
     def testType(self):
         return ""
+    def getNewTestName(self):
+        # Overwritten in subclasses - occasionally it can be inferred
+        return self.optionGroup.getOptionValue("name")
     def setUpSuite(self, suite):
-        testName = self.optionGroup.getOptionValue("name")
+        testName = self.getNewTestName()
         if len(testName) == 0:
             raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + os.linesep + \
                   "Fill in the 'Adding " + self.testType() + "' tab below."
-        guilog.info("Adding " + self.testType() + testName + " under test suite " + repr(suite))
+        guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + repr(suite))
         testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
         newTest = suite.addTest(testName, testDir)

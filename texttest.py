@@ -1513,6 +1513,9 @@ class TextTest:
     def __init__(self):
         self.inputOptions = OptionFinder()
         self.setRunId()
+        if self.inputOptions.slaveRun():
+            # Having the script engine active in the slave isn't a good idea... 
+            self.disableScriptEngine()
         self.allApps = self.findApps()
         self.gui = None
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
@@ -1534,6 +1537,13 @@ class TextTest:
             globalRunIdentifier = self.inputOptions["slave"]
         else:
             globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
+    def disableScriptEngine(self):
+        if os.environ.has_key("USECASE_RECORD_STDIN"):
+            del os.environ["USECASE_RECORD_STDIN"]
+        if os.environ.has_key("USECASE_RECORD_SCRIPT"):
+            del os.environ["USECASE_RECORD_SCRIPT"]
+        if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
+            del os.environ["USECASE_REPLAY_SCRIPT"]
     def findApps(self):
         dirName = self.inputOptions.directoryName
         os.chdir(dirName)

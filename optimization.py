@@ -30,9 +30,12 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Produces a postscript file instead of displaying the graph.
                              - pc
                                The postscript file will be in color.
-                             - i=[appname:]item
+                             - i=[appname:]item,item,...
                                Which item to plot from the status file. Note that whitespaces are replaced
                                by underscores. Default is TOTAL cost. Example: i=overcover_cost.
+                               If a comma-seperated list is given, all the listed items are plotted.
+                               An abreviation is 'i=apctimes', which is equivalent to specifying 'i=OC_to_DH_time,
+                               Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time'.
                              - s
                                Plot against solution number instead of cpu time.
                              - nt
@@ -1016,7 +1019,7 @@ class PlotTest(plugins.Action):
 class _PlotTest(plugins.Action):
     def __init__(self, args = []):
         self.plotFiles = []
-        self.plotItem = costEntryName
+        self.plotItem = [ costEntryName ]
         self.plotItemApp = {}
         self.plotrange = "0:"
         self.plotPrint = None
@@ -1062,66 +1065,128 @@ class _PlotTest(plugins.Action):
             elif arr[0]=="sg":
                 self.plotInSameGraph = 1
             elif arr[0]=="i":
-                parts = arr[1].split(":")
-                if len(parts) < 2:
-                    self.plotItem = arr[1].replace("_"," ")
-                else:
-                    self.plotItemApp[parts[0]] = parts[1].replace("_"," ")
+                if arr[1]=="apctimes":
+                    arr[1] = "OC_to_DH_time,Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time"
+                itemsToPlot = arr[1].split(",")
+                self.plotItem = []
+                for item in itemsToPlot:
+                    parts = item.split(":")
+                    if len(parts) < 2:
+                        self.plotItem.append(parts[0].replace("_"," "))
+                    else:
+                        self.plotItemApp[parts[0]] = parts[1].replace("_"," ")
             else:
                 print "Unknown option " + arr[0]
     def getYlabel(self):
-        return self.yLabel
-    def addYLabel(self, itemNamesInFile):
-        nLabel = self.plotItem
-        if itemNamesInFile.has_key(self.plotItem):
-            nLabel = itemNamesInFile[self.plotItem]
-        if self.yLabel.find(nLabel) == -1:
-            if self.yLabel != "":
-                self.yLabel += ", "
-            self.yLabel += nLabel
+        if len(self.items) == 1:
+            return self.plotItem[0]
+        else:
+            return ""
+    def getPlotFileName(self, version, state, item):
+        return "plot." + version + "." + state + "." + item
+    def getPlotUserAndTest(self, file):
+        username = file.split(os.sep)[-4]
+        testname = file.split(os.sep)[-3]
+        return username, testname
+    def getPlotInfo(self, file):
+        plotFileName = file.split(os.sep)[-1]
+        app = plotFileName.split(".")[-1]
+        ver = plotFileName.split(".")[-4]
+        state = plotFileName.split(".")[-3]
+        item = int(plotFileName.split(".")[-2])
+        username, testname = self.getPlotUserAndTest(file)
+        return app,ver,state,item,username,testname
     def setPointandLineTypes(self):
-        if len(self.plotVersions)>1 or len(self.plotStates)>1:
+        if len(self.plotVersions)>1 or len(self.plotStates)>1 or len(self.items)>1:
             # Choose line type.
             self.versionLineType = {}
             counter = 2
             for versionIndex in range(len(self.plotVersions)):
                 for stateIndex in range(len(self.plotStates)):
-                    self.versionLineType[self.plotVersions[versionIndex],self.plotStates[stateIndex]] = counter
-                    counter = counter + 1
+                    for itemIndex in range(len(self.items)):
+                        self.versionLineType[self.plotVersions[versionIndex], self.plotStates[stateIndex], itemIndex] = counter
+                        counter = counter + 1
             # Choose point type.
             self.testPointType = {}
             counter = 1
             for file in self.plotFiles:
-                name = self.plotNameFromFile(file)
+                username, testname = self.getPlotUserAndTest(file)
+                name = username + "::" + testname
                 if not self.testPointType.has_key(name):
                     self.testPointType[name] = counter
                     counter = counter + 1
-    def getStyle(self,ver,state,name):
+    def getStyle(self, file):
+        plotFileName = file.split(os.sep)[-1]
+        app, ver, state, item, username, testname = self.getPlotInfo(file)
+        name = username + "::" + testname
         if (len(self.plotVersions)>1 or len(self.plotStates)>1) and self.plotVersionColoring:
-            style = " with linespoints lt " +  str(self.versionLineType[ver,state]) + " pt " + str(self.testPointType[name])
+            style = " with linespoints lt " +  str(self.versionLineType[ver,state,item]) + " pt " + str(self.testPointType[name])
         else:
             style = " with linespoints "
         return style
+    # Counts number of tests, versions etc that will be plotted.
+    def count(self):
+        self.appnames = {}
+        self.vers = {}
+        self.states = {}
+        self.items ={}
+        self.usernames = {}
+        self.testnames = {}
+        for file in self.plotFiles:
+            appname, ver , state, item, username, testname = self.getPlotInfo(file)
+            self.appnames[appname] = 1
+            self.vers[ver] = 1
+            self.states[state] = 1
+            self.items[item] = 1
+            self.usernames[username] = 1
+            self.testnames[testname] = 1
+        #print len(self.appnames),len(self.vers),len(self.states),len(self.items),len(self.usernames), len(self.testnames)
+    def makeTitle(self):
+        title = ""
+        if len(self.usernames) == 1:
+            title += "User " + self.usernames.keys()[0] + " "
+        if len(self.testnames) == 1:
+            title += "Test " + self.testnames.keys()[0] + " "
+        if len(self.appnames) == 1:
+            title += "Application " + self.appnames.keys()[0] + " "
+        if len(self.vers) == 1:
+            ver = self.vers.keys()[0]
+            if ver == "":
+                ver = "master"
+            title += "Version " + ver + " "
+        return title
+    def makePlotName(self, file):
+        appname, ver, state, item, username, testname = self.getPlotInfo(file)
+        name = username + "::" + testname
+        title = " title \""
+        if len(self.usernames) > 1:
+            title += username + "."
+        if len(self.testnames) > 1:
+            title += testname + "."
+        if len(self.appnames) > 1:
+            title += appname + "."
+        if len(self.vers) > 1:
+            if ver == "":
+                title += "master."
+            else:
+                title += ver + "."
+        if len(self.states) > 1:
+            title += state + "."
+        if len(self.items) > 1:
+            title += self.plotItem[item]
+        title += "\" "
+        return title
     def __repr__(self):
         return "Plotting"
-    def plotNameFromFile(self, fileName):
-        dirParts = fileName.split(os.sep)
-        return dirParts[-4] + "::" + dirParts[-3]
     def plotGraph(self):
         if len(self.plotFiles) > 0:
             stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
+            self.count()
             self.setPointandLineTypes()
 
             fileList = []
             for file in self.plotFiles:
-                name = self.plotNameFromFile(file)
-                baseName = file.split(os.sep)[-1]
-                baseParts = baseName.split(".")
-                ver = baseParts[1]
-                appname = file.split(os.sep)[-2].split(".")[0]
-                state = baseParts[2]
-                title = " title \"" + name + ":" + appname + "." + ver + state + "\" "
-                fileList.append("'" + file + "' " + title + self.getStyle(ver,state,name))
+                fileList.append("'" + file + "' " + self.makePlotName(file) + self.getStyle(file))
 
             if self.plotPrint:
                 absplotPrint = os.path.expanduser(self.plotPrint)
@@ -1139,6 +1204,7 @@ class _PlotTest(plugins.Action):
             else: 
                 stdin.write("set xlabel 'CPU time (min)'" + os.linesep)
             stdin.write("set time" + os.linesep)
+            stdin.write("set title \"" + self.makeTitle() + "\"" + os.linesep)
             stdin.write("set xtics border nomirror norotate" + os.linesep)
             stdin.write("set ytics border nomirror norotate" + os.linesep)
             stdin.write("set border 3" + os.linesep)
@@ -1162,30 +1228,32 @@ class _PlotTest(plugins.Action):
             test.writeDirs = []
             test.writeDirs.append(self.testWritedir[test])
         os.chdir(test.writeDirs[0])
-        if self.plotItemApp.has_key(test.app.name):
-            usePlotItem = self.plotItemApp[test.app.name]
-        else:
-            usePlotItem = self.plotItem
-        self.addYLabel(test.app.getConfigValue(itemNamesConfigKey))
         for version in self.plotVersions:
             for state in self.plotStates:
-                try:
-                    optRun = OptimizationRun(test, version, [ usePlotItem, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus, state)
-                except plugins.TextTestError:
-                    print "No status file does exist for test " + test.app.name + "::" + test.name + "(" + version + ")"
-                    continue
+                for item in range(len(self.plotItem)):
+                    try:
+                        parts = self.plotItem[item].split(":")
+                        if len(parts) < 2:
+                            usePlotItem = parts[0]
+                        else:
+                            if test.app.name == parts[0]:
+                                usePlotItem = parts[1]
+                            else:
+                                usePlotItem = costEntryName
+                        optRun = OptimizationRun(test, version, [ timeEntryName, usePlotItem], [], self.plotScaleTime, self.plotUseTmpStatus, state)
+                    except plugins.TextTestError:
+                        print "No status file does exist for test " + test.app.name + "::" + test.name + "(" + version + ")"
+                        continue
 
-                plotFileName = test.makeFileName(self.getPlotFileName(version, state), temporary=1)
-                plotFile = open(plotFileName, "w")
-                for solution in optRun.solutions:
-                    if self.plotAgainstSolNum:
-                        plotFile.write(str(solution[usePlotItem]) + os.linesep)
-                    else:
-                        plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[usePlotItem]) + os.linesep)
-                self.plotFiles.append(plotFileName)
+                    plotFileName = test.makeFileName(self.getPlotFileName(version, state, str(item)), temporary = 1)
+                    plotFile = open(plotFileName, "w")
+                    for solution in optRun.solutions:
+                        if self.plotAgainstSolNum:
+                            plotFile.write(str(solution[usePlotItem]) + os.linesep)
+                        else:
+                            plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[usePlotItem]) + os.linesep)
+                    self.plotFiles.append(plotFileName)
         if not self.plotInSameGraph:
             self.plotGraph()
         test.writeDirs = []
-    def getPlotFileName(self, version, state):
-        return "plot." + version + "." + state
         

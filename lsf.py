@@ -310,18 +310,21 @@ class SubmitTest(unixConfig.RunTest):
 class KillTest(plugins.Action):
     def __init__(self, jobNameFunction):
         self.jobNameFunction = jobNameFunction
+        # Don't double-kill jobs, it can cause problems and indeterminism
+        self.jobsKilled = []
     def __repr__(self):
         return "Cancelling"
     def __call__(self, test):
         if test.state > test.RUNNING:
             return
         job = LSFJob(test, self.jobNameFunction)
-        if job.hasFinished():
+        if job.hasFinished() or job.name in self.jobsKilled:
             return
         if self.jobNameFunction:
             print test.getIndent() + repr(self), self.jobNameFunction(test), "in LSF"
         else:
             self.describe(test, " in LSF")
+        self.jobsKilled.append(job.name)
         job.kill()
         
 class Wait(plugins.Action):

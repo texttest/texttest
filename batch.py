@@ -312,6 +312,8 @@ class CollectFiles(plugins.Action):
         for category in categoryNames:
             totalValues.append(0)
         prefix = "batchreport." + app.name + app.versionSuffix()
+        # Don't collect to more collections!
+        app.addConfigEntry("collection", "false", "batch_use_collection")
         for filename in os.listdir(app.abspath):
             if filename.startswith(prefix):
                 fullname = os.path.join(app.abspath, filename)

@@ -373,8 +373,12 @@ class LogFileFinder:
         return None, None
 
 class OptimizationRun:
-    def __init__(self, app, definingItems, interestingItems, logFile, scalePerf = 0.0):
+    def __init__(self, app, definingItems, interestingItems, logFile, scalePerf = 0.0, solutions = None):
         self.diag = plugins.getDiagnostics("optimization")
+        if solutions:
+            self.diag.info("Setting solution")
+            self.solutions = solutions
+            return 
         self.logFile = logFile
         self.diag.info("Reading data from " + self.logFile)
         self.penaltyFactor = 1.0
@@ -749,25 +753,25 @@ class MakeProgressReport(TestReport):
             return "NaN%"
     def compare(self, test, referenceRun, currentRun):
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
-        self.doCompare(test, referenceRun, currentRun, userName)
-    def doCompare(self, test, referenceRun, currentRun, userName):
+        self.doCompare(referenceRun, currentRun, test.app, test.name, userName)
+    def doCompare(self, referenceRun, currentRun, app, testName, userName):
         if currentRun.isVeryShort() or referenceRun.isVeryShort():
             return
 
-        worstCost = self.calculateWorstCost(test, referenceRun, currentRun)
+        worstCost = self.calculateWorstCost(app, referenceRun, currentRun)
         currTTWC = currentRun.timeToCost(worstCost)
         refTTWC = referenceRun.timeToCost(worstCost)
         
         self.testCount += 1
         kpi = self.computeKPI(currTTWC, refTTWC)
-        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + kpi
+        print os.linesep, "Comparison on", app, "test", testName, "(in user " + userName + ") : K.P.I. = " + kpi
         self.reportLine("                         ", self.currentText(), "Version " + self.referenceVersion)
-        self.reportCosts(test, currentRun, referenceRun)
+        self.reportCosts(currentRun, referenceRun)
         self.reportLine("Max memory (MB)", currentRun.getMaxMemory(), referenceRun.getMaxMemory())
         self.reportLine("Total time (minutes)     ", currentRun.getPerformance(), referenceRun.getPerformance())
         self.reportLine("Time to cost " + str(worstCost) + " (mins)", currTTWC, refTTWC)
-    def calculateWorstCost(self, test, referenceRun, currentRun):
-        currMargin, refMargin = self.getMargins(test)
+    def calculateWorstCost(self, app, referenceRun, currentRun):
+        currMargin, refMargin = self.getMargins(app)
         currSol = currentRun.getMeasuredSolution(currMargin)
         refSol = referenceRun.getMeasuredSolution(refMargin)
         currCost = currentRun.getCost(currSol)
@@ -776,10 +780,10 @@ class MakeProgressReport(TestReport):
             return refCost
         else:
             return currCost
-    def getMargins(self, test):
-        refMargin = float(test.app.getConfigValue("kpi_cost_margin"))
+    def getMargins(self, app):
+        refMargin = float(app.getConfigValue("kpi_cost_margin"))
         return refMargin, refMargin
-    def reportCosts(self, test, currentRun, referenceRun):
+    def reportCosts(self, currentRun, referenceRun):
         costEntries = []
         for entry in currentRun.solutions[0].keys():
             if entry.find("cost") != -1 and entry in referenceRun.solutions[0].keys():
@@ -1113,7 +1117,7 @@ class PlotTest(plugins.Action):
 plotAveragerCount = 0
 
 class PlotAverager:
-    def __init__(self, tmpFileDirectory):
+    def __init__(self, tmpFileDirectory = None):
         self.average = {}
         self.numberOfGraphs = 0
         self.plotLineRepresentant = None
@@ -1175,6 +1179,13 @@ class PlotAverager:
                 self.average[averageXValues[averagePos]] += graph[graphXValues[-1]]
                 averagePos += 1
         #print graph, self.average
+    def getGraph(self):
+        graph = {}
+        xValues = self.average.keys()
+        xValues.sort()
+        for xVal in xValues:
+            graph[xVal] = self.average[xVal]/self.numberOfGraphs
+        return graph
     def plotArgument(self):
         global plotAveragerCount
         plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))

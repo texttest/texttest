@@ -448,27 +448,6 @@ class KillTest(plugins.Action):
         self.jobsKilled.append(job.jobId)
         job.kill()
         
-class Wait(plugins.Action):
-    def __init__(self, jobNameFunction = None):
-        self.eventName = "completion"
-        self.jobNameFunction = jobNameFunction
-    def __repr__(self):
-        return "Waiting for " + self.eventName + " of"
-    def __call__(self, test):
-        job = LSFServer.instance.findJob(test, self.jobNameFunction)
-        if self.checkCondition(job):
-            return
-        postText = "..."
-        if self.jobNameFunction:
-            postText += "(" + self.jobNameFunction(test) + ")"
-        self.describe(test, postText)
-        while not self.checkCondition(job):           
-            sleep(2)
-            # Object is renewed when job is submitted
-            job = LSFServer.instance.findJob(test, self.jobNameFunction)
-    def checkCondition(self, job):
-        return job.hasFinished()
-
 plugins.addCategory("killed", "unfinished", "were unfinished")
 
 class UpdateLSFStatus(plugins.Action):

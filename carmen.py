@@ -581,7 +581,7 @@ class BuildCode(plugins.Action):
         signal.signal(15, self.killBuild) 
         targetDir = app.getConfigValue("build_targets")
         if not targetDir.has_key("codebase"):
-            return
+            return 1
         for relPath in targetDir["codebase"]:
             absPath = app.makeAbsPath(relPath)
             if os.path.isdir(absPath):    

@@ -189,16 +189,14 @@ class ViewApcLog(guiplugins.InteractiveAction):
     def __repr__(self):
         return "Viewing log of"
     def __call__(self, test):
-        machine = getTestMachine(test)
-        apcTmpDir = test.writeDirs[-1]
-        self.showLogFile(test, machine, os.path.join(apcTmpDir, "apclog"))
-    def showLogFile(self, test, machine, logFileName):
-        command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''"
-        self.startExternalProgram(command)
-    def showRunStatusFile(self, test):
-        # Under construction! 
-        #  $CARMSYS/bin/APCstatus.sh ${SUBPLAN}/run_status
-        return
+        viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
+        if os.path.isfile(viewLogScript):
+            file = open(viewLogScript)
+            command = file.readlines()[0].strip()
+            file.close()
+            self.startExternalProgram(command)
+        else:
+            raise plugins.TextTestError, "APC log file not yet available"
     def getTitle(self):
         return "View APC Log"
 
@@ -464,10 +462,15 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         subplanName, apcFiles = os.path.split(test.writeDirs[1])
         baseSubPlan = os.path.basename(subplanName)
         return os.path.join(self.getApcHostTmp(), baseSubPlan + "_" + processId)
-    def makeLinks(self, test):
+    def makeLinks(self, test, apcTmpDir):
         sourceName = os.path.join(test.writeDirs[1], "run_status_head")
         targetName = os.path.join(test.writeDirs[0], "run_status_head")
         os.symlink(sourceName, targetName)
+        viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
+        file = open(viewLogScript, "w")
+        logFileName = os.path.join(apcTmpDir, "apc_log")
+        file.write("xon " + unixConfig.hostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
+        file.close()
     def performParallelAction(self, test, processInfo):
         processId, processName = processInfo[0]
         runProcessId, runProcessName = processInfo[-1]
@@ -475,7 +478,7 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         self.diag.info("APC log directory is " + apcTmpDir + " based on process " + processName)
         if not os.path.isdir(apcTmpDir):
             raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + runProcessName
-        self.makeLinks(test)
+        self.makeLinks(test, apcTmpDir)
         test.writeDirs.append(apcTmpDir)
         self.describe(test)
         if self.keepLogs:

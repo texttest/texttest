@@ -249,9 +249,11 @@ class MakeResourceFiles(plugins.Action):
                 cpuTime = line.strip().split()[-1]
                 resourceDict["CPU time"] = "CPU time   : " + string.rjust(cpuTime, 9) + " sec."
         os.remove(tmpFile)
-	# remove the command-file created before submitting the command
+        # remove the command-file created before submitting the command
+        # Note APC does not create one!
         cmdFile = test.getTmpFileName("cmd", "r")
-        os.remove(cmdFile)
+        if os.path.isfile(cmdFile):
+            os.remove(cmdFile)
         # There was still an error (jobs killed in emergency), so don't write resource files
         if len(resourceDict) < len(textList):
             return

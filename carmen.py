@@ -103,9 +103,12 @@ class RuleSet:
             self.targetFile = os.path.join(os.environ["CARMTMP"], "crc", "rule_set", string.upper(raveName), architecture, self.name)
             self.sourceFile = os.path.join(os.environ["CARMUSR"], "crc", "source", self.name)
     def isValid(self):
-        return self.name != None and os.path.isfile(self.targetFile)
+        return self.name != None
+    def isCompiled(self):
+        return os.path.isfile(self.targetFile)
     def backup(self):
-        shutil.copyfile(self.targetFile, self.targetFile + ".bak")
+        if self.isCompiled():
+            shutil.copyfile(self.targetFile, self.targetFile + ".bak")
         
 class UpdatedStaticRulesetFilter:
     def __init__(self, getRuleSetName, libraryFile):
@@ -114,7 +117,11 @@ class UpdatedStaticRulesetFilter:
         self.defaultAcceptance = 0
     def acceptsTestCase(self, test):
         ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test))
-        return ruleset.isValid() and self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.libraryFile))
+        if not ruleset.isValid():
+            return 0
+        if not ruleset.isCompiled():
+            return 1
+        return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.libraryFile))
     def acceptsTestSuite(self, suite):
         raveName = getRaveName(suite)
         if not isUserSuite(suite):

@@ -767,7 +767,6 @@ class OptionFinder:
                     raise sys.exc_type, sys.exc_value
                 except:
                     print "Could not use application", appName, "-", sys.exc_value
-                    printException()
                     raisedError = 1
             elif os.path.isdir(pathname) and recursive:
                 subRaisedError, subApps = self._findApps(pathname, 0)

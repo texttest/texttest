@@ -83,13 +83,13 @@ class TestComparison:
         for file in fileList:
             if os.path.isdir(file):
                 self.makeComparisons(test, os.path.join(dir, file))
-            elif self.shouldCompare(file, dir):
+            elif self.shouldCompare(file, dir, test.app):
                 fullPath = os.path.join(dir, file)
                 stdFile = os.path.normpath(fullPath.replace(test.getTmpIdentifier(), ""))
                 comparison = self.makeComparison(test, stdFile, fullPath)
                 self.addComparison(stdFile, comparison)
-    def shouldCompare(self, file, dir):
-        return not file.startswith("input.")
+    def shouldCompare(self, file, dir, app):
+        return not file.startswith("input.") and app.ownsFile(file)
     def makeComparison(self, test, standardFile, tmpFile):
         comparison = self.createFileComparison(test, standardFile, tmpFile)
         if comparison.newResult() or comparison.hasDifferences():

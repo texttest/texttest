@@ -53,14 +53,6 @@ class MatadorConfig(optimization.OptimizationConfig):
         switches = optimization.OptimizationConfig.getSwitches(self)
         switches["diag"] = "Use Matador Codebase diagnostics"
         return switches
-    def getTestRunner(self):
-        basicRunner = optimization.OptimizationConfig.getTestRunner(self)
-        if os.environ.has_key("DIAGNOSTICS_IN"):
-            return plugins.CompositeAction([ CopyDiagnostics(), CopySecretParameter(), basicRunner ])
-        else:
-            return plugins.CompositeAction([ CopySecretParameter(), basicRunner ])
-    def getTestCollator(self):
-        return plugins.CompositeAction([ optimization.OptimizationConfig.getTestCollator(self), RemoveSecretParameter() ])
     def checkPerformance(self):
         return not self.optionMap.has_key("diag")
     def getLibraryFile(self, test):
@@ -94,6 +86,9 @@ class MatadorConfig(optimization.OptimizationConfig):
         print helpScripts
     def setUpApplication(self, app):
         optimization.OptimizationConfig.setUpApplication(self, app)
+        if os.environ.has_key("DIAGNOSTICS_IN"):
+            app.addToConfigList("copy_test_path", "Diagnostics")
+            app.addToConfigList("compare_extension", "diag")
         self.itemNamesInFile[optimization.memoryEntryName] = "Memory"
         self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
         self.itemNamesInFile[optimization.solutionName] = "Solution\."
@@ -104,26 +99,6 @@ class MatadorConfig(optimization.OptimizationConfig):
         self.noIncreaseExceptMethods["broken hard trip constraints"] = [ "MaxRoster" ]
         self.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
         self.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]
-
-class CopyDiagnostics(plugins.Action):
-    def __call__(self, test):
-        os.mkdir("Diagnostics")
-        sourceFile = os.path.join(test.abspath, "Diagnostics", "diagnostics.etab")
-        destFile = os.path.join(os.getcwd(), "Diagnostics", "diagnostics.etab")
-        shutil.copyfile(sourceFile, destFile)
-
-class CopySecretParameter(plugins.Action):
-    def __call__(self, test):
-        fileName = "secret_parameters.etab"
-        filePath = os.path.join(test.abspath, fileName)
-        if os.path.isfile(filePath):
-            shutil.copyfile(filePath, fileName)
-
-class RemoveSecretParameter(plugins.Action):
-    def __call__(self, test):
-        fileName = "secret_parameters.etab"
-        if os.path.isfile(fileName):
-            os.remove(fileName)
 
 class MatadorTestCaseInformation(optimization.TestCaseInformation):
     def isComplete(self):

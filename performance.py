@@ -67,8 +67,8 @@ class PerformanceTestComparison(comparetest.TestComparison):
             return PerformanceFileComparison(test, standardFile, tmpFile)
         else:
             return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile)
-    def shouldCompare(self, file, dir):
-        if not comparetest.TestComparison.shouldCompare(self, file, dir):
+    def shouldCompare(self, file, dir, app):
+        if not comparetest.TestComparison.shouldCompare(self, file, dir, app):
             return 0
         stem, ext = file.split(".",1)
         if stem != "performance":

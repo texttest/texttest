@@ -80,13 +80,16 @@ class Config(plugins.Configuration):
     def getTestRunner(self):
         return RunTest()
     def getTestEvaluator(self):
-        subParts = [ self.getFileExtractor(), self.getTestPredictionChecker(), self.getTestComparator(), self.getTestResponder() ]
+        subParts = [ self.getFileExtractor(), self.getCatalogueCreator(), \
+                     self.getTestPredictionChecker(), self.getTestComparator(), self.getTestResponder() ]
         return plugins.CompositeAction(subParts)
     def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"))
         else:
             return self.getTestCollator()
+    def getCatalogueCreator(self):
+        return CreateCatalogue()
     def getTestCollator(self):
         return plugins.Action()
     def getTestPredictionChecker(self):
@@ -185,10 +188,18 @@ class TestSuiteFilter(TextFilter):
 
 class FileFilter(TextFilter):
     def __init__(self, filterFile):
-        self.texts = map(string.strip, open(filterFile).readlines())
+        self.filename = filterFile
+        self.texts = [] 
     def acceptsTestCase(self, test):
         return self.equalsText(test)
-
+    def acceptsApplication(self, app):
+        fullPath = app.makePathName(self.filename)
+        if not fullPath:
+            print "File", self.filename, "not found for application", app
+            return 0
+        self.texts = map(string.strip, open(fullPath).readlines())
+        return 1
+    
 # Use communication channels for stdin and stderr (because we don't know how to redirect these on windows).
 # Tried to use communication channels on all three, but read() blocks and deadlock between stderr and stdout can result.
 class RunTest(plugins.Action):
@@ -218,6 +229,48 @@ class RunTest(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 
+class CreateCatalogue(plugins.Action):
+    def setUpApplication(self, app):
+        app.setConfigDefault("create_catalogues", "false")
+    def __call__(self, test):
+        if test.app.getConfigValue("create_catalogues") != "true":
+            return
+        fileName = test.makeFileName("catalogue", temporary=1)
+        file = open(fileName, "w")
+        for writeDir in test.writeDirs:
+            self.listDirectory(test.app, file, writeDir)
+        file.close()
+        if os.path.getsize(fileName) == 0:
+            os.remove(fileName)
+    def listDirectory(self, app, file, writeDir):
+        subDirs = []
+        files = []
+        availFiles = os.listdir(writeDir)
+        availFiles.sort()
+        for writeFile in availFiles:
+            if writeFile == "CVS":
+                continue
+            fullPath = os.path.join(writeDir, writeFile)
+            if os.path.isdir(fullPath):
+                subDirs.append(fullPath)
+            elif not app.ownsFile(writeFile):
+                files.append(writeFile)
+        if len(files) == 0 and len(subDirs) == 0:
+            return 0
+        file.write("Under " + self.getName(writeDir) + " :" + os.linesep)
+        for writeFile in files:
+            file.write(writeFile + os.linesep)
+        for subDir in subDirs:
+            self.listDirectory(app, file, subDir)
+        return 1
+    def getName(self, writeDir):
+        currDir = os.getcwd()
+        if writeDir == currDir:
+            return "Test Directory"
+        if writeDir.startswith(currDir):
+            return "Test subdirectory " + writeDir.replace(currDir + os.sep, "")
+        return os.path.basename(writeDir)
+                    
 class CountTest(plugins.Action):
     def __init__(self):
         self.appCount = {}

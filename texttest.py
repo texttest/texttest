@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, types, string, getopt, types, time, re, plugins, exceptions, stat, log4py
+import os, sys, types, string, getopt, types, time, re, plugins, exceptions, stat, log4py, shutil
 from stat import *
 
 helpIntro = """
@@ -185,40 +185,55 @@ class TestCase(Test):
         return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
-    def makeWriteDirectory(self, rootDir, basicDir = None, subDir = None):
-        prefix = self.app.name + self.app.versionSuffix()
-        identifier = prefix + globalRunIdentifier
-        dirName = identifier
-        currTmpString = prefix + self.getTestUser()
-        if basicDir:
-            dirName = basicDir + "." + identifier
-            currTmpString = basicDir + "." + currTmpString
-        dirName = os.path.join(rootDir, dirName)
+    def makePathName(self, fileName, startDir):
+        fullPath = os.path.join(startDir, fileName)
+        if os.path.exists(fullPath) or startDir == self.app.abspath:
+            return fullPath
+        parent, current = os.path.split(startDir)
+        return self.makePathName(fileName, parent)
+    def makeBasicWriteDirectory(self):
+        self.cleanPreviousWriteDirs(self.abspath)
+        writeDir = self.createDir(self.abspath)
+        for copyTestPath in self.app.getConfigList("copy_test_path"):
+            fullPath = self.makePathName(copyTestPath, self.abspath)
+            target = os.path.join(writeDir, copyTestPath)
+            if os.path.isfile(fullPath):
+                shutil.copy(fullPath, target)
+            if os.path.isdir(fullPath):
+                shutil.copytree(fullPath, target)
+    def createDir(self, rootDir, nameBase = "", subDir = None):
+        writeDir = os.path.join(rootDir, nameBase + self.getTmpIdentifier())
+        fullWriteDir = writeDir
+        if subDir:
+            fullWriteDir = os.path.join(writeDir, subDir)
+        os.makedirs(fullWriteDir)
+        debugLog.info("Created write directory " + fullWriteDir)
+        self.writeDirs.append(fullWriteDir)
+        return writeDir
+    def cleanPreviousWriteDirs(self, rootDir, nameBase = ""):
+        currTmpString = nameBase + self.app.name + self.app.versionSuffix() + self.getTestUser()
         for file in os.listdir(rootDir):
             fpath = os.path.join(rootDir, file)
             if not os.path.isdir(fpath):
                 continue
             if fpath.find(currTmpString) != -1:
                 self._removeDir(os.path.join(rootDir, file))
-        writeDir = dirName
-        if subDir:
-            writeDir = os.path.join(dirName, subDir)
-        os.makedirs(writeDir)
-        debugLog.info("Created write directory " + writeDir)
-        self.writeDirs.append(writeDir)
-        if basicDir:
-            newBasic = os.path.basename(dirName)
-            debugLog.info("Replacing " + basicDir + " with " + newBasic)
-            self.options = self.options.replace(basicDir, newBasic)
-            debugLog.info("Options string now '" + self.options + "'") 
-            if os.path.isfile(self.inputFile):
-                tmpFileName = self.makeFileName("input", temporary=1)
-                tmpFile = open(tmpFileName, "w")
-                for line in open(self.inputFile).xreadlines():
-                    tmpFile.write(line.replace(basicDir, newBasic))
-                self.inputFile = tmpFileName
-                debugLog.info("Input file now '" + self.inputFile + "'")
-        return dirName
+    def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
+        nameBase = basicDir + "."
+        self.cleanPreviousWriteDirs(rootDir, nameBase)
+        writeDir = self.createDir(rootDir, nameBase, subDir)
+        newBasic = os.path.basename(writeDir)
+        debugLog.info("Replacing " + basicDir + " with " + newBasic)
+        self.options = self.options.replace(basicDir, newBasic)
+        debugLog.info("Options string now '" + self.options + "'") 
+        if os.path.isfile(self.inputFile):
+            tmpFileName = self.makeFileName("input", temporary=1)
+            tmpFile = open(tmpFileName, "w")
+            for line in open(self.inputFile).xreadlines():
+                tmpFile.write(line.replace(basicDir, newBasic))
+            self.inputFile = tmpFileName
+            debugLog.info("Input file now '" + self.inputFile + "'")
+        return writeDir
     def cleanFiles(self, keeptmp):
         if self.inputFile.find(globalRunIdentifier) != -1:
             os.remove(self.inputFile)
@@ -323,7 +338,7 @@ class TestSuite(Test):
                 testCase = TestCase(testName, testPath, self.app)
                 testCase.tearDownEnvironment()
                 if testCase.isValid() and testCase.isAcceptedByAll(filters):
-                    testCase.makeWriteDirectory(testCase.abspath)
+                    testCase.makeBasicWriteDirectory()
                     testCaseList.append(testCase)
         return testCaseList
             
@@ -385,6 +400,26 @@ class Application:
     def hasREpattern(self, txt):
     	# return 1 if txt contains a regular expression meta character
 	return self.specialChars.search(txt) != None
+    def ownsFile(self, fileName):
+        # We can claim all environment files...
+        if fileName.startswith("environment"):
+            return 1
+        parts = fileName.split(".")
+        if len(parts) == 1:
+            return 0
+        ext = parts[1]
+        return ext == self.name or ext in self.getConfigList("compare_extension")
+    def makePathName(self, name):
+        if os.path.isabs(name):
+            return name
+        localName = os.path.join(self.abspath, name)
+        if os.path.exists(localName):
+            return localName
+        homeDir, baseName = os.path.split(self.abspath)
+        homeName = os.path.join(homeDir, name)
+        if os.path.exists(homeName):
+            return homeName
+        return None
     def makeAbsPath(self, path):
         if (os.path.isabs(path)):
             return path
@@ -437,6 +472,8 @@ class Application:
     def setConfigDefault(self, key, value):
         if not self.configDir.has_key(key):
             self.configDir[key] = value
+    def addToConfigList(self, key, value):
+        self.configDir.addEntry(key, value)
     def filterFile(self, fileName):
         stem = os.path.basename(fileName).split('.')[0]
         if not self.configDir.has_key(stem) or not os.path.isfile(fileName):
@@ -493,7 +530,7 @@ class Application:
         else:
             checkout = self.getConfigValue("default_checkout")
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
-        return os.path.join(checkoutLocation, checkout)
+        return self.makePathName(os.path.join(checkoutLocation, checkout))
     def getExecuteCommand(self, test):
         binary = self._getBinary()
         return self.configObject.getExecuteCommand(binary, test)
@@ -664,7 +701,7 @@ class OptionFinder:
         if self.inputOptions.has_key("d"):
             return os.path.abspath(self.inputOptions["d"])
         elif os.environ.has_key("TEXTTEST_HOME"):
-            return os.environ["TEXTTEST_HOME"]
+            return os.path.abspath(os.environ["TEXTTEST_HOME"])
         else:
             return os.getcwd()
     def getActionSequence(self, app):
@@ -727,6 +764,8 @@ class MultiEntryDictionary:
                 self.dict[key] = value
     def addLine(self, line, separator = ':'):
         entryName, entry = string.split(line, separator, 1)
+        self.addEntry(entryName, entry)
+    def addEntry(self, entryName, entry):
         if self.dict.has_key(entryName):
             try:
                 self.dict[entryName].append(entry)

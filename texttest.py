@@ -361,10 +361,7 @@ class Application:
         self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
         self.setConfigDefault("extra_version", "none")
         self.setConfigDefault("write_tmp_files", "~/texttesttmp")
-        root = os.path.expanduser(self.getConfigValue("write_tmp_files"))
-        self.writeDirectory = os.path.join(os.path.abspath(root), self.getTmpIdentifier())
-        if not os.path.isdir(os.path.abspath(root)):
-            os.makedirs(os.path.abspath(root))
+        self.writeDirectory = self._getWriteDirectory()
         self.configObject.setUpApplication(self)
     def __repr__(self):
         return self.fullName
@@ -375,6 +372,16 @@ class Application:
             return self.configDir["full_name"]
         else:
             return string.upper(self.name)
+    def _getWriteDirectory(self):
+        root = os.path.expanduser(self.getConfigValue("write_tmp_files"))
+        absroot = os.path.abspath(root)
+        if not os.path.isdir(absroot):
+            os.makedirs(absroot)
+        savedir = os.getcwd()
+        os.chdir(absroot)
+        result = os.path.join(os.getcwd(), self.getTmpIdentifier())
+        os.chdir(savedir)
+        return result
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:

@@ -229,7 +229,7 @@ class TestCase(Test):
         parent, local = os.path.split(writeDir)
         if local.find(self.app.getTmpIdentifier()) != -1:
             debugLog.info("Removing write directory under", parent)
-            shutil.rmtree(writeDir)
+            plugins.rmtree(writeDir)
         elif parent:
             self._removeDir(parent)
     def collatePaths(self, configListName, collateMethod):
@@ -647,16 +647,7 @@ class Application:
         # Don't be somewhere under the directory when it's removed
         os.chdir(self.abspath)
         if not self.keepTmpFiles and os.path.isdir(self.writeDirectory):
-            self._removeDir()
-    def _removeDir(self):
-        for i in range(5):
-            try:
-                shutil.rmtree(self.writeDirectory)
-                return
-            except OSError:
-                print "Write directory still in use, waiting 1 second to remove..."
-                time.sleep(1)
-        print "Something still using write directory", self.writeDirectory, ": leaving it"
+            plugins.rmtree(self.writeDirectory)
     def tryCleanPreviousWriteDirs(self, rootDir, nameBase = ""):
         if not self.keepTmpFiles or not os.path.isdir(rootDir):
             return

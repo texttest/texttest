@@ -1,5 +1,5 @@
 
-import os, log4py, string, signal, shutil
+import os, log4py, string, signal, shutil, time
 from types import FileType
 from ndict import seqdict
 
@@ -81,6 +81,17 @@ def samefile(writeDir, currDir):
         # samefile doesn't exist on Windows, but nor do soft links so we can
         # do a simpler version
         return os.path.normpath(writeDir) == os.path.normpath(currDir)
+
+# Version of rmtree not prone to crashing if directory in use
+def rmtree(dir, attempts=5):
+    for i in range(attempts):
+        try:
+            shutil.rmtree(dir)
+            return
+        except OSError:
+            print "Write directory still in use, waiting 1 second to remove..."
+            time.sleep(1)
+    print "Something still using write directory", dir, ": leaving it"
 
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):

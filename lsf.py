@@ -412,7 +412,7 @@ class KillTest(plugins.Action):
     def __repr__(self):
         return "Cancelling"
     def __call__(self, test):
-        if test.state > test.RUNNING:
+        if test.state > test.RUNNING or not LSFServer.instance:
             return
         job = LSFServer.instance.findJob(test, self.jobNameFunction)
         if not job.isActive() or job.jobId in self.jobsKilled:

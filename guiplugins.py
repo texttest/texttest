@@ -21,7 +21,9 @@ class InteractiveAction(plugins.Action):
         return None
     def getScriptTitle(self):
         return self.getTitle()
-    def startExternalProgram(self, commandLine):
+    def startExternalProgram(self, commandLine, shellTitle = None):
+        if shellTitle:
+            commandLine = "xterm -bg white -T '" + shellTitle + "' -e " + commandLine
         process = plugins.BackgroundProcess(commandLine)
         self.processes.append(process)
         return process
@@ -101,8 +103,7 @@ class ViewFile(InteractiveAction):
         title = self.test.name + " (" + baseName + ")"
         followProgram = self.test.app.getConfigValue("follow_program")
         print "Following file", title, "using '" + followProgram + "'"
-        commandLine = "xterm -bg white -T '" + title + "' -e " + followProgram + " " + fileName
-        self.startExternalProgram(commandLine)
+        self.startExternalProgram(followProgram + " " + fileName, shellTitle=title)
     def view(self, comparison, fileName):
         if self.optionGroup.getSwitchValue("f"):
             return self.followFile(fileName)
@@ -299,9 +300,10 @@ class RunTests(InteractiveAction):
             print "No tests selected - cannot run!"
             return
         ttOptions = string.join(self.getTextTestOptions(app, selTests))
-        commandLine = self.getTextTestName() + " " + ttOptions + " > /dev/null"
+        commandLine = self.getTextTestName() + " " + ttOptions
         print "Starting dynamic TextTest with options :", ttOptions
-        self.startExternalProgram(commandLine)
+        shellTitle = app.fullName + " Tests"
+        self.startExternalProgram(commandLine, shellTitle)
     def getTextTestOptions(self, app, selTests):
         ttOptions = [ "-a " + app.name ]
         ttOptions += self.invisibleGroup.getCommandLines()

@@ -106,10 +106,12 @@ class RuleSet:
     def backup(self):
         shutil.copyfile(self.targetFile, self.targetFile + ".bak")
     def findName(self, test):
-        for line in open(test.makeFileName("output")).xreadlines():
-            if line.find("Loading rule set") != -1:
-                finalWord = string.split(line, " ")[-1]
-                return finalWord.strip()
+        fileName = test.makeFileName("output")
+        if os.path.isfile(fileName):
+            for line in open(fileName).xreadlines():
+                if line.find("Loading rule set") != -1:
+                    finalWord = string.split(line, " ")[-1]
+                    return finalWord.strip()
         return None
         
 class UpdatedStaticRulesetFilter:

@@ -83,7 +83,7 @@ class TestSuiteInformation:
                     return line.split(":")[1].strip()
         return None
     def chooseCarmUsr(self):
-        dirName = self.findCarmUsrFrom(["environment.apc", "environment"])
+        dirName = self.findCarmUsrFrom(["environment"])
         while dirName == None:
             print "Please give CARMUSR directory to use for new user '" + self.name + "'"
             dirName = sys.stdin.readline().strip();
@@ -178,10 +178,7 @@ class ImportTest:
         return "Importing into"
     def __call__(self, test, description):
         pass
-
-    def isUserSuite(self, suite):
-        return suite.environment.has_key("CARMUSR")
-
+    
     def userSuiteComplete(self, userInfo, carmTmpDirInCarmSys):
         if not os.path.isdir(carmTmpDirInCarmSys):
             return 0
@@ -194,7 +191,7 @@ class ImportTest:
         return 1
     
     def setUpSuite(self, suite, description):
-        if self.isUserSuite(suite):
+        if carmen.isUserSuite(suite):
             for testline in open(suite.testCaseFile).readlines():
                 if testline != '\n' and testline[0] != '#':
                     testInfo = TestCaseInformation(suite, testline.strip())

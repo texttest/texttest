@@ -70,16 +70,54 @@ class CalculateKPI:
     def setUpSuite(self, suite, description):
         print description
 
-class TestSuiteInformation:
+class TestInformation:
     def __init__(self, suite, name):
         self.suite = suite
         self.name = name
+    def isComplete(self):
+        return 1
+    def absPathToCarmSys(self):
+        return os.path.join(self.suite.app.checkout, self.suite.environment["CARMSYS"])
     def testPath(self):
         return os.path.join(self.suite.abspath, self.name)
     def filePath(self, file):
         return os.path.join(self.suite.abspath, self.name, file)
-    def absPathToCarmSys(self):
-        return os.path.join(self.suite.app.checkout, self.suite.environment["CARMSYS"])
+    def makeFileName(self, stem, version = None):
+        return self.suite.makeFileName(self.name + os.sep + stem, version)
+    def appSuffix(self):
+        asFileName = self.suite.makeFileName("__tmp__")
+        return asFileName.replace(os.path.join(self.suite.abspath, "__tmp__"), "")
+    def makeCarmTmpName(self):
+        return self.name + "_tmp" + self.appSuffix()
+
+class TestSuiteInformation(TestInformation):
+    def __init__(self, suite, name):
+        TestInformation.__init__(self, suite, name)
+    def isComplete(self):
+        if not os.path.isdir(self.testPath()):
+            return 0
+        if not os.path.isfile(self.makeFileName("testsuite")):
+            return 0
+        if not os.path.isfile(self.makeFileName("environment")):
+            return 0
+        return 1
+    def makeImport(self, description):
+        if not os.path.isdir(self.testPath()):
+            os.mkdir(self.testPath())
+        suitePath = self.makeFileName("testsuite")
+        if not os.path.isfile(suitePath):
+            suiteContent = "# Tests for user " + self.name + os.linesep + "#"
+            open(suitePath, "w").write(suiteContent + os.linesep)
+        envPath = self.makeFileName("environment")
+        if not os.path.isfile(envPath):
+            carmUsrDir = self.chooseCarmUsr()
+            if carmUsrDir != None:
+                open(envPath,"w").write(self.getEnvContent(carmUsrDir) + os.linesep)
+        if description != None:
+            print description + ", User: '" + self.name + "'"
+    def getEnvContent(self, carmUsrDir):
+        carmTmpDir = carmUsrDir[:-4] + "tmp"
+        return "CARMUSR:" + carmUsrDir + os.linesep + "CARMTMP:" + carmTmpDir
     def findCarmUsrFrom(self, fileList):
         for file in fileList:
             if not os.path.isfile(self.filePath(file)):
@@ -97,8 +135,6 @@ class TestSuiteInformation:
                 print "Not found: '" + dirName + "'"
                 dirName = None
         return dirName
-    def makeFileName(self, stem, version = None):
-        return self.suite.makeFileName(self.name + os.sep + stem, version)
     def findStems(self, baseName):
         stems = []
         totalName = baseName + self.appSuffix()
@@ -111,18 +147,54 @@ class TestSuiteInformation:
         return stems;
     def userDesc(self):
         return "'" + self.name + "'(" + self.appSuffix() + ")"
-    def appSuffix(self):
-        asFileName = self.suite.makeFileName("__tmp__")
-        return asFileName.replace(os.path.join(self.suite.abspath, "__tmp__"), "")
-    def makeCarmTmpName(self):
-        return self.name + "_tmp" + self.appSuffix()
         
-class TestCaseInformation:
+class TestCaseInformation(TestInformation):
     def __init__(self, suite, name):
-        self.suite = suite
-        self.name = name
-    def testPath(self):
-        return os.path.join(self.suite.abspath, self.name)
+        TestInformation.__init__(self, suite, name)
+    def isComplete(self):
+        if not os.path.isdir(self.testPath()):
+            return 0
+        if not os.path.isfile(self.makeFileName("options")):
+            return 0
+        if not os.path.isfile(self.makeFileName("environment")):
+            return 0
+        if not os.path.isfile(self.makeFileName("performance")):
+            return 0
+        return 1
+    def makeImport(self, description):
+        testPath = self.testPath()
+        optionPath = self.makeFileName("options")
+        envPath = self.makeFileName("environment")
+        perfPath = self.makeFileName("performance")
+        if not os.path.isdir(testPath):
+            os.mkdir(testPath)
+        if not os.path.isfile(optionPath):
+            dirName = self.chooseSubPlan()
+            if dirName == None:
+                return
+            subPlanDir = os.path.join(dirName, "APC_FILES")
+            ruleSet = self.getRuleSetName(subPlanDir)
+            carmUsrSubPlanDirectory = self.replaceCarmUsr(subPlanDir)
+            newOptions = self.buildOptions(carmUsrSubPlanDirectory, ruleSet)
+            open(optionPath,"w").write(newOptions + os.linesep)
+        else:
+            carmUsrSubPlanDirectory = self.subPlanFromOptions(optionPath)
+        if not os.path.isfile(envPath):
+            envContent = self.buildEnvironment(carmUsrSubPlanDirectory)
+            open(envPath,"w").write(envContent + os.linesep)
+        if not os.path.isfile(perfPath):
+            perfContent = self.buildPerformance(carmUsrSubPlanDirectory)
+            open(perfPath, "w").write(perfContent + os.linesep)
+        if description != None:
+            print description + ", Test: '" + self.name + "'"
+    def subPlanFromOptions(self, optionPath):
+        return None
+    def buildOptions(self, path, ruleSet):
+        return None
+    def buildEnvironment(self, carmUsrSubPlanDirectory):
+        return None
+    def buildPerformance(self, carmUsrSubPlanDirectory):
+        return None
     def getRuleSetName(self, subPlanDir):
         problemLines = open(os.path.join(subPlanDir,"problems")).xreadlines()
         for line in problemLines:
@@ -198,15 +270,6 @@ class ImportTest:
     def __call__(self, test, description):
         pass
     
-    def userSuiteComplete(self, userInfo):
-        if not os.path.isdir(userInfo.testPath()):
-            return 0
-        if not os.path.isfile(userInfo.makeFileName("testsuite")):
-            return 0
-        if not os.path.isfile(userInfo.makeFileName("environment")):
-            return 0
-        return 1
-
     def getTestCaseInformation(self, suite, name):
         return TestCaseInformation(suite, name)
 
@@ -214,35 +277,21 @@ class ImportTest:
         return TestSuiteInformation(suite, name)
     
     def setUpSuite(self, suite, description):
-        if carmen.isUserSuite(suite):
-            for testline in open(suite.testCaseFile).readlines():
-                if testline != '\n' and testline[0] != '#':
+        if not os.environ.has_key("CARMSYS"):
+            return
+        for testline in open(suite.testCaseFile).readlines():
+            if testline != '\n' and testline[0] != '#':
+                if carmen.isUserSuite(suite):
                     testInfo = self.getTestCaseInformation(suite, testline.strip())
-                    if self.testForImportTestCase(testInfo) != 0:
-                        print description + ", Test: '" + testInfo.name + "'"
-        else:
-            for testline in open(suite.testCaseFile).readlines():
-                if testline != '\n' and testline[0] != '#':
-                    userInfo = self.getTestSuiteInformation(suite, testline.strip())
-                    if self.testForImportTestSuite(userInfo) != 0:
-                        print description + ", User: '" + userInfo.name + "'"
+                else:
+                    testInfo = self.getTestSuiteInformation(suite, testline.strip())
+                if not testInfo.isComplete():
+                    testInfo.makeImport(description)
 
-    def testForImportTestSuite(self, userInfo):
-        if not userInfo.suite.environment.has_key("CARMSYS"):
-            return 0
-        if self.userSuiteComplete(userInfo):
-            return 0
-        envPath = userInfo.makeFileName("environment")
-        if not os.path.isfile(envPath):
-            carmUsrDir = userInfo.chooseCarmUsr()
-        else:
-            carmUsrDir = None
-        if carmUsrDir != None or os.path.isfile(envPath):
-            return self.makeUser(userInfo, carmUsrDir)
-        return 0
 
     def makeUser(self, userInfo, carmUsrDir):
         return 0
     
     def testForImportTestCase(self, testInfo):
         return 0
+

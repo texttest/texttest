@@ -72,32 +72,68 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
         optimization.TestCaseInformation.__init__(self, suite, name)
     def ruleSetPath(self):
         return "${CARMTMP}" + os.sep + os.path.join("crc", "rule_set", "APC", "PUTS_ARCH_HERE")
+    def subPlanFromOptions(self, optionPath):
+        path = open(optionPath).readline().split()[0]
+        if path[0:10] != "${CARMUSR}":
+            return path
+        if not os.environ.has_key("CARMUSR"):
+            return path
+        carmUsr = os.environ["CARMUSR"]
+        npath = os.path.join(carmUsr, path.replace("${CARMUSR}", "./"))
+        return os.path.normpath(npath)
 
-    def buildApcOptions(self, path, ruleSet):
+    def buildOptions(self, path, ruleSet):
        subPlan = path
        statusFile = path + os.sep + "run_status"
        ruleSetFile = self.ruleSetPath() + os.sep + ruleSet
        return subPlan + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
 
-    def buildApcEnvironment(self, carmUsrSubPlanDirectory):
+    def buildEnvironment(self, carmUsrSubPlanDirectory):
         lpEtab = carmUsrSubPlanDirectory.split(os.sep)[0:-2]
         spEtab = carmUsrSubPlanDirectory.split(os.sep)[0:-1]
         lpEtabLine = "LP_ETAB_DIR:" + os.path.normpath(string.join(lpEtab, "/") + "/etable")
         spEtabLine = "SP_ETAB_DIR:" + os.path.normpath(string.join(spEtab, "/") + "/etable")
         return lpEtabLine + os.linesep + spEtabLine
 
+    def buildPerformance(self, subPlanDir):
+        statusPath = os.path.join(subPlanDir, "status")
+        if os.path.isfile(statusPath):
+            lastLines = os.popen("tail -10 " + statusPath).xreadlines()
+            for line in lastLines:
+                if line[0:5] == "Time:":
+                    sec = line.split(":")[1].split("s")[0]
+                    return "CPU time   :     " + str(int(sec)) + ".0 sec. on heathlands"
+# Give some default that will not end it up in the short queue
+        return "CPU time   :      2500.0 sec. on heathlands"
+        
+
+class ApcTestSuiteInformation(optimization.TestSuiteInformation):
+    def __init__(self, suite, name):
+        optimization.TestSuiteInformation.__init__(self, suite, name)
+    def getEnvContent(self, carmUsrDir):
+        usrContent = "CARMUSR:" + carmUsrDir
+        tmpContent = "CARMTMP:${CARMSYS}" + os.sep + self.makeCarmTmpName()
+        return usrContent + os.linesep + tmpContent
+
+class ImportTest(optimization.ImportTest):
+    def getTestCaseInformation(self, suite, name):
+        return ApcTestCaseInformation(suite, name)
+    def getTestSuiteInformation(self, suite, name):
+        return ApcTestSuiteInformation(suite, name)
+
 
 class PortApcTest:
     def __repr__(self):
-        return "Porting old test"
+        return "Porting old"
     def __call__(self, test, description):
         testInfo = ApcTestCaseInformation(self.suite, test.name)
+        hasPorted = 0
         if test.options[0] == "-":
-            print description
+            hasPorted = 1
             subPlanDirectory = test.options.split()[3]
             carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDirectory)
             ruleSetName = testInfo.getRuleSetName(subPlanDirectory)
-            newOptions = testInfo.buildApcOptions(carmUsrSubPlanDirectory, ruleSetName)
+            newOptions = testInfo.buildOptions(carmUsrSubPlanDirectory, ruleSetName)
             fileName = test.makeFileName("options")
             shutil.copyfile(fileName, fileName + ".oldts")
             os.remove(fileName)
@@ -108,51 +144,29 @@ class PortApcTest:
             carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDirectory)
         envFileName = test.makeFileName("environment")
         if not os.path.isfile(envFileName):
-            envContent = testInfo.buildApcEnvironment(carmUsrSubPlanDirectory)
+            hasPorted = 1
+            envContent = testInfo.buildEnvironment(carmUsrSubPlanDirectory)
             open(envFileName,"w").write(envContent + os.linesep)
+        perfFileName = test.makeFileName("performance")
+        if not os.path.isfile(perfFileName):
+            hasPorted = 1
+            perfContent = testInfo.buildPerformance(carmUsrSubPlanDirectory)
+            open(envFileName,"w").write(perfContent + os.linesep)
+        else:
+            lines = open(perfFileName).readlines()
+            if len(lines) > 1:
+                line1 = lines[0]
+                line2 = lines[1]
+                if line1[0:4] == "real" and line2[0:4] == "user":
+                    sec = line2.split(" ")[1]
+                    perfContent = "CPU time   :     " + str(float(sec)) + " sec. on heathlands"
+                    open(perfFileName,"w").write(perfContent + os.linesep)
+                    hasPorted = 1
+        if hasPorted != 0:
+            print description, "in", testInfo.suiteDescription()
     def setUpSuite(self, suite, description):
         self.suite = suite
-        print description
 
-class ImportTest(optimization.ImportTest):
-    def getTestCaseInformation(self, suite, name):
-        return ApcTestCaseInformation(suite, name)
 
-    def makeUser(self, userInfo, carmUsrDir):
-        if not os.path.isdir(userInfo.testPath()):
-            os.mkdir(userInfo.testPath())
-        if carmUsrDir != None:
-            usrContent = "CARMUSR:" + carmUsrDir
-            tmpContent = "CARMTMP:${CARMSYS}" + os.sep + userInfo.makeCarmTmpName()
-            envContent = usrContent + os.linesep + tmpContent
-            open(os.path.join(userInfo.testPath(), "environment.apc"),"w").write(envContent + os.linesep)
-        suitePath = os.path.join(userInfo.testPath(), "testsuite.apc")
-        if not os.path.isfile(suitePath):
-            suiteContent = "# Tests for user " + userInfo.name + os.linesep + "#"
-            open(suitePath, "w").write(suiteContent + os.linesep)
-        return 1
-            
-    def testForImportTestCase(self, testInfo):
-        testPath = testInfo.testPath()
-        optionPath = os.path.join(testPath, "options.apc")
-        suitePath = os.path.join(testPath, "testsuite.apc")
-        if os.path.isdir(testPath) and (os.path.isfile(optionPath) or os.path.isfile(suitePath)):
-            return 0
-        dirName = testInfo.chooseSubPlan()
-        if dirName != None:
-            return self.makeImport(testInfo, dirName)
-        return 0
-
-    def makeImport(self, testInfo, dirName):
-        if not os.path.isdir(testInfo.testPath()):
-            os.mkdir(testInfo.testPath())
-        subPlanDir = os.path.join(dirName, "APC_FILES")
-        ruleSet = testInfo.getRuleSetName(subPlanDir)
-        carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDir)
-        newOptions = testInfo.buildApcOptions(carmUsrSubPlanDirectory, ruleSet)
-        optionFile = open(os.path.join(testInfo.testPath(), "options.apc"),"w")
-        optionFile.write(newOptions + os.linesep)
-        envContent = testInfo.buildApcEnvironment(carmUsrSubPlanDirectory)
-        open(os.path.join(testInfo.testPath(), "environment.apc"),"w").write(envContent + os.linesep)
-        return 1
+        
             

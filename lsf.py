@@ -187,7 +187,7 @@ class SubmitTest(plugins.Action):
         self.diag.info("Submitting with command : " + commandLine)
         stdin, stdout, stderr = os.popen3(commandLine)
         errorMessage = stderr.readline()
-        if errorMessage:
+        if errorMessage and errorMessage.find("still trying") == -1:
             raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()

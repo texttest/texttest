@@ -165,9 +165,8 @@ class RunWithParallelAction(plugins.Action):
         allProcesses = plugins.findAllProcesses(firstpid)
         if len(allProcesses) == 0:
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
-        self.diag.info("All processes " + repr(allProcesses))
         processNameDict = self.getProcessNames(allProcesses)
-        if not self.binaryName in processNameDict.values():
+        if not self.binaryRunning(processNameDict):
             self.diag.info("Failed to find '" + self.binaryName + "' in " + repr(processNameDict.values()))
             return
         executableProcessName = processNameDict.values()[-1]
@@ -176,6 +175,11 @@ class RunWithParallelAction(plugins.Action):
             return processNameDict.items()[-2:]
         else:
             self.diag.info("Rejected process as executable : " + executableProcessName + " in " + repr(processNameDict))
+    def binaryRunning(self, processNameDict):
+        for name in processNameDict.values():
+            if self.binaryName.startswith(name):
+                return 1
+        return 0
     def getProcessNames(self, allProcesses):
         dict = seqdict()
         for processId in allProcesses:

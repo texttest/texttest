@@ -108,14 +108,23 @@ class ViewFile(InteractiveAction):
         if self.optionGroup.getSwitchValue("f"):
             return self.followFile(fileName)
         if not comparison:
-            return self.viewFile(fileName)
+            return self.viewUncomparedFile(fileName)
         newFile = self.tmpFile(comparison)
         if comparison.newResult() or not self.optionGroup.getSwitchValue("nf"):
             self.viewFile(newFile)
         else:
-            diffProgram = self.test.app.getConfigValue("diff_program")
-            guilog.info("Comparing file " + os.path.basename(newFile) + "with previous version using '" + diffProgram + "'")
-            self.startExternalProgram("tkdiff " + self.stdFile(comparison) + " " + newFile)
+            self.takeDiff(self.stdFile(comparison), newFile)
+    def viewUncomparedFile(self, fileName):
+        if self.optionGroup.getSwitchValue("rdt") and self.optionGroup.getSwitchValue("nf"):
+            fileStem = os.path.basename(fileName).split(".")[0]
+            stdFile = self.test.makeFileName(fileStem)
+            self.takeDiff(stdFile, fileName)
+        else:
+            self.viewFile(fileName)
+    def takeDiff(self, stdFile, newFile):
+        diffProgram = self.test.app.getConfigValue("diff_program")
+        guilog.info("Comparing file " + os.path.basename(newFile) + " with previous version using '" + diffProgram + "'")
+        self.startExternalProgram("tkdiff " + stdFile + " " + newFile)
 
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveAction):

@@ -228,7 +228,7 @@ class OptionFinder:
         for item in optionList:
             option = string.strip(item)
             if ' ' in option:
-                opt, value = string.split(option, ' ')
+                opt, value = string.split(option, ' ', 1)
                 inputOptions[opt] = value
             else:
                 inputOptions[option] = ""

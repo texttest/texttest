@@ -90,6 +90,7 @@ class LSFConfig(unixConfig.UNIXConfig):
             resource = "(" + resourceList[0] + ")"
             for res in resourceList[1:]:
                 resource += " && (" + res + ")"
+            return resource
     def findResourceList(self, app):
         resourceList = []
         if self.optionMap.has_key("R"):

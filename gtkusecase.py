@@ -57,16 +57,32 @@ import usecase, gtk, os, string
 
 # Base class for all GTK events due to widget signals
 class SignalEvent(usecase.UserEvent):
+    anyEvent = None
     def __init__(self, name, widget, signalName):
         usecase.UserEvent.__init__(self, name)
         self.widget = widget
         self.signalName = signalName
+        # Signals often need to be emitted with a corresponding event.
+        # This is very hard to fake. The only way I've found is to seize a random event
+        # and use that... this is not foolproof...
+        if not self.anyEvent:
+            try:
+                self.anyEventHandler = self.widget.connect("event", self.storeEvent)
+            except TypeError:
+                pass
+    def storeEvent(self, widget, event, *args):
+        self.anyEvent = event
+        self.widget.disconnect(self.anyEventHandler)
     def outputForScript(self, widget, *args):
         return self._outputForScript(*args)
     def _outputForScript(self, *args):
         return self.name
     def generate(self, argumentString):
-        self.widget.emit(self.signalName)
+        try:
+            self.widget.emit(self.signalName)
+        except TypeError:
+            # The simplest way I could find to fake a gtk.gdk.Event
+            self.widget.emit(self.signalName, self.anyEvent)
 
 class ActivateEvent(SignalEvent):
     def __init__(self, name, widget, active = gtk.TRUE):
@@ -230,7 +246,7 @@ class ScriptEngine(usecase.ScriptEngine):
         entry = gtk.Entry()
         entry.set_text(defaultValue)
         if self.hasScript():
-            stateChangeName = "enter " + self.standardName(description) + " ="
+            stateChangeName = self.standardName(description)
             entryEvent = EntryEvent(stateChangeName, entry)
             if self.recordScript:
                 entryEvent.widget.connect("editing-done", self.recordScript.writeEvent, entryEvent)

@@ -263,9 +263,6 @@ class MakeComparisons(plugins.Action):
         self.categorise(testComparison)
         self.describe(test, testComparison.getPostText())
         test.changeState(testComparison)
-    def fileFinders(self, test):
-        defaultFinder = test.app.name + test.app.versionSuffix() + test.getTmpExtension(), ""
-        return [ defaultFinder ]
     def setUpSuite(self, suite):
         self.describe(suite)
     def categorise(self, state):

@@ -232,14 +232,14 @@ class TreeSelectionSignalEvent(TreeSignalEvent):
 
 class ScriptEngine(usecase.ScriptEngine):
     def connect(self, eventName, signalName, widget, method = None, argumentParseData = None, *data):
-        if self.hasScript():
+        if self.active():
             stdName = self.standardName(eventName)
             signalEvent = self._createSignalEvent(signalName, stdName, widget, argumentParseData)
             self._addEventToScripts(signalEvent)
         if method:
             widget.connect(signalName, method, *data)
     def monitorTreeSelection(self, additionName, removalName, selection, argumentParseData):
-        if self.hasScript():
+        if self.active():
             addEvent = TreeSelectionSignalEvent(self.standardName(additionName), selection, "changed", 1, argumentParseData)
             remEvent = TreeSelectionSignalEvent(self.standardName(removalName), selection, "changed", -1, argumentParseData)
             self._addEventToScripts(addEvent)
@@ -254,11 +254,11 @@ class ScriptEngine(usecase.ScriptEngine):
     def createEntry(self, description, defaultValue):
         entry = gtk.Entry()
         entry.set_text(defaultValue)
-        if self.hasScript():
+        if self.active():
             stateChangeName = self.standardName(description)
             entryEvent = EntryEvent(stateChangeName, entry)
-            if self.recordScript:
-                entryEvent.widget.connect("activate", self.recordScript.writeEvent, entryEvent)
+            if self.recorderActive():
+                entryEvent.widget.connect("activate", self.recorder.writeEvent, entryEvent)
             self._addEventToScripts(entryEvent)
         return entry
     def createNotebook(self, description, pages):
@@ -266,7 +266,7 @@ class ScriptEngine(usecase.ScriptEngine):
         for page, tabText in pages:
             label = gtk.Label(tabText)
             notebook.append_page(page, label)
-        if self.hasScript():
+        if self.active():
             stateChangeName = self.standardName(description)
             event = NotebookPageChangeEvent(stateChangeName, notebook)
             self._addEventToScripts(event)
@@ -276,7 +276,7 @@ class ScriptEngine(usecase.ScriptEngine):
         if defaultValue:
             button.set_active(gtk.TRUE)
 
-        if self.hasScript():
+        if self.active():
             checkChangeName = "check " + self.standardName(description)
             uncheckChangeName = "uncheck " + self.standardName(description)
             checkEvent = ActivateEvent(checkChangeName, button)
@@ -284,15 +284,93 @@ class ScriptEngine(usecase.ScriptEngine):
             self._addEventToScripts(checkEvent)
             self._addEventToScripts(uncheckEvent)
         return button
+    def createShortcutBar(self):
+        # Standard thing to add at the bottom of the GUI...
+        buttonbox = gtk.HBox()
+        existingbox = self.createExistingShortcutBox()
+        buttonbox.pack_start(existingbox, expand=gtk.FALSE, fill=gtk.FALSE)
+        newbox = gtk.HBox()
+        self.addNewButton(newbox)
+        self.addStopControls(newbox, existingbox)
+        buttonbox.pack_start(newbox, expand=gtk.FALSE, fill=gtk.FALSE)
+        existingbox.show()
+        newbox.show()
+        return buttonbox
 #private
-    def createReplayScript(self, scriptName, logger):
-        return ReplayScript(scriptName, logger)
+    def getShortcutFiles(self):
+        files = []
+        usecaseDir = os.environ["USECASE_HOME"]
+        if not os.path.isdir(usecaseDir):
+            return files
+        for fileName in os.listdir(usecaseDir):
+            if fileName.endswith(".shortcut"):
+                files.append(os.path.join(os.environ["USECASE_HOME"], fileName))
+        return files
+    def createExistingShortcutBox(self):
+        buttonbox = gtk.HBox()
+        files = self.getShortcutFiles()
+        label = gtk.Label("Shortcuts:")
+        buttonbox.pack_start(label, expand=gtk.FALSE, fill=gtk.FALSE)
+        for fileName in files:
+            buttonName = self.getShortcutButtonName(fileName)
+            self.addShortcutButton(buttonbox, buttonName, fileName)
+        label.show()
+        return buttonbox
+    def addNewButton(self, buttonbox):
+        newButton = gtk.Button()
+        newButton.set_label("New")
+        self.connect("create new shortcut", "clicked", newButton, self.createShortcut, None, buttonbox)
+        newButton.show()
+        buttonbox.pack_start(newButton, expand=gtk.FALSE, fill=gtk.FALSE)
+    def addShortcutButton(self, buttonbox, buttonName, fileName):
+        button = gtk.Button()
+        button.set_label(buttonName)
+        self.connect(buttonName.lower(), "clicked", button, self.replayShortcut, None, fileName)
+        button.show()
+        buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
+    def addStopControls(self, buttonbox, existingbox):
+        label = gtk.Label("Recording shortcut named:")
+        buttonbox.pack_start(label, expand=gtk.FALSE, fill=gtk.FALSE)
+        entry = self.createEntry("set shortcut name to", "")
+        buttonbox.pack_start(entry, expand=gtk.FALSE, fill=gtk.FALSE)
+        stopButton = gtk.Button()
+        stopButton.set_label("Stop")
+        self.connect("stop recording", "clicked", stopButton, self.stopRecording, None, label, entry, buttonbox, existingbox)
+        self.recorder.blockTopLevel("stop recording")
+        self.recorder.blockTopLevel("set shortcut name to")
+        buttonbox.pack_start(stopButton, expand=gtk.FALSE, fill=gtk.FALSE)
+    def createShortcut(self, button, buttonbox, *args):
+        buttonbox.show_all()
+        button.hide()
+        tmpFileName = self.getTmpShortcutName()
+        self.recorder.addScript(tmpFileName)
+    def stopRecording(self, button, label, entry, buttonbox, existingbox, *args):
+        self.recorder.terminateScript()
+        buttonbox.show_all()
+        button.hide()
+        label.hide()
+        entry.hide()
+        buttonName = entry.get_text()
+        newScriptName = self.getShortcutFileName(buttonName)
+        if not os.path.isfile(newScriptName):
+            self.addShortcutButton(existingbox, buttonName, newScriptName)
+        os.rename(self.getTmpShortcutName(), newScriptName)
+    def replayShortcut(self, button, fileName, *args):
+        self.replayer.addScript(fileName)
+    def getTmpShortcutName(self):
+        return os.path.join(os.environ["USECASE_HOME"], "new_shortcut")
+    def getShortcutButtonName(self, fileName):
+        return os.path.basename(fileName).split(".")[0].replace("_", " ")
+    def getShortcutFileName(self, buttonName):
+        return os.path.join(os.environ["USECASE_HOME"], buttonName.replace(" ", "_") + ".shortcut")
+    def createReplayer(self, logger):
+        return UseCaseReplayer(logger)
     def _addEventToScripts(self, event):
-        if self.replayScript:
-            self.replayScript.addEvent(event)
-        if self.recordScript:
-            self.recordScript.addEvent(event)
-            event.widget.connect(event.signalName, self.recordScript.writeEvent, event)
+        if self.replayerActive():
+            self.replayer.addEvent(event)
+        if self.recorderActive():
+            self.recorder.addEvent(event)
+            event.widget.connect(event.signalName, self.recorder.writeEvent, event)
     def _createSignalEvent(self, signalName, eventName, widget, argumentParseData):
         if signalName == "response":
             return ResponseEvent(eventName, widget, argumentParseData)
@@ -302,18 +380,17 @@ class ScriptEngine(usecase.ScriptEngine):
             return SignalEvent(eventName, widget, signalName)
     def _setMonitoring(self, selection, active):
         # Allow disabling and enabling of the tree selection monitoring. This to avoid recording changes made programatically
-        if self.recordScript:
-            for event in self.recordScript.events:
+        if self.recorderActive():
+            for event in self.recorder.events:
                 if event.widget == selection:
                     event.setMonitoring(active)
-    
 
 # Use the GTK idle handlers instead of a separate thread for replay execution
-class ReplayScript(usecase.ReplayScript):
+class UseCaseReplayer(usecase.UseCaseReplayer):
      def executeCommandsInBackground(self):
          gtk.idle_add(self.runNextCommand)
      def runNextCommand(self):
-         retValue = usecase.ReplayScript.runNextCommand(self)
+         retValue = usecase.UseCaseReplayer.runNextCommand(self)
          if retValue:
              return gtk.TRUE
          else:

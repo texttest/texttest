@@ -39,7 +39,7 @@ class TextTestGUI:
         guiplugins.setUpGuiLog()
         global guilog, scriptEngine
         from guiplugins import guilog
-        scriptEngine = ScriptEngine(guilog)
+        scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic
@@ -58,7 +58,14 @@ class TextTestGUI:
         else:
             win.set_title("TextTest static GUI (test management)")
         scriptEngine.connect("close window", "delete_event", win, self.exit)
-        vbox = self.createWindowContents(testWins)
+
+        mainWindow = self.createWindowContents(testWins)
+        shortcutBar = scriptEngine.createShortcutBar()
+        vbox = gtk.VBox()
+        vbox.pack_start(mainWindow, expand=gtk.TRUE, fill=gtk.TRUE)
+        vbox.pack_start(shortcutBar, expand=gtk.FALSE, fill=gtk.FALSE)
+        #shortcutBar.show()
+        vbox.show()
         win.add(vbox)
         win.show()
         win.resize(self.getWindowWidth(), self.getWindowHeight())

@@ -229,12 +229,16 @@ class CalculateKPIs(TestReport):
 class MakeProgressReport(TestReport):
     def __init__(self, referenceVersion):
         TestReport.__init__(self, referenceVersion)
-        self.kpi = 1.0
+        self.totalKpi = 1.0
         self.testCount = 0
+        self.bestKpi = 1.0
+        self.worstKpi = 1.0
     def __del__(self):
         if self.testCount > 0:
-            avg = math.pow(self.kpi, 1.0 / float(self.testCount))
+            avg = math.pow(self.totalKpi, 1.0 / float(self.testCount))
             print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
+            print "Best KPI with respect to version", self.referenceVersion, "=", self.percent(self.bestKpi)
+            print "Worst KPI with respect to version", self.referenceVersion, "=", self.percent(self.worstKpi)
     def __repr__(self):
         return "Comparison on"
     def setUpApplication(self, app):
@@ -254,7 +258,11 @@ class MakeProgressReport(TestReport):
         if refTTWC > 0:
             kpi = float(currTTWC) / float(refTTWC)
             if kpi > 0:
-                self.kpi *= kpi
+                self.totalKpi *= kpi
+                if kpi > self.worstKpi:
+                    self.worstKpi = kpi
+                if kpi < self.bestKpi:
+                    self.bestKpi = kpi
             return self.percent(kpi)
         else:
             return "NaN%"

@@ -313,6 +313,8 @@ class CompileRules(plugins.Action):
     def __call__(self, test):
         if self.raveName and (not self.filter or self.filter.acceptsTestCase(test)):
             return self.compileRulesForTest(test)
+        else:
+            self.diag.info("Rejecting ruleset compile for " + test.name)
     def compileRulesForTest(self, test):
         arch = getArchitecture(test.app)
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
@@ -372,6 +374,7 @@ class CompileRules(plugins.Action):
     def setUpSuite(self, suite):
         if self.filter and not self.filter.acceptsTestSuite(suite):
             self.raveName = None
+            self.diag.info("Rejecting ruleset compile for " + suite.name)
             return
         self.describe(suite)
         if self.raveName == None:
@@ -482,7 +485,8 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
 
         carmtmp = suite.environment["CARMTMP"]
         self.diag.info("CARMTMP: " + carmtmp)
-        return carmtmp.find(os.environ["CARMSYS"]) != -1
+        # Ruleset is local if CARMTMP depends on the CARMSYS or the user's home directory  
+        return carmtmp.find(os.environ["CARMSYS"]) != -1 or carmtmp.find(os.environ["HOME"]) != -1
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
 

@@ -1213,9 +1213,9 @@ class ApplicationRunner:
             except KeyboardInterrupt:
                 raise sys.exc_type, sys.exc_value
             except:
-                printException()
                 message = str(sys.exc_value)
                 if sys.exc_type != plugins.TextTestError:
+                    printException()
                     message = str(sys.exc_type) + ": " + message
                 raise BadConfigError, message
         self.testSuite.tearDownEnvironment()

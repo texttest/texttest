@@ -554,6 +554,7 @@ class ProcessProfilerResults(plugins.Action):
 
 class BuildCode(plugins.Action):
     builtDirs = {}
+    buildFailedDirs = {}
     def __init__(self, target, remote = 1):
         self.target = target
         self.remote = remote
@@ -565,13 +566,17 @@ class BuildCode(plugins.Action):
         arch = getArchitecture(app)
         if not self.builtDirs.has_key(arch):
             self.builtDirs[arch] = []
+            self.buildFailedDirs[arch] = []
         for optValue in targetDir[self.target]:
             relPath, makeTargets = self.getPathAndTargets(optValue)
             absPath = app.makeAbsPath(relPath)
             if absPath in self.builtDirs[arch]:
                 print "Already built on", arch, "under", absPath, "- skipping build"
-                return
-            self.builtDirs[arch].append(absPath)
+                continue
+            if absPath in self.buildFailedDirs[arch]:
+                raise plugins.TextTestError, "BUILD ERROR: " + repr(app) + " depends on already failed build " + os.linesep \
+                      + "(Build in " + absPath + " on " + arch + ")"
+            
             if os.path.isdir(absPath):
                 self.buildLocal(absPath, app, makeTargets)
             else:
@@ -615,15 +620,18 @@ class BuildCode(plugins.Action):
         return commandLine
     def buildLocal(self, absPath, app, makeTargets):
         os.chdir(absPath)
-        print "Building", app, "in", absPath, "..."
         arch = getArchitecture(app)
         buildFile = "build.default." + arch
         commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& " + buildFile)
         machine = self.getMachine(app, arch)
+        print "Building", app, "in", absPath, "on", machine, "..."
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
-            raise plugins.TextTestError, "Product " + repr(app) + " did not build, exiting"
+            self.buildFailedDirs[arch].append(absPath)
+            raise plugins.TextTestError, "BUILD ERROR: Product " + repr(app) + " did not build!" + os.linesep + \
+                  "(See " + os.path.join(absPath, buildFile) + " for details)"
         print "Product", app, "built correctly in", absPath
+        self.builtDirs[arch].append(absPath)
         os.remove(buildFile)
         if os.environ.has_key("CARMSYS"):
             commandLine = self.getRemoteCommandLine(arch, absPath, "gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null")

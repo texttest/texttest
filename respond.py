@@ -87,12 +87,16 @@ class InteractiveResponder(Responder):
 class UNIXInteractiveResponder(InteractiveResponder):
     def __init__(self, lineCount):
         self.lineCount = lineCount
+    def useGraphicalComparison(self, comparison, displayStream, app):
+        if not os.environ.has_key("DISPLAY") or plugins.BackgroundProcess.fakeProcesses:
+            return 0
+        return displayStream == sys.stdout and repr(comparison) == app.getConfigValue("log_file")
     def display(self, comparison, displayStream, app):
         if comparison.newResult():
             argumentString = " /dev/null " + comparison.tmpFile
         else:
             argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
-        if os.environ.has_key("DISPLAY") and displayStream == sys.stdout and repr(comparison) == app.getConfigValue("log_file"):
+        if self.useGraphicalComparison(comparison, displayStream, app):
             print "<See tkdiff window>"
             os.system("tkdiff" + argumentString + " &")
         else:

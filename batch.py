@@ -54,6 +54,7 @@ class BatchFilter(plugins.Filter):
         allowedVersions = app.getConfigList(self.batchSession + "_version")
         if len(allowedVersions) == 0:
             return None
+        allowedVersions = map(string.strip, allowedVersions)
         for version in app.versions:
             if not version in allowedVersions:
                 return version

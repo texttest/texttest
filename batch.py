@@ -142,7 +142,7 @@ class BatchResponder(respond.Responder):
         for category in self.categories.values():
             category.addSuite(suite)
     def failureCount(self):
-        return len(self.failureDetail) + len(self.crashDetail) + len(self.deadDetail) + self.categories["badPredict"].count
+        return self.testCount() - self.categories["success"].count
     def testCount(self):
         count = 0
         for category in self.categories.values():
@@ -326,7 +326,13 @@ class CollectFiles(plugins.Action):
                     totalValues[i] += int(catValues[i])
                 fileBodies.append(file.read())
                 file.close()
-                os.remove(fullname)
+                try:
+                    os.remove(fullname)
+                except OSError:
+                    print "Don't have permissions to remove file", fullname
+        if len(fileBodies) == 0:
+            return
+        
         mailTitle = self.getTitle(app, totalValues)
         mailFile = self.mailSender.createMail(mailTitle, app, [])
         self.writeBody(mailFile, fileBodies)

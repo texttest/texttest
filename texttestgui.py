@@ -4,7 +4,7 @@
 
 import guiplugins, plugins, comparetest, gtk, gobject, os, string, time, sys
 from threading import Thread, currentThread
-from gtkusecase import ScriptEngine
+from gtkusecase import ScriptEngine, TreeModelIndexer
 from Queue import Queue, Empty
 from ndict import seqdict
 
@@ -199,9 +199,11 @@ class TextTestGUI:
             perfColumn = gtk.TreeViewColumn("Details", renderer, text=4, background=5)
             view.append_column(perfColumn)
         view.expand_all()
+        modelIndexer = TreeModelIndexer(self.model, column, 3)
+        # The order of these two is vital!
+        scriptEngine.connect("select test", "row_activated", view, self.viewTest, modelIndexer)
         if not self.dynamic:
-            scriptEngine.monitorTreeSelection("add to test selection", "remove from test selection", self.selection, argumentParseData=(column, 3))
-        scriptEngine.connect("select test", "row_activated", view, self.viewTest, argumentParseData=(column, 3))
+            scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
         view.show()
 
         # Create scrollbars around the view.
@@ -297,8 +299,11 @@ class TextTestGUI:
         newTest.observers.append(self)
         guilog.info("Viewing new test " + newTest.name)
         self.recreateTestView(newTest)
+        self.markAndExpand(iter)
+    def markAndExpand(self, iter):
         self.selection.get_tree_view().expand_all()
-        scriptEngine.setSelection(self.selection, [ iter ])
+        self.selection.unselect_all()
+        self.selection.select_iter(iter)
     def redoOrder(self, suite, suiteIter):
         iter = self.model.iter_children(suiteIter)
         for i in range(len(suite.testcases)):
@@ -306,8 +311,7 @@ class TextTestGUI:
         for test in suite.testcases:
             iter = self.addSuiteWithParent(test, suiteIter)
         self.createSubIterMap(suiteIter, newTest=0)
-        self.selection.get_tree_view().expand_all()
-        scriptEngine.setSelection(self.selection, [ suiteIter ])
+        self.markAndExpand(suiteIter)
     def exit(self, *args):
         gtk.main_quit()
         sys.stdout.flush()
@@ -346,7 +350,7 @@ class TextTestGUI:
                 self.recreateTestView(app)
     def viewTest(self, view, path, column, *args):
         iter = self.model.get_iter(path)
-        scriptEngine.setSelection(self.selection, [ iter ])
+        self.selection.select_iter(iter)
         self.viewTestAtIter(iter)
     def viewTestAtIter(self, iter):
         test = self.model.get_value(iter, 2)
@@ -404,7 +408,8 @@ class RightWindowGUI:
             perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)
             view.append_column(perfColumn)
         view.expand_all()
-        scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, (column, 0))
+        indexer = TreeModelIndexer(self.model, column, 0)
+        scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, indexer)
         view.show()
         return view
     def makeActionInstances(self):
@@ -579,7 +584,9 @@ class ApplicationGUI(RightWindowGUI):
             if self.app.extra:
                 extraSuite = action.performOn(self.app.extra, self.getSelectedTests())
                 iterlist += self.getSelectedIters(extraSuite)
-            scriptEngine.setSelection(self.selection, iterlist)
+            self.selection.unselect_all()
+            for iter in iterlist:
+                self.selection.select_iter(iter)
             self.selection.get_tree_view().grab_focus()
             guilog.info("Marking " + str(len(self.getSelectedTests())) + " tests as selected")
     def getSelectedIters(self, suite):

@@ -108,7 +108,9 @@ class MatadorConfig(optimization.OptimizationConfig):
 class CopyDiagnostics(plugins.Action):
     def __call__(self, test):
         os.mkdir("Diagnostics")
-        shutil.copyfile(os.path.join(test.abspath, "Diagnostics", "diagnostics.etab"), "Diagnostics")
+        sourceFile = os.path.join(test.abspath, "Diagnostics", "diagnostics.etab")
+        destFile = os.path.join(os.getcwd(), "Diagnostics", "diagnostics.etab")
+        shutil.copyfile(sourceFile, destFile)
 
 class CopySecretParameter(plugins.Action):
     def __call__(self, test):

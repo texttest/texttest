@@ -340,7 +340,7 @@ class TestCaseGUI:
                 elif not fileComparison.newResult():
                     self.addComparison(compiter, name, fileComparison, "red")
             for fc in testComparison.newResults:
-                self.addComparison(newiter, fc.stdFile, fc, "red")
+                self.addComparison(newiter, os.path.basename(fc.stdFile), fc, "red")
         except AttributeError:
             pass
     def addComparison(self, iter, name, comp, colour):

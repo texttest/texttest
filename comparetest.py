@@ -82,7 +82,7 @@ class TestComparison:
         fileList.sort()
         for file in fileList:
             if os.path.isdir(file):
-                self.makeComparisons(test, file)
+                self.makeComparisons(test, os.path.join(dir, file))
             elif self.shouldCompare(file, dir):
                 fullPath = os.path.join(dir, file)
                 stdFile = os.path.normpath(fullPath.replace(test.getTmpIdentifier(), ""))

@@ -596,7 +596,11 @@ class ApplicationGUI(RightWindowGUI):
                 iters += self.getSelectedIters(test)
             return iters
         except AttributeError:
-            return [ self.itermap[suite.app][suite.abspath] ]    
+            iterMapApp = self.itermap[suite.app]
+            if iterMapApp.has_key(suite.abspath):
+                return [ iterMapApp[suite.abspath] ]
+            else:
+                return []
     def getSelectedTests(self):
         tests = []
         self.selection.selected_foreach(self.addSelTest, tests)

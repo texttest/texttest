@@ -52,7 +52,7 @@ batchInfo = """
              Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
              at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
-import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, predict
+import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, time, predict
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -177,17 +177,26 @@ class CompileRules(plugins.Action):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
             commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile
             self.rulesCompiled.append(ruleset.name)
-            compTmp = test.getTmpFileName("ravecompile", "w")
-            returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
-            if returnValue:
+            errorMessage = self.performCompile(test, commandLine)
+            if errorMessage:
                 self.rulesCompileFailed.append(ruleset.name)
-                errContents = string.join(open(compTmp).readlines(),"")
-                os.remove(compTmp)
-                print "Failed to build ruleset " + ruleset.name + os.linesep + errContents
-                raise plugins.TextTestError, "Failed to build ruleset " + ruleset.name + os.linesep + errContents
-            os.remove(compTmp)
+                print "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
+                raise plugins.TextTestError, "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
+    def performCompile(self, test, commandLine):
+        compTmp = test.getTmpFileName("ravecompile", "w")
+        returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
+        if returnValue:
+            errContents = string.join(open(compTmp).readlines(),"")
+            if errContents.find("already being compiled by") != -1:
+                print test.getIndent() + "Waiting for other compilation to finish..."
+                time.sleep(30)
+                return self.performCompile(test, commandLine)
+            os.remove(compTmp)
+            return errContents
+        os.remove(compTmp)
+        return ""
     def setUpSuite(self, suite):
         self.describe(suite)
         self.rulesCompiled = []

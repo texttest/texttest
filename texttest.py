@@ -136,8 +136,9 @@ class TestCase(Test):
         # we are in parallel mode and the files are less than 2 days old
         if mode == "w":
             for file in os.listdir(self.abspath):
-                if file.find(prefix) != -1 and file.find(self.getTestUser()) != -1:
+                if file.find(prefix + self.getTestUser()) != -1:
                     if not self.app.parallelMode or self.isOutdated(file):
+                        debugLog.info("Cleaning previous file " + file)
                         os.remove(file)
         return fileName
     def isOutdated(self, filename):

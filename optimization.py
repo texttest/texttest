@@ -45,6 +45,8 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                No line type grouping for different versions of the test.
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
+                             - sg
+                               Plot all tests chosen on the same graph, rather than one window per test
                                
 optimization.JoinPlot      - As PlotTest above but allows plots of multiple apps in same diag
 
@@ -906,8 +908,13 @@ class PlotTest(plugins.Action):
         self.plotVersionColoring = 1
         self.plotUseTmpStatus = 1
         self.plotStates = [ "" ]
-        self.interpretOptions(args)
         self.yLabel = ""
+        self.plotInSameGraph = 0
+        # Must be last in the constructor
+        self.interpretOptions(args)
+    def __del__(self):
+        if self.plotInSameGraph:
+            self.plotGraph()
     # Interactive stuff
     def getTitle(self):
         return "Plot Graph"
@@ -948,6 +955,8 @@ class PlotTest(plugins.Action):
                 self.plotUseTmpStatus = 0
             elif arr[0]=="nv":
                 self.plotVersionColoring = 0
+            elif arr[0]=="sg":
+                self.plotInSameGraph = 1
             elif arr[0]=="i":
                 parts = arr[1].split(":")
                 if len(parts) < 2:
@@ -1055,4 +1064,5 @@ class PlotTest(plugins.Action):
                     else:
                         plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[usePlotItem]) + os.linesep)
                 self.plotFiles.append(plotFileName)
-        self.plotGraph()
+        if not self.plotInSameGraph:
+            self.plotGraph()

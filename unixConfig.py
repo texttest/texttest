@@ -143,6 +143,9 @@ class RunTest(default.RunTest):
     def killServer(self, server):
         # Xvfb servers get overloaded after a while. If they do, kill them
         line = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep 42 | grep -v grep'").readline()
+        if len(line) == 0:
+            # We will only kill servers that were started by TextTest (have number 42!)
+            return
         # On Linux fourth column of ps output is pid
         pidStr = line.split()[3]
         os.system("remsh " + server + " 'kill -9 " + pidStr + " >& /dev/null &' < /dev/null >& /dev/null &")

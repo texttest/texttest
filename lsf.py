@@ -57,7 +57,10 @@ class QueueSystem:
                 others.append(resource)
             else:
                 selectResources.append(resource)
-        return self.getSelectResourceArg(selectResources) + " " + string.join(others)
+        if len(selectResources) == 0:
+            return string.join(others)
+        else:
+            return self.getSelectResourceArg(selectResources) + " " + string.join(others)
     def getSelectResourceArg(self, resourceList):
         if len(resourceList) == 1:
             return self.formatResource(resourceList[0])

@@ -232,12 +232,16 @@ class RecordTest(InteractiveAction):
         if not os.path.isfile(test.useCaseFile):
             if not plugins.BackgroundProcess.fakeProcesses: # do not make this check when running self tests
                 raise plugins.TextTestError, "Recording did not produce a usecase file"
+
+        test.state.freeText = "Recorded use case - now attempting to replay in the background to collect standard files" + \
+                              os.linesep + "These will appear shortly. You do not need to submit the test manually."
+        test.notifyChanged()
         ttOptions = self.getRunOptions(test)
         commandLine = self.getTextTestName() + " " + ttOptions + " > /dev/null 2>&1"
         guilog.info("Starting replay TextTest with options : " + ttOptions)
-        process = self.startExternalProgram(commandLine)
-        process.waitForTermination()
-        test.state.freeText = "Recorded use case"
+        process = self.startExternalProgram(commandLine, exitHandler=self.setTestReady, exitHandlerArgs=(test,))
+    def setTestReady(self, test):
+        test.state.freeText = "Recorded use case and collected all standard files"
         test.notifyChanged()
     def getRunOptions(self, test):
         basicOptions = "-t " + self.test.name + " -a " + self.test.app.name# + " -ts " + self.test.parent.name

@@ -75,6 +75,8 @@ signal.signal(signal.SIGUSR2, tenMinutesToGo)
 # Use the non-monitoring version of run test, but the rest from unix
 class RunTestInSlave(unixConfig.RunTest):
     def runTest(self, test):
+        # Debug, to try and get more info
+        print "Running test from directory", os.getcwd()
         default.RunTest.runTest(self, test)
     def setUpVirtualDisplay(self, app):
         # Assume the master sets DISPLAY for us

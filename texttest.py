@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, types, string, getopt, types, time, re, plugins, exceptions, stat, log4py, shutil
+import os, sys, types, string, getopt, types, time, plugins, exceptions, stat, log4py, shutil
 from stat import *
 
 helpIntro = """
@@ -359,7 +359,6 @@ class Application:
         self.configObject = self.makeConfigObject(optionMap)
         self.setConfigDefault("keeptmp_default", 0)
         self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
-        self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
         self.setConfigDefault("extra_version", "none")
         self.setConfigDefault("write_tmp_files", "~/texttesttmp")
         root = os.path.expanduser(self.getConfigValue("write_tmp_files"))
@@ -446,9 +445,6 @@ class Application:
         return self.name + self.versionSuffix() + globalRunIdentifier
     def getTestUser(self):
         return tmpString()
-    def hasREpattern(self, txt):
-    	# return 1 if txt contains a regular expression meta character
-	return self.specialChars.search(txt) != None
     def ownsFile(self, fileName):
         # We can claim all environment files...
         if fileName.startswith("environment"):
@@ -524,63 +520,6 @@ class Application:
             self.configDir[key] = value
     def addToConfigList(self, key, value):
         self.configDir.addEntry(key, value)
-    def filterFile(self, fileName, newFileName, makeNew = 0):
-        stem = os.path.basename(fileName).split('.')[0]
-        if not self.configDir.has_key(stem) or not os.path.isfile(fileName):
-            debugLog.info("No filter for " + fileName)
-            return fileName
-
-        # Don't recreate filtered files
-        if os.path.isfile(newFileName):
-            if makeNew:
-                os.remove(newFileName)
-            else:
-                return newFileName
-        
-        oldFile = open(fileName)
-        newFile = open(newFileName, "w")
-        forbiddenText = self.getConfigList(stem)
-        linesToRemove = 0
-        lineNumber = 0
-        for line in oldFile.readlines():
-            lineNumber += 1
-            linesToRemove += self.calculateLinesToRemove(line, lineNumber, forbiddenText)
-            if linesToRemove == 0:
-                newFile.write(line)
-            else:
-                linesToRemove -= 1
-        newFile.close()
-        debugLog.info("Filter for " + fileName + " returned " + newFileName)
-        return newFileName
-#private:
-    def matchRE(self, ptn, text):
-	if re.compile(ptn).search(text):
-	    return 1
-	return 0
-    def matchPlain(self, ptn, text):
-    	if text.find(ptn) != -1:
-	    return 1
-	return 0
-    def calculateLinesToRemove(self, line, lineNumber, forbiddenText):
-        lineNumberString = "{LINE " + str(lineNumber) + "}"
-        for text in forbiddenText:
-            if text == lineNumberString:
-                return 1
-            searchText = text
-            linePoint = text.find("{LINES:")
-            if linePoint != -1:
-                searchText = text[:linePoint]
-	    if self.hasREpattern(searchText):
-            	found = self.matchRE(searchText, line[:-1])
-	    else:
-	    	found = self.matchPlain(searchText, line[:-1])
-            if found:
-                if linePoint != -1:
-                    var, val = text[linePoint + 1:-1].split(":")
-                    return int(val)
-                else:
-                    return 1
-        return 0
     def makeCheckout(self, optionMap):
         if optionMap.has_key("c"):
             checkout = optionMap["c"]

@@ -3,10 +3,22 @@
 helpDescription = """
 Evaluation of test results consists by default of comparing all files that have been collected.
 If nothing else is specified, the application's standard output is collected in output.<app>
-and standard error is collected in errors.<app>. All files, including these two, are then
-filtered using the config file list entries corresponding to the stem of the file name (e.g  "output").
-This will remove all run-dependent text like process IDs, timestamps etc., and ensure
-that false failures are avoided in this way.
+and standard error is collected in errors.<app>.
+
+All files, including these two, are then filtered using the config file list entries corresponding
+to the stem of the file name (e.g  "output"). This will remove all run-dependent text like process
+IDs, timestamps etc., and ensure that false failures are avoided in this way.
+
+Various extensions are available. The following is a summary of what will happen...
+
+output:remove this          - Lines containing the text "remove this" in the file output are filtered out
+output:remove this{LINES:3} - Any line containing the text "remove this" will cause 3 lines starting
+                              with it to be filtered out
+output:{LINE 5}             - will cause the fifth line to be filtered out
+my_file:remove this{WORD 1} - Lines containing the text "remove this" in my_file will have their 1st word
+                              filtered out
+output:start{->}end         - On encountering the text "start", all lines are filtered out until the text
+                              "end" is encountered.
 
 If standard results have not already been collected, the results are reported as new results
 and must be checked carefully by hand and saved if correct. If standard results have been
@@ -14,7 +26,7 @@ collected, the filtered new results are compared with the standard and any diffe
 is interpreted as a test failure. 
 """
 
-import os, filecmp, string, plugins
+import os, filecmp, string, plugins, re
 
 class TestComparison:
     scoreTable = {}
@@ -159,11 +171,13 @@ class FileComparison:
     def __init__(self, test, standardFile, tmpFile, makeNew = 0):
         self.stdFile = standardFile
         self.tmpFile = tmpFile
-        self.stdCmpFile = test.app.filterFile(standardFile, tmpFile + "origcmp")
+        stem = os.path.basename(tmpFile).split('.')[0]
+        filter = RunDependentTextFilter(test.app, stem)
+        self.stdCmpFile = filter.filterFile(standardFile, tmpFile + "origcmp")
         tmpCmpFileName = tmpFile + "cmp"
         if makeNew:
             tmpCmpFileName = tmpFile + "partcmp"
-        self.tmpCmpFile = test.app.filterFile(tmpFile, tmpCmpFileName, makeNew)
+        self.tmpCmpFile = filter.filterFile(tmpFile, tmpCmpFileName, makeNew)
         self.test = test
     def __repr__(self):
         return os.path.basename(self.stdFile).split('.')[0]
@@ -190,4 +204,82 @@ class FileComparison:
     def saveResults(self, destFile):
         os.rename(self.tmpFile, destFile)
         
+class RunDependentTextFilter:
+    def __init__(self, app, stem):
+        self.diag = plugins.getDiagnostics("Run Dependent Text")
+        self.lineFilters = []
+        for text in app.getConfigList(stem):
+            self.lineFilters.append(LineFilter(text))
+    def filterFile(self, fileName, newFileName, makeNew = 0):
+        if not len(self.lineFilters) or not os.path.isfile(fileName):
+            self.diag.info("No filter for " + fileName)
+            return fileName
+
+        # Don't recreate filtered files
+        if os.path.isfile(newFileName):
+            if makeNew:
+                os.remove(newFileName)
+            else:
+                return newFileName
+        
+        oldFile = open(fileName)
+        newFile = open(newFileName, "w")
+        linesToRemove = 0
+        lineNumber = 0
+        for line in oldFile.readlines():
+            lineNumber += 1
+            linesToRemove += self.calculateLinesToRemove(line, lineNumber)
+            if linesToRemove == 0:
+                newFile.write(line)
+            else:
+                linesToRemove -= 1
+        newFile.close()
+        self.diag.info("Filter for " + fileName + " returned " + newFileName)
+        return newFileName
+    def calculateLinesToRemove(self, line, lineNumber):
+        for lineFilter in self.lineFilters:
+            toRemove = lineFilter.calculateLinesToRemove(line, lineNumber)
+            if toRemove:
+                return toRemove
+        return 0
+
+class LineFilter:
+    specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
+    def __init__(self, text):
+        self.triggerText = text
+        self.triggerNumber = 0
+        self.linesToRemove = 1
+        linePoint = text.find("{LINES:")
+        if linePoint != -1:
+            self.triggerText = text[:linePoint]
+            var, val = text[linePoint + 1:-1].split(":")
+            self.linesToRemove = int(val)
+        else:
+            linePoint = text.find("{LINE")
+            if linePoint != -1:
+                self.triggerText = None
+                self.triggerNumber = int(text[6:-1])
+        self.regex = self.getRegularExpression()
+    def getRegularExpression(self):
+        if not self.triggerText:
+            return None
+        if self.specialChars.search(self.triggerText) != None:
+            return re.compile(self.triggerText)
+        else:
+            return None
+    def calculateLinesToRemove(self, line, lineNumber):
+        if self.triggerNumber == lineNumber:
+            return 1
+
+        if self.hasMatch(line.strip()):
+            return self.linesToRemove
+        else:
+            return 0
+    def hasMatch(self, line):
+        if self.regex:
+            return self.regex.search(line)
+        elif self.triggerText:
+            return line.find(self.triggerText) != -1
+        else:
+            return 0
 

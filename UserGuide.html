@@ -161,7 +161,7 @@ read as well as those for v2.
 <p>It can be useful to start another version all the time when running
 tests, so that -v &lt;version1> behaves like - v &lt;version1>,&lt;version2>
 at all
-<br>times (or no option behaves like -v ,&lt;version1>).&nbsp;This is achieved
+<br>times (or no option behaves like -v ,&lt;version1>). This is achieved
 by adding the line "extra_version:v1" to the relevant config file.
 <p><u>Checkouts of Applications</u>
 <br>It is expected that TextTest test suites will want to be version-controlled,
@@ -186,15 +186,25 @@ start with,&nbsp; the operating system path separator) are paths relative
 to the checkout, and
 <br>hence the checkout name will be pre-pended to these before they are
 used.
-<p><u>File Management and Parallel Mode</u>
+<p><u>File Management and Keeping Temporary Files</u>
 <br>Each time you call TextTest, your run is assigned a unique identifier
 based on the version, your user name and the time stamp.
-<br>All temporary files created will use this identifier.
-<p>The framework will generally clean up any files created by previous
-runs that have the same version and user name. If you wish to
-<br>disable this to run the same tests in parallel, you must specify -p
-on the command line, which essentially tells the framework to
-<br>leave alone all files and directories created by previous runs.
+<br>All temporary files created will be created under a root temporary
+directory with this identifier. The location of this is controlled
+<br>by the config file entry "write_tmp_files", and defaults to ~/texttesttmp
+on UNIX&nbsp;systems.
+<p>When the run finishes, you will be given an opportunity to save any
+new results that may have been found. If you do not do this, the
+<br>files will be removed when TextTest cleans up the run's temporary directory
+structure. This behaviour is different in version 2.1 from
+<br>previous versions.
+<p>To override this, the command line option -keeptmp will not delete the
+run's directory structure so it can be examined manually
+<br>after TextTest exits. However, beware!&nbsp;In this mode it will clean
+up the run directories of previous runs that it finds. This means
+<br>that you cannot run more than one instance of TextTest on the same
+application with the same version simultaneously if you are
+<br>specifying the -keeptmp flag.
 <p><u>Repeating things</u>
 <br>It can be useful to detect unreliable behaviour to repeat the test
 runs several times. To do this, specify -m &lt;number_of_times> on

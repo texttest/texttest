@@ -116,7 +116,7 @@ class Config(plugins.Configuration):
         else:
             return None
     def bugzillaInstalled(self):
-        return os.system("which bugcli > /dev/null") == 0
+        return os.system("which bugcli > /dev/null 2>&1") == 0
     def getTestComparator(self):
         return performance.MakeComparisons()
     def getTestResponder(self):

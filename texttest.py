@@ -1493,7 +1493,8 @@ class TextTest:
                 if len(self.allApps) > 0:
                     self.allApps[0].printHelpText()
                 else:
-                    print "You probably need to tell TextTest where to find your test files."
+                    print helpIntro
+                    print "TextTest didn't find any valid test applications - you probably need to tell it where to find them."
                     print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
                     print "If this makes no sense, read the user guide..."
                 return

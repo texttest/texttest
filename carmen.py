@@ -129,8 +129,10 @@ class CarmenConfig(lsf.LSFConfig):
         return filters
     def getActionSequence(self, useGui):
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
-        return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getRuleBuilder() ] + \
+        return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleBuilder() ] + \
                  lsf.LSFConfig._getActionSequence(self, useGui, makeDirs = 0)
+    def getCarmVarChecker(self):
+        return CheckCarmVariables()
     def getRuleCleanup(self):
         return CleanupRules(self.getRuleSetName)
     def isRaveRun(self):
@@ -269,6 +271,21 @@ class CarmenConfig(lsf.LSFConfig):
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
 
+class CheckCarmVariables(plugins.Action):
+    def setUpSuite(self, suite):
+        if isUserSuite(suite):
+            self.ensureCarmTmpDirExists()
+    def ensureCarmTmpDirExists(self):
+        carmTmp = os.path.normpath(os.environ["CARMTMP"])
+        if not os.path.isdir(carmTmp):
+            if os.path.islink(carmTmp):
+                print "CARMTMP", carmTmp, "seems to be a deadlink"
+                return 0
+            else:
+                print "CARMTMP", carmTmp, "did not exist, attempting to create it"
+                os.makedirs(os.environ["CARMTMP"])
+        return 1
+
 class CleanupRules(plugins.Action):
     def __init__(self, getRuleSetName):
         self.rulesCleaned = []
@@ -348,7 +365,6 @@ class CompileRules(plugins.Action):
             test.changeState(test.NEED_PREPROCESS, "Compiling ruleset " + ruleset.name)
             return
         self.describe(test, " - ruleset " + ruleset.name)
-        self.ensureCarmTmpDirExists()
         ruleset.backup()
         self.rulesCompiled.append(jobName)
         retStatus = None
@@ -375,16 +391,6 @@ class CompileRules(plugins.Action):
             return self.modeString + " " + os.environ["TEXTTEST_RAVE_MODE"]
         else:
             return self.modeString
-    def ensureCarmTmpDirExists(self):
-        carmTmp = os.path.normpath(os.environ["CARMTMP"])
-        if not os.path.isdir(carmTmp):
-            if os.path.islink(carmTmp):
-                print "CARMTMP", carmTmp, "seems to be a deadlink"
-                return 0
-            else:
-                print "CARMTMP", carmTmp, "did not exist, attempting to create it"
-                os.makedirs(os.environ["CARMTMP"])
-        return 1
     def performCompile(self, test, commandLine):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         # Hack to work around crc_compile bug which fails if ":" in directory

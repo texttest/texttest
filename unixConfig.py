@@ -9,7 +9,7 @@ to Python's ndiff, and sendmail is used to implement an email-sending batch mode
 The default behaviour is to run all tests locally.
 """
 
-import default, batch, respond, comparetest, performance, predict, os, shutil, plugins, string
+import default, batch, respond, performance, predict, os, shutil, plugins, string, time
 
 def getConfig(optionMap):
     return UNIXConfig(optionMap)
@@ -108,9 +108,11 @@ class CollateUNIXFiles(default.CollateFiles):
             toUse = path + ".Z"
             os.rename(path, toUse)
             os.system("uncompress " + toUse)
-        if os.path.basename(path).startswith("stacktrace"):
+        if self.isCoreFile(path):
             # Extract just the stack trace rather than the whole core
             self.interpretCoreFile(path)
+    def isCoreFile(self, path):
+        return os.path.basename(path).startswith("stacktrace")
     def interpretCoreFile(self, path):
         if os.path.getsize(path) == 0:
             os.remove(path)
@@ -147,6 +149,9 @@ class CollateUNIXFiles(default.CollateFiles):
         os.remove(fileName)
         os.rename(newPath, path)
     def extract(self, sourcePath, targetFile):
+        if self.isCoreFile(targetFile):
+            # Try to avoid race conditions extracting core files
+            time.sleep(1)
         try:
             os.rename(sourcePath, targetFile)
         except:

@@ -39,7 +39,7 @@ class UNIXConfig(default.Config):
     def getTestCollator(self):
         return CollateUNIXFiles()
     def getPerformanceFileMaker(self):
-        return MakePerformanceFile()
+        return MakePerformanceFile(self.getMachineInfoFinder())
     def getTestRunner(self):
         return RunTest()
     def getTestResponder(self):
@@ -343,32 +343,30 @@ class CollateUNIXFiles(default.CollateFiles):
             plugins.movefile(sourcePath, targetFile)
 
 class MakePerformanceFile(default.PerformanceFileCreator):
-    def __init__(self):
-        default.PerformanceFileCreator.__init__(self)
-        self.performanceMachines = []
+    def __init__(self, machineInfoFinder):
+        default.PerformanceFileCreator.__init__(self, machineInfoFinder)
         self.includeSystemTime = 0
     def setUpApplication(self, app):
-        self.performanceMachines = self.findPerformanceMachines(app)
-        self.diag.info("Found performance machines as " + repr(self.performanceMachines))
+        default.PerformanceFileCreator.setUpApplication(self, app)
         self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
     def __repr__(self):
         return "Making performance file for"
-    def makePerformanceFiles(self, test, executionMachines, temp):
+    def makePerformanceFiles(self, test, temp):
         # Ugly hack to work around lack of proper test states
+        executionMachines = self.machineInfoFinder.findExecutionMachines(test)
         test.execHost = string.join(executionMachines, ",")
         
         # Check that all of the execution machines are also performance machines
-        if not self.allMachinesTestPerformance(test, executionMachines, self.performanceMachines):
+        if not self.allMachinesTestPerformance(test, "cputime"):
             return
         cpuTime, realTime = self.readTimes(test)
         # There was still an error (jobs killed in emergency), so don't write performance files
         if cpuTime == None:
             print "Not writing performance file for", test
             return
+        
         fileToWrite = test.makeFileName("performance", temporary=1)
         self.writeFile(test, cpuTime, realTime, executionMachines, fileToWrite)
-    def findPerformanceMachines(self, app):
-        return app.getCompositeConfigValue("performance_test_machine", "cputime")
     def readTimes(self, test):
         # Read the UNIX performance file, allowing us to discount system time.
         tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)

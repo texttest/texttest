@@ -154,9 +154,11 @@ class Config(plugins.Configuration):
     def getTestCollator(self):
         return CollateFiles()
     def getPerformanceExtractor(self):
-        return ExtractPerformanceFiles()
+        return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def getPerformanceFileMaker(self):
         return None
+    def getMachineInfoFinder(self):
+        return MachineInfoFinder()
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getFailureExplainer(self):
@@ -560,12 +562,24 @@ class ReconnectTest(plugins.Action):
     def hasUserDependentWriteDir(self):
         return os.environ["TEXTTEST_TMP"].find("~") != -1
 
-class PerformanceFileCreator(plugins.Action):
-    def __init__(self):
-        self.diag = plugins.getDiagnostics("makeperformance")
+class MachineInfoFinder:
+    def findPerformanceMachines(self, app, fileStem):
+        return app.getCompositeConfigValue("performance_test_machine", fileStem)
     def findExecutionMachines(self, test):
         return [ hostname() ]
-    def allMachinesTestPerformance(self, test, executionMachines, performanceMachines):
+    def setUpApplication(self, app):
+        pass
+
+class PerformanceFileCreator(plugins.Action):
+    def __init__(self, machineInfoFinder):
+        self.diag = plugins.getDiagnostics("makeperformance")
+        self.machineInfoFinder = machineInfoFinder
+    def setUpApplication(self, app):
+        self.machineInfoFinder.setUpApplication(app)
+    def allMachinesTestPerformance(self, test, fileStem):
+        executionMachines = self.machineInfoFinder.findExecutionMachines(test)
+        performanceMachines = self.machineInfoFinder.findPerformanceMachines(test.app, fileStem)
+        self.diag.info("Found performance machines as " + repr(performanceMachines))
         if "any" in performanceMachines:
             return 1
         for host in executionMachines:
@@ -581,24 +595,23 @@ class PerformanceFileCreator(plugins.Action):
         if test.state.isComplete():
             return
 
-        executionMachines = self.findExecutionMachines(test)
-        return self.makePerformanceFiles(test, executionMachines, temp)
+        return self.makePerformanceFiles(test, temp)
 
 
 # Relies on the config entry performance_logfile_extractor, so looks in the log file for anything reported
 # by the program
 class ExtractPerformanceFiles(PerformanceFileCreator):
-    def __init__(self):
-        PerformanceFileCreator.__init__(self)
+    def __init__(self, machineInfoFinder):
+        PerformanceFileCreator.__init__(self, machineInfoFinder)
         self.entryFinders = None
         self.logFileStem = None
     def setUpApplication(self, app):
+        PerformanceFileCreator.setUpApplication(self, app)
         self.entryFinders = app.getConfigValue("performance_logfile_extractor")
         self.logFileStem = app.getConfigValue("log_file")
-    def makePerformanceFiles(self, test, executionMachines, temp):
+    def makePerformanceFiles(self, test, temp):
         for fileStem, entryFinder in self.entryFinders.items():
-            perfMachines = test.app.getCompositeConfigValue("performance_test_machine", fileStem)
-            if not self.allMachinesTestPerformance(test, executionMachines, perfMachines):
+            if not self.allMachinesTestPerformance(test, fileStem):
                 continue
             logFile = test.makeFileName(self.logFileStem, temporary=temp)
             if not os.path.isfile(logFile):
@@ -652,10 +665,15 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
 
 # A standalone action, we add description and generate the main file instead...
 class ExtractStandardPerformance(ExtractPerformanceFiles):
+    def __init__(self):
+        ExtractPerformanceFiles.__init__(self, MachineInfoFinder())
     def __repr__(self):
         return "Extracting standard performance for"
     def __call__(self, test):
         self.describe(test)
         ExtractPerformanceFiles.__call__(self, test, temp=0)
+    def allMachinesTestPerformance(self, test, fileStem):
+        # Assume this is OK: the current host is in any case utterly irrelevant
+        return 1
     def setUpSuite(self, suite):
         self.describe(suite)

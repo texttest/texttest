@@ -118,9 +118,14 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         return UpdateTestStatus()
     def getPerformanceFileMaker(self):
         if self.optionMap.slaveRun():
-            return MakePerformanceFile(self.isSlowdownJob)
+            return MakePerformanceFile(self.getMachineInfoFinder(), self.isSlowdownJob)
         else:
             return unixConfig.UNIXConfig.getPerformanceFileMaker(self)
+    def getMachineInfoFinder(self):
+        if self.optionMap.slaveRun():
+            return MachineInfoFinder()
+        else:
+            return unixConfig.UNIXConfig.getMachineInfoFinder(self)
     def isSlowdownJob(self, jobUser, jobName):
         return 0
     def printHelpDescription(self):
@@ -539,26 +544,40 @@ class UpdateTestStatus(UpdateStatus):
             return 0
         return (tmpSize * 100) / stdSize 
 
-class MakePerformanceFile(unixConfig.MakePerformanceFile):
-    def __init__(self, isSlowdownJob):
-        unixConfig.MakePerformanceFile.__init__(self)
-        self.isSlowdownJob = isSlowdownJob
-        self.queueMachineInfo = None
+class MachineInfoFinder(default.MachineInfoFinder):
+    def __init__(self):
+        self.queueMachineInfo = None        
     def findExecutionMachines(self, test):
         machines = self.queueMachineInfo.findAllMachinesForJob()
         if len(machines):
             return machines
 
-        return unixConfig.MakePerformanceFile.findExecutionMachines(self, test)        
-    def findPerformanceMachines(self, app):
-        rawPerfMachines = unixConfig.MakePerformanceFile.findPerformanceMachines(self, app)
+        return default.MachineInfoFinder.findExecutionMachines(self, test)
+    def findPerformanceMachines(self, app, fileStem):
         perfMachines = []
-        for machine in rawPerfMachines:
-            perfMachines += self.queueMachineInfo.findActualMachines(machine)
-        resources = app.getCompositeConfigValue("performance_test_resource", "cputime")
+        resources = app.getCompositeConfigValue("performance_test_resource", fileStem)
         for resource in resources:
             perfMachines += self.queueMachineInfo.findResourceMachines(resource)
-        return perfMachines
+
+        rawPerfMachines = default.MachineInfoFinder.findPerformanceMachines(self, app, fileStem)
+        for machine in rawPerfMachines:
+            if machine != "any":
+                perfMachines += self.queueMachineInfo.findActualMachines(machine)
+        if "any" in rawPerfMachines and len(perfMachines) == 0:
+            return rawPerfMachines
+        else:
+            return perfMachines
+    def setUpApplication(self, app):
+        default.MachineInfoFinder.setUpApplication(self, app)
+        moduleName = queueSystemName(app).lower()
+        command = "from " + moduleName + " import MachineInfo as _MachineInfo"
+        exec command
+        self.queueMachineInfo = _MachineInfo()
+
+class MakePerformanceFile(unixConfig.MakePerformanceFile):
+    def __init__(self, machineInfoFinder, isSlowdownJob):
+        unixConfig.MakePerformanceFile.__init__(self, machineInfoFinder)
+        self.isSlowdownJob = isSlowdownJob
     def writeMachineInformation(self, file, executionMachines):
         # Try and write some information about what's happening on the machine
         for machine in executionMachines:
@@ -575,7 +594,7 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         # as for example a process can hog the memory bus. Allow subclasses to define how to
         # stop these "slowdown jobs" to avoid false performance failures. Even if they aren't defined
         # as such, print them anyway so the user can judge for himself...
-        jobsFromQueue = self.queueMachineInfo.findRunningJobs(machine)
+        jobsFromQueue = self.machineInfoFinder.queueMachineInfo.findRunningJobs(machine)
         jobs = []
         for user, jobName in jobsFromQueue:
             descriptor = "Also on "
@@ -583,11 +602,5 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
                 descriptor = "Suspected of SLOWING DOWN "
             jobs.append(descriptor + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
-    def setUpApplication(self, app):
-        moduleName = queueSystemName(app).lower()
-        command = "from " + moduleName + " import MachineInfo as _MachineInfo"
-        exec command
-        self.queueMachineInfo = _MachineInfo()
-        # This calls back to findPerformanceMachines, do it last.
-        unixConfig.MakePerformanceFile.setUpApplication(self, app)
+    
         

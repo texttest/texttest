@@ -121,7 +121,7 @@ class CompileRules(plugins.Action):
             self.rulesCompiled.append(ruleset.name)
             returnValue = os.system(commandLine)
             if returnValue:
-                raise "Failed to build ruleset, exiting"
+                raise EnvironmentError, "Failed to build ruleset " + ruleset.name
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
     def setUpSuite(self, suite):

@@ -578,6 +578,7 @@ class Application:
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
+        extensions = self.getVersionFileExtensions(baseVersion=1)
         self.configDir.readValuesFromFile(configFile, name, extensions, insert=0, errorOnUnknown=1)
         personalFile = self.getPersonalConfigFile()
         self.configDir.readValuesFromFile(personalFile, insert=0, errorOnUnknown=1)

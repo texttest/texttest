@@ -210,12 +210,12 @@ class CollateUNIXFiles(default.CollateFiles):
         if os.path.getsize(path) == 0:
             os.remove(path)
             file = open(path, "w")
-            file.write("Core file of zero size written - no stack trace for crash\nCheck your coredumpsize limit" + os.linesep)
+            file.write("Core file of zero size written - Stack trace not produced for crash\nCheck your coredumpsize limit" + os.linesep)
             file.close()
             return
         fileName = "coreCommands.gdb"
         file = open(fileName, "w")
-        file.write("bt\nq\n")
+        file.write("bt\n")
         file.close()
         # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
         # Unfortunately running gdb is not the answer, because it truncates the data...
@@ -223,19 +223,16 @@ class CollateUNIXFiles(default.CollateFiles):
         newPath = path + "tmp" 
         writeFile = open(newPath, "w")
         if os.path.isfile(binary):
-            gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " " + path)
-            # reckoned necessary on UNIX
-            os.wait()
-            prevLine = ""
-            for line in gdbData.xreadlines():
-                if line.find("Program terminated") != -1:
-                    writeFile.write(line)
-                    writeFile.write("Stack trace from gdb :" + os.linesep)
-                if line[0] == "#" and line != prevLine:
-                    startPos = line.find("in ") + 3
-                    endPos = line.rfind("(")
-                    writeFile.write(line[startPos:endPos] + os.linesep)
-                prevLine = line
+            stdoutFile = "gdbout.txt"
+            stderrFile = "gdberr.txt"
+            gdbCommand = "gdb -q -batch -x " + fileName + " " + binary + " " + path + \
+                         " > " + stdoutFile + " 2> " + stderrFile
+            self.diag.info("Running GDB with command '" + gdbCommand + "'")
+            os.system(gdbCommand)
+            if not self.writeStackTrace(stdoutFile, writeFile):
+                self.writeGdbErrors(stderrFile, writeFile)
+            os.remove(stdoutFile)
+            os.remove(stderrFile)
             os.remove(path)
         else:
             writeFile.write("Could not find binary name from core file : Stack trace not produced for crash" + os.linesep)
@@ -243,6 +240,25 @@ class CollateUNIXFiles(default.CollateFiles):
             os.rename(path, "core")
         os.remove(fileName)
         os.rename(newPath, path)
+    def writeStackTrace(self, stdoutFile, writeFile):
+        prevLine = ""
+        foundStack = 0
+        for line in open(stdoutFile).xreadlines():
+            if line.find("Program terminated") != -1:
+                writeFile.write(line)
+                writeFile.write("Stack trace from gdb :" + os.linesep)
+                foundStack = 1
+            if line[0] == "#" and line != prevLine:
+                startPos = line.find("in ") + 3
+                endPos = line.rfind("(")
+                writeFile.write(line[startPos:endPos] + os.linesep)
+            prevLine = line
+        return foundStack
+    def writeGdbErrors(self, stderrFile, writeFile):
+        writeFile.write("GDB backtrace command failed : Stack trace not produced for crash" + os.linesep)
+        writeFile.write("Errors from GDB:" + os.linesep)
+        for line in open(stderrFile).xreadlines():
+            writeFile.write(line)
     def extract(self, sourcePath, targetFile):
         if self.isCoreFile(targetFile):
             # Try to avoid race conditions extracting core files

@@ -27,7 +27,7 @@ class TestComparison:
         if test.state == test.FAILED:
             self.failedPrediction = test.stateDetails
     def __repr__(self):
-        if len(self.changedResults) > 0:
+        if len(self.changedResults) > 0 or self.failedPrediction:
             return "FAILED :"
         elif len(self.newResults) > 0:
             return ":"

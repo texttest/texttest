@@ -44,6 +44,8 @@ class UNIXConfig(default.Config):
         default.Config.printHelpOptions(self, builtInOptions)
 
 def isCompressed(path):
+    if os.path.getsize(path) == 0:
+        return 0
     magic = open(path).read(2)
     if magic[0] == chr(0x1f) and magic[1] == chr(0x9d):
         return 1
@@ -63,25 +65,37 @@ class CollateFile(default.CollateFile):
 class CollateCore(CollateFile):
     def transformToText(self, path):
         CollateFile.transformToText(self, path)
+        if os.path.getsize(path) == 0:
+            os.remove(path)
+            file = open(path, "w")
+            file.write("Core file of zero size written - no stack trace for crash\nCheck your coredumpsize limit" + os.linesep)
+            file.close()
+            return
         fileName = "coreCommands.gdb"
         file = open(fileName, "w")
         file.write("bt\nq\n")
         file.close()
         # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
         # Unfortunately running gdb is not the answer, because it truncates the data...
-        binary = os.popen("csh -c 'echo `tail -c 1024 " + path + "`'").read().split(" ")[-1].strip()        
-        gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " " + path)
+        binary = os.popen("csh -c 'echo `tail -c 1024 " + path + "`'").read().split(" ")[-1].strip()
         newPath = "tmp" + path
         writeFile = open(newPath, "w")
-        prevLine = ""
-        for line in gdbData.xreadlines():
-            if line.find("Program terminated") != -1:
-                writeFile.write(line)
-                writeFile.write("Stack trace from gdb :" + os.linesep)
-            if line[0] == "#" and line != prevLine:
-                startPos = line.find("in ") + 3
-                endPos = line.rfind("()")
-                writeFile.write(line[startPos:endPos] + os.linesep)
-            prevLine = line
+        if os.path.isfile(binary):
+            gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " " + path)
+            prevLine = ""
+            for line in gdbData.xreadlines():
+                if line.find("Program terminated") != -1:
+                    writeFile.write(line)
+                    writeFile.write("Stack trace from gdb :" + os.linesep)
+                if line[0] == "#" and line != prevLine:
+                    startPos = line.find("in ") + 3
+                    endPos = line.rfind("()")
+                    writeFile.write(line[startPos:endPos] + os.linesep)
+                prevLine = line
+        else:
+            writeFile.write("Could not find binary name from core file - no stack trace for crash" + os.linesep)
         os.remove(path)
+        os.remove(fileName)
         os.rename(newPath, path)
+    def extract(self, sourcePath, targetFile):
+        os.rename(sourcePath, targetFile)

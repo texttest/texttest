@@ -122,7 +122,7 @@ class CollateFile(plugins.Action):
         targetFile = test.getTmpFileName(self.targetStem, "w")
         fullpath = self.findPath(test)
         if fullpath:
-            shutil.copyfile(fullpath, targetFile)
+            self.extract(fullpath, targetFile)
             self.transformToText(targetFile)
         elif os.path.isfile(test.makeFileName(self.targetStem)):
             errText = "Expected file '" + self.sourcePattern + "' not created by test"

@@ -8,9 +8,10 @@ pattern matching is allowed here, e.g *.myext), and <target> is what you want it
 
 Evaluation of test results consists by default of comparing all files that have been collected.
 
-All files are then filtered using the config file list entries corresponding
-to the stem of the file name (e.g  "output"). This will remove all run-dependent text like process
-IDs, timestamps etc., and ensure that false failures are avoided in this way.
+All files are then filtered using the config file dictionary entry 'run_dependent_text', with
+list entries corresponding to the stem of the file name (e.g  "output"). This will remove all
+run-dependent text like process IDs, timestamps etc., and ensure that false failures are avoided
+in this way.
 
 Various extensions are available. The following is a summary of what will happen...
 
@@ -25,6 +26,10 @@ my_file:remove this{WORD 1} - Lines containing the text "remove this" in my_file
 output:start{->}end         - On encountering the text "start", all lines are filtered out until the text
                               "end" is encountered. Neither the line containing "start" nor the line containing
                               "end" are themselves filtered.
+
+You can also use the config file dictionary entry 'unordered_text' in a similar way. Note that in this
+case the matching text is not removed, but assumed to be in random order. It is therefore sorted and appears
+in a section of its own at the end.
 
 If standard results have not already been collected, the results are reported as new results
 and must be checked carefully by hand and saved if correct. If standard results have been

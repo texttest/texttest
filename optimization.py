@@ -998,7 +998,7 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
     def addEnvironmentFileOptions(self):
         self.optionGroup.addOption("usr", "CARMUSR")
     def getCarmusr(self):
-        return self.optionGroup.getOptionValue("usr")
+        return os.path.normpath(self.optionGroup.getOptionValue("usr"))
     def hasStaticLinkage(self):
         return 1
     def openFile(self, fileName):
@@ -1018,14 +1018,10 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
             return
 
         self.writeLine(file, "CARMTMP:" + self.getCarmtmpPath(carmtmp))
-        self.writeVersionFile(testDir, "10", carmtmp)
-        self.writeVersionFile(testDir, "9", carmtmp)
-    def writeVersionFile(self, testDir, version, carmtmp):
-        envFile = os.path.join(testDir, "environment" + "." + version)
-        file = self.openFile(envFile)
-        carmtmpLine = "CARMTMP:" + self.getCarmtmpPath(carmtmp, version)
-        self.writeLine(file, carmtmpLine)
-    def getCarmtmpPath(self, carmtmp, version=""):
+        envLocalFile = os.path.join(testDir, "environment.local")
+        localFile = self.openFile(envLocalFile)
+        self.writeLine(localFile, "CARMTMP:$CARMSYS/" + carmtmp)
+    def getCarmtmpPath(self, carmtmp):
         pass
     # getCarmtmpPath implemented by subclasses
         

@@ -268,14 +268,8 @@ class ImportTestSuite(optimization.ImportTestSuite):
                 if parts[4].find("true") != -1:
                     return 1
         return 0
-    def getCarmtmpPath(self, carmtmp, version=""):
-        rootDir = "/carm/proj/matador/carmtmps"
-        if version == "":
-            return os.path.join(rootDir, "master", carmtmp)
-        elif version == "10":
-            return os.path.join(rootDir, "carmen_10", carmtmp)
-        elif version == "9":
-            return os.path.join(rootDir, "carmen_9", carmtmp)
+    def getCarmtmpPath(self, carmtmp):
+        return os.path.join("/carm/proj/matador/carmtmps/${MAJOR_RELEASE_ID}/${ARCHITECTURE}", carmtmp)
 
 class EnableDiagnostics(guiplugins.InteractiveAction):
     def __repr__(self):

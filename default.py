@@ -29,6 +29,8 @@ helpOptions = """
              a comma-separated list.
 
 -f <file>  - only run tests whose names appear in the file <file>
+-grep <tx> - only run tests whose log file (according to the config file entry "log_file") contains <tx>. Note that
+             this can also be a comma-separated list
 """
 
 helpScripts = """
@@ -49,6 +51,7 @@ class Config(plugins.Configuration):
         options["t"] = "Select tests containing"
         options["f"] = "Select tests from file"
         options["ts"] = "Select test suites containing"
+        options["grep"] = "Select tests whose log contains"
         options["reconnect"] = "Reconnect to previous run"
         return options
     def getSwitches(self):
@@ -75,6 +78,7 @@ class Config(plugins.Configuration):
         self.addFilter(filters, "t", TestNameFilter)
         self.addFilter(filters, "ts", TestSuiteFilter)
         self.addFilter(filters, "f", FileFilter)
+        self.addFilter(filters, "grep", GrepFilter)
         return filters
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
@@ -195,9 +199,11 @@ class TextFilter(plugins.Filter):
         self.texts = plugins.commasplit(filterText)
         self.allTestCaseNames = []
     def containsText(self, test):
+        return self.stringContainsText(test.name)
+    def stringContainsText(self, searchString):
         for text in self.texts:
-            if test.name.find(text) != -1:
-                if test.name == text or not text in self.allTestCaseNames:
+            if searchString.find(text) != -1:
+                if searchString == text or not text in self.allTestCaseNames:
                     return 1
                 else:
                     return 0
@@ -222,6 +228,21 @@ class TestSuiteFilter(TextFilter):
                     if path.find(text) != -1:
                         return 1
         return 0
+
+class GrepFilter(TextFilter):
+    def __init__(self, filterText):
+        TextFilter.__init__(self, filterText)
+        self.logFileStem = None
+    def acceptsTestCase(self, test):
+        logFile = test.makeFileName(self.logFileStem)
+        for line in open(logFile).xreadlines():
+            if self.stringContainsText(line):
+                return 1
+        return 0
+    def acceptsApplication(self, app):
+        app.setConfigDefault("log_file", "output")
+        self.logFileStem = app.getConfigValue("log_file")
+        return 1
 
 class FileFilter(TextFilter):
     def __init__(self, filterFile):

@@ -1,22 +1,20 @@
 helpDescription = """
 It follows the usage of the Carmen configuration.""" 
 
-import unixConfig, guiplugins, os, string, shutil
+import lsf, guiplugins, os, string, shutil
 
 def getConfig(optionMap):
     return DayOPsGUIConfig(optionMap)
 
-class DayOPsGUIConfig(unixConfig.UNIXConfig):
-    def __init__(self, optionMap):
-        unixConfig.UNIXConfig.__init__(self, optionMap)
+class DayOPsGUIConfig(lsf.LSFConfig):
     def printHelpDescription(self):
         print helpDescription
-        unixConfig.UNIXConfig.printHelpDescription(self)
+        lsf.LSFConfig.printHelpDescription(self)
     def getExecuteCommand(self, binary, test):
         propFile = test.makeFileName("properties")
         logFile = test.makeFileName("dmserverlog", temporary=1)
         os.environ["DMG_RUN_TEST"] = test.abspath + "#" + propFile + "#" + logFile
-        return unixConfig.UNIXConfig.getExecuteCommand(self, binary, test)
+        return lsf.LSFConfig.getExecuteCommand(self, binary, test)
 
 class JavaPropertyReader:
     def __init__(self, filename):

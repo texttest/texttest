@@ -416,7 +416,8 @@ class RunTests(InteractiveAction):
             ttOptions += group.getCommandLines()
         selTestPaths = []
         for test in selTests:
-            relPath = test.getRelPath()
+            # Use UNIX style paths in internal communications...
+            relPath = test.getRelPath().replace("\\", "/")
             if not relPath in selTestPaths:
                 selTestPaths.append(relPath)
         ttOptions.append("-tp " + string.join(selTestPaths, ","))

@@ -177,6 +177,7 @@ class ApcCompileRules(carmen.CompileRules):
         carmen.CompileRules.__init__(self, getRuleSetName, "-optimize", sFilter)
         self.forcedRuleCompile = forcedRuleCompile
         self.getLibraryFile = getLibraryFile
+        self.diag = plugins.getDiagnostics("ApcCompileRules")
     def __call__(self, test):
         self.apcLib = os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test))
         carmTmpDir = os.environ["CARMTMP"]
@@ -188,12 +189,14 @@ class ApcCompileRules(carmen.CompileRules):
             carmen.CompileRules.__call__(self, test)
     def linuxRuleSetBuild(self, test):
         ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
+        self.diag.info("Using linuxRuleSetBuild for building rule set " + ruleset.name)
         if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
             return
         apcExecutable = ruleset.targetFile
         carmen.ensureDirectoryExists(os.path.dirname(apcExecutable))
         ruleLib = self.getRuleLib(ruleset.name)
         if self.isNewer(apcExecutable, self.apcLib):
+            self.diag.info("APC binary is newer than libapc.a, returning.")
             return
         self.describe(test, " -  ruleset " + ruleset.name)
         ruleset.backup()
@@ -202,19 +205,22 @@ class ApcCompileRules(carmen.CompileRules):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
             # Hack for crc_compile.
             os.chdir(test.abspath)
+            self.diag.debug("Building rule set library using the command " + self.ruleCompileCommand(ruleset.sourceFile, test))
             returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile, test))
             if returnValue:
                 raise plugins.TextTestError, "Failed to build library for APC ruleset " + ruleset.name
         commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib, test)
         commandLine += "-o " + apcExecutable
-        si, so, se = os.popen3(commandLine)
-        lastErrors = se.readlines()
-        if len(lastErrors) > 0:
-            if lastErrors[-1].find("exit status") != -1:
-                print "Building", ruleset.name, "failed!"
-                for line in lastErrors:
-                    print "   ", line.strip()
-                raise plugins.TextTestError, "Failed to link APC ruleset " + ruleset.name
+        self.diag.debug("Linking APC binary using the command " + commandLine)
+        po = popen2.Popen3(commandLine,"t")
+        returnValue = po.wait()
+        if returnValue:
+            print "Building", ruleset.name, "failed:"
+            se = po.childerr
+            lastErrors = se.readlines()
+            for line in lastErrors:
+                print "   ", line.strip()
+            raise plugins.TextTestError, "Failed to link APC ruleset " + ruleset.name        
 
     def getRuleLib(self, ruleSetName):
         optArch = "i386_linux_opt"
@@ -222,29 +228,15 @@ class ApcCompileRules(carmen.CompileRules):
         return os.path.join(os.environ["CARMTMP"], "compile", self.raveName.upper(), optArch, ruleLib)
         
     def ruleCompileCommand(self, sourceFile, test):
-       compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-       params = " -optimize -makelib -archs i386_linux"
-       # Fix to be able to run crc_compile for apc also on Carmen 8.
-       # crc_compile provides backward compability, so we can always have the '-'.
-       extra = ""
-       if test.app.name == "apc":
-           extra = "-"
-       if "8" in test.app.versions:
-           os.environ["CRC_PATH"] = os.environ["CARMUSR"] + ":" + os.environ["CARMSYS"] + "/carmusr_default"
-       return compiler + " " + extra + self.raveName + params + " " + sourceFile
-                    
+        compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
+        params = " -optimize -makelib -archs i386_linux"
+        if "8" in test.app.versions:
+            os.environ["CRC_PATH"] = os.environ["CARMUSR"] + ":" + os.environ["CARMSYS"] + "/carmusr_default"
+        return compiler + " -" + self.raveName + params + " " + sourceFile
+
     def linkLibs(self, apcLib, ruleLib, test):
-       path1 = os.path.join(os.environ["CARMSYS"], "data", "crc", "i386_linux")
-       path2 = os.path.join(os.environ["CARMSYS"], "lib", "i386_linux")
-       paths = " -L" + path1 + " -L" + path2
-       raveLib = "-lrave_rts"
-       # Evil hack to make compilation on Carmen 8 possible.
-       if "8" in test.app.versions:
-           raveLib = "-lrave_static"
-           paths += " -L/carm/carmen_8.0/libi386_linux"
-       basicLibs = " -lxprs -lxprl -lm -ldl " + raveLib + " -lBasics_STACK -lrave_private "
-       extraLib = " `xml2-config --libs` -ldl "
-       return apcLib + paths + basicLibs + ruleLib + extraLib
+        linkLib = test.app.getConfigValue("link_libs")
+        return apcLib + " " + os.path.expandvars(linkLib) + " " + ruleLib + " "
 
     def isNewer(self, file1, file2):
         if not os.path.isfile(file1):

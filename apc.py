@@ -53,7 +53,7 @@ apc.UpdatePerformance      - Update the performance file for tests with time fro
 
 """
 
-import default, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins
+import default, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -398,7 +398,7 @@ class ApcUpdateLSFStatus(lsf.UpdateTestLSFStatus):
              try:
                  runStatusHead = open(runStatusHeadFile).read()
                  return runStatusHead
-             except OSError,IOError:
+             except (OSError,IOError):
                  return "Error opening/reading " + runStatusHeadFile                 
          else:
              return "Run status file is not avaliable yet."

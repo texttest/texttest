@@ -98,7 +98,6 @@ class ExtractSubPlanFile(plugins.Action):
     def __repr__(self):
         return "Extracting subplan file " + self.sourceName + " to " + self.targetName + " on"
     def __call__(self, test):
-        self.describe(test)
         if self.config.isReconnecting():
             return
         sourcePath = self.config.getSubPlanFileName(test, self.sourceName)

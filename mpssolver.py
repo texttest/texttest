@@ -139,9 +139,7 @@ class OutputFileComparison(comparetest.FileComparison):
                 if self.tableEnds(line, cols):
                     inTable = 0
                 else:
-                    sVal = cols[-1].strip()
-                    ix = line.rfind(sVal);
-                    line = line[0:ix] + "XXX" + line[ix + len(sVal):]
+                    line = string.join(cols[:-2], " ").rstrip() + os.linesep
             else:
                 if self.tableStarts(line, cols):
                     inTable = 1
@@ -333,3 +331,11 @@ class FeasibilityStatisticsBuilder(plugins.Action):
             print self.suiteName + pad(test.name, 30) + "\t", refErrors, currErrors
             self.suiteName = "   "
 
+class CopyFile(plugins.Action):
+    def __call__(self, test):
+        self.copy(os.path.join(test.abspath, "output.tip.1427"), os.path.join(test.abspath, "output.tip.1428"))
+        self.copy(os.path.join(test.abspath, "performance.tip.1427"), os.path.join(test.abspath, "performance.tip.1428"))
+    def copy(self, source, target):
+        if (os.path.isfile(source)):
+            shutil.copyfile(source, target)
+        

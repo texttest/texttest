@@ -321,16 +321,22 @@ class TextTestGUI:
                 guilog.info("Killing '" + repr(process) + "' interactive process")
                 process.kill()
     def saveAll(self, *args):
-        saveTestAction = self.rightWindowGUI.getSaveTestAction()
-        fullVersion = None
-        if saveTestAction:
-            fullVersion = saveTestAction.test.app.getFullVersion()
+        saveActionFromWindow = self.rightWindowGUI.getSaveTestAction()
+        windowVersion = None
+        if saveActionFromWindow:
+            windowVersion = saveActionFromWindow.test.app.getFullVersion()
+            saveTestAction = saveActionFromWindow
+
         for test in self.itermap.keys():
             currFullVersion = test.app.getFullVersion()
-            if not saveTestAction or fullVersion != currFullVersion:
-                saveTestAction = guiplugins.interactiveActionHandler.getInstance(test, guiplugins.SaveTest)
+            if currFullVersion == windowVersion:
+                saveTestAction = saveActionFromWindow
+            else:
+                saveTestAction = self.getDefaultSaveAction(test)
             if saveTestAction.isSaveable(test):
                 saveTestAction(test)
+    def getDefaultSaveAction(self, test):
+        return guiplugins.interactiveActionHandler.getInstance(test, guiplugins.SaveTest)
     def viewApp(self, *args):
         self.selection.selected_foreach(self.viewAppFromTest)
     def viewAppFromTest(self, model, path, iter, *args):

@@ -565,10 +565,29 @@ class MakeProgressReport(optimization.MakeProgressReport):
             refMargin, currentMargin = self._calculateMargin(fcTupleList)
             self.refMargins[groupName] = refMargin
             self.currentMargins[groupName] = currentMargin
+
+        referenceAverages = {}
+        currentAverages = {}
+        userNameForKPIGroup = {}
+        # Iterate over all tests and add them to the relevant KPI group.
         for testTuple in self.testInGroupList:
             test, referenceRun, currentRun, userName = testTuple
-            self.doCompare(test, referenceRun, currentRun, userName)
+            app = test.app
+            if not self.kpiGroupForTest.has_key(test.name):
+                continue
+            groupName = self.kpiGroupForTest[test.name]
+            if not userNameForKPIGroup.has_key(groupName):
+                userNameForKPIGroup[groupName] = userName
+            
+            self.addRunToAverage(referenceRun, referenceAverages, groupName)
+            self.addRunToAverage(currentRun, currentAverages, groupName)
 
+        # Calculate the KPI for each KPI group.
+        for groupName in self.finalCostsInGroup.keys():
+            referenceAverageRun = self.createAverageOptimizationRun(referenceAverages[groupName])
+            currentAverageRun = self.createAverageOptimizationRun(currentAverages[groupName])
+            self.doCompare(referenceAverageRun, currentAverageRun, app, groupName, userNameForKPIGroup[groupName], "KPI-group")
+    
         print os.linesep
         if self.sumRefTime > 0:
             speedKPI = 1.0 * self.sumCurTime / self.sumRefTime
@@ -648,28 +667,21 @@ class MakeProgressReport(optimization.MakeProgressReport):
         if not self.finalCostsInGroup.has_key(groupName):
             self.finalCostsInGroup[groupName] = []
         self.finalCostsInGroup[groupName].append(fcTuple)
-    def getMargins(self, test):
-        if not self.kpiGroupForTest.has_key(test.name):
-            return optimization.MakeProgressReport.getMargins(self, test)
-        refMargin = self.refMargins[self.kpiGroupForTest[test.name]]
-        currentMargin = self.currentMargins[self.kpiGroupForTest[test.name]]
+    def getMargins(self, app, groupName):
+        refMargin = self.refMargins[groupName]
+        currentMargin = self.currentMargins[groupName]
         return currentMargin, refMargin
-    def calculateWorstCost(self, test, referenceRun, currentRun):
-        worstCost = self._kpiCalculateWorstCost(test, referenceRun, currentRun)
+    def calculateWorstCost(self, referenceRun, currentRun, app, groupName):
+        if self.groupQualityLimit.has_key(groupName):
+            worstCost = self.groupQualityLimit[groupName]
+        else:
+            worstCost = optimization.MakeProgressReport.calculateWorstCost(self, referenceRun, currentRun, app, groupName)
         self.sumCurTime += currentRun.timeToCost(worstCost)
         self.sumRefTime += referenceRun.timeToCost(worstCost)
         self.lastKPITime = (currentRun.getPerformance() + referenceRun.getPerformance()) / 2.0
-        if self.kpiGroupForTest.has_key(test.name):
-            groupName = self.kpiGroupForTest[test.name]
-            if self.groupTimeLimit.has_key(groupName):
-                self.lastKPITime = self.groupTimeLimit[groupName]
+        if self.groupTimeLimit.has_key(groupName):
+            self.lastKPITime = self.groupTimeLimit[groupName]
         return worstCost
-    def _kpiCalculateWorstCost(self, test, referenceRun, currentRun):
-        if self.kpiGroupForTest.has_key(test.name):
-            groupName = self.kpiGroupForTest[test.name]
-            if self.groupQualityLimit.has_key(groupName):
-                return self.groupQualityLimit[groupName]
-        return optimization.MakeProgressReport.calculateWorstCost(self, test, referenceRun, currentRun)
     def computeKPI(self, currTTWC, refTTWC):
         kpi = optimization.MakeProgressReport.computeKPI(self, currTTWC, refTTWC)
         if kpi != "NaN%":
@@ -680,23 +692,58 @@ class MakeProgressReport(optimization.MakeProgressReport):
             weightKPItuple = kpi, kpiTime
             self.weightKPI.append(weightKPItuple)
         return kpi
-    def reportCosts(self, test, currentRun, referenceRun):
-        optimization.MakeProgressReport.reportCosts(self, test, currentRun, referenceRun)
-        if self.kpiGroupForTest.has_key(test.name):
-            groupName = self.kpiGroupForTest[test.name]
-            if self.groupTimeLimit.has_key(groupName):
-                qualTime = self.groupTimeLimit[groupName]
-                curCost = currentRun.costAtTime(qualTime)
-                refCost = referenceRun.costAtTime(qualTime)
-                kpi = float(curCost) / float(refCost)
-                if kpi > 0:
-                    self.qualKPI *= kpi
-                    self.qualKPICount += 1
-                    qKPI = str(round(kpi - 1.0,5) * 100.0) + "%"
-                self.reportLine("Cost at " + str(qualTime) + " mins, qD=" + qKPI, curCost, refCost)
-        currentMargin, refMargin = self.getMargins(test)
+    def reportCosts(self, currentRun, referenceRun, app, groupName):
+        optimization.MakeProgressReport.reportCosts(self, currentRun, referenceRun, app, groupName)
+        if self.groupTimeLimit.has_key(groupName):
+            qualTime = self.groupTimeLimit[groupName]
+            curCost = currentRun.costAtTime(qualTime)
+            refCost = referenceRun.costAtTime(qualTime)
+            kpi = float(curCost) / float(refCost)
+            if kpi > 0:
+                self.qualKPI *= kpi
+                self.qualKPICount += 1
+                qKPI = str(round(kpi - 1.0,5) * 100.0) + "%"
+            self.reportLine("Cost at " + str(qualTime) + " mins, qD=" + qKPI, curCost, refCost)
+        currentMargin, refMargin = self.getMargins(app, groupName)
         self.reportLine("Cost variance tolerance (%) ", currentMargin, refMargin)
-                
+        
+    # Extracts data from an OptimizationRun and adds it to the appropriate averager.
+    def addRunToAverage(self, optRun, averagerMap, groupName):
+        costGraph = {}
+        memoryGraph = {}
+        for solution in optRun.solutions:
+            time = solution[optimization.timeEntryName]
+            costGraph[time] = solution[optimization.costEntryName]
+            memoryGraph[time] = solution[optimization.memoryEntryName]
+
+        # Find what averagers to put it in.
+        if averagerMap.has_key(groupName):
+            averagers = averagerMap[groupName]
+        else:
+            averagers = averagerMap[groupName] = optimization.PlotAverager(), optimization.PlotAverager()
+        costAverager, memAverager = averagers
+        costAverager.addGraph(costGraph)
+        memAverager.addGraph(memoryGraph)
+        
+    # Creates an OptimizationRun from the averager values.
+    def createAverageOptimizationRun(self, averages):
+        costAverage, memAverage = averages
+        costAverageGraph = costAverage.getGraph()
+        memAverageGraph = memAverage.getGraph()
+
+        solution = []
+        timeVals = costAverageGraph.keys()
+        timeVals.sort()
+        for time in timeVals:
+            if not memAverageGraph.has_key(time):
+                print "Errror!"
+            else:
+                map = {}
+                map[optimization.timeEntryName] = time
+                map[optimization.costEntryName] = costAverageGraph[time]
+                map[optimization.memoryEntryName] = memAverageGraph[time]
+                solution.append(map)
+        return optimization.OptimizationRun("","","","", 0.0, solution)                
 
 class ApcTestCaseInformation(optimization.TestCaseInformation):
     def isComplete(self):

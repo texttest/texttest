@@ -1,4 +1,69 @@
 
+"""
+The idea of this module is to implement a generic record/playback tool for GTK GUIs that
+will create scripts in terms of the domain language. These will then be much more stable
+than traditional such tools that create complicated Tcl scripts with lots of references
+to pixel positions etc., which tend to be extremely brittle if the GUI is updated.
+
+(1) For user actions such as clicking a button, selecting a list item etc., the general idea
+is to add an extra argument to the call to 'connect', so that instead of writing
+
+button.connect("clicked", myMethod)
+
+you would write
+
+eventHandler.connect("save changes", "clicked", button, myMethod)
+
+thus tying the user action to the script command "save changes". If you set up a record
+script, then the module will write "save changes" to the script whenever the button is clicked.
+Conversely, if you set up a replay script, then on finding the command "save changes", the
+module will emit the "clicked" signal for said button, effectively clicking it programatically.
+
+This means that, so long as my GUI has a concept of "save changes", I can redesign the GUI totally,
+making the user choose to do this via a totally different widget, but all my scripts wiill
+remaing unchanged.
+
+(2) Some GUI widgets have "state" rather than relying on signals (for example text entries, toggle buttons),
+so that the GUI itself may not necessarily make any calls to 'connect'. But you still want to generate
+script commands when they change state, and be able to change them programatically. I have done this
+by wrapping the constructor for such widgets, so that instead of
+
+entry = gtk.Entry()
+
+you would write
+
+entry = eventHandler.createEntry("file name")
+
+which would tie the "focus-out-event" to the script command "enter file name = ".
+
+(3) There are also composite widgets like the TreeView where you need to be able to specify an argument.
+In this case the application has to provide extra information as to how the text is to be translated
+into selecting an item in the tree. So, for example:
+
+treeView.connect("row_activated", myMethod)
+
+might become
+
+eventHandler.connect("select file", "row_activated", treeView, myMethod, (column, dataIndex))
+
+(column, dataIndex) is a tuple to tell it which data in the tree view we are looking for. So that
+the command "select file foobar.txt" will search the tree's column <column> and data index <dataIndex>
+for the text "foobar.txt" and select that row accordingly.
+
+(4) Idle handlers can also be scripted: it's often a significant event when an idle handler exits and
+you want to script waiting for that to happen. Therefore you can replace
+
+gtk.idle_add(myMethod)
+
+with
+
+eventHandler.addIdle("background processing", myMethod)
+
+which, as expected, will create the command "wait for background processing" when this idle handler exits
+(returns gtk.FALSE). On running the script, it will do as expected and wait for this idle handler to exit
+before proceeding.
+"""
+
 import gtk, os, string, sys
 
 # Exception to throw when scripts go wrong
@@ -9,10 +74,11 @@ class Event:
     def __init__(self, name, widget):
         self.name = name
         self.widget = widget
-    def hasChanged(self):
+    def widgetHasChanged(self):
         return 1
     def outputForScript(self, *args):
         return self.name
+    # Return 1 if we succeed in generating, 0 if we should wait for some external action
     def generate(self, argumentString):
         return 1
 
@@ -20,7 +86,7 @@ class ActivateEvent(Event):
     def __init__(self, name, widget, active = gtk.TRUE):
         Event.__init__(self, name, widget)
         self.active = active
-    def hasChanged(self):
+    def widgetHasChanged(self):
         return self.widget.get_active() == self.active
     def generate(self, argumentString):
         self.widget.set_active(self.active)
@@ -30,7 +96,7 @@ class EntryEvent(Event):
     def __init__(self, name, widget):
         Event.__init__(self, name, widget)
         self.oldText = ""
-    def hasChanged(self):
+    def widgetHasChanged(self):
         text = self.widget.get_text()
         return text != self.oldText
     def outputForScript(self, *args):
@@ -234,7 +300,7 @@ class RecordScript:
         event.widget.connect(signalName, self.writeEvent, event)
     def writeEvent(self, widget, *args):
         event = self.findEvent(*args)
-        if event.hasChanged():
+        if event.widgetHasChanged():
             self.fileForAppend.write(event.outputForScript(*args) + os.linesep)
     def findEvent(self, *args):
         for arg in args:

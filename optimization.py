@@ -683,7 +683,7 @@ class MakeProgressReport(TestReport):
         print os.linesep + header
         print underline
     def percent(self, fValue):
-        return str(int(round(100.0 * fValue))) + "%"
+        return str(int(round(100.0 * fValue))) + "% or x" + str(round(1.0 / fValue, 2))
     def computeKPI(self, currTTWC, refTTWC):
         if refTTWC > 0:
             kpi = float(currTTWC) / float(refTTWC)

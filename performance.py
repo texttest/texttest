@@ -117,11 +117,14 @@ class PerformanceTestComparison(comparetest.TestComparison):
             os.remove(tmpFile)
         return cmpFlag
     def checkHosts(self):
+        perfMachines = self.test.app.getConfigList("performance_test_machine")
+        if "any" in perfMachines:
+            return 1
         for host in self.execHost.split(","):
             realHost = host
             if host[1] == "*":
                 realHost = host[2:]
-            if not realHost in self.test.app.getConfigList("performance_test_machine"):
+            if not realHost in perfMachines:
                 return 0
         return 1
     

@@ -154,6 +154,11 @@ class CollateUNIXFiles(default.CollateFiles):
             os.remove(sourcePath)
 
 class MakePerformanceFile(plugins.Action):
+    def __init__(self):
+        self.includeSystemTime = 0
+    def setUpApplication(self, app):
+        app.setConfigDefault("cputime_include_system_time", 0)
+        self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
     def __repr__(self):
         return "Making performance file for"
     def __call__(self, test):
@@ -187,23 +192,27 @@ class MakePerformanceFile(plugins.Action):
         realTime = None
         for line in file.readlines():
             if line.find("user") != -1:
-                cpuTime = self.parseUnixTime(line.strip().split()[-1])
+                cpuTime = self.parseUnixTime(line)
+            if self.includeSystemTime and line.find("sys") != -1:
+                cpuTime = cpuTime + self.parseUnixTime(line)
             if line.find("real") != -1:
-                realTime = self.parseUnixTime(line.strip().split()[-1])
+                realTime = self.parseUnixTime(line)
         os.remove(tmpFile)
         return cpuTime, realTime
-    def parseUnixTime(self, timeVal):
+    def timeString(self, timeVal):
+        return str(round(float(timeVal), 1)).rjust(9)
+    def parseUnixTime(self, line):
+        timeVal = line.strip().split()[-1]
         if timeVal.find(":") == -1:
-            return timeVal.rjust(9)
+            return float(timeVal)
 
         parts = timeVal.split(":")
-        floatVal = 60 * float(parts[0]) + float(parts[1])
-        return str(floatVal).rjust(9)
+        return 60 * float(parts[0]) + float(parts[1])
     def writeFile(self, test, cpuTime, realTime, executionMachines, fileName):
         file = open(fileName, "w")
-        cpuLine = "CPU time   : " + cpuTime + " sec. on " + string.join(executionMachines, ",") + os.linesep
+        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. on " + string.join(executionMachines, ",") + os.linesep
         file.write(cpuLine)
-        realLine = "Real time  : " + realTime + " sec."
+        realLine = "Real time  : " + self.timeString(realTime) + " sec." + os.linesep
         file.write(realLine)
         self.writeMachineInformation(file, executionMachines)
     def writeMachineInformation(self, file, executionMachines):

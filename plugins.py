@@ -101,7 +101,7 @@ class TestState:
     # Used by text interface to print states
     def getDifferenceSummary(self, actionDesc):
         if self.freeText:
-            return "not compared:  " + self.freeText.split(os.linesep)[0]
+            return "not compared:  " + self.freeText
         else:
             return "not compared"
     def getTypeBreakdown(self):

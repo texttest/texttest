@@ -409,7 +409,6 @@ class UpdateRulesetBuildStatus(queuesystem.UpdateStatus):
             return errContents
     def raiseFailureWithError(self, ruleset, errContents):
         errMsg = "Failed to build ruleset " + ruleset + os.linesep + errContents 
-        print errMsg
         raise plugins.TextTestError, errMsg
             
 class RuleSet:

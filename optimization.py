@@ -772,6 +772,7 @@ class MakeProgressReport(TestReport):
         self.reportLine("Max memory (MB)", currentRun.getMaxMemory(), referenceRun.getMaxMemory())
         self.reportLine("Total time (minutes)     ", currentRun.getPerformance(), referenceRun.getPerformance())
         self.reportLine("Time to cost " + str(worstCost) + " (mins)", currTTWC, refTTWC)
+        self.plotKPI(self.testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi)
     def calculateWorstCost(self, referenceRun, currentRun, app, groupName):
         currMargin, refMargin = self.getMargins(app, groupName)
         currSol = currentRun.getMeasuredSolution(currMargin)
@@ -804,6 +805,8 @@ class MakeProgressReport(TestReport):
         fieldWidth = 15
         titleWidth = 30
         print string.ljust(title, titleWidth) + ": " + string.rjust(str(currEntry), fieldWidth) + string.rjust(str(refEntry), fieldWidth)
+    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi):
+        pass
     
 # This is for importing new tests and test suites
 #

@@ -29,6 +29,8 @@ helpOptions = """-rundebug <options>
              and the result is piped into a file named <option>.<app>.<ver> If no option is given or the config value
              specified does not exist, then the command specifed by extract_logs_default is used, and the result is
              saved in the file extract.<app>.<ver>
+-prrepgraphical
+           - (only APC) Produces graphical progress reports. Also see prrep.
 """
 
 helpScripts = """apc.CleanTmpFiles          - Removes all temporary files littering the test directories
@@ -74,6 +76,9 @@ class ApcConfig(optimization.OptimizationConfig):
             if group.name.startswith("How"):
                 group.addOption("rundebug", "Run debugger")
                 group.addOption("extractlogs", "Extract Apc Logs")
+            if group.name.startswith("Invisible"):
+                # These need a better interface before they can be plugged in, really
+                group.addOption("prrepgraphical", "Run graphical KPI progress report")
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI,
@@ -87,7 +92,10 @@ class ApcConfig(optimization.OptimizationConfig):
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         return optimization.OptimizationConfig.getActionSequence(self)
     def getProgressReportBuilder(self):
-        return MakeProgressReport(self.optionValue("prrep"))
+        if self.optionMap.has_key("prrepgraphical"):
+            return MakeProgressReportGraphical(self.optionValue("prrep"))
+        else:
+            return MakeProgressReport(self.optionValue("prrep"))
     def getRuleBuildObject(self, testRunner, jobNameCreator):
         return ApcCompileRules(self.getRuleSetName, jobNameCreator, self.getRuleBuildFilter(), testRunner, \
                                self.raveMode(), self.optionValue("rulecomp"))
@@ -549,8 +557,9 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.groupPenaltyQualityFactor = {}
         self.groupTimeLimit = {}
         self.kpiGroupForTest = {}
-        self.testInGroupList = []
+        self.testInGroup = {}
         self.finalCostsInGroup = {}
+        self.lowestCostInGroup = {}
         self.weightKPI = []
         self.sumKPITime = 0.0
         self.minKPITime = 0.0
@@ -570,8 +579,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         currentAverages = {}
         userNameForKPIGroup = {}
         # Iterate over all tests and add them to the relevant KPI group.
-        for testTuple in self.testInGroupList:
-            test, referenceRun, currentRun, userName = testTuple
+        for testName in self.testInGroup.keys():
+            test, referenceRun, currentRun, userName = self.testInGroup[testName]
             app = test.app
             if not self.kpiGroupForTest.has_key(test.name):
                 print "Warning: Skipping test not in KPI group:", test.name
@@ -663,11 +672,15 @@ class MakeProgressReport(optimization.MakeProgressReport):
             referenceRun.penaltyFactor = self.groupPenaltyQualityFactor[groupName]
             currentRun.penaltyFactor = self.groupPenaltyQualityFactor[groupName]
         testTuple = test, referenceRun, currentRun, userName
-        self.testInGroupList.append(testTuple)
+        self.testInGroup[test.name] = testTuple
         fcTuple = referenceRun.getCost(-1), currentRun.getCost(-1)
         if not self.finalCostsInGroup.has_key(groupName):
             self.finalCostsInGroup[groupName] = []
         self.finalCostsInGroup[groupName].append(fcTuple)
+        if not self.lowestCostInGroup.has_key(groupName):
+            self.lowestCostInGroup[groupName] = min(fcTuple)
+            return
+        self.lowestCostInGroup[groupName] = min(self.lowestCostInGroup[groupName], fcTuple)
     def getMargins(self, app, groupName):
         refMargin = self.refMargins[groupName]
         currentMargin = self.currentMargins[groupName]
@@ -745,7 +758,81 @@ class MakeProgressReport(optimization.MakeProgressReport):
                 map[optimization.costEntryName] = costAverageGraph[time]
                 map[optimization.memoryEntryName] = memAverageGraph[time]
                 solution.append(map)
-        return optimization.OptimizationRun("","","","", 0.0, solution)                
+        return optimization.OptimizationRun("","","","", 0.0, solution)
+
+# Produces graphical output for the progress report.
+class MakeProgressReportGraphical(MakeProgressReport):
+    def __init__(self, referenceVersion):
+        MakeProgressReport.__init__(self, referenceVersion)
+        self.matplotlibPresent = 0
+        try:
+            from matplotlib.pylab import figure, axes, plot, show, title, legend, FuncFormatter
+            self.figure = figure
+            self.axes = axes
+            self.plot = plot
+            self.show = show
+            self.title = title
+            self.legend = legend
+            self.FuncFormatter = FuncFormatter
+            self.matplotlibPresent = 1
+        except:
+            print "The matplotlib package doesn't seem to be in PYTHONPATH." + os.linesep + "No graphical output will be avaliable."
+    def __del__(self):
+        MakeProgressReport.__del__(self)
+        if self.matplotlibPresent:
+            # Finally show the matlab plots.
+            self.show()
+    def plotRun(self, optRun, options):
+        xVals = []
+        yVals = []
+        for solution in optRun.solutions:
+            xVals.append(solution[optimization.timeEntryName])
+            yVals.append(solution[optimization.costEntryName])
+        self.plot(xVals, yVals, options)
+    def plotKPILimits(self, worstCost, currTTWC, refTTWC):
+        self.plot([0,1.1*max(currTTWC,refTTWC)],[worstCost, worstCost],"r")
+        self.plot([currTTWC,currTTWC], [worstCost*1.01,worstCost*0.99],"r")
+        self.plot([refTTWC,refTTWC], [worstCost*1.01,worstCost*0.99],"r")
+    def plotPost(self, ax, lowestCost, worstCost, currTTWC, refTTWC):
+        self.plotKPILimits(worstCost, currTTWC, refTTWC)
+        ax.set_ylim( (lowestCost*0.999, lowestCost * 1.05) )
+        self.legend([self.referenceVersion,self.currentVersion])
+    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi):
+        if not self.matplotlibPresent:
+            return
+        self.figure(testCount, facecolor = 'w', figsize = (13,6))
+        axesBG  = '#f6f6f6'
+        height = 0.79
+        width = 0.38
+        up = 0.11
+        # Create a formatter for the ylabels.
+        lowestCostInGroup = self.lowestCostInGroup[groupName]
+        form = self.MyFormatter(lowestCostInGroup)
+        majorFormatter = self.FuncFormatter(form.formatterFcn)
+        # Plot the average curves on the left axes.
+        ax = self.axes([0.1, up ,width, height], axisbg = axesBG)
+        ax.yaxis.set_major_formatter(majorFormatter)
+        self.plotRun(referenceRun, "b")
+        self.plotRun(currentRun, "g")
+        self.plotPost(ax, lowestCostInGroup, worstCost, currTTWC, refTTWC)
+        self.title("User " + userName + ", KPI group " + groupName + ": " + str(kpi))
+        # Plot the individual curves on the right axes.
+        ax = self.axes([0.585, up, width, height], axisbg = axesBG)
+        ax.yaxis.set_major_formatter(majorFormatter)
+        for testName in self.testInGroup.keys():
+            if self.kpiGroupForTest[testName] == groupName:
+                test, referenceIndividualRun, currentIndividualRun, userName = self.testInGroup[testName]
+                self.plotRun(referenceIndividualRun, "b")
+                self.plotRun(currentIndividualRun, "g")
+        self.plotPost(ax, lowestCostInGroup, worstCost, currTTWC, refTTWC)
+        self.title("Individual runs")
+    # Tiny class to provide a UNIQUE formatter function carrying the lowest
+    # value for each group (which corresponds to a plot)
+    class MyFormatter:
+        def __init__(self, lowestValue):
+            self.lowestValue = lowestValue
+        def formatterFcn(self, y, pos):
+            return '%.2e(%.1f%%)' % (y, 100*y/self.lowestValue-100)     
 
 class ApcTestCaseInformation(optimization.TestCaseInformation):
     def isComplete(self):

@@ -23,7 +23,9 @@ class TestComparison:
         self.changedResults = []
         self.attemptedComparisons = []
         self.newResults = []
-        self.failedPrediction = test.stateDetails
+        self.failedPrediction = None
+        if test.state == test.FAILED:
+            self.failedPrediction = test.stateDetails
     def __repr__(self):
         if len(self.changedResults) > 0:
             return "FAILED :"
@@ -159,8 +161,9 @@ class FileComparison:
     def hasDifferences(self):
         return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
     def overwrite(self, exact, versionString = ""):
-        newVersions = versionString.split(".")
-        parts = self.stdFile.split(".")[:2] + newVersions
+        parts = self.stdFile.split(".")[:2] 
+        if len(versionString):
+            parts += versionString.split(".")
         stdFile = string.join(parts, ".")
         if os.path.isfile(stdFile):
             os.remove(stdFile)

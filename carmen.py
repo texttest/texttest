@@ -217,7 +217,10 @@ class RuleSet:
         return os.path.isfile(self.targetFile)
     def backup(self):
         if self.isCompiled():
-            shutil.copyfile(self.targetFile, self.targetFile + ".bak")
+            try:
+                shutil.copyfile(self.targetFile, self.targetFile + ".bak")
+            except IOError:
+                print "WARNING - did not have permissions to backup ruleset, continuing anyway"
     def moveDebugVersion(self):
         debugVersion = self.targetFile + "_g"
         if os.path.isfile(debugVersion):

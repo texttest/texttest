@@ -972,11 +972,11 @@ class ViewLog(plugins.Action):
 commonPlotter = 0
 commonPlotCount = 0
 
-class JoinPlot(plugins.Action):
+class PlotTest(plugins.Action):
     def __init__(self, args = []):
         global commonPlotCount, commonPlotter
         if commonPlotter == 0:
-            commonPlotter = PlotTest(args)
+            commonPlotter = _PlotTest(args)
             commonPlotCount = 1
         else:
             commonPlotCount += 1
@@ -989,10 +989,12 @@ class JoinPlot(plugins.Action):
         return "Plotting"
     def __call__(self, test):
         commonPlotter(test)
-
+    def setUpSuite(self, suite):
+        commonPlotter.setUpSuite(suite)
+        
 # Class for using gnuplot to plot test curves of tests
 #
-class PlotTest(plugins.Action):
+class _PlotTest(plugins.Action):
     def __init__(self, args = []):
         self.plotFiles = []
         self.plotItem = costEntryName
@@ -1009,11 +1011,14 @@ class PlotTest(plugins.Action):
         self.yLabel = ""
         self.plotInSameGraph = 0
         self.testWritedir = {}
+        self.lastSuite = ""
         # Must be last in the constructor
         self.interpretOptions(args)
     def __del__(self):
         if self.plotInSameGraph:
             self.plotGraph()
+    def setUpSuite(self, suite):
+        self.lastSuite = suite.name
     # Interactive stuff
     def getTitle(self):
         return "Plot Graph"
@@ -1087,7 +1092,7 @@ class PlotTest(plugins.Action):
             self.testPointType = {}
             counter = 1
             for file in self.plotFiles:
-                name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
+                name = self.plotNameFromFile(file)
                 if not self.testPointType.has_key(name):
                     self.testPointType[name] = counter
                     counter = counter + 1
@@ -1099,6 +1104,9 @@ class PlotTest(plugins.Action):
         return style
     def __repr__(self):
         return "Plotting"
+    def plotNameFromFile(self, fileName):
+        dirParts = fileName.split(os.sep)
+        return dirParts[-4] + "::" + dirParts[-3]
     def plotGraph(self):
         if len(self.plotFiles) > 0:
             stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
@@ -1106,11 +1114,13 @@ class PlotTest(plugins.Action):
 
             fileList = []
             for file in self.plotFiles:
-                ver = file.split(os.sep)[-1].split(".")[-2]
-                appname = file.split(os.sep)[-1].split(".")[-3]
-                state = file.split(os.sep)[-1].split(".")[-1]
-                name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
-                title = " title \"" + name + " " + appname + "." + ver + " " + state + "\" "
+                name = self.plotNameFromFile(file)
+                baseName = file.split(os.sep)[-1]
+                baseParts = baseName.split(".")
+                ver = baseParts[1]
+                appname = file.split(os.sep)[-2].split(".")[0]
+                state = baseParts[2]
+                title = " title \"" + name + ":" + appname + "." + ver + state + "\" "
                 fileList.append("'" + file + "' " + title + self.getStyle(ver,state,name))
 
             if self.plotPrint:
@@ -1143,7 +1153,7 @@ class PlotTest(plugins.Action):
             self.plotFiles = []
     def __call__(self, test):
         if not self.testWritedir.has_key(test):
-            rootPath = os.path.join(os.environ["HOME"], ".texttestplot")
+            rootPath = os.path.join(os.environ["HOME"], ".texttestplot", self.lastSuite, test.name)
             if os.path.isdir(rootPath):
                 test.cleanPreviousWriteDirs(rootPath);
             test.createDir(rootPath);
@@ -1165,7 +1175,7 @@ class PlotTest(plugins.Action):
                     print "No status file does exist for test " + test.app.name + "::" + test.name + "(" + version + ")"
                     continue
 
-                plotFileName = test.makeFileName("plot" + "." + version + "." + state, temporary = 1)
+                plotFileName = test.makeFileName(self.getPlotFileName(version, state), temporary=1)
                 plotFile = open(plotFileName, "w")
                 for solution in optRun.solutions:
                     if self.plotAgainstSolNum:
@@ -1176,3 +1186,6 @@ class PlotTest(plugins.Action):
         if not self.plotInSameGraph:
             self.plotGraph()
         test.writeDirs = []
+    def getPlotFileName(self, version, state):
+        return "plot." + version + "." + state
+        

@@ -17,10 +17,10 @@ class InteractiveAction(plugins.Action):
         return 1
     def getScriptTitle(self):
         return self.getTitle()
-    def startExternalProgram(self, commandLine, shellTitle = None, shellOptions = ""):
+    def startExternalProgram(self, commandLine, shellTitle = None, shellOptions = "", exitHandler=None, exitHandlerArgs=()):
         if shellTitle:
             commandLine = "xterm " + shellOptions + " -bg white -T '" + shellTitle + "' -e " + commandLine
-        process = plugins.BackgroundProcess(commandLine)
+        process = plugins.BackgroundProcess(commandLine, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         self.processes.append(process)
         return process
     def viewFile(self, fileName, wait = 0):
@@ -311,7 +311,11 @@ class RunTests(InteractiveAction):
         errFile = os.path.join(app.writeDirectory, "dynamic_errors.log")
         commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
         print "Starting dynamic TextTest with options :", ttOptions
-        self.startExternalProgram(commandLine)
+        self.startExternalProgram(commandLine, exitHandler=self.checkTestRun, exitHandlerArgs=errFile)
+    def checkTestRun(self, errFile):
+        errText = open(errFile).read()
+        if len(errText):
+            raise plugins.TextTestError, "Dynamic run failed, with the following errors:" + os.linesep + errText
     def getTextTestOptions(self, app, selTests):
         ttOptions = [ "-a " + app.name ]
         ttOptions += self.invisibleGroup.getCommandLines()

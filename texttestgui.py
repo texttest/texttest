@@ -8,6 +8,19 @@ from gtkusecase import ScriptEngine
 from Queue import Queue, Empty
 from ndict import seqdict
 
+def destroyDialog(dialog, *args):
+    dialog.destroy()
+
+def showError(message):
+    guilog.info("ERROR : " + message)
+    dialog = gtk.Dialog("TextTest Message", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    label = gtk.Label(message)
+    dialog.vbox.pack_start(label, expand=gtk.TRUE, fill=gtk.TRUE)
+    label.show()
+    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
+    dialog.show()
+
+
 class ActionThread(Thread):
     def __init__(self, actionRunner):
         Thread.__init__(self)
@@ -201,6 +214,8 @@ class TextTestGUI:
             self.actionThread = ActionThread(actionRunner)
             self.actionThread.start()
             gtk.idle_add(self.pickUpChange)
+        else:
+            gtk.idle_add(self.monitorBackgroundProcesses)
         # Run the Gtk+ main loop.
         gtk.main()
     def createDefaultRightGUI(self):
@@ -220,7 +235,21 @@ class TextTestGUI:
                 return gtk.FALSE
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
-            return gtk.TRUE    
+            return gtk.TRUE
+    def monitorBackgroundProcesses(self):
+        termProcesses = []
+        for process in guiplugins.InteractiveAction.processes:
+            try:
+                if process.checkTermination():
+                    termProcesses.append(process)
+            except plugins.TextTestError, e:
+                showError(str(e))
+                termProcesses.append(process)
+        for process in termProcesses:
+            guiplugins.InteractiveAction.processes.remove(process)
+        # We must sleep for a bit, or we use the whole CPU (busy-wait)
+        time.sleep(0.1)
+        return gtk.TRUE
     def testChanged(self, test, state, byAction):
         if test.classId() == "test-case":
             if test.waitingForProcess():
@@ -438,17 +467,7 @@ class RightWindowGUI:
         try:
             self.performInteractiveAction(action)
         except plugins.TextTestError, e:
-            self.showError(str(e))
-    def destroyDialog(self, dialog, *args):
-        dialog.destroy()
-    def showError(self, message):
-        guilog.info("ERROR : " + message)
-        dialog = gtk.Dialog("TextTest Message", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
-        label = gtk.Label(message)
-        dialog.vbox.pack_start(label, expand=gtk.TRUE, fill=gtk.TRUE)
-        label.show()
-        scriptEngine.connect("agree to texttest message", "response", dialog, self.destroyDialog, gtk.RESPONSE_ACCEPT)
-        dialog.show()
+            showError(str(e))
 
 class ApplicationGUI(RightWindowGUI):
     def __init__(self, app, selection, itermap):

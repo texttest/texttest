@@ -135,9 +135,11 @@ class NonPythonAction(Action):
 # a few... seems it only works on UNIX right now.
 class BackgroundProcess:
     fakeProcesses = os.environ.has_key("TEXTTEST_NO_SPAWN")
-    def __init__(self, commandLine, testRun=0):
+    def __init__(self, commandLine, testRun=0, exitHandler=None, exitHandlerArgs=()):
         self.commandLine = commandLine
         self.processId = None
+        self.exitHandler = exitHandler
+        self.exitHandlerArgs = exitHandlerArgs
         if not testRun:
             if not self.fakeProcesses:
                 self.doFork()
@@ -157,6 +159,12 @@ class BackgroundProcess:
     def waitForStart(self):
         while self.processId == None:
             time.sleep(0.1)
+    def checkTermination(self):
+        if not self.hasTerminated():
+            return 0
+        if not self.fakeProcesses and self.exitHandler:
+            self.exitHandler(self.exitHandlerArgs)
+        return 1
     def hasTerminated(self):
         if self.processId == None:
             return 1

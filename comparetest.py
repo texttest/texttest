@@ -50,6 +50,7 @@ class TestComparison:
         self.failedPrediction = None
         if test.state == test.FAILED:
             self.failedPrediction = test.stateDetails
+        self.diag = plugins.getDiagnostics("TestComparison")
     def __repr__(self):
         if len(self.changedResults) > 0 or self.failedPrediction:
             return "FAILED :"
@@ -119,9 +120,12 @@ class TestComparison:
             if os.path.isdir(file):
                 self.makeComparisons(test, fullPath)
             elif self.shouldCompare(file, dir, test.app):
+                self.diag.info("Decided we should compare " + file)
                 stdFile = os.path.normpath(self.findTestDirectory(fullPath, test))
                 comparison = self.makeComparison(test, stdFile, fullPath, makeNew)
                 self.addComparison(fullPath, comparison)
+            else:
+                self.diag.info("Rejected " + file)
     def shouldCompare(self, file, dir, app):
         return not file.startswith("input.") and app.ownsFile(file)
     def findTestDirectory(self, fullPath, test):

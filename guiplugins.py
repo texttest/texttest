@@ -44,6 +44,8 @@ class SaveTest(InteractiveAction):
         InteractiveAction.__init__(self, test, "Saving")
         if self.canPerformOnTest():
             extensions = test.app.getVersionFileExtensions(forSave = 1)
+            # Include the default version always
+            extensions.append("")
             self.optionGroup.addOption("v", "Version to save", test.app.getFullVersion(forSave = 1), extensions)
             self.optionGroup.addSwitch("over", "Replace successfully compared files also", 0)
             try:

@@ -222,64 +222,90 @@ class RunDependentTextFilter:
             else:
                 return newFileName
         
-        oldFile = open(fileName)
         newFile = open(newFileName, "w")
-        linesToRemove = 0
         lineNumber = 0
-        for line in oldFile.readlines():
+        for line in open(fileName).xreadlines():
             lineNumber += 1
-            linesToRemove += self.calculateLinesToRemove(line, lineNumber)
-            if linesToRemove == 0:
-                newFile.write(line)
-            else:
-                linesToRemove -= 1
-        newFile.close()
+            filteredLine = self.getFilteredLine(line, lineNumber)
+            if filteredLine:
+                newFile.write(filteredLine)
         self.diag.info("Filter for " + fileName + " returned " + newFileName)
         return newFileName
-    def calculateLinesToRemove(self, line, lineNumber):
+    def getFilteredLine(self, line, lineNumber):
         for lineFilter in self.lineFilters:
-            toRemove = lineFilter.calculateLinesToRemove(line, lineNumber)
-            if toRemove:
-                return toRemove
-        return 0
+            changed, filteredLine = lineFilter.applyTo(line, lineNumber)
+            if changed:
+                return filteredLine
+        return line
 
 class LineFilter:
-    specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
+    # Order is important here: word processing first, line number last.
+    # This is because WORD can be combined with the others, and LINE screws up the model...
+    syntaxStrings = [ "{WORD ", "{LINES:", "{->}", "{LINE " ]
     def __init__(self, text):
-        self.triggerText = text
+        self.trigger = text
+        self.untrigger = None
         self.triggerNumber = 0
         self.linesToRemove = 1
-        linePoint = text.find("{LINES:")
-        if linePoint != -1:
-            self.triggerText = text[:linePoint]
-            var, val = text[linePoint + 1:-1].split(":")
-            self.linesToRemove = int(val)
-        else:
-            linePoint = text.find("{LINE")
+        self.autoRemove = 0
+        self.wordNumber = 0
+        for syntaxString in self.syntaxStrings:
+            linePoint = self.trigger.find(syntaxString)
             if linePoint != -1:
-                self.triggerText = None
-                self.triggerNumber = int(text[6:-1])
-        self.regex = self.getRegularExpression()
-    def getRegularExpression(self):
-        if not self.triggerText:
-            return None
-        if self.specialChars.search(self.triggerText) != None:
-            return re.compile(self.triggerText)
-        else:
-            return None
-    def calculateLinesToRemove(self, line, lineNumber):
+                beforeText = self.trigger[:linePoint]
+                afterText = self.trigger[linePoint + len(syntaxString):]
+                self.readSyntax(syntaxString, beforeText, afterText)
+        if self.trigger:
+            self.trigger = re.compile(self.trigger)
+        if self.untrigger:
+            self.untrigger = re.compile(self.untrigger)
+    def readSyntax(self, syntaxString, beforeText, afterText):
+        if syntaxString == "{WORD ":
+            self.trigger = beforeText
+            self.wordNumber = int(afterText[:-1])
+        elif syntaxString == "{LINES:":
+            self.trigger = beforeText
+            self.linesToRemove = int(afterText[:-1])
+        elif syntaxString == "{LINE ":
+            self.trigger = None
+            self.triggerNumber = int(afterText[:-1])
+        elif syntaxString == "{->}":
+            self.trigger = beforeText
+            self.untrigger = afterText
+    def applyTo(self, line, lineNumber):
+        if self.autoRemove:
+            if self.untrigger:
+                if self.untrigger.search(line.strip()):
+                    self.autoRemove = 0
+                    return 0, line
+            else:
+                self.autoRemove -= 1
+            return 1, self.filterWords(line)
+        
         if self.triggerNumber == lineNumber:
+            return 1, self.filterWords(line)
+
+        if self.checkMatch(line.strip()):
+            return 1, self.filterWords(line)
+        else:
+            return 0, line
+    def checkMatch(self, line):
+        if self.trigger and self.trigger.search(line):
+            if self.untrigger:
+                self.autoRemove = 1
+                return 0
+            if self.linesToRemove:
+                self.autoRemove = self.linesToRemove - 1
             return 1
-
-        if self.hasMatch(line.strip()):
-            return self.linesToRemove
         else:
             return 0
-    def hasMatch(self, line):
-        if self.regex:
-            return self.regex.search(line)
-        elif self.triggerText:
-            return line.find(self.triggerText) != -1
+    def filterWords(self, line):
+        if self.wordNumber:
+            words = line.split()
+            try:
+                words.remove(words[self.wordNumber])
+                return string.join(words).strip() + os.linesep
+            except IndexError:
+                return line
         else:
-            return 0
-
+            return None

@@ -250,6 +250,10 @@ class TestCase(Test):
             shutil.copy(fullPath, target)
         if os.path.isdir(fullPath):
             shutil.copytree(fullPath, target)
+            if os.name == "posix":
+                # Cannot get os.chmod to work recursively, or worked out the octal digits..."
+                # In any case, it's important that it's writeable
+                os.system("chmod -R +w " + target)
     def linkTestPath(self, fullPath, target):
         # Linking doesn't exist on windows!
         if os.name != "posix":

@@ -452,7 +452,6 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
                 print "WARNING : Could not find machines in LSF report, keeping it"
                 return executionMachines
 
-        os.remove(tmpFile)
         return executionMachines
     def parseMachine(self, line):
         start = string.find(line, "<")

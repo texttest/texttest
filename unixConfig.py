@@ -46,8 +46,6 @@ class UNIXConfig(default.Config):
             return batch.BatchResponder(self.optionValue("b"))
         else:
             return default.Config.getTestResponder(self)
-    def defaultGraphicalDiffTool(self):
-        return "tkdiff"
     def defaultTextDiffTool(self):
         return "diff"
     def defaultSeverities(self):
@@ -340,12 +338,6 @@ class MakePerformanceFile(plugins.Action):
             return
 
         cpuTime, realTime = self.readTimes(test)
-        # remove the command-file created before submitting the command
-        # Note not everybody creates one!
-        cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
-        if os.path.isfile(cmdFile):
-            os.remove(cmdFile)
-
         executionMachines = self.findExecutionMachines(test)
         # There was still an error (jobs killed in emergency), so don't write performance files
         if cpuTime == None:
@@ -373,8 +365,6 @@ class MakePerformanceFile(plugins.Action):
                 cpuTime = cpuTime + self.parseUnixTime(line)
             if line.startswith("real"):
                 realTime = self.parseUnixTime(line)
-        if cpuTime != None:
-            os.remove(tmpFile)
         return cpuTime, realTime
     def timeString(self, timeVal):
         return str(round(float(timeVal), 1)).rjust(9)

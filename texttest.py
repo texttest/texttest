@@ -407,8 +407,10 @@ class OptionFinder:
                 try:
                     app = Application(appName, dirName, pathname, versionList, self.inputOptions, "a:c:d:h:m:s:v:xp")
                     appList.append(app)
-                except (getopt.GetoptError, KeyError), e:
-                    print "Could not use application", appName, "-", e
+                except (SystemExit, KeyboardInterrupt):
+                    raise sys.exc_type, sys.exc_value
+                except:
+                    print "Could not use application", appName, "-", sys.exc_value
             elif os.path.isdir(pathname) and recursive:
                 for app in self._findApps(pathname, 0):
                     appList.append(app)

@@ -53,6 +53,7 @@ class UNIXConfig(default.Config):
         print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
     def printHelpScripts(self):
         print performance.helpScripts
+        default.Config.printHelpScripts(self)
     def printHelpOptions(self, builtInOptions):
         print batch.helpOptions
         default.Config.printHelpOptions(self, builtInOptions)

@@ -202,6 +202,7 @@ class TestComparison(plugins.TestState):
     def findTestDirectory(self, fullPath, test):
         result = os.path.normpath(fullPath.replace(test.app.writeDirectory, test.app.abspath))
         if result != fullPath:
+            self.diag.info("Finding standard file from " + result)
             return self.getStandardFile(result, test)
         # writeDir contains so
         savedir = os.getcwd()

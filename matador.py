@@ -1,5 +1,5 @@
 helpDescription = """
-The Matador configuration is based on the Carmen configuration. It will compile all static rulesets in the test
+The Matador configuration is based on the Rave-based configuration. It will compile all static rulesets in the test
 suite before running any tests, if the library file "matador.o" has changed since the static ruleset was last built.""" 
 
 helpOptions = """-diag      - Run with diagnostics on. This will set the environment variables DIAGNOSTICS_IN and DIAGNOSTICS_OUT to
@@ -45,7 +45,7 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
                             making the changes it has shown, and writing an options.<app> file.
 """
 
-import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest, unixConfig, sys, guiplugins
+import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixConfig, sys, guiplugins
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
@@ -313,7 +313,7 @@ class MigrateApcTest(plugins.Action):
         return absPath
     def setUpSuite(self, suite):
         self.describe(suite)
-        if not carmen.isUserSuite(suite):
+        if not ravebased.isUserSuite(suite):
             return
         for testline in open(suite.testCaseFile).readlines():
             if testline != '\n' and testline[0] != '#':
@@ -370,7 +370,7 @@ class CopyEnvironment(plugins.Action):
         return "Making environment.ARCH for"
     def setUpSuite(self, suite):
         versions = [ "", ".10", ".9" ]
-        if carmen.isUserSuite(suite):
+        if ravebased.isUserSuite(suite):
             self.describe(suite)
             for version in versions:
                 oldFile = os.path.join(suite.abspath, "environment.cas" + version)

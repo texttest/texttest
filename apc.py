@@ -1,5 +1,5 @@
 helpDescription = """
-The apc configuration is based on the Carmen configuration. It will compile all rulesets in the test
+The apc configuration is based on the Rave-based configuration. It will compile all rulesets in the test
 suite before running any tests, if the library file "libapc.a" has changed since the ruleset was last built.
 
 It uses a special ruleset building strategy on the linux platforms, such that rebuilding the APC binary
@@ -56,7 +56,7 @@ apc.UpdatePerformance      - Update the performance file for tests with time fro
 
 """
 
-import default, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
+import default, ravebased, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -154,7 +154,7 @@ def verifyAirportFile(arch):
     customerEtab = os.path.join(etabPath, "Customer.etab")
     if os.path.isfile(customerEtab):
         diag.info("Reading etable at " + customerEtab)
-        etab = carmen.ConfigEtable(customerEtab)
+        etab = ravebased.ConfigEtable(customerEtab)
         airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
         if airportFile != None and os.path.isfile(airportFile):
             return
@@ -169,7 +169,7 @@ def verifyAirportFile(arch):
             apCompile = os.path.join(os.environ["CARMSYS"], "bin", arch, "apcomp")
             if os.path.isfile(apCompile):
                 print "Missing AirportFile detected, building:", airportFile
-                carmen.ensureDirectoryExists(os.path.dirname(airportFile))
+                ravebased.ensureDirectoryExists(os.path.dirname(airportFile))
                 # We need to source the CONFIG file in order to get some
                 # important environment variables set, i.e. PRODUCT and BRANCH.
                 configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
@@ -312,10 +312,10 @@ class RunApcTestInDebugger(default.RunTest):
     def setUpSuite(self, suite):
         self.describe(suite)
     
-class ApcCompileRules(carmen.CompileRules):
+class ApcCompileRules(ravebased.CompileRules):
     def __init__(self, getRuleSetName, jobNameCreator, sFilter = None, testRunner = None, \
                  modeString = "-optimize", ruleCompFlags = None):
-        carmen.CompileRules.__init__(self, getRuleSetName, jobNameCreator, modeString, sFilter, testRunner)
+        ravebased.CompileRules.__init__(self, getRuleSetName, jobNameCreator, modeString, sFilter, testRunner)
         self.ruleCompFlags = ruleCompFlags
         self.diag = plugins.getDiagnostics("ApcCompileRules")
     def compileRulesForTest(self, test):
@@ -324,9 +324,9 @@ class ApcCompileRules(carmen.CompileRules):
         if self.filter and carmen.getArchitecture(test.app) == "i386_linux" and self.ruleCompFlags == "apc":
             self.linuxRuleSetBuild(test)
         else:
-            return carmen.CompileRules.compileRulesForTest(self, test)
+            return ravebased.CompileRules.compileRulesForTest(self, test)
     def linuxRuleSetBuild(self, test):
-        ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
+        ruleset = ravebased.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
         if not self.ensureCarmTmpDirExists():
             #self.rulesCompileFailed.append(ruleset.name)
             raise plugins.TextTestError, "Non-existing CARMTMP"
@@ -336,7 +336,7 @@ class ApcCompileRules(carmen.CompileRules):
         if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
             return
         apcExecutable = ruleset.targetFile
-        carmen.ensureDirectoryExists(os.path.dirname(apcExecutable))
+        ravebased.ensureDirectoryExists(os.path.dirname(apcExecutable))
         ruleLib = self.getRuleLib(ruleset.name)
         if self.isNewer(apcExecutable, self.apcLib):
             self.diag.info("APC binary is newer than libapc.a, returning.")
@@ -911,7 +911,7 @@ class PrintAirport(plugins.Action):
         etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
         customerEtab = os.path.join(etabPath, "Customer.etab")
         if os.path.isfile(customerEtab):
-            etab = carmen.ConfigEtable(customerEtab)
+            etab = ravebased.ConfigEtable(customerEtab)
             airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
             if airportFile != None:
                 self.describe(suite, ": " + airportFile)
@@ -990,7 +990,7 @@ class CopyEnvironment(plugins.Action):
     def __repr__(self):
         return "Making environment.apc.ARCH for"
     def setUpSuite(self, suite):
-        if carmen.isUserSuite(suite):
+        if ravebased.isUserSuite(suite):
             self.describe(suite)
             oldFile = os.path.join(suite.abspath, "environment.apc")
             if not os.path.isfile(oldFile):

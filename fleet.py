@@ -6,7 +6,7 @@ Note though that the 'matador.ImportTest' script is not implemeted for Fleet yet
 helpOptions = """
 """
 
-import os, string, carmen, optimization, matador, plugins, shutil
+import os, string, optimization, matador, plugins, shutil
 
 def getConfig(optionMap):
     return FleetConfig(optionMap)

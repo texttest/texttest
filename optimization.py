@@ -12,7 +12,7 @@ this is done hierarchiclly, i.e. lines in raveparameters suite files will be wri
 in raveparameters test files. By doing this you can experiment with a new feature on a lot of tests
 without having to manually create new tests.
 
-In other respects, it follows the usage of the Carmen configuration.""" 
+In other respects, it follows the usage of the Rave-based configuration.""" 
 
 helpOptions = """-prrep <v> - Generate a Progress Report relative to the version <v>. This will produce some
              key numbers for all tests specified.
@@ -86,7 +86,7 @@ optimization.TraverseSubPlans
 """
 
 
-import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, guiplugins
+import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, guiplugins
 from ndict import seqdict
 
 itemNamesConfigKey = "_itemnames_map"
@@ -103,15 +103,15 @@ activeMethodEntryName = "Active method"
 newSolutionMarker = "new solution"
 solutionName = "solution"
 
-class OptimizationConfig(carmen.CarmenConfig):
+class OptimizationConfig(ravebased.Config):
     def __init__(self, optionMap):
-        carmen.CarmenConfig.__init__(self, optionMap)
+        ravebased.Config.__init__(self, optionMap)
         #Probably different for APC and matador : static data for the text in the log file
         self.itemNamesInFile = {}
         # Static data for what data to check in CheckOptimizationRun, and what methods to avoid it with
         self.noIncreaseExceptMethods = {}
     def addToOptionGroup(self, group):
-        carmen.CarmenConfig.addToOptionGroup(self, group)
+        ravebased.Config.addToOptionGroup(self, group)
         if group.name.startswith("Invisible"):
             # These need a better interface before they can be plugged in, really
             group.addOption("prrep", "Run KPI progress report")
@@ -129,7 +129,7 @@ class OptimizationConfig(carmen.CarmenConfig):
             return [ WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
-        return carmen.CarmenConfig.getActionSequence(self, useGui)
+        return ravebased.Config.getActionSequence(self, useGui)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def defaultBuildRules(self):
@@ -154,18 +154,18 @@ class OptimizationConfig(carmen.CarmenConfig):
             "carmusr_default", "crc", "modules", test.getConfigValue("rave_name")) ]
         return readDirs
     def getSpecificTestRunner(self):
-        return carmen.CarmenConfig.getTestRunner(self) 
+        return ravebased.Config.getTestRunner(self) 
     def printHelpDescription(self):
         print helpDescription
-        carmen.CarmenConfig.printHelpDescription(self)
+        ravebased.Config.printHelpDescription(self)
     def printHelpOptions(self, builtInOptions):
-        carmen.CarmenConfig.printHelpOptions(self, builtInOptions)
+        ravebased.Config.printHelpOptions(self, builtInOptions)
         print helpOptions
     def printHelpScripts(self):
-        carmen.CarmenConfig.printHelpScripts(self)
+        ravebased.Config.printHelpScripts(self)
         print helpScripts
     def setApplicationDefaults(self, app):
-        carmen.CarmenConfig.setApplicationDefaults(self, app)
+        ravebased.Config.setApplicationDefaults(self, app)
         app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile)
         app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods)
         app.setConfigDefault("kpi_cost_margin", 0.0)
@@ -967,7 +967,7 @@ class ImportTest(plugins.Action):
             return
         for testline in open(suite.testCaseFile).readlines():
             if testline != '\n' and testline[0] != '#':
-                if carmen.isUserSuite(suite):
+                if ravebased.isUserSuite(suite):
                     testInfo = self.getTestCaseInformation(suite, testline.strip())
                 else:
                     testInfo = self.getTestSuiteInformation(suite, testline.strip())

@@ -69,11 +69,15 @@ class TestCase(Test):
         return self.app.getExecuteCommand() + " " + self.options
     def getTmpExtension(self):
         return globalRunIdentifier
+    def getTestUser(self):
+        return tmpString()
+    def parallelMode(self):
+        return inputOptions.parallelMode()
     def getTmpFileName(self, text, mode):
         prefix = text + "." + self.app.name
         fileName = prefix + globalRunIdentifier
         if mode == "w" and not inputOptions.parallelMode():
-            currTmpString = prefix + tmpString()
+            currTmpString = prefix + self.getTestUser()
             for file in os.listdir(self.abspath):
                 if file.find(currTmpString) != -1:
                     os.remove(file)

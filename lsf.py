@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import os, time, string, signal, sys, default, performance, respond, batch, plugins
+import os, time, string, signal, sys, default, performance, respond, batch, plugins, types
 
 def getConfig(optionMap):
     return LSFConfig(optionMap)
@@ -102,7 +102,7 @@ class SubmitTest(plugins.Action):
     def __call__(self, test):
         queueToUse = self.queueFunction(test)
         self.describe(test, " to LSF queue " + queueToUse)
-        testCommand = "'" + test.getExecuteCommand() 
+        testCommand = "'" + self.getExecuteCommand(test) 
         if os.path.isfile(test.inputFile):
             testCommand = testCommand + " < " + test.inputFile
         outfile = test.getTmpFileName("output", "w")
@@ -115,6 +115,8 @@ class SubmitTest(plugins.Action):
             lsfOptions += " -R '" + self.resource + "'"
         commandLine = "bsub " + lsfOptions + " " + testCommand + " > " + reportfile + " 2>&1"
         os.system(commandLine)
+    def getExecuteCommand(self, test):
+        return test.getExecuteCommand()
     def setUpSuite(self, suite):
         self.describe(suite)
     

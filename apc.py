@@ -1,17 +1,36 @@
-import carmen, os, sys, stat, string, shutil, optimization, plugins
+import default, carmen, lsf, os, sys, stat, string, shutil, optimization, plugins
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
 
 class ApcConfig(optimization.OptimizationConfig):
+    def __init__(self, optionMap):
+        optimization.OptimizationConfig.__init__(self, optionMap)
+        self.subplanManager = ApcSubPlanDirManager(self)
     def getLibraryFile(self):
         return os.path.join("data", "apc", carmen.architecture, "libapc.a")
     def getSubPlanFileName(self, test, sourceName):
-        return os.path.join(test.options.split()[0], sourceName)
-    def getCompileRules(self, filter):
-        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile(), filter, self.optionMap.has_key("rulecomp"))
+        return self.subplanManager.getSubPlanFileName(test, sourceName)
+    def _getTestRunner(self):
+        if self.optionMap.has_key("l"):
+            return ApcRunTest(self.subplanManager)
+        else:
+            return ApcSubmitTest(self.subplanManager, self.findLSFQueue, self.optionValue("R"))
+    def getTestRunner(self):
+        if self.optionMap.has_key("lprof"):
+            subActions = [ self._getTestRunner(), carmen.WaitForDispatch(), carmen.RunLProf() ]
+            return plugins.CompositeAction(subActions)
+        else:
+            return self._getTestRunner()
+    def getCompileRules(self, staticFilter):
+        libFile = self.getLibraryFile()
+        ruleCompile = self.optionMap.has_key("rulecomp")
+        return ApcCompileRules(self.getRuleSetName, libFile, staticFilter, ruleCompile)
     def getTestCollator(self):
-        subActions = [ optimization.OptimizationConfig.getTestCollator(self), RemoveLogs(), optimization.ExtractSubPlanFile(self, "status", "status") ]
+        subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
+        subActions.append(RemoveLogs())
+        subActions.append(optimization.ExtractSubPlanFile(self, "status", "status"))
+        subActions.append(RemoveTemporarySubplan(self.subplanManager))
         return plugins.CompositeAction(subActions)
     def getRuleSetName(self, test):
         fileName = test.makeFileName("options")
@@ -19,13 +38,113 @@ class ApcConfig(optimization.OptimizationConfig):
             optionLine = open(fileName).readline()
             options = optionLine.split()
             for option in options:
-                if option.find("crc/rule_set") != -1:
-                    return option.split("/")[-1]
+                if option.find("crc" + os.sep + "rule_set") != -1:
+                    return option.split(os.sep)[-1]
         return None
 
+class ApcSubPlanDirManager:
+    def __init__(self, config):
+        self.config = config
+        self.tmpDirs = {}
+    def getSubPlanFileName(self, test, sourceName):
+        if not self.tmpDirs.has_key(test):
+            return os.path.join(test.options.split()[0], sourceName)
+        else:
+            return os.path.join(self.tmpDirs[test], "APC_FILES", sourceName)
+    def makeTemporary(self, test):
+        dirName = self.getSubPlanDirName(test)
+        baseName = self.getSubPlanBaseName(test)
+        tmpDir = self.getTmpSubdir(test, dirName, baseName, "w")
+        self.tmpDirs[test] = tmpDir
+        os.mkdir(tmpDir)
+        self.makeLinksIn(tmpDir, os.path.join(dirName, baseName))
+    def makeLinksIn(self, inDir, fromDir):
+        for file in os.listdir(fromDir):
+            if file.find("Solution_") != -1:
+                continue
+            if file.find("status") != -1:
+                continue
+            if file.find("hostname") != -1:
+                continue
+            if file.find("best_solution") != -1:
+                continue
+            if file != "APC_FILES":
+                fromPath = os.path.join(fromDir, file)
+                toPath = os.path.join(inDir, file)
+                os.symlink(fromPath, toPath)
+            else:
+                apcFiles = os.path.join(inDir, file)
+                os.mkdir(apcFiles)
+                self.makeLinksIn(apcFiles, os.path.join(fromDir, file))
+
+    def removeTemporary(self, test):
+        self.removeDir(self.tmpDirs[test])
+    def getExecuteCommand(self, test):
+        self.makeTemporary(test)
+        binary = test.app.getExecuteCommand()
+        options = test.options.split(" ")
+        tmpDir = self.tmpDirs[test]
+        dirName = os.path.join(self.getSubPlanDirName(test), self.getSubPlanBaseName(test))
+        dirName = os.path.normpath(dirName)
+        options[0] = os.path.normpath(options[0]).replace(dirName, tmpDir)
+        options[1] = os.path.normpath(options[1]).replace(dirName, tmpDir)
+        return binary + " " + string.join(options, " ")
+    def getSubPlanDirName(self, test):
+        dirs = os.path.expandvars(test.options.split()[1]).split(os.sep)[:-3]
+        return os.path.normpath(string.join(dirs, os.sep))
+    def getSubPlanBaseName(self, test):
+        baseName = test.options.split()[1].split(os.sep)[-3]
+        return baseName
+    def getTmpSubdir(self, test, subDir, baseName, mode):
+        prefix = os.path.join(subDir, baseName) + "." + test.app.name
+        dirName = prefix + test.getTmpExtension()
+        if not test.parallelMode():
+            currTmpString = prefix + test.getTestUser()
+            for file in os.listdir(subDir):
+                fpath = os.path.join(subDir,file)
+                if not os.path.isdir(fpath):
+                    continue
+                if fpath.find(currTmpString) != -1:
+                    self.removeDir(os.path.join(subDir, file))
+        return dirName
+    def removeDir(self, subDir):
+        for file in os.listdir(subDir):
+            fpath = os.path.join(subDir,file)
+            try:
+                # if softlinked dir, remove as file and do not recurse
+                os.remove(fpath) 
+            except:
+                self.removeDir(fpath)
+        try:
+            os.remove(subDir)
+        except:
+            os.rmdir(subDir)
+    
+class ApcRunTest(default.RunTest):
+    def __init__(self, subplanManager):
+        self.subplanManager = subplanManager
+    def getExecuteCommand(self, test):
+        return self.subplanManager.getExecuteCommand(test)
+
+class ApcSubmitTest(lsf.SubmitTest):
+    def __init__(self, subplanManager, queueFunction, resource = ""):
+        lsf.SubmitTest.__init__(self, queueFunction, resource)
+        self.subplanManager = subplanManager
+    def getExecuteCommand(self, test):
+        return self.subplanManager.getExecuteCommand(test)
+
+class RemoveTemporarySubplan(plugins.Action):
+    def __init__(self, subplanManager):
+        self.subplanManager = subplanManager
+    def __call__(self, test):
+        self.subplanManager.removeTemporary(test)
+    def __repr__(self):
+        return "Removing temporary subplan for"
+
+
 class ApcCompileRules(carmen.CompileRules):
-    def __init__(self, getRuleSetName, libraryFile, filter = None, forcedRuleCompile = 0):
-        carmen.CompileRules.__init__(self, getRuleSetName, "-optimize", filter)
+    def __init__(self, getRuleSetName, libraryFile, sFilter = None, forcedRuleCompile = 0):
+        carmen.CompileRules.__init__(self, getRuleSetName, "-optimize", sFilter)
         self.forcedRuleCompile = forcedRuleCompile
         self.libraryFile = libraryFile
     def __call__(self, test):
@@ -100,6 +219,8 @@ class RemoveLogs(plugins.Action):
         self.removeFile(test, "output")
     def removeFile(self, test, stem):
         os.remove(test.getTmpFileName(stem, "r"))
+    def __repr__(self):
+        return "Remove logs"
 
 class StartStudio(plugins.Action):
     def __call__(self, test):

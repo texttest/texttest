@@ -44,7 +44,7 @@ class CompositeAction(Action):
     def __init__(self, subActions):
         self.subActions = subActions
     def __repr__(self):
-        return "Performing " + self.subActions + " on"
+        return "Performing " + repr(self.subActions) + " on"
     def __call__(self, test):
         for subAction in self.subActions:
             subAction(test)

@@ -67,7 +67,7 @@ class RunTest(plugins.Action):
         return "Running"
     def __call__(self, test):
         self.describe(test)
-        stdin, stdout, stderr = os.popen3(test.getExecuteCommand())
+        stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test))
         if os.path.isfile(test.inputFile):
             stdin.write(open(test.inputFile).read())
             stdin.close()
@@ -75,5 +75,7 @@ class RunTest(plugins.Action):
         outfile.write(stdout.read())
         errfile = open(test.getTmpFileName("errors", "w"), "w")
         errfile.write(stderr.read())
+    def getExecuteCommand(self, test):
+        return test.getExecuteCommand()
     def setUpSuite(self, suite):
         self.describe(suite)

@@ -125,7 +125,10 @@ class CarmenConfig(lsf.LSFConfig):
     def findResourceList(self, app):
         resourceList = lsf.LSFConfig.findResourceList(self, app)
         # Sparc queue requires this resource
-        if architecture == "sparc":
+        if "9" in app.versions:
+            if architecture != "i386_linux":
+                resourceList.append("carmen_9")
+        else:
             resourceList.append("master")
         return resourceList
     def isNightJob(self):
@@ -288,12 +291,14 @@ class BuildCode(plugins.Action):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."
         buildFile = "build.default"
-        os.system("gmake >& " + buildFile)
+        commandLine = "cd " + absPath + "; gmake >& " + buildFile
+        os.system("rsh wake '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
             raise "Product " + repr(app) + " did not build, exiting"
         print "Product", app, "built correctly in", absPath
         os.remove(buildFile)
-        os.system("gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null")
+        commandLine = "cd " + absPath + "; gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"
+        os.system("rsh wake '" + commandLine + "' < /dev/null")
         print "Making install from", absPath ,"to", os.environ["CARMSYS"]
     def buildRemote(self, machine, arch, app):
         print "Building remotely in parallel on " + machine + " ..."

@@ -483,6 +483,7 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
 
 class WaitForDispatch(lsf.Wait):
     def __init__(self):
+        lsf.Wait.__init__(self)
         self.eventName = "dispatch"
     def checkCondition(self, job):
         return job.getProcessId()

@@ -43,10 +43,12 @@ class GetEtabs(plugins.Action):
     def __call__(self, test):
         lpEtabs = glob("./etable/LpLocal/*")
         for file in lpEtabs:
-            os.rename(file,"./"+os.path.basename(file)+".lp")
+            if os.path.isfile(file):
+                os.rename(file,"./"+os.path.basename(file)+".lp")
         spEtabs = glob("./etable/SpLocal/*")
         for file in spEtabs:
-            os.rename(file,"./"+os.path.basename(file)+".sp")
+            if os.path.isfile(file):
+                os.rename(file,"./"+os.path.basename(file)+".sp")
             
 
 

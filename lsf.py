@@ -241,7 +241,7 @@ class MakeResourceFiles(plugins.Action):
         self.checkPerformance = checkPerformance
         self.checkMemory = checkMemory
     def __call__(self, test):
-        textList = [ "Max Memory", "Max Swap", "CPU time", "executed on host" ]
+        textList = [ "Max Memory", "Max Swap", "CPU time", "executed on host", "Real time" ]
         tmpFile = test.getTmpFileName("report", "r")
         resourceDict = self.makeResourceDict(tmpFile, textList)
         if len(resourceDict) < len(textList):
@@ -257,6 +257,9 @@ class MakeResourceFiles(plugins.Action):
                 if line.find("user") != -1:
                     cpuTime = line.strip().split()[-1]
                     resourceDict["CPU time"] = "CPU time   : " + string.rjust(cpuTime, 9) + " sec."
+                if line.find("real") != -1:
+                    realTime = line.strip().split()[-1]
+                    resourceDict["Real time"] = "Real time  : " + string.rjust(realTime, 9) + " sec." + os.linesep
             os.remove(tmpFile)
 
         # remove the command-file created before submitting the command
@@ -268,7 +271,7 @@ class MakeResourceFiles(plugins.Action):
         if len(resourceDict) < len(textList):
             return
         if self.checkPerformance:
-            self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3]], test.getTmpFileName("performance", "w"))
+            self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3]], resourceDict[textList[4]], test.getTmpFileName("performance", "w"))
         if self.checkMemory:
             self.writeMemoryFile(resourceDict[textList[0]], resourceDict[textList[1]], test.getTmpFileName("memory", "w"))
 #private
@@ -280,11 +283,12 @@ class MakeResourceFiles(plugins.Action):
                 if string.find(line, text) != -1:
                     resourceDict[text] = line
         return resourceDict
-    def writePerformanceFile(self, test, cpuLine, executionLine, fileName):
+    def writePerformanceFile(self, test, cpuLine, executionLine, realLine, fileName):
         executionMachine = self.findExecutionMachine(executionLine)
         file = open(fileName, "w")
         line = string.strip(cpuLine) + " on " + executionMachine + os.linesep
         file.write(line)
+        file.write(realLine)
         file.close()
     def findExecutionMachine(self, line):
         start = string.find(line, "<")

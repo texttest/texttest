@@ -20,7 +20,7 @@ class UNIXConfig(default.Config):
         default.Config.addToOptionGroup(self, group)
         if group.name.startswith("Select"):
             group.addOption("r", "Execution time <min, max>")
-        elif group.name.startswith("Invisible"):
+        elif group.name.startswith("How"):
             group.addOption("b", "Run batch mode session")
     def getFilterList(self):
         filters = default.Config.getFilterList(self)

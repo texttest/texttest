@@ -98,13 +98,13 @@ class HandleCompressedFiles(plugins.Action):
             if not self.compress:
                 if isCompressed(file):
                     #print "uncompressing:", file
-                    os.system('uncompress '+file)
+                    os.system('uncompress -f '+file)
             elif os.stat(file)[6] > self.compressIfOverSize:
                 #0 as size means do not compress at all
                 if 0 == self.compressIfOverSize:
                     return
                 #print "compressing:", file
-                os.system('compress '+file)
+                os.system('compress -f '+file)
                     
                 
 class CreateCompareFiles(plugins.Action):
@@ -138,7 +138,7 @@ class CreateCompareFiles(plugins.Action):
             compareFile=test.getTmpFileName(f,'w')
             #the program might create compressed files
             if isCompressed(file):
-                os.system('zcat '+file+' > '+compareFile)
+                os.system('zcat -f '+file+' > '+compareFile)
                 os.unlink(file)
             else:
                 os.rename(file,compareFile)

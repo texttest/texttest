@@ -104,12 +104,19 @@ class SaveTest(InteractiveAction):
 class ViewFile(InteractiveAction):
     def __init__(self, test):
         InteractiveAction.__init__(self, test)
-        self.switches["rdt"] = Switch("Include Run-dependent Text", 0)
-        self.switches["nf"] = Switch("Show differences where present", 1)
-        if test and test.state == test.RUNNING:
-            self.switches["f"] = Switch("Follow file rather than view it", 1)
+        if test:
+            self.switches["rdt"] = Switch("Include Run-dependent Text", 0)
+            self.switches["nf"] = Switch("Show differences where present", 1)
+            if test and test.state == test.RUNNING:
+                self.switches["f"] = Switch("Follow file rather than view it", 1)
+            self.setProgramDefaults(test.app)
     def __repr__(self):
         return "Viewing file"
+    def setProgramDefaults(self, app):
+        if os.name == "posix":
+            app.setConfigDefault("view_program", "xemacs")
+            app.setConfigDefault("diff_program", "tkdiff")
+            app.setConfigDefault("follow_program", "tail -f")
     def canPerformOnTest(self):
         return 0
     def getOptionTitle(self):
@@ -125,13 +132,15 @@ class ViewFile(InteractiveAction):
         else:
             return comparison.stdCmpFile
     def viewFile(self, fileName):
-        print "Viewing file", os.path.basename(fileName)
-        self.startExternalProgram("xemacs " + fileName + " &")
+        viewProgram = self.test.app.getConfigValue("view_program")
+        print "Viewing file", os.path.basename(fileName), "using '" + viewProgram + "'"
+        self.startExternalProgram(viewProgram + " " + fileName + " &")
     def followFile(self, fileName):
         baseName = os.path.basename(fileName)
         title = self.test.name + " (" + baseName + ")"
-        print "Following file", title
-        commandLine = "xterm -bg white -T '" + title + "' -e tail -f " + fileName + " &"
+        followProgram = self.test.app.getConfigValue("follow_program")
+        print "Following file", title, "using '" + followProgram + "'"
+        commandLine = "xterm -bg white -T '" + title + "' -e " + followProgram + " " + fileName + " &"
         self.startExternalProgram(commandLine)
     def view(self, comparison, fileName):
         if self.switches.has_key("f") and self.switches["f"].getValue():
@@ -142,7 +151,8 @@ class ViewFile(InteractiveAction):
         if comparison.newResult() or not self.switches["nf"].getValue():
             self.viewFile(newFile)
         else:
-            print "Comparing file", os.path.basename(newFile), "with previous version"
+            diffProgram = self.test.app.getConfigValue("diff_program")
+            print "Comparing file", os.path.basename(newFile), "with previous version using '" + diffProgram + "'"
             self.startExternalProgram("tkdiff " + self.stdFile(comparison) + " " + newFile + " &")
 
 

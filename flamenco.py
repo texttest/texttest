@@ -4,10 +4,12 @@ def getConfig(optionMap):
     return FlamencoConfig(optionMap)
 
 class FlamencoConfig(carmen.CarmenConfig):
+     def interpretBinary(self, binaryString):
+         return binaryString.replace("ARCHITECTURE", carmen.architecture)
     def getTestCollator(self):
-        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), MakeResultFiles() ])
+        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), MakeSQLErrorFile() ])
 
-class MakeResultFiles(plugins.Action):
+class MakeSQLErrorFile(plugins.Action):
     def __call__(self, test):
         sqlfile = test.getTmpFileName("sqlerr", "w")
         if os.path.isfile("sqlnet.log"):

@@ -337,12 +337,11 @@ class InteractiveActionHandler:
             instances.append(instance)
         return instances
     def getClassList(self, test):
-        try:
-            if test.classId() == "test-case":
-                return self.testClasses
-            else:
-                return self.suiteClasses
-        except AttributeError:
+        if test.classId() == "test-case":
+            return self.testClasses
+        elif test.classId() == "test-suite":
+            return self.suiteClasses
+        else:
             return self.appClasses
     def makeInstance(self, className, test):
         module = test.getConfigValue("interactive_action_module")

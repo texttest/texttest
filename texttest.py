@@ -511,6 +511,8 @@ class Application:
     def getIndent(self):
         # Useful for printing with tests
         return ""
+    def classId(self):
+        return "test-app"
     def getPersonalConfigFile(self):
         if os.environ.has_key("TEXTTEST_PERSONAL_CONFIG"):
             return os.path.join(os.environ["TEXTTEST_PERSONAL_CONFIG"], ".texttest")

@@ -266,11 +266,11 @@ class TextTestGUI:
         test = self.model.get_value(iter, 2)
         guilog.info("Viewing test " + repr(test))
         colour = self.model.get_value(iter, 1)
-        self.recreateTestView(test, colour)
-    def recreateTestView(self, test, colour = ""):
+        self.recreateTestView(test)
+    def recreateTestView(self, test):
         if self.rightWindowGUI:
             self.contents.remove(self.rightWindowGUI.getWindow())
-        if colour == test.getConfigValue("test_colours")["app_static"]:
+        if test.classId() == "test-app":
             self.rightWindowGUI = ApplicationGUI(test, self.selection, self.itermap)
         else:
             self.rightWindowGUI = TestCaseGUI(test, self.dynamic)

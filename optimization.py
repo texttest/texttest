@@ -277,9 +277,9 @@ class LogFileFinder:
         if self.tryTmpFile:
             if not version:
                 version = string.join(self.test.app.versions, ".")
-            logFile = self.findTempFile(self.test, version) 
+            logFile, tmpDir = self.findTempFile(self.test, version) 
             if logFile and os.path.isfile(logFile):
-                print "Using temporary log file for test " + self.test.name + " version " + version
+                print "Using temporary log file (from " + tmpDir + ") for test " + self.test.name + " version " + version
                 return 1, logFile
         logFile = self.test.makeFileName(self.logStem, version)
         if os.path.isfile(logFile):
@@ -288,7 +288,7 @@ class LogFileFinder:
             raise plugins.TextTestError, "Could not find log file for Optimization Run in test" + repr(self.test)
     def findSpecifiedFile(self, version, spec):
         if spec == "run":
-            logFile = self.findTempFile(self.test, version)
+            logFile, tmpDir = self.findTempFile(self.test, version)
             if logFile and os.path.isfile(logFile):
                 return logFile
             else:
@@ -303,19 +303,19 @@ class LogFileFinder:
             print "Wrong spec"
             return None
     def findTempFile(self, test, version):
-        fileInTest = self.findTempFileInTest(version, self.logStem)
+        fileInTest, tmpDir = self.findTempFileInTest(version, self.logStem)
         if fileInTest or self.logStem == "output":
-            return fileInTest
+            return fileInTest, tmpDir
         # Look for output, find appropriate temp subplan, and look there
-        outputInTest = self.findTempFileInTest(version, "output")
+        outputInTest, tmpDir = self.findTempFileInTest(version, "output")
         if outputInTest == None:
-            return None
+            return None, None
         grepCommand = "grep -E 'SUBPLAN' " + outputInTest
         grepLines = os.popen(grepCommand).readlines()
         if len(grepLines) > 0:
             currentFile = os.path.join(grepLines[0].split()[1], self.logStem)
             if os.path.isfile(currentFile):
-                return currentFile
+                return currentFile, tmpDir
         else:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
     def findTempFileInTest(self, version, stem):
@@ -329,11 +329,12 @@ class LogFileFinder:
             fullDir = os.path.join(root, subDir)
             if os.path.isdir(fullDir) and subDir.startswith(searchString):
                 testDir = os.path.join(fullDir, self.test.getRelPath())
-                for file in os.listdir(testDir):
-                    # don't pick up comparison files
-                    if file.startswith(stem) and not file.endswith("cmp"):
-                        return os.path.join(testDir, file)
-        return None
+                if os.path.isdir(testDir):
+                    for file in os.listdir(testDir):
+                        # don't pick up comparison files
+                        if file.startswith(stem) and not file.endswith("cmp"):
+                            return os.path.join(testDir, file), subDir
+        return None, None
 
 class OptimizationRun:
     def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0, specFile = "", givenLogFile = ""):

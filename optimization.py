@@ -71,6 +71,16 @@ optimization.StartStudio   - Starts up Studio (with ${CARMSYS}/bin/studio) and l
                              Studio. If serveral tests are specified, the subplan will be loaded for the
                              first one. It is a simple shortcut to set the correct CARMSYS etc. environment
                              variables for the test and run Studio.
+                             
+optimization.TraverseSubPlans
+                           - Traverses all subplan directories associated with the selected tests,
+                             and executes the command specified by argument. Be careful to quote the command
+                             if you use options, otherwise texttest will try to interpret the options.
+                             Example: texttest -s carmen.TraverseCarmUsers "pwd".
+                             This will display the path of all subplan directories in the test suite.
+                             Example:
+                             texttest -apc -s carmen.TraverseCarmUsers "grep use_column_generation_method APC_FILES/rules"
+                             This will show for which APC tests the column generation method is used.
 """
 
 
@@ -981,6 +991,36 @@ class ViewLog(plugins.Action):
         switches = {}
         #switches["lf"] = "APC log file"
         #switches["st"] = "APC status file"
+        return switches
+
+class TraverseSubPlans(plugins.Action):
+    def __init__(self, args = []):
+        self.Command = string.join(args)
+        if not self.Command:
+            raise "No command given"
+    def __repr__(self):
+        return "Traversing subplan dir for"
+    def __call__(self, test):
+        self.describe(test)
+        sys.stdout.flush()
+        # Save the old dir, so we can restore it later.
+        saveDir = os.getcwd()
+        subplanDir = test.app.configObject._getSubPlanDirName(test)
+        try:
+            os.chdir(subplanDir)
+            os.system(self.Command)
+        except OSError, detail:
+            print "Failed due to " + str(detail)
+        # Restore dir
+        os.chdir(saveDir)
+    # Interactive stuff
+    def getTitle(self):
+        return "Traversing subplans"
+    def getArgumentOptions(self):
+        options = {}
+        return options
+    def getSwitches(self):
+        switches = {}
         return switches
 
 #

@@ -662,7 +662,6 @@ class Application:
     def addToOptionGroup(self, group):
         if group.name.startswith("What"):
             group.addOption("c", "Use checkout")
-            group.addOption("s", "Run this script")
             group.addOption("v", "Run this version")
         elif group.name.startswith("How"):
             diagDict = self.getConfigValue("diagnostics")
@@ -672,9 +671,11 @@ class Application:
                 group.addOption("trace", "Target application trace level")
         elif group.name.startswith("Side"):
             group.addSwitch("x", "Write TextTest diagnostics")
-            group.addSwitch("keeptmp", "Keep write-directories on success")
+            group.addSwitch("keeptmp", "Keep temporary write-directories")
         elif group.name.startswith("Invisible"):
+            # Options that don't make sense with the GUI should be invisible there...
             group.addOption("a", "Applications containing")
+            group.addOption("s", "Run this script")
             group.addOption("d", "Run tests at")
             group.addOption("record", "Record user actions to this script")
             group.addOption("replay", "Replay user actions from this script")

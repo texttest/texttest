@@ -52,9 +52,11 @@ class Config(plugins.Configuration):
         elif group.name.startswith("What"):
             group.addOption("reconnect", "Reconnect to previous run")
         elif group.name.startswith("How"):
+            group.addSwitch("noperf", "Disable any performance testing")
+        elif group.name.startswith("Invisible"):
+            # Only relevant without the GUI
             group.addSwitch("o", "Overwrite all failures")
             group.addSwitch("n", "Create new results files (overwrite everything)")
-            group.addSwitch("noperf", "Disable any performance testing")
     def getActionSequence(self, useGui):
         return self._getActionSequence(useGui, makeDirs=1)
     def _getActionSequence(self, useGui, makeDirs):

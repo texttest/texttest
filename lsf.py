@@ -77,7 +77,7 @@ class LSFConfig(unixConfig.UNIXConfig):
     def addToOptionGroup(self, group):
         unixConfig.UNIXConfig.addToOptionGroup(self, group)
         if group.name.startswith("How"):
-            group.addSwitch("l", "Run tests locally (not LSF)")
+            group.addSwitch("l", "Run tests locally", nameForOff="Submit tests to LSF")
             group.addSwitch("perf", "Run on performance machines only")
             group.addOption("R", "Request LSF resource")
             group.addOption("q", "Request LSF queue")

@@ -182,8 +182,8 @@ class LSFJob:
         try:
             return self._getStatus()
         except IOError:
-            # Assume this is interrupted system call and try once more
-            return self._getStatus()
+            # Assume this is interrupted system call and keep trying
+            return self.getStatus()
     def _getStatus(self):
         file = self.getFile("-w -a")
         lines = file.readlines()

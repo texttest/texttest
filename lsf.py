@@ -174,13 +174,13 @@ class LSFServer:
     instance = None
     def __init__(self):
         self.submissionQueue = Queue()
+        self.allJobs = {}
+        self.activeJobs = {}
+        self.diag = plugins.getDiagnostics("LSF Thread")
+        LSFServer.instance = self
         self.lsfThread = Thread(target=self.runLsfThread)
         self.lsfThread.setDaemon(1)
         self.lsfThread.start()
-        self.allJobs = {}
-        self.activeJobs = {}
-        LSFServer.instance = self
-        self.diag = plugins.getDiagnostics("LSF Thread")
     def getJobName(self, test, jobNameFunction):
         jobName = repr(test.app) + test.app.versionSuffix() + test.getRelPath()
         if jobNameFunction:

@@ -64,6 +64,14 @@ class Action:
 def getDiagnostics(diagName):
     return log4py.Logger().get_instance(diagName)
 
+def getSelfTestDiagnostics(diagName, fileName):
+    diag = getDiagnostics(diagName)
+    if os.environ.has_key("TEXTTEST_NO_SPAWN"):
+        diag.set_loglevel(log4py.LOGLEVEL_NORMAL)
+        diag.set_target(os.path.abspath(fileName))
+        diag.set_formatstring("%M")
+    return diag
+
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
     return map(string.strip, input.split(","))
@@ -142,6 +150,11 @@ class BackgroundProcess:
             # again, so we provide an environment variable to fake them all
             print "Faking start of external progam: '" + commandLine + "'"
             self.processId = None
+    def waitForStart(self):
+        processes = self.findAllProcesses(self.processId)
+        if len(processes) > 0:
+            return
+        self.waitForStart()
     def hasTerminated(self):
         if self.processId == None:
             return 1

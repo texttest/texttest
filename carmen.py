@@ -12,7 +12,8 @@ deprecated.
 It determines the queue as follows: if a test takes less than 10 minutes, it will be submitted
 to short_<arch>, where <arch> is the architecture as determined above. If it takes
 more than 2 hours, it will go to idle_<arch>. If neither of these, or if the specified queue
-does not exist, it will be submitted to the queue <arch>.
+does not exist, it will be submitted to the queue <arch>. If however the environment LSF_QUEUE_PREFIX is set
+then that <prefix>_<arch> will be used if arch is i386_linux or sparc.
 """
 
 helpOptions = """
@@ -178,15 +179,22 @@ class CarmenConfig(lsf.LSFConfig):
         return self.getQueuePerformancePrefix(test, arch) + arch + self.getQueuePlatformSuffix(test.app, arch)
     def getQueuePerformancePrefix(self, test, arch):
         cpuTime = performance.getTestPerformance(test)
+        usePrefix = ""
+        if os.environ.has_key("LSF_QUEUE_PREFIX"):
+            usePrefix = os.environ["LSF_QUEUE_PREFIX"]
         # Currently no short queue for powerpc_aix4
         if arch == "powerpc" and "9" in test.app.versions:
             return ""
-        if cpuTime < 10:
+        if usePrefix == "" and cpuTime < 10:
             return "short_"
-        elif arch == "powerpc" or arch == "parisc_2_0" or cpuTime < 120:
+        elif arch == "powerpc" or arch == "parisc_2_0":
             return ""
-        else:
+        elif usePrefix == "" and cpuTime < 120:
+            return ""
+        elif usePrefix == "":
             return "idle_"
+        else:
+            return usePrefix + "_"
     def getQueuePlatformSuffix(self, app, arch):
         if arch == "i386_linux":
             return "_RH8"

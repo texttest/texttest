@@ -388,22 +388,23 @@ class RightWindowGUI:
         self.object = object
         self.dynamic = dynamic
         self.fileViewAction = guiplugins.ViewFile(object)
-        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.addFilesToModel()
-        view = self.createView(self.createTitle())
+        view = self.createView()
         self.actionInstances = self.makeActionInstances()
         buttons = self.makeButtons(self.actionInstances)
         notebook = self.createNotebook(self.actionInstances)
         self.window = self.createWindow(buttons, view, notebook)
-    def createTitle(self):
-        return repr(self.object).replace("_", "__")
     def getWindow(self):
         return self.window
-    def createView(self, title):
+    def createView(self):
         view = gtk.TreeView(self.model)
         renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn(title, renderer, text=0, background=1)
+        column = gtk.TreeViewColumn("Relevant Files", renderer, text=0, background=1)
         view.append_column(column)
+        if self.dynamic:
+            perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)
+            view.append_column(perfColumn)
         view.expand_all()
         scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, (column, 0))
         view.show()
@@ -423,12 +424,16 @@ class RightWindowGUI:
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
         heading = self.model.get_value(iter, 0)
-        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour) 
         self.model.set_value(fciter, 0, baseName)
         self.model.set_value(fciter, 1, colour)
         self.model.set_value(fciter, 2, name)
+        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour)
         if comp:
             self.model.set_value(fciter, 3, comp)
+            details = comp.getDetails()
+            if len(details) > 0:
+                self.model.set_value(fciter, 4, details)
+                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
         return fciter
     def createNotebook(self, interactiveActions):
         pages = self.getHardcodedNotebookPages()

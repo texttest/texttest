@@ -115,7 +115,11 @@ class AnalyzeLProfData:
                                      "apc_setup"]
         self.raveFunctions = ["CRCExecuteAllRules",
                               "CRCComputeValue",
-                              "CRCSetRotation"]
+                              "CRCComputeValueArgs",
+                              "CRCSetRotation",
+                              "CRCModifyRotation",
+                              "CRCCollectInfo",
+                              "CRCApplicationRetrieveValue"]
         self.hatedFunctions = {}
         self.numMeans = 0
 
@@ -232,9 +236,9 @@ class GenHTML(plugins.Action):
         self.totalCPUtime = 0
 
         self.definingValues = [ "Network generation time", "Generation time", "Coordination time", "DH post processing" ]
-        self.interestingValues = ["Conn fixing time"]
+        self.interestingValues = ["Conn fixing time", "OC to DH time"]
         #self.tsValues = self.definingValues + self.interestingValues + ["Other time"]
-        self.tsValues = [ "Network gen", "Generation", "Costing", "DH post", "Conn fix", "Other" ]
+        self.tsValues = [ "Network gen", "Generation", "Coordination", "DH post", "Conn fix", "OC->DH", "Other" ]
         self.timeSpentBC = BarChart(self.tsValues)
         
         # The global chart for relative times.

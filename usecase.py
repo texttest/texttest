@@ -202,12 +202,12 @@ class ReplayScript:
         #import time
         #time.sleep(2)
     def processWaitCommand(self, applicationEventName):
+        self.write("Waiting for application event '" + applicationEventName + "' to occur.")
         if applicationEventName in self.applicationEventNames:
-            self.write("Application event '" + applicationEventName + "' already occurred, not waiting.")
+            self.write("Expected application event '" + applicationEventName + "' occurred, proceeding.")
             return 1
         else:
             self.waitingForEvent = applicationEventName
-            self.write("Waiting for application event '" + applicationEventName + "' to occur.")
             return 0
     def processSignalCommand(self, signalArg):
         signalNum = int(signalArg)

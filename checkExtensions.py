@@ -3,7 +3,7 @@
 import os, plugins, carmen
 from glob import glob
 
-HELPTEXT="""
+helpDescription="""
 Generic test plugin which will not only compare stdout and stderr but
 also files created in the test directory that have specified extensions.
 If the files created are compressed they will automatically be uncompressed.
@@ -17,7 +17,7 @@ check_extension:.log
 
 To filter things that should not be used for comparison from the files
 add the file name (with dots "." changed to underscore "_") into
-"config.app" (run.log -> run_log):
+"config.app" (example run.log -> run_log):
 
 run_log:text to be filtered out
 run_log:text to be filtered out2
@@ -70,6 +70,10 @@ class CheckExtConfig(carmen.CarmenConfig):
     def getTestRunner(self):
         return plugins.CompositeAction([ HandleCompressedFiles(UNCOMPRESS),
                                          carmen.CarmenConfig.getTestRunner(self)])
+    def printHelpDescription(self):
+        print helpDescription
+        carmen.CarmenConfig.printHelpDescription(self)
+    
 
 class HandleCompressedFiles(plugins.Action):
     def __init__(self,compress,keyInConfig='compress_extension',compressIfOverSize=50000):

@@ -12,6 +12,7 @@ Format-Parameters:
     %D -- Program duration since program start.
     %d -- Program duration for the last step (last output).
     %F -- The name of the current function.
+    %f -- Current filename
     %L -- Log type (Error, Warning, Debug or Info)
     %M -- The actual message.
     %N -- The current line number.
@@ -100,7 +101,8 @@ import os
 import copy
 import socket
 import locale
-import syslog
+if (os.name == "posix"):
+    import syslog
 
 try:
     import MySQLdb
@@ -214,7 +216,10 @@ class Logger:
                     if (target not in SPECIAL_TARGETS):
                         target = os.path.expanduser(target)
                         target = os.path.expandvars(target)
-                self.__Logger_targets.append(target)
+                if ((target == TARGET_SYSLOG) and (os.name != "posix")):
+                    self.warn("TARGET_SYSLOG is not available on non-posix platforms!")
+                else:
+                    self.__Logger_targets.append(target)
 
     def remove_target(self, target):
         """ Remove a target from the logger targets. """
@@ -295,39 +300,33 @@ class Logger:
 
     def debug(self, *messages):
         """ Write a debug message. """
-        message = self.__Logger_collate_messages(messages)
         if (self.__Logger_loglevel >= LOGLEVEL_DEBUG):
+            message = self.__Logger_collate_messages(messages)
             self.__Logger_showmessage(message, MSG_DEBUG)
 
     def warn(self, *messages):
         """ Write a warning message. """
-        message = self.__Logger_collate_messages(messages)
         if (self.__Logger_loglevel >= LOGLEVEL_VERBOSE):
+            message = self.__Logger_collate_messages(messages)
             self.__Logger_showmessage(message, MSG_WARN)
 
     def error(self, *messages):
         """ Write a error message. """
-        message = self.__Logger_collate_messages(messages)
         if (self.__Logger_loglevel >= LOGLEVEL_ERROR):
+            message = self.__Logger_collate_messages(messages)
             self.__Logger_showmessage(message, MSG_ERROR)
 
     def info(self, *messages):
         """ Write a info message. """
-        message = self.__Logger_collate_messages(messages)
         if (self.__Logger_loglevel >= LOGLEVEL_NORMAL):
+            message = self.__Logger_collate_messages(messages)
             self.__Logger_showmessage(message, MSG_INFO)
 
     # Private methods of the Logger class - you never have to use those directly
 
     def __Logger_collate_messages(self, messages):
         """ **(private)** Create a single string from a number of messages. """
-        if (type(messages) == TupleType):
-            message = ""
-            for i in range(len(messages)):
-                message = "%s%s " % (message, messages[i])
-            return strip(message)
-        else:
-            return strip(str(messages))
+        return strip(reduce(lambda x, y: "%s%s" % (x, y), messages))
 
     def __Logger_tracestack(self):
         """ **(private)** Analyze traceback stack and set linenumber and functionname. """
@@ -335,6 +334,7 @@ class Logger:
         self.__Logger_module = stack[-4][0]
         self.__Logger_linenumber = stack[-4][1]
         self.__Logger_functionname = stack[-4][2]
+        self.__Logger_filename = stack[-4][0]
         if (self.__Logger_functionname == "?"):
             self.__Logger_functionname = "Main"
 
@@ -347,6 +347,7 @@ class Logger:
         self.__Logger_loglevel = LOGLEVEL_NORMAL
         self.__Logger_useansicodes = FALSE
         self.__Logger_functionname = ""
+        self.__Logger_filename = ""
         self.__Logger_linenumber = -1
         try:
             self.__Logger_timeformat = "%s %s" % (locale.nl_langinfo(locale.D_FMT), locale.nl_langinfo(locale.T_FMT))
@@ -468,6 +469,7 @@ class Logger:
         line = sub("%D", timedifference, line)
         line = sub("%d", timedifflaststep, line)
         line = sub("%F", self.__Logger_functionname, line)
+        line = sub("%f", self.__Logger_filename, line)
         line = sub("%U", self.__Logger_module, line)
         line = sub("%u", os.path.split(self.__Logger_module)[-1], line)
         ndc = self.__Logger_get_ndc()
@@ -499,12 +501,12 @@ class Logger:
                 sys.stdout.write("%s\n" % line)
             elif (target == sys.stderr) or (lower(target) == TARGET_SYS_STDERR) or (lower(target) == TARGET_SYS_STDERR_ALIAS):
                 sys.stderr.write("%s\n" % line)
-            elif (type(target) == FileType):
-                target.write("%s\n" % line)
-            else:
+            elif (type(target) == StringType):
                 file = open(target, "a")
                 file.write("%s\n" % line)
                 file.close()
+            else:
+                target.write("%s\n" % line)
 
     def __Logger_ansi(self, text, messagesource):
         """ **(private)** Converts plain text to ansi text. """

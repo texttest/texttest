@@ -208,6 +208,7 @@ class LSFJob:
     
 class SubmitTest(unixConfig.RunTest):
     def __init__(self, queueFunction, resourceFunction):
+        unixConfig.RunTest.__init__(self)
         self.queueFunction = queueFunction
         self.resourceFunction = resourceFunction
         self.diag = plugins.getDiagnostics("LSF")

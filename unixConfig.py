@@ -60,6 +60,7 @@ class UNIXConfig(default.Config):
 
 class RunTest(default.RunTest):
     def __init__(self):
+        default.RunTest.__init__(self)
         self.interactive = 0
         self.process = None
         self.collectStdErr = 1
@@ -104,6 +105,7 @@ class RunTest(default.RunTest):
             print "Killing running test (process id", str(self.process.processId) + ")"
             self.process.kill()
     def setUpApplication(self, app):
+        default.RunTest.setUpApplication(self, app)
         app.setConfigDefault("collect_standard_error", 1)
         self.collectStdErr = int(app.getConfigValue("collect_standard_error"))
    

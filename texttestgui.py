@@ -620,7 +620,7 @@ class TestCaseGUI(RightWindowGUI):
 
         self.testComparison = test.state
         if not test.state.isComplete():
-            self.testComparison = comparetest.TestComparison(test.state, None)
+            self.testComparison = comparetest.TestComparison(test.state, None, test.app.abspath)
             self.testComparison.makeComparisons(test, makeNew = 1)
         diagComps = []
         hasNewDiags, hasOldDiags = 0, 0

@@ -113,6 +113,8 @@ class TestState:
     def hasResults(self):
         # Do we have actual results that can be compared
         return 0
+    def updateAbsPath(self, newAbsPath):
+        pass
     def changeDescription(self):
         if self.isComplete():
             return "complete"
@@ -137,7 +139,7 @@ def commasplit(input):
 def modifiedTime(filename):
     return os.stat(filename)[stat.ST_MTIME]
 
-# Another useful utility, for moving files around
+# Another useful utility, for moving files around and copying where not possible
 def movefile(sourcePath, targetFile):
     try:
         # This generally fails due to cross-device link problems
@@ -145,7 +147,11 @@ def movefile(sourcePath, targetFile):
         os.utime(targetFile, None)
     except:
         shutil.copyfile(sourcePath, targetFile)
-        os.remove(sourcePath)
+        try:
+            # This can also fail due to permissions, but we don't care
+            os.remove(sourcePath)
+        except OSError:
+            pass
 
 # portable version of os.path.samefile
 def samefile(writeDir, currDir):

@@ -52,16 +52,18 @@ plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
 
 class TestComparison(plugins.TestState):
-    def __init__(self, previousInfo, execHost):
+    def __init__(self, previousInfo, execHost, appAbs):
         plugins.TestState.__init__(self, "failure", "", started=1, completed=1)
         self.allResults = []
         self.changedResults = []
         self.newResults = []
         self.correctResults = []
         self.failedPrediction = None
-        if isinstance(previousInfo, FailedPrediction) or (previousInfo.isComplete() and not previousInfo.needsRecalculation()):
+        if isinstance(previousInfo, FailedPrediction):
             self.setFailedPrediction(previousInfo)
         self.diag = plugins.getDiagnostics("TestComparison")
+        # Cache this only so it gets output when we pickle, so we can re-interpret if needed...
+        self.appAbsPath = appAbs
     def __repr__(self):
         if len(self.changedResults) > 0 or self.failedPrediction:
             return plugins.TestState.__repr__(self)
@@ -69,6 +71,12 @@ class TestComparison(plugins.TestState):
             return ":"
         else:
             return ""
+    def updateAbsPath(self, newAbsPath):
+        self.diag = plugins.getDiagnostics("TestComparison")
+        self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
+        for comparison in self.allResults:
+            comparison.updatePaths(self.appAbsPath, newAbsPath)
+        self.appAbsPath = newAbsPath
     def setFailedPrediction(self, prediction):
         self.failedPrediction = prediction
         self.freeText = str(prediction)
@@ -162,7 +170,7 @@ class TestComparison(plugins.TestState):
         if not makeNew:
             self.categorise()
     def categorise(self):
-        if not self.hasResults() and (not self.failedPrediction or not self.failedPrediction.hasResults()):
+        if not self.hasResults():
             raise plugins.TextTestError, "No output files at all produced, presuming problems running test"
         if self.failedPrediction:
             # Keep the category we had before
@@ -253,7 +261,7 @@ class MakeComparisons(plugins.Action):
         # Don't compare already completed tests if they have errors
         if test.state.isComplete() and not test.state.hasResults():
             return
-        testComparison = self.testComparisonClass(test.state, self.execHost(test))
+        testComparison = self.testComparisonClass(test.state, self.execHost(test), test.app.abspath)
         testComparison.makeComparisons(test)
         self.describe(test, testComparison.getPostText())
         test.changeState(testComparison)
@@ -317,6 +325,11 @@ class FileComparison:
             return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
         else:
             return 0
+    def updatePaths(self, oldAbsPath, newAbsPath):
+        self.stdFile = self.stdFile.replace(oldAbsPath, newAbsPath)
+        self.stdCmpFile = self.stdCmpFile.replace(oldAbsPath, newAbsPath)
+        self.tmpCmpFile = self.tmpCmpFile.replace(oldAbsPath, newAbsPath)
+        self.tmpFile = self.tmpFile.replace(oldAbsPath, newAbsPath)
     def overwrite(self, exact, versionString = ""):
         parts = os.path.basename(self.stdFile).split(".")[:2] 
         if len(versionString):

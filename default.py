@@ -41,6 +41,7 @@ default.ExtractMemory      - update the memory files from the standard log files
 
 import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, bugzilla
 from glob import glob
+from cPickle import Unpickler
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -92,9 +93,9 @@ class Config(plugins.Configuration):
     def getTestRunner(self):
         return RunTest()
     def getTestEvaluator(self, useGui):
-        actions = [ self.getFileExtractor(), self.getCatalogueCreator(), \
-                 self.getTestPredictionChecker(), self.getTestComparator(), \
-                 self.getFailureExplainer() ]
+        actions = [ self.getFileExtractor() ]
+        if not self.isReconnecting() or self.optionMap.has_key("reconnfull"):
+            actions += [ self.getCatalogueCreator(), self.getTestPredictionChecker(), self.getTestComparator(), self.getFailureExplainer() ]
         if not useGui:
             actions.append(self.getTestResponder())
         return actions
@@ -420,18 +421,18 @@ class CountTest(plugins.Action):
     def setUpApplication(self, app):
         self.appCount[repr(app)] = 0
 
-class Reconnected(plugins.TestState):
-    def hasResults(self):
-        return 1
-
 class ReconnectTest(plugins.Action):
-    def __init__(self, fetchUser, discardFilterFiles):
+    def __init__(self, fetchUser, fullRecalculate):
         self.fetchUser = fetchUser
         self.userDepWriteDir = self.hasUserDependentWriteDir()
         self.rootDirToCopy = None
-        self.discardFilterFiles = discardFilterFiles
+        self.fullRecalculate = fullRecalculate
+        self.diag = plugins.getDiagnostics("Reconnection")
     def __repr__(self):
-        return "Reconnect to"
+        if self.fullRecalculate:
+            return "Copying files for recalculation of"
+        else:
+            return "Reconnecting to"
     def __call__(self, test):
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
         writeDir = test.writeDirs[0]
@@ -439,32 +440,48 @@ class ReconnectTest(plugins.Action):
             os.makedirs(writeDir)
             raise plugins.TextTestError, "No test results found to reconnect to"
         
-        print "Reconnecting to test", test.name
-        shutil.copytree(reconnLocation, writeDir)
-        frameworkTmpDir = os.path.join(writeDir, "framework_tmp")
-        stateFile = os.path.join(frameworkTmpDir, "teststate")
-        if os.path.isfile(stateFile):
-            self.interpretTestState(test, stateFile)
-        if self.discardFilterFiles:
-            self.clearFrameworkTmp(frameworkTmpDir)
-    def clearFrameworkTmp(self, frameworkTmpDir):
+        storedState = self.findStoredState(reconnLocation, test.app.abspath)
+        useStoredState = storedState and (not storedState.hasResults() or not self.fullRecalculate)
+        self.describe(test, self.postText(useStoredState, storedState))
+        if useStoredState:
+            test.changeState(storedState)
+        if self.fullRecalculate:
+            shutil.copytree(reconnLocation, writeDir)
+            self.clearFrameworkTmp(writeDir)
+        else:
+            if not storedState:
+                raise plugins.TextTestError, "No teststate file found, cannot do fast reconnect. Maybe try full recalculation to see what happened"
+            test.writeDirs[0] = reconnLocation
+    def postText(self, useStoredState, storedState):
+        if useStoredState:
+            return " (state " + storedState.category + ")"
+        else:
+            return ""
+    def clearFrameworkTmp(self, writeDir):
         # Clear the framework temporary directory, as configuration may be different now
+        frameworkTmpDir = os.path.join(writeDir, "framework_tmp")
         for file in os.listdir(frameworkTmpDir):
             fullPath = os.path.join(frameworkTmpDir, file)
             if os.path.isfile(fullPath):
                 os.remove(fullPath)
-    def interpretTestState(self, test, stateFile):
+    def findStoredState(self, reconnLocation, absPath):
+        frameworkTmpDir = os.path.join(reconnLocation, "framework_tmp")
+        stateFile = os.path.join(frameworkTmpDir, "teststate")
+        if not os.path.isfile(stateFile):
+            return
+        
         file = open(stateFile)
-        category, briefText = file.readline().strip().split(":")
-        freeText = file.read()
-        test.changeState(Reconnected(category, freeText, briefText, completed=1))
+        unpickler = Unpickler(file)
+        state = unpickler.load()
+        # State will refer to TEXTTEST_HOME in the original (which we may not have now,
+        # and certainly don't want to save), try to fix this...
+        state.updateAbsPath(absPath)
+        return state
     def canReconnectTo(self, dir):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0
     def setUpApplication(self, app):
         root, localDir = os.path.split(app.writeDirectory)
-        if not os.path.isdir(root):
-            os.makedirs(root)
         fetchDir = root
         userId = app.getTestUser()
         if self.fetchUser and self.userDepWriteDir:
@@ -475,9 +492,14 @@ class ReconnectTest(plugins.Action):
         self.rootDirToCopy = self.findReconnDirectory(fetchDir, app, userToFind)
         if self.rootDirToCopy:
             print "Reconnecting to test results in directory", self.rootDirToCopy
+            if not self.fullRecalculate:
+                app.writeDirectory = self.rootDirToCopy
         else:
             raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + userToFind + " under " + fetchDir
     def findReconnDirectory(self, fetchDir, app, userToFind):
+        if not os.path.isdir(fetchDir):
+            return None
+
         versions = app.getVersionFileExtensions()
         if len(versions) == 0:
             versions = [""]
@@ -495,7 +517,9 @@ class ReconnectTest(plugins.Action):
             if os.path.isdir(fullPath) and subDir.startswith(patternToFind):
                 return fullPath
     def setUpSuite(self, suite):
-        os.makedirs(os.path.join(suite.app.writeDirectory, suite.getRelPath()))        
+        self.describe(suite)
+        if self.fullRecalculate:
+            os.makedirs(os.path.join(suite.app.writeDirectory, suite.getRelPath()))        
     def hasUserDependentWriteDir(self):
         return os.environ["TEXTTEST_TMP"].find("~") != -1
 

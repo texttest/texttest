@@ -85,8 +85,8 @@ def getTestMemory(test, version = None):
     return getPerformance(test.makeFileName("memory", version))
 
 class PerformanceTestComparison(comparetest.TestComparison):
-    def __init__(self, previousInfo, execHost):
-        comparetest.TestComparison.__init__(self, previousInfo, execHost)
+    def __init__(self, previousInfo, execHost, appAbs):
+        comparetest.TestComparison.__init__(self, previousInfo, execHost, appAbs)
         self.execHost = execHost
     def __repr__(self):
         basicDesc = comparetest.TestComparison.__repr__(self)
@@ -189,7 +189,11 @@ class PerformanceFileComparison(comparetest.FileComparison):
         lineToWrite = line.replace(str(self.newPerformance), str(avgPerformance))
         newFile = open(destFile, "w")
         newFile.write(lineToWrite)
-        os.remove(self.tmpFile)
+        try:
+            os.remove(self.tmpFile)
+        except OSError:
+            # May not have permission, don't worry if not
+            pass
 
 class TimeFilter(plugins.Filter):
     def __init__(self, timeLimit):

@@ -19,6 +19,7 @@ helpOptions = """
 
 import os, performance, plugins, respond, sys, string, time, types
 from ndict import seqdict
+from cPickle import Pickler
 
 def getBatchConfigValue(app, entryName, sessionName):
     dict = app.getConfigValue(entryName)
@@ -131,8 +132,8 @@ class BatchResponder(respond.Responder):
         if not os.path.isdir(dir):
             os.makedirs(dir)
         stateFile = open(stateFileName, "w")
-        stateFile.write(state.category + ":" + state.briefText + os.linesep)
-        stateFile.write(state.freeText)
+        pickler = Pickler(stateFile)
+        pickler.dump(state)
     def handleAll(self, test):
         category = test.state.category
         self.writeState(test)

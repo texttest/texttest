@@ -113,9 +113,8 @@ class TestCase(Test):
         prefix = text + "." + self.app.name
         fileName = prefix + globalRunIdentifier
         if mode == "w" and not inputOptions.parallelMode():
-            currTmpString = prefix + self.getTestUser()
             for file in os.listdir(self.abspath):
-                if file.find(currTmpString) != -1:
+                if file.find(prefix) != -1 and file.find(self.getTestUser()) != -1:
                     os.remove(file)
         return fileName
     def isAcceptedBy(self, filter):

@@ -41,16 +41,17 @@ builtInOptions = """
 class Test:
     #State names
     NOT_STARTED = 0
-    NOT_FINISHED = 1
-    SUCCEEDED = 2
-    FAILED = 3
-    UNRUNNABLE = 4
+    RUNNING = 1
+    KILLED = 2
+    SUCCEEDED = 3
+    FAILED = 4
+    UNRUNNABLE = 5
     def __init__(self, name, abspath, app):
         self.name = name
         self.app = app
         self.abspath = abspath
         self.paddedName = self.name
-        self.state = self.NOT_FINISHED 
+        self.state = self.RUNNING 
         self.stateDetails = None
         self.previousEnv = {}
         self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
@@ -146,13 +147,13 @@ class TestCase(Test):
     def callAction(self, action):
         os.chdir(self.abspath)
         try:
-            if self.state == self.UNRUNNABLE:
-                return action.processUnRunnable(self)
-            else:
-                return action(self)
+            return action(self)
         except plugins.TextTestError, e:
             self.changeState(self.UNRUNNABLE, e)
     def changeState(self, state, details = ""):
+        # Once we've left the pathway, we can't return...
+        if self.state == self.UNRUNNABLE or self.state == self.KILLED:
+            return
         self.state = state
         self.stateDetails = details
     def performOnSubTests(self, action):

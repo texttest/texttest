@@ -51,35 +51,35 @@ class PerformanceTestComparison(comparetest.TestComparison):
     def __init__(self, test, comparisonMaker):
         comparetest.TestComparison.__init__(self, test)
         self.comparisonMaker = comparisonMaker
+        self.execHost = None
     def __repr__(self):
-        if self.comparisonMaker.execHost == None:
+        if self.execHost == None:
             return comparetest.TestComparison.__repr__(self)
         if len(self.comparisons) > 0:
-            return "FAILED on " + self.comparisonMaker.execHost + " :"
+            return "FAILED on " + self.execHost + " :"
         else:
             return ""
         
 # Does the same as the basic test comparison apart from when comparing the performance file
 class MakeComparisons(comparetest.MakeComparisons):
-    def __init__(self):
-        self.execHost = None
     def createFileComparison(self, test, standardFile, tmpFile):
         stem, ext = os.path.splitext(standardFile)
         if (stem == "performance"):
             return PerformanceFileComparison(test, standardFile, tmpFile)
         else:
             return comparetest.FileComparison(test, standardFile, tmpFile)
-    def shouldCompare(self, file, test, tmpExt, dirPath):
-        if not comparetest.MakeComparisons.shouldCompare(self, file, test, tmpExt, dirPath):
+    def shouldCompare(self, file, testComparison, tmpExt, dirPath):
+        if not comparetest.MakeComparisons.shouldCompare(self, file, testComparison, tmpExt, dirPath):
             return 0
         stem, ext = os.path.splitext(file)
         if stem != "performance":
             return 1
         tmpFile = os.path.join(dirPath, file)
-        self.execHost = getPerformanceHost(tmpFile)
+        execHost = getPerformanceHost(tmpFile)
         cmpFlag = 0
-        if self.execHost != None:
-            cmpFlag = self.execHost in test.app.getConfigList("performance_test_machine")
+        testComparison.execHost = execHost
+        if execHost != None:
+            cmpFlag = execHost in testComparison.test.app.getConfigList("performance_test_machine")
         if cmpFlag == 0:
             os.remove(tmpFile)
         return cmpFlag

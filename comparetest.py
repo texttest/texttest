@@ -53,7 +53,7 @@ class MakeComparisons(plugins.Action):
         fileList = os.listdir(dirPath)
         fileList.sort()
         for file in fileList:
-            if self.shouldCompare(file, test, tmpExt, dirPath):
+            if self.shouldCompare(file, testComparison, tmpExt, dirPath):
                 stem, ext = os.path.splitext(file)
                 standardFile = os.path.basename(test.makeFileName(stem))
                 comparison = self.makeComparison(test, os.path.join(subDirectory, standardFile), os.path.join(subDirectory, file))
@@ -63,7 +63,7 @@ class MakeComparisons(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 #private:
-    def shouldCompare(self, file, test, tmpExt, dirPath):
+    def shouldCompare(self, file, testComparison, tmpExt, dirPath):
         return file.endswith(tmpExt)
     def makeComparison(self, test, standardFile, tmpFile):
         comparison = self.createFileComparison(test, standardFile, tmpFile)

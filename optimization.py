@@ -1,11 +1,13 @@
-import carmen, os, sys, string, shutil, KPI, plugins
+import carmen, os, sys, string, shutil, KPI, plugins, performance
 
 class OptimizationConfig(carmen.CarmenConfig):
     def getOptionString(self):
         return "k:" + carmen.CarmenConfig.getOptionString(self)
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
-            return [ CalculateKPI(self.optionValue("kpi"), self.getKPIFileName()) ]
+            return [ CalculateKPI(self.optionValue("kpi")) ]
+        if self.optionMap.has_key("prrep"):
+            return [ MakeProgressReport(self.optionValue("prrep")) ]
 
         return carmen.CarmenConfig.getActionSequence(self)
     def getRuleBuilder(self, neededOnly):
@@ -18,8 +20,6 @@ class OptimizationConfig(carmen.CarmenConfig):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), ExtractSubPlanFile(self, "best_solution", "solution") ])
-    def getKPIFileName(self):
-	return "status"
 
 class ExtractSubPlanFile(plugins.Action):
     def __init__(self, config, sourceName, targetName):
@@ -134,12 +134,23 @@ class RemoveTemporarySubplan(plugins.Action):
     def __repr__(self):
         return "Removing temporary subplan for"
 
-class CalculateKPI(plugins.Action):
-    def __init__(self, referenceVersion, statusFileName):
+class TestReport(plugins.Action):
+    def __init__(self, referenceVersion):
         self.referenceVersion = referenceVersion
+        self.statusFileName = None
+    def __call__(self, test):
+        currentFile = test.makeFileName(self.statusFileName)
+        referenceFile = test.makeFileName(self.statusFileName, self.referenceVersion)
+        if currentFile != referenceFile:
+            self.compare(test, referenceFile, currentFile)
+    def setUpApplication(self, app):
+        self.statusFileName = app.getConfigValue("log_file")
+
+class CalculateKPI(TestReport):
+    def __init__(self, referenceVersion):
+        TestReport.__init__(self, referenceVersion)
         self.totalKPI = 0
         self.numberOfValues = 0
-	self.statusFileName = statusFileName
     def __del__(self):
         if self.numberOfValues > 0:
             print "Overall average KPI with respect to version", self.referenceVersion, "=", float(self.totalKPI / self.numberOfValues)
@@ -147,17 +158,71 @@ class CalculateKPI(plugins.Action):
             print "No KPI tests were found with respect to version " + self.referenceVersion
     def __repr__(self):
         return "Calculating KPI for"
-    def __call__(self, test):
-        currentFile = test.makeFileName(self.statusFileName)
-        referenceFile = test.makeFileName(self.statusFileName, self.referenceVersion)
-        if currentFile != referenceFile:
-            kpiValue = KPI.calculate(referenceFile, currentFile)
-            self.describe(test, ", with respect to version " + self.referenceVersion + " - returns " + str(kpiValue))
-            if kpiValue != None:
-                self.totalKPI += kpiValue
-                self.numberOfValues += 1
+    def compare(self, test, referenceFile, currentFile):
+        kpiValue = KPI.calculate(referenceFile, currentFile)
+        self.describe(test, ", with respect to version " + self.referenceVersion + " - returns " + str(kpiValue))
+        if kpiValue != None:
+            self.totalKPI += kpiValue
+            self.numberOfValues += 1
     def setUpSuite(self, suite):
         self.describe(suite)
+
+class MakeProgressReport(TestReport):
+    def __repr__(self):
+        return "Comparison on"
+    def setUpApplication(self, app):
+        TestReport.setUpApplication(self, app)
+        header = "Progress Report for " + repr(app) + ", compared to version " + self.referenceVersion
+        underline = ""
+        for i in range(len(header)):
+            underline += "-"
+        print os.linesep + header
+        print underline
+    def compare(self, test, referenceFile, currentFile):
+        currPerf = int(performance.getTestPerformance(test))
+        refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
+        if currPerf < 30 and refPerf < 30:
+            return
+
+        userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
+        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ")"
+        referenceCosts = self.getCosts(referenceFile, "plan")
+        currentCosts =  self.getCosts(currentFile, "plan")
+        refRosterCosts = self.getCosts(referenceFile, "roster")
+        currRosterCosts = self.getCosts(currentFile, "roster")
+        self.reportLine("                         ", "Current", "Version " + self.referenceVersion)
+        self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
+        self.reportLine("Initial cost of rosters  ", currRosterCosts[0], refRosterCosts[0])
+        self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
+        self.reportLine("Final cost of rosters    ", currRosterCosts[-1], refRosterCosts[-1])
+        self.reportLine("Total time (minutes)     ", currPerf, refPerf)
+        if currentCosts[-1] < referenceCosts[-1]:
+            self.reportLine("Time to worst cost (mins)", self.timeToCost(currentFile, currPerf, currentCosts, referenceCosts[-1]), refPerf)
+        else:
+            self.reportLine("Time to worst cost (mins)", currPerf, self.timeToCost(referenceFile, refPerf, referenceCosts, currentCosts[-1]))
+    def getCosts(self, file, type):
+        costCommand = "grep 'cost of " + type + "' " + file + " | awk -F':' '{ print $2 }'"
+        return map(self.makeInt, os.popen(costCommand).readlines())
+    def makeInt(self, val):
+        return int(string.strip(val))
+    def reportLine(self, title, currEntry, refEntry):
+        fieldWidth = 15
+        print title + ": " + string.rjust(str(currEntry), fieldWidth) + string.rjust(str(refEntry), fieldWidth)
+    def timeToCost(self, file, performanceScale, costs, targetCost):
+        timeCommand = "grep 'cpu time' " + file + " | awk '{ print $6 }'"
+        times = map(self.convertTime, os.popen(timeCommand).readlines())
+        times.insert(0, 0.0)
+        for index in range(len(costs)):
+            if costs[index] < targetCost:
+                costGap = costs[index - 1] - costs[index]
+                percent = float(costs[index -1] - targetCost) / costGap
+                performance = times[index - 1] + (times[index] - times[index - 1]) * percent
+                return int(performance / times[-1] * performanceScale)
+        return performanceScale
+    def convertTime(self, timeEntry):
+        entries = timeEntry.split(":")
+        timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip())
+        return float(timeInSeconds) / 60.0
 
 # This is for importing new tests and test suites
 #

@@ -35,8 +35,8 @@ def getPerformance(fileName):
     except:
         return float(-1)
 
-def getTestPerformance(test):
-    return getPerformance(test.makeFileName("performance")) / 60
+def getTestPerformance(test, version = None):
+    return getPerformance(test.makeFileName("performance", version)) / 60
 
 def getPerformanceHost(fileName):
     try:

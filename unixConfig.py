@@ -72,6 +72,8 @@ class UNIXConfig(default.Config):
         app.setConfigDefault("batch_use_collection", { "default" : "false" })
         # Sample to show that values are lists
         app.setConfigDefault("batch_version", { "default" : [] })
+        # Use batch session as a base version
+        app.addConfigEntry("base_version", self.optionValue("b"))
 
 class RunTest(default.RunTest):
     def __init__(self):

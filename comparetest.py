@@ -562,11 +562,9 @@ class LineFilter:
             self.diag.info("Removing word " + str(self.wordNumber) + " from " + repr(words))
             realNumber = self.findRealWordNumber(words)
             self.diag.info("Real number was " + str(realNumber))
-            try:
+            if realNumber < len(words):
                 del words[realNumber]
-                return string.join(words).rstrip() + os.linesep
-            except IndexError:
-                return line
+            return string.join(words).rstrip() + os.linesep
         else:
             return None
     def findRealWordNumber(self, words):

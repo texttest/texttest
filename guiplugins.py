@@ -1,14 +1,14 @@
 
-import plugins, os, sys, shutil
-from ndict import seqdict
+import plugins, os, sys, shutil, string
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
-    def __init__(self, test):
+    def __init__(self, test, optionName):
         self.test = test
-        self.options = seqdict()
-        self.switches = seqdict()
         self.processes = []
+        self.optionGroup = plugins.OptionGroup(optionName)
+    def getOptionGroups(self):
+        return [ self.optionGroup ]
     def killProcesses(self):
         # Don't leak processes
         for process in self.processes:
@@ -19,72 +19,33 @@ class InteractiveAction(plugins.Action):
         return self.test
     def getTitle(self):
         return None
-    def getOptionTitle(self):
-        return getTitle()
-    def perform(self):
-        pass
-    # Often we want to start an external program. But that's not so good: in replay mode,
-    # as there's nobody around to delete it afterwards and race conditions easily arise.
-    # So we fake it...
+    def getScriptTitle(self):
+        return self.getTitle()
     def startExternalProgram(self, commandLine):
         process = plugins.BackgroundProcess(commandLine)
         self.processes.append(process)
         return process
     def viewFile(self, fileName, wait = 0):
-        viewProgram = self.test.app.getConfigValue("view_program")
+        viewProgram = self.test.getConfigValue("view_program")
         print "Viewing file", os.path.basename(fileName), "using '" + viewProgram + "'"
         process = self.startExternalProgram(viewProgram + " " + fileName)
         if wait:
             process.waitForTermination()
-    def readCommandLineArguments(self, args):
-        for arg in args:
-            if arg.find("=") != -1:
-                option, value = arg.split("=")
-                if self.options.has_key(option):
-                    self.options[option].defaultValue = value
-                else:
-                    raise plugins.TextTestError, self.__name__ + " does not support option '" + option + "'"
-            else:
-                if self.switches.has_key(arg):
-                    oldValue = self.switches[arg].defaultValue
-                    # Toggle the value from the default
-                    self.switches[arg].defaultValue = 1 - oldValue
-                else:
-                    raise plugins.TextTestError, self.__name__ + " does not support switch '" + arg + "'"
- 
-class Option:    
-    def __init__(self, name, value):
-        self.name = name
-        self.defaultValue = value
-        self.valueMethod = None
-    def getValue(self):
-        if self.valueMethod:
-            return self.valueMethod()
-        else:
-            return self.defaultValue
-
-class TextOption(Option):
-    def __init__(self, name, value = "", possibleValues = None):
-        Option.__init__(self, name, value)
-        self.possibleValues = possibleValues
-
-class Switch(Option):
-    def __init__(self, name, value = 0, nameForOff = None):
-        Option.__init__(self, name, value)
-        self.nameForOff = nameForOff
-
+    def getTextTestName(self):
+        return "python " + sys.argv[0]
+    
 # Plugin for saving tests (standard)
 class SaveTest(InteractiveAction):
     def __init__(self, test):
-        InteractiveAction.__init__(self, test)
+        InteractiveAction.__init__(self, test, "Saving")
         if self.canPerformOnTest():
             extensions = test.app.getVersionFileExtensions(forSave = 1)
-            self.options["v"] = TextOption("Version to save", test.app.getFullVersion(forSave = 1), extensions)
+            self.optionGroup.addOption("v", "Version to save", test.app.getFullVersion(forSave = 1), extensions)
             try:
                 comparisonList = test.stateDetails.getComparisons()
                 if self.hasPerformance(comparisonList):
                     exact = (len(comparisonList) != 1)
-                    self.switches["ex"] = Switch("Exact Performance", exact, "Average Performance")
+                    self.optionGroup.addSwitch("ex", "Exact Performance", exact, "Average Performance")
             except AttributeError:
                 pass
     def __repr__(self):
@@ -93,54 +54,45 @@ class SaveTest(InteractiveAction):
         return self.test and self.test.state == self.test.FAILED
     def getTitle(self):
         return "Save"
-    def getOptionTitle(self):
-        return "Saving"
     def hasPerformance(self, comparisonList):
         for comparison in comparisonList:
             if comparison.getType() != "difference" and comparison.hasDifferences():
                 return 1
         return 0
     def getExactness(self):
-        if self.switches.has_key("ex"):
-            return self.switches["ex"].getValue()
-        else:
-            return 1
+        return self.optionGroup.getSwitchValue("ex", 1)
     def __call__(self, test):
-        self.describe(test, " - version " + self.options["v"].getValue() + ", exactness " + str(self.getExactness()))
+        version = self.optionGroup.getOptionValue("v")
+        self.describe(test, " - version " + version + ", exactness " + str(self.getExactness()))
         testComparison = test.stateDetails
         if testComparison:
-            testComparison.save(self.getExactness(), self.options["v"].getValue())
+            testComparison.save(self.getExactness(), version)
 
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!
 class ViewFile(InteractiveAction):
     def __init__(self, test):
-        InteractiveAction.__init__(self, test)
-        if test:
-            if test and test.state >= test.RUNNING:
-                self.switches["rdt"] = Switch("Include Run-dependent Text", 0)
-                self.switches["nf"] = Switch("Show differences where present", 1)
-            if test and test.state == test.RUNNING:
-                self.switches["f"] = Switch("Follow file rather than view it", 1)
-            self.setProgramDefaults(test.app)
+        InteractiveAction.__init__(self, test, "Viewing")
+        try:
+            if test.state >= test.RUNNING:
+                self.optionGroup.addSwitch("rdt", "Include Run-dependent Text", 0)
+                self.optionGroup.addSwitch("nf", "Show differences where present", 1)
+            if test.state == test.RUNNING:
+                self.optionGroup.addSwitch("f", "Follow file rather than view it", 1)
+        except AttributeError:
+            # Will get given applications too, don't need options there
+            pass
     def __repr__(self):
         return "Viewing file"
-    def setProgramDefaults(self, app):
-        if os.name == "posix":
-            app.setConfigDefault("view_program", "xemacs")
-            app.setConfigDefault("diff_program", "tkdiff")
-            app.setConfigDefault("follow_program", "tail -f")
     def canPerformOnTest(self):
         return 0
-    def getOptionTitle(self):
-        return "Viewing"
     def tmpFile(self, comparison):
-        if self.switches["rdt"].getValue():
+        if self.optionGroup.getSwitchValue("rdt"):
             return comparison.tmpFile
         else:
             return comparison.tmpCmpFile
     def stdFile(self, comparison):
-        if self.switches["rdt"].getValue():
+        if self.optionGroup.getSwitchValue("rdt"):
             return comparison.stdFile
         else:
             return comparison.stdCmpFile
@@ -152,12 +104,12 @@ class ViewFile(InteractiveAction):
         commandLine = "xterm -bg white -T '" + title + "' -e " + followProgram + " " + fileName
         self.startExternalProgram(commandLine)
     def view(self, comparison, fileName):
-        if self.switches.has_key("f") and self.switches["f"].getValue():
+        if self.optionGroup.getSwitchValue("f"):
             return self.followFile(fileName)
         if not comparison:
             return self.viewFile(fileName)
         newFile = self.tmpFile(comparison)
-        if comparison.newResult() or not self.switches["nf"].getValue():
+        if comparison.newResult() or not self.optionGroup.getSwitchValue("nf"):
             self.viewFile(newFile)
         else:
             diffProgram = self.test.app.getConfigValue("diff_program")
@@ -167,22 +119,20 @@ class ViewFile(InteractiveAction):
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveAction):
     def __init__(self, suite):
-        InteractiveAction.__init__(self, suite)
+        InteractiveAction.__init__(self, suite, "Adding " + self.testType())
         if self.canPerformOnTest():
-            self.options["name"] = TextOption(self.testType() + " Name")
-            self.options["desc"] = TextOption(self.testType() + " Description")
+            self.optionGroup.addOption("name", self.testType() + " Name")
+            self.optionGroup.addOption("desc", self.testType() + " Description")
     def canPerformOnTest(self):
         return self.test and self.test.state == self.test.NOT_STARTED
     def getTitle(self):
         return "Add " + self.testType()
-    def getOptionTitle(self):
-        return "Adding " + self.testType()
     def testType(self):
         return ""
     def setUpSuite(self, suite):
-        testName = self.options["name"].getValue()
+        testName = self.optionGroup.getOptionValue("name")
         print "Adding", self.testType(), testName, "under test suite", suite
-        testDir = self.createTest(suite, testName, self.options["desc"].getValue())
+        testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
         newTest = suite.addTest(testName, testDir)
         self.recordResults(newTest)
@@ -204,18 +154,21 @@ class ImportTestCase(ImportTest):
         ImportTest.__init__(self, suite)
         if self.canPerformOnTest():
             self.addOptionsFileOption()
-            suite.app.setConfigDefault("use_standard_input", not self.appIsGUI())
             if self.appIsGUI():
-                self.switches["editsc"] = Switch("Change user abilities (edit GUI script)")
-            if suite.app.getConfigValue("use_standard_input") != "0":
-                self.switches["editin"] = Switch("Create standard input file", not self.appIsGUI())
-            self.switches["editlog"] = Switch("Change system behaviour (edit log file)")
+                self.optionGroup.addSwitch("editsc", "Change user abilities (edit GUI script)")
+            # Assume GUIs never deal with standard input
+            if suite.app.getConfigValue("use_standard_input") and not self.appIsGUI():
+                self.optionGroup.addSwitch("editin", "Create standard input file", not self.appIsGUI())
+            self.optionGroup.addSwitch("runstd", "Collect standard results immediately", self.assumeShortTests())
+            self.optionGroup.addSwitch("editlog", "Change system behaviour (edit log file)")
     def testType(self):
         return "Test"
+    def assumeShortTests(self):
+        return 1
     def appIsGUI(self):
         return 0
     def addOptionsFileOption(self):
-        self.options["opt"] = TextOption("Command line options")
+        self.optionGroup.addOption("opt", "Command line options")
     def createTestContents(self, suite, testDir):
         self.writeOptionFile(suite, testDir)
         self.writeInputFile(suite, testDir)
@@ -223,7 +176,8 @@ class ImportTestCase(ImportTest):
         if self.appIsGUI():
             self.recordGUIActions(newTest)
 
-        self.recordStandardResult(newTest)
+        if self.optionGroup.getSwitchValue("runstd"):
+            self.recordStandardResult(newTest)
     def recordGUIActions(self, test):
         print "Record your actions using the", test.app.fullName, "GUI..."
         test.app.makeWriteDirectory()
@@ -235,18 +189,16 @@ class ImportTestCase(ImportTest):
         os.system(recordCommand)
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
-        if self.switches["editsc"].getValue():
+        if self.optionGroup.getSwitchValue("editsc"):
             self.viewFile(os.path.join(test.abspath, "gui_script"), wait=1)
     def recordStandardResult(self, test):
         print "Running test", test, "to get standard behaviour..."
-        progName = sys.argv[0]
-        commandLine = "python " + progName + " -a " + test.app.name + " -o -t " + test.name + " -ts " + self.test.name \
+        commandLine = self.getTextTestName() + " -a " + test.app.name + " -o -t " + test.name + " -ts " + self.test.name \
                       + self.getStdResultOptions()
         stdout = os.popen(commandLine)
         for line in stdout.readlines():
             sys.stdout.write("> " + line)
-        if self.switches["editlog"].getValue():
-            test.app.setConfigDefault("log_file", "output")
+        if self.optionGroup.getSwitchValue("editlog"):
             logFile = test.makeFileName(test.app.getConfigValue("log_file"))
             self.viewFile(logFile, wait=1)
     def getStdResultOptions(self):
@@ -261,7 +213,7 @@ class ImportTestCase(ImportTest):
         optionFile.write(os.linesep)
         return optionString
     def writeInputFile(self, suite, testDir):
-        if not self.switches.has_key("editin") or not self.switches["editin"].getValue():
+        if not self.optionGroup.getSwitchValue("editin"):
             return
         inputFile = os.path.join(testDir, "input." + suite.app.name)
         file = open(inputFile, "w")
@@ -269,7 +221,7 @@ class ImportTestCase(ImportTest):
         file.close()
         self.viewFile(inputFile, wait=1)
     def getOptions(self):
-        return self.options["opt"].getValue()
+        return self.optionGroup.getOptionValue("opt")
     # We assume tested GUIs support record and replay. These default to command
     # line -replay and -record
     def getReplayOption(self):
@@ -292,18 +244,78 @@ class ImportTestSuite(ImportTest):
         file = open(testCasesFile, "w")
         file.write("# Ordered list of tests in test suite. Add as appropriate" + os.linesep + os.linesep)
     def addEnvironmentFileOptions(self):
-        self.switches["env"] = Switch("Add environment file")
+        self.optionGroup.addSwitch("env", "Add environment file")
     def writeEnvironmentFiles(self, suite, testDir):
-        if self.switches["env"].getValue():
+        if self.optionGroup.getSwitchValue("env"):
             envFile = os.path.join(testDir, "environment")
             file = open(envFile, "w")
             file.write("# Dictionary of environment to variables to set in test suite" + os.linesep)
+
+class SelectTests(InteractiveAction):
+    def __init__(self, app):
+        self.app = app
+        self.test = app
+        self.processes = []
+        for group in app.optionGroups:
+            if group.name.startswith("Select"):
+                self.optionGroup = group
+    def __repr__(self):
+        return "Selecting"
+    def canPerformOnTest(self):
+        return 1
+    def getTitle(self):
+        return "Select"
+    def getScriptTitle(self):
+        return "Select indicated tests"
+    def performOn(self, app, selTests):
+        valid, testSuite = app.createTestSuite(self.optionGroup)
+        print "Created test suite of size", testSuite.size()
+        return testSuite
+
+class RunTests(InteractiveAction):
+    def __init__(self, app):
+        self.app = app
+        self.test = app
+        self.processes = []
+        self.optionGroups = []
+        for group in app.optionGroups:
+            group.reset()
+            if group.name.startswith("Invisible"):
+                self.invisibleGroup = group
+            elif not group.name.startswith("Select"):
+                self.optionGroups.append(group)
+    def getOptionGroups(self):
+        return self.optionGroups
+    def __repr__(self):
+        return "Running"
+    def canPerformOnTest(self):
+        return 1
+    def getTitle(self):
+        return "Run Tests"
+    def getScriptTitle(self):
+        return "Run selected tests"
+    def performOn(self, app, selTests):
+        if len(selTests) == 0:
+            print "No tests selected - cannot run!"
+            return
+        ttOptions = string.join(self.getTextTestOptions(app, selTests))
+        commandLine = self.getTextTestName() + " " + ttOptions + " > /dev/null"
+        print "Starting dynamic TextTest with options :", ttOptions
+        self.startExternalProgram(commandLine)
+    def getTextTestOptions(self, app, selTests):
+        ttOptions = [ "-a " + app.name ]
+        ttOptions += self.invisibleGroup.getCommandLines()
+        for group in self.optionGroups:
+            ttOptions += group.getCommandLines()
+        ttOptions.append("-t " + string.join(selTests, ","))
+        return ttOptions
 
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
         self.testClasses =  [ SaveTest ]
         self.suiteClasses = [ ImportTestCase, ImportTestSuite ]
+        self.appClasses = [ SelectTests, RunTests ]
     def getInstances(self, test):
         instances = []
         classList = self.getClassList(test)
@@ -312,13 +324,15 @@ class InteractiveActionHandler:
             instances.append(instance)
         return instances
     def getClassList(self, test):
-        if test.classId() == "test-case":
-            return self.testClasses
-        else:
-            return self.suiteClasses
+        try:
+            if test.classId() == "test-case":
+                return self.testClasses
+            else:
+                return self.suiteClasses
+        except AttributeError:
+            return self.appClasses
     def makeInstance(self, className, test):
-        test.app.setConfigDefault("interactive_action_module", test.app.getConfigValue("config_module"))
-        module = test.app.getConfigValue("interactive_action_module")
+        module = test.getConfigValue("interactive_action_module")
         command = "from " + module + " import " + className.__name__ + " as realClassName"
         try:
             exec command

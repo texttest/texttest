@@ -107,12 +107,13 @@ class OptimizationConfig(carmen.CarmenConfig):
         self.itemNamesInFile = {}
         # Static data for what data to check in CheckOptimizationRun, and what methods to avoid it with
         self.noIncreaseExceptMethods = {}
-    def getArgumentOptions(self):
-        options = carmen.CarmenConfig.getArgumentOptions(self)
-        options["prrep"] = "Run KPI progress report"
-        options["kpiData"] = "Output KPI curve data etc."
-        options["kpi"] = "Run Henrik's old KPI"
-        return options
+    def addToOptionGroup(self, group):
+        carmen.CarmenConfig.addToOptionGroup(self, group)
+        if group.name.startswith("Invisible"):
+            # These need a better interface before they can be plugged in, really
+            group.addOption("prrep", "Run KPI progress report")
+            group.addOption("kpiData", "Output KPI curve data etc.")
+            group.addOption("kpi", "Run Henrik's old KPI")
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
@@ -155,10 +156,11 @@ class OptimizationConfig(carmen.CarmenConfig):
     def printHelpScripts(self):
         carmen.CarmenConfig.printHelpScripts(self)
         print helpScripts
-    def setUpApplication(self, app):
+    def setApplicationDefaults(self, app):
+        carmen.CarmenConfig.setApplicationDefaults(self, app)
         app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile)
         app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods)
-
+        app.setConfigDefault("kpi_cost_margin", 0.0)
 
 class MakeTmpSubPlan(plugins.Action):
     def __init__(self, subplanFunction):
@@ -272,7 +274,6 @@ class LogFileFinder:
     def __init__(self, test, tryTmpFile = 1):
         self.tryTmpFile = tryTmpFile
         self.test = test
-        test.app.setConfigDefault("log_file", "output")
         self.logStem = test.app.getConfigValue("log_file")
     def findFile(self, version = None, specFile = ""):
         if len(specFile):
@@ -744,10 +745,7 @@ class MakeProgressReport(TestReport):
         else:
             return currCost
     def getMargins(self, test):
-        try:
-            refMargin = float(test.app.getConfigValue("kpi_cost_margin"))
-        except:
-            refMargin = 0.0
+        refMargin = float(test.app.getConfigValue("kpi_cost_margin"))
         return refMargin, refMargin
     def reportCosts(self, test, currentRun, referenceRun):
         costEntries = []
@@ -979,9 +977,11 @@ class ImportTest(plugins.Action):
 # Graphical import test
 class ImportTestCase(lsf.ImportTestCase):
     def addOptionsFileOption(self):
-        self.options["sp"] = guiplugins.TextOption("Subplan name")
+        self.optionGroup.addOption("sp", "Subplan name")
+    def assumeShortTests(self):
+        return 0
     def getSubplanName(self):
-        return self.options["sp"].getValue()
+        return self.optionGroup.getOptionValue("sp")
     def getOptions(self):
         pass
     # getOptions implemented in subclasses
@@ -989,9 +989,9 @@ class ImportTestCase(lsf.ImportTestCase):
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):
     def addEnvironmentFileOptions(self):
-        self.options["usr"] = guiplugins.TextOption("CARMUSR")
+        self.optionGroup.addOption("usr", "CARMUSR")
     def getCarmusr(self):
-        return self.options["usr"].getValue()
+        return self.optionGroup.getOptionValue("usr")
     def hasStaticLinkage(self):
         return 1
     def openFile(self, fileName):
@@ -1081,7 +1081,6 @@ class PlotTest(plugins.Action):
         self.describe(suite)
     def setUpApplication(self, app):
         app.makeWriteDirectory()
-        app.setConfigDefault("log_file", "output")
     def getCleanUpAction(self):
         if commonPlotter.plotForTest:
             plotOptions = commonPlotter.plotForTest.getPlotOptions()
@@ -1097,7 +1096,7 @@ class _PlotTest(plugins.Action):
         self.plotForTest = None
     def __call__(self, test):
         self.plotForTest = PlotTestInGUI(test, self.testGraph)
-        self.plotForTest.readCommandLineArguments(self.args)
+        self.plotForTest.optionGroup.readCommandLineArguments(self.args)
         self.plotForTest(test)
     
 class GraphPlot(plugins.Action):
@@ -1217,13 +1216,13 @@ class TestGraph:
 # Same as above, but from GUI. Refactor!
 class PlotTestInGUI(guiplugins.InteractiveAction):
     def __init__(self, test, graph = None):
-        guiplugins.InteractiveAction.__init__(self, test)
-        self.options["r"] = guiplugins.TextOption("Time range in minutes", "1:")
-        self.options["p"] = guiplugins.TextOption("Absolute file to print to")
-        self.options["i"] = guiplugins.TextOption("Log file item to plot", costEntryName)
-        self.options["v"] = guiplugins.TextOption("Extra versions to plot")
-        self.switches["pc"] = guiplugins.Switch("Print in colour")
-        self.switches["s"] = guiplugins.Switch("Plot against solution number rather than time")
+        guiplugins.InteractiveAction.__init__(self, test, "Graph")
+        self.optionGroup.addOption("r", "Time range in minutes", "1:")
+        self.optionGroup.addOption("p", "Absolute file to print to")
+        self.optionGroup.addOption("i", "Log file item to plot", costEntryName)
+        self.optionGroup.addOption("v", "Extra versions to plot")
+        self.optionGroup.addSwitch("pc", "Print in colour")
+        self.optionGroup.addSwitch("s", "Plot against solution number rather than time")
         self.externalGraph = graph
         if graph:
             self.testGraph = graph
@@ -1233,10 +1232,8 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         return "Plotting Graph"
     def getTitle(self):
         return "Plot Graph"
-    def getOptionTitle(self):
-        return "Graph"
     def getItemsToPlot(self):
-        text = self.options["i"].getValue()
+        text = self.optionGroup.getOptionValue("i")
         if text == "apctimes":
             text = "OC_to_DH_time,Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time"
         return plugins.commasplit(text.replace("_", " "))
@@ -1252,7 +1249,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         stdFile = test.makeFileName(logFileStem)
         if os.path.isfile(stdFile):
             self.writePlotFiles("std result", stdFile, test)
-        for version in plugins.commasplit(self.options["v"].getValue()):
+        for version in plugins.commasplit(self.optionGroup.getOptionValue("v")):
             if version:
                 self.writePlotFiles(version, test.makeFileName(logFileStem, version), test)
         if not self.externalGraph:
@@ -1262,9 +1259,9 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         self.testGraph.plot(range, fileName, writeColour)
         self.testGraph = TestGraph()
     def getPlotOptions(self):
-        range = self.options["r"].getValue()
-        fileName = self.options["p"].getValue()
-        writeColour = self.switches["pc"].getValue()
+        range = self.optionGroup.getOptionValue("r")
+        fileName = self.optionGroup.getOptionValue("p")
+        writeColour = self.optionGroup.getSwitchValue("pc")
         return range, fileName, writeColour
     def writePlotFiles(self, lineName, logFile, test):
         plotItems = self.getItemsToPlot()
@@ -1273,7 +1270,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             return
 
         for item in plotItems:
-            plotLine = PlotLine(test, lineName, item, optRun, self.switches["s"].getValue())
+            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"))
             self.testGraph.addLine(plotLine)
 
 guiplugins.interactiveActionHandler.testClasses.append(PlotTestInGUI)

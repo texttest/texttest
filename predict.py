@@ -32,7 +32,6 @@ class CheckLogFilePredictions(plugins.Action):
     def insertError(self, test, error):
         test.changeState(test.FAILED, error)
     def setUpApplication(self, app):
-        app.setConfigDefault("log_file", "output")
         self.logFile = app.getConfigValue("log_file")   
 
 class CheckPredictions(CheckLogFilePredictions):
@@ -79,8 +78,8 @@ class CheckPredictions(CheckLogFilePredictions):
         return errorsFound
     def setUpApplication(self, app):
         CheckLogFilePredictions.setUpApplication(self, app)
-        self.internalErrorList = app.getConfigList("internal_error_text")
-        self.internalCompulsoryList = app.getConfigList("internal_compulsory_text")
+        self.internalErrorList = app.getConfigValue("internal_error_text")
+        self.internalCompulsoryList = app.getConfigValue("internal_compulsory_text")
 
 def pad(str, padSize):
     return str.ljust(padSize)

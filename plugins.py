@@ -1,15 +1,14 @@
 
 import os, log4py, string, signal, shutil
 from types import FileType
+from ndict import seqdict
 
 # Generic configuration class
 class Configuration:
     def __init__(self, optionMap):
         self.optionMap = optionMap
-    def getArgumentOptions(self):
-        return {}
-    def getSwitches(self):
-        return {}
+    def addToOptionGroup(self, group):
+        pass
     def getActionSequence(self):
         return []
     def getFilterList(self):
@@ -25,7 +24,7 @@ class Configuration:
         return []
     def printHelpText(self):
         pass
-    def setUpApplication(self, app):
+    def setApplicationDefaults(self, app):
         pass
     
 # Filter interface: all must provide these three methods
@@ -170,6 +169,8 @@ class BackgroundProcess:
             else:
                 self.processId = processId
         else:
+            # When running self tests, we don't have time to start external programs and stop them
+            # again, so we provide an environment variable to fake them all
             print "Faking start of external progam: '" + commandLine + "'"
             self.processId = None
     def hasTerminated(self):
@@ -184,20 +185,105 @@ class BackgroundProcess:
         if self.processId == None:
             return
         for process in self.findAllProcesses(self.processId):
-            os.waitpid(process, 0)
+            try:
+                os.waitpid(process, 0)
+            except OSError:
+                pass
     def kill(self):
-        killSignal = signal.SIGTERM
         if self.testRun:
-            killSignal = signal.SIGKILL
+            self.killWithSignal(signal.SIGKILL)
+        else:
+            self.killWithSignal(signal.SIGTERM)
+    def killWithSignal(self, killSignal):
         for process in self.findAllProcesses(self.processId):
-            if process != self.processId:
-                print "Killing child process", process
+            print "Killing process", process, "with signal", killSignal
             os.kill(process, killSignal)
     def findAllProcesses(self, pid):
         processes = []
         processes.append(pid)
         for line in os.popen("ps -efl | grep " + str(pid)).xreadlines():
             entries = line.split()
-            if entries[4] == pid:
+            if entries[4] == str(pid):
                 processes += self.findAllProcesses(int(entries[3]))
         return processes
+
+class Option:    
+    def __init__(self, name, value):
+        self.name = name
+        self.defaultValue = value
+        self.valueMethod = None
+    def getValue(self):
+        if self.valueMethod:
+            return self.valueMethod()
+        else:
+            return self.defaultValue
+
+class TextOption(Option):
+    def __init__(self, name, value, possibleValues):
+        Option.__init__(self, name, value)
+        self.possibleValues = possibleValues
+
+class Switch(Option):
+    def __init__(self, name, value, nameForOff):
+        Option.__init__(self, name, value)
+        self.nameForOff = nameForOff
+
+class OptionGroup:
+    def __init__(self, name):
+        self.name = name
+        self.options = seqdict()
+        self.switches = seqdict()
+    def __repr__(self):
+        return "OptionGroup " + self.name + os.linesep + repr(self.options) + os.linesep + repr(self.switches)
+    def reset(self):
+        for option in self.options.values():
+            option.valueMethod = None
+        for switch in self.switches.values():
+            switch.valueMethod = None
+    def setValue(self, key, value):
+        if self.options.has_key(key):
+            self.options[key].defaultValue = value
+            return 1
+        elif self.switches.has_key(key):
+            self.switches[key].defaultValue = 1
+            return 1
+        return 0
+    def addSwitch(self, key, name, value = 0, nameForOff = None):
+        self.switches[key] = Switch(name, value, nameForOff)
+    def addOption(self, key, name, value = "", possibleValues = None):
+        self.options[key] = TextOption(name, value, possibleValues)
+    def getSwitchValue(self, key, defValue = None):
+        if self.switches.has_key(key):
+            return self.switches[key].getValue()
+        else:
+            return defValue
+    def getOptionValue(self, key, defValue = None):
+        if self.options.has_key(key):
+            return self.options[key].getValue()
+        else:
+            return defValue
+    def getCommandLines(self):
+        commandLines = []
+        for key, option in self.options.items():
+            if len(option.getValue()):
+                commandLines.append("-" + key + " " + option.getValue())
+        for key, switch in self.switches.items():
+            if switch.getValue():
+                commandLines.append("-" + key)
+        return commandLines
+    def readCommandLineArguments(self, args):
+        for arg in args:
+            if arg.find("=") != -1:
+                option, value = arg.split("=")
+                if self.options.has_key(option):
+                    self.options[option].defaultValue = value
+                else:
+                    raise TextTestError, self.name + " does not support option '" + option + "'"
+            else:
+                if self.switches.has_key(arg):
+                    oldValue = self.switches[arg].defaultValue
+                    # Toggle the value from the default
+                    self.switches[arg].defaultValue = 1 - oldValue
+                else:
+                    raise TextTestError, self.name + " does not support switch '" + arg + "'"
+ 

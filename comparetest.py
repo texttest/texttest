@@ -132,7 +132,7 @@ class TestComparison:
             else:
                 self.diag.info("Rejected " + file)
     def shouldCompare(self, file, dir, app):
-        return not file.startswith("input.") and app.ownsFile(file)
+        return not file.startswith("input.") and not file.startswith("environment") and app.ownsFile(file)
     def findTestDirectory(self, fullPath, test):
         result = os.path.normpath(fullPath.replace(test.app.writeDirectory, test.app.abspath))
         if result != fullPath:
@@ -236,8 +236,10 @@ class RunDependentTextFilter:
     def __init__(self, app, stem):
         self.diag = plugins.getDiagnostics("Run Dependent Text")
         self.lineFilters = []
-        for text in app.getConfigList(stem):
-            self.lineFilters.append(LineFilter(text, self.diag))
+        dict = app.getConfigValue("run_dependent_text")
+        if dict.has_key(stem):
+            for text in dict[stem]:
+                self.lineFilters.append(LineFilter(text, self.diag))
     def filterFile(self, fileName, newFileName, makeNew = 0):
         if not len(self.lineFilters) or not os.path.isfile(fileName):
             self.diag.info("No filter for " + fileName)

@@ -66,11 +66,11 @@ def getApcHostTmp():
     return "/tmp"
 
 class ApcConfig(optimization.OptimizationConfig):
-    def getArgumentOptions(self):
-        options = optimization.OptimizationConfig.getArgumentOptions(self)
-        options["rundebug"] = "Run debugger"
-        options["extractlogs"] = "Extract Apc Logs"
-        return options
+    def addToOptionGroup(self, group):
+        optimization.OptimizationConfig.addToOptionGroup(self, group)
+        if group.name.startswith("How"):
+            group.addOption("rundebug", "Run debugger")
+            group.addOption("extractlogs", "Extract Apc Logs")
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI,
@@ -143,13 +143,15 @@ class ApcConfig(optimization.OptimizationConfig):
     def printHelpScripts(self):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts
-    def setUpApplication(self, app):
-        optimization.OptimizationConfig.setUpApplication(self, app)
+    def setApplicationDefaults(self, app):
+        optimization.OptimizationConfig.setApplicationDefaults(self, app)
         self.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
         self.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
         if app.name == "cas_apc":
             self.itemNamesInFile[optimization.costEntryName] = "rule cost"
         self.itemNamesInFile[optimization.newSolutionMarker] = "apc_status Solution"
+        app.setConfigDefault("link_libs", "")
+        app.setConfigDefault("extract_logs", {})
 
 def verifyAirportFile(arch):
     diag = plugins.getDiagnostics("APC airport")
@@ -527,19 +529,19 @@ class KeepApcLogs(plugins.Action):
 class ExtractApcLogs(plugins.Action):
     def __init__(self, args):
         self.args = args
-    def __call__(self, test):
         if not self.args:
-            print "No argument given, using config value extract_logs_default"
-            extractCommand = test.app.getConfigValue("extract_logs_default")
+            print "No argument given, using default value for extract_logs"
+            self.args = "default"
+    def __call__(self, test):
+        dict = test.app.getConfigValue("extract_logs")
+        if not dict.has_key(self.args):
+            print "Config value " + self.args + " does not exist, using default value extract_logs"
+            self.args = "default"
+        extractCommand = dict[self.args]
+        if self.args == "default":
             saveName = "extract"
         else:
-            try:
-                extractCommand = test.app.getConfigValue("extract_logs_" + self.args)
-                saveName = self.args
-            except KeyError:
-                print "Config value " + self.args + " does not exist, using config value extract_logs_default"
-                extractCommand = test.app.getConfigValue("extract_logs_default")
-                saveName = "extract"
+            saveName = self.args
         # Find machine name
         tmpStatusFile = test.makeFileName("status", temporary = 1)
         if not os.path.isfile(tmpStatusFile):

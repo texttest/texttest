@@ -96,21 +96,25 @@ class FlamencoConfig(carmen.CarmenConfig):
         return resourceList
     def findReqFiles(self):
 	try:
-	    return app.getConfigList("required_file")
+	    return app.getConfigValue("required_file")
 	except:
 	    #value not set
 	    debugLog.info(nameslist + " not set")
 	return None
+    def setApplicationDefaults(self, app):
+        carmen.CarmenConfig.setApplicationDefaults(self, app)
+        app.setConfigDefault("required_file", [])
+        app.setConfigDefault("lsfres", "")
 
 class CollateFiles(unixConfig.CollateUNIXFiles):
     def __init__(self):
 	unixConfig.CollateUNIXFiles.__init__(self)
-        self.collations.append(("sqlnet.log", "sqlerr"))
+        self.collations["sqlerr"] = "sqlnet.log"
     def setUpApplication(self, app):
         unixConfig.CollateUNIXFiles.setUpApplication(self, app)
-        for stem in app.getConfigList("required_file"):
+        for stem in app.getConfigValue("required_file"):
             debugLog.info("collect output file " + stem)
-            self.collations.append((stem + "*", "resultfile_" + stem))
+            self.collations["resultfile_" + stem] = stem + "*"
     def getErrorText(self, sourcePattern):
         if sourcePattern == "sqlnet.log":
             return "NO ERROR"

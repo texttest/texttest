@@ -74,10 +74,10 @@ class MatadorConfig(optimization.OptimizationConfig):
         if self.optionMap.has_key("diag"):
             del os.environ["DIAGNOSTICS_IN"]
             del os.environ["DIAGNOSTICS_OUT"]
-    def getSwitches(self):
-        switches = optimization.OptimizationConfig.getSwitches(self)
-        switches["diag"] = "Use Matador Codebase diagnostics"
-        return switches
+    def addToOptionGroup(self, group):
+        optimization.OptimizationConfig.addToOptionGroup(self, group)
+        if group.name.startswith("How"):
+            group.addSwitch("diag", "Use Matador Codebase diagnostics")
     def getPerformanceFileMaker(self):
         if self.optionMap.has_key("diag"):
             return plugins.Action()
@@ -129,11 +129,11 @@ class MatadorConfig(optimization.OptimizationConfig):
     def printHelpScripts(self):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts
-    def setUpApplication(self, app):
-        optimization.OptimizationConfig.setUpApplication(self, app)
+    def setApplicationDefaults(self, app):
+        optimization.OptimizationConfig.setApplicationDefaults(self, app)
         if os.environ.has_key("DIAGNOSTICS_IN"):
-            app.addToConfigList("copy_test_path", "Diagnostics/diagnostics.etab")
-            app.addToConfigList("compare_extension", "diag")
+            app.addConfigEntry("copy_test_path", "Diagnostics/diagnostics.etab")
+            app.addConfigEntry("compare_extension", "diag")
         self.itemNamesInFile[optimization.memoryEntryName] = "Memory"
         self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
         self.itemNamesInFile[optimization.solutionName] = "Solution\."

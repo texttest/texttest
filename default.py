@@ -39,30 +39,25 @@ default.CountTest          - produce a brief report on the number of tests in th
 default.ExtractMemory      - update the memory files from the standard log files
 """
 
-import os, re, shutil, plugins, respond, performance, string, predict
+import os, shutil, plugins, respond, performance, string, predict
 from glob import glob
 
 def getConfig(optionMap):
     return Config(optionMap)
 
 class Config(plugins.Configuration):
-    def getArgumentOptions(self):
-        options = {}
-        options["t"] = "Select tests containing"
-        options["f"] = "Select tests from file"
-        options["ts"] = "Select test suites containing"
-        options["grep"] = "Select tests whose log contains"
-        options["reconnect"] = "Reconnect to previous run"
-        return options
-    def getSwitches(self):
-        switches = {}
-        switches["i"] = "Interactive mode"
-        switches["o"] = "Overwrite all failures"
-        switches["n"] = "Create new results files (overwrite everything)"
-        switches["b"] = "Plot original and temporary file"
-        switches["ns"] = "Don't scale times"
-        switches["nv"] = "No line type grouping for versions"
-        return switches
+    def addToOptionGroup(self, group):
+        if group.name.startswith("Select"):
+            group.addOption("t", "Test names containing")
+            group.addOption("f", "Tests listed in file")
+            group.addOption("ts", "Suite names containing")
+            group.addOption("grep", "Log files containing")
+        elif group.name.startswith("What"):
+            group.addOption("reconnect", "Reconnect to previous run")
+        elif group.name.startswith("How"):
+            group.addSwitch("i", "Interactive mode")
+            group.addSwitch("o", "Overwrite all failures")
+            group.addSwitch("n", "Create new results files (overwrite everything)")
     def getActionSequence(self):
         return self._getActionSequence(makeDirs=1)
     def _getActionSequence(self, makeDirs):
@@ -143,7 +138,19 @@ class Config(plugins.Configuration):
         print "Python scripts: (as given to -s <module>.<class> [args])"
         print "--------------------------------------------------------"
         self.printHelpScripts()
-
+    def setApplicationDefaults(self, app):
+        app.setConfigDefault("log_file", "output")
+        app.setConfigDefault("collate_file", {})
+        app.setConfigDefault("run_dependent_text", { "" : [] })
+        app.setConfigDefault("string_before_memory", "")
+        app.setConfigDefault("create_catalogues", "false")
+        app.setConfigDefault("internal_error_text", [])
+        app.setConfigDefault("internal_compulsory_text", [])
+        app.setConfigDefault("memory_variation_%", 5)
+        app.setConfigDefault("minimum_memory_for_test", 5)
+        app.setConfigDefault("use_standard_input", 1)
+        app.setConfigDefault("collect_standard_output", 1)
+        
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeBasicWriteDirectory()
@@ -155,21 +162,15 @@ class MakeWriteDirectory(plugins.Action):
 
 class CollateFiles(plugins.Action):
     def __init__(self):
-        self.collations = []
+        self.collations = {}
         self.diag = plugins.getDiagnostics("Collate Files")
     def setUpApplication(self, app):
-        for entry in app.getConfigList("collate_file"):
-            if entry.find("->") == -1:
-                print "WARNING: cannot collate file from entry '" + entry + "'"
-                print "Must be of the form '<source_pattern>-><target_name>'"
-                continue
-            sourcePattern, targetStem = entry.split("->")
-            self.collations.append((sourcePattern, targetStem))
+        self.collations.update(app.getConfigValue("collate_file"))
     def __call__(self, test):
         if test.state > test.RUNNING:
             return
 
-        for sourcePattern, targetStem in self.collations:
+        for targetStem, sourcePattern in self.collations.items():
             targetFile = test.makeFileName(targetStem, temporary=1)
             fullpath = self.findPath(test, sourcePattern)
             if fullpath:
@@ -205,8 +206,6 @@ class TextFilter(plugins.Filter):
             if searchString.find(text) != -1:
                 if searchString == text or not text in self.allTestCaseNames:
                     return 1
-                else:
-                    return 0
         return 0
     def equalsText(self, test):
         return test.name in self.texts
@@ -240,7 +239,6 @@ class GrepFilter(TextFilter):
                 return 1
         return 0
     def acceptsApplication(self, app):
-        app.setConfigDefault("log_file", "output")
         self.logFileStem = app.getConfigValue("log_file")
         return 1
 
@@ -292,8 +290,6 @@ class RunTest(plugins.Action):
                 self.brokenApps[app.name] = file + " has not been built"
 
 class CreateCatalogue(plugins.Action):
-    def setUpApplication(self, app):
-        app.setConfigDefault("create_catalogues", "false")
     def __call__(self, test):
         if test.app.getConfigValue("create_catalogues") != "true":
             return
@@ -320,7 +316,7 @@ class CreateCatalogue(plugins.Action):
             fullPath = os.path.join(writeDir, writeFile)
             if os.path.isdir(fullPath):
                 subDirs.append(fullPath)
-            elif not app.ownsFile(writeFile):
+            elif not app.ownsFile(writeFile, unknown=0):
                 files.append(writeFile)
         if len(files) == 0 and len(subDirs) == 0:
             return 0
@@ -399,8 +395,6 @@ class MakeMemoryFile(plugins.Action):
         self.memoryFinder = None
         self.logFileStem = None
     def setUpApplication(self, app):
-        app.setConfigDefault("log_file", "output")
-        app.setConfigDefault("string_before_memory", "")
         self.memoryFinder = app.getConfigValue("string_before_memory")
         self.logFileStem = app.getConfigValue("log_file")
     def __call__(self, test, temp=1):

@@ -19,6 +19,14 @@ helpOptions = """
 
 import os, performance, plugins, respond, sys, string, time
 
+def getBatchConfigValue(app, entryName, sessionName):
+    dict = app.getConfigValue(entryName)
+    if dict.has_key(sessionName):
+        return dict[sessionName]
+    elif dict.has_key("default"):
+        return dict["default"]
+    return None
+
 class BatchFilter(plugins.Filter):
     def __init__(self, batchSession):
         self.batchSession = batchSession
@@ -29,9 +37,6 @@ class BatchFilter(plugins.Filter):
         else:
             return self.performanceFilter.acceptsTestCase(test)
     def acceptsApplication(self, app):
-        if not self.hasRecipients(app):
-            print "Rejected application", app, "for", self.batchSession, "session"
-            return 0
         badVersion = self.findUnacceptableVersion(app)
         if badVersion != None:
             print "Rejected application", app, "for", self.batchSession, "session, unregistered version '" + badVersion + "'"
@@ -39,22 +44,14 @@ class BatchFilter(plugins.Filter):
         
         self.setTimeLimit(app)
         return 1
-    def hasRecipients(self, app):
-        try:
-            return app.getConfigValue(self.batchSession + "_recipients") != "none"
-        except:
-            return 1
     def setTimeLimit(self, app):
-        try:
-            timeLimit = app.getConfigValue(self.batchSession + "_timelimit")
+        timeLimit = getBatchConfigValue(app, "batch_timelimit", self.batchSession)
+        if timeLimit:
             self.performanceFilter = performance.TimeFilter(timeLimit)
-        except:
-            self.performanceFilter = None
     def findUnacceptableVersion(self, app):
-        allowedVersions = app.getConfigList(self.batchSession + "_version")
+        allowedVersions = getBatchConfigValue(app, "batch_version", self.batchSession)
         if len(allowedVersions) == 0:
             return None
-        allowedVersions = map(string.strip, allowedVersions)
         for version in app.versions:
             if not version in allowedVersions:
                 return version
@@ -213,7 +210,7 @@ class MailSender(plugins.Action):
             allBatchResponders.remove(responder)
     def createMail(self, title, app, appResponders):
         fromAddress = os.environ["USER"]
-        toAddress = self.getRecipient(fromAddress, app)
+        toAddress = self.getRecipient(app)
         if self.useCollection(app):
             collFile = os.path.join(app.abspath, "batchreport." + app.name + app.versionSuffix())
             mailFile = open(collFile, "w")
@@ -230,16 +227,10 @@ class MailSender(plugins.Action):
             mailFile.write(os.linesep) # blank line separating headers from body
             return mailFile
     def useCollection(self, app):
-        try:
-            return app.getConfigValue(self.sessionName + "_use_collection") == "true"
-        except:
-            return 0
-    def getRecipient(self, fromAddress, app):
+        return getBatchConfigValue(app, "batch_use_collection", self.sessionName) == "true"
+    def getRecipient(self, app):
         # See if the session name has an entry, if not, send to the user
-        try:
-            return app.getConfigValue(self.sessionName + "_recipients")
-        except:
-            return fromAddress
+        return getBatchConfigValue(app, "batch_recipients", self.sessionName)
     def getMailHeader(self, app, appResponders):
         title = time.strftime("%y%m%d") + " " + repr(app) + " Test Suite "
         versions = self.findCommonVersions(app, appResponders)
@@ -325,7 +316,7 @@ class CollectFiles(plugins.Action):
             if filename.startswith(prefix):
                 fullname = os.path.join(app.abspath, filename)
                 file = open(fullname)
-                app.setConfigDefault("collection_recipients", file.readline().strip())
+                app.addConfigEntry("collection", file.readline().strip(), "batch_recipients")
                 catValues = plugins.commasplit(file.readline().strip())
                 for i in range(len(categoryNames)):
                     totalValues[i] += int(catValues[i])

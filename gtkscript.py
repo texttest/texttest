@@ -128,26 +128,19 @@ class NotebookPageChangeEvent(SignalEvent):
                 self.widget.set_current_page(i)
                 return 1
         raise GtkScriptError, "Could not find page " + argumentString + " in '" + self.name + "'"
-    
-class TreeViewSignalEvent(SignalEvent):
+
+class TreeSignalEvent(SignalEvent):
     def __init__(self, name, widget, signalName, argumentParseData):
         SignalEvent.__init__(self, name, widget, signalName)
         self.column, self.valueId = argumentParseData
-        self.model = widget.get_model()
-    def outputForScript(self, path, *args):
-        nodeLabel = self.model.get_value(self.model.get_iter(path), self.valueId)
-        return self.name + " " + nodeLabel
-    def generate(self, argumentString):
-        arguments = argumentString.split(" ")
-        rowText = arguments[0]
-        path = self.findTreePath(self.model.get_iter_root(), rowText)
+        self.model = self.getModel()
+    def getOutput(self, path):
+        return self.name + " " + self.model.get_value(self.model.get_iter(path), self.valueId)
+    def getPathData(self, argumentString):
+        path = self.findTreePath(self.model.get_iter_root(), argumentString)
         if not path:
-            raise GtkScriptError, "Could not find row '" + rowText + "' in Tree View"
-        userArgs = argumentString.replace(rowText, "").strip()
-        self.widget.emit(self.signalName, path, self.column, *userArgs)
-        return 1
-    def pathHasText(self, iter, argumentText):
-        return self.model.get_value(iter, self.valueId) == argumentText
+            raise GtkScriptError, "Could not find row '" + argumentString + "' in Tree View"
+        return path
     def findTreePath(self, iter, argumentText):
         if self.pathHasText(iter, argumentText):
             return self.model.get_path(iter)
@@ -160,6 +153,64 @@ class TreeViewSignalEvent(SignalEvent):
         if nextIter:
             return self.findTreePath(nextIter, argumentText)
         return None
+    def pathHasText(self, iter, argumentText):
+        return self.model.get_value(iter, self.valueId) == argumentText
+
+class TreeViewSignalEvent(TreeSignalEvent):
+    def getModel(self):
+        return self.widget.get_model()
+    def outputForScript(self, path, *args):
+        return self.getOutput(path)
+    def generate(self, argumentString):
+        path = self.getPathData(argumentString)
+        self.widget.emit(self.signalName, path, self.column)
+        return 1
+    
+class TreeSelectionSignalEvent(TreeSignalEvent):
+    def __init__(self, name, widget, signalName, sense, argumentParseData):
+        TreeSignalEvent.__init__(self, name, widget, signalName, argumentParseData)
+        self.oldSelectedPaths = self.findSelectedPaths()
+        self.newSelectedPaths = self.oldSelectedPaths
+        self.sense = sense
+    def getModel(self):
+        return self.widget.get_tree_view().get_model()
+    def widgetHasChanged(self):
+        self.newSelectedPaths = self.findSelectedPaths()
+        if self.sense > 0 and len(self.newSelectedPaths) > len(self.oldSelectedPaths):
+            return 1
+        elif self.sense < 0 and len(self.newSelectedPaths) < len(self.oldSelectedPaths):
+            return 1
+        self.oldSelectedPaths = self.newSelectedPaths
+        return 0
+    def outputForScript(self, *args):
+        extraPaths = self.extraPaths()
+        self.oldSelectedPaths = self.newSelectedPaths
+        outputList = map(self.getOutput, extraPaths)
+        return string.join(outputList, os.linesep)
+    def extraPaths(self):
+        if self.sense > 0:
+            return self._extraPaths(self.newSelectedPaths, self.oldSelectedPaths)
+        else:
+            return self._extraPaths(self.oldSelectedPaths, self.newSelectedPaths)
+    def _extraPaths(self, longPaths, shortPaths):
+        extraPaths = []
+        for path in longPaths:
+            if not path in shortPaths:
+                extraPaths.append(path)
+        return extraPaths
+    def findSelectedPaths(self):
+        paths = []
+        self.widget.selected_foreach(self.addSelPath, paths)
+        return paths
+    def addSelPath(self, model, path, iter, paths):
+        paths.append(path)
+    def generate(self, argumentString):
+        path = self.getPathData(argumentString)
+        if self.sense > 0:
+            self.widget.select_path(path)
+        else:
+            self.widget.unselect_path(path)
+        return 1
 
 class IdleHandler(Event):
     def __init__(self, name, callback):
@@ -193,20 +244,23 @@ class EventHandler:
             self.replayScript = ReplayScript(replayScriptName)
         if recordScriptName:
             self.recordScript = RecordScript(recordScriptName)
-    def connect(self, eventName, signalName, widget, method, argumentParseData = None, *data):
-        widget.connect(signalName, method, *data)
+    def connect(self, eventName, signalName, widget, method = None, argumentParseData = None, sense = 1, *data):
+        if method:
+            widget.connect(signalName, method, *data)
         if self.hasScript():
             stdName = self.standardName(eventName)
-            signalEvent = self.createSignalEvent(signalName, stdName, widget, argumentParseData)
+            signalEvent = self.createSignalEvent(signalName, stdName, widget, sense, argumentParseData)
             self.addEventToScripts(signalEvent, signalName)
     def addEventToScripts(self, event, signalName):
         if self.replayScript:
             self.replayScript.addEvent(event)
         if self.recordScript:
             self.recordScript.addEvent(event, signalName)
-    def createSignalEvent(self, signalName, eventName, widget, argumentParseData):
+    def createSignalEvent(self, signalName, eventName, widget, sense, argumentParseData):
         if isinstance(widget, gtk.TreeView):
             return TreeViewSignalEvent(eventName, widget, signalName, argumentParseData)
+        elif isinstance(widget, gtk.TreeSelection):
+            return TreeSelectionSignalEvent(eventName, widget, signalName, sense, argumentParseData)
         else:
             return SignalEvent(eventName, widget, signalName)
     def standardName(self, name):

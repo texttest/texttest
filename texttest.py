@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os, sys, types, string, getopt, types, time, plugins, exceptions, stat, log4py, shutil
 from stat import *
+from ndict import seqdict
 
 helpIntro = """
 Note: the purpose of this help is primarily to document the configuration you currently have,
@@ -67,7 +68,8 @@ class Test:
         self.previousEnv = {}
         # List of objects observing this test, to be notified when it changes state
         self.observers = []
-        self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
+        self.environment = MultiEntryDictionary()
+        self.environment.readValuesFromFile(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
         # Single pass to expand all variables (don't want multiple expansion)
         for var, value in self.environment.items():
             expValue = os.path.expandvars(value)
@@ -101,6 +103,8 @@ class Test:
                 debugLog.info("Chosen " + versionName)
                 return nonVersionName + "." + version
         return nonVersionName
+    def getConfigValue(self, key):
+        return self.app.getConfigValue(key)
     def makePathName(self, fileName, startDir):
         fullPath = os.path.join(startDir, fileName)
         if os.path.exists(fullPath) or startDir == self.app.abspath:
@@ -223,7 +227,7 @@ class TestCase(Test):
         self.collatePaths("copy_test_path", self.copyTestPath)
         self.collatePaths("link_test_path", self.linkTestPath)
     def collatePaths(self, configListName, collateMethod):
-        for copyTestPath in self.app.getConfigList(configListName):
+        for copyTestPath in self.app.getConfigValue(configListName):
             fullPath = self.makePathName(copyTestPath, self.abspath)
             target = os.path.join(self.writeDirs[0], copyTestPath)
             dir, localName = os.path.split(target)
@@ -379,26 +383,92 @@ class Application:
         self.versions = version.split(".")
         if self.versions[0] == "":
             self.versions = []
-        self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions(baseVersion=0))
-        self.fullName = self._getFullName()
+        self.configDir = MultiEntryDictionary()
+        self.setConfigDefaults()
+        self.configDir.readValuesFromFile(configFile, name, self.getVersionFileExtensions(baseVersion=0), insert=0)
+        self.fullName = self.getConfigValue("full_name")
         debugLog.info("Found application " + repr(self))
         self.checkout = self.makeCheckout(optionMap)
         debugLog.info("Checkout set to " + self.checkout)
         self.configObject = self.makeConfigObject(optionMap)
-        self.setConfigDefault("keeptmp_default", 0)
         self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
-        self.setConfigDefault("extra_version", "none")
         self.writeDirectory = self._getWriteDirectory()
-        self.configObject.setUpApplication(self)
+        # Fill in the values we expect from the configurations, and read the file a second time
+        self.configObject.setApplicationDefaults(self)
+        self.setDependentConfigDefaults()
+        self.configDir.readValuesFromFile(configFile, name, self.getVersionFileExtensions(baseVersion=0), insert=0, errorOnUnknown=1)
+        self.optionGroups = self.createOptionGroups(optionMap)
     def __repr__(self):
         return self.fullName
     def __cmp__(self, other):
         return cmp(self.name, other.name)
-    def _getFullName(self):
-        if self.configDir.has_key("full_name"):
-            return self.configDir["full_name"]
+    def setConfigDefaults(self):
+        self.setConfigDefault("binary", None)
+        self.setConfigDefault("config_module", "default")
+        self.setConfigDefault("full_name", string.upper(self.name))
+        self.setConfigDefault("checkout_location", ".")
+        self.setConfigDefault("default_checkout", "")
+        self.setConfigDefault("keeptmp_default", 0)
+        self.setConfigDefault("extra_version", "none")
+        self.setConfigDefault("base_version", [])
+        self.setConfigDefault("unsaveable_version", [])
+        self.setConfigDefault("compare_extension", [])
+        self.setConfigDefault("copy_test_path", [])
+        self.setConfigDefault("link_test_path", [])
+        # External viewing tools
+        # Do this here rather than from the GUI: if applications can be run with the GUI
+        # anywhere it needs to be set up
+        if os.name == "posix":
+            self.setConfigDefault("view_program", "xemacs")
+            self.setConfigDefault("diff_program", "tkdiff")
+            self.setConfigDefault("follow_program", "tail -f")
+        elif os.name == "dos" or os.name == "nt":
+            self.setConfigDefault("view_program", "wordpad.exe")
+            self.setConfigDefault("diff_program", "tkdiff.tcl")
+            self.setConfigDefault("follow_program", None)
+    def setDependentConfigDefaults(self):
+        # Set values which default to other values
+        self.setConfigDefault("display_module", self.getConfigValue("config_module"))
+        self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module"))
+        if self.getConfigValue("binary").endswith(".py"):
+            self.setConfigDefault("interpreter", "python")
         else:
-            return string.upper(self.name)
+            self.setConfigDefault("interpreter", "")
+    def createOptionGroups(self, optionMap):
+        groupNames = [ "Select Tests", "What to run", "How to run", "Side effects", "Invisible" ]
+        optionGroups = []
+        for name in groupNames:
+            group = plugins.OptionGroup(name)
+            self.addToOptionGroup(group)
+            self.configObject.addToOptionGroup(group)
+            optionGroups.append(group)
+        for option in optionMap.keys():
+            optionGroup = self.findOptionGroup(option, optionGroups)
+            if not optionGroup:
+                raise plugins.TextTestError, "unrecognised option -" + option
+        return optionGroups
+    def addToOptionGroup(self, group):
+        if group.name.startswith("What"):
+            group.addOption("c", "Use checkout")
+            group.addOption("s", "Run this script")
+            group.addOption("v", "Run this version")
+        elif group.name.startswith("Side"):
+            group.addSwitch("x", "Write TextTest diagnostics")
+            group.addSwitch("keeptmp", "Keep write-directories on success")
+        elif group.name.startswith("Invisible"):
+            group.addOption("a", "Applications containing")
+            group.addOption("d", "Run tests at")
+            group.addOption("m", "Run this number of times")
+            group.addOption("record", "Record user actions to this script")
+            group.addOption("replay", "Replay user actions from this script")
+            group.addOption("help", "Print help text")
+            group.addSwitch("g", "use GUI", 1)
+            group.addSwitch("gx", "use static GUI")
+    def findOptionGroup(self, option, optionGroups):
+        for optionGroup in optionGroups:
+            if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):
+                return optionGroup
+        return None
     def _getWriteDirectory(self):
         if not os.environ.has_key("TEXTTEST_TMP"):
             if os.name == "posix":
@@ -420,6 +490,17 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
+    def createTestSuite(self, optionGroup = None):
+        if optionGroup:
+            for key, option in optionGroup.options.items():
+                if len(option.getValue()):
+                    self.configObject.optionMap[key] = option.getValue()
+                elif self.configObject.optionMap.has_key(key):
+                    del self.configObject.optionMap[key]
+        valid, filters = self.getFilterList()
+        suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters)
+        suite.reFilter(filters)
+        return valid, suite
     def description(self):
         description = "Application " + self.fullName
         if len(self.versions):
@@ -427,7 +508,7 @@ class Application:
         return description
     def filterUnsaveable(self, versions):
         saveableVersions = []
-        unsaveableVersions = self.getConfigList("unsaveable_version")
+        unsaveableVersions = self.getConfigValue("unsaveable_version")
         for version in versions:
             if not version in unsaveableVersions:
                 saveableVersions.append(version)
@@ -435,7 +516,7 @@ class Application:
     def getVersionFileExtensions(self, baseVersion = 1, forSave = 0):
         versionsToUse = self.versions
         if baseVersion:
-            versionsToUse = self.getConfigList("base_version") + self.versions
+            versionsToUse = self.getConfigValue("base_version") + self.versions
         if forSave:
             versionsToUse = self.filterUnsaveable(versionsToUse)
             
@@ -489,7 +570,10 @@ class Application:
         return self.name + self.versionSuffix() + globalRunIdentifier
     def getTestUser(self):
         return tmpString()
-    def ownsFile(self, fileName):
+    def ownsFile(self, fileName, unknown = 1):
+        # Environment file may or may not be owned. Return whatever we're told to return for unknown
+        if fileName == "environment":
+            return unknown
         # And anything ending in cmp we don't want...
         if fileName.endswith("cmp"):
             return 0
@@ -497,7 +581,11 @@ class Application:
         if len(parts) == 1:
             return 0
         ext = parts[1]
-        return ext == self.name or ext in self.getConfigList("compare_extension")
+        if ext == self.name or ext in self.getConfigValue("compare_extension"):
+            return 1
+        elif parts[0] == "environment":
+            return unknown
+        return 0
     def makePathName(self, name):
         if os.path.isabs(name):
             return name
@@ -547,21 +635,15 @@ class Application:
                 success = 0
         return success, filters
     def getConfigValue(self, key):
-        if self.configDir.has_key(key):
-            value = self.configDir[key]
-            if type(value) == types.StringType:
-                return os.path.expandvars(self.configDir[key])
-            else:
-                return value
+        value = self.configDir[key]
+        if type(value) == types.StringType:
+            return os.path.expandvars(value)
         else:
-            raise KeyError, "Error: " + repr(self) + " cannot find config entry " + key
-    def getConfigList(self, key):
-        return self.configDir.getListValue(key)
+            return value
+    def addConfigEntry(self, key, value, sectionName = ""):
+        self.configDir.addEntry(key, value, sectionName)
     def setConfigDefault(self, key, value):
-        if not self.configDir.has_key(key):
-            self.configDir[key] = value
-    def addToConfigList(self, key, value):
-        self.configDir.addEntry(key, value)
+        self.configDir[key] = value
     def makeCheckout(self, optionMap):
         if optionMap.has_key("c"):
             checkout = optionMap["c"]
@@ -665,35 +747,8 @@ class OptionFinder:
                 for app in subApps:
                     appList.append(app)
         return raisedError, appList
-    def getArgumentOptions(self, app):
-        options = {}
-        options["a"] = "Select applications containing"
-        options["c"] = "Use checkout"
-        options["d"] = "Find tests at"
-        options["help"] = "Print help text"
-        options["m"] = "Run this number of times"
-        options["s"] = "Run this script"
-        options["v"] = "Run this version"
-        options["record"] = "Record user actions to this script"
-        options["replay"] = "Replay user actions from this script"
-        options.update(app.configObject.getArgumentOptions())
-        return options
-    def getSwitches(self, app):
-        switches = {}
-        switches["x"] = "Write TextTest diagnostics"
-        switches["keeptmp"] = "Keep write-directories on success"
-        switches["g"] = "use GUI"
-        switches["gx"] = "use static GUI"
-        switches.update(app.configObject.getSwitches())
-        return switches
     def createApplication(self, appName, dirName, pathname, version):
-        app = Application(appName, dirName, pathname, version, self.inputOptions)
-        options = self.getArgumentOptions(app)
-        switches = self.getSwitches(app)
-        for option in self.inputOptions.keys():
-            if not option in options.keys() and not option in switches.keys():
-                raise plugins.TextTestError, "unrecognised option -" + option
-        return app
+        return Application(appName, dirName, pathname, version, self.inputOptions)
     def addApplications(self, appName, dirName, pathname, version):
         appList = []
         app = self.createApplication(appName, dirName, pathname, version)
@@ -782,98 +837,78 @@ class OptionFinder:
     def getNonPython(self):
         return [ plugins.NonPythonAction(self.inputOptions["s"]) ]
             
-class MultiEntryDictionary:
-    def __init__(self, filename, appName = "", versions = []):
-        self.dict = {}
-        self.entries = []
+class MultiEntryDictionary(seqdict):
+    def readValuesFromFile(self, filename, appName = "", versions = [], insert=1, errorOnUnknown=0):
+        self.currDict = self
         if os.path.isfile(filename):
             configFile = open(filename)
-            for line in configFile.readlines():
-                if line[0] == '#' or not ':' in line:
-                    continue
-                self.addLine(line.strip())
+            for line in configFile.xreadlines():
+                self.parseConfigLine(line.strip(), insert, errorOnUnknown)
         self.updateFor(filename, appName)
         for version in versions:
             self.updateFor(filename, version)
             self.updateFor(filename, appName + "." + version)
+    def parseConfigLine(self, line, insert, errorOnUnknown):
+        if line.startswith("#") or len(line) == 0:
+            return
+        if line.startswith("[") and line.endswith("]"):
+            self.currDict = self.changeSectionMarker(line[1:-1], errorOnUnknown)
+        elif line.find(":") != -1:
+            self.addLine(line, insert, errorOnUnknown)
+        else:
+            print "WARNING : could not parse config line", line
+    def changeSectionMarker(self, name, errorOnUnknown):
+        if name == "end":
+            return self
+        if self.has_key(name) and type(self[name]) == types.DictType:
+            return self[name]
+        if errorOnUnknown:
+            print "ERROR : config section name '" + name + "' not recognised."
+        return self
     def updateFor(self, filename, extra):
         if len(extra) == 0:
             return
         debugLog.debug("Updating " + filename + " for version " + extra) 
         extraFileName = filename + "." + extra
-        if not os.path.isfile(extraFileName):
-            return
-        overrideDir = MultiEntryDictionary(extraFileName)
-        for key, value in overrideDir.items():
-            if not key in self.entries:
-                self.entries.append(key)
-                self.dict[key] = value
-            elif type(self.dict[key]) == types.ListType:
-                if type(value) == types.ListType:
-                    self.dict[key] += value
-                else:
-                    self.dict[key].append(value)
-            else:
-                self.dict[key] = value
-    def addLine(self, line, separator = ':'):
+        if os.path.isfile(extraFileName):
+            self.readValuesFromFile(extraFileName)
+    def addLine(self, line, insert, errorOnUnknown, separator = ':'):
         entryName, entry = string.split(line, separator, 1)
-        self.addEntry(entryName, entry)
-    def addEntry(self, entryName, entry):
-        if self.dict.has_key(entryName):
-            try:
-                self.dict[entryName].append(entry)
-            except:
-                oldEntry = self.dict[entryName]
-                entryList = []
-                entryList.append(oldEntry)
-                entryList.append(entry)
-                self.dict[entryName] = entryList
+        self.addEntry(entryName, entry, "", insert, errorOnUnknown)
+    def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
+        if sectionName:
+            self.currDict = self[sectionName]
+        if not self.currDict.has_key(entryName):
+            if insert or not self.currDict is self:
+                val = self.currDict.values()
+                if len(val) == 0 or type(val[0]) != types.ListType:
+                    self.currDict[entryName] = entry
+                else:
+                    self.currDict[entryName] = [ entry ]
+            elif errorOnUnknown:
+                print "ERROR : config entry name '" + entryName + "' not recognised"
         else:
-            self.dict[entryName] = entry
-            self.entries.append(entryName)
-    def has_key(self, key):
-        return self.dict.has_key(key)
-    def keys(self):
-        return self.dict.keys()
-    def items(self):
-        itemList = []
-        for key in self.entries:
-            if self.dict.has_key(key):
-                t = key, self.dict[key]
-                itemList.append(t)
-        return itemList
-    def __getitem__(self, key):
-        return self.dict[key]
-    def __setitem__(self, key, value):
-        self.dict[key] = value
-        if not key in self.entries:
-            self.entries.append(key)
-    def __repr__(self):
-        return repr(self.dict)
-    def getListValue(self, key):
-        if self.dict.has_key(key):
-            value = self.dict[key]
-            if type(value) == types.ListType:
-                return value
-            else:
-                list = []
-                list.append(value)
-                return list
+            self.insertEntry(entryName, entry)
+    def insertEntry(self, entryName, entry):
+        currType = type(self.currDict[entryName]) 
+        if currType == types.ListType:
+            if not entry in self.currDict[entryName]:
+                self.currDict[entryName].append(entry)
+        elif currType == types.IntType:
+            self.currDict[entryName] = int(entry)
         else:
-            return []
-
+            self.currDict[entryName] = entry        
+    
 class ApplicationRunner:
     def __init__(self, app, inputOptions, gui):
         self.app = app
         self.actionSequence = inputOptions.getActionSequence(app)
         debugLog.debug("Action sequence = " + repr(self.actionSequence))
-        self.valid, self.filterList = app.getFilterList()
         if inputOptions.helpMode():
             app.printHelpText()
             self.valid = 0
             return
-        tmpSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
-        tmpSuite.reFilter(self.filterList)
+        self.valid, tmpSuite = app.createTestSuite()
         self.gui = gui
         if tmpSuite.size() == 0:
             print "No tests found for", app.description()
@@ -904,7 +939,7 @@ class ApplicationRunner:
         suite.setUpEnvironment()
         action.setUpApplication(suite.app)
         suite.tearDownEnvironment()
-        debugLog.debug("Current config dictionary for " + repr(suite.app) + ": " + os.linesep + repr(suite.app.configDir.dict))
+        debugLog.debug("Current config dictionary for " + repr(suite.app) + ": " + os.linesep + repr(suite.app.configDir))
         if self.gui:
             instructionList = suite.getInstructions(action)
             self.gui.storeInstructions(instructionList)
@@ -938,7 +973,7 @@ class TextTest:
                 import texttestgui
                 recordScript = self.inputOptions.recordScript()
                 replayScript = self.inputOptions.replayScript()
-                self.gui = texttestgui.TextTestGUI(replayScript, recordScript)
+                self.gui = texttestgui.TextTestGUI(self.inputOptions.guiRunTests(), replayScript, recordScript)
             except:
                 print "Cannot use GUI: caught exception:"
                 printException()

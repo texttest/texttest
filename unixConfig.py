@@ -15,11 +15,12 @@ def getConfig(optionMap):
     return UNIXConfig(optionMap)
 
 class UNIXConfig(default.Config):
-    def getArgumentOptions(self):
-        options = default.Config.getArgumentOptions(self)
-        options["b"] = "Run batch mode with identifier"
-        options["r"] = "Select tests by execution time"
-        return options
+    def addToOptionGroup(self, group):
+        default.Config.addToOptionGroup(self, group)
+        if group.name.startswith("Select"):
+            group.addOption("r", "Execution time <min, max>")
+        elif group.name.startswith("How"):
+            group.addOption("b", "Run batch mode session")
     def getFilterList(self):
         filters = default.Config.getFilterList(self)
         self.addFilter(filters, "b", batch.BatchFilter)
@@ -57,6 +58,21 @@ class UNIXConfig(default.Config):
     def printHelpOptions(self, builtInOptions):
         print batch.helpOptions
         default.Config.printHelpOptions(self, builtInOptions)
+    def setApplicationDefaults(self, app):
+        default.Config.setApplicationDefaults(self, app)
+        app.setConfigDefault("collect_standard_error", 1)
+        # Performance values
+        app.setConfigDefault("performance_test_machine", [])
+        app.setConfigDefault("cputime_include_system_time", 0)
+        app.setConfigDefault("cputime_slowdown_variation_%", 30)
+        app.setConfigDefault("cputime_variation_%", 10)
+        app.setConfigDefault("minimum_cputime_for_test", 10)
+        # Batch values. Maps from session name to values
+        app.setConfigDefault("batch_recipients", { "default" : "$USER" })
+        app.setConfigDefault("batch_timelimit", { "default" : None })
+        app.setConfigDefault("batch_use_collection", { "default" : "false" })
+        # Sample to show that values are lists
+        app.setConfigDefault("batch_version", { "default" : [] })
 
 class RunTest(default.RunTest):
     def __init__(self):
@@ -108,8 +124,7 @@ class RunTest(default.RunTest):
             self.process.kill()
     def setUpApplication(self, app):
         default.RunTest.setUpApplication(self, app)
-        app.setConfigDefault("collect_standard_error", 1)
-        self.collectStdErr = int(app.getConfigValue("collect_standard_error"))
+        self.collectStdErr = app.getConfigValue("collect_standard_error")
    
 def hostname():
     if os.environ.has_key("HOST"):
@@ -132,7 +147,7 @@ def isCompressed(path):
 class CollateUNIXFiles(default.CollateFiles):
     def __init__(self):
         default.CollateFiles.__init__(self)
-        self.collations.append(("core*", "stacktrace"))
+        self.collations["stacktrace"] = "core*"
     def transformToText(self, path):
         if isCompressed(path):
             toUse = path + ".Z"
@@ -194,7 +209,6 @@ class MakePerformanceFile(plugins.Action):
     def __init__(self):
         self.includeSystemTime = 0
     def setUpApplication(self, app):
-        app.setConfigDefault("cputime_include_system_time", 0)
         self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
     def __repr__(self):
         return "Making performance file for"

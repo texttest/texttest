@@ -140,18 +140,24 @@ class UserFilter(default.TextFilter):
             return 1
 
 class CarmenConfig(lsf.LSFConfig):
+    def addToOptionGroup(self, group):
+        lsf.LSFConfig.addToOptionGroup(self, group)
+        if group.name.startswith("Select"):
+            group.addOption("u", "CARMUSRs containing")
+        elif group.name.startswith("What"):
+            group.addSwitch("rulecomp", "Build rulesets only")
+        elif group.name.startswith("How"):
+            group.addSwitch("debug", "Use debug rulesets")
+            group.addSwitch("raveexp", "Run with RAVE Explorer")
+            group.addSwitch("lprof", "Run with LProf profiler")
+        elif group.name.startswith("Side"):
+            group.addOption("build", "Build application target")
+            group.addOption("buildl", "Build application target locally")        
     def getArgumentOptions(self):
         options = lsf.LSFConfig.getArgumentOptions(self)
-        options["u"] = "Select CARMUSRs containing"
-        options["build"] = "Build application target"
-        options["buildl"] = "Build application target locally"
         return options
     def getSwitches(self):
         switches = lsf.LSFConfig.getSwitches(self)
-        switches["rulecomp"] = "Build rulesets only"
-        switches["debug"] = "Use debug rulesets"
-        switches["raveexp"] = "Run with RAVE Explorer"
-        switches["lprof"] = "Run with LProf profiler"
         return switches
     def getFilterList(self):
         filters = lsf.LSFConfig.getFilterList(self)
@@ -263,7 +269,13 @@ class CarmenConfig(lsf.LSFConfig):
         lsf.LSFConfig.printHelpScripts(self)
         print helpScripts
     def printHelpDescription(self):
-        print helpDescription, lsf.lsfGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription 
+        print helpDescription, lsf.lsfGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription
+    def setApplicationDefaults(self, app):
+        lsf.LSFConfig.setApplicationDefaults(self, app)
+        app.setConfigDefault("default_architecture", "i386_linux")
+        app.setConfigDefault("rave_name", None)
+        # dictionary of lists
+        app.setConfigDefault("build_targets", { "" : [] })
     
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
@@ -507,7 +519,10 @@ class BuildCode(plugins.Action):
         self.remote = remote
         self.childProcesses = []
     def setUpApplication(self, app):
-        for relPath in app.getConfigList("build_" + self.target):
+        targetDir = app.getConfigValue("build_targets")
+        if not targetDir.has_key(self.target):
+            return
+        for relPath in targetDir[self.target]:
             absPath = app.makeAbsPath(relPath)
             if absPath in self.builtDirs:
                 print "Already built under", absPath, "- skipping build"
@@ -593,7 +608,7 @@ class CheckBuild(plugins.Action):
         for process, arch in self.builder.childProcesses:
             pid, status = os.waitpid(process, 0)
             # In theory we should be able to trust the status. In practice, it seems to be 0, even when the build failed.
-            for relPath in app.getConfigList("build_codebase"):
+            for relPath in app.getConfigValue("build_targets")["codebase"]:
                 absPath = app.makeAbsPath(relPath)
                 self.checkBuild(arch, absPath)
     def checkBuild(self, arch, absPath):

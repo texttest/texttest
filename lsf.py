@@ -70,16 +70,13 @@ def tenMinutesToGo(signal, stackFrame):
 signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
 class LSFConfig(unixConfig.UNIXConfig):
-    def getArgumentOptions(self):
-        options = unixConfig.UNIXConfig.getArgumentOptions(self)
-        options["R"] = "Request LSF resource"
-        options["q"] = "Request LSF queue"
-        return options
-    def getSwitches(self):
-        switches = unixConfig.UNIXConfig.getSwitches(self)
-        switches["l"] = "Run tests locally (not LSF)"
-        switches["perf"] = "Run on performance machines only"
-        return switches
+    def addToOptionGroup(self, group):
+        unixConfig.UNIXConfig.addToOptionGroup(self, group)
+        if group.name.startswith("How"):
+            group.addSwitch("l", "Run tests locally (not LSF)")
+            group.addSwitch("perf", "Run on performance machines only")
+            group.addOption("R", "Request LSF resource")
+            group.addOption("q", "Request LSF queue")
     def useLSF(self):
         if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l") or self.optionMap.has_key("rundebug"):
             return 0
@@ -116,7 +113,7 @@ class LSFConfig(unixConfig.UNIXConfig):
         if self.optionMap.has_key("R"):
             resourceList.append(self.optionValue("R"))
         if self.optionMap.has_key("perf"):
-            performanceMachines = app.getConfigList("performance_test_machine")
+            performanceMachines = app.getConfigValue("performance_test_machine")
             resource = "select[hname == " + performanceMachines[0]
             if len(performanceMachines) > 1:
                 for machine in performanceMachines[1:]:
@@ -145,6 +142,9 @@ class LSFConfig(unixConfig.UNIXConfig):
     def printHelpOptions(self, builtInOptions):
         print helpOptions + batchInfo
         default.Config.printHelpOptions(self, builtInOptions)
+    def setApplicationDefaults(self, app):
+        unixConfig.UNIXConfig.setApplicationDefaults(self, app)
+        app.setConfigDefault("lsf_queue", "normal")
 
 class LSFJob:
     def __init__(self, test):
@@ -254,10 +254,6 @@ class SubmitTest(unixConfig.RunTest):
     def changeState(self, test):
         # Don't change state just because we submitted to LSF
         pass
-    def setUpApplication(self, app):
-        unixConfig.RunTest.setUpApplication(self, app)
-        app.setConfigDefault("lsf_queue", "normal")
-        app.setConfigDefault("lsf_processes", "1")
     def getCleanUpAction(self):
         return KillTest()
 
@@ -321,7 +317,6 @@ class UpdateLSFStatus(plugins.Action):
             test.changeState(test.RUNNING, details)
         return "wait"
     def setUpApplication(self, app):
-        app.setConfigDefault("log_file", "output")
         self.logFile = app.getConfigValue("log_file")
     def calculatePercentage(self, test):
         stdFile = test.makeFileName(self.logFile)

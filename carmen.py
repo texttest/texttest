@@ -183,14 +183,17 @@ class CompileRules(plugins.Action):
                 print "CARMTMP", os.environ["CARMTMP"], "did not exist, attempting to create it"
                 os.mkdir(os.environ["CARMTMP"])
             ruleset.backup()
-            compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-            commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + arch + " " + ruleset.sourceFile
             self.rulesCompiled.append(ruleset.name)
-            errorMessage = self.performCompile(test, commandLine)
-            if errorMessage:
-                self.rulesCompileFailed.append(ruleset.name)
-                print "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
-                raise plugins.TextTestError, "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
+            if ruleset.precompiled:
+                shutil.copyfile(ruleset.precompiled, ruleset.targetFile)
+            else:
+                compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
+                commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + arch + " " + ruleset.sourceFile
+                errorMessage = self.performCompile(test, commandLine)
+                if errorMessage:
+                    self.rulesCompileFailed.append(ruleset.name)
+                    print "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
+                    raise plugins.TextTestError, "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
     def performCompile(self, test, commandLine):
@@ -217,13 +220,26 @@ class CompileRules(plugins.Action):
 class RuleSet:
     def __init__(self, ruleSetName, raveName, arch):
         self.name = ruleSetName
-        if self.name != None:
-            self.targetFile = os.path.join(os.environ["CARMTMP"], "crc", "rule_set", string.upper(raveName), arch, self.name)
-            self.sourceFile = os.path.join(os.environ["CARMUSR"], "crc", "source", self.name)
+        if not self.name:
+            return
+        self.sourceFile = self.sourcePath(self.name)
+        self.targetFile = self.targetPath("rule_set", raveName, arch, self.name)
+        self.precompiled = None
+        if not os.path.isfile(self.sourceFile):
+            # Might be a test rule set, have a try
+            parts = self.name.split(".")
+            if len(parts) == 2 and os.path.isdir("/users/" + parts[1]):
+                self.sourceFile = self.sourcePath(parts[0])
+                self.precompiled = self.targetPath("rule_set", raveName, arch, parts[0])
+                self.targetFile = self.targetPath("test_rule_set", raveName, arch, self.name)
     def isValid(self):
-        return self.name != None and os.path.isfile(self.sourceFile)
+        return self.name and os.path.isfile(self.sourceFile)
     def isCompiled(self):
         return os.path.isfile(self.targetFile)
+    def targetPath(self, type, raveName, arch, name):
+        return os.path.join(os.environ["CARMTMP"], "crc", type, string.upper(raveName), arch, name)
+    def sourcePath(self, name):
+        return os.path.join(os.environ["CARMUSR"], "crc", "source", name)
     def backup(self):
         if self.isCompiled():
             try:

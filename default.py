@@ -311,8 +311,17 @@ class ReconnectTest(plugins.Action):
         self.fetchUser = fetchUser
     def __repr__(self):
         return "Reconnect to"
+    def __call__(self, test):
+        print "Reconnecting to test", test.name
+        if os.path.isdir(test.writeDirs[0]):
+            os.chdir(test.writeDirs[0])
+        else:
+            os.makedirs(test.writeDirs[0])
+            os.chdir(test.writeDirs[0])
     def setUpApplication(self, app):
         root, localDir = os.path.split(app.writeDirectory)
+        if not os.path.isdir(root):
+            os.makedirs(root)
         fetchDir = root
         userId = app.getTestUser()
         if self.fetchUser and self.hasUserDependentWriteDir(app, userId):

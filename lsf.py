@@ -210,7 +210,7 @@ class LSFServer:
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
     def getEnvironmentString(self, envDict):
-        envStr = "env "
+        envStr = "env -i "
         for key, value in envDict.items():
             envStr += "'" + key + "=" + value + "' "
         return envStr

@@ -36,7 +36,7 @@ default.CountTest          - produce a brief report on the number of tests in th
 default.ExtractMemory      - update the memory files from the standard log files
 """
 
-import os, shutil, plugins, respond, performance, string, predict, sys, bugzilla
+import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, bugzilla
 from glob import glob
 
 def getConfig(optionMap):
@@ -119,7 +119,8 @@ class Config(plugins.Configuration):
     def bugzillaInstalled(self):
         return os.system("which bugcli > /dev/null 2>&1") == 0
     def getTestComparator(self):
-        return performance.MakeComparisons()
+        comparetest.MakeComparisons.testComparisonClass = performance.PerformanceTestComparison
+        return comparetest.MakeComparisons()
     def getTestResponder(self):
         overwriteSuccess = self.optionMap.has_key("n")
         if self.optionMap.has_key("o"):
@@ -342,17 +343,18 @@ class CreateCatalogue(plugins.Action):
                 os.chdir(writeDir)
                 realWriteDir = os.getcwd();
                 os.chdir(currDir)
-                self.listDirectory(test.app, file, realWriteDir)
+                self.listDirectory(test.app, file, realWriteDir, firstLevel = 1)
         file.close()
         if os.path.getsize(fileName) == 0:
             os.remove(fileName)
-    def listDirectory(self, app, file, writeDir):
+    def listDirectory(self, app, file, writeDir, firstLevel = 0):
         subDirs = []
         files = []
         availFiles = os.listdir(writeDir)
         availFiles.sort()
         for writeFile in availFiles:
-            if writeFile == "CVS":
+            # Don't list special directories or the framework's own temporary files
+            if writeFile == "CVS" or (firstLevel and writeFile == "framework_tmp"):
                 continue
             fullPath = os.path.join(writeDir, writeFile)
             if os.path.isdir(fullPath):
@@ -407,9 +409,12 @@ class ReconnectTest(plugins.Action):
         
         print "Reconnecting to test", test.name
         shutil.copytree(reconnLocation, writeDir)
-        for file in os.listdir(writeDir):
-            if file.endswith("cmp"):
-                os.remove(os.path.join(writeDir, file))
+        # Clear the framework temporary directory, as configuration may be different now
+        frameworkTmpDir = os.path.join(writeDir, "framework_tmp")
+        for file in os.listdir(frameworkTmpDir):
+            fullPath = os.path.join(frameworkTmpDir, file)
+            if os.path.isfile(fullPath):
+                os.remove(fullPath)
     def canReconnectTo(self, dir):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0

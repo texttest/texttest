@@ -146,11 +146,6 @@ class PerformanceTestComparison(comparetest.TestComparison):
             if not realHost in perfMachines:
                 return 0
         return 1
-    
-# Does the same as the basic test comparison apart from when comparing the performance file
-class MakeComparisons(comparetest.MakeComparisons):
-    def makeTestComparison(self, test):
-        return PerformanceTestComparison(test)
 
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile, descriptors, makeNew):

@@ -90,7 +90,7 @@ class Test:
                 self.previousEnv[var] = os.environ[var]
             os.environ[var] = self.environment[var]
     def makeFileName(self, stem, refVersion = None, temporary = 0, forComparison = 1):
-        root = self.getDirectory(temporary)
+        root = self.getDirectory(temporary, forComparison)
         if not forComparison:
             return os.path.join(root, stem)
         if stem.find(".") == -1: 
@@ -129,7 +129,7 @@ class Test:
         if relPath.startswith(os.sep):
             return relPath[1:]
         return relPath
-    def getDirectory(self, temporary):
+    def getDirectory(self, temporary, forComparison = 1):
         return self.abspath
     def setUpEnvironment(self, parents=0):
         if parents and self.parent:
@@ -204,9 +204,12 @@ class TestCase(Test):
             self.options = os.path.expandvars(open(optionsFile).readline().strip())
         elif not os.path.isfile(self.inputFile) and not os.path.isfile(self.useCaseFile):
             self.valid = 0
-    def getDirectory(self, temporary):
+    def getDirectory(self, temporary, forComparison = 1):
         if temporary:
-            return self.writeDirs[0]
+            if forComparison:
+                return self.writeDirs[0]
+            else:
+                return os.path.join(self.writeDirs[0], "framework_tmp")
         else:
             return self.abspath
     def callAction(self, action):
@@ -262,7 +265,8 @@ class TestCase(Test):
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
     def makeBasicWriteDirectory(self):
-        os.makedirs(self.writeDirs[0])
+        fullPathToMake = os.path.join(self.writeDirs[0], "framework_tmp")
+        os.makedirs(fullPathToMake)
         if self.app.useDiagnostics:
             os.mkdir(os.path.join(self.writeDirs[0], "Diagnostics"))
         self.collatePaths("copy_test_path", self.copyTestPath)
@@ -776,9 +780,6 @@ class Application:
         # Environment file may or may not be owned. Return whatever we're told to return for unknown
         if fileName == "environment":
             return unknown
-        # And anything ending in cmp we don't want...
-        if fileName.endswith("cmp"):
-            return 0
         parts = fileName.split(".")
         if len(parts) == 1 or len(parts[0]) == 0:
             return 0

@@ -49,6 +49,7 @@ comparetest.RemoveObsoleteVersions
 import os, filecmp, string, plugins, time
 from ndict import seqdict
 from predict import FailedPrediction
+from shutil import copyfile
 
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
@@ -357,7 +358,7 @@ class FileComparison:
         # more intelligent save, e.g. for performance. Default is the same for exact
         # and inexact save
         if exact:
-            plugins.movefile(self.tmpFile, stdFile)
+            copyfile(self.tmpFile, stdFile)
         else:
             self.saveResults(stdFile)
         # Try to get everything to behave normally after a save...
@@ -366,7 +367,7 @@ class FileComparison:
         self.tmpCmpFile = self.stdCmpFile
         self.stdFile = stdFile
     def saveResults(self, destFile):
-        plugins.movefile(self.tmpFile, destFile)
+        copyfile(self.tmpFile, destFile)
         
 class RunDependentTextFilter:
     def __init__(self, app, stem):

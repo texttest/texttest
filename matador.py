@@ -94,6 +94,7 @@ class MatadorConfig(optimization.OptimizationConfig):
         optimization.OptimizationConfig.setUpApplication(self, app)
         self.itemNamesInFile[optimization.memoryEntryName] = "Memory"
         self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
+        self.itemNamesInFile[optimization.solutionName] = "Solution\."
         # Add here list of entries that should not increase, paired with the methods not to check
         self.noIncreaseExceptMethods[optimization.costEntryName] = [ "SolutionLegaliser", "initial" ]
         self.noIncreaseExceptMethods["crew with illegal rosters"] = []

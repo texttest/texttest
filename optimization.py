@@ -50,6 +50,19 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
                                
 optimization.JoinPlot      - As PlotTest above but allows plots of multiple apps in same diag
+
+optimization.TableTest     - Displays solution data in a table. Works the same as PlotTest in most respects,
+                             in terms of which data is displayed and the fact that temporary files are used if possible.
+                             Currently supports these options:
+                             - nt
+                               Do not use status file from the currently running test.
+                             - ns
+                               Do not scale times with the performance of the test. 
+                             - i=<item>,<item>,...
+                               Which items to print in the table. Note that whitespaces are replaced
+                               by underscores. Default is TOTAL cost and cpu time only.
+                               Example: i=cost_of_roster,rost/sec,Generated_rosters
+                             
 optimization.StartStudio   - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
                              This is intended to be used on a single specified test and will terminate
                              the testsuite after it starts Studio. It is a simple shortcut to set the
@@ -68,7 +81,7 @@ timeEntryName = "cpu time"
 memoryEntryName = "memory"
 methodEntryName = "Running.*\.\.\."
 newSolutionMarker = "new solution"
-
+solutionName = "solution"
 
 class OptimizationConfig(carmen.CarmenConfig):
     def __init__(self, optionMap):
@@ -308,8 +321,10 @@ class LogFileFinder:
         self.test = test
         test.app.setConfigDefault("log_file", "output")
         self.logStem = test.app.getConfigValue("log_file")
-    def findFile(self, version = ""):
+    def findFile(self, version = None):
         if self.tryTmpFile:
+            if not version:
+                version = string.join(self.test.app.versions, ".")
             logFile = self.findTempFile(self.test, version) 
             if logFile and os.path.isfile(logFile):
                 print "Using temporary log file for test " + self.test.name + " version " + version
@@ -351,7 +366,7 @@ class LogFileFinder:
                 return currentFile
         else:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
-    def findTempFileInTest(self, version, stem):                           
+    def findTempFileInTest(self, version, stem):
         for file in os.listdir(self.test.abspath):
             versionMod = ""
             if version:
@@ -494,7 +509,10 @@ class OptimizationValueCalculator:
             return self.getFinalNumeric(line)
     def getFinalNumeric(self, line):
         lastField = line.split(" ")[-1]
-        return int(lastField.strip())
+        try:
+            return int(lastField.strip())
+        except ValueError:
+            return lastField.strip()
     def convertTime(self, timeLine):
         timeEntry = self.getTimeEntry(timeLine.strip())
         entries = timeEntry.split(":")
@@ -524,7 +542,67 @@ class OptimizationValueCalculator:
                 else:
                     return float(memNum)
         return 0
-    
+
+class TableTest(plugins.Action):
+    def __init__(self, args = []):
+        self.definingValues = [ timeEntryName, costEntryName ]
+        self.interestingValues = [ ]
+        self.scaleTime = 1
+        self.useTmpFiles = 1
+        self.interpretOptions(args)
+        self.values = self.definingValues + self.interestingValues
+    def interpretOptions(self, args):
+        for ar in args:
+            arr = ar.split("=")
+            if arr[0]=="ns":
+                self.scaleTime = 0
+            elif arr[0]=="nt":
+                self.useTmpFiles = 0
+            elif arr[0]=="i":
+                for entry in arr[1].split(","):
+                    self.interestingValues.append(entry.replace("_", " "))
+            else:
+                print "Unknown option " + arr[0]
+    def __call__(self, test):
+        # Values that should be reported if present, but should not be fatal if not
+        extraValues = [ "machine", "Crew Members" ]
+        currentRun = OptimizationRun(test, None, self.definingValues, self.interestingValues + extraValues, self.scaleTime, self.useTmpFiles)
+        self.displayTitle(test, currentRun.solutions[0])
+        self.display(currentRun)
+    def displayTitle(self, test, initialSol):
+        print "Generating table for test", test.name
+        print "Executed on", initialSol["machine"], ": total crew", initialSol["Crew Members"]
+    def display(self, currentRun):
+        underlines = []
+        for value in self.values:
+            underline = ""
+            for i in range(len(value)):
+                underline += "="
+            underlines.append(underline)
+        self.printRow(underlines)
+        self.printRow(self.values)
+        self.printRow(underlines)
+        for solution in currentRun.solutions:
+            solStrings = [] 
+            for value in self.values:
+                toPrint = self.getSolutionValue(value, solution)
+                solStrings.append(string.rjust(toPrint, len(value)))
+            self.printRow(solStrings)
+    def printRow(self, values):
+        print string.join(values, " | ")
+    def getSolutionValue(self, entryName, solution):
+        if solution.has_key(entryName):
+            value = solution[entryName]
+            if entryName == timeEntryName:
+                hours = int(value) / 60
+                minutes = int(value) - hours * 60
+                seconds = int((value - int(value)) * 60.0)
+                return string.zfill(hours, 2) + ":" + string.zfill(minutes, 2) + ":" + string.zfill(seconds, 2)
+            else:
+                return str(value).strip()
+        else:
+            return "N/A"
+      
 class TestReport(plugins.Action):
     def __init__(self, versionString):
         versions = versionString.split(",")
@@ -904,7 +982,7 @@ class PlotTest(plugins.Action):
         self.plotPrint = None
         self.plotPrintColor = None
         self.plotAgainstSolNum = 0
-        self.plotVersions = [ "" ]
+        self.plotVersions = [ None ]
         self.plotScaleTime = 1
         self.plotVersionColoring = 1
         self.plotUseTmpStatus = 1

@@ -98,6 +98,7 @@ class RunTest(default.RunTest):
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
         self.process = plugins.BackgroundProcess(testCommand, testRun=1)
+        self.process.waitForStart()
         return self.RETRY
     def getExecuteCommand(self, test):
         testCommand = default.RunTest.getExecuteCommand(self, test)

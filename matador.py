@@ -82,7 +82,7 @@ class MatadorConfig(optimization.OptimizationConfig):
         if self.optionMap.has_key("diag"):
             return plugins.Action()
         else:
-            return optionMap.OptimizationConfig.getPerformanceFileMaker(self)
+            return optimization.OptimizationConfig.getPerformanceFileMaker(self)
     def getLibraryFile(self, test):
         return os.path.join("data", "crc", "MATADOR", carmen.getArchitecture(test.app), "matador.o")
     def _getSubPlanDirName(self, test):

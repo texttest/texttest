@@ -319,9 +319,13 @@ class TextTestGUI:
                 process.kill()
     def saveAll(self, *args):
         saveTestAction = self.rightWindowGUI.getSaveTestAction()
+        fullVersion = None
+        if saveTestAction:
+            fullVersion = saveTestAction.test.app.getFullVersion()
         for test in self.itermap.keys():
             if test.state == test.FAILED:
-                if not saveTestAction:
+                currFullVersion = test.app.getFullVersion()
+                if not saveTestAction or fullVersion != currFullVersion:
                     saveTestAction = guiplugins.SaveTest(test)
                 saveTestAction(test)
     def viewApp(self, *args):

@@ -386,22 +386,29 @@ class CopyEnvironment(plugins.Action):
         return "Making environment.ARCH for"
     def setUpSuite(self, suite):
         versions = [ "", ".10", ".9" ]
-        archs = [ "sparc", "parisc_2_0", "powerpc" ]
         if carmen.isUserSuite(suite):
             self.describe(suite)
             for version in versions:
                 oldFile = os.path.join(suite.abspath, "environment" + version)
                 if not os.path.isfile(oldFile):
                     return
-                
+
+                archs = self.getArchs(version)
                 oldcarmtmp = self.getCarmtmp(oldFile)
                 root, local = os.path.split(os.path.normpath(oldcarmtmp))
                 newcarmtmp = self.getNewCarmtmp(oldcarmtmp, version, "i386_linux", local)
                 self.replaceInFile(oldFile, oldcarmtmp, newcarmtmp)
                 for arch in archs:
                     targetFile = oldFile + "." + arch
+                    if os.path.isfile(targetFile):
+                        continue
                     newcarmtmp = self.getNewCarmtmp(oldcarmtmp, version, arch, local)
                     self.makeCarmtmpFile(targetFile, newcarmtmp)
+    def getArchs(self, version):
+        archs = [ "sparc", "parisc_2_0", "powerpc" ]
+        if len(version) == 0:
+            archs.append("sparc_64")
+        return archs
     def getNewCarmtmp(self, oldcarmtmp, version, arch, local):
         basePath = "${CARMSYS}"
         if oldcarmtmp.find("CARMSYS") == -1:

@@ -246,6 +246,9 @@ class SubmitTest(unixConfig.RunTest):
                 if len(parts) > 1:
                     var = parts[0]
                     value = parts[1]
+                    # Assume relative paths are relative to test directory. Don't rely on pwd!
+                    if os.path.exists(value) and not os.path.isabs(value):
+                        value = os.path.join(test.getDirectory(temporary=1), value)
                     if value != "dummy":
                         f.write(var + "=" + "\"" + value + "\"; export " + var + os.linesep)
         f.write(testCommand + os.linesep)

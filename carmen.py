@@ -83,9 +83,9 @@ def findDisplay(maintainer, server):
 def getDisplay(trystart = 1):
     # The nightjob should connect to a virtual X server
     maintainers = [ "geoff", "johana", "nightjob" ]
-    XServerMachines = [ "schiphol" ]
-    for maintainer in maintainers:
-        for server in XServerMachines:
+    XServerMachines = [ "reedsville", "schiphol" ]
+    for server in XServerMachines:
+        for maintainer in maintainers:
             display = findDisplay(maintainer, server)
             if display:
                 return display

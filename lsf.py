@@ -233,9 +233,6 @@ class SubmitTest(unixConfig.RunTest):
     def runTest(self, test):
         testCommand = self.getExecuteCommand(test)
         lsfOptions = ""
-        resource = self.resourceFunction(test)
-        if len(resource):
-            lsfOptions += " -R '" + resource + "'"
         if os.environ.has_key("LSF_PROCESSES"):
             lsfOptions += " -n " + os.environ["LSF_PROCESSES"]
         self.runCommand(test, testCommand, None, lsfOptions)
@@ -249,6 +246,9 @@ class SubmitTest(unixConfig.RunTest):
         reportfile =  test.makeFileName(repFileName, temporary=1, forComparison=0)
         lsfJob = LSFJob(test, jobNameFunction)
         lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -u nobody" + commandLsfOptions
+        resource = self.resourceFunction(test)
+        if len(resource):
+            lsfOptions += " -R '" + resource + "'"
         commandLine = "bsub " + lsfOptions + " '" + command + "' > " + reportfile
         self.diag.info("Submitting with command : " + commandLine)
         stdin, stdout, stderr = os.popen3(commandLine)

@@ -545,8 +545,6 @@ class Application:
         self.configDir.readValuesFromFile(configFile, name, extensions, insert=0)
         self.fullName = self.getConfigValue("full_name")
         debugLog.info("Found application " + repr(self))
-        self.checkout = self.makeCheckout(optionMap)
-        debugLog.info("Checkout set to " + self.checkout)
         self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), optionMap)
         self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
         self.writeDirectory = self._getWriteDirectory(optionMap.has_key("gx"))
@@ -556,6 +554,8 @@ class Application:
         self.configDir.readValuesFromFile(configFile, name, extensions, insert=0, errorOnUnknown=1)
         personalFile = self.getPersonalConfigFile()
         self.configDir.readValuesFromFile(personalFile, insert=0, errorOnUnknown=1)
+        self.checkout = self.makeCheckout(optionMap)
+        debugLog.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(optionMap)
     def __repr__(self):
         return self.fullName

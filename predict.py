@@ -12,29 +12,39 @@ import os, filecmp, string, plugins
 # Map from test to broken prediction text
 testBrokenPredictionMap = {}
 
-class CheckPredictions(plugins.Action):
+class CheckLogFilePredictions(plugins.Action):
     def __init__(self):
         self.logFile = None
-        self.internalErrorList = None
-    def __repr__(self):
-        return "Checking predictions for"
     def __del__(self):
         # Useful to have a nice list at the end...
         for test, error in testBrokenPredictionMap.items():
             print error, "in", test, "(under", test.getRelPath() + ")"
+    def getLogFile(self, test):
+        logFile = test.getTmpFileName(self.logFile, "r")
+        if not os.path.isfile(logFile):
+            logFile = test.makeFileName(self.logFile)
+        return logFile
+    def insertError(self, test, error):
+        testBrokenPredictionMap[test] = error
+    def setUpApplication(self, app):
+        self.logFile = app.getConfigValue("log_file")   
+
+class CheckPredictions(CheckLogFilePredictions):
+    def __init__(self):
+        CheckLogFilePredictions.__init__(self)
+        self.internalErrorList = None
+    def __repr__(self):
+        return "Checking predictions for"
     def __call__(self, test):
         if len(self.internalErrorList) == 0:
             return
 
-        logFile = test.getTmpFileName(self.logFile, "r")
-        if not os.path.isfile(logFile):
-            logFile = test.makeFileName(self.logFile)
-        
+        logFile = self.getLogFile(test)
         for line in open(logFile).xreadlines():
             for error in self.internalErrorList:
                 if line.find(error) != -1:
-                    testBrokenPredictionMap[test] = "Internal Error (" + error + ")" 
+                    self.insertError(test, "Internal Error (" + error + ")")
     def setUpApplication(self, app):
-        self.logFile = app.getConfigValue("log_file")
+        CheckLogFilePredictions.setUpApplication(self, app)
         self.internalErrorList = app.getConfigList("internal_error_text")
         

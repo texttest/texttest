@@ -241,6 +241,7 @@ class ImportTest(optimization.ImportTest):
             self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
 
 optimization.itemNamesInFile[optimization.memoryEntryName] = "Memory"
+optimization.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
     
 class PlotTest(optimization.PlotTest):
     def __init__(self, args = []):

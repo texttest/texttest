@@ -248,17 +248,8 @@ class StartStudio(plugins.Action):
         
 optimization.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
 optimization.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
+optimization.itemNamesInFile[optimization.newSolutionMarker] = "apc_status Solution"
 
-class OptimizationRun(optimization.OptimizationRun):
-    def __init__(self, test, version, itemList, margin = 0.0):
-        optimization.OptimizationRun.__init__(self, test, version, itemList, margin)
-        self.penaltyFactor = 1.0
-    def timeToCost(self, targetCost):
-        if len(self.solutions) < 2 or abs(self.solutions[-1][optimization.costEntryName]) < abs(targetCost):
-            return optimization.OptimizationRun.timeToCost(self, targetCost)
-        penalizedTime = self.getPerformance() * self.penaltyFactor
-        return int(penalizedTime)
-        
 #
 # TODO: Check Sami's stuff in /users/sami/work/Matador/Doc/Progress
 #

@@ -195,28 +195,31 @@ class RemoveTemporarySubplan(plugins.Action):
 costEntryName = "cost of plan"
 timeEntryName = "cpu time"
 memoryEntryName = "memory"
+newSolutionMarker = "new solution"
 
 #Probably different for APC and matador
 itemNamesInFile = {}
 
 class OptimizationRun:
-    def __init__(self, test, version, itemList, margin = 0.0):
-        self.solutions = []
+    def __init__(self, test, version, definingItems, interestingItems, margin = 0.0):
         self.performance = performance.getTestPerformance(test, version) # float value
         self.logFile = test.makeFileName(test.app.getConfigValue("log_file"), version)
-        calculator = OptimizationValueCalculator(itemList, self.logFile)
-        for item in itemList:
-            valueList = calculator.getValues(item)
-            if len(valueList) > 0:
-                self.addSolutionData(item, valueList)
+        self.penaltyFactor = 1.0
+        calculator = OptimizationValueCalculator(definingItems + interestingItems, self.logFile)
+        self.solutions = calculator.getSolutions(definingItems)
+        self.scaleTimes()
+    def scaleTimes(self):
+        finalTime = self.solutions[-1][timeEntryName]
+        if finalTime == 0.0:
+            return
+        scaleFactor = self.performance / finalTime
+        for solution in self.solutions:
+            solution[timeEntryName] *= scaleFactor    
     def addSolutionData(self, item, valueList):
         for i in range(len(valueList)):
             if len(self.solutions) <= i:
                 self.solutions.append({})
             entry = valueList[i]
-            # Scale by performance
-            if item == timeEntryName and valueList[-1] > 0.0:
-                entry = valueList[i] / valueList[-1] * self.performance
             self.solutions[i][item] = entry
     def isVeryShort(self):
         return len(self.solutions) < 3 or self.getPerformance() == 0
@@ -225,15 +228,20 @@ class OptimizationRun:
     def getPerformance(self, solNum = -1): # return int for presentation
         return int(round(self.solutions[solNum][timeEntryName]))
     def getMaxMemory(self):
-        maxMemory = 0
+        maxMemory = "??"
         for solution in self.solutions:
             if not solution.has_key(memoryEntryName):
-                return "??"
+                continue
             memory = solution[memoryEntryName]
-            if memory > maxMemory:
+            if maxMemory == "??" or memory > maxMemory:
                 maxMemory = memory
         return maxMemory
     def timeToCost(self, targetCost):
+        if len(self.solutions) < 2 or abs(self.solutions[-1][costEntryName]) < abs(targetCost):
+            return self._timeToCostNoPenalty(targetCost)
+        penalizedTime = self.getPerformance() * self.penaltyFactor
+        return int(penalizedTime)
+    def _timeToCostNoPenalty(self, targetCost):
         lastCost = 0
         lastTime = 0
         for solution in self.solutions:
@@ -275,58 +283,45 @@ class OptimizationRun:
         return 2
 
 class OptimizationValueCalculator:
-    def __init__(self, itemList, logfile):
-        command = "grep -E '" + string.join(map(self.getItemName, itemList),"|") + "' " + logfile
-        grepLines = os.popen(command).readlines()
-        self.itemValues = {}
-        lastItemLine = {}
-        rexpItem = {}
-        convertFuncs = {}
-        for item in itemList:
-            self.itemValues[item] = []
-            rexpItem[item] = re.compile(self.getItemName(item))
-            lastItemLine[item] = ""
-            convertFuncs[item] = self.getConversionFunction(item)
-        #
-        # Matador needs this 'inital' hack, because it does not have a time entry for
-        # the inital input analysis.
-        #
-        initial = 1
-        lastItemLine[timeEntryName] = "cpu time:  0:00:00"
-        lastItemLine[memoryEntryName] = "Memory consumption: 0 MB"
-        
-        for line in grepLines:
-            for item in itemList:
-                if rexpItem[item].search(line):
-                    lastItemLine[item] = line
-                    if (initial and self._hasValuesForAll(itemList, lastItemLine)) or item == timeEntryName:
-                        if initial or self._hasValuesForAll(itemList, lastItemLine):
-                            for it in itemList:
-                                self.itemValues[it].append(convertFuncs[it](lastItemLine[it]))
-                        initial = 0
-                        for it in itemList:                                
-                            lastItemLine[it] = ""
-    def _hasValuesForAll(self, itemList, lineMap):
-        for item in itemList:
-            if not lineMap.has_key(item) or lineMap[item] == "":
-                return 0
+    def __init__(self, items, logfile):
+        regexps = {}
+        for item in items:
+            regexps[item] = self.getItemRegexp(item)
+        newSolutionRegexp = self.getItemRegexp(newSolutionMarker)
+        self.solutions = [{}]
+        for line in open(logfile).xreadlines():
+            if newSolutionRegexp.search(line):
+                self.solutions.append({})
+                continue
+            for item, regexp in regexps.items():
+                if regexp.search(line):
+                     self.solutions[-1][item] = self.calculateEntry(item, line)
+    def getSolutions(self, definingItems):
+        solutions = []
+        for solution in self.solutions:
+            if self.isComplete(solution, definingItems):
+                solutions.append(solution)
+        return solutions
+    def isComplete(self, solution, definingItems):
+        for item in definingItems:
+            if not item in solution.keys():
+                if solution is self.solutions[0] and item == timeEntryName:
+                    solution[timeEntryName] = 0.0
+                else:
+                    return 0
         return 1
-    def getItemName(self, item):
+    def getItemRegexp(self, item):
         if itemNamesInFile.has_key(item):
-            return itemNamesInFile[item]
+            return re.compile(itemNamesInFile[item])
         else:
-            return item
-    def getValues(self, item):
-        if self.itemValues.has_key(item):
-            return self.itemValues[item]
-        return None
-    def getConversionFunction(self, item):
+            return re.compile(item)
+    def calculateEntry(self, item, line):
         if item == timeEntryName:
-            return self.convertTime
+            return self.convertTime(line)
         elif item == memoryEntryName:
-            return self.getMemory
+            return self.getMemory(line)
         else: # Default assumes a numeric value as the last field of the line
-            return self.getFinalNumeric
+            return self.getFinalNumeric(line)
     def getFinalNumeric(self, line):
         lastField = line.split(" ")[-1]
         return int(lastField.strip())
@@ -365,14 +360,14 @@ class TestReport(plugins.Action):
         if len(versions) > 1:
             self.currentVersion = versions[1]
     def __call__(self, test):
-        currentRun, referenceRun = self.getOptimizationRuns(test)
+        # Values that must be present for a solution to be considered
+        definingValues = [ costEntryName, timeEntryName ]
+        # Values that should be reported if present, but should not be fatal if not
+        interestingValues = [ memoryEntryName, "cost of rosters" ]
+        currentRun = OptimizationRun(test, self.currentVersion, definingValues, interestingValues)
+        referenceRun = OptimizationRun(test, self.referenceVersion, definingValues, interestingValues)
         if currentRun.logFile != referenceRun.logFile:
             self.compare(test, referenceRun, currentRun)
-    def getOptimizationRuns(self, test):
-        interestingValues = [ costEntryName, timeEntryName, memoryEntryName, "cost of rosters" ]
-        currentRun = OptimizationRun(test, self.currentVersion, interestingValues)
-        referenceRun = OptimizationRun(test, self.referenceVersion, interestingValues)
-        return currentRun, referenceRun
     
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):
@@ -484,6 +479,7 @@ class MakeProgressReport(TestReport):
         for entry in currentRun.solutions[0].keys():
             if entry.find("cost") != -1:
                 costEntries.append(entry)
+        costEntries.sort()
         for entry in costEntries:
             self.reportLine("Initial " + entry, currentRun.solutions[0][entry], referenceRun.solutions[0][entry])
         for entry in costEntries:

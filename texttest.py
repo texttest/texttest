@@ -82,6 +82,7 @@ class Test:
         for filter in filters:
             debugPrint(repr(self) + " filter " + repr(filter))
             if not self.isAcceptedBy(filter):
+                debugPrint("REJECTED")
                 return 0
         return 1
         

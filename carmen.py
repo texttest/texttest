@@ -383,6 +383,7 @@ class CompileRules(plugins.Action):
         return self.filter
 
 class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
+    ruleCompilations = []
     def __init__(self, getRuleSetName, jobNameFunction):
         lsf.UpdateLSFStatus.__init__(self, jobNameFunction)
         self.getRuleSetName = getRuleSetName
@@ -394,6 +395,7 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
         if status == "EXIT":
             self.raiseFailure(test, ruleset)
         elif status == "DONE":
+            self.ruleCompilations.append(self.jobNameFunction(test))
             test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
         else:
             details = "Compiling ruleset " + ruleset
@@ -403,9 +405,14 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
             test.changeState(RULESET_NOT_BUILT, details)
     def raiseFailure(self, test, ruleset):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
+        jobName = self.jobNameFunction(test)
         if not os.path.isfile(compTmp):
-            raise plugins.TextTestError, "Trying to use ruleset '" + ruleset + "' that failed to build."
-
+            # Make sure first test is first one to report - less confusing...
+            if jobName in self.ruleCompilations:
+                raise plugins.TextTestError, "Trying to use ruleset '" + ruleset + "' that failed to build."
+            else:
+                return self.RETRY | self.WAIT
+        self.ruleCompilations.append(jobName)
         errContents = string.join(open(compTmp).readlines(),"")
         errMsg = "Failed to build ruleset " + ruleset + os.linesep + errContents 
         print errMsg

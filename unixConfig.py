@@ -9,7 +9,7 @@ to Python's ndiff, and sendmail is used to implement an email-sending batch mode
 The default behaviour is to run all tests locally.
 """
 
-import default, batch, respond, comparetest, predict, os
+import default, batch, respond, comparetest, predict, os, shutil
 
 def getConfig(optionMap):
     return UNIXConfig(optionMap)
@@ -98,4 +98,9 @@ class CollateCore(CollateFile):
         os.remove(fileName)
         os.rename(newPath, path)
     def extract(self, sourcePath, targetFile):
-        os.rename(sourcePath, targetFile)
+        try:
+            os.rename(sourcePath, targetFile)
+        except:
+            print "Failed to rename '" + sourcePath + "' to '" + targetFile + "', using copy-delete"
+            shutil.copyfile(sourcePath, targetFile)
+            os.remove(sourcePath)

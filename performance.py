@@ -146,6 +146,13 @@ class PerformanceTestComparison(comparetest.TestComparison):
 class MakeComparisons(comparetest.MakeComparisons):
     def makeTestComparison(self, test):
         return PerformanceTestComparison(test, self.overwriteOnSuccess)
+    def setUpApplication(self, app):
+        comparetest.MakeComparisons.setUpApplication(self, app)
+        app.setConfigDefault("cputime_slowdown_variation_%", 30)
+        app.setConfigDefault("cputime_variation_%", 10)
+        app.setConfigDefault("minimum_cputime_for_test", 10)
+        app.setConfigDefault("memory_variation_%", 5)
+        app.setConfigDefault("minimum_memory_for_test", 5)
 
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile, descriptors, makeNew):
@@ -183,13 +190,13 @@ class PerformanceFileComparison(comparetest.FileComparison):
                 return 0
         longEnough = self.newPerformance > float(self.test.app.getConfigValue("minimum_" + configDescriptor + "_for_test"))
         varianceEnough = self.percentageChange > float(self.test.app.getConfigValue(configDescriptor + "_variation_%"))
-        return longEnough and varianceEnough and not self.hasExternalExcuse()
-    def hasExternalExcuse(self):
+        return longEnough and varianceEnough and not self.hasExternalExcuse(configDescriptor)
+    def hasExternalExcuse(self, configDescriptor):
         if self.getType() != "slower":
             return 0
         for line in open(self.tmpCmpFile).xreadlines():
             if line.find("SLOWING DOWN") != -1:
-                return 1
+                return self.percentageChange <= float(self.test.app.getConfigValue(configDescriptor + "_slowdown_variation_%"))
         return 0
     def calculatePercentageIncrease(self):
         largest = max(self.oldPerformance, self.newPerformance)

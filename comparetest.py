@@ -93,8 +93,11 @@ class TestComparison(plugins.TestState):
         return len(self.changedResults) > 0
     def needsRecalculation(self):
         for comparison in self.allResults:
+            self.diag.info(comparison.stem + " dates " + comparison.modifiedDates())
             if comparison.needsRecalculation():
+                self.diag.info("Recalculation needed for file " + comparison.stem)
                 return 1
+        self.diag.info("All file comparisons up to date")
         return 0
     def getMostSevereFileComparison(self):
         worstSeverity = None
@@ -300,6 +303,14 @@ class FileComparison:
     def checkExternalExcuses(self, app):
         # No excuses here...
         return 0
+    def modifiedDates(self):
+        files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
+        return string.join(map(self.modifiedDate, files), " : ")
+    def modifiedDate(self, file):
+        if not os.path.isfile(file):
+            return "---"
+        modTime = plugins.modifiedTime(file)
+        return time.strftime("%d%b%H:%M:%S", time.localtime(modTime))
     def needsRecalculation(self):
         # A test that has been saved doesn't need recalculating
         if self.tmpCmpFile == self.stdCmpFile or self.stdCmpFile == self.stdFile:

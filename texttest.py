@@ -410,7 +410,7 @@ class TestCase(Test):
         fullWriteDir = writeDir
         if subDir:
             fullWriteDir = os.path.join(writeDir, subDir)
-        self.createDirs(fullWriteDir)
+        self.createDirs(fullWriteDir)    
         return writeDir
     def createDirs(self, fullWriteDir):
         os.makedirs(fullWriteDir)    
@@ -420,7 +420,10 @@ class TestCase(Test):
     def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
         nameBase = self.getNameBaseToUse(rootDir, basicDir + ".")
         self.app.tryCleanPreviousWriteDirs(rootDir, nameBase)
-        writeDir = self.createDir(rootDir, nameBase, subDir)
+        try:
+            writeDir = self.createDir(rootDir, nameBase, subDir)
+        except OSError:
+            return self.makeWriteDirectory(rootDir, basicDir, subDir)
         newBasic = os.path.basename(writeDir)
         debugLog.info("Replacing " + basicDir + " with " + newBasic)
         self.options = self.options.replace(basicDir, newBasic)

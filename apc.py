@@ -840,7 +840,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
         xVals.append(solutionPrev[optimization.timeEntryName])
         yVals.append(solutionPrev[optimization.costEntryName])
         self.plot(xVals, yVals, options, linewidth = linewidth)
-    def fillRuns(self, optRunMin, optRunMax, axes, options):
+    def fillRuns(self, optRunMin, optRunMax, axes, options, color = '#dddddd'):
         xVals = []
         yVals = []
         solutionPrev = optRunMin.solutions[0]
@@ -861,7 +861,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
             xVals.append(solutionPrev[optimization.timeEntryName])
             yVals.append(solution[optimization.costEntryName])
             solutionPrev = solution
-        axes.fill(xVals, yVals, '#dddddd' , linewidth = 0.5, edgecolor = options)
+        axes.fill(xVals, yVals, color , linewidth = 0, edgecolor = options)
     def plotKPILimits(self, worstCost, currTTWC, refTTWC):
         self.plot([0,1.1*max(currTTWC,refTTWC)],[worstCost, worstCost],"r")
         self.plot([currTTWC,currTTWC], [worstCost*1.01,worstCost*0.99],"r")
@@ -885,10 +885,16 @@ class MakeProgressReportGraphical(MakeProgressReport):
         # Plot the average curves on the left axes.
         ax = self.axes([0.1, up ,width, height], axisbg = axesBG)
         ax.yaxis.set_major_formatter(majorFormatter)
+        self.plotRun(referenceRun, "b", 1.5)
+        self.plotRun(currentRun, "g", 1.5)
         if minMaxRuns:
             referenceMinRun, referenceMaxRun, currentMinRun, currentMaxRun = minMaxRuns
-            self.fillRuns(referenceMinRun, referenceMaxRun, ax, "b")
+            self.fillRuns(referenceMinRun, referenceMaxRun, ax, "b", '#cccccc')
             self.fillRuns(currentMinRun, currentMaxRun, ax, "g")
+            self.plotRun(referenceMinRun ,"b--", 1)
+            self.plotRun(referenceMaxRun ,"b--", 1)
+            self.plotRun(currentMinRun ,"g--", 1)
+            self.plotRun(currentMaxRun ,"g--", 1)
         self.plotRun(referenceRun, "b", 1.5)
         self.plotRun(currentRun, "g", 1.5)
         self.plotPost(ax, lowestCostInGroup, worstCost, currTTWC, refTTWC)

@@ -828,7 +828,7 @@ class Application:
         absroot = plugins.abspath(root)
         if not os.path.isdir(absroot):
             os.makedirs(absroot)
-        localName = self.getTmpIdentifier()
+        localName = self.getTmpIdentifier().replace(":", "")
         if inputOptions.useStaticGUI():
             localName = "static_gui." + localName
         return os.path.join(absroot, localName)
@@ -1610,10 +1610,7 @@ class TextTest:
         return appList
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names
-        if os.environ.has_key("USER"):
-            return "%d%b%H:%M:%S"
-        else:
-            return "%H%M%S"
+        return "%d%b%H:%M:%S"
     def createActionRunner(self):
         actionRunner = ActionRunner()
         uniqueNameFinder = UniqueNameFinder()

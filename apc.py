@@ -151,8 +151,10 @@ class MakeProgressReport(optimization.MakeProgressReport):
     def __init__(self, referenceVersion):
         optimization.MakeProgressReport.__init__(self, referenceVersion)
     def compare(self, test, referenceFile, currentFile):
-        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile)
-        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile)
+
+        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile," TOTAL cost")
+        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile," TOTAL cost")
+
         currPerf = int(performance.getTestPerformance(test))
         refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
         currTTWC = currPerf
@@ -331,8 +333,8 @@ def convertTime(timeEntry):
     timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip())
     return float(timeInSeconds) / 60.0
 
-def getSolutionStatistics(currentFile):
-    grepCommand = "grep -E 'memory|TOTAL|cpu time' " + currentFile
+def getSolutionStatistics(currentFile,statistics):
+    grepCommand = "grep -E 'memory|" + statistics + "|cpu time' " + currentFile
     grepLines = os.popen(grepCommand).readlines()
     costs = []
     times = []
@@ -347,15 +349,18 @@ def getSolutionStatistics(currentFile):
                     maxMemory = mem
         if line.startswith("Total time"):
             lastTime = convertTime(line.split()[-1])
-        if line.startswith(" TOTAL cost"):
+        if line.startswith(statistics):
             costs.append(int(line.split()[-1]))
             times.append(lastTime)
     return maxMemory, costs, times
 
 class PlotApcTest(plugins.Action):
-    def __init__(self):
+    def __init__(self, args = ["0:"]):
         self.plotFiles = []
         self.statusFileName = None
+        self.plotItem = " " + "TOTAL cost"
+        if args[0]:
+            self.plotrange = args[0]
     def __repr__(self):
         return "Plotting"
     def __del__(self):
@@ -364,24 +369,48 @@ class PlotApcTest(plugins.Action):
             fileList = []
             style = " with linespoints"
             for file in self.plotFiles:
-                title = " title \"" + file.split(os.sep)[-2] + "\" "
+                title = " title \"" + file.split(os.sep)[-2] + "_" + self.plotItem.strip().replace(" ","_") + "\" "
                 fileList.append("'" + file + "' " + title + style)
-            print "plot " + string.join(fileList, ",") + os.linesep
+#            print "plot " + string.join(fileList, ",") + os.linesep
             stdin.write("plot " + string.join(fileList, ",") + os.linesep)
+            stdin.write("set xrange [" + self.plotrange +"]; rep" + os.linesep)
             stdin.write("quit" + os.linesep)
     def __call__(self, test):
-        currentFile = test.makeFileName(self.statusFileName)
-        maxMem, costs, times = getSolutionStatistics(currentFile)
+        currentFile = self.findTemporaryStatusFile(test)
+        if currentFile:
+            print "Using status file in temporary subplan directory for plotting test " + test.name
+        else:
+            currentFile = test.makeFileName(self.statusFileName)
+            if not os.path.isfile(currentFile):
+                print "No status file does exist for test " + test.name
+                return
+        maxMem, costs, times = getSolutionStatistics(currentFile,self.plotItem)
         plotFileName = test.makeFileName("plot")
         plotFile = open(plotFileName,"w")
         for il in range(len(costs)):
             plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
+            #plotFile.write(str(costs[il]) + os.linesep)
         self.plotFiles.append(plotFileName)
     def setUpSuite(self, suite):
         pass
     def setUpApplication(self, app):
         self.statusFileName = app.getConfigValue("log_file")
-
-
-        
-            
+    def findTemporaryStatusFile(self,test):
+        foundoutputfile = 0
+        for file in os.listdir(test.abspath):
+            if file.startswith("output") and file.find(test.getTestUser()) != -1:
+                foundoutputfile = 1
+                break
+        if not foundoutputfile:
+            return
+        grepCommand = "grep -E 'SUBPLAN' " + file
+        grepLines = os.popen(grepCommand).readlines()
+        if len(grepLines) > 0:
+            currentFile = grepLines[0].split()[1] + os.sep + "status"
+            if not os.path.isfile(currentFile):
+                return
+            else:
+                return currentFile
+        else:
+            print "Could not find subplan name in output file " + file + os.linesep
+            return    

@@ -94,6 +94,31 @@ class UserFilter(default.TextFilter):
         else:
             return 1
 
+class RulesetJobBuildNameCreator:
+    namesCreated = {}
+    def __init__(self, getRuleSetName):
+        self.diag = plugins.getDiagnostics("Rule job names")
+        self.getRuleSetName = getRuleSetName
+        self.testRuleNames = {}
+    def getName(self, test):
+        if self.testRuleNames.has_key(test):
+            return self.testRuleNames[test]
+        basicName = getRaveName(test) + "." + self.getUserParentName(test) + "." + self.getRuleSetName(test)
+        if self.namesCreated.has_key(basicName):
+            carmtmp = self.namesCreated[basicName]
+            if carmtmp == os.environ["CARMTMP"]:
+                return basicName
+            else:
+                basicName += "." + test.app.getFullVersion()
+        self.namesCreated[basicName] = os.environ["CARMTMP"]
+        self.diag.info(repr(self.namesCreated))
+        self.testRuleNames[test] = basicName
+        return basicName
+    def getUserParentName(self, test):
+        if isUserSuite(test.parent):
+            return test.parent.name
+        return self.getUserParentName(test.parent)
+
 class CarmenConfig(lsf.LSFConfig):
     def __init__(self, optionMap):
         lsf.LSFConfig.__init__(self, optionMap)
@@ -155,15 +180,11 @@ class CarmenConfig(lsf.LSFConfig):
             ruleRunner = lsf.SubmitTest(self.findRaveCompilationLSFQueue, self.findLSFResource)
         else:
             ruleRunner = default.RunTest()
-        return [ self.getRuleBuildObject(ruleRunner), UpdateRulesetBuildStatus(self.getRuleSetName, self.getRulesetBuildJobName) ]
-    def getUserParentName(self, test):
-        if isUserSuite(test.parent):
-            return test.parent.name
-        return self.getUserParentName(test.parent)
-    def getRulesetBuildJobName(self, test):
-        return getRaveName(test) + "." + self.getUserParentName(test) + "." + self.getRuleSetName(test)
-    def getRuleBuildObject(self, ruleRunner):
-        return CompileRules(self.getRuleSetName, self.getRulesetBuildJobName, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
+        jobNameCreator = RulesetJobBuildNameCreator(self.getRuleSetName)
+        return [ self.getRuleBuildObject(ruleRunner, jobNameCreator), \
+                 UpdateRulesetBuildStatus(self.getRuleSetName, jobNameCreator) ]
+    def getRuleBuildObject(self, ruleRunner, jobNameCreator):
+        return CompileRules(self.getRuleSetName, jobNameCreator, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
     def buildRules(self):
         if self.optionMap.has_key("skip") or self.isReconnecting():
             return 0
@@ -339,10 +360,10 @@ class CleanupRules(plugins.Action):
 
 class CompileRules(plugins.Action):
     rulesCompiled = []
-    def __init__(self, getRuleSetName, getRulesetBuildJobName, modeString = "-optimize", filter = None, ruleRunner = None):
+    def __init__(self, getRuleSetName, jobNameCreator, modeString = "-optimize", filter = None, ruleRunner = None):
         self.raveName = None
         self.getRuleSetName = getRuleSetName
-        self.getRulesetBuildJobName = getRulesetBuildJobName
+        self.jobNameCreator = jobNameCreator
         self.modeString = modeString
         self.filter = filter
         self.ruleRunner = ruleRunner
@@ -359,7 +380,7 @@ class CompileRules(plugins.Action):
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
         if not ruleset.isValid():
             return
-        jobName = self.getRulesetBuildJobName(test)
+        jobName = self.jobNameCreator.getName(test)
         if jobName in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name + " already being compiled")
             test.changeState(test.NEED_PREPROCESS, "Compiling ruleset " + ruleset.name)
@@ -398,7 +419,7 @@ class CompileRules(plugins.Action):
         self.diag.info("Compiling with command '" + commandLine + "'")
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
         test.changeState(test.NEED_PREPROCESS, "Compiling ruleset " + self.getRuleSetName(test))
-        return self.ruleRunner.runCommand(test, fullCommand, self.getRulesetBuildJobName)
+        return self.ruleRunner.runCommand(test, fullCommand, self.jobNameCreator.getName)
     def setUpSuite(self, suite):
         if self.filter and not self.filter.acceptsTestSuite(suite):
             self.raveName = None
@@ -414,8 +435,8 @@ class CompileRules(plugins.Action):
 
 class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
     ruleCompilations = []
-    def __init__(self, getRuleSetName, jobNameFunction):
-        lsf.UpdateLSFStatus.__init__(self, jobNameFunction)
+    def __init__(self, getRuleSetName, jobNameCreator):
+        lsf.UpdateLSFStatus.__init__(self, jobNameCreator.getName)
         self.getRuleSetName = getRuleSetName
     def __call__(self, test):
         # Don't do anything unless we've been put in NEED_PREPROCESS state

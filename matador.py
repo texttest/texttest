@@ -1,4 +1,4 @@
-import carmen, os, shutil, getopt, optimization
+import carmen, os, shutil, getopt, optimization, string
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
@@ -9,6 +9,11 @@ class MatadorConfig(optimization.OptimizationConfig):
     def getSubPlanFileName(self, test, sourceName):
         return os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", self.subPlanName(test), "APC_FILES", sourceName)
     def subPlanName(self,test):
+        if len(test.options):
+            return self.optionsSubPlanName(test)
+        else:
+            return self.inputSubPlanName(test)
+    def optionsSubPlanName(self, test):
         try:
             opts, args = getopt.getopt(test.options.split(), "s:r:")
         except getopt.GetoptError:
@@ -17,6 +22,11 @@ class MatadorConfig(optimization.OptimizationConfig):
         for o, a in opts:
             if o == "-s":
                 return a
+    def inputSubPlanName(self, test):
+        for line in open(test.inputFile).xreadlines():
+            entries = line.split()
+            if entries[0] == "loadsp":
+                return string.join(entries[1:], os.sep)
     def getRuleSetName(self, test):
         fileName = test.makeFileName("output")
         if os.path.isfile(fileName):

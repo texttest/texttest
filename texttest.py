@@ -483,7 +483,8 @@ class Application:
             self.versions = []
         self.configDir = MultiEntryDictionary()
         self.setConfigDefaults()
-        self.configDir.readValuesFromFile(configFile, name, self.getVersionFileExtensions(baseVersion=0), insert=0)
+        extensions = self.getVersionFileExtensions(baseVersion=0)
+        self.configDir.readValuesFromFile(configFile, name, extensions, insert=0)
         self.fullName = self.getConfigValue("full_name")
         debugLog.info("Found application " + repr(self))
         self.checkout = self.makeCheckout(optionMap)
@@ -494,7 +495,9 @@ class Application:
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
-        self.configDir.readValuesFromFile(configFile, name, self.getVersionFileExtensions(baseVersion=0), insert=0, errorOnUnknown=1)
+        self.configDir.readValuesFromFile(configFile, name, extensions, insert=0, errorOnUnknown=1)
+        personalFile = self.getPersonalConfigFile()
+        self.configDir.readValuesFromFile(personalFile, insert=0, errorOnUnknown=1)
         self.optionGroups = self.createOptionGroups(optionMap)
     def __repr__(self):
         return self.fullName
@@ -503,6 +506,13 @@ class Application:
     def getIndent(self):
         # Useful for printing with tests
         return ""
+    def getPersonalConfigFile(self):
+        if os.environ.has_key("TEXTTEST_PERSONAL_CONFIG"):
+            return os.path.join(os.environ["TEXTTEST_PERSONAL_CONFIG"], ".texttest")
+        elif os.name == "posix":
+            return os.path.join(os.environ["HOME"], ".texttest")
+        else:
+            return os.path.join(self.abspath, ".texttest")
     def setConfigDefaults(self):
         self.setConfigDefault("binary", None)
         self.setConfigDefault("config_module", "default")
@@ -670,7 +680,7 @@ class Application:
         if fileName.endswith("cmp"):
             return 0
         parts = fileName.split(".")
-        if len(parts) == 1:
+        if len(parts) == 1 or len(parts[0]) == 0:
             return 0
         ext = parts[1]
         if ext == self.name or ext in self.getConfigValue("compare_extension"):

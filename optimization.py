@@ -301,7 +301,7 @@ class LogFileFinder:
             return fileInTest
         # Look for output, find appropriate temp subplan, and look there
         outputInTest = self.findTempFileInTest(version, "output")
-        if not outputInTest:
+        if outputInTest == None:
             return None
         grepCommand = "grep -E 'SUBPLAN' " + outputInTest
         grepLines = os.popen(grepCommand).readlines()
@@ -315,6 +315,7 @@ class LogFileFinder:
         for file in os.listdir(self.test.abspath):
             if file.startswith(stem) and file.find(version + self.test.getTestUser()) != -1:
                 return file
+        return None
 
 class OptimizationRun:
     def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0):

@@ -18,6 +18,20 @@ helpScripts = """matador.ImportTest         - Import new test cases and test use
                              'template' for temporary subplandirs as created when the test is run.
                              The action will look for available subplandirectories under
                              CARMUSR and present them to you.
+matador.TimeSummary         - Show a summary of 'useful' time in generation solutions.
+                            The idea is that generation time and optimization time is considered useful and
+                            compared to the total time. Output is like:
+                               52% 14:45 RD_klm_cabin::index_groups_test
+                            First item is how much time in percent was generation and optimization.
+                            Second item is total runtime in hours:minutes of the test
+                            Third item is the name of the test
+
+                            Currently supports these options:
+                             - sd
+                               Display the solution details, ie useful percent for each solution
+                             - v=version
+                               Print result for specific version
+
 """
 
 import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest
@@ -223,4 +237,79 @@ class CopyEnvironment(plugins.Action):
             carmtmp = os.path.join("/carm/user_and_tmp/carmen_9.0_deliver/tmps_for_Matador_9", os.path.basename(os.path.normpath(os.environ["CARMTMP"])))
             print carmtmp
             file.write("CARMTMP:" + carmtmp + os.linesep)
+
+class TimeSummary(plugins.Action):
+    def __init__(self, args = []):
+        self.timeVersions = [ "" ]
+        self.timeStates = [ "" ]
+        self.scaleTime = 0
+        self.useTmpStatus = 0
+        self.suite = ""
+        self.solutionDetail = 0
+        # Must be last in the constructor
+        self.interpretOptions(args)
+    def __repr__(self):
+        return "Timing statistics"
+    def interpretOptions(self, args):
+        for ar in args:
+            arr = ar.split("=")
+            if arr[0]=="v":
+                self.timeVersions = arr[1].split(",")
+            elif arr[0]=="sd":
+                self.solutionDetail = 1
+            else:
+                print "Unknown option " + arr[0]
+    def setUpSuite(self, suite):
+        self.suite = suite.name
+    # Interactive stuff
+    def getTitle(self):
+        return "Time statistics"
+    def getArgumentOptions(self):
+        options = {}
+        options["v"] = "Versions to plot"
+        return options
+    def getSwitches(self):
+        switches = {}
+        switches["sd"] = "Solution detail(%)"
+        return switches
+    def __call__(self, test):
+        totTime = optimization.timeEntryName
+        genTime = "Generation time"
+        optTime = "Optimization time"
+        entries = [ genTime, optTime ]
+        for version in self.timeVersions:
+            try:
+                optRun = optimization.OptimizationRun(test, version, [ totTime ], entries, self.scaleTime, self.useTmpStatus, self.timeStates[0])
+            except plugins.TextTestError:
+                print "No status file does exist for test " + test.app.name + "::" + test.name + "(" + version + ")"
+                continue
+            sumTot = 0
+            sumGen = 0
+            sumOpt = 0
+            lastTotTime = 0;
+            usePercent = []
+            hasTimes = 0
+            for solution in optRun.solutions:
+                if solution.has_key(genTime) and solution.has_key(optTime):
+                    hasTimes = 1
+                    totalTime = int(solution[totTime] * 60) - lastTotTime
+                    if totalTime > 0:
+                        sumGen += solution[genTime]
+                        sumOpt += solution[optTime]
+                        sumTot += totalTime
+                        useFul = solution[genTime] + solution[optTime]
+                        usePercent.append(str(int(100.0* useFul / totalTime)))
+                    else:
+                        usePercent.append("--")
+                lastTotTime = int(solution[totTime] * 60)
+            if sumTot > 0:
+                sumUse = int(100.0 * (sumGen + sumOpt) / sumTot)
+            else:
+                sumUse = 100
+            hrs = sumTot / 3600
+            mins = (sumTot - hrs * 3600) / 60
+            if sumTot > 60 and hasTimes:
+                print str(sumUse)+"%", str(hrs) + ":" + str(mins), self.suite + "::" + test.name
+                if self.solutionDetail:
+                    print "   ", string.join(usePercent," ")
 

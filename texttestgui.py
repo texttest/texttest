@@ -761,7 +761,9 @@ class TestCaseGUI(RightWindowGUI):
             guilog.info("---------- Text Info Window ----------")
             guilog.info(testInfo)
             guilog.info("--------------------------------------")
-        textbuffer.set_text(testInfo)
+        # Need to convert to utf-8 for display...
+        unicodeInfo = unicode(testInfo, "utf-8", errors="replace")
+        textbuffer.set_text(unicodeInfo.encode("utf-8"))
         textViewWindow.add(textview)
         textview.show()
         textViewWindow.show()

@@ -96,7 +96,7 @@ class Config(plugins.Configuration):
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
-        if self.isReconnecting():
+        if self.isReconnectingFast():
             return None
         else:
             return self._getWriteDirectoryMaker()
@@ -472,10 +472,10 @@ class ReconnectTest(plugins.Action):
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
         writeDir = test.writeDirs[0]
         if not self.canReconnectTo(reconnLocation):
-            os.makedirs(writeDir)
             raise plugins.TextTestError, "No test results found to reconnect to"
 
         if self.fullRecalculate:
+            shutil.rmtree(writeDir)
             shutil.copytree(reconnLocation, writeDir)
         else:
             test.writeDirs[0] = reconnLocation
@@ -537,8 +537,6 @@ class ReconnectTest(plugins.Action):
                 return fullPath
     def setUpSuite(self, suite):
         self.describe(suite)
-        if self.fullRecalculate:
-            os.makedirs(os.path.join(suite.app.writeDirectory, suite.getRelPath()))        
     def hasUserDependentWriteDir(self):
         return os.environ["TEXTTEST_TMP"].find("~") != -1
 

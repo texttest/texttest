@@ -910,8 +910,11 @@ class MakeProgressReportGraphical(MakeProgressReport):
         self.plotLine(ax,kpiData["KPILine"],"r")
         for k,c in [("qualKPILine","k"),("refEndLine","b"),("currEndLine","g")]:
             if kpiData.has_key(k):
-                self.plotLine(ax,kpiData[k],c)
-        self.legend([self.referenceVersion,self.currentVersion])
+                self.plotLine(ax, kpiData[k], c)
+        currVer = self.currentVersion
+        if not self.currentVersion:
+            currVer = "current"
+        self.legend([self.referenceVersion, currVer])
     def plotKPI(self, testCount, currentRun, referenceRun, groupName, userName, kpiData, minMaxRuns):
         if not self.matplotlibPresent:
             return

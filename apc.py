@@ -87,16 +87,12 @@ class ApcConfig(optimization.OptimizationConfig):
         return MakeProgressReport(self.optionValue("prrep"))
     def getLibraryFile(self, test):
         return os.path.join("data", "apc", carmen.getArchitecture(test.app), "libapc.a")
-    def getCompileRules(self, staticFilter):
+    def getRuleBuilder(self):
         if self.isNightJob():
             ruleCompile = 1
         else:
             ruleCompile = self.optionMap.has_key("rulecomp")
-        if self.optionMap.has_key("debug"):
-            modeString = "-debug"
-        else:
-            modeString = "-optimize"
-        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, staticFilter, ruleCompile, modeString)
+        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, self.getRuleBuildFilter(), ruleCompile, self.raveMode())
     def getSpecificTestRunner(self):
         subActions = [ self._getApcTestRunner() ]
         if self.optionMap.has_key("lprof"):

@@ -130,6 +130,8 @@ class CarmenConfig(lsf.LSFConfig):
     def getSwitches(self):
         switches = lsf.LSFConfig.getSwitches(self)
         switches["rulecomp"] = "Build rulesets only"
+        switches["debug"] = "Use debug rulesets"
+        switches["raveexp"] = "Run with RAVE Explorer"
         switches["lprof"] = "Run with LProf profiler"
         return switches
     def getFilterList(self):
@@ -139,21 +141,30 @@ class CarmenConfig(lsf.LSFConfig):
     def getActionSequence(self):
         if self.optionMap.has_key("rulecomp"):
             if self.optionValue("rulecomp") != "clean":
-                return [ self.getWriteDirectoryMaker(), self.getRuleBuilder(0) ]
+                return [ self.getWriteDirectoryMaker(), self.getRuleBuilder() ]
             else:
-                return [ self.getWriteDirectoryMaker(), self.getRuleCleanup(), self.getRuleBuilder(0) ]
+                return [ self.getWriteDirectoryMaker(), self.getRuleCleanup(), self.getRuleBuilder() ]
         else:
             builder = self.getAppBuilder()
             # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
-            return [ builder, self.getWriteDirectoryMaker(), self.getRuleBuilder(1) ] + \
+            return [ builder, self.getWriteDirectoryMaker(), self.getRuleBuilder() ] + \
                    lsf.LSFConfig._getActionSequence(self, makeDirs = 0)
     def getRuleCleanup(self):
         return CleanupRules(self.getRuleSetName)
-    def getRuleBuilder(self, neededOnly):
-        if neededOnly:
-            return plugins.Action()
+    def getRuleBuildFilter(self):
+        return None
+    def getRuleBuilder(self):
+        if self.buildRules():
+            return CompileRules(self.getRuleSetName, self.raveMode(), self.getRuleBuildFilter())
         else:
-            return CompileRules(self.getRuleSetName)
+            return plugins.Action()
+    def buildRules(self):
+        return self.optionMap.has_key("rulecomp")
+    def raveMode(self):
+        if self.optionMap.has_key("debug"):
+            return "-debug"
+        else:
+            return "-optimize"
     def getAppBuilder(self):
         if self.optionMap.has_key("build"):
             return BuildCode(self.optionValue("build"))
@@ -297,6 +308,7 @@ class CompileRules(plugins.Action):
         self.getRuleSetName = getRuleSetName
         self.modeString = modeString
         self.filter = filter
+        self.diag = plugins.getDiagnostics("Compile Rules")
     def __repr__(self):
         return "Compiling rules for"
     def __call__(self, test):
@@ -323,14 +335,19 @@ class CompileRules(plugins.Action):
                 extra = ""
                 if test.app.name == "apc":
                     extra = "-"
-                commandLine = compiler + " " + extra + self.raveName + " " + self.modeString + " -archs " + arch + " " + ruleset.sourceFile
+                commandLine = compiler + " " + extra + self.raveName + " " + self.getModeString() + " -archs " + arch + " " + ruleset.sourceFile
                 errorMessage = self.performCompile(test, commandLine)
                 if errorMessage:
                     self.rulesCompileFailed.append(ruleset.name)
                     print "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
                     raise plugins.TextTestError, "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
-            if self.modeString == "-debug":
+            if self.getModeString() == "-debug":
                 ruleset.moveDebugVersion()
+    def getModeString(self):
+        if os.environ.has_key("TEXTTEST_RAVE_MODE"):
+            return self.modeString + " " + os.environ["TEXTTEST_RAVE_MODE"]
+        else:
+            return self.modeString
     def ensureCarmTmpDirExists(self):
         carmTmp = os.path.normpath(os.environ["CARMTMP"])
         if not os.path.isdir(carmTmp):
@@ -339,12 +356,13 @@ class CompileRules(plugins.Action):
                 return 0
             else:
                 print "CARMTMP", carmTmp, "did not exist, attempting to create it"
-                os.mkdir(os.environ["CARMTMP"])
+                os.makedirs(os.environ["CARMTMP"])
         return 1
     def performCompile(self, test, commandLine):
         compTmp = test.makeFileName("ravecompile", temporary=1)
         # Hack to work around crc_compile bug which fails if ":" in directory
         os.chdir(test.abspath)
+        self.diag.info("Compiling with command '" + commandLine + "'")
         returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
         if returnValue:
             errContents = string.join(open(compTmp).readlines(),"")
@@ -789,5 +807,4 @@ def ensureDirectoryExists(path):
     if len(t) > 0:
         os.mkdir(path)
 
-    
-    
+

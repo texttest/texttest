@@ -17,17 +17,9 @@ class RaveConfig(carmen.CarmenConfig):
     def getSwitches(self):
         switches = carmen.CarmenConfig.getSwitches(self)
         switches["skip"] = "Don't build rulesets"
-        switches["debug"] = "Use debug rulesets"
         return switches
-    def getRuleBuilder(self, neededOnly):
-        if self.optionMap.has_key("skip"):
-            return plugins.Action()
-
-        buildMode = "-optimize"
-        if self.optionMap.has_key("debug"):
-            buildMode = "-debug"
-            
-        return carmen.CompileRules(self.getRuleSetName, buildMode)
+    def buildRules(self):
+        return not self.optionMap.has_key("skip")
     def getSubPlanFileName(self, test, sourceName):
         firstWord = test.options.split()[0]
         subPlan = firstWord[1:-1]

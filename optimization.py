@@ -108,10 +108,6 @@ class OptimizationConfig(carmen.CarmenConfig):
         options["kpiData"] = "Output KPI curve data etc."
         options["kpi"] = "Run Henrik's old KPI"
         return options
-    def getSwitches(self):
-        switches = carmen.CarmenConfig.getSwitches(self)
-        switches["debug"] = "Build debug compiled ruleset"
-        return switches
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
@@ -127,20 +123,13 @@ class OptimizationConfig(carmen.CarmenConfig):
         return carmen.CarmenConfig.getActionSequence(self)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
-    def getRuleBuilder(self, neededOnly):
-        if self.isReconnecting():
-            return plugins.Action()
-        if self.isNightJob() or not neededOnly:
-            return self.getCompileRules(None)
-        else:
-            localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
-            return self.getCompileRules(localFilter)
-    def getCompileRules(self, localFilter):
-        if self.optionMap.has_key("debug"):
-            modeString = "-debug"
-        else:
-            modeString = "-optimize"
-        return carmen.CompileRules(self.getRuleSetName, modeString, localFilter)
+    def buildRules(self):
+        # Always try to build at least some rules, whatever happens
+        return not self.isReconnecting()
+    def getRuleBuildFilter(self):
+        if self.isNightJob() or self.optionMap.has_key("rulecomp"):
+            return None
+        return carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
     def getTestRunner(self):
         return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
     def getSpecificTestRunner(self):

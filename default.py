@@ -70,11 +70,21 @@ class RunTest(plugins.Action):
         stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test))
         if os.path.isfile(test.inputFile):
             stdin.write(open(test.inputFile).read())
-            stdin.close()
+        stdin.close()
         outfile = open(test.getTmpFileName("output", "w"), "w")
         outfile.write(stdout.read())
         errfile = open(test.getTmpFileName("errors", "w"), "w")
         errfile.write(stderr.read())
+        stdout.close()
+        stderr.close()
+        outfile.close()
+        errfile.close()
+        #Added by sandborg 030219
+        #needed to be sure command is finished
+        try:
+            os.wait()
+        except:
+            pass #should not end up here but you never know...
     def getExecuteCommand(self, test):
         return test.getExecuteCommand()
     def setUpSuite(self, suite):

@@ -42,7 +42,7 @@ default.CountTest          - produce a brief report on the number of tests in th
 default.ExtractStandardPerformance     - update the standard performance files from the standard log files
 """
 
-import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, bugzilla
+import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, knownbugs
 from glob import glob
 from cPickle import Unpickler
 
@@ -167,12 +167,7 @@ class Config(plugins.Configuration):
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getFailureExplainer(self):
-        if self.bugzillaInstalled():
-            return bugzilla.CheckForBugs()
-        else:
-            return None
-    def bugzillaInstalled(self):
-        return os.system("which bugcli > /dev/null 2>&1") == 0
+        return knownbugs.CheckForBugs()
     def getTestComparator(self):
         comparetest.MakeComparisons.testComparisonClass = performance.PerformanceTestComparison
         return comparetest.MakeComparisons()
@@ -235,8 +230,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("performance_test_minimum", { "default" : 0 })
         app.setConfigDefault("use_standard_input", 1)
         app.setConfigDefault("collect_standard_output", 1)
-        if self.bugzillaInstalled():
-            app.addConfigEntry("definition_file_stems", "bugzilla")
+        app.addConfigEntry("definition_file_stems", "knownbugs")
         
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):

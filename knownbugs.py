@@ -1,18 +1,26 @@
 #!/usr/bin/env python
 
-import plugins, os
+import plugins, os, string
 from ConfigParser import ConfigParser
 from predict import FailedPrediction
 
 plugins.addCategory("bug", "known bugs", "had known bugs")
 
 class KnownBug(FailedPrediction):
-    def __init__(self, bugNum):
-        self.bugNumber = bugNum
-        fullBugText = os.popen("bugcli -b " + bugNum).read()
-        self.bugStatus = self.findStatus(fullBugText)
-        briefBugText = "bug " + self.bugNumber + " (" + self.bugStatus + ")"
+    def __init__(self, bugDesc):
+        self.bugStatus = "UNREPORTED"
+        fullBugText = bugDesc
+        briefBugText = "unreported bug"
+        if self.isNumber(bugDesc):
+            fullBugText = os.popen("bugcli -b " + bugDesc).read()
+            self.bugStatus = self.findStatus(fullBugText)
+            briefBugText = "bug " + bugDesc + " (" + self.bugStatus + ")"
         FailedPrediction.__init__(self, self.findCategory(), briefText=briefBugText, freeText=fullBugText, completed = 1)
+    def isNumber(self, desc):
+        for letter in desc:
+            if not letter in string.digits:
+                return 0
+        return 1
     def findStatus(self, description):
         for line in description.split(os.linesep):
             words = line.split()
@@ -20,6 +28,7 @@ class KnownBug(FailedPrediction):
                 continue
             if words[2].startswith("Status"):
                 return words[3]
+        return "UNKNOWN"
     def findCategory(self):
         if self.bugStatus == "RESOLVED" or self.bugStatus == "CLOSED":
             return "badPredict"
@@ -48,15 +57,15 @@ class CheckForBugs(plugins.Action):
             fileName = test.makeFileName(stem, temporary=1)
             if os.path.isfile(fileName):
                 for line in open(fileName).xreadlines():
-                    for trigger, bugNum in entryDict.items():
+                    for trigger, bugDesc in entryDict.items():
                         if trigger.matches(line):
-                            test.state.setFailedPrediction(KnownBug(bugNum))
+                            test.state.setFailedPrediction(KnownBug(bugDesc))
                             # Tell the GUI
                             test.notifyChanged()
         self.unreadBugs(test)
     def readBugs(self, suite):
         if not self.testBugParserMap.has_key(suite):
-            bugFile = suite.makeFileName("bugzilla")
+            bugFile = suite.makeFileName("knownbugs")
             if os.path.isfile(bugFile):
                 self.diag.info("Reading bugs from file " + bugFile)
                 parser = ConfigParser()

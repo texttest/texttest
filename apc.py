@@ -15,7 +15,10 @@ class ApcConfig(optimization.OptimizationConfig):
         return self.subplanManager.getSubPlanFileName(test, sourceName)
     def getCompileRules(self, staticFilter):
         libFile = self.getLibraryFile()
-        ruleCompile = self.optionMap.has_key("rulecomp")
+        if self.isNightJob():
+            ruleCompile = 1
+        else:
+            ruleCompile = self.optionMap.has_key("rulecomp")
         return ApcCompileRules(self.getRuleSetName, libFile, staticFilter, ruleCompile)
     def getTestCollator(self):
         subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]

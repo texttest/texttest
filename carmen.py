@@ -76,7 +76,7 @@ def getConfig(optionMap):
 def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
-architectures = [ "i386_linux", "sparc", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris" ]
+architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris" ]
 def getArchitecture(app):
     for version in app.versions:
         if version in architectures:
@@ -177,7 +177,12 @@ class CarmenConfig(lsf.LSFConfig):
             return lsf.LSFConfig.findLSFQueue(self, test)
 
         arch = getArchitecture(test.app)
-        return self.getQueuePerformancePrefix(test, arch) + arch + self.getQueuePlatformSuffix(test.app, arch)
+        return self.getQueuePerformancePrefix(test, arch) + self.getArchQueueName(arch) + self.getQueuePlatformSuffix(test.app, arch)
+    def getArchQueueName(self, arch):
+        if arch == "sparc_64":
+            return "sparc"
+        else:
+            return arch
     def getQueuePerformancePrefix(self, test, arch):
         cpuTime = performance.getTestPerformance(test)
         usePrefix = ""
@@ -199,7 +204,7 @@ class CarmenConfig(lsf.LSFConfig):
     def getQueuePlatformSuffix(self, app, arch):
         if arch == "i386_linux":
             return "_RHEL"
-        elif arch == "sparc":
+        elif arch == "sparc" or arch == "sparc_64":
             return "_sol8"
         elif arch == "powerpc":
             if "9" in app.versions:

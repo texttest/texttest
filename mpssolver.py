@@ -76,6 +76,7 @@ class MpsSolverConfig(carmen.CarmenConfig):
         ldPath2 = os.path.join(os.environ["CARMSYS"], "lib", archName)
         ldEnv = self.getLibPathEnvName(archName)
         binary = "env " + ldEnv + "=" + "${" + ldEnv + "}:" + ldPath1 + ":" + ldPath2 + " " + binary
+        print binary
         mpsFiles = "";
         if os.environ.has_key("MPSDATA_PROBLEMS"):
             mpsFilePath = os.environ["MPSDATA_PROBLEMS"]

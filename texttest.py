@@ -347,9 +347,9 @@ class TestSuite(Test):
                     testCaseList.append(testSuite)
             else:
                 testCase = TestCase(testName, testPath, self.app)
-                testCase.tearDownEnvironment()
                 if testCase.isValid() and testCase.isAcceptedByAll(filters):
                     testCaseList.append(testCase)
+                testCase.tearDownEnvironment()
         return testCaseList
     def alreadyContains(self, testCaseList, testName):
         for test in testCaseList:
@@ -616,7 +616,7 @@ class OptionFinder:
             pathname = os.path.join(dirName, f)
             if os.path.isfile(pathname):
                 components = string.split(f, '.')
-                if len(components) > 2 or components[0] != "config":
+                if len(components) != 2 or components[0] != "config":
                     continue
                 appName = components[1]
                 if len(selectedAppList) and not appName in selectedAppList:

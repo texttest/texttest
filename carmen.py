@@ -281,6 +281,7 @@ class CompileRules(plugins.Action):
                 if test.app.name == "apc":
                     extra = "-"
                 commandLine = compiler + " " + extra + self.raveName + " " + self.modeString + " -archs " + arch + " " + ruleset.sourceFile
+                print commandLine
                 errorMessage = self.performCompile(test, commandLine)
                 if errorMessage:
                     self.rulesCompileFailed.append(ruleset.name)

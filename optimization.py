@@ -953,7 +953,7 @@ class ViewLog(plugins.Action):
         logFileName = test.app.getConfigValue("log_file")
         return test.makeFileName(logFileName, temporary=1)
     def showLogFile(self, test, machine, logFileName):
-        command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''"
+        command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'tail -f " + logFileName + "''"
         os.system(command)
     def showRunStatusFile(self, test):
         # Under construction! 

@@ -69,6 +69,7 @@ apc.CVSBranchTests         - This script is useful when two versions of a test s
 
 import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
 from time import sleep
+from ndict import seqdict
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -1109,6 +1110,78 @@ class ApcTestSuiteInformation(optimization.TestSuiteInformation):
         usrContent = "CARMUSR:" + carmUsrDir
         tmpContent = "CARMTMP:${CARMSYS}" + os.sep + self.makeCarmTmpName()
         return usrContent + os.linesep + tmpContent
+
+class ImportTestSuite(optimization.ImportTestSuite):
+    def getCarmtmpDirName(self, carmUsr):
+        return optimization.ImportTestSuite.getCarmtmpDirName(self, carmUsr) + ".apc"
+    
+# Graphical import
+class ImportTestCase(optimization.ImportTestCase):
+    def getSubplanPath(self, suite, subplan):
+        suite.setUpEnvironment(parents=1)
+        subplanPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", subplan, "APC_FILES")
+        suite.tearDownEnvironment(parents=1)
+        return subplanPath
+    def findRuleset(self, suite, subplan):
+        subplanPath = self.getSubplanPath(suite, subplan)
+        return self.getRuleSetName(subplanPath)
+    # copied from TestCaseInformation...
+    def getRuleSetName(self, absSubPlanDir):
+        problemPath = os.path.join(absSubPlanDir,"problems")
+        if not unixConfig.isCompressed(problemPath):
+            problemLines = open(problemPath).xreadlines()
+        else:
+            tmpName = os.tmpnam()
+            shutil.copyfile(problemPath, tmpName + ".Z")
+            os.system("uncompress " + tmpName + ".Z")
+            problemLines = open(tmpName).xreadlines()
+            os.remove(tmpName)
+        for line in problemLines:
+            if line[0:4] == "153;":
+                return line.split(";")[3]
+        return ""
+    def writeResultsFiles(self, suite, testDir):
+        subPlanDir = self.getSubplanPath(suite, self.getSubplanName())
+        statusPath = os.path.join(testDir, "status." + suite.app.name)
+        if not os.path.isfile(statusPath):
+            shutil.copyfile(os.path.join(subPlanDir, "status"), statusPath)
+        perf = self.getPerformance(statusPath)
+        perfFile = self.getWriteFile("performance", suite, testDir)
+        perfFile.write("CPU time   :     " + str(int(perf)) + ".0 sec. on tiptonville" + os.linesep)
+        perfFile.close()
+    def getEnvironment(self, suite):
+        env = seqdict()
+        subPlanDir = self.getSubplanPath(suite, self.getSubplanName())
+        spDir, local = os.path.split(subPlanDir)
+        env["SP_ETAB_DIR"] = os.path.join(spDir, "etable")
+        lpDir, local = os.path.split(spDir)
+        env["LP_ETAB_DIR"] = os.path.join(lpDir, "etable")
+        return env        
+    def getPerformance(self, statusPath):
+        if os.path.isfile(statusPath):
+            lastLines = os.popen("tail -10 " + statusPath).xreadlines()
+            for line in lastLines:
+                if line[0:5] == "Time:":
+                    return line.split(":")[1].split("s")[0]
+        # Give some default that will not end it up in the short queue
+        return "2500"
+    def getOptions(self, suite):
+        subplan = self.getSubplanName()
+        ruleset = self.findRuleset(suite, subplan)
+        application = self.getApplication(suite)
+        return self.buildOptions(subplan, ruleset, application)
+    def getApplication(self, suite):
+        application = suite.app.name
+        if application == "cs":
+            return "FANDANGO"
+        else:
+            return "APC"
+    def buildOptions(self, subplan, ruleSet, application):
+        path = os.path.join("$CARMUSR", "LOCAL_PLAN", subplan, "APC_FILES")
+        statusFile = os.path.join(path, "run_status")
+        ruleSetPath = os.path.join("${CARMTMP}", "crc", "rule_set", application, "PUTS_ARCH_HERE")
+        ruleSetFile = os.path.join(ruleSetPath, ruleSet)
+        return path + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
 
 class ImportTest(optimization.ImportTest):
     def getTestCaseInformation(self, suite, name):

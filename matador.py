@@ -223,7 +223,7 @@ class ImportTest(optimization.ImportTest):
             self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
 
 class ImportTestCase(optimization.ImportTestCase):
-    def getOptions(self):
+    def getOptions(self, suite):
         return "-s " + self.getSubplanName()
 
 class ImportTestSuite(optimization.ImportTestSuite):

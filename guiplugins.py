@@ -261,14 +261,32 @@ class ImportTestCase(ImportTest):
         self.addOption(oldOptionGroup, "opt", "Command line options")
     def createTestContents(self, suite, testDir):
         self.writeOptionFile(suite, testDir)
+        self.writeEnvironmentFile(suite, testDir)
+        self.writeResultsFiles(suite, testDir)
+    def getWriteFile(self, name, suite, testDir):
+        return open(os.path.join(testDir, name + "." + suite.app.name), "w")
+    def writeEnvironmentFile(self, suite, testDir):
+        envDir = self.getEnvironment(suite)
+        if len(envDir) == 0:
+            return
+        envFile = self.getWriteFile("environment", suite, testDir)
+        for var, value in envDir.items():
+            guilog.info("Setting test env: " + var + " = " + value)
+            envFile.write(var + ":" + value + os.linesep)
+        envFile.close()
     def writeOptionFile(self, suite, testDir):
-        optionString = self.getOptions()
+        optionString = self.getOptions(suite)
         guilog.info("Using option string : " + optionString)
-        optionFile = open(os.path.join(testDir, "options." + suite.app.name), "w")
+        optionFile = self.getWriteFile("options", suite, testDir)
         optionFile.write(optionString + os.linesep)
         return optionString
-    def getOptions(self):
+    def getOptions(self, suite):
         return self.optionGroup.getOptionValue("opt")
+    def getEnvironment(self, suite):
+        return {}
+    def writeResultsFiles(self, suite, testDir):
+        # Cannot do anything in general
+        pass
 
 class ImportTestSuite(ImportTest):
     def __init__(self, suite, oldOptionGroup):

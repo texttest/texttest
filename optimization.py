@@ -1052,7 +1052,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
         self.optionGroup.addOption("sp", "Subplan name")
     def getSubplanName(self):
         return self.optionGroup.getOptionValue("sp")
-    def getOptions(self):
+    def getOptions(self, suite):
         pass
     # getOptions implemented in subclasses
 
@@ -1062,7 +1062,7 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
         self.optionGroup.addOption("usr", "CARMUSR")
     def getCarmusr(self):
         return os.path.normpath(self.optionGroup.getOptionValue("usr"))
-    def hasStaticLinkage(self):
+    def hasStaticLinkage(self, carmUsr):
         return 1
     def openFile(self, fileName):
         guiplugins.guilog.info("Writing file " + os.path.basename(fileName))
@@ -1070,12 +1070,14 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
     def writeLine(self, file, line):
         file.write(line + os.linesep)
         guiplugins.guilog.info(line)
+    def getCarmtmpDirName(self, carmUsr):
+        return os.path.basename(carmUsr).replace("_user", "_tmp")
     def writeEnvironmentFiles(self, suite, testDir):
         carmUsr = self.getCarmusr()
         envFile = os.path.join(testDir, "environment")
         file = self.openFile(envFile)
         self.writeLine(file, "CARMUSR:" + carmUsr)
-        carmtmp = os.path.basename(carmUsr).replace("_user", "_tmp")
+        carmtmp = self.getCarmtmpDirName(carmUsr)
         if self.hasStaticLinkage(carmUsr):
             self.writeLine(file, "CARMTMP:$CARMSYS/" + carmtmp)
             return

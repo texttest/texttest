@@ -26,7 +26,7 @@ class InteractiveAction(plugins.Action):
     def viewFile(self, fileName, wait = 0, refresh=0):
         viewProgram = self.test.getConfigValue("view_program")
         baseName = os.path.basename(fileName)
-        guilog.info("Viewing file " + baseName + " using '" + viewProgram + "'")
+        guilog.info("Viewing file " + baseName + " using '" + viewProgram + "', refresh set to " + str(refresh))
         exitHandler = None
         if refresh:
             exitHandler = self.test.filesChanged

@@ -177,15 +177,21 @@ class BatchResponder(respond.Responder):
 class MailSender(plugins.Action):
     def __init__(self, sessionName):
         self.sessionName = sessionName
+        self.diag = plugins.getDiagnostics("Mail Sender")
     def getResponders(self, app):
         appResponders = []
         for responder in allBatchResponders:
-           if responder.mainSuite and responder.mainSuite.app.name == app.name and responder.testCount() > 0:
-               appResponders.append(responder)
+            if responder.mainSuite:
+                self.diag.info("Responder for " + responder.mainSuite.app.name + " has " + str(responder.testCount()) + " tests.")
+            else:
+                self.diag.info("Responder with main suite " + str(responder.mainSuite))
+            if responder.mainSuite and responder.mainSuite.app.name == app.name and responder.testCount() > 0:
+                appResponders.append(responder)
         return appResponders
     def setUpApplication(self, app):
         appResponders = self.getResponders(app)
         if len(appResponders) == 0:
+            self.diag.info("No responders for " + repr(app))
             return
         mailTitle = self.getMailTitle(app, appResponders)
         mailFile = self.createMail(mailTitle, app, appResponders)
@@ -208,6 +214,7 @@ class MailSender(plugins.Action):
         toAddress = self.getRecipient(app)
         if self.useCollection(app):
             collFile = os.path.join(app.abspath, "batchreport." + app.name + app.versionSuffix())
+            self.diag.info("Sending mail to", collFile)
             mailFile = open(collFile, "w")
             mailFile.write(toAddress + os.linesep)
             mailFile.write(self.getMachineTitle(app, appResponders) + os.linesep)

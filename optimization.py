@@ -206,7 +206,7 @@ class MakeProgressReport(TestReport):
         currRosterCosts = self.getCosts(currentFile, "roster")
         currTTWC = currPerf
         refTTWC = refPerf
-        if currentCosts[-1] < referenceCosts[-1]:
+        if abs(currentCosts[-1]) < abs(referenceCosts[-1]):
             currTTWC = self.timeToCost(currentFile, currPerf, currentCosts, referenceCosts[-1])
         else:
             refTTWC = self.timeToCost(referenceFile, refPerf, referenceCosts, currentCosts[-1])
@@ -235,7 +235,7 @@ class MakeProgressReport(TestReport):
         times = map(self.convertTime, os.popen(timeCommand).readlines())
         times.insert(0, 0.0)
         for index in range(len(costs)):
-            if costs[index] < targetCost:
+            if abs(costs[index]) < abs(targetCost):
                 costGap = costs[index - 1] - costs[index]
                 percent = float(costs[index -1] - targetCost) / costGap
                 performance = times[index - 1] + (times[index] - times[index - 1]) * percent

@@ -38,8 +38,6 @@ class Action:
         pass
     def getFilter(self):
         return None
-    def processUnRunnable(self, test):
-        pass
     def getCleanUpAction(self):
         return None
     # Return a list of atomic instructions of action, test pairs that can be applied
@@ -80,9 +78,6 @@ class CompositeAction(Action):
     def setUpApplication(self, app):
         for subAction in self.subActions:
             subAction.setUpApplication(app)
-    def processUnRunnable(self, test):
-        for subAction in self.subActions:
-            subAction.processUnRunnable(test)
     def getInstructions(self, test):
         instructions = []
         for subAction in self.subActions:

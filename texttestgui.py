@@ -3,7 +3,7 @@
 # GUI for TextTest written with PyGTK
 
 import plugins, gtk, gobject, os, string, time, sys
-from threading import Thread
+from threading import Thread, currentThread
 from gtkscript import eventHandler
 from Queue import Queue, Empty
 
@@ -123,14 +123,16 @@ class TextTestGUI:
                 self.actionThread.join()
                 return gtk.FALSE
             if test:
-                self.redrawTest(test)
-                if self.testCaseGUI and self.testCaseGUI.test == test:
-                    self.recreateTestView(test)
+                self.testChanged(test)
             return gtk.TRUE
         except Empty:
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
             return gtk.TRUE
+    def testChanged(self, test):
+        self.redrawTest(test)
+        if self.testCaseGUI and self.testCaseGUI.test == test:
+            self.recreateTestView(test)
     def runActionThread(self):
         while len(self.instructions):
             for test, action in self.instructions:
@@ -150,7 +152,10 @@ class TextTestGUI:
                 self.postponedTests.append(test)
                 self.postponedInstructions.append((test, action))
     def notifyChange(self, test):
-        self.workQueue.put(test)
+        if currentThread() == self.actionThread:
+            self.workQueue.put(test)
+        else:
+            self.testChanged(test)
     def redrawTest(self, test):
         iter = self.itermap[test]
         self.model.set_value(iter, 1, self.getTestColour(test))

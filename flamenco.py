@@ -102,32 +102,53 @@ class MakeResultFiles(plugins.Action):
 	    if file.find(".") != -1:
 		stem, ext = file.split(".", 1)
 	    if stem.endswith("log") or stem.endswith("Output"):
-		if stem not in reqList:
+		# candidate: require if it is NOT a result file (produced by run)
+		# or if ext == app
+		isReq = 0
+		if stem.startswith("resultfile_"):
+		    #is a resultfile, use only if it is from my application
+		    if ext == test.app.name:
+			isReq = 1
+			ext, stem = stem.split("_",1)
+		else:
+		    #not a resultfile, this was produced by the program
+		    isReq = 1
+		if isReq == 1 and stem not in reqList:
 		    debugLog.info( "requireFile " + stem)
 		    reqList.append(stem) #is a required file
 	for stem in reqList:
 	    self.collectFile(test,stem)
     def collectFile(self,test,stem):
-	temp = test.getTmpFileName(stem, "r")
-	if os.path.isfile(temp):#was produced by program directly, need to cleanup
+	#test if the program has produced a file with run-dependent extension
+	search = test.getTmpFileName(stem, "r")
+	temp = test.getTmpFileName("resultfile_" + stem, "w")#this deletes old tempfiles
+	if os.path.isfile(search):
+	    # program has written the run-dependent file
+	    # to make it a result-file we just prefix it as "resultfile_"
 	    debugLog.info( "collectFile(" + stem + ") exists: " + temp)
-	    #ttemp = test.getTmpFileName(stem + "_clean", "w")
-	    #os.rename(temp, ttemp)
-	    #temp = test.getTmpFileName(stem, "w")#this deletes old such files
-	    #os.rename(ttemp, temp)
+	    os.rename(search,temp)
 	    return
-	else: #was not created, check if a file for collection exists
-	    temp = test.getTmpFileName(stem, "w")#this deletes old tempfiles
-	    bla, tmpExt = test.getTmpFileName("bla", "r").split(".", 1)
+	else: 
+            #check if the program has produced some run-independent output...
+	    bla, tmpExt = search.split(".", 1)
 	    for file in os.listdir(test.abspath):
-		if file.startswith(stem + ".") and file.find(tmpExt) != -1:
-		    debugLog.info( "collectFile(" + stem + "," + file + ") as " + temp)
-		    os.rename(file, temp)#this is a run-dependent file, use it
-		    return
-		if file.startswith(stem + ".") and file.find("." + test.app.name) == -1:
-		    debugLog.info( "collectFile(" + stem + "," + file + ") as " + temp)
-		    os.rename(file, temp)#this is a test-independent file, use it
-		    return
+		if file.startswith(stem + "."):
+		    #candidate: this file has the right filename, lets check the extension
+		    if file.find(tmpExt) != -1:
+			# file contains the run-dependent extension in its name
+			# it is written by the run for sure
+			debugLog.info( "collectFile(" + stem + "," + file + ") as " + temp)
+			os.rename(file, temp)#this is a run-dependent file, use it
+			return
+		    else :
+			# the file dosent contain the run-extension,
+			# it might be ok, if it wasnt produced by another run...
+			if file.find("." + test.getTestUser()) == -1:
+			    debugLog.info( "collectFile(" + stem + "," + file + ") as " + temp)
+			    os.rename(file, temp)
+			    return
+	    #no file matched the filename and had an accepted extension
+	    #create a dummy-file that reports the missing of the result
 	    debugLog.info( "requireFile(" + stem + ") create dummy " + temp)
 	    file = open(temp, "w")
 	    file.write("NOT FOUND" + os.linesep)

@@ -63,7 +63,10 @@ class BatchFilter(plugins.Filter):
 class BatchCategory(plugins.Filter):
     def __init__(self, state):
         self.name = state.category
-        self.briefDescription, self.longDescription = state.categoryDescriptions[self.name]
+        if state.categoryDescriptions.has_key(self.name):
+            self.briefDescription, self.longDescription = state.categoryDescriptions[self.name]
+        else:
+            self.briefDescription, self.longDescription = self.name, self.name
         self.allTests = []
         self.testLines = {}
     def addTest(self, test):
@@ -120,8 +123,19 @@ class BatchResponder(respond.Responder):
         self.successCategories = []
         self.mainSuite = None
         allBatchResponders.append(self)
+    def writeState(self, test):
+        state = test.state
+        stateFileName = test.makeFileName("teststate", temporary=1, forComparison=0)
+        # Ensure directory exists, it may not
+        dir, local = os.path.split(stateFileName)
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
+        stateFile = open(stateFileName, "w")
+        stateFile.write(state.category + ":" + state.briefText + os.linesep)
+        stateFile.write(state.freeText)
     def handleAll(self, test):
         category = test.state.category
+        self.writeState(test)
         if not self.categories.has_key(category):
             batchCategory = BatchCategory(test.state)
             if not test.state.hasResults():

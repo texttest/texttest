@@ -419,7 +419,11 @@ class CountTest(plugins.Action):
         self.describe(suite)
     def setUpApplication(self, app):
         self.appCount[repr(app)] = 0
-        
+
+class Reconnected(plugins.TestState):
+    def hasResults(self):
+        return 1
+
 class ReconnectTest(plugins.Action):
     def __init__(self, fetchUser, discardFilterFiles):
         self.fetchUser = fetchUser
@@ -437,15 +441,23 @@ class ReconnectTest(plugins.Action):
         
         print "Reconnecting to test", test.name
         shutil.copytree(reconnLocation, writeDir)
-        if self.discardFilterFiles:
-            self.clearFrameworkTmp(writeDir)
-    def clearFrameworkTmp(self, writeDir):
-        # Clear the framework temporary directory, as configuration may be different now
         frameworkTmpDir = os.path.join(writeDir, "framework_tmp")
+        stateFile = os.path.join(frameworkTmpDir, "teststate")
+        if os.path.isfile(stateFile):
+            self.interpretTestState(test, stateFile)
+        if self.discardFilterFiles:
+            self.clearFrameworkTmp(frameworkTmpDir)
+    def clearFrameworkTmp(self, frameworkTmpDir):
+        # Clear the framework temporary directory, as configuration may be different now
         for file in os.listdir(frameworkTmpDir):
             fullPath = os.path.join(frameworkTmpDir, file)
             if os.path.isfile(fullPath):
                 os.remove(fullPath)
+    def interpretTestState(self, test, stateFile):
+        file = open(stateFile)
+        category, briefText = file.readline().strip().split(":")
+        freeText = file.read()
+        test.changeState(Reconnected(category, freeText, briefText, completed=1))
     def canReconnectTo(self, dir):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0

@@ -59,7 +59,7 @@ class TestComparison(plugins.TestState):
         self.newResults = []
         self.correctResults = []
         self.failedPrediction = None
-        if isinstance(previousInfo, FailedPrediction):
+        if isinstance(previousInfo, FailedPrediction) or (previousInfo.isComplete() and not previousInfo.needsRecalculation()):
             self.setFailedPrediction(previousInfo)
         self.diag = plugins.getDiagnostics("TestComparison")
     def __repr__(self):

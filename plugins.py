@@ -80,6 +80,8 @@ class TestState:
     def __str__(self):
         return self.freeText
     def __repr__(self):
+        if not self.categoryDescriptions.has_key(self.category):
+            return self.category + " :"
         briefDescription, longDescription = self.categoryDescriptions[self.category]
         return longDescription + " :"
     def notifyInMainThread(self):

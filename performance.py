@@ -62,18 +62,18 @@ class PerformanceTestComparison(comparetest.TestComparison):
             return "FAILED on " + self.execHost + " :"
         return comparetest.TestComparison.__repr__(self)
     def createFileComparison(self, test, standardFile, tmpFile):
-        stem, ext = standardFile.split(".", 1)
+        stem, ext = os.path.basename(standardFile).split(".", 1)
         if (stem == "performance"):
             return PerformanceFileComparison(test, standardFile, tmpFile)
         else:
             return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile)
-    def shouldCompare(self, file, tmpExt, dirPath):
-        if not comparetest.TestComparison.shouldCompare(self, file, tmpExt, dirPath):
+    def shouldCompare(self, file, dir):
+        if not comparetest.TestComparison.shouldCompare(self, file, dir):
             return 0
         stem, ext = file.split(".",1)
         if stem != "performance":
             return 1
-        tmpFile = os.path.join(dirPath, file)
+        tmpFile = os.path.join(dir, file)
         execHost = getPerformanceHost(tmpFile)
         cmpFlag = 0
         self.execHost = execHost

@@ -20,7 +20,7 @@ class FlamencoConfig(carmen.CarmenConfig):
 	    return prog + " " + test.options
 	rootdir = test.app.abspath
 	script = os.path.join(rootdir ,"RunTest")
-	bla, tmpExt = test.getTmpFileName("bla", "r").split(".", 1)
+	bla, tmpExt = test.makeFileName("bla", temporary=1).split(".", 1)
 	tmpExt = " " + tmpExt + " "
 	debugLog.info("search for script '" + script + "'")
 	if os.path.isfile(script ):
@@ -95,7 +95,7 @@ class MakeResultFiles(plugins.Action):
     def __call__(self, test):
 	self.collectSqlErr
 	reqList = []
-	for file in os.listdir(test.abspath):
+	for file in os.listdir(os.getcwd()):
 	    debugLog.debug( " check file " + file)
 	    stem = file
 	    ext = ""
@@ -120,8 +120,8 @@ class MakeResultFiles(plugins.Action):
 	    self.collectFile(test,stem)
     def collectFile(self,test,stem):
 	#test if the program has produced a file with run-dependent extension
-	search = test.getTmpFileName(stem, "r")
-	temp = test.getTmpFileName("resultfile_" + stem, "w")#this deletes old tempfiles
+	search = test.makeFileName(stem, temporary=1)
+	temp = test.makeFileName("resultfile_" + stem, temporary=1)#this deletes old tempfiles
 	if os.path.isfile(search):
 	    # program has written the run-dependent file
 	    # to make it a result-file we just prefix it as "resultfile_"
@@ -131,7 +131,7 @@ class MakeResultFiles(plugins.Action):
 	else: 
             #check if the program has produced some run-independent output...
 	    bla, tmpExt = search.split(".", 1)
-	    for file in os.listdir(test.abspath):
+            for file in os.listdir(os.getcwd()):
 		if file.startswith(stem + "."):
 		    #candidate: this file has the right filename, lets check the extension
 		    if file.find(tmpExt) != -1:
@@ -153,7 +153,7 @@ class MakeResultFiles(plugins.Action):
 	    file = open(temp, "w")
 	    file.write("NOT FOUND" + os.linesep)
     def collectSqlErr(self):
-	sqlfile = test.getTmpFileName("sqlerr", "w")
+	sqlfile = test.makeFileName("sqlerr", temporary=1)
         if os.path.isfile("sqlnet.log"):
             os.rename("sqlnet.log", sqlfile)
         else:

@@ -49,11 +49,16 @@ class MatadorConfig(optimization.OptimizationConfig):
         if self.optionMap.has_key("diag"):
             del os.environ["DIAGNOSTICS_IN"]
             del os.environ["DIAGNOSTICS_OUT"]
-    def getTestComparator(self):
-        if self.optionMap.has_key("diag"):
-            return CompareTestWithDiagnostics(self.optionMap.has_key("n"))
+    def getSwitches(self):
+        switches = optimization.OptimizationConfig.getSwitches(self)
+        switches["diag"] = "Use Matador Codebase diagnostics"
+        return switches
+    def getTestRunner(self):
+        basicRunner = optimization.OptimizationConfig.getTestRunner(self)
+        if os.environ.has_key("DIAGNOSTICS_IN"):
+            return plugins.CompositeAction([ CopyDiagnostics(), basicRunner ])
         else:
-            return optimization.OptimizationConfig.getTestComparator(self)
+            return basicRunner
     def checkPerformance(self):
         return not self.optionMap.has_key("diag")
     def getLibraryFile(self, test):
@@ -98,23 +103,12 @@ class MatadorConfig(optimization.OptimizationConfig):
         self.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
         self.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]
 
-class MakeMatadorStatusFile(plugins.Action):
+class CopyDiagnostics(plugins.Action):
     def __call__(self, test):
-        scriptPath = os.path.join(os.environ["CARMSYS"], "bin", "makestatusfiles.sh")
-        outputFile = test.getTmpFileName("output", "r")
-        os.system(scriptPath + " . " + outputFile)
-        os.rename("status", test.getTmpFileName("status", "w"))
+        os.mkdir("Diagnostics")
+        shutil.copyfile(test.makeFileName("Diagnostics/diagnostics.etab"), "Diagnostics")
 
-class CompareTestWithDiagnostics(comparetest.MakeComparisons):
-    def __init__(self, newFiles):
-        comparetest.MakeComparisons.__init__(self, newFiles)
-    def fileFinders(self, test):
-        diagFinder = "diag", "Diagnostics"
-        return comparetest.MakeComparisons.fileFinders(self, test) + [ diagFinder ]
-    
 class MatadorTestCaseInformation(optimization.TestCaseInformation):
-    def __init__(self, suite, name):
-        optimization.TestCaseInformation.__init__(self, suite, name)
     def isComplete(self):
         if not os.path.isdir(self.testPath()):
             return 0

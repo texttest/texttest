@@ -14,8 +14,11 @@ def getConfig(optionMap):
     return RaveConfig(optionMap)
 
 class RaveConfig(carmen.CarmenConfig):
-    def getOptionString(self):
-        return "k:" + carmen.CarmenConfig.getOptionString(self)
+    def getSwitches(self):
+        switches = carmen.CarmenConfig.getSwitches(self)
+        switches["skip"] = "Don't build rulesets"
+        switches["debug"] = "Use debug rulesets"
+        return switches
     def getRuleBuilder(self, neededOnly):
         if self.optionMap.has_key("skip"):
             return plugins.Action()

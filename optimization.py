@@ -89,8 +89,11 @@ class OptimizationConfig(carmen.CarmenConfig):
         self.itemNamesInFile = {}
         # Static data for what data to check in CheckOptimizationRun, and what methods to avoid it with
         self.noIncreaseExceptMethods = {}
-    def getOptionString(self):
-        return "k:" + carmen.CarmenConfig.getOptionString(self)
+    def getArgumentOptions(self):
+        options = carmen.CarmenConfig.getArgumentOptions(self)
+        options["prrep"] = "Run KPI progress report"
+        options["kpi"] = "Run Henrik's old KPI"
+        return options
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
 	    listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
@@ -113,6 +116,8 @@ class OptimizationConfig(carmen.CarmenConfig):
             return self.getCompileRules(localFilter)
     def getCompileRules(self, localFilter):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
+    def getTestRunner(self):
+        return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), carmen.CarmenConfig.getTestRunner(self) ])
     def getTestCollator(self):
         solutionCollator = unixConfig.CollateFile("best_solution", "solution")
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])
@@ -130,12 +135,13 @@ class OptimizationConfig(carmen.CarmenConfig):
     def setUpApplication(self, app):
         app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile)
         app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods)
-    def getExecuteCommand(self, binary, test):
-        # Something of a hack to fit things in here: setting up is really a separate action
-        self.makeTemporarySubplan(test)
-        return carmen.CarmenConfig.getExecuteCommand(self, binary, test)
-    def makeTemporarySubplan(self, test):
-        dirName = self._getSubPlanDirName(test)
+
+
+class MakeTmpSubPlan(plugins.Action):
+    def __init__(self, subplanFunction):
+        self.subplanFunction = subplanFunction
+    def __call__(self, test):
+        dirName = self.subplanFunction(test)
         rootDir, baseDir = os.path.split(dirName)
         tmpDir = test.makeWriteDirectory(rootDir, baseDir, "APC_FILES")
         parameterOverrides = test.app.getConfigList("rave_parameter")
@@ -273,14 +279,16 @@ class LogFileFinder:
         else:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
     def findTempFileInTest(self, version, stem):
-        for file in os.listdir(self.test.abspath):
-            versionMod = ""
-            if version:
-                versionMod = "." + version
-            searchString = self.test.app.name + versionMod + self.test.getTestUser()
-            # don't pick up comparison files
-            if file.startswith(stem) and not file.endswith("cmp") and file.find(searchString) != -1:
-                return file
+        versionMod = ""
+        if version:
+            versionMod = "." + version
+        searchString = self.test.app.name + versionMod + self.test.getTestUser()
+        for subDir in os.listdir(self.test.abspath):
+            if os.path.isdir(subDir) and subDir.startswith(searchString):
+                for file in subDir:
+                    # don't pick up comparison files
+                    if file.startswith(stem) and not file.endswith("cmp"):
+                        return file
         return None
 
 class OptimizationRun:

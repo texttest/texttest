@@ -6,8 +6,10 @@ from types import FileType
 class Configuration:
     def __init__(self, optionMap):
         self.optionMap = optionMap
-    def getOptionString(self):
-        return ""
+    def getArgumentOptions(self):
+        return {}
+    def getSwitches(self):
+        return {}
     def getActionSequence(self):
         return []
     def getFilterList(self):

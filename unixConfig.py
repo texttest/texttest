@@ -15,8 +15,10 @@ def getConfig(optionMap):
     return UNIXConfig(optionMap)
 
 class UNIXConfig(default.Config):
-    def getOptionString(self):
-        return "b:" + default.Config.getOptionString(self)
+    def getArgumentOptions(self):
+        options = default.Config.getArgumentOptions(self)
+        options["b"] = "Run batch mode with identifier"
+        return options
     def getFilterList(self):
         filters = default.Config.getFilterList(self)
         self.addFilter(filters, "b", batch.BatchFilter)
@@ -78,7 +80,7 @@ class CollateCore(CollateFile):
         # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
         # Unfortunately running gdb is not the answer, because it truncates the data...
         binary = os.popen("csh -c 'echo `tail -c 1024 " + path + "`'").read().split(" ")[-1].strip()
-        newPath = "tmp" + path
+        newPath = path + "tmp" 
         writeFile = open(newPath, "w")
         if os.path.isfile(binary):
             gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " " + path)

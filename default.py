@@ -42,8 +42,22 @@ def getConfig(optionMap):
     return Config(optionMap)
 
 class Config(plugins.Configuration):
-    def getOptionString(self):
-        return "iont:f:"
+    def getArgumentOptions(self):
+        options = {}
+        options["t"] = "Select tests containing"
+        options["f"] = "Select tests from file"
+        options["ts"] = "Select test suites containing"
+        options["reconnect"] = "Reconnect to previous run"
+        return options
+    def getSwitches(self):
+        switches = {}
+        switches["i"] = "Interactive mode"
+        switches["o"] = "Overwrite all failures"
+        switches["n"] = "Create new results files (overwrite everything)"
+        switches["b"] = "Plot original and temporary file"
+        switches["ns"] = "Don't scale times"
+        switches["nv"] = "No line type grouping for versions"
+        return switches
     def getActionSequence(self):
         actions = [ self.tryGetTestRunner(), self.getTestEvaluator() ]
         if self.optionMap.has_key("i"):
@@ -115,7 +129,7 @@ class CollateFile(plugins.Action):
     def __call__(self, test):
         if test.state > test.RUNNING:
             return
-        targetFile = test.getTmpFileName(self.targetStem, "w")
+        targetFile = test.makeFileName(self.targetStem, temporary=1)
         fullpath = self.findPath(test)
         if fullpath:
             self.extract(fullpath, targetFile)
@@ -133,8 +147,6 @@ class CollateFile(plugins.Action):
     def transformToText(self, path):
         # By default assume it is text
         pass
-    def currDir(self, test, filename):
-        return os.path.join(test.abspath, filename)       
     def extract(self, sourcePath, targetFile):
         shutil.copyfile(sourcePath, targetFile)
     
@@ -186,14 +198,14 @@ class RunTest(plugins.Action):
         if test.state == test.UNRUNNABLE:
             return
         self.describe(test)
-        outfile = test.getTmpFileName("output", "w")
+        outfile = test.makeFileName("output", temporary=1)
         stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfile)
         inputFileName = test.inputFile
         if os.path.isfile(inputFileName):
             inputData = open(inputFileName).read()
             stdin.write(inputData)
         stdin.close()
-        errfile = open(test.getTmpFileName("errors", "w"), "w")
+        errfile = open(test.makeFileName("errors", temporary=1), "w")
         errfile.write(stderr.read())
         errfile.close()
         #needed to be sure command is finished
@@ -226,19 +238,16 @@ class ReconnectTest(plugins.Action):
     def __init__(self, fetchOption):
         self.fetchDir = None
         self.fetchUser = None
-        self.endRegExp = re.compile("[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$")
         if len(fetchOption) > 0:
             if fetchOption.find(":") != -1:
-                parts = fetchOption.split(":")
-                self.fetchDir = parts[0]
-                self.fetchUser = parts[1]
+                self.fetchDir, self.fetchUser = fetchOption.split(":")
             else:
                 self.fetchDir = fetchOption
     def __repr__(self):
         return "Reconnect to"
     def findTestDir(self, test):
         configFile = "config." + test.app.name
-        testCaseDir = test.abspath.replace(test.app.abspath + os.sep, "")
+        testCaseDir = test.getRelPath()[1:]
         parts = test.app.abspath.split(os.sep)
         for ix in range(len(parts)):
             if ix == 0:
@@ -249,19 +258,6 @@ class ReconnectTest(plugins.Action):
             if os.path.isfile(os.path.join(findDir, configFile)):
                 return os.path.join(findDir, testCaseDir)
         return None
-    def _shouldCopyFile(self, test, stem, file, pattern):
-        if stem == "cmd" or stem == "report" or stem == "unixperf":
-            return 0
-        if self.endRegExp.search(file, 1):
-            return file.startswith(stem + pattern)
-        if not file.startswith(stem + "." + test.app.name):
-            return 0
-        pathStandardFile = test.makeFileName(stem)
-        if pathStandardFile.split(os.sep)[-1] != file:
-            return 0
-        if os.path.isfile(pathStandardFile):
-            return 0
-        return 1
     def __call__(self, test):
         translateUser = 0
         if self.fetchDir == None or not os.path.isdir(self.fetchDir):
@@ -271,33 +267,19 @@ class ReconnectTest(plugins.Action):
         if testDir == None:
             self.describe(test, "Failed!")
             return
-        pattern = "." + test.app.name + test.app.versionSuffix()
+        pattern = test.app.name + test.app.versionSuffix()
         if self.fetchUser != None:
             pattern += self.fetchUser
-            translateUser = 1
         else:
             pattern += test.getTestUser()
-        stemsFound = []
-        mtimeForStem = {}
-        for file in os.listdir(testDir):
-            stem = file.split(".")[0]
-            if self._shouldCopyFile(test, stem, file, pattern):
-                srcFile = os.path.join(testDir, file)
-                mTime = os.path.getmtime(srcFile)
-                targetFile = stem + "." + test.app.name + test.app.versionSuffix() + test.getTmpExtension()
-                if stem in stemsFound:
-                    mTimeOld = mtimeForStem[stem]
-                    if mTimeOld > mTime:
-                        continue
-                else:
-                    stemsFound.append(stem)
-                mtimeForStem[stem] = mTime
-                if translateUser == 1:
-                    targetFile = test.getTmpFileName(stem, "w")
-                targetFile = os.path.join(test.abspath, targetFile)
-                if srcFile != targetFile:
-                    shutil.copyfile(srcFile, targetFile)
         self.describe(test)
+        for subDir in os.listdir(testDir):
+            fullPath = os.path.join(testDir, subDir)
+            if os.path.isdir(fullPath) and subDir.startswith(pattern):
+                for file in os.listdir(fullPath):
+                    if not file.endswith("cmp"):
+                        shutil.copyfile(os.path.join(fullPath, file), os.path.join(os.getcwd(), file))
+                break
     def setUpSuite(self, suite):
         self.describe(suite)
 

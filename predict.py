@@ -14,7 +14,7 @@ class CheckLogFilePredictions(plugins.Action):
     def __init__(self):
         self.logFile = None
     def getLogFile(self, test):
-        logFile = test.getTmpFileName(self.logFile, "r")
+        logFile = test.makeFileName(self.logFile, temporary=1)
         if not os.path.isfile(logFile):
             logFile = test.makeFileName(self.logFile)
         return logFile
@@ -33,7 +33,7 @@ class CheckPredictions(CheckLogFilePredictions):
         return "Checking predictions for"
     def __call__(self, test):
         # Hard-coded prediction: check test didn't crash
-        stackTraceFile = test.getTmpFileName("stacktrace", "r")
+        stackTraceFile = test.makeFileName("stacktrace", temporary=1)
         if os.path.isfile(stackTraceFile):
             errorInfo = open(stackTraceFile).read()
             self.insertError(test, errorInfo)

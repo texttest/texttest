@@ -157,8 +157,6 @@ class RunApcTest(default.RunTest):
         default.RunTest.__call__(self, test)
         
 class SubmitApcTest(lsf.SubmitTest):
-    def __init__(self, queueFunction, resourceFunction):
-        lsf.SubmitTest.__init__(self, queueFunction, resourceFunction)
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
         lsf.SubmitTest.__call__(self, test)
@@ -241,7 +239,7 @@ class RemoveLogs(plugins.Action):
         self.removeFile(test, "errors")
         self.removeFile(test, "output")
     def removeFile(self, test, stem):
-        filePath = test.getTmpFileName(stem, "r")
+        filePath = test.makeFileName(stem, temporary=1)
         if os.path.isfile(filePath):
             os.remove(filePath)
     def __repr__(self):
@@ -253,10 +251,8 @@ class FetchApcCore(plugins.Action):
     def __call__(self, test):
         if self.config.isReconnecting():
             return
-        coreFileName = os.path.join(test.abspath, "core.Z")
-        if os.path.isfile(coreFileName):
-            os.remove(coreFileName)
-        if not os.path.isfile(test.getTmpFileName("error", "r")):
+        coreFileName = os.path.join(test.getDirectory(temporary=1), "core.Z")
+        if not os.path.isfile(test.makeFileName("error", temporary=1)):
             return            
         logFinder = optimization.LogFileFinder(test)
         foundTmp, tmpStatusFile = logFinder.findFile()
@@ -623,11 +619,10 @@ class UpdateCvsIgnore(plugins.Action):
             print "Updated", self.updateCount, ".cvsignore files"
         else:
             print "No .cvsignore files updated"
-        pass
     def __call__(self, test):
         if self.masterCvsIgnoreFile == None:
             return
-        fileName = os.path.join(test.abspath, ".cvsignore")
+        fileName = os.path.join(test.getDirectory(temporary=1), ".cvsignore")
         if not os.path.isfile(fileName) or filecmp.cmp(fileName, self.masterCvsIgnoreFile) == 0:
             shutil.copyfile(self.masterCvsIgnoreFile, fileName)
             self.updateCount += 1
@@ -635,7 +630,7 @@ class UpdateCvsIgnore(plugins.Action):
     def setUpSuite(self, suite):
         pass
     def setUpApplication(self, app):
-        fileName = os.path.join(app.abspath, "cvsignore.master")
+        fileName = os.path.join(test.getDirectory(temporary=1), "cvsignore.master")
         if os.path.isfile(fileName):
             self.masterCvsIgnoreFile = fileName
 

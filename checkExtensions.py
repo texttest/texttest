@@ -131,7 +131,7 @@ class CreateCompareFiles(plugins.Action):
                 missing=glob(('*'+ext).replace('.','_')+'.'+test.app.name)
                 for file in missing:
                     dummyErrFileName=file.split('.')[0]
-                    f=open(test.getTmpFileName(dummyErrFileName,'w'),'w')
+                    f=open(test.makeFileName(dummyErrFileName,temporary=1),'w')
                     f.write("File %s was not created!\nThis dummy file was created by the test framework.\n"\
                             %(dummyErrFileName))
                     f.close()                    
@@ -139,7 +139,7 @@ class CreateCompareFiles(plugins.Action):
         for file in files2Check:
             #the current standard compare can't handle dots in the names
             f = file.replace('.','_')
-            compareFile=test.getTmpFileName(f,'w')
+            compareFile=test.makeFileName(f,temporary=1)
             #the program might create compressed files
             if isCompressed(file):
                 os.system('zcat -f '+file+' > '+compareFile)

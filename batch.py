@@ -164,7 +164,7 @@ class BatchResponder(respond.Responder):
         for test, testComparison in self.failureDetail.items():
             mailFile.write("--------------------------------------------------------" + os.linesep)
             mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
-            os.chdir(test.abspath)
+            os.chdir(test.getDirectory(temporary=1))
             self.responder.displayComparisons(testComparison.getComparisons(), mailFile, self.mainSuite.app)
         
 class MailSender(plugins.Action):

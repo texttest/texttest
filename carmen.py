@@ -88,8 +88,16 @@ class UserFilter(default.TextFilter):
             return 1
 
 class CarmenConfig(lsf.LSFConfig):
-    def getOptionString(self):
-        return "u:" + lsf.LSFConfig.getOptionString(self)
+    def getArgumentOptions(self):
+        options = lsf.LSFConfig.getArgumentOptions(self)
+        options["u"] = "Select CARMUSRs containing"
+        options["build"] = "Build application target"
+        return options
+    def getSwitches(self):
+        switches = lsf.LSFConfig.getSwitches(self)
+        switches["rulecomp"] = "Build rulesets only"
+        switches["lprof"] = "Run with LProf profiler"
+        return switches
     def getFilterList(self):
         filters = lsf.LSFConfig.getFilterList(self)
         self.addFilter(filters, "u", UserFilter)
@@ -202,7 +210,7 @@ class CompileRules(plugins.Action):
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
     def performCompile(self, test, commandLine):
-        compTmp = test.getTmpFileName("ravecompile", "w")
+        compTmp = test.makeFileName("ravecompile", temporary=1)
         returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
         if returnValue:
             errContents = string.join(open(compTmp).readlines(),"")

@@ -26,11 +26,8 @@ builtInOptions = """
 
 -m <times> - perform the actions usually performed by the configuration, but repeated <times> times.
 
--p         - run in parallel mode. Do not clean up any temporary files looking like they belong to other TextTest
-             runs.
-
 -keeptmp   - Keep any temporary directories where test(s) write files. Note that once you run the test again the old
-             temporary dirs will be removed, unless you run in parallel mode of course.       
+             temporary dirs will be removed.       
 
 -help      - Do not run anything. Instead, generate useful text, such as this.
 
@@ -72,8 +69,10 @@ class Test:
             os.environ[var] = self.environment[var]
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
-    def makeFileName(self, stem, refVersion = None):
-        nonVersionName = os.path.join(self.abspath, stem + "." + self.app.name)
+    def makeFileName(self, stem, refVersion = None, temporary = 0):
+        root = self.getDirectory(temporary)
+        stemWithApp = stem + "." + self.app.name
+        nonVersionName = os.path.join(root, stemWithApp)
         versions = self.app.getVersionFileExtensions()
         debugLog.info("Versions available : " + repr(versions))
         if refVersion != None:
@@ -82,13 +81,17 @@ class Test:
             return nonVersionName
         
         # Prioritise finding earlier versions
+        testNonVersion = os.path.join(self.abspath, stemWithApp)
         for version in versions:
-            versionName = nonVersionName + "." + version
+            versionName = testNonVersion + "." + version
             if os.path.isfile(versionName):
-                return versionName
+                debugLog.info("Chosen " + versionName)
+                return nonVersionName + "." + version
         return nonVersionName
     def getRelPath(self):
         return string.replace(self.abspath, self.app.abspath, "")
+    def getDirectory(self, temporary):
+        return self.abspath
     def getInstructions(self, action):
         return [ (self, plugins.SetUpEnvironment()) ] + action.getInstructions(self) \
                + self.getSubInstructions(action) + [ (self, plugins.TearDownEnvironment()) ]
@@ -138,16 +141,21 @@ class TestCase(Test):
         self.options = ""
         if (os.path.isfile(optionsFile)):
             self.options = os.path.expandvars(open(optionsFile).readline().strip())
-        # List of directories where this test will write files
-        self.writeDirs = [ self.abspath ]
+        # List of directories where this test will write files. First is where it executes from
+        self.writeDirs = []
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
         return "test-case"
     def isValidSpecific(self):
         return os.path.isfile(self.inputFile) or len(self.options) > 0
+    def getDirectory(self, temporary):
+        if temporary:
+            return self.writeDirs[0]
+        else:
+            return self.abspath
     def callAction(self, action):
-        os.chdir(self.abspath)
+        os.chdir(self.writeDirs[0])
         try:
             return action(self)
         except plugins.TextTestError, e:
@@ -168,20 +176,8 @@ class TestCase(Test):
         return globalRunIdentifier
     def getTestUser(self):
         return tmpString()
-    def getTmpFileName(self, text, mode):
-        prefix = text + "." + self.app.name + self.app.versionSuffix()
-        fileName = prefix + globalRunIdentifier
-        # When writing files, clean up equivalent files from previous runs, unless
-        # we are in parallel mode and the files are less than 2 days old
-        if mode == "w":
-            clean1 = prefix + self.getTestUser()
-            clean2 = prefix + ".original." + self.getTestUser()
-            for file in os.listdir(self.abspath):
-                if file.find(clean1) != -1 or file.find(clean2) != -1:
-                    if not self.app.parallelMode or self.isOutdated(file):
-                        debugLog.info("Cleaning previous file " + file)
-                        os.remove(file)
-        return fileName
+    def getTmpIdentifier(self):
+        return self.app.name + self.app.versionSuffix() + globalRunIdentifier
     def isOutdated(self, filename):
         modTime = os.stat(filename)[stat.ST_MTIME]
         currTime = time.time()
@@ -189,35 +185,38 @@ class TestCase(Test):
         return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
-    def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
-        prefix = os.path.join(rootDir, basicDir) + "."
-        prefix += self.app.name + self.app.versionSuffix() + "_" + self.name + "_"
-        dirName = prefix + globalRunIdentifier
-        if not self.app.parallelMode:
-            currTmpString = prefix + self.getTestUser()
-            for file in os.listdir(rootDir):
-                fpath = os.path.join(rootDir, file)
-                if not os.path.isdir(fpath):
-                    continue
-                if fpath.find(currTmpString) != -1:
-                    self._removeDir(os.path.join(rootDir, file))
+    def makeWriteDirectory(self, rootDir, basicDir = None, subDir = None):
+        prefix = self.app.name + self.app.versionSuffix()
+        identifier = prefix + globalRunIdentifier
+        dirName = identifier
+        if basicDir:
+            dirName = basicDir + "." + identifier
+        dirName = os.path.join(rootDir, dirName)
+        currTmpString = prefix + self.getTestUser()
+        for file in os.listdir(rootDir):
+            fpath = os.path.join(rootDir, file)
+            if not os.path.isdir(fpath):
+                continue
+            if fpath.find(currTmpString) != -1:
+                self._removeDir(os.path.join(rootDir, file))
         writeDir = dirName
         if subDir:
             writeDir = os.path.join(dirName, subDir)
         os.makedirs(writeDir)
         debugLog.info("Created write directory " + writeDir)
         self.writeDirs.append(writeDir)
-        newBasic = os.path.basename(dirName)
-        debugLog.info("Replacing " + basicDir + " with " + newBasic)
-        self.options = self.options.replace(basicDir, newBasic)
-        debugLog.info("Options string now '" + self.options + "'") 
-        if os.path.isfile(self.inputFile):
-            tmpFileName = self.getTmpFileName("input", "w")
-            tmpFile = open(tmpFileName, "w")
-            for line in open(self.inputFile).xreadlines():
-                tmpFile.write(line.replace(basicDir, newBasic))
-            self.inputFile = tmpFileName
-            debugLog.info("Input file now '" + self.inputFile + "'")
+        if basicDir:
+            newBasic = os.path.basename(dirName)
+            debugLog.info("Replacing " + basicDir + " with " + newBasic)
+            self.options = self.options.replace(basicDir, newBasic)
+            debugLog.info("Options string now '" + self.options + "'") 
+            if os.path.isfile(self.inputFile):
+                tmpFileName = self.getTmpFileName("input", "w")
+                tmpFile = open(tmpFileName, "w")
+                for line in open(self.inputFile).xreadlines():
+                    tmpFile.write(line.replace(basicDir, newBasic))
+                self.inputFile = tmpFileName
+                debugLog.info("Input file now '" + self.inputFile + "'")
         return dirName
     def cleanFiles(self, keeptmp):
         if self.inputFile.find(globalRunIdentifier) != -1:
@@ -227,7 +226,8 @@ class TestCase(Test):
                 continue
             if keeptmp:
                 print self.getIndent() + "Keeping write-directory for", self.name, "in", writeDir
-            else:
+            elif self.state == self.SUCCEEDED:
+                debugLog.info("Removing write-directory for " + self.name + " in " + writeDir)
                 self.removeAtRightLevel(writeDir)
     def removeAtRightLevel(self, writeDir):
         root, basename = os.path.split(writeDir)
@@ -322,27 +322,24 @@ class TestSuite(Test):
                 testCase = TestCase(testName, testPath, self.app)
                 testCase.tearDownEnvironment()
                 if testCase.isValid() and testCase.isAcceptedByAll(filters):
+                    testCase.makeWriteDirectory(testCase.abspath)
                     testCaseList.append(testCase)
         return testCaseList
             
 class Application:
-    def __init__(self, name, abspath, configFile, version, optionMap, builtInOptions):
+    def __init__(self, name, abspath, configFile, version, optionMap):
         self.name = name
         self.abspath = abspath
         self.versions = version.split(".")
         if self.versions[0] == "":
             self.versions = []
-        self.parallelMode = optionMap.has_key("p")
         self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions(0))
         self.fullName = self._getFullName()
         debugLog.info("Found application " + repr(self))
         self.checkout = self.makeCheckout(optionMap)
         debugLog.info("Checkout set to " + self.checkout)
         self.configObject = self.makeConfigObject(optionMap)
-        allowedOptions = self.configObject.getOptionString() + builtInOptions
-        # Force exit if something isn't present
-        getopt.getopt(sys.argv[1:], allowedOptions)    
-	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
+        self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
         self.setConfigDefault("extra_version", "none")
         self.configObject.setUpApplication(self)
     def __repr__(self):
@@ -440,7 +437,7 @@ class Application:
         if not self.configDir.has_key(key):
             self.configDir[key] = value
     def filterFile(self, fileName):
-        stem = fileName.split('.')[0]
+        stem = os.path.basename(fileName).split('.')[0]
         if not self.configDir.has_key(stem) or not os.path.isfile(fileName):
             debugLog.info("No filter for " + fileName)
             return fileName
@@ -448,7 +445,7 @@ class Application:
         if fileName.find(globalRunIdentifier) != -1:
             newFileName = fileName + "cmp"
         else:
-            newFileName = stem + "." + self.name + self.versionSuffix() + ".original." + globalRunIdentifier + "cmp"
+            newFileName = stem + "." + self.name + "origcmp"
         
         oldFile = open(fileName)
         newFile = open(newFileName, "w")
@@ -586,10 +583,35 @@ class OptionFinder:
                 for app in subApps:
                     appList.append(app)
         return raisedError, appList
+    def getArgumentOptions(self, app):
+        options = {}
+        options["a"] = "Select applications containing"
+        options["c"] = "Use checkout"
+        options["d"] = "Find tests at"
+        options["help"] = "Print help text"
+        options["m"] = "Run this number of times"
+        options["s"] = "Run this script"
+        options["v"] = "Run this version"
+        options.update(app.configObject.getArgumentOptions())
+        return options
+    def getSwitches(self, app):
+        switches = {}
+        switches["x"] = "Write TextTest diagnostics"
+        switches["keeptmp"] = "Keep write-directories on success"
+        switches["g"] = "use GUI"
+        switches.update(app.configObject.getSwitches())
+        return switches
+    def createApplication(self, appName, dirName, pathname, version):
+        app = Application(appName, dirName, pathname, version, self.inputOptions)
+        options = self.getArgumentOptions(app)
+        switches = self.getSwitches(app)
+        for option in self.inputOptions.keys():
+            if not option in options.keys() and not option in switches.keys():
+                raise plugins.TextTestError, "unrecognised option -" + option
+        return app
     def addApplications(self, appName, dirName, pathname, version):
         appList = []
-        builtInOptions = "a:c:d:h:m:s:v:xpg"
-        app = Application(appName, dirName, pathname, version, self.inputOptions, builtInOptions)
+        app = self.createApplication(appName, dirName, pathname, version)
         appList.append(app)
         extraVersion = app.getConfigValue("extra_version")
         if extraVersion == "none":
@@ -597,8 +619,7 @@ class OptionFinder:
         aggVersion = extraVersion
         if len(version) > 0:
             aggVersion = version + "." + extraVersion
-        newApp = Application(appName, dirName, pathname, aggVersion, self.inputOptions, builtInOptions)
-        appList.append(newApp)
+        appList.append(self.createApplication(appName, dirName, pathname, aggVersion))
         return appList
     def findVersionList(self):
         if self.inputOptions.has_key("v"):
@@ -623,14 +644,16 @@ class OptionFinder:
         if self.inputOptions.has_key("g"):
             scriptFile = self.inputOptions["g"]
             if len(scriptFile):
-                if os.path.isfile(scriptFile):
-                    return 1, os.path.join(os.getcwd(), scriptFile)
-                else:
-                    return 1, os.path.join(self.directoryName(), scriptFile)
+                return 1, self.findGuiScript(scriptFile)
             else:
                 return 1, None
         else:
             return 0, None
+    def findGuiScript(self, scriptFile):
+        if os.path.isfile(scriptFile):
+            return os.path.join(os.getcwd(), scriptFile)
+        else:
+            return os.path.join(self.directoryName(), scriptFile)
     def _getDiagnosticFile(self):
         if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")

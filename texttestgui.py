@@ -331,7 +331,7 @@ class TestCaseGUI:
         if not test:
             return
         try:
-            os.chdir(test.abspath)
+            os.chdir(test.getDirectory(temporary=1))
             testComparison = test.stateDetails
             for name in testComparison.attemptedComparisons:
                 fileComparison = testComparison.findFileComparison(name)
@@ -402,7 +402,7 @@ class TestCaseGUI:
             return "Test-case info"
         return repr(test).replace("_", "__")
     def displayDifferences(self, view, path, column, *args):
-        os.chdir(self.test.abspath)
+        os.chdir(self.test.getDirectory(temporary=1))
         comparison = self.model.get_value(self.model.get_iter(path), 2)
         if comparison:
             if comparison.newResult():
@@ -462,7 +462,7 @@ class TestCaseGUI:
         else:
             return 1
     def save(self, button, option, *args):
-        os.chdir(self.test.abspath)
+        os.chdir(self.test.getDirectory(temporary=1))
         print "Saving", self.test, "version", option
         testComparison = self.test.stateDetails
         if testComparison:

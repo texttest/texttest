@@ -237,6 +237,8 @@ class MakeProgressReport(TestReport):
         timeCommand = "grep 'cpu time' " + file + " | awk '{ print $6 }'"
         times = map(self.convertTime, os.popen(timeCommand).readlines())
         times.insert(0, 0.0)
+        return self.timeToCostFromTimes(times, performanceScale, costs, targetCost)
+    def timeToCostFromTimes(self, times, performanceScale, costs, targetCost):
         for index in range(len(costs)):
             if abs(costs[index]) < abs(targetCost):
                 costGap = costs[index - 1] - costs[index]

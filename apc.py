@@ -148,16 +148,16 @@ class MakeProgressReport(optimization.MakeProgressReport):
     def __init__(self, referenceVersion):
         optimization.MakeProgressReport.__init__(self, referenceVersion)
     def compare(self, test, referenceFile, currentFile):
+        referenceCosts, refTimes = getSolutionStatistics(referenceFile)
+        currentCosts, curTimes = getSolutionStatistics(currentFile)
         currPerf = int(performance.getTestPerformance(test))
         refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
-        referenceCosts = self.getCosts(referenceFile, "TOTAL")
-        currentCosts =  self.getCosts(currentFile, "TOTAL")
         currTTWC = currPerf
         refTTWC = refPerf
         if currentCosts[-1] < referenceCosts[-1]:
-            currTTWC = self.timeToCost(currentFile, currPerf, currentCosts, referenceCosts[-1])
+            currTTWC = self.timeToCostFromTimes(curTimes, currPerf, currentCosts, referenceCosts[-1])
         else:
-            refTTWC = self.timeToCost(referenceFile, refPerf, referenceCosts, currentCosts[-1])
+            refTTWC = self.timeToCostFromTimes(refTimes, refPerf, referenceCosts, currentCosts[-1])
         if float(refTTWC) < 1:
             return
         kpi = float(currTTWC) / float(refTTWC)
@@ -321,6 +321,55 @@ class PortApcTest(plugins.Action):
             self.describe(test, " in " + testInfo.suiteDescription())
     def setUpSuite(self, suite):
         self.suite = suite
+
+def convertTime(timeEntry):
+    entries = timeEntry.split(":")
+    timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip())
+    return float(timeInSeconds) / 60.0
+
+def getSolutionStatistics(currentFile):
+    grepCommand = "grep -E 'TOTAL|cpu time' " + currentFile
+    grepLines = os.popen(grepCommand).readlines()
+    costs = []
+    times = []
+    lastTime = 0
+    for line in grepLines:
+        if line.startswith("Total time"):
+            lastTime = convertTime(line.split()[-1])
+        if line.startswith(" TOTAL cost"):
+            costs.append(int(line.split()[-1]))
+            times.append(lastTime)
+    return costs, times
+
+class PlotApcTest(plugins.Action):
+    def __init__(self):
+        self.plotFiles = []
+        self.statusFileName = None
+    def __repr__(self):
+        return "Plotting"
+    def __del__(self):
+        if len(self.plotFiles) > 0:
+            stdin, stdout, stderr = os.popen3("gnuplot -persist")
+            fileList = []
+            style = " with linespoints"
+            for file in self.plotFiles:
+                title = " title \"" + file.split(os.sep)[-2] + "\" "
+                fileList.append("'" + file + "' " + title + style)
+            print "plot " + string.join(fileList, ",") + os.linesep
+            stdin.write("plot " + string.join(fileList, ",") + os.linesep)
+            stdin.write("quit" + os.linesep)
+    def __call__(self, test):
+        currentFile = test.makeFileName(self.statusFileName)
+        costs, times = getSolutionStatistics(currentFile)
+        plotFileName = test.makeFileName("plot")
+        plotFile = open(plotFileName,"w")
+        for il in range(len(costs)):
+            plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
+        self.plotFiles.append(plotFileName)
+    def setUpSuite(self, suite):
+        pass
+    def setUpApplication(self, app):
+        self.statusFileName = app.getConfigValue("log_file")
 
 
         

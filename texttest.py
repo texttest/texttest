@@ -784,7 +784,7 @@ class Application:
     def addToOptionGroup(self, group):
         if group.name.startswith("What"):
             group.addOption("c", "Use checkout")
-            group.addOption("v", "Run this version")
+            group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("How"):
             if self.getConfigValue("slow_motion_replay_speed"):
                 group.addSwitch("actrep", "Run with slow motion replay")

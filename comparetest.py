@@ -186,6 +186,9 @@ class MakeComparisons(plugins.Action):
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):
+        # Don't compare killed tests...
+        if test.state == test.KILLED:
+            return
         testComparison = self.makeTestComparison(test)
         testComparison.makeComparisons(test)
         if testComparison.hasDifferences() or testComparison.hasNewResults() or testComparison.failedPrediction:

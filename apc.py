@@ -175,12 +175,11 @@ def verifyAirportFile(arch):
     raise plugins.TextTestError, "Failed to find AirportFile"
 
 def verifyLogFileDir(arch):
-    if arch == "sparc" or arch == "sparc_64":
-        carmTmp = os.environ["CARMTMP"]
-        if os.path.isdir(carmTmp):
-            logFileDir = carmTmp + "/logfiles"
-            if not os.path.isdir(logFileDir):
-                os.makedirs(logFileDir)
+    carmTmp = os.environ["CARMTMP"]
+    if os.path.isdir(carmTmp):
+        logFileDir = carmTmp + "/logfiles"
+        if not os.path.isdir(logFileDir):
+            os.makedirs(logFileDir)
         
 
 class SubmitApcTest(lsf.SubmitTest):

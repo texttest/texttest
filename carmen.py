@@ -420,10 +420,10 @@ class AttachProfiler(plugins.Action):
 
 class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):
-        processLine = "/users/lennart/bin/process_gprof prof.*" + " > lprof." + test.app.name + test.app.versionSuffix()
+        processLine = "/users/lennart/bin/process_gprof prof.*" + " > " + test.makeFileName("lprof", temporary = 1)
         os.system(processLine)
         # Compress and save the raw data.
-        cmdLine = "gzip prof.*;mv prof.* prof." + test.app.name + test.app.versionSuffix() 
+        cmdLine = "gzip prof.*;mv prof.* " + test.makeFileName("prof", temporary = 1)
         os.system(cmdLine)
     def __repr__(self):
         return "Profiling"    

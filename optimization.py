@@ -371,7 +371,9 @@ class LogFileFinder:
             versionMod = ""
             if version:
                 versionMod = "." + version
-            if file.startswith(stem) and file.find(self.test.app.name + versionMod + self.test.getTestUser()) != -1:
+            searchString = self.test.app.name + versionMod + self.test.getTestUser()
+            # don't pick up comparison files
+            if file.startswith(stem) and not file.endswith("cmp") and file.find(searchString) != -1:
                 return file
         return None
 

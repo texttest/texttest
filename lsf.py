@@ -128,13 +128,13 @@ class LSFConfig(unixConfig.UNIXConfig):
         return plugins.CompositeAction([ self.getWaitingAction(), self.getFileCollator() ])
     def getFileCollator(self):
         return unixConfig.UNIXConfig.getTestCollator(self)
-    def getWaitingAction(self):
+    def getWaitingAction(self, jobNameFunction = None):
         if not self.useLSF():
             return plugins.Action()
         else:
-            return plugins.CompositeAction([ Wait(), self.updaterLSFStatus() ])
-    def updaterLSFStatus(self):
-        return UpdateLSFStatus()
+            return plugins.CompositeAction([ Wait(jobNameFunction), self.updaterLSFStatus(jobNameFunction) ])
+    def updaterLSFStatus(self, jobNameFunction):
+        return UpdateLSFStatus(jobNameFunction)
     def isSlowdownJob(self, jobUser, jobName):
         return 0
     def printHelpDescription(self):
@@ -147,8 +147,11 @@ class LSFConfig(unixConfig.UNIXConfig):
         app.setConfigDefault("lsf_queue", "normal")
 
 class LSFJob:
-    def __init__(self, test):
-        self.name = test.getTmpExtension() + repr(test.app) + test.app.versionSuffix() + test.getRelPath()
+    def __init__(self, test, jobNameFunction = None):
+        jobName = test.getRelPath()
+        if jobNameFunction:
+            jobName = jobNameFunction(test)
+        self.name = test.getTmpExtension() + repr(test.app) + test.app.versionSuffix() + jobName
         self.app = test.app
     def hasStarted(self):
         retstring = self.getFile("-r").readline()
@@ -163,7 +166,11 @@ class LSFJob:
         lines = file.readlines()
         if len(lines) == 0:
             return "DONE", None
-        data = lines[-1].strip().split()
+        lastLine = lines[-1].strip()
+        if lastLine.find("not found") != -1:
+            # If it doesn't exist we can assume it's done, it's the same effect...
+            return "DONE", None
+        data = lastLine.split()
         status = data[2]
         if status == "PEND" or len(data) < 6:
             return status, None
@@ -215,26 +222,36 @@ class SubmitTest(unixConfig.RunTest):
     def __repr__(self):
         return "Submitting"
     def runTest(self, test):
-        self.describe(test)
-        queueToUse = self.queueFunction(test)
         testCommand = self.getExecuteCommand(test)
-        reportfile =  test.makeFileName("lsfreport", temporary=1, forComparison=0)
-        lsfJob = LSFJob(test)
-        lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -u nobody"
+        lsfOptions = ""
         resource = self.resourceFunction(test)
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
         if os.environ.has_key("LSF_PROCESSES"):
             lsfOptions += " -n " + os.environ["LSF_PROCESSES"]
-        commandLine = "bsub " + lsfOptions + " '" + testCommand + "' > " + reportfile
+        self.runCommand(test, testCommand, None, lsfOptions)
+    def runCommand(self, test, command, jobNameFunction = None, commandLsfOptions = ""):
+        self.describe(test, jobNameFunction)
+        
+        queueToUse = self.queueFunction(test)
+        repFileName = "lsfreport"
+        if jobNameFunction:
+            repFileName += jobNameFunction(test)
+        reportfile =  test.makeFileName(repFileName, temporary=1, forComparison=0)
+        lsfJob = LSFJob(test, jobNameFunction)
+        lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -u nobody" + commandLsfOptions
+        commandLine = "bsub " + lsfOptions + " '" + command + "' > " + reportfile
         self.diag.info("Submitting with command : " + commandLine)
         stdin, stdout, stderr = os.popen3(commandLine)
         errorMessage = stderr.readline()
         if errorMessage and errorMessage.find("still trying") == -1:
             raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
-    def describe(self, test):
+    def describe(self, test, jobNameFunction = None):
         queueToUse = self.queueFunction(test)
-        unixConfig.RunTest.describe(self, test, " to LSF queue " + queueToUse)
+        if jobNameFunction:
+            print test.getIndent() + "Submitting", jobNameFunction(test), "to LSF queue", queueToUse
+        else:
+            unixConfig.RunTest.describe(self, test, " to LSF queue " + queueToUse)
     def buildCommandFile(self, test, cmdFile, testCommand):
         f = open(cmdFile, "w")
         f.write("HOST=`hostname`; export HOST" + os.linesep)
@@ -246,9 +263,6 @@ class SubmitTest(unixConfig.RunTest):
                 if len(parts) > 1:
                     var = parts[0]
                     value = parts[1]
-                    # Assume relative paths are relative to test directory. Don't rely on pwd!
-#                    if os.path.exists(value) and not os.path.isabs(value):
-#                        value = os.path.join(test.getDirectory(temporary=1), value)
                     if value != "dummy":
                         f.write(var + "=" + "\"" + value + "\"; export " + var + os.linesep)
         f.write("cd " + test.getDirectory(temporary=1) + os.linesep)
@@ -272,15 +286,19 @@ class KillTest(plugins.Action):
         job.kill()
         
 class Wait(plugins.Action):
-    def __init__(self):
+    def __init__(self, jobNameFunction = None):
         self.eventName = "completion"
+        self.jobNameFunction = jobNameFunction
     def __repr__(self):
         return "Waiting for " + self.eventName + " of"
     def __call__(self, test):
-        job = LSFJob(test)
+        job = LSFJob(test, self.jobNameFunction)
         if self.checkCondition(job):
             return
-        self.describe(test, "...")
+        postText = "..."
+        if self.jobNameFunction:
+            postText += "(" + self.jobNameFunction(test) + ")"
+        self.describe(test, postText)
         while not self.checkCondition(job):
             global emergencyFinish
             if emergencyFinish:
@@ -300,16 +318,17 @@ class Wait(plugins.Action):
             return 0
 
 class UpdateLSFStatus(plugins.Action):
-    def __init__(self):
+    def __init__(self, jobNameFunction = None):
         self.logFile = None
+        self.jobNameFunction = jobNameFunction
     def __repr__(self):
         return "Updating LSF status for"
     def __call__(self, test):
-        job = LSFJob(test)
+        job = LSFJob(test, self.jobNameFunction)
         status, machine = job.getStatus()
         if status == "DONE" or status == "EXIT":
             return
-        if status != "PEND":
+        if status != "PEND" and not self.jobNameFunction:
             perc = self.calculatePercentage(test)
             details = ""
             if machine != None:

@@ -122,10 +122,12 @@ class CompositeAction(Action):
 
 # Action for wrapping the calls to setUpEnvironment
 class SetUpEnvironment(Action):
+    def __init__(self, parents=0):
+        self.parents = parents
     def __call__(self, test):
-        test.setUpEnvironment()
+        test.setUpEnvironment(self.parents)
     def setUpSuite(self, suite):
-        suite.setUpEnvironment()
+        suite.setUpEnvironment(self.parents)
 
 # Action for wrapping the calls to tearDownEnvironment
 class TearDownEnvironment(Action):

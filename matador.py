@@ -106,15 +106,15 @@ class MatadorConfig(optimization.OptimizationConfig):
             return ""
         return subPlan
     def getRuleSetName(self, test):
+        fromOptions = getOption(test.options, "-r")
+        if fromOptions:
+            return fromOptions
         outputFile = test.makeFileName("output")
         if os.path.isfile(outputFile):
             for line in open(outputFile).xreadlines():
                 if line.find("Loading rule set") != -1:
                     finalWord = line.split(" ")[-1]
                     return finalWord.strip()
-        fromOptions = getOption(test.options, "-r")
-        if fromOptions:
-            return fromOptions
         subPlanDir = self._getSubPlanDirName(test)
         for line in open(os.path.join(subPlanDir, "APC_FILES", "problems")).xreadlines():
             if line.startswith("153"):

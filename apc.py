@@ -87,15 +87,13 @@ class ApcConfig(optimization.OptimizationConfig):
         return MakeProgressReport(self.optionValue("prrep"))
     def getLibraryFile(self, app):
         return os.path.join("data", "apc", carmen.getArchitecture(app), "libapc.a")
-    def getRuleBuilder(self):
-        if self.buildRules():
-            if self.isNightJob():
-                ruleCompile = 1
-            else:
-                ruleCompile = self.optionMap.has_key("rulecomp")
-            return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, self.getRuleBuildFilter(), ruleCompile, self.raveMode())
+    def getRuleBuildObject(self, testRunner):
+        if self.isNightJob():
+            ruleCompile = 1
         else:
-            return plugins.Action()
+            ruleCompile = self.optionMap.has_key("rulecomp")
+        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, self.getRuleBuildFilter(), testRunner, \
+                               ruleCompile, self.raveMode())
     def getSpecificTestRunner(self):
         subActions = [ self._getApcTestRunner() ]
         if self.optionMap.has_key("lprof"):
@@ -132,8 +130,11 @@ class ApcConfig(optimization.OptimizationConfig):
                 if option.find("crc" + os.sep + "rule_set") != -1:
                     return option.split(os.sep)[-1]
         return None
-    def updaterLSFStatus(self):
-        return ApcUpdateLSFStatus()
+    def updaterLSFStatus(self, jobNameFunction):
+        if jobNameFunction:
+            return optimization.OptimizationConfig.updaterLSFStatus(self, jobNameFunction)
+        else:
+            return ApcUpdateLSFStatus()
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -306,8 +307,9 @@ class RunApcTestInDebugger(default.RunTest):
         self.describe(suite)
     
 class ApcCompileRules(carmen.CompileRules):
-    def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, forcedRuleCompile = 0, modeString = "-optimize"):
-        carmen.CompileRules.__init__(self, getRuleSetName, modeString, sFilter)
+    def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, testRunner = None, \
+                 forcedRuleCompile = 0, modeString = "-optimize"):
+        carmen.CompileRules.__init__(self, getRuleSetName, modeString, sFilter, testRunner)
         self.forcedRuleCompile = forcedRuleCompile
         self.getLibraryFile = getLibraryFile
         self.diag = plugins.getDiagnostics("ApcCompileRules")

@@ -131,9 +131,17 @@ class CarmenConfig(lsf.LSFConfig):
         return None
     def getRuleBuilder(self):
         if self.buildRules():
-            return CompileRules(self.getRuleSetName, self.raveMode(), self.getRuleBuildFilter())
+            return self.getRealRuleBuilder()
         else:
             return plugins.Action()
+    def getRealRuleBuilder(self):
+        ruleRunner = None
+        if self.useLSF() and not self.isNightJob():
+            ruleRunner = lsf.SubmitTest(self.findLSFQueue, self.findLSFResource)
+        return plugins.CompositeAction([ self.getRuleBuildObject(ruleRunner), self.getWaitingAction(self.getRuleSetName), \
+                                         EvaluateRuleBuild(self.getRuleSetName) ])
+    def getRuleBuildObject(self, ruleRunner):
+        return CompileRules(self.getRuleSetName, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
     def buildRules(self):
         return self.optionMap.has_key("rulecomp")
     def raveMode(self):
@@ -283,13 +291,13 @@ class CleanupRules(plugins.Action):
             self.raveName = getRaveName(suite)
 
 class CompileRules(plugins.Action):
-    def __init__(self, getRuleSetName, modeString = "-optimize", filter = None):
+    def __init__(self, getRuleSetName, modeString = "-optimize", filter = None, ruleRunner = None):
         self.rulesCompiled = []
-        self.rulesCompileFailed = []
         self.raveName = None
         self.getRuleSetName = getRuleSetName
         self.modeString = modeString
         self.filter = filter
+        self.ruleRunner = ruleRunner
         self.diag = plugins.getDiagnostics("Compile Rules")
     def __repr__(self):
         return "Compiling rules for"
@@ -299,32 +307,29 @@ class CompileRules(plugins.Action):
     def compileRulesForTest(self, test):
         arch = getArchitecture(test.app)
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
-        if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
-            raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
-        if ruleset.isValid() and not ruleset.name in self.rulesCompiled:
-            self.describe(test, " - ruleset " + ruleset.name)
-            if not self.ensureCarmTmpDirExists():
-                self.rulesCompileFailed.append(ruleset.name)
-                raise plugins.TextTestError, "Non-existing CARMTMP"
-            ruleset.backup()
-            self.rulesCompiled.append(ruleset.name)
-            if ruleset.precompiled:
-                shutil.copyfile(ruleset.precompiled, ruleset.targetFile)
-            else:
-                compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-                # Fix to be able to run crc_compile for apc also on Carmen 8.
-                # crc_compile provides backward compability, so we can always have the '-'.
-                extra = ""
-                if test.app.name == "apc":
-                    extra = "-"
-                commandLine = compiler + " " + extra + self.raveName + " " + self.getModeString() + " -archs " + arch + " " + ruleset.sourceFile
-                errorMessage = self.performCompile(test, commandLine)
-                if errorMessage:
-                    self.rulesCompileFailed.append(ruleset.name)
-                    print "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
-                    raise plugins.TextTestError, "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
-            if self.getModeString() == "-debug":
-                ruleset.moveDebugVersion()
+        if not ruleset.isValid():
+            return
+        if ruleset.name in self.rulesCompiled:
+            return test.changeState(test.NOT_STARTED, "Compiling ruleset " + ruleset.name)
+        
+        self.describe(test, " - ruleset " + ruleset.name)
+        self.ensureCarmTmpDirExists()
+        ruleset.backup()
+        self.rulesCompiled.append(ruleset.name)
+        if ruleset.precompiled:
+            shutil.copyfile(ruleset.precompiled, ruleset.targetFile)
+        else:
+            compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
+            # Fix to be able to run crc_compile for apc also on Carmen 8.
+            # crc_compile provides backward compability, so we can always have the '-'.
+            extra = ""
+            if test.app.name == "apc":
+                extra = "-"
+            commandLine = compiler + " " + extra + self.raveName + " " + self.getModeString() \
+                          + " -archs " + arch + " " + ruleset.sourceFile
+            self.performCompile(test, commandLine)
+        if self.getModeString() == "-debug":
+            ruleset.moveDebugVersion()
     def getModeString(self):
         if os.environ.has_key("TEXTTEST_RAVE_MODE"):
             return self.modeString + " " + os.environ["TEXTTEST_RAVE_MODE"]
@@ -341,21 +346,23 @@ class CompileRules(plugins.Action):
                 os.makedirs(os.environ["CARMTMP"])
         return 1
     def performCompile(self, test, commandLine):
-        compTmp = test.makeFileName("ravecompile", temporary=1)
+        compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         # Hack to work around crc_compile bug which fails if ":" in directory
         os.chdir(test.abspath)
         self.diag.info("Compiling with command '" + commandLine + "'")
-        returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
-        if returnValue:
-            errContents = string.join(open(compTmp).readlines(),"")
-            if errContents.find("already being compiled by") != -1:
-                print test.getIndent() + "Waiting for other compilation to finish..."
-                time.sleep(30)
-                return self.performCompile(test, commandLine)
-            os.remove(compTmp)
-            return errContents
-        os.remove(compTmp)
-        return ""
+        fullCommand = commandLine + " > " + compTmp + " 2>&1"
+        test.changeState(test.NOT_STARTED, "Compiling ruleset " + self.getRuleSetName(test))
+        if self.ruleRunner:
+            self.ruleRunner.runCommand(test, fullCommand, self.getRuleSetName)
+        else:
+            returnValue = os.system(fullCommand)
+            if returnValue:
+                errContents = string.join(open(compTmp).readlines(),"")
+                if errContents.find("already being compiled by") != -1:
+                    print test.getIndent() + "Waiting for other compilation to finish..."
+                    time.sleep(30)
+                    os.remove(compTmp)
+                    self.performCompile(test, commandLine)
     def setUpSuite(self, suite):
         if self.filter and not self.filter.acceptsTestSuite(suite):
             self.raveName = None
@@ -366,7 +373,35 @@ class CompileRules(plugins.Action):
             self.raveName = getRaveName(suite)
     def getFilter(self):
         return self.filter
-    
+
+class EvaluateRuleBuild(plugins.Action):
+    def __init__(self, getRuleSetName):
+        self.getRuleSetName = getRuleSetName
+        self.rulesCompileFailed = []
+    def __call__(self, test):
+        compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
+        if not os.path.isfile(compTmp):
+            return self.checkForPreviousFailure(test)
+        errContents = string.join(open(compTmp).readlines(),"")
+        ruleset = self.getRuleSetName(test)
+        # The first is C-compilation error, the second generation error...
+        # Would be better if there was something unambiguous to look for!
+        if errContents.find("failed!") != -1 or errContents.find("ERROR:") != -1:
+            self.raiseFailure(ruleset, errContents)
+        else:
+            test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
+    def raiseFailure(self, ruleset, errContents):
+        self.rulesCompileFailed.append(ruleset)
+        errMsg = "Failed to build ruleset " + ruleset + os.linesep + errContents 
+        print errMsg
+        raise plugins.TextTestError, errMsg
+    def checkForPreviousFailure(self, test):
+        ruleset = self.getRuleSetName(test)
+        if ruleset in self.rulesCompileFailed:
+            raise plugins.TextTestError, "Trying to use ruleset '" + ruleset + "' that failed to build."
+        else:
+            test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
+            
 class RuleSet:
     def __init__(self, ruleSetName, raveName, arch):
         self.name = ruleSetName

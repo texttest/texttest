@@ -350,9 +350,13 @@ class OptimizationValueCalculator:
         for index in range(len(entries)):
             entry = entries[index].strip()
             if entry == "MB" or entry == "Mb" or entry == "Mb)":
-                mem = float(entries[index - 1])
-                return mem
-            
+                memNum = entries[index - 1]
+                if memNum.find(".") == -1:
+                    return int(memNum)
+                else:
+                    return float(memNum)
+        return 0
+    
 class TestReport(plugins.Action):
     def __init__(self, versionString):
         versions = versionString.split(",")

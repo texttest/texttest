@@ -427,6 +427,26 @@ class RemoveLogs(plugins.Action):
     def __repr__(self):
         return "Remove logs"
 
+def getTestMachineAndApcLogDir(test):
+    diag = plugins.getDiagnostics("getTestMachineAndApcLogDir")
+    # Find which machine the job was run on.
+    if test.app.configObject.target.useLSF():
+        job = lsf.LSFJob(test)
+        file = job.getFile("-w -a")
+        lines = file.readlines()
+        machine = lines[-1].split()[5].split(".")[0]
+        diag.info("Test was run using LSF on " + machine)
+    else:
+        machine = unixConfig.hostname()
+        diag.info("Test was run locally on " + machine)
+    # Logfile dir
+    subplanName = test.writeDirs[-1].split(os.sep)[-2]
+    apcHostTmp = getApcHostTmp() 
+    apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
+    diag.info("APC log directory is " + apcTmpDir)
+    
+    return machine, apcTmpDir
+
 class FetchApcCore(plugins.Action):
     def __init__(self, config):
         self.config = config
@@ -533,28 +553,18 @@ class ExtractApcLogs(plugins.Action):
             saveName = "extract"
         else:
             saveName = self.args
-        # Find machine name
-        tmpStatusFile = test.makeFileName("status", temporary = 1)
-        if not os.path.isfile(tmpStatusFile):
-            print "No status file exists - aborting log file extraction " + tmpStatusFile
-            return
-        grepCommand = "grep Machine " + tmpStatusFile
-        grepLines = os.popen(grepCommand).readlines()
-        if len(grepLines) > 0:
-            machine = grepLines[0].split()[-1]
-            self.describe(test)
-            subplanName = test.writeDirs[-1].split(os.sep)[-2]
-            apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
-            apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
-            # Extract from the apclog
-            cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + test.makeFileName(saveName, temporary = 1)
-            os.system("rsh " + machine + " '" + cmdLine + "'")
-            # Remove dir
-            cmdLine = "rm -rf " + apcTmpDir 
-            os.system("rsh " + machine + " '" + cmdLine + "'")
-            # Remove the error file (which is create because we are keeping the logfiles,
-            # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***")
-            os.system("rm -f error*")
+
+        machine, apcTmpDir = getTestMachineAndApcLogDir(test)
+        self.describe(test)
+        # Extract from the apclog
+        cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + test.makeFileName(saveName, temporary = 1)
+        os.system("rsh " + machine + " '" + cmdLine + "'")
+        # Remove dir
+        cmdLine = "rm -rf " + apcTmpDir 
+        os.system("rsh " + machine + " '" + cmdLine + "'")
+        # Remove the error file (which is create because we are keeping the logfiles,
+        # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***")
+        os.system("rm -f script_errors*")
     def __repr__(self):
         return "Extracting APC logfile for"
         

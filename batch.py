@@ -288,7 +288,7 @@ class CollectFiles(plugins.Action):
         prefix = "batchreport." + app.name + app.versionSuffix()
         # Don't collect to more collections!
         self.diag.info("Setting up application " + app.name + " looking for " + prefix) 
-        app.addConfigEntry("collection", "false", "batch_use_collection")
+        app.addConfigEntry("collection", self.getCollectionSetting(), "batch_use_collection")
         for filename in os.listdir(app.abspath):
             if filename.startswith(prefix):
                 fullname = os.path.join(app.abspath, filename)
@@ -310,6 +310,11 @@ class CollectFiles(plugins.Action):
         mailFile = self.mailSender.createMail(mailTitle, app, [])
         self.writeBody(mailFile, fileBodies)
         mailFile.close()
+    def getCollectionSetting(self):
+        if plugins.BackgroundProcess.fakeProcesses:
+            return "true"
+        else:
+            return "false"
     def getTitle(self, app, totalValues):
         title = self.mailSender.getMailHeader(app, [])
         total = 0

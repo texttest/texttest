@@ -247,8 +247,13 @@ class CreateCatalogue(plugins.Action):
             return
         fileName = test.makeFileName("catalogue", temporary=1)
         file = open(fileName, "w")
+        currDir = os.getcwd()
         for writeDir in test.writeDirs:
-            self.listDirectory(test.app, file, os.path.normpath(writeDir))
+            if os.path.isdir(writeDir):
+                os.chdir(writeDir)
+                realWriteDir = os.getcwd();
+                os.chdir(currDir)
+                self.listDirectory(test.app, file, realWriteDir)
         file.close()
         if os.path.getsize(fileName) == 0:
             os.remove(fileName)
@@ -279,7 +284,7 @@ class CreateCatalogue(plugins.Action):
             return "Test Directory"
         if writeDir.startswith(currDir):
             return "Test subdirectory " + writeDir.replace(currDir + os.sep, "")
-        return os.path.basename(writeDir)
+        return os.path.basename(writeDir) + "(" + writeDir + " != " + currDir + ")"
                     
 class CountTest(plugins.Action):
     def __init__(self):

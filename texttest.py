@@ -31,7 +31,11 @@ class Test:
         self.performOnSubTests(action)
     def setUpEnvironment(self):
         for var, value in self.environment.items():
-            os.environ[var] = self.app.makeAbsPath(os.path.expandvars(value))
+            if value.find("/") != -1:
+                varValue = os.path.expandvars(value)
+                os.environ[var] = self.app.makeAbsPath(os.path.normpath(varValue))
+            else:
+                os.environ[var] = value
             # Ensure multiple expansion doesn't occur
             self.environment[var] = os.environ[var]
             debugPrint("Setting " + var + " to " + os.environ[var])

@@ -92,10 +92,10 @@ class ScriptEngine:
     def applicationEvent(self, name, category = None, timeDelay = 0):
         if currentThread() != self.thread:
             raise UseCaseScriptError, "Can only register application events in the same thread as the script engine"
-        if self.replayScript:
-            self.replayScript.registerApplicationEvent(name, timeDelay)
         if self.recordScript:
             self.recordScript.registerApplicationEvent(name, category)
+        if self.replayScript:
+            self.replayScript.registerApplicationEvent(name, timeDelay)
     def readStdin(self):
         line = sys.stdin.readline().strip()
         if self.stdinScript:

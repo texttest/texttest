@@ -127,9 +127,7 @@ class RunTest(default.RunTest):
     def changeState(self, test):
         test.changeState(test.RUNNING, "Running on " + hostname())
     def getCleanUpAction(self):
-        if self.process:
-            print "Killing running test (process id", str(self.process.processId) + ")"
-            self.process.kill()
+        return KillTest(self)
     def setUpApplication(self, app):
         default.RunTest.setUpApplication(self, app)
         self.collectStdErr = app.getConfigValue("collect_standard_error")
@@ -181,6 +179,15 @@ class RunTest(default.RunTest):
             else:
                 return ""
         return None
+
+class KillTest(plugins.Action):
+    def __init__(self, testRunner):
+        self.runner = testRunner
+    def setUpApplication(self, app):
+        process = self.runner.process
+        if process and process.processId:
+            print "Killing running test (process id", str(process.processId) + ")"
+            process.kill()
    
 def hostname():
     if os.environ.has_key("HOST"):

@@ -167,11 +167,15 @@ class BackgroundProcess:
                 return 0
         return 1
     def _hasTerminated(self, processId):
+        # Works on child processes only. Do not use while killing...
         try:
             procId, status = os.waitpid(processId, os.WNOHANG)
             return procId > 0 or status > 0
         except OSError:
             return 1
+    def _hasTerminatedNotChild(self, processId):
+        lines = os.popen("ps -p " + str(processId)).readlines()
+        return len(lines) < 2
     def waitForTermination(self):
         if self.processId == None:
             return
@@ -181,14 +185,26 @@ class BackgroundProcess:
             except OSError:
                 pass
     def kill(self):
-        self.killWithSignal(signal.SIGTERM)
-    def killWithSignal(self, killSignal):
-        for process in self.findAllProcesses(self.processId):
-            try:
-                os.kill(process, killSignal)
-                print "Killed process", process, "with signal", killSignal
-            except OSError:
-                pass
+        processes = self.findAllProcesses(self.processId)
+        # Just kill the deepest child process, that seems to work best...
+        self.tryKillProcess(processes[-1])
+    def tryKillProcess(self, process):
+        if self.tryKillProcessWithSignal(process, signal.SIGINT):
+            return
+        if self.tryKillProcessWithSignal(process, signal.SIGTERM):
+            return
+        self.tryKillProcessWithSignal(process, signal.SIGKILL)
+    def tryKillProcessWithSignal(self, process, killSignal):
+        try:
+            os.kill(process, killSignal)
+            print "Killed process", process, "with signal", killSignal
+        except OSError:
+            pass
+        for i in range(10):
+            time.sleep(0.1)
+            if self._hasTerminatedNotChild(process):
+                return 1
+        return 0
     def findAllProcesses(self, pid):
         processes = []
         processes.append(pid)

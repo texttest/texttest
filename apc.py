@@ -17,6 +17,8 @@ helpOptions = """-rundebug <options> - (only APC) Runs the test in the debugger 
              The following options are avaliable:
              - xemacs
                The debugger is run in xemacs, in gdbsrc mode.
+             - nolog
+               The log file is not displayed.
 """
 
 helpScripts = """apc.CleanTmpFiles          - Removes all temporary files littering the test directories
@@ -189,8 +191,17 @@ class RunApcTest(default.RunTest):
 class RunApcTestInDebugger(default.RunTest):
     def __init__(self, options):
         self.inXEmacs = None
-        if options == "xemacs":
-            self.inXEmacs = 1
+        self.showLogFile = 1
+        opts = options.split(" ")
+        if opts[0] == "":
+            return
+        for opt in opts:
+            if opt == "xemacs":
+                self.inXEmacs = 1
+            elif opt == "nolog":
+                self.showLogFile = None
+            else:
+                print "Ignoring unknown option " + opt
     def __repr__(self):
         return "Debugging"
     def __call__(self, test):
@@ -205,7 +216,8 @@ class RunApcTestInDebugger(default.RunTest):
         apcLogFile = open(apcLog, "w")
         apcLogFile.write("")
         apcLogFile.close()
-        os.system("xon " + os.environ["HOST"] + " 'xterm -bg white -T " + test.name + " -e 'less +F " + apcLog + "''")
+        if self.showLogFile:
+            os.system("xon " + os.environ["HOST"] + " 'xterm -bg white -T " + test.name + " -e 'less +F " + apcLog + "''")
         # Create a script for gdb to run.
         gdbArgs = test.makeFileName("gdb_args", temporary=1)
         gdbArgsFile = open(gdbArgs, "w")

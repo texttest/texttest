@@ -27,13 +27,13 @@ class InteractiveResponder(Responder):
     def handleFailure(self, test, comparisons):
         performView = self.askUser(test, comparisons, 1)
         if performView:
-            self.displayComparisons(comparisons, sys.stdout)
+            self.displayComparisons(comparisons, sys.stdout, test.app.getConfigValue("log_file"))
             self.askUser(test, comparisons, 0)
-    def displayComparisons(self, comparisons, displayStream):
+    def displayComparisons(self, comparisons, displayStream, logFile):
         for comparison in comparisons:
             displayStream.write("------------------ Differences in " + repr(comparison) + " --------------------\n")
-            self.display(comparison, displayStream)
-    def display(self, comparison, displayStream):
+            self.display(comparison, displayStream, logFile)
+    def display(self, comparison, displayStream, logFile):
         ndiff.fcompare(comparison.stdCmpFile, comparison.tmpCmpFile)
     def askUser(self, test, comparisons, allowView):      
         options = "Save(s) or continue(any other key)?"
@@ -57,9 +57,9 @@ class InteractiveResponder(Responder):
 class UNIXInteractiveResponder(InteractiveResponder):
     def __init__(self, lineCount):
         self.lineCount = lineCount
-    def display(self, comparison, displayStream):
+    def display(self, comparison, displayStream, logFile):
         argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
-        if repr(comparison) == "output" and displayStream == sys.stdout:
+        if repr(comparison) == logFile and displayStream == sys.stdout:
             print "<See tkdiff window>"
             os.system("tkdiff" + argumentString + " &")
         else:

@@ -289,7 +289,9 @@ class CollectFiles(plugins.Action):
         # Don't collect to more collections!
         self.diag.info("Setting up application " + app.name + " looking for " + prefix) 
         app.addConfigEntry("collection", self.getCollectionSetting(), "batch_use_collection")
-        for filename in os.listdir(app.abspath):
+        filelist = os.listdir(app.abspath)
+        filelist.sort()
+        for filename in filelist:
             if filename.startswith(prefix):
                 fullname = os.path.join(app.abspath, filename)
                 file = open(fullname)

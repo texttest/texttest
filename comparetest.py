@@ -93,6 +93,11 @@ class TestComparison(plugins.TestState):
         return len(self.newResults) > 0
     def hasSucceeded(self):
         return self.category == "success"
+    def isSaveable(self):
+        if self.failedPrediction:
+            return self.failedPrediction.isSaveable()
+        else:
+            return plugins.TestState.isSaveable(self)
     def hasDifferences(self):
         return len(self.changedResults) > 0
     def needsRecalculation(self):

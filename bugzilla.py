@@ -25,6 +25,8 @@ class KnownBug(FailedPrediction):
             return "badPredict"
         else:
             return "bug"
+    def isSaveable(self):
+        return self.findCategory() != "bug"
     def getTypeBreakdown(self):
         return "success", self.briefText
 

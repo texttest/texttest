@@ -23,7 +23,9 @@ plugins.addCategory("crash", "CRASHED")
 
 # For backwards compatibility...
 class FailedPrediction(plugins.TestState):
-    pass
+    def isSaveable(self):
+        # for back-compatibility
+        return 1
 
 class CheckLogFilePredictions(plugins.Action):
     def __init__(self, version = None):

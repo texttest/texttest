@@ -75,7 +75,7 @@ class SaveTest(InteractiveAction):
     def canPerformOnTest(self):
         return self.isSaveable(self.test)
     def isSaveable(self, test):
-        return test and test.state.hasFailed() and test.state.hasResults()
+        return test and test.state.isSaveable()
     def getTitle(self):
         return "Save"
     def matchesMode(self, dynamic):

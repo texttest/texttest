@@ -117,6 +117,8 @@ class TestState:
     def hasResults(self):
         # Do we have actual results that can be compared
         return 0
+    def isSaveable(self):
+        return self.hasFailed() and self.hasResults()
     def updateAbsPath(self, newAbsPath):
         pass
     def changeDescription(self):

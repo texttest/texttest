@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os, sys, types, string, getopt, types, time, plugins, exceptions, stat, log4py, shutil
 from stat import *
-from usecase import ScriptEngine
+from usecase import ScriptEngine, UseCaseScriptError
 from ndict import seqdict
 
 helpIntro = """
@@ -208,6 +208,26 @@ class TestCase(Test):
         self.stateDetails = details
         if state != oldState:
             self.notifyChanged()
+            # Tests changing state are reckoned to be significant enough to wait for...
+            try:
+                self.stateChangeEvent(state, oldState)
+            except UseCaseScriptError:
+                # This will be raised if we're in a subthread, i.e. if the GUI is running
+                # Rely on the GUI to report the same event.
+                pass
+    def stateChangeEvent(self, state, oldState = None):
+        if oldState and oldState == self.FAILED:
+            # Don't record event if we're being 'saved' or whatever
+            return
+        eventName = "test " + self.name + " to " + self.stateChangeDescription(state)
+        category = self.name
+        ScriptEngine.instance.applicationEvent(eventName, category)
+    def stateChangeDescription(self, state):
+        if state == self.RUNNING:
+            return "start"
+        if state == self.FAILED or state == self.UNRUNNABLE or state == self.SUCCEEDED:
+            return "complete"
+        return "finish preprocessing"
     def performOnSubTests(self, action):
         pass
     def getExecuteCommand(self):
@@ -692,7 +712,9 @@ class Application:
             if not os.path.isdir(fpath):
                 continue
             if fpath.find(currTmpString) != -1:
-                shutil.rmtree(os.path.join(rootDir, file))
+                previousWriteDir = os.path.join(rootDir, file)
+                print "Removing previous write directory", previousWriteDir
+                shutil.rmtree(previousWriteDir)
     def getTmpIdentifier(self):
         return self.name + self.versionSuffix() + globalRunIdentifier
     def getTestUser(self):
@@ -1267,7 +1289,8 @@ class TextTest:
                 print "Cannot use GUI: caught exception:"
                 printException()
         if not self.gui:
-            self.scriptEngine = ScriptEngine(replayScript, recordScript, stdinScript)
+            logger = plugins.getSelfTestDiagnostics("Use-case log", "usecase_log.texttest")
+            self.scriptEngine = ScriptEngine(replayScript, recordScript, stdinScript, logger)
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names
         if os.environ.has_key("USER"):

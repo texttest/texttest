@@ -22,6 +22,28 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
 -keeptmp   - Keep the temporary subplan directories of the test(s). Note that once you run the test again the old
              temporary subplan dirs will be removed, unless you run in parallell mode of course.       
 """
+helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the cpu time (in minutes) versus total cost. 
+                             The data is extracted from the status file of test(s), and if the test is
+                             currently running, the temporary status file is used, see however the
+                             option nt below. All tests selected are plotted in the same graph.
+                             The following options are supported:
+                             - r=range
+                               The x-axis has the range range. Default is the whole data set. Example: 60:
+                             - p=an absolute file name
+                               Prints the graph to a postscript file instead of displaying it.
+                             - i=item
+                               Which item to plot from the status file. Note that whitespaces are replaced
+                               by underscores. Default is TOTAL cost. Example: i=overcover_cost.
+                             - s
+                               Plot against solution number instead of cpu time.
+                             - nt
+                               Do not use status file from the currently running test.
+                             - ns
+                               Do not scale times with the performance of the test
+                             - v=v1,v2
+                               Plot multiple versions in same dia, ie 'v=,9' means master and version 9
+"""
+
 
 import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re
 
@@ -59,6 +81,9 @@ class OptimizationConfig(carmen.CarmenConfig):
     def printHelpOptions(self, builtInOptions):
         carmen.CarmenConfig.printHelpOptions(self, builtInOptions)
         print helpOptions
+    def printHelpScripts(self):
+        carmen.CarmenConfig.printHelpScripts(self)
+        print helpScripts
 
 class ExtractSubPlanFile(plugins.Action):
     def __init__(self, config, sourceName, targetName):
@@ -200,14 +225,51 @@ newSolutionMarker = "new solution"
 #Probably different for APC and matador
 itemNamesInFile = {}
 
+class LogFileFinder:
+    def __init__(self, test, tryTmpFile = 1):
+        self.tryTmpFile = tryTmpFile
+        self.test = test
+        self.logStem = test.app.getConfigValue("log_file")
+    def findFile(self, version = ""):
+        if self.tryTmpFile:
+            logFile = self.findTempFile(self.test, version) 
+            if logFile and os.path.isfile(logFile):
+                return logFile
+        logFile = self.test.makeFileName(self.logStem, version)
+        if os.path.isfile(logFile):
+            return logFile
+        else:
+            raise EnvironmentError, "Could not find log file for Optimization Run in test", + repr(self.test)
+    def findTempFile(self, test, version):
+        fileInTest = self.findTempFileInTest(version, self.logStem)
+        if fileInTest or self.logStem == "output":
+            return fileInTest
+        # Look for output, find appropriate temp subplan, and look there
+        outputInTest = self.findTempFileInTest(version, "output")
+        grepCommand = "grep -E 'SUBPLAN' " + file
+        grepLines = os.popen(grepCommand).readlines()
+        if len(grepLines) > 0:
+            currentFile = os.path.join(grepLines[0].split()[1], self.logStem)
+            if os.path.isfile(currentFile):
+                return currentFile
+        else:
+            print "Could not find subplan name in output file " + file + os.linesep
+    def findTempFileInTest(self, version, stem):                           
+        for file in os.listdir(self.test.abspath):
+            if file.startswith("output") and file.find(version + self.test.getTestUser()) != -1:
+                return file
+
 class OptimizationRun:
-    def __init__(self, test, version, definingItems, interestingItems, margin = 0.0):
+    def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0):
         self.performance = performance.getTestPerformance(test, version) # float value
-        self.logFile = test.makeFileName(test.app.getConfigValue("log_file"), version)
+        logFinder = LogFileFinder(test, tryTmpFile)
+        self.logFile = logFinder.findFile(version)
+        print self.logFile
         self.penaltyFactor = 1.0
         calculator = OptimizationValueCalculator(definingItems + interestingItems, self.logFile)
         self.solutions = calculator.getSolutions(definingItems)
-        self.scaleTimes()
+        if scale and self.solutions:
+            self.scaleTimes()
     def scaleTimes(self):
         finalTime = self.solutions[-1][timeEntryName]
         if finalTime == 0.0:
@@ -696,18 +758,19 @@ class ImportTest(plugins.Action):
     def testForImportTestCase(self, testInfo):
         return 0
 
-# Base class for using gnuplot to plot test curves of tests
+# Class for using gnuplot to plot test curves of tests
 #
 class PlotTest(plugins.Action):
     def __init__(self, args = []):
         self.plotFiles = []
-        self.statusFileName = None
-        self.plotItem = None
+        self.plotItem = costEntryName
         self.plotrange = "0:"
-        self.plotPrint = []
-        self.plotAgainstSolNum = []
+        self.plotPrint = None
+        self.plotAgainstSolNum = 0
         self.plotVersions = [ "" ]
-        self.plotScaleTime = "t"
+        self.plotScaleTime = 1
+        self.plotUseTmpStatus = 1
+        self.interpretOptions(args)
     def interpretOptions(self, args):
         for ar in args:
             arr = ar.split("=")
@@ -716,17 +779,22 @@ class PlotTest(plugins.Action):
             elif arr[0]=="p":
                 self.plotPrint = arr[1]
             elif arr[0]=="s":
-                self.plotAgainstSolNum = "t"
+                self.plotAgainstSolNum = 1
             elif arr[0]=="v":
                 self.plotVersions = arr[1].split(",")
             elif arr[0]=="ns":
-                self.plotScaleTime = None
-            elif not self.setOption(arr):
+                self.plotScaleTime = 0
+            elif arr[0]=="nt":
+                self.plotUseTmpStatus = 0
+            elif arr[0]=="i":
+                self.plotItem = arr[1].replace("_"," ")
+            else:
                 print "Unknown option " + arr[0]
-    def setOption(self, arr):
-        return 0
     def getYlabel(self):
-        return self.plotItem
+        if itemNamesInFile.has_key(self.plotItem):
+            return itemNamesInFile[self.plotItem]
+        else:
+            return self.plotItem
     def __repr__(self):
         return "Plotting"
     def __del__(self):
@@ -760,45 +828,21 @@ class PlotTest(plugins.Action):
                 tmppf = stdout.read()
                 if len(tmppf) > 0:
                     open(absplotPrint,"w").write(tmppf)
-
-    def getCostsAndTimes(self, file, plotItem):
-        costs = []
-        times = []
-        return costs, times
-    def getStatusFile(self, test, version):
-        currentFile = test.makeFileName(self.statusFileName, version)
-        if not os.path.isfile(currentFile):
-            return None
-        return currentFile
-    def scaleTimes(self, times, test, version):
-        totPerf = int(performance.getTestPerformance(test, version))
-        if totPerf < 1:
-            return times
-        scaleFactor = float(1.0 * totPerf / times[-1])
-        ntimes = []
-        for t in times:
-            ntimes.append(t * scaleFactor)
-        return ntimes
     def __call__(self, test):
         for version in self.plotVersions:
-            currentFile = self.getStatusFile(test, version)
-            if currentFile == None:
+            try:
+                optRun = OptimizationRun(test, version, [ costEntryName, timeEntryName ], [], self.plotScaleTime, self.plotUseTmpStatus)
+            except EnvironmentError:
                 print "No status file does exist for test " + test.name + "(" + version + ")"
-                return
-            costs, times = self.getCostsAndTimes(currentFile, self.plotItem)
-            if self.plotScaleTime:
-                times = self.scaleTimes(times, test, version)
+
             plotFileName = test.makeFileName("plot")
             if len(version) > 0:
                 plotFileName += "." + version
-            plotFile = open(plotFileName,"w")
-            for il in range(len(costs)):
+            plotFile = open(plotFileName, "w")
+            for solution in optRun.solutions:
                 if self.plotAgainstSolNum:
-                    plotFile.write(str(costs[il]) + os.linesep)
+                    plotFile.write(str(solution[costEntryName]) + os.linesep)
                 else:
-                    plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
+                    plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[costEntryName]) + os.linesep)
             self.plotFiles.append(plotFileName)
-    def setUpSuite(self, suite):
-        pass
-    def setUpApplication(self, app):
-        self.statusFileName = app.getConfigValue("log_file")
+

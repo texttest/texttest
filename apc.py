@@ -559,42 +559,15 @@ class PortApcTest(plugins.Action):
     def setUpSuite(self, suite):
         self.suite = suite
 
-class PlotApcTest(optimization.PlotTest):
-    def __init__(self, args = []):
-        optimization.PlotTest.__init__(self, args)
-        self.plotItem = " " + "TOTAL cost"
-        self.plotUseTmpStatus = "t"
-        self.interpretOptions(args)
-    def setOption(self, arr):
-        if arr[0]=="i":
-            self.plotItem = " " + arr[1].replace("_"," ")
-            return 1
-        elif arr[0]=="nt":
-            self.plotUseTmpStatus = []
-        return 0
-    def getCostsAndTimes(self, file, plotItem):
-        optCalc = optimization.OptimizationValueCalculator( [ plotItem, optimization.timeEntryName ], file)
-        costs = optCalc.getValues(plotItem)
-        times = optCalc.getValues(optimization.timeEntryName)
-        return costs, times
-    def getStatusFile(self, test, version):
-        currentFile = findTemporaryStatusFile(test, version)
-        if self.plotUseTmpStatus and currentFile:
-            print "Using status file in temporary subplan directory for plotting test " + test.name
-            return currentFile
-        else:
-            return optimization.PlotTest.getStatusFile(self, test, version)
-
 class GrepApcLog(plugins.Action):
     def __init__(self,args = ["(heuristic subselection|unfixvars time|focussing|Solv|OBJ|LBD|\*\*\*)"]):
         self.grepwhat = args[0]
     def __repr__(self):
         return "Greping"
-    def __del__(self):
-        pass
     def __call__(self, test):
-        tmpStatusFile = findTemporaryStatusFile(test)
-        if not tmpStatusFile:
+        logFinder = optimization.LogFileFinder(test)
+        tmpStatusFile = logFinder.findFile()
+        if tmpStatusFile.find(test.getTestUser()) == -1:
             print "Test " + test.name + " is not running."
             return
         grepCommand = "grep Machine " + tmpStatusFile
@@ -604,31 +577,6 @@ class GrepApcLog(plugins.Action):
             Command = "rsh " + machine + " 'cd /tmp/*" + test.name + "*; egrep \"" + self.grepwhat + "\" apclog'" 
             grepLines = os.popen(Command).read()
             print grepLines
-    def setUpSuite(self, suite):
-        pass
-    def setUpApplication(self, app):
-        pass
-        
-def findTemporaryStatusFile(test,version = ""):
-    foundoutputfile = 0
-    for file in os.listdir(test.abspath):
-        if file.startswith("output") and file.find(version + test.getTestUser()) != -1:
-            foundoutputfile = 1
-            break
-    if not foundoutputfile:
-        return
-    grepCommand = "grep -E 'SUBPLAN' " + file
-    grepLines = os.popen(grepCommand).readlines()
-    if len(grepLines) > 0:
-        currentFile = grepLines[0].split()[1] + os.sep + "status"
-        if not os.path.isfile(currentFile):
-            return
-        else:
-            return currentFile
-    else:
-        print "Could not find subplan name in output file " + file + os.linesep
-        return    
-
 
 class UpdateCvsIgnore(plugins.Action):
     def __init__(self):

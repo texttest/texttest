@@ -372,13 +372,19 @@ class Application:
 class OptionFinder:
     def __init__(self):
         self.inputOptions = self.buildOptions()
-        # At some stage we should find a scheme to use the log4py configuration files: for now just do this
-        # rather coarse thing
+        self._setUpLogging()
+    def _setUpLogging(self):
+        global debugLog
+        rootLogger = log4py.Logger().get_root()
         if self.inputOptions.has_key("x"):
-            debugLog.set_loglevel(log4py.LOGLEVEL_DEBUG)
-            debugLog.set_formatstring("%C %L - %M")
+            diagPath = _getDiagnosticPath()
+            rootLogger.set_loglevel(log4py.LOGLEVEL_DEBUG)
+            rootLogger.set_formatstring("%C %L - %M")
         else:
-            debugLog.set_loglevel(log4py.LOGLEVEL_NONE)
+            rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
+        # Module level debugging logger
+        global debugLog
+        debugLog = log4py.Logger().get_instance("TextTest")
     # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
     def buildOptions(self):
         inputOptions = {}
@@ -440,6 +446,11 @@ class OptionFinder:
             return 1
     def helpMode(self):
         return self.inputOptions.has_key("help")
+    def _getDiagnosticPath(self):
+        if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
+            return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
+        else:
+            return os.path.join(self.directoryName(), "Diagnostics", "log4py.conf")
     def directoryName(self):
         if self.inputOptions.has_key("d"):
             return os.path.abspath(self.inputOptions["d"])
@@ -590,9 +601,6 @@ def tmpString():
 
 class TextTest:
     def __init__(self):
-        global debugLog
-        debugLog = log4py.Logger().get_instance("TextTest")
-        # Module level debugging logger
         self.inputOptions = OptionFinder()
         global globalRunIdentifier
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())

@@ -349,7 +349,7 @@ class TestSuite(Test):
             testPath = os.path.join(self.abspath, testName)
             testSuite = TestSuite(testName, testPath, self.app, filters)
             if testSuite.isValid():
-                if not testSuite.rejected: # and testSuite.size() > 0:
+                if not testSuite.rejected and testSuite.size() > 0:
                     testCaseList.append(testSuite)
             else:
                 testCase = TestCase(testName, testPath, self.app)
@@ -850,8 +850,7 @@ class ApplicationRunner:
         tmpSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
         tmpSuite.reFilter(self.filterList)
         self.gui = gui
-        print "here"
-        if 0: #tmpSuite.size() == 0:
+        if tmpSuite.size() == 0:
             print "No tests found for", app.description()
             self.valid = 0
         else:

@@ -211,6 +211,8 @@ class CompileRules(plugins.Action):
                 ruleset.moveDebugVersion()
     def performCompile(self, test, commandLine):
         compTmp = test.makeFileName("ravecompile", temporary=1)
+        # Hack to work around crc_compile bug which fails if ":" in directory
+        os.chdir(test.abspath)
         returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
         if returnValue:
             errContents = string.join(open(compTmp).readlines(),"")

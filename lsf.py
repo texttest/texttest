@@ -107,6 +107,10 @@ class LSFConfig(unixConfig.UNIXConfig):
                 for machine in performanceMachines[1:]:
                     resource += " || hname == " + machine
             resourceList.append(resource)
+        if os.environ.has_key("LSF_RESOURCE"):
+            resource = os.getenv("LSF_RESOURCE")
+            if len(resource):
+                resourceList.append(resource)
         return resourceList
     def getTestCollator(self):
         if not self.useLSF():

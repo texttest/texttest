@@ -96,6 +96,9 @@ class Config(plugins.Configuration):
         else:
             if self.optionMap.has_key("noperf"):
                 return self.getTestCollator()
+            elif self.optionMap.has_key("diag"):
+                print "Note: Running with Diagnostics on, so performance checking is disabled!"
+                return [ self.getTestCollator(), self.getMemoryFileMaker() ] 
             else:
                 return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getMemoryFileMaker() ] 
     def getCatalogueCreator(self):
@@ -146,9 +149,6 @@ class Config(plugins.Configuration):
         print "Python scripts: (as given to -s <module>.<class> [args])"
         print "--------------------------------------------------------"
         self.printHelpScripts()
-    def defaultGraphicalDiffTool(self):
-        # Don't know of any that work anywhere with the same name...
-        return None
     def defaultTextDiffTool(self):
         for dir in sys.path:
             fullPath = os.path.join(dir, "ndiff.py")
@@ -165,7 +165,6 @@ class Config(plugins.Configuration):
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output")
         app.setConfigDefault("failure_severity", self.defaultSeverities())
-        app.setConfigDefault("diff_program", self.defaultGraphicalDiffTool())
         app.setConfigDefault("text_diff_program", self.defaultTextDiffTool())
         app.setConfigDefault("lines_of_text_difference", 30)
         app.setConfigDefault("collate_file", {})

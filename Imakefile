@@ -1,5 +1,5 @@
 XCOMM Install test components in generally available place.
-XCOMM $Id: Imakefile,v 1.3 2003/02/12 15:17:27 geoff Exp $
+XCOMM $Id: Imakefile,v 1.4 2003/02/13 17:11:14 uddeborg Exp $
 
 MODULEDIR=/usr/local/lib/python
 FRAMEWORK_MODULES=comparetest.py default.py localrun.py lsf.py ndiff.py performance.py respond.py
@@ -15,4 +15,4 @@ XCOMM There is no single macro which both removes the suffix and installs.
 XCOMM Easiest to do by hand, as long as it is only one case.
 install:: /usr/local/bin/texttest
 /usr/local/bin/texttest: texttest.py
-	install -c -m 775 $< $@
+	cp $< $@

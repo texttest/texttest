@@ -227,10 +227,10 @@ class TestSuite(Test):
             self.rejected = 1
             return testCaseList
 
-        for testline in open(self.testCaseFile).readlines():
-            if testline == '\n' or testline[0] == '#':
+        for testline in open(self.testCaseFile).xreadlines():
+            testName = testline.strip()
+            if len(testName) == 0  or testName[0] == '#':
                 continue
-            testName = string.strip(testline)
             testPath = os.path.join(self.abspath, testName)
             testSuite = TestSuite(testName, testPath, self.app, filters)
             if testSuite.isValid():

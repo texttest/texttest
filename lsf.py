@@ -156,8 +156,10 @@ class LSFJob:
         os.system("bkill -J " + self.name + " > /dev/null 2>&1")
     def getStatus(self):
         file = self.getFile("-w -a")
-        lastline = file.readlines()[-1]
-        data = lastline.strip().split()
+        lines = file.readlines()
+        if len(lines) == 0:
+            return "DONE", None
+        data = lines[-1].strip().split()
         status = data[2]
         if status == "PEND" or len(data) < 6:
             return status, None

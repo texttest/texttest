@@ -1,5 +1,5 @@
 
-import os, log4py, string, signal, shutil, time
+import os, log4py, string, signal, shutil, time, re
 from types import FileType
 from ndict import seqdict
 
@@ -130,6 +130,19 @@ class NonPythonAction(Action):
         os.system(self.script + " app_level " + app.name)
     def callScript(self, test, level):
         os.system(self.script + " " + level + " " + test.name + " " + test.app.name)
+
+class TextTrigger:
+    specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
+    def __init__(self, text):
+        self.text = text
+        self.regex = None
+        if self.specialChars.search(text) != None:
+            self.regex = re.compile(text)
+    def matches(self, line):
+        if self.regex:
+            return self.regex.search(line)
+        else:
+            return line.find(self.text) != -1
 
 # Generally useful class to encapsulate a background process, of which TextTest creates
 # a few... seems it only works on UNIX right now.

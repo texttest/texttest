@@ -21,8 +21,8 @@ class CheckForBugs(plugins.Action):
             fileName = test.makeFileName(stem, temporary=1)
             if os.path.isfile(fileName):
                 for line in open(fileName).xreadlines():
-                    for text, bugNum in entryDict.items():
-                        if line.find(text) != -1:
+                    for trigger, bugNum in entryDict.items():
+                        if trigger.matches(line):
                             test.stateDetails.failedPrediction = os.popen("bugcli -b " + bugNum).read()
         self.unreadBugs(test)
     def readBugs(self, suite):
@@ -50,7 +50,8 @@ class CheckForBugs(plugins.Action):
             for bugText in testBugParser.options(fileStem):
                 bugId = testBugParser.get(fileStem, bugText)
                 self.diag.info("Adding entry to bug map " + fileStem + " : " + bugText + " : " + bugId)
-                self.bugMap[fileStem][bugText] = bugId
+                trigger = plugins.TextTrigger(bugText)
+                self.bugMap[fileStem][trigger] = bugId
     def unreadBugs(self, suite):
         if not self.testBugParserMap.has_key(suite):
             return
@@ -59,5 +60,10 @@ class CheckForBugs(plugins.Action):
         for fileStem in testBugParser.sections():
             for bugText in testBugParser.options(fileStem):
                 self.diag.info("Removing entry from bug map " + fileStem + " : " + bugText)
-                del self.bugMap[fileStem][bugText]
-                bugId = testBugParser.get(fileStem, bugText)
+                trigger = self.findTrigger(fileStem, bugText)
+                del self.bugMap[fileStem][trigger]
+    def findTrigger(self, fileStem, bugText):
+        for trigger in self.bugMap[fileStem]:
+            if trigger.text == bugText:
+                return trigger
+            

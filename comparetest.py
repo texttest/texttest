@@ -37,7 +37,7 @@ collected, the filtered new results are compared with the standard and any diffe
 is interpreted as a test failure. 
 """
 
-import os, filecmp, string, plugins, re
+import os, filecmp, string, plugins
 from ndict import seqdict
 
 class TestComparison:
@@ -342,9 +342,9 @@ class LineFilter:
                 afterText = self.trigger[linePoint + len(syntaxString):]
                 self.readSyntax(syntaxString, beforeText, afterText)
         if self.trigger:
-            self.trigger = TextTrigger(self.trigger)
+            self.trigger = plugins.TextTrigger(self.trigger)
         if self.untrigger:
-            self.untrigger = TextTrigger(self.untrigger)
+            self.untrigger = plugins.TextTrigger(self.untrigger)
     def reset(self):
         self.autoRemove = 0
     def readSyntax(self, syntaxString, beforeText, afterText):
@@ -424,15 +424,3 @@ class LineFilter:
                 wordNumber -= 1
         return len(words) + 1
 
-class TextTrigger:
-    specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
-    def __init__(self, text):
-        self.text = text
-        self.regex = None
-        if self.specialChars.search(text) != None:
-            self.regex = re.compile(text)
-    def matches(self, line):
-        if self.regex:
-            return self.regex.search(line)
-        else:
-            return line.find(self.text) != -1

@@ -179,6 +179,8 @@ class MakeTmpSubPlan(plugins.Action):
         self.raveParameters = []
     def setUpSuite(self, suite):
         self.readRaveParameters(suite.makeFileName("raveparameters"))
+    def tearDownSuite(self, suite):
+        self.unreadRaveParameters()
     def __call__(self, test):
         dirName = self.subplanFunction(test)
         if not os.path.isdir(dirName):
@@ -187,6 +189,7 @@ class MakeTmpSubPlan(plugins.Action):
         tmpDir = test.makeWriteDirectory(rootDir, baseDir, "APC_FILES")
         self.readRaveParameters(test.makeFileName("raveparameters"))
         self.makeLinksIn(tmpDir, dirName)
+        self.unreadRaveParameters()
     def makeLinksIn(self, inDir, fromDir):
         for file in os.listdir(fromDir):
             if file == "APC_FILES":
@@ -215,16 +218,21 @@ class MakeTmpSubPlan(plugins.Action):
             if (len(self.raveParameters) > 0) and file.find("rules") != -1:
                 file = open(toPath, 'w')
                 for line in open(fromPath).xreadlines():
-                    if line.find("<SETS>") != -1:        
-                        for override in self.raveParameters:
-                            file.write(override.strip(os.linesep) + os.linesep)
+                    if line.find("<SETS>") != -1:
+                        #print self.raveParameters
+                        for overrideItems in self.raveParameters:
+                            for override in overrideItems:
+                                file.write(override.strip(os.linesep) + os.linesep)
                     file.write(line)
             else:
                 os.symlink(fromPath, toPath)            
     def readRaveParameters(self, fileName):
         if not os.path.isfile(fileName):
+            self.raveParameters.append([]);
             return
-        self.raveParameters += open(fileName).readlines()
+        self.raveParameters.append(open(fileName).readlines())
+    def unreadRaveParameters(self):
+        self.raveParameters.pop()
         
 class StartStudio(plugins.Action):
     def __call__(self, test):
@@ -1324,7 +1332,7 @@ class PlotLine:
         if addAppDescriptor:
             title += self.test.app.fullName + "."
         if addUserDescriptor:
-            user, name = self.test.getRelPath.split(os.sep)
+            user, name = self.test.getRelPath().split(os.sep)
             title += user + "."
         if addTestDescriptor:
             title += self.test.name + "."

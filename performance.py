@@ -54,8 +54,11 @@ class PerformanceTestComparison(comparetest.TestComparison):
     def __repr__(self):
         if self.comparisonMaker.execHost == None:
             return comparetest.TestComparison.__repr__(self)
-        return "FAILED on " + self.comparisonMaker.execHost
-
+        if len(self.comparisons) > 0:
+            return "FAILED on " + self.comparisonMaker.execHost + " :"
+        else:
+            return ""
+        
 # Does the same as the basic test comparison apart from when comparing the performance file
 class MakeComparisons(comparetest.MakeComparisons):
     def __init__(self):

@@ -21,7 +21,7 @@ class Responder(plugins.Action):
             os.remove("core")
         if comparetest.testComparisonMap.has_key(test):
             testComparison = comparetest.testComparisonMap[test]
-            print test.getIndent() + repr(test), repr(testComparison), ": differences in " + self.comparisonsString(testComparison.comparisons)
+            print test.getIndent() + repr(test), self.responderText(test)
             self.handleFailure(test, testComparison)
             del comparetest.testComparisonMap[test]
         else:
@@ -30,7 +30,10 @@ class Responder(plugins.Action):
         pass
     def comparisonsString(self, comparisons):
         return string.join([repr(x) for x in comparisons], ",")
-
+    def responderText(self, test):
+        testComparison = comparetest.testComparisonMap[test]
+        diffText = " differences in " + self.comparisonsString(testComparison.comparisons)
+        return repr(testComparison) + diffText
 
 # Uses the python ndiff library, which should work anywhere. Override display method to use other things
 class InteractiveResponder(Responder):
@@ -103,8 +106,10 @@ class UNIXInteractiveResponder(InteractiveResponder):
 class OverwriteOnFailures(Responder):
     def __init__(self, version):
         self.version = version
-    def __repr__(self):
-        return "- overwriting"
+    def responderText(self, test):
+        testComparison = comparetest.testComparisonMap[test]
+        diffText = " differences in " + self.comparisonsString(testComparison.comparisons)
+        return "- overwriting" + diffText
     def handleFailure(self, test, testComparison):
         for comparison in testComparison.comparisons:
             comparison.overwrite(self.version)

@@ -24,7 +24,10 @@ class TestComparison:
         self.comparisons = []
         self.attemptedComparisons = []
     def __repr__(self):
-        return "FAILED"
+        if len(self.comparisons) > 0:
+            return "FAILED :"
+        else:
+            return ""
 
 class MakeComparisons(plugins.Action):
     def __repr__(self):

@@ -346,11 +346,12 @@ class LogFileFinder:
         else:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
             return None, None
-    def findTempFileInTest(self, version, stem):
-        fromThisRun = self.test.makeFileName(stem, version, temporary=1)
+    def findTempFileInTest(self, version, stem, thisRun = 1):
         app = self.test.app
-        if os.path.isfile(fromThisRun):
-            return fromThisRun, app.writeDirectory
+        if thisRun:
+            fromThisRun = self.test.makeFileName(stem, version, temporary=1)
+            if os.path.isfile(fromThisRun):
+                return fromThisRun, app.writeDirectory
         versionMod = ""
         if version:
             versionMod = "." + version

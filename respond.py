@@ -6,6 +6,11 @@ class Responder:
     def __repr__(self):
         return "Responding to"
     def __call__(self, test, description):
+        if os.path.isfile("core.Z"):
+            os.system("uncompress core.Z")
+        if os.path.isfile("core"):
+            self.handleCoreFile(test)
+            os.remove("core")
         if comparetest.testComparisonMap.has_key(test):
             comparisons = comparetest.testComparisonMap[test]
             print test.getIndent() + repr(test), self, "differences in", self.comparisonsString(comparisons)
@@ -57,6 +62,21 @@ class InteractiveResponder(Responder):
 class UNIXInteractiveResponder(InteractiveResponder):
     def __init__(self, lineCount):
         self.lineCount = lineCount
+    def handleCoreFile(self, test):
+        fileName = "coreCommands.gdb"
+        file = open(fileName, "w")
+        file.write("bt\nq\n")
+        file.close()
+        # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
+        # Unfortunately running gdb is not the answer, because it truncates the data...
+        binary = os.popen("csh -c 'echo `tail -c 1024 core`'").read().split(" ")[-1].strip()        
+        gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " core")
+        for line in gdbData.xreadlines():
+            if line.find("Program terminated") != -1:
+                print test.getIndent() + repr(test) + " CRASHED (" + line.strip() + ") : stack trace from gdb follows"
+            if line[0] == "#":
+                print line.strip()
+        os.remove(fileName)
     def display(self, comparison, displayStream, logFile):
         argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
         if repr(comparison) == logFile and displayStream == sys.stdout:

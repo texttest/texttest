@@ -192,7 +192,7 @@ class ApcCompileRules(carmen.CompileRules):
        if os.path.isfile(customerEtab):
           etab = carmen.ConfigEtable(customerEtab)
           airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
-          if os.path.isfile(airportFile):
+          if airportFile != None and os.path.isfile(airportFile):
              return
           srcDir = etab.getValue("default", "AirpMaint", "AirportSrcDir")
           if srcDir == None:
@@ -200,7 +200,7 @@ class ApcCompileRules(carmen.CompileRules):
           if srcDir == None:
              srcDir = os.path.join(os.environ["CARMUSR"], "data", "Airport", "source")
           srcFile = os.path.join(srcDir, "AirportFile")
-          if os.path.isfile(srcFile):
+          if os.path.isfile(srcFile) and airportFile != None:
              apCompile = os.path.join(os.environ["CARMSYS"], "bin", carmen.architecture, "apcomp")
              if os.path.isfile(apCompile):
                 print "Missing AirportFile detected, building:", airportFile

@@ -691,7 +691,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         if not self.lowestCostInGroup.has_key(groupName):
             self.lowestCostInGroup[groupName] = min(fcTuple)
             return
-        self.lowestCostInGroup[groupName] = min(self.lowestCostInGroup[groupName], fcTuple)
+        self.lowestCostInGroup[groupName] = min(self.lowestCostInGroup[groupName], min(fcTuple))
     def getMargins(self, app, groupName):
         refMargin = self.refMargins[groupName]
         currentMargin = self.currentMargins[groupName]

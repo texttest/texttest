@@ -541,7 +541,12 @@ class TestCaseGUI(RightWindowGUI):
         textview = gtk.TextView()
         textview.set_wrap_mode(gtk.WRAP_WORD)
         textbuffer = textview.get_buffer()
-        textbuffer.set_text(self.getTestInfo(test))
+        testInfo = self.getTestInfo(test)
+        if len(testInfo):
+            guilog.info("---------- Text Info Window ----------")
+            guilog.info(testInfo)
+            guilog.info("--------------------------------------")
+        textbuffer.set_text(testInfo)
         textViewWindow.add(textview)
         textview.show()
         textViewWindow.show()
@@ -550,7 +555,7 @@ class TestCaseGUI(RightWindowGUI):
         if not test:
             return ""
         if test.state == test.UNRUNNABLE:
-            return str(test.stateDetails).split(os.linesep)[0]
+            return str(test.stateDetails)
         elif test.state == test.FAILED:
             try:
                 if test.stateDetails.failedPrediction:

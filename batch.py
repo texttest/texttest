@@ -189,7 +189,7 @@ class MailSender(plugins.Action):
     def getResponders(self, app):
         appResponders = []
         for responder in allBatchResponders:
-           if responder.mainSuite.app.name == app.name and responder.testCount() > 0:
+           if responder.mainSuite and responder.mainSuite.app.name == app.name and responder.testCount() > 0:
                appResponders.append(responder)
         return appResponders
     def setUpApplication(self, app):

@@ -1133,15 +1133,15 @@ class TestGraph:
         test = plotLine.test
         if not test.app in self.apps:
             self.apps.append(test.app)
-        user, testName = test.getRelPath().split(os.sep)
+        user = plotLine.getUserName()
         if not user in self.users:
             self.users.append(user)
-        if not testName in self.pointTypes.keys():
+        if not test.name in self.pointTypes.keys():
             plotLine.pointType = str(self.pointTypeCounter)
-            self.pointTypes[testName] = plotLine.pointType
+            self.pointTypes[test.name] = plotLine.pointType
             self.pointTypeCounter += 1
         else:
-            plotLine.pointType = self.pointTypes[testName]
+            plotLine.pointType = self.pointTypes[test.name]
         # Fill in the map for later deduction
         self.lineTypes[plotLine.name] = 0
     def getPlotArguments(self):
@@ -1355,12 +1355,13 @@ class PlotLine:
         if addAppDescriptor:
             title += self.test.app.fullName + "."
         if addUserDescriptor:
-            user, name = self.test.getRelPath().split(os.sep)
-            title += user + "."
+            title += self.getUserName() + "."
         if addTestDescriptor:
             title += self.test.name + "."
         title += self.name + "\" "
         return title
+    def getUserName(self):
+        return self.test.getRelPath().split(os.sep)[0]
     def getStyle(self, multipleLines):
         if multipleLines:
             style = " with linespoints lt " +  self.lineType + " pt " + self.pointType

@@ -164,20 +164,22 @@ class SubmitTest(plugins.Action):
     def __call__(self, test):
         queueToUse = self.queueFunction(test)
         self.describe(test, " to LSF queue " + queueToUse)
-        testCommand = "'" + self.getExecuteCommand(test)
+        testCommand = self.getExecuteCommand(test)
         inputFileName = test.getInputFileName()
         if os.path.isfile(inputFileName):
             testCommand = testCommand + " < " + inputFileName
         outfile = test.getTmpFileName("output", "w")
-        testCommand = testCommand + " > " + outfile + "'"
         errfile = test.getTmpFileName("errors", "w")
+        testCommand = testCommand + " > " + outfile + " 2> " + errfile
         reportfile =  test.getTmpFileName("report", "w")
         lsfJob = LSFJob(test)
-        lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -e " + errfile
+        lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile
         resource = self.resourceFunction(test)
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
-        commandLine = "bsub " + lsfOptions + " " + testCommand + " > " + reportfile + " 2>&1"
+        unixPerfFile = test.getTmpFileName("unixperf", "w")
+        timedTestCommand = '\\time -p sh -c "' + testCommand + '" 2> ' + unixPerfFile
+        commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile + " 2>&1"
         os.system(commandLine)
     def getExecuteCommand(self, test):
         return test.getExecuteCommand()
@@ -233,6 +235,14 @@ class MakeResourceFiles(plugins.Action):
             time.sleep(2)
             resourceDict = self.makeResourceDict(tmpFile, textList)
         os.remove(tmpFile)
+        # Read the UNIX performance file, allowing us to discount system time.
+        tmpFile = test.getTmpFileName("unixperf", "r")
+        file = open(tmpFile)
+        for line in file.readlines():
+            if line.find("user") != -1:
+                cpuTime = line.strip().split()[-1]
+                resourceDict["CPU time"] = "CPU time   : " + string.rjust(cpuTime, 9) + " sec."
+        os.remove(tmpFile)
         # There was still an error (jobs killed in emergency), so don't write resource files
         if len(resourceDict) < len(textList):
             return
@@ -252,7 +262,8 @@ class MakeResourceFiles(plugins.Action):
     def writePerformanceFile(self, test, cpuLine, executionLine, fileName):
         executionMachine = self.findExecutionMachine(executionLine)
         file = open(fileName, "w")
-        file.write(string.strip(cpuLine) + " on " + executionMachine + "\n")
+        line = string.strip(cpuLine) + " on " + executionMachine + os.linesep
+        file.write(line)
         file.close()
     def findExecutionMachine(self, line):
         start = string.find(line, "<")

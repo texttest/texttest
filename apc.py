@@ -298,15 +298,15 @@ class ApcCompileRules(carmen.CompileRules):
         self.diag = plugins.getDiagnostics("ApcCompileRules")
     def compileRulesForTest(self, test):
         self.apcLib = os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test))
-        carmTmpDir = os.environ["CARMTMP"]
-        if not os.path.isdir(carmTmpDir):
-            os.mkdir(carmTmpDir)
         if self.forcedRuleCompile == 0 and carmen.getArchitecture(test.app) == "i386_linux":
             self.linuxRuleSetBuild(test)
         else:
             carmen.CompileRules.compileRulesForTest(self, test)
     def linuxRuleSetBuild(self, test):
         ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
+        if not self.ensureCarmTmpDirExists():
+            self.rulesCompileFailed.append(ruleset.name)
+            raise plugins.TextTestError, "Non-existing CARMTMP"
         self.diag.info("Using linuxRuleSetBuild for building rule set " + ruleset.name)
         if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
             raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
@@ -406,22 +406,25 @@ class ApcUpdateLSFStatus(plugins.Action):
 
 class ApcMakeResourceFiles(lsf.MakeResourceFiles):
     def writeMemoryFile(self, test, textList, resourceDict, explicitFileName = "" ):
-        optRun = optimization.OptimizationRun(test, "", [ optimization.memoryEntryName ], [], 0, 0, 0, test.writeDirs[0] + os.sep + "status." + test.app.name + test.app.versionSuffix())
+        optRun = optimization.OptimizationRun(test, "", [ optimization.memoryEntryName ], [], 0, 0, 0, test.makeFileName("status", temporary=1))
         maxMem = optRun.getMaxMemory()
-        if explicitFileName:
-            fileName = explicitFileName
-        else:
-            fileName = test.makeFileName("memory", temporary=1)
-        file = open(fileName, "w")
-        file.write(string.lstrip(textList[0] + " :      " + str(maxMem) + " MB") + os.linesep)
-        file.close()
+        if not maxMem == "??":
+            # We save memory performance in steps of 0.5Mb
+            roundedMaxMem = float(int(2*maxMem))/2
+            if explicitFileName:
+                fileName = explicitFileName
+            else:
+                fileName = test.makeFileName("memory", temporary=1)
+                file = open(fileName, "w")
+                file.write(string.lstrip(textList[0] + " :      " + str(roundedMaxMem) + " MB") + os.linesep)
+                file.close()
 
 class ExtractMemoryPerformance(plugins.Action):
     def __repr__(self):
         return "Extracting memory performance for"
     def __call__(self, test):
         test.writeDirs.append(test.abspath)
-        statusFileName = test.writeDirs[0] + os.sep + "status." + test.app.name + test.app.versionSuffix()
+        statusFileName = test.makeFileName("status", temporary = 0)
         if os.path.isfile(statusFileName):
             resourceAction = ApcMakeResourceFiles(None, None, None)
             resourceAction.writeMemoryFile(test, [ "Max Memory" ], None, test.makeFileName("memory", temporary=1) + test.app.versionSuffix())
@@ -461,9 +464,8 @@ class FetchApcCore(plugins.Action):
             self.diag.info("APC log files are NOT kept, exiting.")
             return
         self.diag.info("APC log files are kept.")
-        logFinder = optimization.LogFileFinder(test)
-        foundTmp, tmpStatusFile = logFinder.findFile()
-        if not foundTmp:
+        tmpStatusFile = test.makeFileName("status.apc", temporary = 1)
+        if not os.path.isfile(tmpStatusFile):
             return
         self.diag.info("Found temporary status file " + tmpStatusFile)
         grepCommand = "grep Machine " + tmpStatusFile
@@ -542,9 +544,9 @@ class ExtractApcLogs(plugins.Action):
                 extractCommand = test.app.getConfigValue("extract_logs_default")
                 saveName = "extract"
         # Find machine name
-        logFinder = optimization.LogFileFinder(test)
-        foundTmp, tmpStatusFile = logFinder.findFile()
-        if not foundTmp:
+        tmpStatusFile = test.makeFileName("status", temporary = 1)
+        if not os.path.isfile(tmpStatusFile):
+            print "No status file exists - aborting log file extraction " + tmpStatusFile
             return
         grepCommand = "grep Machine " + tmpStatusFile
         grepLines = os.popen(grepCommand).readlines()
@@ -555,7 +557,7 @@ class ExtractApcLogs(plugins.Action):
             apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
             apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
             # Extract from the apclog
-            cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + test.writeDirs[0] + os.sep + saveName + "." + test.app.name + test.app.versionSuffix()
+            cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + test.makeFileName(saveName, temporary = 1)
             os.system("rsh " + machine + " '" + cmdLine + "'")
             # Remove dir
             cmdLine = "rm -rf " + apcTmpDir 
@@ -873,25 +875,6 @@ class PortApcTest(plugins.Action):
             self.describe(test, " in " + testInfo.suiteDescription())
     def setUpSuite(self, suite):
         self.suite = suite
-
-class GrepApcLog(plugins.Action):
-    def __init__(self,args = ["(heuristic subselection|unfixvars time|focussing|Solv|OBJ|LBD|\*\*\*)"]):
-        self.grepwhat = args[0]
-    def __repr__(self):
-        return "Greping"
-    def __call__(self, test):
-        logFinder = optimization.LogFileFinder(test)
-        foundTmp, tmpStatusFile = logFinder.findFile()
-        if not foundTmp:
-            print "Test " + test.name + " is not running."
-            return
-        grepCommand = "grep Machine " + tmpStatusFile
-        grepLines = os.popen(grepCommand).readlines()
-        if len(grepLines) > 0:
-            machine = grepLines[0].split()[-1]
-            cmdLine = "cd " + getApcHostTmp() + "/*" + test.name + "*; egrep \"" + self.grepwhat + "\" apclog"
-            grepLines = os.popen("rsh " + machine + " '" + cmdLine + "'").read()
-            print grepLines
 
 class UpdateCvsIgnore(plugins.Action):
     def __init__(self):

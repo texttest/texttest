@@ -303,9 +303,9 @@ class CompileRules(plugins.Action):
             raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
         if ruleset.isValid() and not ruleset.name in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name)
-            if not os.path.isdir(os.environ["CARMTMP"]):
-                print "CARMTMP", os.environ["CARMTMP"], "did not exist, attempting to create it"
-                os.mkdir(os.environ["CARMTMP"])
+            if not self.ensureCarmTmpDirExists():
+                self.rulesCompileFailed.append(ruleset.name)
+                raise plugins.TextTestError, "Non-existing CARMTMP"
             ruleset.backup()
             self.rulesCompiled.append(ruleset.name)
             if ruleset.precompiled:
@@ -325,6 +325,16 @@ class CompileRules(plugins.Action):
                     raise plugins.TextTestError, "Failed to build ruleset " + ruleset.name + os.linesep + errorMessage
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
+    def ensureCarmTmpDirExists(self):
+        carmTmp = os.environ["CARMTMP"]
+        if not os.path.isdir(carmTmp):
+            if os.path.islink(carmTmp):
+                print "CARMTMP", carmTmp, "seems to be a deadlink"
+                return 0
+            else:
+                print "CARMTMP", carmTmp, "did not exist, attempting to create it"
+                os.mkdir(os.environ["CARMTMP"])
+        return 1
     def performCompile(self, test, commandLine):
         compTmp = test.makeFileName("ravecompile", temporary=1)
         # Hack to work around crc_compile bug which fails if ":" in directory

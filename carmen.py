@@ -327,7 +327,7 @@ class CompileRules(plugins.Action):
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
     def ensureCarmTmpDirExists(self):
-        carmTmp = os.environ["CARMTMP"]
+        carmTmp = os.path.normpath(os.environ["CARMTMP"])
         if not os.path.isdir(carmTmp):
             if os.path.islink(carmTmp):
                 print "CARMTMP", carmTmp, "seems to be a deadlink"

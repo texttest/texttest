@@ -439,61 +439,66 @@ class FetchApcCore(plugins.Action):
                 return "Yes"
         return []
     def __call__(self, test):
+        self.diag.info("Calling FetchApcCore")
         if self.config.isReconnecting():
             return
         coreFileName = os.path.join(test.getDirectory(temporary=1), "core.Z")
-        errorFileName = test.makeFileName("error", temporary=1)
-        if not os.path.isfile(errorFileName):
+        subplanDir = test.writeDirs[-1];
+        scriptErrorsFileName = os.path.join(subplanDir, "run_status_script_error")
+        self.diag.info(scriptErrorsFileName)
+        if not os.path.isfile(scriptErrorsFileName):
             return
         self.diag.info("Error file found.")
         # An error file can be created even if there are no kept log files
-        if not self.isApcLogFileKept(errorFileName):
+        if not self.isApcLogFileKept(scriptErrorsFileName):
             self.diag.info("APC log files are NOT kept, exiting.")
             return
         self.diag.info("APC log files are kept.")
-        tmpStatusFile = test.makeFileName("status.apc", temporary = 1)
-        if not os.path.isfile(tmpStatusFile):
+        #Find which machine the job was run on.
+        if self.config.useLSF():
+            job = lsf.LSFJob(test)
+            file = job.getFile("-w -a")
+            lines = file.readlines()
+            machine = lines[-1].split()[5].split(".")[0]
+        else:
+            machine = unixConfig.hostname()
+        self.diag.info("Job was ran on machine " + machine)
+        #Find out APC tmp directory.
+        subplanName = test.writeDirs[-1].split(os.sep)[-2]
+        apcHostTmp = getApcHostTmp() 
+        apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
+        # Check if there is a apc_debug file.
+        stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls apc_debug"  + "'")
+        stderrlines = stderr.readlines()
+        if not stderrlines:
+            self.diag.info("apc_debug file is found. Aborting.")
             return
-        self.diag.info("Found temporary status file " + tmpStatusFile)
-        grepCommand = "grep Machine " + tmpStatusFile
-        grepLines = os.popen(grepCommand).readlines()
-        if len(grepLines) > 0:
-            machine = grepLines[0].split()[-1]
-            subplanName = test.writeDirs[-1].split(os.sep)[-2]
-            apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
-            apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
-            # Check if there is a apc_debug file.
-            stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls apc_debug"  + "'")
-            stderrlines = stderr.readlines()
-            if not stderrlines:
-                self.diag.info("apc_debug file is found. Aborting.")
-                return
-            self.describe(test, " from " + machine)
-            # Check if there really is a core file! One don't get a core if APC does a scream for example.
-            stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls core"  + "'")
-            stderrlines = stderr.readlines()
-            if stderrlines:
-                print "No core file present."
-            else:
-                binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
-                binCmd = "echo ' " + binName +  "' >> core"
-                cmdLine = "cd " + apcTmpDir + "; " + binCmd + ";compress -c core > " + coreFileName
-                os.system("rsh " + machine + " '" + cmdLine + "'")
-            # Show log file!
-            if not self.config.isNightJob():
-                command = "xon " + machine + " 'xterm -bg white -fg black -T " + test.name + " -e 'less +F " + apcTmpDir + os.sep + "apclog" + "''"
-                os.system(command)
-            tmpDir = test.writeDirs[0]
-            if os.path.isdir(tmpDir):
-                tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
-                if os.path.isfile(tgzFile):
-                    os.remove(tgzFile)
-                cmdLine = "cd " + apcTmpDir + "; tar cf - . | gzip -c > " + tgzFile
-                self.diag.info("Crash is saved in " + tgzFile)
-                os.system("rsh " + machine + " '" + cmdLine + "'")
-            if self.config.isNightJob():
-                cmdLine = "rm -rf " + apcTmpDir 
-                os.system("rsh " + machine + " '" + cmdLine + "'")
+        self.describe(test, " from " + machine)
+        # Check if there really is a core file! One don't get a core if APC does a scream for example.
+        stdin,stdout,stderr = os.popen3("rsh " + machine + " '" + "cd " + apcTmpDir + "; ls core.*"  + "'")
+        stderrlines = stderr.readlines()
+        if stderrlines:
+            print "No core file present."
+        else:
+            binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
+            binCmd = "echo ' " + binName +  "' >> core.*"
+            cmdLine = "cd " + apcTmpDir + "; " + binCmd + ";compress -c core.* > " + coreFileName
+            os.system("rsh " + machine + " '" + cmdLine + "'")
+        # Show log file!
+        if not self.config.isNightJob():
+            command = "xon " + machine + " 'xterm -bg white -fg black -T " + test.name + " -e 'less +F " + apcTmpDir + os.sep + "apclog" + "''"
+            os.system(command)
+        tmpDir = test.writeDirs[0]
+        if os.path.isdir(tmpDir):
+            tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
+            if os.path.isfile(tgzFile):
+                os.remove(tgzFile)
+            cmdLine = "cd " + apcTmpDir + "; tar cf - . | gzip -c > " + tgzFile
+            self.diag.info("Crash is saved in " + tgzFile)
+            os.system("rsh " + machine + " '" + cmdLine + "'")
+        if self.config.isNightJob():
+            cmdLine = "rm -rf " + apcTmpDir 
+            os.system("rsh " + machine + " '" + cmdLine + "'")
     def __repr__(self):
         return "Fetching crash for"
 

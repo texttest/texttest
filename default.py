@@ -59,7 +59,11 @@ class Config(plugins.Configuration):
         switches["nv"] = "No line type grouping for versions"
         return switches
     def getActionSequence(self):
-        actions = [ self.getWriteDirectoryMaker(), self.tryGetTestRunner(), self.getTestEvaluator() ]
+        return self._getActionSequence(makeDirs=1)
+    def _getActionSequence(self, makeDirs):
+        actions = [ self.tryGetTestRunner(), self.getTestEvaluator() ]
+        if makeDirs:
+            actions = [ self.getWriteDirectoryMaker() ] + actions
         if self.optionMap.has_key("i"):
             return [ plugins.CompositeAction(actions) ]
         else:

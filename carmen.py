@@ -145,7 +145,8 @@ class CarmenConfig(lsf.LSFConfig):
         else:
             builder = self.getAppBuilder()
             # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
-            return [ builder, self.getWriteDirectoryMaker(), self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self)[1:]
+            return [ builder, self.getWriteDirectoryMaker(), self.getRuleBuilder(1) ] + \
+                   lsf.LSFConfig._getActionSequence(self, makeDirs = 0)
     def getRuleCleanup(self):
         return CleanupRules(self.getRuleSetName)
     def getRuleBuilder(self, neededOnly):

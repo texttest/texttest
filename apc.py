@@ -38,7 +38,7 @@ apc.UpdatePerformance      - Update the performance file for tests with time fro
 
 """
 
-import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins, math, filecmp
+import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimization, plugins, math, filecmp, re
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)

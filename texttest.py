@@ -423,7 +423,10 @@ class TextTest:
                 try:
                     self.runApp(app)
                 except:
-                    if sys.exc_type == exceptions.KeyboardInterrupt:
+                    # Assumed to be a child thread, in any case exit silently
+                    if sys.exc_type == exceptions.SystemExit:
+                        return
+                    elif sys.exc_type == exceptions.KeyboardInterrupt:
                         print "Terminated due to interruption"
                         return
                     else:
@@ -438,7 +441,10 @@ class TextTest:
         try:
             self.performActionSequence(allTests, actionSequence, app, filterList)
         except:
-            self.performCleanUp(allTests, actionSequence, app)
+            if sys.exc_type == exceptions.SystemExit:
+                raise sys.exc_type, sys.exc_value
+            else:
+                self.performCleanUp(allTests, actionSequence, app)
     def performCleanUp(self, suite, actionSequence, app):    
         print "Caught exception, cleaning up..."
         for action in actionSequence:

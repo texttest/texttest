@@ -95,6 +95,7 @@ class MatadorConfig(optimization.OptimizationConfig):
         self.itemNamesInFile[optimization.memoryEntryName] = "Memory"
         self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
         self.itemNamesInFile[optimization.solutionName] = "Solution\."
+        self.itemNamesInFile["unassigned slots"] = "slots \(unassigned\)"
         # Add here list of entries that should not increase, paired with the methods not to check
         self.noIncreaseExceptMethods[optimization.costEntryName] = [ "SolutionLegaliser", "initial" ]
         self.noIncreaseExceptMethods["crew with illegal rosters"] = []
@@ -250,20 +251,15 @@ class PrintRuleValue(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 
-class CopyOutput(plugins.Action):
+class CopyEnvironment(plugins.Action):
     def __repr__(self):
-        return "Copying errors file for"
-    def __call__(self, test):
-        if not os.path.isfile("errors.cas.9"):
-            status = os.popen("cvs update errors.cas").readline()
-            if status.startswith("M "):
-                self.describe(test)
-                os.rename("errors.cas", "errors.cas.tmpnow")
-                os.system("cvs update errors.cas")
-                os.rename("errors.cas", "errors.cas.9")
-                os.system("cvs add errors.cas.9")
-                os.rename("errors.cas.tmpnow", "errors.cas")
+        return "Making environment.9 for"
     def setUpSuite(self, suite):
-        self.describe(suite)
-
+        targetFile = os.path.join(suite.abspath, "environment.9")
+        if carmen.isUserSuite(suite) and os.path.isfile(targetFile):
+            self.describe(suite)
+            file = open(targetFile, "w")
+            carmtmp = os.path.join("/carm/user_and_tmp/carmen_9.0_deliver/tmps_for_Matador_9", os.path.basename(os.path.normpath(os.environ["CARMTMP"])))
+            print carmtmp
+            file.write("CARMTMP:" + carmtmp + os.linesep)
 

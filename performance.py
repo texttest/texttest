@@ -98,8 +98,15 @@ class PerformanceFileComparison(comparetest.FileComparison):
             # If we didn't understand the old performance, overwrite it
             if (self.oldCPUtime < 0):
                 os.remove(self.stdFile)
+        else:
+            self.newCPUtime = getPerformance(self.tmpFile)
+            self.oldCPUtime = self.newCPUtime
+            self.percentageChange = 0.0
     def __repr__(self):
-        return comparetest.FileComparison.__repr__(self) + "(" + self.getType() + ")"
+        baseText = comparetest.FileComparison.__repr__(self)
+        if self.newResult():
+            return baseText
+        return baseText + "(" + self.getType() + ")"
     def getType(self):
         if self.newCPUtime < self.oldCPUtime:
             return "faster"

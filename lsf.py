@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, time, string, signal, sys, default, performance, respond, batch, plugins, types
+import os, time, string, signal, sys, default, unix, performance, respond, batch, plugins, types
 
 # Text only relevant to using the LSF configuration directly
 helpDescription = """
@@ -55,16 +55,13 @@ def tenMinutesToGo(signal, stackFrame):
 
 signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
-class LSFConfig(default.Config):
+class LSFConfig(unix.UNIXConfig):
     def getOptionString(self):
-        return "lb:r:R:" + default.Config.getOptionString(self)
+        return "lr:R:" + unix.UNIXConfig.getOptionString(self)
     def getFilterList(self):
-        filters = default.Config.getFilterList(self)
+        filters = unix.UNIXConfig.getFilterList(self)
         self.addFilter(filters, "r", performance.TimeFilter)
-        self.addFilter(filters, "b", self.batchFilterClass())
         return filters
-    def batchFilterClass(self):
-        return batch.BatchFilter
     def getTestRunner(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestRunner(self)
@@ -83,15 +80,6 @@ class LSFConfig(default.Config):
             return default.Config.getTestComparator(self)
         else:
             return performance.MakeComparisons()
-    def getTestResponder(self):
-        diffLines = 30
-        # If running multiple times, batch mode is assumed
-        if self.optionMap.has_key("b") or self.optionMap.has_key("m"):
-            return batch.BatchResponder(diffLines, self.optionValue("b"))
-        elif self.optionMap.has_key("o"):
-            return default.Config.getTestResponder(self)
-        else:
-            return respond.UNIXInteractiveResponder(diffLines)
     def checkMemory(self):
         return 0
     def checkPerformance(self):

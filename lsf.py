@@ -65,7 +65,7 @@ class LSFJob:
         retstring = self.getFile().readline()
         return retstring.find("not found") != -1
     def kill(self):
-        os.system("bkill -J " + self.name + " >& /dev/null")
+        os.system("bkill -J " + self.name + " > /dev/null 2>&1")
     def getExecutionMachine(self):
         file = self.getFile("-w")
         lastline = file.readlines()[-1]

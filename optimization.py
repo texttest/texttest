@@ -175,6 +175,8 @@ class MakeTmpSubPlan(plugins.Action):
                 continue
             if file.find("status") != -1:
                 continue
+            if file.find("run_status") != -1:
+                continue
             if file.find("hostname") != -1:
                 continue
             if file.find("best_solution") != -1:
@@ -182,6 +184,8 @@ class MakeTmpSubPlan(plugins.Action):
             if file.find("core") != -1:
                 continue
             if file == "input":
+                continue
+            if file.endswith(".log"):
                 continue
 
             fromPath = os.path.join(fromDir, file)

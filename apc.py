@@ -127,6 +127,8 @@ class ApcConfig(optimization.OptimizationConfig):
         optimization.OptimizationConfig.setUpApplication(self, app)
         self.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
         self.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
+        if app.name == "cas_apc":
+            self.itemNamesInFile[optimization.costEntryName] = "rule cost"
         self.itemNamesInFile[optimization.newSolutionMarker] = "apc_status Solution"
 
 def verifyAirportFile(arch):

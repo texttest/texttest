@@ -9,7 +9,7 @@ class Test:
         self.app = app
         self.abspath = abspath
         self.paddedName = self.name
-        self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.version)
+        self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.version)
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
     def makeFileName(self, stem, version = None):
@@ -137,7 +137,7 @@ class Application:
     def __init__(self, name, abspath, configFile, version, optionMap, builtInOptions):
         self.name = name
         self.abspath = abspath
-        self.configDir = MultiEntryDictionary(configFile, version)
+        self.configDir = MultiEntryDictionary(configFile, name, version)
         self.version = version
         debugPrint("Found application " + repr(self))
         self.checkout = self.makeCheckout()
@@ -264,7 +264,15 @@ class OptionFinder:
             return None
     def getActionSequence(self, app):
         if self.inputOptions.has_key("s"):
-            return [ NonPythonAction(self.inputOptions["s"]) ]
+            actionOption = self.inputOptions["s"].split(".")
+            if len(actionOption) == 2:
+                module, pclass = actionOption
+
+                importCommand = "from " + module + " import " + pclass + " as _pclass"
+                exec importCommand
+                return [ _pclass() ]
+            else:
+                return [ NonPythonAction(self.inputOptions["s"]) ]
         else:
             return app.getActionSequence()
 
@@ -282,7 +290,7 @@ class NonPythonAction:
         os.system(self.script + " " + level + " " + test.name + " " + test.app.name + " '" + description + "'")
             
 class MultiEntryDictionary:
-    def __init__(self, filename, version = ""):
+    def __init__(self, filename, appName = "", version = ""):
         self.dict = {}
         if os.path.isfile(filename):
             configFile = open(filename)
@@ -290,14 +298,16 @@ class MultiEntryDictionary:
                 if line[0] == '#' or not ':' in line:
                     continue
                 self.addLine(line[:-1])
-        self.updateForVersion(filename, version)
-    def updateForVersion(self, filename, version):
-        if len(version) == 0:
+        self.updateFor(filename, appName)
+        self.updateFor(filename, version)
+        self.updateFor(filename, appName + "." + version)
+    def updateFor(self, filename, extra):
+        if len(extra) == 0:
             return
-        versionFileName = filename + "." + version
-        if not os.path.isfile(versionFileName):
+        extraFileName = filename + "." + extra
+        if not os.path.isfile(extraFileName):
             return
-        overrideDir = MultiEntryDictionary(versionFileName)
+        overrideDir = MultiEntryDictionary(extraFileName)
         for key, value in overrideDir.items():
             self.dict[key] = value
     def addLine(self, line, separator = ':'):

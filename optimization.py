@@ -36,7 +36,12 @@ class ExtractSubPlanFile(plugins.Action):
             else:
                 targetFile = test.getTmpFileName(self.targetName, "w")
                 shutil.copyfile(sourcePath, targetFile)
-
+            return
+        if os.path.isfile(test.makeFileName(self.targetName)):
+            targetFile = test.getTmpFileName(self.targetName, "w")
+            errText = "Expected file '" + sourcePath + "'not created by test"
+            open(targetFile,"w").write(errText + os.linesep)
+            
 # Abstract base class for handling running tests in temporary subplan dirs
 # see example usage in apc.py
 #

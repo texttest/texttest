@@ -119,10 +119,11 @@ class PerformanceTestComparison(comparetest.TestComparison):
 
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile, descriptors, makeNew):
-        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile, makeNew)
+        self.descriptors = descriptors
         self.diag = plugins.getDiagnostics("performance")
         self.diag.info("Checking test " + test.name)
-        self.descriptors = descriptors
+        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile, makeNew)
+    def _cacheValues(self, app):
         if (os.path.exists(self.stdCmpFile)):
             self.oldPerformance = getPerformance(self.stdCmpFile)
             self.newPerformance = getPerformance(self.tmpCmpFile)
@@ -135,6 +136,7 @@ class PerformanceFileComparison(comparetest.FileComparison):
             self.newPerformance = getPerformance(self.tmpFile)
             self.oldPerformance = self.newPerformance
             self.percentageChange = 0.0
+        comparetest.FileComparison._cacheValues(self, app)
     def __repr__(self):
         baseText = comparetest.FileComparison.__repr__(self)
         if self.newResult():
@@ -155,21 +157,21 @@ class PerformanceFileComparison(comparetest.FileComparison):
             return self.getSummary()
         else:
             return ""
-    def _hasDifferences(self):
+    def _hasDifferences(self, app):
         configDescriptor = self.descriptors["config"]
         if configDescriptor == "cputime":
-            perfList = self.test.app.getConfigValue("performance_test_machine")
+            perfList = app.getConfigValue("performance_test_machine")
             if perfList == None or len(perfList) == 0 or perfList[0] == "none":
                 return 0
-        longEnough = self.newPerformance > float(self.test.app.getConfigValue("minimum_" + configDescriptor + "_for_test"))
-        varianceEnough = self.percentageChange > float(self.test.app.getConfigValue(configDescriptor + "_variation_%"))
+        longEnough = self.newPerformance > float(app.getConfigValue("minimum_" + configDescriptor + "_for_test"))
+        varianceEnough = self.percentageChange > float(app.getConfigValue(configDescriptor + "_variation_%"))
         return longEnough and varianceEnough
-    def checkExternalExcuses(self):
+    def checkExternalExcuses(self, app):
         if self.getType() != "slower":
             return 0
         for line in open(self.tmpCmpFile).xreadlines():
             if line.find("SLOWING DOWN") != -1:
-                if self.percentageChange <= float(self.test.app.getConfigValue("cputime_slowdown_variation_%")):
+                if self.percentageChange <= float(app.getConfigValue("cputime_slowdown_variation_%")):
                     # We mark it as OK now...
                     self.differenceId = 0
                     return 1

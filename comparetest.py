@@ -89,7 +89,7 @@ class TestComparison(plugins.TestState):
         worstSeverity = None
         worstResult = None
         for result in self.getComparisons():
-            severity = result.getSeverity()
+            severity = result.severity
             if not worstSeverity or severity < worstSeverity:
                 worstSeverity = severity
                 worstResult = result
@@ -101,7 +101,7 @@ class TestComparison(plugins.TestState):
             return self.failedPrediction.getTypeBreakdown()
 
         worstResult = self.getMostSevereFileComparison()
-        worstSeverity = worstResult.getSeverity()
+        worstSeverity = worstResult.severity
         self.diag.info("Severity " + str(worstSeverity) + " for failing test")
         details = worstResult.getSummary()
         if len(self.getComparisons()) > 1:
@@ -153,7 +153,7 @@ class TestComparison(plugins.TestState):
             self.correctResults.append(comparison)
     def makeComparisons(self, test, makeNew = 0):
         self.makeComparisonsInDir(test, test.getDirectory(temporary=1), makeNew)
-        if len(self.changedResults) == 1 and self.changedResults[0].checkExternalExcuses():
+        if len(self.changedResults) == 1 and self.changedResults[0].checkExternalExcuses(test.app):
             # If the only difference has an excuse, remove it...
             fileComparison = self.changedResults[0]
             del self.changedResults[0]
@@ -275,11 +275,16 @@ class FileComparison:
         if makeNew:
             tmpCmpFileName = filterFileBase + "partcmp"
         self.tmpCmpFile = filter.filterFile(tmpFile, tmpCmpFileName, makeNew)
-        self.test = test
-        self.differenceId = -1
+        self._cacheValues(test.app)
+    def _cacheValues(self, app):
+        self.differenceId = self._hasDifferences(app)
+        self.severity = 99
+        failureSeverityDict = app.getConfigValue("failure_severity")
+        if failureSeverityDict.has_key(self.stem):
+            self.severity = failureSeverityDict[self.stem]
     def __repr__(self):
         return os.path.basename(self.stdFile).split('.')[0]
-    def checkExternalExcuses(self):
+    def checkExternalExcuses(self, app):
         # No excuses here...
         return 0
     def needsRecalculation(self):
@@ -303,21 +308,15 @@ class FileComparison:
             return self.stem + " new"
         else:
             return self.stem + " different"
-    def getSeverity(self):
-        dict = self.test.getConfigValue("failure_severity")
-        if dict.has_key(self.stem):
-            return dict[self.stem]
-        else:
-            return 99
     def newResult(self):
         return not os.path.exists(self.stdFile)
     def hasDifferences(self):
-        # Cache the result: typically expensive to compute...
-        if self.differenceId == -1:
-            self.differenceId = self._hasDifferences()
         return self.differenceId
-    def _hasDifferences(self):
-        return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
+    def _hasDifferences(self, app):
+        if os.path.isfile(self.stdCmpFile):
+            return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
+        else:
+            return 0
     def overwrite(self, exact, versionString = ""):
         parts = os.path.basename(self.stdFile).split(".")[:2] 
         if len(versionString):

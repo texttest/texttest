@@ -66,7 +66,10 @@ class CheckPredictions(CheckLogFilePredictions):
         stackTraceFile = test.makeFileName("stacktrace", temporary=1)
         if os.path.isfile(stackTraceFile):
             errorInfo = open(stackTraceFile).read()
-            self.insertError(test, "crash", self.findCrashSummary(errorInfo), errorInfo)
+            summary = self.findCrashSummary(errorInfo)
+            if summary.startswith("unknown") and len(errorInfo) > 10000:
+                errorInfo = "Stack trace contained over 10000 characters, suspecting binary output problems..."
+            self.insertError(test, "crash", summary, errorInfo)
             os.remove(stackTraceFile)
             return 1
         

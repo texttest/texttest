@@ -420,6 +420,9 @@ class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):
         processLine = "/users/lennart/bin/process_gprof prof.*" + " > lprof." + test.app.name + test.app.versionSuffix()
         os.system(processLine)
+        # Compress and save the raw data.
+        cmdLine = "gzip prof.*;mv prof.* prof." + test.app.name + test.app.versionSuffix() 
+        os.system(cmdLine)
     def __repr__(self):
         return "Profiling"    
 

@@ -163,7 +163,7 @@ class SubmissionRules:
 
         return self.findDefaultQueue()
     def findDefaultQueue(self):
-        return "normal"
+        return ""
     def findMachineList(self):
         if not self.forceOnPerformanceMachines():
             return []
@@ -243,9 +243,9 @@ class QueueSystemServer:
         envString = self.envString
         if envCopy:
             envString = self.getEnvironmentString(envCopy)
-        self.diag.info("Creating job " + jobName + " with command : " + command)
         submitCommand = queueSystem.getSubmitCommand(jobName, submissionRules)
         fullCommand = envString + submitCommand + " '" + command + "'"
+        self.diag.info("Creating job " + jobName + " with command : " + fullCommand)
         stdin, stdout, stderr = os.popen3(fullCommand)
         errorMessage = queueSystem.findSubmitError(stderr)
         if errorMessage:
@@ -361,7 +361,11 @@ class SubmitTest(plugins.Action):
         name = queueSystemName(test.app)
         queueToUse = name + " queues"
         if submissionRules:
-            queueToUse = name + " queue " + submissionRules.findQueue()
+            queue = submissionRules.findQueue()
+            if queue:
+                queueToUse = name + " queue " + queue
+            else:
+                queueToUse = "default " + name + " queue"
         if jobNameFunction:
             print test.getIndent() + "Submitting", jobNameFunction(test), "to", queueToUse
         else:

@@ -9,7 +9,9 @@ class QueueSystem:
         bsubArgs = "-J " + jobName
         if submissionRules.processesNeeded != "1":
             bsubArgs += " -n " + submissionRules.processesNeeded
-        bsubArgs += " -q " + submissionRules.findQueue() 
+        queue = submissionRules.findQueue()
+        if queue:
+            bsubArgs += " -q " + queue
         resource = self.getResourceArg(submissionRules)
         if len(resource):
             bsubArgs += " -R \"" + resource + "\""

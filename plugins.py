@@ -300,7 +300,7 @@ class OptionGroup:
             return value
     def addSwitch(self, key, name, value = 0, nameForOff = None):
         self.switches[key] = Switch(name, int(self.getDefault(name, value)), nameForOff)
-    def addOption(self, key, name, value = "", possibleValues = None):
+    def addOption(self, key, name, value = "", possibleValues = []):
         self.options[key] = TextOption(name, self.getDefault(name, value), possibleValues)
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):

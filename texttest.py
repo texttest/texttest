@@ -191,6 +191,8 @@ class Application:
 	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
     def __repr__(self):
         return self.fullName
+    def __cmp__(self, other):
+        return cmp(self.name, other.name)
     def _getFullName(self):
         if self.configDir.has_key("full_name"):
             return self.configDir["full_name"]
@@ -333,7 +335,9 @@ class OptionFinder:
         dirName = self.directoryName()
         os.chdir(dirName)
         debugPrint("Using test suite at " + dirName)
-        return self._findApps(dirName, 1)
+        appList = self._findApps(dirName, 1)
+        appList.sort()
+        return appList
     def _findApps(self, dirName, recursive):
         appList = []
         for f in os.listdir(dirName):

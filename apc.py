@@ -1000,9 +1000,3 @@ class UpdatePerformance(plugins.Action):
         pass
     def setUpApplication(self, app):
         self.statusFileName = app.getConfigValue("log_file")
-
-class CleanTmpFiles(default.CleanTmpFiles):
-    def __init__(self):
-        default.CleanTmpFiles.__init__(self)
-        self.regExps.append(re.compile("plot\.apc.*"))
-

@@ -794,6 +794,7 @@ class OptionFinder:
     def __init__(self):
         self.inputOptions = self.buildOptions()
         self.directoryName = self.findDirectoryName()
+        os.environ["TEXTTEST_HOME"] = self.directoryName
         self._setUpLogging()
         debugLog.debug(repr(self.inputOptions))
     def _setUpLogging(self):

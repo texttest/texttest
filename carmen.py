@@ -336,6 +336,9 @@ class CompileRules(plugins.Action):
         self.rulesCompiled.append(ruleset.name)
         retStatus = None
         if ruleset.precompiled:
+            root, local = os.path.split(ruleset.targetFile)
+            if not os.path.isdir(root):
+                os.makedirs(root)
             shutil.copyfile(ruleset.precompiled, ruleset.targetFile)
         else:
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
@@ -550,7 +553,9 @@ class BuildCode(plugins.Action):
             else:
                 print "Not building in", absPath, "which doesn't exist!"
         if arch == "i386_linux" and self.remote:
-            self.buildRemote("sparc", app) 
+            self.buildRemote("sparc", app)
+            if not "9" in app.versions and not "10" in app.versions:
+                self.buildRemote("sparc_64", app)
             self.buildRemote("parisc_2_0", app)
             self.buildRemote("powerpc", app)
     def getPathAndTargets(self, optValue):
@@ -570,6 +575,8 @@ class BuildCode(plugins.Action):
                 return "reedsville"
         if arch == "sparc":
             return "turin"
+        if arch == "sparc_64":
+            return "elmira"
         if arch == "parisc_2_0":
             return "ramechap"
         if arch == "powerpc":
@@ -616,6 +623,8 @@ class BuildCode(plugins.Action):
             absPath = app.makeAbsPath(relPath)
             if os.path.isdir(absPath):    
                 commandLine = "cd " + absPath + "; gmake " + makeTargets + " >& build." + arch
+                if arch == "sparc_64":
+                    commandLine = "setenv BITMODE 64; " + commandLine
                 os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         return 0            
     def checkBuildFile(self, buildFile):

@@ -185,7 +185,7 @@ class Application:
         newFileName = fileName + "cmp"
         oldFile = open(fileName)
         newFile = open(newFileName, "w")
-        forbiddenText = self.getConfigValue(stem)
+        forbiddenText = self.getConfigList(stem)
         linesToRemove = 0 
         for line in oldFile.readlines():
             linesToRemove += self.calculateLinesToRemove(line, forbiddenText)
@@ -211,7 +211,7 @@ class Application:
             if linePoint != -1:
                 searchText = text[:linePoint]
 	    if self.hasREpattern(searchText):
-	    	found = self.matchRE(searchText, line[:-1])
+            	found = self.matchRE(searchText, line[:-1])
 	    else:
 	    	found = self.matchPlain(searchText, line[:-1])
             if found:

@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import os, plugins, respond, comparetest
+import os, plugins, respond, comparetest, string
 
 def getConfig(optionMap):
     return Config(optionMap)

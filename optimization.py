@@ -153,8 +153,9 @@ class CalculateKPI(plugins.Action):
         if currentFile != referenceFile:
             kpiValue = KPI.calculate(referenceFile, currentFile)
             self.describe(test, ", with respect to version " + self.referenceVersion + " - returns " + str(kpiValue))
-            self.totalKPI += kpiValue
-            self.numberOfValues += 1
+            if kpiValue != None:
+                self.totalKPI += kpiValue
+                self.numberOfValues += 1
     def setUpSuite(self, suite):
         self.describe(suite)
 

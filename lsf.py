@@ -7,9 +7,9 @@ helpDescription = """
 The LSF configuration is designed to run on a UNIX system with the LSF (Load Sharing Facility)
 product from Platform installed.
 
-It's default operation is to submit all tests to LSF's "normal" queue. For this reason
-it is probably not so useful as a standalone configuration, because most people will
-want to configure which queue they send jobs to, and hence need a derived configuration.
+It's default operation is to submit all jobs to the queue indicated by the config file value
+"lsf_queue". To provide more complex rules for queue selection a derived configuration would be
+needed.
 """
 
 # Text for use by derived configurations as well
@@ -77,9 +77,8 @@ class LSFConfig(unixConfig.UNIXConfig):
             return default.Config.getTestRunner(self)
         else:
             return SubmitTest(self.findLSFQueue, self.findLSFResource)
-    # Default queue function, users probably need to override
     def findLSFQueue(self, test):
-        return "normal"
+        return test.app.getConfigValue("lsf_queue")
     def findLSFResource(self, test):
         resourceList = self.findResourceList(test.app)
         if len(resourceList) == 0:

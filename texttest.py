@@ -569,6 +569,7 @@ class ApplicationRunner:
     def __init__(self, app, inputOptions):
         self.app = app
         self.actionSequence = inputOptions.getActionSequence(app)
+        debugLog.debug("Action sequence = " + repr(self.actionSequence))
         self.valid, self.filterList = app.getFilterList()
         if inputOptions.helpMode():
             app.printHelpText()

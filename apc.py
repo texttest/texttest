@@ -209,28 +209,31 @@ class ApcCompileRules(carmen.CompileRules):
         return os.stat(filename)[stat.ST_MTIME]
 
     def verifyAirportFile(self):
-       etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
-       customerEtab = os.path.join(etabPath, "Customer.etab")
-       if os.path.isfile(customerEtab):
-          etab = carmen.ConfigEtable(customerEtab)
-          airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
-          if airportFile != None and os.path.isfile(airportFile):
-             return
-          srcDir = etab.getValue("default", "AirpMaint", "AirportSrcDir")
-          if srcDir == None:
-             srcDir = etab.getValue("default", "AirpMaint", "AirportSourceDir")
-          if srcDir == None:
-             srcDir = os.path.join(os.environ["CARMUSR"], "data", "Airport", "source")
-          srcFile = os.path.join(srcDir, "AirportFile")
-          if os.path.isfile(srcFile) and airportFile != None:
-             apCompile = os.path.join(os.environ["CARMSYS"], "bin", carmen.architecture, "apcomp")
-             if os.path.isfile(apCompile):
-                print "Missing AirportFile detected, building:", airportFile
-                carmen.ensureDirectoryExists(os.path.dirname(airportFile))
-                os.system(apCompile + " " + srcFile + " > " + airportFile)
-                if os.path.isfile(airportFile):
-                   return
-       raise EnvironmentError, "Failed to find AirportFile"
+        diag = plugins.getDiagnostics("APC airport")
+        etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
+        customerEtab = os.path.join(etabPath, "Customer.etab")
+        if os.path.isfile(customerEtab):
+            diag.info("Reading etable at " + customerEtab)
+            etab = carmen.ConfigEtable(customerEtab)
+            airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
+            if airportFile != None and os.path.isfile(airportFile):
+                return
+            diag.info("Airport file is at " + airportFile)
+            srcDir = etab.getValue("default", "AirpMaint", "AirportSrcDir")
+            if srcDir == None:
+                srcDir = etab.getValue("default", "AirpMaint", "AirportSourceDir")
+            if srcDir == None:
+                srcDir = os.path.join(os.environ["CARMUSR"], "data", "Airport", "source")
+            srcFile = os.path.join(srcDir, "AirportFile")
+            if os.path.isfile(srcFile) and airportFile != None:
+                apCompile = os.path.join(os.environ["CARMSYS"], "bin", carmen.architecture, "apcomp")
+                if os.path.isfile(apCompile):
+                    print "Missing AirportFile detected, building:", airportFile
+                    carmen.ensureDirectoryExists(os.path.dirname(airportFile))
+                    os.system(apCompile + " " + srcFile + " > " + airportFile)
+                    if os.path.isfile(airportFile):
+                        return
+        raise EnvironmentError, "Failed to find AirportFile"
 
       
 class RemoveLogs(plugins.Action):
@@ -551,11 +554,6 @@ class ImportTest(optimization.ImportTest):
         return ApcTestCaseInformation(suite, name)
     def getTestSuiteInformation(self, suite, name):
         return ApcTestSuiteInformation(suite, name)
-    def setUpSuite(self, suite):
-        if suite.app.name == "apc":
-            optimization.ImportTest.setUpSuite(self, suite)
-        else:
-            self.describe(suite, " failed: Only imports APC test suites!")
 
 class PortApcTest(plugins.Action):
     def __repr__(self):

@@ -81,7 +81,9 @@ class Config(plugins.Configuration):
         if self.isReconnecting():
             return None
         else:
-            return MakeWriteDirectory()
+            return self._getWriteDirectoryMaker()
+    def _getWriteDirectoryMaker(self):
+        return MakeWriteDirectory()
     def tryGetTestRunner(self):
         if self.isReconnecting():
             return None
@@ -189,8 +191,10 @@ class Config(plugins.Configuration):
             app.addConfigEntry("definition_file_stems", "bugzilla")
         
 class MakeWriteDirectory(plugins.Action):
+    def __init__(self, copyAll = 1):
+        self.copyAll = copyAll
     def __call__(self, test):
-        test.makeBasicWriteDirectory()
+        test.makeBasicWriteDirectory(self.copyAll)
         os.chdir(test.writeDirs[0])
     def __repr__(self):
         return "Make write directory for"

@@ -259,12 +259,13 @@ class TestCase(Test):
         return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
-    def makeBasicWriteDirectory(self):
+    def makeBasicWriteDirectory(self, copyAll = 1):
         fullPathToMake = os.path.join(self.writeDirs[0], "framework_tmp")
         os.makedirs(fullPathToMake)
         if self.app.useDiagnostics:
             os.mkdir(os.path.join(self.writeDirs[0], "Diagnostics"))
-        self.collatePaths("copy_test_path", self.copyTestPath)
+        if copyAll:
+            self.collatePaths("copy_test_path", self.copyTestPath)
         self.collatePaths("link_test_path", self.linkTestPath)
     def cleanNonBasicWriteDirectories(self):
         if len(self.writeDirs) > 0:

@@ -90,6 +90,9 @@ class LSFConfig(unixConfig.UNIXConfig):
             return unixConfig.UNIXConfig.getTestRunner(self)
         else:
             return SubmitTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource, self.findLSFMachine)
+    def _getWriteDirectoryMaker(self):
+        copyAll = not self.useLSF()
+        return default.MakeWriteDirectory(copyAll)
     def getPerformanceFileMaker(self):
         if self.useLSF():
             return MakePerformanceFile(self.isSlowdownJob)
@@ -401,16 +404,24 @@ class SubmitTest(unixConfig.RunTest):
     def buildCommandFile(self, test, cmdFile, testCommand):
         self.diag.info("Building command file at " + cmdFile)
         f = open(cmdFile, "w")
-        # LSF is meant to ensure that directories are transferred,
-        # but this is error prone with the AMD automounter. Best to make sure...
         curDir = test.getDirectory(temporary=1)
         f.write("cd " + curDir + os.linesep)
+        # LSF is meant to ensure that directories are transferred,
+        # but this is error prone with the AMD automounter. Best to make sure...
+        test.collatePaths("copy_test_path", CopyPathWriter(f))
         f.write(testCommand + os.linesep)
         f.close()
         return cmdFile
     def changeState(self, test):
         # Don't change state just because we submitted to LSF
         pass
+
+class CopyPathWriter:
+    def __init__(self, outFile):
+        self.outFile = outFile
+    def __call__(self, source, target):
+        self.outFile.write("cp -pr " + source + " ." + os.linesep)
+        self.outFile.write("chmod -R +w " + os.path.basename(target) + os.linesep)
 
 class KillTest(plugins.Action):
     jobsKilled = []

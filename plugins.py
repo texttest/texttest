@@ -162,8 +162,8 @@ class BackgroundProcess:
     def checkTermination(self):
         if not self.hasTerminated():
             return 0
-        if not self.fakeProcesses and self.exitHandler:
-            self.exitHandler(self.exitHandlerArgs)
+        if self.exitHandler:
+            self.exitHandler(*self.exitHandlerArgs)
         return 1
     def hasTerminated(self):
         if self.processId == None:

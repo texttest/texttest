@@ -76,21 +76,22 @@ class TextTestGUI:
         iter = self.model.get_iter_root()
         self.createSubIterMap(iter)
         guilog.info("")
-    def createSubIterMap(self, iter):
+    def createSubIterMap(self, iter, newTest=1):
         test = self.model.get_value(iter, 2)
         guilog.info("-> " + test.getIndent() + "Added " + repr(test) + " to test tree view.")
         childIter = self.model.iter_children(iter)
         try:
             self.itermap[test] = iter.copy()
-            test.observers.append(self)
+            if newTest:
+                test.observers.append(self)
         except TypeError:
             # Applications aren't hashable, but they don't change state anyway
             pass
         if childIter:
-            self.createSubIterMap(childIter)
+            self.createSubIterMap(childIter, newTest)
         nextIter = self.model.iter_next(iter)
         if nextIter:
-            self.createSubIterMap(nextIter)
+            self.createSubIterMap(nextIter, newTest)
     def addApplication(self, app):
         colour = app.getConfigValue("test_colours")["app_static"]
         iter = self.model.insert_before(None, None)
@@ -276,8 +277,14 @@ class TextTestGUI:
         if self.performanceColumn:
             guilog.info("(Second column '" + self.model.get_value(iter, 4) + "' coloured " + self.model.get_value(iter, 5) + ")")
     def redrawSuite(self, suite):
-        newTest = suite.testcases[-1]
+        maybeNewTest = suite.testcases[-1]
         suiteIter = self.itermap[suite]
+        if self.itermap.has_key(maybeNewTest):
+            self.redoOrder(suite, suiteIter)
+        else:
+            self.addNewTestToModel(suiteIter, maybeNewTest, suiteIter)
+        self.selection.get_tree_view().grab_focus()
+    def addNewTestToModel(self, suite, newTest, suiteIter):
         iter = self.addSuiteWithParent(newTest, suiteIter)
         self.itermap[newTest] = iter.copy()
         newTest.observers.append(self)
@@ -285,7 +292,15 @@ class TextTestGUI:
         self.recreateTestView(newTest)
         self.selection.get_tree_view().expand_all()
         scriptEngine.setSelection(self.selection, [ iter ])
-        self.selection.get_tree_view().grab_focus()
+    def redoOrder(self, suite, suiteIter):
+        iter = self.model.iter_children(suiteIter)
+        for i in range(len(suite.testcases)):
+            self.model.remove(iter)
+        for test in suite.testcases:
+            iter = self.addSuiteWithParent(test, suiteIter)
+        self.createSubIterMap(suiteIter, newTest=0)
+        self.selection.get_tree_view().expand_all()
+        scriptEngine.setSelection(self.selection, [ suiteIter ])
     def exit(self, *args):
         gtk.main_quit()
         sys.stdout.flush()

@@ -181,12 +181,7 @@ class TestCase(Test):
         Test.__init__(self, name, abspath, app, parent)
         self.inputFile = self.makeFileName("input")
         self.useCaseFile = self.makeFileName("usecase")
-        optionsFile = self.makeFileName("options")
-        self.options = ""
-        if (os.path.isfile(optionsFile)):
-            self.options = os.path.expandvars(open(optionsFile).readline().strip())
-        elif not os.path.isfile(self.inputFile) and not os.path.isfile(self.useCaseFile):
-            self.valid = 0
+        self._setOptions()
         # List of directories where this test will write files. First is where it executes from
         self.writeDirs = []
         self.writeDirs.append(os.path.join(app.writeDirectory, self.getRelPath()))
@@ -196,6 +191,13 @@ class TestCase(Test):
         return "test-case"
     def testCaseList(self):
         return [ self ]
+    def _setOptions(self):
+        optionsFile = self.makeFileName("options")
+        self.options = ""
+        if (os.path.isfile(optionsFile)):
+            self.options = os.path.expandvars(open(optionsFile).readline().strip())
+        elif not os.path.isfile(self.inputFile) and not os.path.isfile(self.useCaseFile):
+            self.valid = 0
     def getDirectory(self, temporary):
         if temporary:
             return self.writeDirs[0]
@@ -207,6 +209,9 @@ class TestCase(Test):
         return action(self)
     def waitingForProcess(self):
         return isinstance(self.stateDetails, plugins.BackgroundProcess)
+    def filesChanged(self):
+        self._setOptions()
+        self.notifyChanged()
     def changeState(self, state, details = ""):
         # Once we've left the pathway, we can't return...
         if self.state == self.UNRUNNABLE or self.state == self.KILLED:
@@ -349,6 +354,19 @@ class TestSuite(Test):
         return action.setUpSuite(self)
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
+    def filesChanged(self):
+        # Here we assume that only order can change and suites be removed...
+        newList = []
+        for testline in open(self.testCaseFile).xreadlines():
+            testName = testline.strip()
+            if len(testName) == 0  or testName[0] == '#':
+                continue
+            for testcase in self.testcases:
+                if testcase.name == testName:
+                    newList.append(testcase)
+                    break
+        self.testcases = newList
+        self.notifyChanged()
     def reFilter(self, filters):
         testCaseList = []
         debugLog.debug("Refilter for " + self.name)

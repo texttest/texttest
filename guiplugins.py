@@ -25,8 +25,12 @@ class InteractiveAction(plugins.Action):
         return process
     def viewFile(self, fileName, wait = 0):
         viewProgram = self.test.getConfigValue("view_program")
-        guilog.info("Viewing file " + os.path.basename(fileName) + " using '" + viewProgram + "'")
-        process = self.startExternalProgram(viewProgram + " " + fileName)
+        baseName = os.path.basename(fileName)
+        guilog.info("Viewing file " + baseName + " using '" + viewProgram + "'")
+        exitHandler = None
+        if baseName.startswith("options.") or baseName.startswith("testsuite."):
+            exitHandler = self.test.filesChanged
+        process = self.startExternalProgram(viewProgram + " " + fileName, exitHandler=exitHandler)
         if wait:
             process.waitForTermination()
     def getTextTestName(self):
@@ -311,11 +315,12 @@ class RunTests(InteractiveAction):
         errFile = os.path.join(app.writeDirectory, "dynamic_errors.log")
         commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
         print "Starting dynamic TextTest with options :", ttOptions
-        self.startExternalProgram(commandLine, exitHandler=self.checkTestRun, exitHandlerArgs=errFile)
+        self.startExternalProgram(commandLine, exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,))
     def checkTestRun(self, errFile):
-        errText = open(errFile).read()
-        if len(errText):
-            raise plugins.TextTestError, "Dynamic run failed, with the following errors:" + os.linesep + errText
+        if os.path.isfile(errFile):
+            errText = open(errFile).read()
+            if len(errText):
+                raise plugins.TextTestError, "Dynamic run failed, with the following errors:" + os.linesep + errText
     def findCommonParentName(self, selTests):
         allParents = self.findAllParents(selTests)
         if len(allParents) == 1:

@@ -159,7 +159,7 @@ class LSFJob:
         lastline = file.readlines()[-1]
         data = lastline.strip().split()
         status = data[2]
-        if status == "PEND":
+        if status == "PEND" or len(data) < 6:
             return status, None
         else:
             execMachine = data[5].split('.')[0]

@@ -24,6 +24,13 @@ then the list of collated files becomes:
 and in the latest run data1 will be compared against the save result,
 data2 will be flagged as missing and data3 flagged as new result.
 
+Some care is required in writing collate patterns.
+Completely general patters like *:* would cause confusion since files like
+config.<app> would suddely be treated as files that should be generated.
+The current implementation assumes that files have a common stem, i.e.:
+it can handle stems like       data* : data*.dump
+but not unrelated stems like  *good* : *bad*
+
 Evaluation of test results consists by default of comparing all files that have been collected.
 
 All files are then filtered using the config file dictionary entry 'run_dependent_text', with

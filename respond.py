@@ -34,8 +34,7 @@ class InteractiveResponder(Responder):
             displayStream.write("------------------ Differences in " + repr(comparison) + " --------------------\n")
             self.display(comparison, displayStream)
     def display(self, comparison, displayStream):
-        fileWritten = os.popen(ndiff.fcompare(comparison.stdCmpFile, comparison.tmpCmpFile))
-        displayStream.write(fileWritten.read())
+        ndiff.fcompare(comparison.stdCmpFile, comparison.tmpCmpFile)
     def askUser(self, test, comparisons, allowView):      
         options = "Save(s) or continue(any other key)?"
         if len(test.app.version) > 0:

@@ -1,8 +1,8 @@
 #!/usr/local/bin/python
 import os, localrun, respond, comparetest
 
-def getConfig():
-    return Config()
+def getConfig(optionMap):
+    return Config(optionMap)
 
 class Config:
     def __init__(self, optionMap):
@@ -16,7 +16,7 @@ class Config:
             return ""
     def getActionSequence(self):
         if self.optionMap.has_key("i"):
-            return [ self.getTestRunner() ] + self.getTestEvaluator()
+            return [ [ self.getTestRunner() ] + self.getTestEvaluator() ]
         else:
             return [ self.getTestRunner(), self.getTestEvaluator() ]
     def getFilterList(self):

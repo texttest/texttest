@@ -75,9 +75,9 @@ class TestCase(Test):
         prefix = text + "." + self.app.name
         fileName = prefix + globalRunIdentifier
         if mode == "w" and not inputOptions.parallelMode():
-            tmpString = prefix + os.environ["USER"]
+            currTmpString = prefix + tmpString()
             for file in os.listdir(self.abspath):
-                if file.find(tmpString) != -1:
+                if file.find(currTmpString) != -1:
                     os.remove(file)
         return fileName
     def isAcceptedBy(self, filter):
@@ -349,6 +349,20 @@ def extraFilter(action):
     except:
         return None
 
+# Need somewhat different formats on Windows/UNIX
+def tmpString():
+    if os.environ.has_key("USER"):
+        return os.getenv("USER")
+    else:
+        return "tmp"
+
+# Needs to work in files - Windows doesn't like : in file names
+def timeFormat():
+    if os.environ.has_key("USER"):
+        return "%H:%M:%S"
+    else:
+        return "%H%M%S"
+
 # --- MAIN ---
 
 def main():
@@ -356,7 +370,7 @@ def main():
     global inputOptions
     inputOptions = OptionFinder()
     global globalRunIdentifier
-    globalRunIdentifier = os.environ["USER"] + time.strftime("%H:%M:%S", time.localtime())
+    globalRunIdentifier = tmpString() + time.strftime(timeFormat(), time.localtime())
 
     for app in inputOptions.findApps():
         actionSequence = inputOptions.getActionSequence(app)

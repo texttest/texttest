@@ -572,7 +572,7 @@ class BuildCode(plugins.Action):
         processId = os.fork()
         if processId == 0:
             result = self.buildRemoteInChild(machine, arch, app)
-            sys.exit(result)
+            os._exit(result)
         else:
             tuple = processId, arch
             self.childProcesses.append(tuple)

@@ -49,7 +49,17 @@ class QueueSystem:
         resourceList = submissionRules.findResourceList()
         if len(resourceList) == 0:
             return ""
-        elif len(resourceList) == 1:
+        selectResources = []
+        others = []
+        for resource in resourceList:
+            if resource.find("rusage[") != -1 or resource.find("order[") != -1 or \
+               resource.find("span[") != -1 or resource.find("same[") != -1:
+                others.append(resource)
+            else:
+                selectResources.append(resource)
+        return self.getSelectResourceArg(selectResources) + " " + string.join(others)
+    def getSelectResourceArg(self, resourceList):
+        if len(resourceList) == 1:
             return self.formatResource(resourceList[0])
         else:
             resource = "(" + self.formatResource(resourceList[0]) + ")"
@@ -57,8 +67,6 @@ class QueueSystem:
                 resource += " && (" + self.formatResource(res) + ")"
             return resource
     def formatResource(self, res):
-        if res.find("rusage") != -1:
-            return res
         if res.find("==") == -1 and res.find("!=") == -1 and res.find("<=") == -1 and \
            res.find(">=") == -1 and res.find("=") != -1:
             return res.replace("=", "==")

@@ -189,10 +189,11 @@ class TestCase(Test):
         prefix = self.app.name + self.app.versionSuffix()
         identifier = prefix + globalRunIdentifier
         dirName = identifier
+        currTmpString = prefix + self.getTestUser()
         if basicDir:
             dirName = basicDir + "." + identifier
+            currTmpString = basicDir + "." + currTmpString
         dirName = os.path.join(rootDir, dirName)
-        currTmpString = prefix + self.getTestUser()
         for file in os.listdir(rootDir):
             fpath = os.path.join(rootDir, file)
             if not os.path.isdir(fpath):

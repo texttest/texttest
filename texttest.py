@@ -39,11 +39,19 @@ builtInOptions = """
 
 # Base class for TestCase and TestSuite
 class Test:
+    #State names
+    NOT_STARTED = 0
+    NOT_FINISHED = 1
+    SUCCEEDED = 2
+    FAILED = 3
+    UNRUNNABLE = 4
     def __init__(self, name, abspath, app):
         self.name = name
         self.app = app
         self.abspath = abspath
         self.paddedName = self.name
+        self.state = self.NOT_FINISHED 
+        self.stateDetails = None
         self.previousEnv = {}
         self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
         # Single pass to expand all variables (don't want multiple expansion)
@@ -58,6 +66,9 @@ class Test:
             if os.environ.has_key(var):
                 self.previousEnv[var] = os.environ[var]
             os.environ[var] = self.environment[var]
+    def __del__(self):
+        # Because this may delete local files
+        os.chdir(self.abspath)
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
     def makeFileName(self, stem, refVersion = None):
@@ -77,6 +88,9 @@ class Test:
         return nonVersionName
     def getRelPath(self):
         return string.replace(self.abspath, self.app.abspath, "")
+    def getInstructions(self, action):
+        return [ (self, plugins.SetUpEnvironment()) ] + action.getInstructions(self) \
+               + self.getSubInstructions(action) + [ (self, plugins.TearDownEnvironment()) ]
     def performAction(self, action):
         self.setUpEnvironment()
         self.callAction(action)
@@ -114,12 +128,10 @@ class Test:
         return 1
     def size(self):
         return 1
-        
+
 class TestCase(Test):
     def __init__(self, name, abspath, app):
         Test.__init__(self, name, abspath, app)
-        self.isDead = 0
-        self.deathReason = None
         self.inputFile = self.makeFileName("input")
         optionsFile = self.makeFileName("options")
         self.options = ""
@@ -134,15 +146,19 @@ class TestCase(Test):
     def callAction(self, action):
         os.chdir(self.abspath)
         try:
-            if self.isDead:
-                action.processUnRunnable(self)
+            if self.state == self.UNRUNNABLE:
+                return action.processUnRunnable(self)
             else:
-                action(self)
+                return action(self)
         except plugins.TextTestError, e:
-            self.isDead = 1
-            self.deathReason = e
+            self.changeState(self.UNRUNNABLE, e)
+    def changeState(self, state, details = ""):
+        self.state = state
+        self.stateDetails = details
     def performOnSubTests(self, action):
         pass
+    def getSubInstructions(self, action):
+        return []
     def getExecuteCommand(self):
         return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
@@ -155,8 +171,10 @@ class TestCase(Test):
         # When writing files, clean up equivalent files from previous runs, unless
         # we are in parallel mode and the files are less than 2 days old
         if mode == "w":
+            clean1 = prefix + self.getTestUser()
+            clean2 = prefix + ".original." + self.getTestUser()
             for file in os.listdir(self.abspath):
-                if file.find(prefix + self.getTestUser()) != -1:
+                if file.find(clean1) != -1 or file.find(clean2) != -1:
                     if not self.app.parallelMode or self.isOutdated(file):
                         debugLog.info("Cleaning previous file " + file)
                         os.remove(file)
@@ -195,10 +213,15 @@ class TestSuite(Test):
     def isEmpty(self):
         return len(self.testcases) == 0
     def callAction(self, action):
-        action.setUpSuite(self)
+        return action.setUpSuite(self)
     def performOnSubTests(self, action):
         for testcase in self.testcases:
             testcase.performAction(action)
+    def getSubInstructions(self, action):
+        instructions = []
+        for testcase in self.testcases:
+            instructions += testcase.getInstructions(action)
+        return instructions
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
     def reFilter(self, filters):
@@ -504,7 +527,7 @@ class OptionFinder:
         return raisedError, appList
     def addApplications(self, appName, dirName, pathname, version):
         appList = []
-        builtInOptions = "a:c:d:h:m:s:v:xp"
+        builtInOptions = "a:c:d:h:m:s:v:xpg"
         app = Application(appName, dirName, pathname, version, self.inputOptions, builtInOptions)
         appList.append(app)
         extraVersion = app.getConfigValue("extra_version")
@@ -533,6 +556,8 @@ class OptionFinder:
             return 1
     def helpMode(self):
         return self.inputOptions.has_key("help")
+    def useGui(self):
+        return self.inputOptions.has_key("g")
     def _getDiagnosticFile(self):
         if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
@@ -649,7 +674,7 @@ class MultiEntryDictionary:
             return []
 
 class ApplicationRunner:
-    def __init__(self, app, inputOptions):
+    def __init__(self, app, inputOptions, gui):
         self.app = app
         self.actionSequence = inputOptions.getActionSequence(app)
         debugLog.debug("Action sequence = " + repr(self.actionSequence))
@@ -657,14 +682,17 @@ class ApplicationRunner:
         if inputOptions.helpMode():
             app.printHelpText()
             self.valid = 0
+            return
+        tmpSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
+        tmpSuite.reFilter(self.filterList)
+        self.gui = gui
+        if tmpSuite.size() == 0:
+            print "No tests found for", app.description()
+            self.valid = 0
         else:
-            tmpSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
-            tmpSuite.reFilter(self.filterList)
-            if tmpSuite.size() == 0:
-                print "No tests found for", app.description()
-                self.valid = 0
-            else:
-                self.testSuite = tmpSuite
+            self.testSuite = tmpSuite
+            if gui:
+                gui.addSuite(self.testSuite)
     def actionCount(self):
         return len(self.actionSequence)
     def performAction(self, actionNum):
@@ -678,6 +706,8 @@ class ApplicationRunner:
                 self._performAction(self.testSuite, action)
     def performCleanUp(self):
         self.valid = 0 # Make sure no future runs are made
+        self.gui = None # The GUI has been exited
+        self.actionSequence.reverse()
         for action in self.actionSequence:
             cleanUp = action.getCleanUpAction()
             if cleanUp != None:
@@ -695,7 +725,11 @@ class ApplicationRunner:
         action.setUpApplication(suite.app)
         suite.tearDownEnvironment()
         debugLog.debug("Current config dictionary for " + repr(suite.app) + ": " + os.linesep + repr(suite.app.configDir.dict))
-        suite.performAction(action)    
+        if self.gui:
+            instructionList = suite.getInstructions(action)
+            self.gui.storeInstructions(instructionList)
+        else:
+            suite.performAction(action)    
 
 def printException():
     type, value, traceback = sys.exc_info()
@@ -716,6 +750,14 @@ class TextTest:
         global globalRunIdentifier
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
         self.allApps = self.inputOptions.findApps()
+        self.gui = None
+        if self.inputOptions.useGui():
+            try:
+                import texttestgui
+                self.gui = texttestgui.TextTestGUI()
+            except:
+                print "Cannot use GUI: caught exception:"
+                printException()
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names
         if os.environ.has_key("USER"):
@@ -738,11 +780,15 @@ class TextTest:
         for run in range(self.inputOptions.timesToRun()):
             for actionNum in range(maxActionCount):
                 self.performActionOnApps(applicationRunners, actionNum)
+            if self.gui:
+                self.gui.takeControl()
+            for appRunner in applicationRunners:
+                appRunner.performCleanUp()
     def createAppRunners(self):
         applicationRunners = []
         for app in self.allApps:
             try:
-                appRunner = ApplicationRunner(app, self.inputOptions)
+                appRunner = ApplicationRunner(app, self.inputOptions, self.gui)
                 if appRunner.valid:
                     print "Using", app.description() + ", checkout", app.checkout
                     applicationRunners.append(appRunner)

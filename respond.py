@@ -19,11 +19,10 @@ class Responder(plugins.Action):
             predictionText = predict.testBrokenPredictionMap[test]
             print test.getIndent() + "WARNING :", predictionText, "in", repr(test)
             self.handleFailedPrediction(test, predictionText)
-        if comparetest.testComparisonMap.has_key(test):
-            testComparison = comparetest.testComparisonMap[test]
+        if test.state == test.FAILED:
+            testComparison = test.stateDetails
             print test.getIndent() + repr(test), self.responderText(test)
             self.handleFailure(test, testComparison)
-            del comparetest.testComparisonMap[test]
         else:
             self.handleSuccess(test)
     def handleSuccess(self, test):
@@ -42,11 +41,11 @@ class Responder(plugins.Action):
              self.handleCoreFile(test)
              os.remove("core")
     def responderText(self, test):
-        testComparison = comparetest.testComparisonMap[test]
+        testComparison = test.stateDetails
         diffText = testComparison.getDifferenceSummary()
         return repr(testComparison) + diffText
     def processUnRunnable(self, test):
-        print test.getIndent() + repr(test), "Failed: ", str(test.deathReason).split(os.linesep)[0]
+        print test.getIndent() + repr(test), "Failed: ", str(test.stateDetails).split(os.linesep)[0]
         self.handleDead(test)
     def handleDead(self, test):
         pass
@@ -71,6 +70,8 @@ class InteractiveResponder(Responder):
             self.display(comparison, displayStream, app)
     def display(self, comparison, displayStream, app):
         ndiff.fcompare(comparison.stdCmpFile, comparison.tmpCmpFile)
+    def getInstructions(self, test):
+        return []
     def askUser(self, test, testComparison, allowView):      
         versions = test.app.getVersionFileExtensions()
         options = ""
@@ -140,7 +141,7 @@ class OverwriteOnFailures(Responder):
     def __init__(self, version):
         self.version = version
     def responderText(self, test):
-        testComparison = comparetest.testComparisonMap[test]
+        testComparison = test.stateDetails
         diffText = testComparison.getDifferenceSummary()
         return "- overwriting" + diffText
     def handleFailure(self, test, testComparison):

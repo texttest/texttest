@@ -42,6 +42,10 @@ class Action:
         pass
     def getCleanUpAction(self):
         return None
+    # Return a list of atomic instructions of action, test pairs that can be applied
+    # Should not involve waiting or hanging on input
+    def getInstructions(self, test):
+        return [ (test, self) ]
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText
@@ -79,6 +83,11 @@ class CompositeAction(Action):
     def processUnRunnable(self, test):
         for subAction in self.subActions:
             subAction.processUnRunnable(test)
+    def getInstructions(self, test):
+        instructions = []
+        for subAction in self.subActions:
+            instructions += subAction.getInstructions(test)
+        return instructions
     def getCleanUpAction(self):
         cleanUpSubActions = []
         for subAction in self.subActions:
@@ -89,6 +98,20 @@ class CompositeAction(Action):
             return CompositeAction(cleanUpSubActions)
         else:
             return None
+
+# Action for wrapping the calls to setUpEnvironment
+class SetUpEnvironment(Action):
+    def __call__(self, test):
+        test.setUpEnvironment()
+    def setUpSuite(self, suite):
+        suite.setUpEnvironment()
+
+# Action for wrapping the calls to tearDownEnvironment
+class TearDownEnvironment(Action):
+    def __call__(self, test):
+        test.tearDownEnvironment()
+    def setUpSuite(self, suite):
+        suite.tearDownEnvironment()
 
 # Action for wrapping an executable that isn't Python, or can't be imported in the usual way
 class NonPythonAction(Action):

@@ -255,6 +255,9 @@ class Wait(plugins.Action):
                 batch.killedTests.append(test)
                 return
             time.sleep(2)
+    # Involves sleeping, don't do it from GUI
+    def getInstructions(self, test):
+        return []
     def checkCondition(self, job):
         return job.hasFinished()
 
@@ -263,7 +266,12 @@ class MakeResourceFiles(plugins.Action):
         self.checkPerformance = checkPerformance
         self.checkMemory = checkMemory
         self.isSlowdownJob = isSlowdownJob
+    def __repr__(self):
+        return "Making resource files for"
     def __call__(self, test):
+        job = LSFJob(test)
+        if not job.hasFinished():
+            return "wait"
         textList = [ "Max Memory", "Max Swap", "CPU time", [ "executed on host", "home directory" ], "Real time" ]
         tmpFile = test.getTmpFileName("report", "r")
         resourceDict = self.makeResourceDict(tmpFile, textList)

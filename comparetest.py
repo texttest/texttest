@@ -16,8 +16,6 @@ is interpreted as a test failure.
 
 import os, filecmp, string, plugins
 
-testComparisonMap = {}
-
 class TestComparison:
     def __init__(self, test, overwriteOnSuccess):
         self.test = test
@@ -95,6 +93,11 @@ class TestComparison:
         return None
     def createFileComparison(self, test, standardFile, tmpFile):
         return FileComparison(test, standardFile, tmpFile)
+    def findFileComparison(self, name):
+        for comparison in self.changedResults:
+            if comparison.stdFile == name:
+                return comparison
+        return None
     def save(self, exact = 1, versionString = ""):
         # Force exactness unless there is only one difference : otherwise
         # performance is averaged when results have changed as well
@@ -117,7 +120,9 @@ class MakeComparisons(plugins.Action):
         for tmpExt, subDir in self.fileFinders(test):
             testComparison.makeComparisons(test, tmpExt, subDir)
         if testComparison.hasDifferences() or testComparison.hasNewResults():
-            testComparisonMap[test] = testComparison
+            test.changeState(test.FAILED, testComparison)
+        else:
+            test.changeState(test.SUCCEEDED)
         self.describe(test, testComparison.getPostText())
     def makeTestComparison(self, test):
         return TestComparison(test, self.overwriteOnSuccess)

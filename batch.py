@@ -122,7 +122,7 @@ class BatchResponder(respond.Responder):
         crashText = self.responder.getCrashText(test)
         self.crashDetail[test] = crashText
     def handleDead(self, test):
-        self.deadDetail[test] = test.deathReason
+        self.deadDetail[test] = test.stateDetails
         self.addTestToCategory("dead", test)
     def findFailureCategory(self, test, testComparison):
         successCategory = self.findSuccessCategory(test)

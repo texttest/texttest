@@ -90,7 +90,7 @@ class CarmenConfig(lsf.LSFConfig):
             return [ self.getRuleBuilder(0) ]
         else:
             builder = self.getAppBuilder()
-            return [ builder, self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self) + [ self.getBuildChecker(builder) ]
+            return [ builder, self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self)
     def getRuleBuilder(self, neededOnly):
         if neededOnly:
             return plugins.Action()
@@ -99,11 +99,6 @@ class CarmenConfig(lsf.LSFConfig):
     def getAppBuilder(self):
         if self.optionMap.has_key("build"):
             return BuildCode(self.optionValue("build"))
-        else:
-            return plugins.Action()
-    def getBuildChecker(self, builder):
-        if self.optionMap.has_key("build"):
-            return CheckBuild(builder)
         else:
             return plugins.Action()
     def getTestRunner(self):
@@ -368,6 +363,8 @@ class BuildCode(plugins.Action):
         return 0
     def killBuild(self):
         print "Terminating remote build."
+    def getCleanUpAction(self):
+        return CheckBuild(self)
 
 class CheckBuild(plugins.Action):
     def __init__(self, builder):

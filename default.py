@@ -54,6 +54,7 @@ class Config(plugins.Configuration):
         elif group.name.startswith("How"):
             group.addSwitch("o", "Overwrite all failures")
             group.addSwitch("n", "Create new results files (overwrite everything)")
+            group.addSwitch("noperf", "Disable any performance testing")
     def getActionSequence(self, useGui):
         return self._getActionSequence(useGui, makeDirs=1)
     def _getActionSequence(self, useGui, makeDirs):
@@ -92,7 +93,10 @@ class Config(plugins.Configuration):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"))
         else:
-            return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getMemoryFileMaker() ] 
+            if self.optionMap.has_key("noperf"):
+                return self.getTestCollator()
+            else:
+                return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getMemoryFileMaker() ] 
     def getCatalogueCreator(self):
         return CreateCatalogue()
     def getTestCollator(self):
@@ -102,7 +106,7 @@ class Config(plugins.Configuration):
     def getPerformanceFileMaker(self):
         return None
     def hasPerformanceComparison(self, app):
-        return len(app.getConfigValue("string_before_memory")) > 0
+        return not self.optionMap.has_key("noperf") and len(app.getConfigValue("string_before_memory")) > 0
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getTestComparator(self):

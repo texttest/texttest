@@ -121,7 +121,7 @@ class TestCase(Test):
     def parallelMode(self):
         return inputOptions.parallelMode()
     def getTmpFileName(self, text, mode):
-        prefix = text + "." + self.app.name
+        prefix = text + "." + self.app.name + self.app.versionSuffix()
         fileName = prefix + globalRunIdentifier
         # When writing files, clean up equivalent files from previous runs, unless
         # we are in parallel mode and the files are less than 2 days old
@@ -217,6 +217,12 @@ class Application:
             return self.configDir["full_name"]
         else:
             return string.upper(self.name)
+    def versionSuffix(self):
+        if len(self.versions) == 0:
+            return ""
+        if len(self.versions) == 1:
+            return "." + self.versions[0]
+        return "." + string.join(self.versions, ".")
     def description(self):
         description = "Using Application " + self.fullName
         if len(self.versions) == 1:

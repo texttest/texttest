@@ -52,7 +52,7 @@ class MakeComparisons(plugins.Action):
     def makeTestComparison(self, test):
         return TestComparison(test)
     def fileFinders(self, test):
-        defaultFinder = test.app.name + test.getTmpExtension(), ""
+        defaultFinder = test.app.name + test.app.versionSuffix() + test.getTmpExtension(), ""
         return [ defaultFinder ]
     def makeComparisons(self, test, tmpExt, subDirectory, testComparison):
         dirPath = os.path.join(test.abspath, subDirectory)
@@ -60,7 +60,7 @@ class MakeComparisons(plugins.Action):
         fileList.sort()
         for file in fileList:
             if self.shouldCompare(file, testComparison, tmpExt, dirPath):
-                stem, ext = os.path.splitext(file)
+                stem, ext = file.split(".", 1)
                 standardFile = os.path.basename(test.makeFileName(stem))
                 comparison = self.makeComparison(test, os.path.join(subDirectory, standardFile), os.path.join(subDirectory, file))
                 testComparison.attemptedComparisons.append(standardFile)

@@ -142,7 +142,8 @@ class SubPlanDirManager:
         baseName =  subPlanDir.split(os.sep)[-1]
         return baseName
     def getTmpSubdir(self, test, subDir, baseName, mode):
-        prefix = os.path.join(subDir, baseName) + "." + test.app.name + "_" + test.name + "_"
+        prefix = os.path.join(subDir, baseName) + "."
+        prefix += test.app.name + test.app.versionSuffix() + "_" + test.name + "_"
         dirName = prefix + test.getTmpExtension()
         if not test.parallelMode():
             currTmpString = prefix + test.getTestUser()

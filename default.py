@@ -165,7 +165,7 @@ class ReconnectTest(plugins.Action):
                 return os.path.join(findDir, testCaseDir)
         return None
     def newResult(self, test, file):
-        if file.find("." + test.app.name) == -1:
+        if file.find("." + test.app.name + test.app.versionSuffix()) == -1:
             return 0
         stem = file.split(".")[0]
         pathStandardFile = test.makeFileName(stem)
@@ -184,7 +184,7 @@ class ReconnectTest(plugins.Action):
         if testDir == None:
             self.describe(test, "Failed!")
             return
-        pattern = "." + test.app.name
+        pattern = "." + test.app.name + test.app.versionSuffix()
         if self.fetchUser != None:
             pattern += self.fetchUser
             translateUser = 1
@@ -197,7 +197,7 @@ class ReconnectTest(plugins.Action):
             if rexp.search(file, 1) or self.newResult(test, file):
                 srcFile = os.path.join(testDir, file)
                 stem = file.split(".")[0]
-                targetFile = stem + "." + test.app.name + test.getTmpExtension()
+                targetFile = stem + "." + test.app.name + test.app.versionSuffix() + test.getTmpExtension()
                 if stem in stemsFound:
                     okFlag = 0
                     if not stem in multiStems:

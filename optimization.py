@@ -1116,14 +1116,10 @@ class PlotTest(plugins.Action):
     def getCleanUpAction(self):
         return GraphPlot()
 
-plotAveragerCount = 0
-
-class PlotAverager:
-    def __init__(self, tmpFileDirectory = None):
+class Averager:
+    def __init__(self):
         self.average = {}
         self.numberOfGraphs = 0
-        self.plotLineRepresentant = None
-        self.tmpFileDirectory = tmpFileDirectory
 
     def addGraph(self, graph):
         self.numberOfGraphs += 1
@@ -1163,6 +1159,7 @@ class PlotAverager:
         return graph
 
     def findClosestEarlierVal(self, xval, xvalues):
+        # If there is no earlier value.
         if xval < xvalues[0]:
             return xvalues[0]
         if xval > xvalues[-1]:
@@ -1179,6 +1176,14 @@ class PlotAverager:
         for xVal in xValues:
             graph[xVal] = self.average[xVal]/self.numberOfGraphs
         return graph
+
+plotAveragerCount = 0
+
+class PlotAverager(Averager):
+    def __init__(self, tmpFileDirectory = None):
+        Averager.__init__(self)
+        self.plotLineRepresentant = None
+        self.tmpFileDirectory = tmpFileDirectory
     
     def plotArgument(self):
         global plotAveragerCount

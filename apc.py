@@ -722,7 +722,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         if averagerMap.has_key(groupName):
             averagers = averagerMap[groupName]
         else:
-            averagers = averagerMap[groupName] = optimization.PlotAverager(), optimization.PlotAverager()
+            averagers = averagerMap[groupName] = optimization.Averager(), optimization.Averager()
         costAverager, memAverager = averagers
         costAverager.addGraph(costGraph)
         memAverager.addGraph(memoryGraph)

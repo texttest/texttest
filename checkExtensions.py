@@ -6,6 +6,8 @@ from glob import glob
 #Generic test plugin which will not only compare stdout and stderr but
 #also files created in the test directory that have specified extensions.
 #If the files created are compressed they will automatically be uncompressed.
+#The comparison and input files will be compressed after the test and
+#uncompressed when needed (see below).
 
 #Specify file extensions to check in "config.app":
 #
@@ -19,13 +21,23 @@ from glob import glob
 #run_log:text to be filtered out
 #run_log:text to be filtered out2
 
-#The plugin will automatcally compress the comparison files if they have
-#a size over 50000 or a over size defined by your entry in "config.app"
-#like this:
+#The plugin will automatcally compress the comparison files and input files
+#if they have a size over 50000 or over size defined by your entry in
+#"config.app" like this:
 #compress_bytesize_over:15000
 #If this size is set to 0 no compression is made
 
+#To define which input files that should be compressed after each run, add
+#entries to the "config.app" like this:
+#compress_extension:.ssim
+#compress_extension:.SSIM
+#compress_extension:.ctf
+
 #by Christian Sandborg 2003-02-19
+
+#constants
+COMPRESS=1
+UNCOMPRESS=0
 
 def getConfig(optionMap):
     return CheckExtConfig(optionMap)
@@ -39,36 +51,49 @@ def isCompressed(path):
     else:
         return 0
 
-class CheckExtConfig(carmen.CarmenConfig):
+class CheckExtConfig(carmen.CarmenConfig):   
     def getExecuteCommand(self, binary, test):
         return binary.replace("ARCHITECTURE", carmen.architecture) + " " + test.options
+
     def getTestCollator(self):
-        return plugins.CompositeAction([ HandleCompressedFiles(0), carmen.CarmenConfig.getTestCollator(self),  createCompareFiles() ])
+        return plugins.CompositeAction([ HandleCompressedFiles(UNCOMPRESS,'check_extension'),
+                                         carmen.CarmenConfig.getTestCollator(self),
+                                         CreateCompareFiles(),
+                                         HandleCompressedFiles(COMPRESS) ])
 
     def getTestEvaluator(self):
-        return plugins.CompositeAction([  carmen.CarmenConfig.getTestEvaluator(self) , HandleCompressedFiles(1) ])
-        
+        return plugins.CompositeAction([ carmen.CarmenConfig.getTestEvaluator(self) ,
+                                         HandleCompressedFiles(COMPRESS,'check_extension') ])
+
+    def getTestRunner(self):
+        return plugins.CompositeAction([ HandleCompressedFiles(UNCOMPRESS),
+                                         carmen.CarmenConfig.getTestRunner(self)])
+
 class HandleCompressedFiles(plugins.Action):
-    def __init__(self,compress=0):
-        self.compressIfOverSize=50000
+    def __init__(self,compress,keyInConfig='compress_extension',compressIfOverSize=50000):
+        self.compressIfOverSize=compressIfOverSize
+        self.compress=compress
         self.zext=".Z"
         if compress:
             self.zext=""
+        self.keyInConfig=keyInConfig
+    
     def __call__(self, test):
-        checkExtensions=[]
+        extensions=[]
         files=[]
         if test.app.configDir.has_key('compress_bytesize_over'):
             self.compressIfOverSize=int(test.app.configDir['compress_bytesize_over'])
-        if test.app.configDir.has_key('check_extension'):
-            checkExtensions=test.app.configDir.getListValue('check_extension')
-        if not checkExtensions:
+        extensions=test.app.configDir.getListValue(self.keyInConfig)
+        if not extensions:
             return
-        checkExtensions=[ x.replace('.','_')+"."+ test.app.name+self.zext for x in checkExtensions ]
-        for ext in checkExtensions:
-            files+=glob('*'+ext)
-        #print test.app.name, os.path.basename(os.getcwd()), os.listdir('.'), files, self.zext
+        #special case for 'check_extensions' (they are used for comparison)
+        if 'check_extension' == self.keyInConfig:
+            extensions=[ x.replace('.','_')+"."+ test.app.name \
+                         for x in extensions ]
+        for ext in extensions:
+            files+=glob('*'+ext+self.zext)
         for file in files:
-            if self.zext :
+            if not self.compress:
                 if isCompressed(file):
                     #print "uncompressing:", file
                     os.system('uncompress '+file)
@@ -78,8 +103,9 @@ class HandleCompressedFiles(plugins.Action):
                     return
                 #print "compressing:", file
                 os.system('compress '+file)
+                    
                 
-class createCompareFiles(plugins.Action):
+class CreateCompareFiles(plugins.Action):
     def __call__(self, test):
         checkExtensions=[]
         files2Check=[]
@@ -95,10 +121,11 @@ class createCompareFiles(plugins.Action):
             #the current standard compare can't handle dots in the names
             f = file.replace('.','_')
             compareFile=test.getTmpFileName(f,'w')
+            #the program might create compressed files
             if isCompressed(file):
                 os.system('zcat '+file+' > '+compareFile)
                 os.unlink(file)
             else:
                 os.rename(file,compareFile)
-
+        
 

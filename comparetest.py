@@ -66,6 +66,7 @@ import os, filecmp, string, plugins, time
 from ndict import seqdict
 from predict import FailedPrediction
 from shutil import copyfile
+from fnmatch import fnmatch
 
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
@@ -439,16 +440,20 @@ class RunDependentTextFilter:
         self.contentFilters = []
         self.orderFilters = seqdict()
         dict = app.getConfigValue("run_dependent_text")
-        if dict.has_key(stem):
-            for text in dict[stem]:
-                self.contentFilters.append(LineFilter(text, self.diag))
+        for text in self.findConfigTexts(dict, stem):
+            self.contentFilters.append(LineFilter(text, self.diag))
         dict = app.getConfigValue("unordered_text")
-        if dict.has_key(stem):
-            for text in dict[stem]:
-                orderFilter = LineFilter(text, self.diag)
-                self.orderFilters[orderFilter] = []
+        for text in self.findConfigTexts(dict, stem):
+            orderFilter = LineFilter(text, self.diag)
+            self.orderFilters[orderFilter] = []
     def hasFilters(self):
         return len(self.contentFilters) > 0 or len(self.orderFilters) > 0
+    def findConfigTexts(self, dict, stem):
+        texts = []
+        for key in dict.keys():
+            if fnmatch(stem, key):
+                texts += dict[key]
+        return texts
     def filterFile(self, fileName, newFileName, makeNew = 0):
         if not self.hasFilters() or not os.path.isfile(fileName):
             self.diag.info("No filter for " + fileName)

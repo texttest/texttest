@@ -98,10 +98,13 @@ class ExtractSubPlanFile(plugins.Action):
     def __repr__(self):
         return "Extracting subplan file " + self.sourceName + " to " + self.targetName + " on"
     def __call__(self, test):
+        self.describe(test)
         if self.config.isReconnecting():
             return
         sourcePath = self.config.getSubPlanFileName(test, self.sourceName)
+        diag = plugins.getDiagnostics("Extract subplan")
         targetFile = test.getTmpFileName(self.targetName, "w")
+        diag.info("Extracting " + sourcePath + " to " + targetFile)
         if os.path.isfile(sourcePath):
             shutil.copyfile(sourcePath, targetFile)
             if carmen.isCompressed(targetFile):

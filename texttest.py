@@ -725,7 +725,7 @@ class Application:
     def getPreviousWriteDirInfo(self, userName):
         userId = tmpString()
         if userName:
-            if globalTmpDirectory.find("~") != -1:
+            if globalTmpDirectory == os.path.expanduser("~/texttesttmp"):
                 return userName, globalTmpDirectory.replace(userId, userName)
             else:
                 # hack for self-tests, don't replace user globally, only locally

@@ -173,6 +173,8 @@ class TextTestGUI:
         childIter = self.model.iter_children(iter)
         if childIter:
             self.createSubIterMap(childIter)
+        else:
+            test.observers.append(self)
         nextIter = self.model.iter_next(iter)
         if nextIter:
             self.createSubIterMap(nextIter)
@@ -249,7 +251,6 @@ class TextTestGUI:
         if len(self.scriptCommands):
             gtk.idle_add(self.runScriptCommands)
         gtk.idle_add(self.doNextAction)
-        gtk.idle_add(self.updateForTest)
         gtk.main()
     def doNextAction(self):
         if len(self.instructions) == 0:
@@ -264,28 +265,19 @@ class TextTestGUI:
         if test in self.postponedTests:
             self.postponedInstructions.append((test, action))
         else:
-            oldState = test.state
             retValue = test.callAction(action)
             if retValue != None:
                 self.postponedTests.append(test)
                 self.postponedInstructions.append((test, action))
-            if test.state != oldState:
-                self.redrawTest(test)
         return gtk.TRUE
+    def notifyChange(self, test):
+        self.redrawTest(test)
+        if self.testCaseGUI and self.testCaseGUI.test == test:
+            self.recreateTestView(test)
     def redrawTest(self, test):
         iter = self.itermap[test]
         self.model.set_value(iter, 1, self.getTestColour(test))
         self.model.row_changed(self.model.get_path(iter), iter)
-    def updateForTest(self):
-        if not self.testCaseGUI or not self.testCaseGUI.test:
-            return gtk.TRUE
-        test = self.testCaseGUI.test
-        if self.testCaseGUI.oldState == test.state:
-            return gtk.TRUE
-
-        self.redrawTest(test)
-        self.recreateTestView(test)
-        return gtk.TRUE
     def runScriptCommands(self):
         global appendToScript
         if self.scriptPointer >= len(self.scriptCommands):
@@ -330,8 +322,6 @@ class TestCaseGUI:
         self.exactButton = None
         self.optionChooser = None
         self.test = test
-        if test:
-            self.oldState = test.state
         self.interactiveDialogue = None
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.addFilesToModel(test)

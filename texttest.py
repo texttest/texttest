@@ -143,6 +143,8 @@ class TestCase(Test):
             self.options = os.path.expandvars(open(optionsFile).readline().strip())
         # List of directories where this test will write files. First is where it executes from
         self.writeDirs = []
+        # List of objects observing this test, to be notified when it changes state
+        self.observers = []
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -167,6 +169,8 @@ class TestCase(Test):
             return
         self.state = state
         self.stateDetails = details
+        for observer in self.observers:
+            observer.notifyChange(self)
     def performOnSubTests(self, action):
         pass
     def getSubInstructions(self, action):

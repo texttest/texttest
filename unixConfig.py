@@ -396,6 +396,7 @@ class MakePerformanceFile(plugins.Action):
             if host[1] == "*":
                 realHost = host[2:]
             if not realHost in self.performanceMachines:
+                self.diag.info("Real host rejected for performance " + realHost)
                 return 0
         return 1
     def readTimes(self, test):

@@ -54,6 +54,11 @@ apc.UpdatePerformance      - Update the performance file for tests with time fro
                              - v=v1,v2
                                Update for  multiple versions, ie 'v=,9' means master and version 9
 
+apc.CVSBranchTests         - This script is useful when two versions of a test starts to differ.
+                             For all relevant APC files in the current testselection, it check if the
+                             files are CVS modified. If they are, the check-in result is stored in version v.
+                             Example: texttest -a apc -s apc.CVSBranchTests 11
+
 """
 
 import default, ravebased, carmen, lsf, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
@@ -974,3 +979,31 @@ class CopyEnvironment(plugins.Action):
             if line.startswith("CARMTMP"):
                 name, carmtmp = line.strip().split(":")
                 return carmtmp
+
+class CVSBranchTests(plugins.Action):
+    def __init__(self, args = []):
+        if not len(args) == 1:
+            raise plugins.TextTestError, "CVSBranchTests accepts exactly one argument (version)"
+        self.version = args[0]
+    def __repr__(self):
+        return "CVS Branch test for"
+    def __call__(self, test):
+        interestingFiles = ["status","error","memory","performance","solution","warnings"]
+        for file in interestingFiles:
+            fullFileName = test.makeFileName(file)
+            if not os.path.isfile(fullFileName):
+                continue
+            fullFileNameNewVersion = fullFileName + "." + self.version
+            if os.path.isfile(fullFileNameNewVersion):
+                self.describe(test, ": version " + self.version + " already exists of " + file)
+                continue
+            stdin, stdout, stderr = os.popen3("cvs -q upd " + fullFileName)
+            lines = stdout.readlines()
+            if lines:
+                for line in lines:
+                    if line[0] == "M":
+                        self.describe(test, ": creating version " + self.version + " of " + file)
+                        os.system("cvs -q upd -p " + fullFileName + " > " + fullFileNameNewVersion)
+                        os.system("cvs add " + fullFileNameNewVersion)
+                
+                

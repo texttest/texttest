@@ -277,6 +277,13 @@ class UseCaseRecorder:
             if entry.startswith("SIG") and not entry.startswith("SIG_"):
                 exec "number = signal." + entry
                 self.signalNames[number] = entry
+    def notifyExit(self):
+        self.suspended = 0
+    def addScript(self, scriptName):
+        self.scripts.append(RecordScript(scriptName))
+        if len(self.scripts) == 1:
+            self.addSignalHandlers()
+    def addSignalHandlers(self):
         for signum in range(signal.NSIG):
             try:
                 # Don't record SIGCHLD unless told to, these are generally ignored
@@ -286,14 +293,16 @@ class UseCaseRecorder:
             except:
                 # Various signals aren't really valid here...
                 pass
-    def notifyExit(self):
-        self.suspended = 0
-    def addScript(self, scriptName):
-        self.scripts.append(RecordScript(scriptName))
+    def removeSignalHandlers(self):
+        for signum, handler in self.realSignalHandlers.items():
+            signal.signal(signum, handler)
+        self.realSignalHandlers = {}
     def blockTopLevel(self, eventName):
         self.eventsBlockedTopLevel.append(eventName)
     def terminateScript(self):
         del self.scripts[-1]
+        if len(self.scripts) == 0:
+            self.removeSignalHandlers()
     def readTranslationFile(self):
         fileName = os.path.join(os.environ["USECASE_HOME"], "usecase_translation")
         configParser = ConfigParser()
@@ -310,7 +319,7 @@ class UseCaseRecorder:
         # If there was no handler-override installed, resend the signal with the handler reset
         if realHandler == signal.SIG_DFL:
             signal.signal(signum, self.realSignalHandlers[signum])
-            print "Killing process", self.processId
+            print "Killing process", self.processId, "with signal", signum
             os.kill(self.processId, signum)
             # If we're still alive, set the signal handler back again to record future signals
             signal.signal(signum, self.recordSignal)

@@ -341,7 +341,7 @@ class TextTestGUI:
         test = model.get_value(iter, 2)
         if test.classId() != "test-app":
             app = test.app
-            if self.rightWindowGUI.object != app:
+            if not self.rightWindowGUI.object is app:
                 guilog.info("Viewing app " + repr(app))
                 self.recreateTestView(app)
     def viewTest(self, view, path, column, *args):

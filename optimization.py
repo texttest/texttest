@@ -12,12 +12,15 @@ experiment with a new feature on a lot of tests without having to manually creat
 
 In other respects, it follows the usage of the Carmen configuration.""" 
 
-helpOptions = """-prrep <v> - Generate a Progress Report relative to the version <v>. This will produce some key numbers for all
-             tests specified.
+helpOptions = """-prrep <v> - Generate a Progress Report relative to the version <v>. This will produce some
+key numbers for all tests specified.
 
 -kpi <ver> - Generate a Key Performance Indicator ("KPI") relative to the version <ver>. This will try to apply
              some formula to boil down the results of the tests given to a single-number "performance indicator".
              Please note that the results so far are not very reliable, as the formula itself is still under development.
+
+-keeptmp   - Keep the temporary subplan directories of the test(s). Note that once you run the test again the old
+             temporary subplan dirs will be removed, unless you run in parallell mode of course.       
 """
 
 import carmen, os, sys, string, shutil, KPI, plugins, performance, math
@@ -46,6 +49,10 @@ class OptimizationConfig(carmen.CarmenConfig):
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), ExtractSubPlanFile(self, "best_solution", "solution") ])
+    def keepTemporarySubplans(self):
+        if self.optionMap.has_key("keeptmp"):
+            return 1
+        return 0
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
@@ -132,6 +139,9 @@ class SubPlanDirManager:
         if self.tmpDirs.has_key(test):
             tmpDir = self.tmpDirs[test]
             if os.path.isdir(tmpDir):
+                if self.config.keepTemporarySubplans():
+                    print test.getIndent() + "Keeping subplan dir for", repr(test), "in", tmpDir
+                    return
                 self._removeDir(tmpDir)
     def getSubPlanDirName(self, test):
         subPlanDir = self.getSubPlanDirFromTest(test)

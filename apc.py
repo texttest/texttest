@@ -1129,6 +1129,8 @@ class ApcTestSuiteInformation(optimization.TestSuiteInformation):
 class ImportTestSuite(optimization.ImportTestSuite):
     def getCarmtmpDirName(self, carmUsr):
         return optimization.ImportTestSuite.getCarmtmpDirName(self, carmUsr) + ".apc"
+    def getEnvironmentFileName(self, suite):
+        return "environment." + suite.app.name
     
 # Graphical import
 class ImportTestCase(optimization.ImportTestCase):

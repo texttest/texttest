@@ -93,9 +93,6 @@ class Pending(plugins.TestState):
             self.notifyInMainThread()
     def notifyInMainThread(self):
         self.process.doFork()
-    def timeElapsedSince(self, oldState):
-        # Going in to this state always means moving on..
-        return 1
 
 class RunTest(default.RunTest):
     def __init__(self, loginShell):

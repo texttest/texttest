@@ -15,6 +15,9 @@ class DayOPsGUIConfig(lsf.LSFConfig):
         logFile = test.makeFileName("dmserverlog", temporary=1)
         os.environ["DMG_RUN_TEST"] = test.abspath + "#" + propFile + "#" + logFile
         return lsf.LSFConfig.getExecuteCommand(self, binary, test)
+    def setApplicationDefaults(self, app):
+        lsf.LSFConfig.setApplicationDefaults(self, app)
+        app.addConfigEntry("definition_file_stems", "properties")
 
 class JavaPropertyReader:
     def __init__(self, filename):

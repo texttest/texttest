@@ -192,9 +192,14 @@ class RunWithParallelAction(plugins.Action):
     def getProcessNames(self, allProcesses):
         dict = seqdict()
         for processId in allProcesses:
-            psline = os.popen("ps -l -p " + str(processId)).readlines()[-1]
-            dict[str(processId)] = psline.split()[-1]
-        return dict        
+            dict[str(processId)] = self.getProcessName(processId)
+        return dict
+    def getProcessName(self, processId):
+        pslines = os.popen("ps -l -p " + str(processId)).readlines()
+        if len(pslines) == 0:
+            return self.getProcessName(processId)
+        else:
+            return pslines[-1].split()[-1]
                 
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, processInfo):

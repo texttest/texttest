@@ -229,7 +229,7 @@ class MakePerformanceFile(plugins.Action):
         for line in file.readlines():
             if line.startswith("user"):
                 cpuTime = self.parseUnixTime(line)
-            if self.includeSystemTime and line.startswith("sys") != -1:
+            if self.includeSystemTime and line.startswith("sys"):
                 cpuTime = cpuTime + self.parseUnixTime(line)
             if line.startswith("real"):
                 realTime = self.parseUnixTime(line)

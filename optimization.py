@@ -177,6 +177,7 @@ class MakeTmpSubPlan(plugins.Action):
     def __init__(self, subplanFunction):
         self.subplanFunction = subplanFunction
         self.raveParameters = []
+        self.diag = plugins.getDiagnostics("Tmp Subplan")
     def setUpSuite(self, suite):
         self.readRaveParameters(suite.makeFileName("raveparameters"))
     def tearDownSuite(self, suite):
@@ -227,11 +228,13 @@ class MakeTmpSubPlan(plugins.Action):
                 os.symlink(fromPath, toPath)            
     def readRaveParameters(self, fileName):
         if not os.path.isfile(fileName):
-            self.raveParameters.append([]);
-            return
-        self.raveParameters.append(open(fileName).readlines())
+            self.raveParameters.append([])
+        else:
+            self.raveParameters.append(open(fileName).readlines())
+        self.diag.info("Added to list : " + repr(self.raveParameters))    
     def unreadRaveParameters(self):
         self.raveParameters.pop()
+        self.diag.info("Removed from list : " + repr(self.raveParameters))
         
 class StartStudio(plugins.Action):
     def __call__(self, test):

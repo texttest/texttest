@@ -97,11 +97,11 @@ class ApcConfig(optimization.OptimizationConfig):
         return subActions
     def _getApcTestRunner(self):
         if self.useLSF():
-            return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
+            return SubmitApcTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource)
         elif self.optionMap.has_key("rundebug"):
             return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
         else:
-            return RunApcTest()
+            return RunApcTest(self.getLoginShell())
     def getFileCollator(self):
         baseCollator = optimization.OptimizationConfig.getFileCollator(self)
         subActions = []

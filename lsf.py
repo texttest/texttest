@@ -86,7 +86,7 @@ class LSFConfig(unixConfig.UNIXConfig):
         if not self.useLSF():
             return unixConfig.UNIXConfig.getTestRunner(self)
         else:
-            return SubmitTest(self.findLSFQueue, self.findLSFResource)
+            return SubmitTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource)
     def getPerformanceFileMaker(self):
         if self.useLSF():
             return MakePerformanceFile(self.isSlowdownJob)
@@ -257,8 +257,8 @@ class LSFJob:
         return os.popen("bjobs -J " + self.name + " " + options + " 2>&1")
     
 class SubmitTest(unixConfig.RunTest):
-    def __init__(self, queueFunction, resourceFunction):
-        unixConfig.RunTest.__init__(self)
+    def __init__(self, loginShell, queueFunction, resourceFunction):
+        unixConfig.RunTest.__init__(self, loginShell)
         self.queueFunction = queueFunction
         self.resourceFunction = resourceFunction
         self.diag = plugins.getDiagnostics("LSF")
@@ -302,21 +302,9 @@ class SubmitTest(unixConfig.RunTest):
     def buildCommandFile(self, test, cmdFile, testCommand):
         self.diag.info("Building command file at " + cmdFile)
         f = open(cmdFile, "w")
-        f.write("HOST=`hostname`; export HOST" + os.linesep)
+        # LSF is meant to ensure that directories are transferred,
+        # but this is error prone with the AMD automounter. Best to make sure...
         curDir = test.getDirectory(temporary=1)
-        if os.environ.has_key("LSF_ENVIRONMENT"):
-            data = os.environ["LSF_ENVIRONMENT"]
-            defs = data.split(";")
-            for def1 in defs:
-                parts = def1.split("=")
-                if len(parts) > 1:
-                    var = parts[0]
-                    value = parts[1]
-                    fullPathValue = os.path.join(curDir, value)
-                    if os.path.exists(fullPathValue):
-                        value = fullPathValue
-                    if value != "dummy":
-                        f.write(var + "=" + "\"" + value + "\"; export " + var + os.linesep)
         f.write("cd " + curDir + os.linesep)
         f.write(testCommand + os.linesep)
         f.close()

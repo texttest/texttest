@@ -408,6 +408,20 @@ class PrintRuleValue(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 
+class UpdateXpressVersion(plugins.Action):
+    def __repr__(self):
+        return "Updating XPRESS version for"
+    def __call__(self, test):
+        self.describe(test)
+        errFile = test.makeFileName("errors")
+        newErrFile = test.makeFileName("new_errors")
+        writeFile = open(newErrFile, "w")
+        for line in open(errFile).xreadlines():
+            writeFile.write(line.replace("15.10.04", "15.10.06"))
+        writeFile.close()
+        os.rename(newErrFile, errFile)
+        os.system("cvs diff " + errFile)
+                  
 class CopyEnvironment(plugins.Action):
     def __repr__(self):
         return "Making environment.ARCH for"

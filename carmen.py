@@ -185,7 +185,7 @@ class CarmenConfig(lsf.LSFConfig):
             return None
     def getRealRuleBuilder(self):
         if self.useLSF():
-            ruleRunner = lsf.SubmitTest(self.findRaveCompilationLSFQueue, self.findLSFResource)
+            ruleRunner = lsf.SubmitTest(self.getLoginShell(), self.findRaveCompilationLSFQueue, self.findLSFResource)
         else:
             ruleRunner = default.RunTest()
         jobNameCreator = RulesetJobBuildNameCreator(self.getRuleSetName)
@@ -215,6 +215,9 @@ class CarmenConfig(lsf.LSFConfig):
             return BuildCode(self.optionValue("buildl"), remote = 0)
         else:
             return None
+    def getLoginShell(self):
+        # All of carmen's login stuff is done in tcsh starter scripts...
+        return "/bin/tcsh"
     def getTestRunner(self):
         if self.optionMap.has_key("lprof"):
             subActions = [ lsf.LSFConfig.getTestRunner(self), AttachProfiler() ]

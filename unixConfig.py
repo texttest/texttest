@@ -39,7 +39,10 @@ class UNIXConfig(default.Config):
     def getPerformanceFileMaker(self):
         return MakePerformanceFile()
     def getTestRunner(self):
-        return RunTest()
+        return RunTest(self.getLoginShell())
+    def getLoginShell(self):
+        # Default, we know this exists everywhere
+        return "sh"
     def getTestResponder(self):
         if self.batchMode():
             return batch.BatchResponder(self.optionValue("b"))
@@ -79,8 +82,9 @@ class UNIXConfig(default.Config):
             app.addConfigEntry("base_version", batchSession)
 
 class RunTest(default.RunTest):
-    def __init__(self):
+    def __init__(self, loginShell):
         self.process = None
+        self.loginShell = loginShell
         self.collectStdErr = 1
         self.testDisplay = None
         self.realDisplay = os.getenv("DISPLAY")
@@ -116,13 +120,17 @@ class RunTest(default.RunTest):
         testCommand = default.RunTest.getExecuteCommand(self, test)
         if self.collectStdErr:
             errfile = test.makeFileName("errors", temporary=1)
-            testCommand += " 2> " + errfile
+            # C-shell based shells have different syntax here...
+            if self.loginShell.find("csh") != -1:
+                testCommand = "( " + testCommand + " ) >& " + errfile
+            else:
+                testCommand += " 2> " + errfile
         # put the command in a file to avoid quoting problems,
         # also fix env.variables that remote login doesn't reset
         cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
         self.buildCommandFile(test, cmdFile, testCommand)
         unixPerfFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
-        timedTestCommand = '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
+        timedTestCommand = '\\time -p ' + self.loginShell + ' ' + cmdFile + ' 2> ' + unixPerfFile
         return timedTestCommand
     def buildCommandFile(self, test, cmdFile, testCommand):
         f = open(cmdFile, "w")

@@ -722,6 +722,16 @@ class Application:
     def createCopy(self, version):
         configFile = os.path.join(self.abspath, "config." + self.name)
         return Application(self.name, self.abspath, configFile, version, self.inputOptions)
+    def getPreviousWriteDirInfo(self, userName):
+        userId = tmpString()
+        if userName:
+            if globalTmpDirectory.find("~") != -1:
+                return userName, globalTmpDirectory.replace(userId, userName)
+            else:
+                # hack for self-tests, don't replace user globally, only locally
+                return userName, globalTmpDirectory
+        else:
+            return userId, globalTmpDirectory
     def getPersonalConfigFile(self):
         if os.environ.has_key("TEXTTEST_PERSONAL_CONFIG"):
             return os.path.join(os.environ["TEXTTEST_PERSONAL_CONFIG"], ".texttest")
@@ -852,13 +862,14 @@ class Application:
             else:
                 os.environ["TEXTTEST_TMP"] = os.environ["TEMP"]
         root = os.path.expanduser(os.environ["TEXTTEST_TMP"])
-        absroot = plugins.abspath(root)
-        if not os.path.isdir(absroot):
-            os.makedirs(absroot)
+        global globalTmpDirectory
+        globalTmpDirectory = plugins.abspath(root)
+        if not os.path.isdir(globalTmpDirectory):
+            os.makedirs(globalTmpDirectory)
         localName = self.getTmpIdentifier().replace(":", "")
         if inputOptions.useStaticGUI():
             localName = "static_gui." + localName
-        return os.path.join(absroot, localName)
+        return os.path.join(globalTmpDirectory, localName)
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:
@@ -944,8 +955,6 @@ class Application:
                 shutil.rmtree(previousWriteDir)
     def getTmpIdentifier(self):
         return self.name + self.versionSuffix() + globalRunIdentifier
-    def getTestUser(self):
-        return tmpString()
     def ownsFile(self, fileName, unknown = 1):
         # Environment file may or may not be owned. Return whatever we're told to return for unknown
         if fileName == "environment":

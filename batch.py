@@ -209,7 +209,11 @@ class MailSender(plugins.Action):
         fromAddress = os.environ["USER"]
         toAddress = self.getRecipient(app)
         if self.useCollection(app):
-            collFile = os.path.join(app.abspath, "batchreport." + app.name + app.versionSuffix())
+            writeDir = app.writeDirectory
+            # Hack for self-tests: if there isn't a write directory, use the tests themselves!
+            if not os.path.isdir(writeDir):
+                writeDir = app.abspath
+            collFile = os.path.join(writeDir, "batchreport." + app.name + app.versionSuffix())
             self.diag.info("Sending mail to", collFile)
             mailFile = open(collFile, "w")
             mailFile.write(toAddress + os.linesep)
@@ -307,41 +311,21 @@ class MailSender(plugins.Action):
         return versions
         
 class CollectFiles(plugins.Action):
-    def __init__(self):
+    def __init__(self, userName=""):
         self.mailSender = MailSender("collection")
         self.diag = plugins.getDiagnostics("batch collect")
+        self.userName = userName
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()
-        prefix = "batchreport." + app.name + app.versionSuffix()
-        # Don't collect to more collections!
-        self.diag.info("Setting up application " + app.name + " looking for " + prefix) 
         app.addConfigEntry("collection", self.getCollectionSetting(), "batch_use_collection")
-        filelist = os.listdir(app.abspath)
-        filelist.sort()
-        for filename in filelist:
-            if filename.startswith(prefix):
-                fullname = os.path.join(app.abspath, filename)
-                print "Found file called", filename
-                file = open(fullname)
-                recipient = file.readline().strip()
-                if recipient:
-                    app.addConfigEntry("collection", recipient, "batch_recipients")
-                catValues = plugins.commasplit(file.readline().strip())
-                try:
-                    for value in catValues:
-                        catName, count = value.split("=")
-                        if not totalValues.has_key(catName):
-                            totalValues[catName] = 0
-                        totalValues[catName] += int(count)
-                except ValueError:
-                    print "WARNING : found truncated or old format batch report (" + filename + ") - could not parse result correctly"
-                fileBodies.append(file.read())
-                file.close()
-                try:
-                    os.remove(fullname)
-                except OSError:
-                    print "Don't have permissions to remove file", fullname
+        userName, rootDir = app.getPreviousWriteDirInfo(self.userName)
+        dirlist = os.listdir(rootDir)
+        dirlist.sort()
+        for dir in dirlist:
+            fullDir = os.path.join(rootDir, dir)
+            if os.path.isdir(fullDir) and dir.startswith(app.name + app.versionSuffix()):
+                fileBodies += self.parseDirectory(fullDir, app, totalValues)
         if len(fileBodies) == 0:
             return
         
@@ -349,6 +333,38 @@ class CollectFiles(plugins.Action):
         mailFile = self.mailSender.createMail(mailTitle, app, [])
         self.writeBody(mailFile, fileBodies)
         mailFile.close()
+    def parseDirectory(self, fullDir, app, totalValues):
+        prefix = "batchreport." + app.name + app.versionSuffix()
+        # Don't collect to more collections!
+        self.diag.info("Setting up application " + app.name + " looking for " + prefix) 
+        filelist = os.listdir(fullDir)
+        filelist.sort()
+        fileBodies = []
+        for filename in filelist:
+            if filename.startswith(prefix):
+                fullname = os.path.join(fullDir, filename)
+                fileBody = self.parseFile(fullname, app, totalValues)
+                fileBodies.append(fileBody)
+        return fileBodies
+    def parseFile(self, fullname, app, totalValues):
+        localName = os.path.basename(fullname)
+        print "Found file called", localName
+        file = open(fullname)
+        recipient = file.readline().strip()
+        if recipient:
+            app.addConfigEntry("collection", recipient, "batch_recipients")
+        catValues = plugins.commasplit(file.readline().strip())
+        try:
+            for value in catValues:
+                catName, count = value.split("=")
+                if not totalValues.has_key(catName):
+                    totalValues[catName] = 0
+                totalValues[catName] += int(count)
+        except ValueError:
+            print "WARNING : found truncated or old format batch report (" + localName + ") - could not parse result correctly"
+        fileBody = file.read()
+        file.close()
+        return fileBody
     def getCollectionSetting(self):
         if plugins.BackgroundProcess.fakeProcesses:
             return "true"

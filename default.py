@@ -559,7 +559,6 @@ class CountTest(plugins.Action):
 class ReconnectTest(plugins.Action):
     def __init__(self, fetchUser, fullRecalculate):
         self.fetchUser = fetchUser
-        self.userDepWriteDir = self.hasUserDependentWriteDir()
         self.rootDirToCopy = None
         self.fullRecalculate = fullRecalculate
         self.diag = plugins.getDiagnostics("Reconnection")
@@ -603,14 +602,7 @@ class ReconnectTest(plugins.Action):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0
     def setUpApplication(self, app):
-        root, localDir = os.path.split(app.writeDirectory)
-        fetchDir = root
-        userId = app.getTestUser()
-        if self.fetchUser and self.userDepWriteDir:
-            fetchDir = fetchDir.replace(userId, self.fetchUser)
-        userToFind = self.fetchUser
-        if not self.fetchUser:
-            userToFind = userId
+        userToFind, fetchDir = app.getPreviousWriteDirInfo(self.fetchUser)
         self.rootDirToCopy = self.findReconnDirectory(fetchDir, app, userToFind)
         if self.rootDirToCopy:
             print "Reconnecting to test results in directory", self.rootDirToCopy
@@ -639,8 +631,6 @@ class ReconnectTest(plugins.Action):
                 return fullPath
     def setUpSuite(self, suite):
         self.describe(suite)
-    def hasUserDependentWriteDir(self):
-        return os.environ["TEXTTEST_TMP"].find("~") != -1
 
 class MachineInfoFinder:
     def findPerformanceMachines(self, app, fileStem):

@@ -361,13 +361,9 @@ class LogFileFinder:
         versionMod = ""
         if version:
             versionMod = "." + version
-        root, localDir = os.path.split(app.writeDirectory)
         searchString = app.name + versionMod
-        if self.searchInUser:
-            searchString += self.searchInUser
-            root = "/users/" + self.searchInUser + "/texttesttmp/"
-        else:
-            searchString += app.getTestUser()
+        userId, root = app.getPreviousWriteDirInfo(self.searchInUser)
+        searchString += userId
         for subDir in os.listdir(root):
             fullDir = os.path.join(root, subDir)
             if os.path.isdir(fullDir) and subDir.startswith(searchString):

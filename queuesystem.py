@@ -133,7 +133,7 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         app.setConfigDefault("default_queue", "texttest_default")
         app.setConfigDefault("min_time_for_performance_force", -1)
         app.setConfigDefault("queue_system_module", "LSF")
-        app.setConfigDefault("performance_test_model", [])
+        app.setConfigDefault("performance_test_resource", [])
 
 class SubmissionRules:
     def __init__(self, optionMap, test, nonTestProcess):
@@ -146,15 +146,22 @@ class SubmissionRules:
         self.envResource = ""
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE"):
             self.envResource = os.getenv("QUEUE_SYSTEM_RESOURCE")
+    def getSubmitSuffix(self, name):
+        queue = self.findQueue()
+        if queue:
+            return name + " queue " + queue
+        else:
+            return "default " + name + " queue"    
     def findResourceList(self):
         resourceList = []
         if self.optionMap.has_key("R"):
             resourceList.append(self.optionMap["R"])
         if len(self.envResource):
             resourceList.append(self.envResource)
-        models = self.test.app.getConfigValue("performance_test_model")
-        for model in models:
-            resourceList.append("model=" + model)
+        if self.forceOnPerformanceMachines():
+            resources = self.test.app.getConfigValue("performance_test_resource")
+            for resource in resources:
+                resourceList.append(resource)
         return resourceList
     def findQueue(self):
         if self.nonTestProcess:
@@ -177,6 +184,9 @@ class SubmissionRules:
 
         return performanceMachines
     def forceOnPerformanceMachines(self):
+        if self.nonTestProcess:
+            return 0
+        
         if self.optionMap.has_key("perf"):
             return 1
 
@@ -363,17 +373,13 @@ class SubmitTest(plugins.Action):
                 return group
     def describe(self, test, jobNameFunction = None, submissionRules = None):
         name = queueSystemName(test.app)
-        queueToUse = name + " queues"
+        suffix = name + " queues"
         if submissionRules:
-            queue = submissionRules.findQueue()
-            if queue:
-                queueToUse = name + " queue " + queue
-            else:
-                queueToUse = "default " + name + " queue"
+            suffix = submissionRules.getSubmitSuffix(name)
         if jobNameFunction:
-            print test.getIndent() + "Submitting", jobNameFunction(test), "to", queueToUse
+            print test.getIndent() + "Submitting", jobNameFunction(test), "to", suffix
         else:
-            plugins.Action.describe(self, test, " to " + queueToUse)
+            plugins.Action.describe(self, test, " to " + suffix)
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
@@ -523,20 +529,20 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         self.isSlowdownJob = isSlowdownJob
         self.queueMachineInfo = None
     def findExecutionMachines(self, test):
-        # This is LSF-specific right now. Leave generalising until we understand
-        # how SGE works in these respects.
-        if not os.environ.has_key("LSB_HOSTS"):
-            return unixConfig.MakePerformanceFile.findExecutionMachines(self, test)
-        hosts = os.environ["LSB_HOSTS"].split(":")
-        return [ host.split(".")[0] for host in hosts ] 
+        machines = self.queueMachineInfo.findAllMachinesForJob()
+        if len(machines):
+            return machines
+
+        return unixConfig.MakePerformanceFile.findExecutionMachines(self, test)        
     def findPerformanceMachines(self, app):
         rawPerfMachines = unixConfig.MakePerformanceFile.findPerformanceMachines(self, app)
         perfMachines = []
         for machine in rawPerfMachines:
             perfMachines += self.queueMachineInfo.findActualMachines(machine)
-        models = app.getConfigValue("performance_test_model")
-        for model in models:
-            perfMachines += self.queueMachineInfo.findModelMachines(model)
+        resources = app.getConfigValue("performance_test_resource")
+        for resource in resources:
+            perfMachines += self.queueMachineInfo.findResourceMachines(resource)
+        self.diag.info("Found performance machines as " + repr(perfMachines))
         return perfMachines
     def writeMachineInformation(self, file, executionMachines):
         # Try and write some information about what's happening on the machine

@@ -50,12 +50,18 @@ class QueueSystem:
         if len(resourceList) == 0:
             return ""
         elif len(resourceList) == 1:
-            return resourceList[0]
+            return self.formatResource(resourceList[0])
         else:
-            resource = "(" + resourceList[0] + ")"
+            resource = "(" + self.formatResource(resourceList[0]) + ")"
             for res in resourceList[1:]:
-                resource += " && (" + res + ")"
+                resource += " && (" + self.formatResource(res) + ")"
             return resource
+    def formatResource(self, res):
+        if res.find("==") == -1 and res.find("!=") == -1 and res.find("<=") == -1 and \
+           res.find(">=") == -1 and res.find("=") != -1:
+            return res.replace("=", "==")
+        else:
+            return res
     def updateJobs(self):
         commandLine = self.envString + "bjobs -a -w " + string.join(self.activeJobs.keys())
         stdin, stdout, stderr = os.popen3(commandLine)
@@ -125,9 +131,9 @@ class MachineInfo:
             if not line.startswith("HOST_NAME"):
                 machines.append(line.split()[0].split(".")[0])
         return machines
-    def findModelMachines(self, model):
+    def findResourceMachines(self, resource):
         machines = []
-        for line in os.popen("bhosts -w -R 'model=" + model + "' 2>&1"):
+        for line in os.popen("bhosts -w -R '" + resource + "' 2>&1"):
             if not line.startswith("HOST_NAME"):
                 machines.append(line.split()[0].split(".")[0])
         return machines
@@ -139,4 +145,7 @@ class MachineInfo:
             jobName = fields[6]
             jobs.append((user, jobName))
         return jobs
-    
+    # Need to get all hosts for parallel
+    def findAllMachinesForJob(self):
+        hosts = os.environ["LSB_HOSTS"].split(":")
+        return [ host.split(".")[0] for host in hosts ] 

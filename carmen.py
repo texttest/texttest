@@ -55,7 +55,38 @@ def getMajorReleaseId(app):
             return "carmen_" + version
     return "master"
 
-class LsfSubmissionRules(queuesystem.SubmissionRules):
+class CarmenSubmissionRules(queuesystem.SubmissionRules):
+    # Return "short", "medium" or "long"
+    def getPerformanceCategory(self):
+        # RAVE compilations
+        if self.nonTestProcess:
+            return "short"
+        # Hard-coded, useful at boundaries
+        if not self.nonTestProcess and os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
+            return os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
+        cpuTime = performance.getTestPerformance(self.test)
+        if cpuTime < self.test.getConfigValue("maximum_cputime_for_short_queue"):
+            return "short"
+        elif cpuTime > 120:
+            return "long"
+        else:
+            return "medium"
+
+class SgeSubmissionRules(CarmenSubmissionRules):
+    def findResourceList(self):
+        # architecture resources
+        resources = CarmenSubmissionRules.findResourceList(self)
+        arch = getArchitecture(self.test.app)
+        resources.append("carmarch=\"*" + arch + "*\"")
+        category = self.getPerformanceCategory()
+        if category == "short":
+            resources.append("short")
+        return resources
+    def getSubmitSuffix(self, name):
+        resourceList = self.findResourceList()
+        return name + ", requesting " + string.join(resourceList, ",")
+
+class LsfSubmissionRules(CarmenSubmissionRules):
     def findDefaultQueue(self):
         arch = getArchitecture(self.test.app)
         if arch == "i386_linux" and not self.nonTestProcess:
@@ -63,33 +94,21 @@ class LsfSubmissionRules(queuesystem.SubmissionRules):
             chunkLimit = float(self.test.app.getConfigValue("maximum_cputime_for_chunking"))
             if cpuTime > 0 and cpuTime < chunkLimit:
                 return "short_rd_testing_chunked"
-        return self.getQueuePerformancePrefix(arch, self.nonTestProcess) + self.getArchQueueName(arch) +\
+        return self.getQueuePerformancePrefix(arch) + self.getArchQueueName(arch) +\
                self.getQueuePlatformSuffix(arch)
     def getArchQueueName(self, arch):
         if arch == "sparc_64":
             return "sparc"
         else:
             return arch
-    def getQueuePerformancePrefix(self, arch, rave = 0):
-        cpuTime = performance.getTestPerformance(self.test)
-        usePrefix = None
-        if not rave and os.environ.has_key("LSF_QUEUE_PREFIX"):
-            usePrefix = os.environ["LSF_QUEUE_PREFIX"]
-        # Currently no short queue for powerpc_aix4
-        if arch == "powerpc" and "9" in self.test.app.versions:
-            return ""
-        if usePrefix == None and (cpuTime < self.test.getConfigValue("maximum_cputime_for_short_queue") or rave):
+    def getQueuePerformancePrefix(self, arch):
+        category = self.getPerformanceCategory()
+        if category == "short":
             return "short_"
-        elif arch == "powerpc" or arch == "parisc_2_0":
-            return ""
-        elif usePrefix == None and cpuTime < 120:
-            return ""
-        elif usePrefix == None:
-            return "idle_"
-        elif usePrefix == "":
+        elif category == "medium" or (arch == "powerpc" or arch == "parisc_2_0"):
             return ""
         else:
-            return usePrefix + "_"
+            return "idle_"
     def getQueuePlatformSuffix(self, arch):
         if arch == "i386_linux":
             return "_RHEL"

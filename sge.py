@@ -20,7 +20,7 @@ class QueueSystem:
         resource = self.getResourceArg(submissionRules)
         if len(resource):
             qsubArgs += " -l " + resource
-        qsubArgs += " -w e -m n -b y -V"
+        qsubArgs += " -w e -m n -b y -V -o /dev/null -e /dev/null"
         return "qsub " + qsubArgs
     def findSubmitError(self, stderr):
         errLines = stderr.readlines()
@@ -47,7 +47,7 @@ class QueueSystem:
         if len(machines):
             resourceList.append("hostname='" + string.join(machines, "|") + "'")
         return string.join(resourceList, ",")
-    def getStatus(self, sgeStat, states):
+    def getStatus(self, sgeStat, states, jobId):
         # Use LSF status names for now as queuesystem.py expects them. man qstat gives
         # states as d(eletion), t(ransfering), r(unning), R(estarted), s(uspended),
         # S(uspended),  T(hreshold),  w(aiting) or h(old).
@@ -59,7 +59,7 @@ class QueueSystem:
             return "PEND"
         elif sgeStat.startswith("q"):
             if states == "z":
-                return "DONE"
+                return self.exitStatus(jobId)
             else:
                 return "PEND"
         elif sgeStat.startswith("s") or sgeStat.startswith("S") or sgeStat.startswith("T"):
@@ -68,6 +68,20 @@ class QueueSystem:
             return "USUSP"
         else:
             return sgeStat
+    def exitStatus(self, jobId):
+        stdin, stdout, stderr = os.popen3("qacct -j " + jobId)
+        errMsg = stderr.readlines()
+        lines = stdout.readlines()
+        if len(errMsg):
+            # assume this is because the job hasn't propagated yet, wait a bit
+            return "RUN"
+        for line in lines:
+            if line.startswith("exit_status"):
+                exitStatus = int(line.strip().split()[-1])
+                if exitStatus == 0:
+                    return "DONE"
+                else:
+                    return "EXIT"
     def updateJobs(self):
         self._updateJobs("prs")
         self._updateJobs("z")
@@ -85,7 +99,7 @@ class QueueSystem:
             if not self.activeJobs.has_key(jobId):
                 continue
             job = self.activeJobs[jobId]
-            status = self.getStatus(words[4], states)
+            status = self.getStatus(words[4], states, jobId)
             if job.status == "PEND" and status != "PEND" and len(words) >= 6:
                 fullMachine = words[7].split('@')[-1]
                 job.machines = [ fullMachine.split('.')[0] ]
@@ -111,9 +125,9 @@ class MachineInfo:
         # In LSF this unpacks host groups, taking advantage of the fact that they are
         # interchangeable with machines. This is not true in SGE anyway, so don't support it.
         return [ machineOrGroup ]
-    def findModelMachines(self, model):
+    def findResourceMachines(self, resource):
         machines = []
-        for line in os.popen("qhost -l 'model=" + model + "' 2>&1"):
+        for line in os.popen("qhost -l '" + resource + "'"):
             if not line.startswith("HOSTNAME") and not line.startswith("-----") and not line.startswith("global"):
                 machines.append(line.split()[0].split(".")[0])
         return machines
@@ -121,7 +135,7 @@ class MachineInfo:
         jobs = []
         fieldInfo = 0
         user = ""
-        for line in os.popen("qstat -r -s r -l hostname ='" + machine + "' 2>&1").xreadlines():
+        for line in os.popen("qstat -r -s r -l hostname ='" + machine + "'").xreadlines():
             if line.startswith("job") or line.startswith("----"):
                 fieldInfo = 1
                 continue
@@ -133,3 +147,6 @@ class MachineInfo:
                 jobName = line.split(":")[-1].strip()
                 jobs.append((user, jobName))
         return jobs
+    def findAllMachinesForJob(self):
+        # Need all hosts for parallel, but don't know how yet. Default.
+        return []

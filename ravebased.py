@@ -326,7 +326,12 @@ class CompileRules(plugins.Action):
         # Hack to work around AMD automounter which creates weird temporary path
         os.environ["PWD"] = test.abspath
         self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.environ["PWD"])
-        fullCommand = commandLine + " > " + compTmp + " 2>&1"
+        # Redirect standard out and standard error to same file. Unfortunately, not all queue systems use the same shell.
+        # This is another hack...
+        if queuesystem.queueSystemName(test.app) == "LSF": # LSF uses sh...
+            fullCommand = commandLine + " > " + compTmp + " 2>&1"
+        else: # ... but SGE uses csh
+            fullCommand = commandLine + " >& " + compTmp
         test.changeState(NeedRuleCompilation("Compiling ruleset " + self.getRuleSetName(test), thisTestCompiles=1))
         return self.ruleRunner.runCommand(test, fullCommand, self.jobNameCreator.getName)
     def setUpSuite(self, suite):

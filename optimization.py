@@ -460,7 +460,7 @@ class OptimizationValueCalculator:
         position = self.regexps[timeEntryName].search(timeLine.strip())
 	cutLine = timeLine[position.start():]
         # Find first pattern after timeEntryName
-        timeEntry = re.findall(r'[0-9]{2}:[0-9]{2}:[0-9]{2}', cutLine)
+        timeEntry = re.findall(r'[0-9]{1,2}:[0-9]{2}:[0-9]{2}', cutLine)
 	if len(timeEntry) == 0:
             # No match, return 0
 	    return 0

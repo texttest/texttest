@@ -497,8 +497,8 @@ class LineFilter:
         
         if self.triggerNumber == lineNumber:
             return 1, self.filterWords(line)
-
-        if self.checkMatch(line.strip()):
+          
+        if self.checkMatch(line):
             return 1, self.filterWords(line)
         else:
             return 0, line

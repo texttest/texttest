@@ -260,9 +260,9 @@ class LineFilter:
                 afterText = self.trigger[linePoint + len(syntaxString):]
                 self.readSyntax(syntaxString, beforeText, afterText)
         if self.trigger:
-            self.trigger = re.compile(self.trigger)
+            self.trigger = TextTrigger(self.trigger)
         if self.untrigger:
-            self.untrigger = re.compile(self.untrigger)
+            self.untrigger = TextTrigger(self.untrigger)
     def readSyntax(self, syntaxString, beforeText, afterText):
         if syntaxString == "{WORD ":
             self.trigger = beforeText
@@ -282,7 +282,7 @@ class LineFilter:
     def applyTo(self, line, lineNumber):
         if self.autoRemove:
             if self.untrigger:
-                if self.untrigger.search(line.strip()):
+                if self.untrigger.matches(line.strip()):
                     self.autoRemove = 0
                     return 0, line
             else:
@@ -297,7 +297,7 @@ class LineFilter:
         else:
             return 0, line
     def checkMatch(self, line):
-        if self.trigger and self.trigger.search(line):
+        if self.trigger and self.trigger.matches(line):
             if self.untrigger:
                 self.autoRemove = 1
                 return 0
@@ -339,3 +339,16 @@ class LineFilter:
                     return realWordNumber
                 wordNumber -= 1
         return len(words) + 1
+
+class TextTrigger:
+    specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
+    def __init__(self, text):
+        self.text = text
+        self.regex = None
+        if self.specialChars.search(text) != None:
+            self.regex = re.compile(text)
+    def matches(self, line):
+        if self.regex:
+            return self.regex.search(line)
+        else:
+            return line.find(self.text) != -1

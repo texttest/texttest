@@ -94,6 +94,8 @@ class CompositeAction(Action):
 class NonPythonAction(Action):
     def __init__(self, actionText):
         self.script = os.path.abspath(actionText)
+        if not os.path.isfile(self.script):
+            raise TextTestError, "Could not find non-python script " + self.script
     def __repr__(self):
         return "Running script " + os.path.basename(self.script) + " for"
     def __call__(self, test):

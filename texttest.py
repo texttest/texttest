@@ -462,7 +462,7 @@ class OptionFinder:
             elif optionKey:
                 if len(inputOptions[optionKey]):
                     inputOptions[optionKey] += " "
-                inputOptions[optionKey] += item.strip() 
+                inputOptions[optionKey] += item.strip()
         return inputOptions
     def findApps(self):
         dirName = self.directoryName()
@@ -546,25 +546,29 @@ class OptionFinder:
         else:
             return os.getcwd()
     def getActionSequence(self, app):
-        if self.inputOptions.has_key("s"):
-            actionCom = self.inputOptions["s"].split(" ")[0]
-            actionArgs = self.inputOptions["s"].split(" ")[1:]
-            actionOption = actionCom.split(".")
-            if len(actionOption) == 2:
-                module, pclass = actionOption
-
-                importCommand = "from " + module + " import " + pclass + " as _pclass"
-                try:
-                    exec importCommand
-                    if len(actionArgs) > 0:
-                        return [ _pclass(actionArgs) ]
-                    else:
-                        return [ _pclass() ]
-                except:
-                    pass
-            return [ plugins.NonPythonAction(self.inputOptions["s"]) ]
-        else:
+        if not self.inputOptions.has_key("s"):
             return app.getActionSequence()
+            
+        actionCom = self.inputOptions["s"].split(" ")[0]
+        actionArgs = self.inputOptions["s"].split(" ")[1:]
+        actionOption = actionCom.split(".")
+        if len(actionOption) != 2:
+            return self.getNonPython()
+                
+        module, pclass = actionOption
+        importCommand = "from " + module + " import " + pclass + " as _pclass"
+        try:
+            exec importCommand
+        except:
+            return self.getNonPython()
+
+        # Assume if we succeed in importing then a python module is intended.
+        if len(actionArgs) > 0:
+            return [ _pclass(actionArgs) ]
+        else:
+            return [ _pclass() ]
+    def getNonPython(self):
+        return [ plugins.NonPythonAction(self.inputOptions["s"]) ]
             
 class MultiEntryDictionary:
     def __init__(self, filename, appName = "", versions = []):

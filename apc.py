@@ -126,7 +126,7 @@ class ApcConfig(optimization.OptimizationConfig):
         return processData.startswith(rulesetName) or rulesetName.startswith(processData)
     def getFileCollator(self):
         subActions = []
-        subActions.append(FetchApcCore())
+        subActions.append(FetchApcCore(self.optionMap.has_key("keeptmp")))
         subActions.append(RemoveLogs())
         if self.optionMap.slaveRun():
             useExtractLogs = self.optionValue("extractlogs")

@@ -37,7 +37,7 @@ class UNIXConfig(default.Config):
         else:
             return defaultMode
     def getTestCollator(self):
-        return CollateUNIXFiles()
+        return CollateUNIXFiles(self.optionMap.has_key("keeptmp"))
     def getPerformanceFileMaker(self):
         return MakePerformanceFile(self.getMachineInfoFinder())
     def getTestRunner(self):
@@ -256,9 +256,10 @@ def isCompressed(path):
 
 # Deal with UNIX-compressed files as well as straight text
 class CollateUNIXFiles(default.CollateFiles):
-    def __init__(self):
+    def __init__(self, keepCoreFiles):
         default.CollateFiles.__init__(self)
         self.collations["stacktrace"] = "core*"
+        self.keepCoreFiles = keepCoreFiles
     def transformToText(self, path, test):
         if isCompressed(path):
             toUse = path + ".Z"
@@ -292,8 +293,11 @@ class CollateUNIXFiles(default.CollateFiles):
                          " > " + stdoutFile + " 2> " + stderrFile
             self.diag.info("Running GDB with command '" + gdbCommand + "'")
             os.system(gdbCommand)
-            if not self.writeStackTrace(stdoutFile, writeFile):
+            stackTraceFound = self.writeStackTrace(stdoutFile, writeFile)
+            if not stackTraceFound:
                 self.writeGdbErrors(stderrFile, writeFile)
+                self.keepCoreFiles = 1
+            if self.keepCoreFiles:
                 os.rename(path, "core")
             else:
                 os.remove(path)

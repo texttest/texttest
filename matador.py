@@ -28,24 +28,16 @@ import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
 
-def subPlanOption(options):
+def getOption(options, optionVal):
     optparts = options.split()
-    nextIsSubplan = 0
+    nextWanted = 0
     for option in optparts:
-        if nextIsSubplan == 1:
+        if nextWanted:
             return option
-        if option == "-s":
-            nextIsSubplan = 1
+        if option == optionVal:
+            nextWanted = 1
         else:
-            nextIsSubplan = 0
-    return None
-
-def ruleSetFromOutputFile(outputFile):
-    if os.path.isfile(outputFile):
-        for line in open(outputFile).xreadlines():
-            if line.find("Loading rule set") != -1:
-                finalWord = line.split(" ")[-1]
-                return finalWord.strip()
+            nextWanted = 0
     return None
 
 class MatadorConfig(optimization.OptimizationConfig):
@@ -73,13 +65,19 @@ class MatadorConfig(optimization.OptimizationConfig):
     def getSubPlanFileName(self, test, sourceName):
         return self.subplanManager.getSubPlanFileName(test, sourceName)
     def subPlanName(self, test):
-        subPlan = subPlanOption(test.options)            
+        subPlan = getOption(test.options, "-s")            
         if subPlan == None:
             # print help information and exit:
             return ""
         return subPlan
     def getRuleSetName(self, test):
-        return ruleSetFromOutputFile(test.makeFileName("output"))
+        outputFile = test.makeFileName("output")
+        if os.path.isfile(outputFile):
+            for line in open(outputFile).xreadlines():
+                if line.find("Loading rule set") != -1:
+                    finalWord = line.split(" ")[-1]
+                    return finalWord.strip()
+        return getOption(test.options, "-r")
     def getExecuteCommand(self, binary, test):
         return self.subplanManager.getExecuteCommand(binary, test)
     def getTestCollator(self):
@@ -155,7 +153,7 @@ class MatadorTestCaseInformation(optimization.TestCaseInformation):
             newOptions = "-s " + self.getOptionPart(dirName) + " -r " + ruleSet
             open(optionPath,"w").write(newOptions + os.linesep)
         else:
-            relPath = subPlanOption(open(optionPath).readline().strip())
+            relPath = getOption(open(optionPath).readline().strip(), "-s")
             subPlanDir = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", relPath, "APC_FILES")
         if not os.path.isfile(perfPath):
             perfContent = self.buildPerformance(subPlanDir)

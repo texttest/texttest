@@ -116,6 +116,10 @@ class LSFConfig(unixConfig.UNIXConfig):
     def forceOnPerformanceMachines(self, test):
         if self.optionMap.has_key("perf"):
             return 1
+
+        minTimeForce = test.getConfigValue("min_time_for_performance_force")
+        if minTimeForce >= 0 and performance.getTestPerformance(test) > minTimeForce:
+            return 1
         # If we haven't got a log_file yet, we should do this so we collect performance reliably
         logFile = test.makeFileName(test.getConfigValue("log_file"))
         return not os.path.isfile(logFile)
@@ -157,6 +161,7 @@ class LSFConfig(unixConfig.UNIXConfig):
     def setApplicationDefaults(self, app):
         unixConfig.UNIXConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("lsf_queue", "texttest_default")
+        app.setConfigDefault("min_time_for_performance_force", -1)
 
 class LSFJob:
     def __init__(self, test, jobNameFunction = None):

@@ -271,11 +271,6 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.sumRefTime = 0
         self.qualKPI = 1.0
         self.qualKPICount = 0
-    def getOptimizationRuns(self, test):
-        interestingValues = [ optimization.costEntryName, optimization.timeEntryName, optimization.memoryEntryName ]
-        currentRun = OptimizationRun(test, self.currentVersion, interestingValues)
-        referenceRun = OptimizationRun(test, self.referenceVersion, interestingValues)
-        return currentRun, referenceRun
     def __del__(self):
         for groupName in self.finalCostsInGroup.keys():
             fcTupleList = self.finalCostsInGroup[groupName]

@@ -48,9 +48,8 @@ def getPerformanceHost(fileName):
     return None
 
 class PerformanceTestComparison(comparetest.TestComparison):
-    def __init__(self, test, comparisonMaker):
-        comparetest.TestComparison.__init__(self, test)
-        self.comparisonMaker = comparisonMaker
+    def __init__(self, test, newFiles):
+        comparetest.TestComparison.__init__(self, test, newFiles)
         self.execHost = None
     def __repr__(self):
         if self.execHost == None:
@@ -59,19 +58,14 @@ class PerformanceTestComparison(comparetest.TestComparison):
             return "FAILED on " + self.execHost + " :"
         else:
             return ""
-        
-# Does the same as the basic test comparison apart from when comparing the performance file
-class MakeComparisons(comparetest.MakeComparisons):
-    def __init__(self, newFiles):
-        comparetest.MakeComparisons.__init__(self, newFiles)
     def createFileComparison(self, test, standardFile, tmpFile):
         stem, ext = standardFile.split(".", 1)
         if (stem == "performance"):
             return PerformanceFileComparison(test, standardFile, tmpFile)
         else:
-            return comparetest.FileComparison(test, standardFile, tmpFile)
-    def shouldCompare(self, file, testComparison, tmpExt, dirPath):
-        if not comparetest.MakeComparisons.shouldCompare(self, file, testComparison, tmpExt, dirPath):
+            return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile)
+    def shouldCompare(self, file, tmpExt, dirPath):
+        if not comparetest.TestComparison.shouldCompare(self, file, tmpExt, dirPath):
             return 0
         stem, ext = file.split(".",1)
         if stem != "performance":
@@ -79,14 +73,19 @@ class MakeComparisons(comparetest.MakeComparisons):
         tmpFile = os.path.join(dirPath, file)
         execHost = getPerformanceHost(tmpFile)
         cmpFlag = 0
-        testComparison.execHost = execHost
+        self.execHost = execHost
         if execHost != None:
-            cmpFlag = execHost in testComparison.test.app.getConfigList("performance_test_machine")
+            cmpFlag = execHost in self.test.app.getConfigList("performance_test_machine")
         if cmpFlag == 0:
             os.remove(tmpFile)
         return cmpFlag
+        
+# Does the same as the basic test comparison apart from when comparing the performance file
+class MakeComparisons(comparetest.MakeComparisons):
+    def __init__(self, newFiles):
+        comparetest.MakeComparisons.__init__(self, newFiles)
     def makeTestComparison(self, test):
-        return PerformanceTestComparison(test, self)
+        return PerformanceTestComparison(test, self.newFiles)
 
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile):

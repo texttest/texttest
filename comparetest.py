@@ -19,8 +19,9 @@ import os, filecmp, string, plugins
 testComparisonMap = {}
 
 class TestComparison:
-    def __init__(self, test):
+    def __init__(self, test, newFiles):
         self.test = test
+        self.newFiles = newFiles
         self.comparisons = []
         self.attemptedComparisons = []
     def __repr__(self):
@@ -28,48 +29,33 @@ class TestComparison:
             return "FAILED :"
         else:
             return ""
-
-class MakeComparisons(plugins.Action):
-    def __init__(self, newFiles):
-        self.newFiles = newFiles
-    def __repr__(self):
-        return "Comparing differences for"
-    def __call__(self, test):
-        testComparison = self.makeTestComparison(test)
-        for tmpExt, subDir in self.fileFinders(test):
-            self.makeComparisons(test, tmpExt, subDir, testComparison)
+    def hasDifferences(self):
+        return len(self.comparisons) > 0
+    def getPostText(self):
         postText = ""
-        if len(testComparison.comparisons) > 0:
-            testComparisonMap[test] = testComparison
-        else:
-            if len(testComparison.attemptedComparisons) == 0:
+        if len(self.comparisons) == 0:
+            if len(self.attemptedComparisons) == 0:
                 postText += " - NONE!"
             else:
                 postText += " - SUCCESS!"
-        if len(testComparison.attemptedComparisons) > 0:
-            postText +=  " (on " + string.join(testComparison.attemptedComparisons, ",") + ")"
-        self.describe(test, postText)
-    def makeTestComparison(self, test):
-        return TestComparison(test)
-    def fileFinders(self, test):
-        defaultFinder = test.app.name + test.app.versionSuffix() + test.getTmpExtension(), ""
-        return [ defaultFinder ]
-    def makeComparisons(self, test, tmpExt, subDirectory, testComparison):
+        if len(self.attemptedComparisons) > 0:
+            postText +=  " (on " + string.join(self.attemptedComparisons, ",") + ")"
+        return postText
+    def addComparison(self, standardFile, comparison):
+        self.attemptedComparisons.append(standardFile)
+        if comparison != None:
+            self.comparisons.append(comparison)
+    def makeComparisons(self, test, tmpExt, subDirectory):
         dirPath = os.path.join(test.abspath, subDirectory)
         fileList = os.listdir(dirPath)
         fileList.sort()
         for file in fileList:
-            if self.shouldCompare(file, testComparison, tmpExt, dirPath):
+            if self.shouldCompare(file, tmpExt, dirPath):
                 stem, ext = file.split(".", 1)
                 standardFile = os.path.basename(test.makeFileName(stem))
                 comparison = self.makeComparison(test, os.path.join(subDirectory, standardFile), os.path.join(subDirectory, file))
-                testComparison.attemptedComparisons.append(standardFile)
-                if comparison != None:
-                    testComparison.comparisons.append(comparison)
-    def setUpSuite(self, suite):
-        self.describe(suite)
-#private:
-    def shouldCompare(self, file, testComparison, tmpExt, dirPath):
+                self.addComparison(standardFile, comparison)
+    def shouldCompare(self, file, tmpExt, dirPath):
         return file.endswith(tmpExt)
     def makeComparison(self, test, standardFile, tmpFile):
         comparison = self.createFileComparison(test, standardFile, tmpFile)
@@ -85,6 +71,26 @@ class MakeComparisons(plugins.Action):
         return None
     def createFileComparison(self, test, standardFile, tmpFile):
         return FileComparison(test, standardFile, tmpFile)
+
+class MakeComparisons(plugins.Action):
+    def __init__(self, newFiles):
+        self.newFiles = newFiles
+    def __repr__(self):
+        return "Comparing differences for"
+    def __call__(self, test):
+        testComparison = self.makeTestComparison(test)
+        for tmpExt, subDir in self.fileFinders(test):
+            testComparison.makeComparisons(test, tmpExt, subDir)
+        if testComparison.hasDifferences():
+            testComparisonMap[test] = testComparison
+        self.describe(test, testComparison.getPostText())
+    def makeTestComparison(self, test):
+        return TestComparison(test, self.newFiles)
+    def fileFinders(self, test):
+        defaultFinder = test.app.name + test.app.versionSuffix() + test.getTmpExtension(), ""
+        return [ defaultFinder ]
+    def setUpSuite(self, suite):
+        self.describe(suite)
 
 class FileComparison:
     def __init__(self, test, standardFile, tmpFile):

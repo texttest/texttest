@@ -602,7 +602,7 @@ class TextTest:
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names
         if os.environ.has_key("USER"):
-            return "%d:%H:%M:%S"
+            return "%d%b%H:%M:%S"
         else:
             return "%H%M%S"
     def run(self):

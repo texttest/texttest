@@ -162,6 +162,7 @@ class ReconnectTest(plugins.Action):
     def __init__(self, fetchOption):
         self.fetchDir = None
         self.fetchUser = None
+        self.endRegExp = re.compile("[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$")
         if len(fetchOption) > 0:
             if fetchOption.find(":") != -1:
                 parts = fetchOption.split(":")
@@ -184,10 +185,11 @@ class ReconnectTest(plugins.Action):
             if os.path.isfile(os.path.join(findDir, configFile)):
                 return os.path.join(findDir, testCaseDir)
         return None
-    def newResult(self, test, file):
-        if file.find("." + test.app.name + test.app.versionSuffix()) == -1:
+    def _shouldCopyFile(self, test, stem, file, pattern):
+        if self.endRegExp.search(file, 1):
+            return file.startswith(stem + pattern)
+        if not file.startswith(stem + "." + test.app.name):
             return 0
-        stem = file.split(".")[0]
         pathStandardFile = test.makeFileName(stem)
         if pathStandardFile.split(os.sep)[-1] != file:
             return 0
@@ -209,14 +211,13 @@ class ReconnectTest(plugins.Action):
             translateUser = 1
         else:
             pattern += test.getTestUser()
-        rexp = re.compile(pattern + "[0-9][0-9]:[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$")
         stemsFound = []
         mtimeForStem = {}
         for file in os.listdir(testDir):
-            if rexp.search(file, 1) or self.newResult(test, file):
+            stem = file.split(".")[0]
+            if self._shouldCopyFile(test, stem, file, pattern):
                 srcFile = os.path.join(testDir, file)
                 mTime = os.path.getmtime(srcFile)
-                stem = file.split(".")[0]
                 targetFile = stem + "." + test.app.name + test.app.versionSuffix() + test.getTmpExtension()
                 if stem in stemsFound:
                     mTimeOld = mtimeForStem[stem]

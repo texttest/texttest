@@ -366,7 +366,7 @@ class FileComparison:
         # Try to get everything to behave normally after a save...
         self.differenceId = 0
         self.tmpFile = stdFile
-        self.tmpCmpFile = self.stdCmpFile
+        self.stdCmpFile = self.tmpCmpFile
         self.stdFile = stdFile
     def saveResults(self, destFile):
         copyfile(self.tmpFile, destFile)

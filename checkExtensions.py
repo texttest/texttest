@@ -3,37 +3,39 @@
 import os, plugins, carmen
 from glob import glob
 
-#Generic test plugin which will not only compare stdout and stderr but
-#also files created in the test directory that have specified extensions.
-#If the files created are compressed they will automatically be uncompressed.
-#The comparison and input files will be compressed after the test and
-#uncompressed when needed (see below).
+HELPTEXT="""
+Generic test plugin which will not only compare stdout and stderr but
+also files created in the test directory that have specified extensions.
+If the files created are compressed they will automatically be uncompressed.
+The comparison and input files will be compressed after the test and
+uncompressed when needed (see below).
 
-#Specify file extensions to check in "config.app":
-#
-#check_extension:.rrl
-#check_extension:.log
+Specify file extensions to check in "config.app":
 
-#To filter things that should not be used for comparison from the files
-#add the file name (with dots "." changed to underscore "_") into
-#"config.app" (run.log -> run_log):
-#
-#run_log:text to be filtered out
-#run_log:text to be filtered out2
+check_extension:.rrl
+check_extension:.log
 
-#The plugin will automatcally compress the comparison files and input files
-#if they have a size over 50000 or over size defined by your entry in
-#"config.app" like this:
-#compress_bytesize_over:15000
-#If this size is set to 0 no compression is made
+To filter things that should not be used for comparison from the files
+add the file name (with dots "." changed to underscore "_") into
+"config.app" (run.log -> run_log):
 
-#To define which input files that should be compressed after each run, add
-#entries to the "config.app" like this:
-#compress_extension:.ssim
-#compress_extension:.SSIM
-#compress_extension:.ctf
+run_log:text to be filtered out
+run_log:text to be filtered out2
 
-#by Christian Sandborg 2003-02-19
+The plugin will automatcally compress the comparison files and input files
+if they have a size over 50000 or over size defined by your entry in
+"config.app" like this:
+compress_bytesize_over:15000
+If this size is set to 0 no compression is made
+
+To define which input files that should be compressed after each run, add
+entries to the "config.app" like this:
+compress_extension:.ssim
+compress_extension:.SSIM
+compress_extension:.ctf
+
+by Christian Sandborg 2003-02-19
+"""
 
 #constants
 COMPRESS=1

@@ -232,9 +232,11 @@ class CollateUNIXFiles(default.CollateFiles):
             os.system(gdbCommand)
             if not self.writeStackTrace(stdoutFile, writeFile):
                 self.writeGdbErrors(stderrFile, writeFile)
+                os.rename(path, "core")
+            else:
+                os.remove(path)
             os.remove(stdoutFile)
             os.remove(stderrFile)
-            os.remove(path)
         else:
             writeFile.write("Could not find binary name from core file : Stack trace not produced for crash" + os.linesep)
             # Keep the core file for later viewing

@@ -29,8 +29,12 @@ helpOptions = """-rundebug <options>
              and the result is piped into a file named <option>.<app>.<ver> If no option is given or the config value
              specified does not exist, then the command specifed by extract_logs_default is used, and the result is
              saved in the file extract.<app>.<ver>
+             
 -prrepgraphical
-           - (only APC) Produces graphical progress reports. Also see prrep.
+           - (only APC) Produces a graphical progress reports. Also see prrep.
+           
+-prrephtml <directory>
+           - (only APC) Produces an html progress report with graphics.
 """
 
 helpScripts = """apc.CleanTmpFiles          - Removes all temporary files littering the test directories
@@ -79,6 +83,7 @@ class ApcConfig(optimization.OptimizationConfig):
             if group.name.startswith("Invisible"):
                 # These need a better interface before they can be plugged in, really
                 group.addOption("prrepgraphical", "Run graphical KPI progress report")
+                group.addOption("prrephtml", "Generates an HTML KPI progress report with graphics")
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI,
@@ -94,6 +99,8 @@ class ApcConfig(optimization.OptimizationConfig):
     def getProgressReportBuilder(self):
         if self.optionMap.has_key("prrepgraphical"):
             return MakeProgressReportGraphical(self.optionValue("prrep"))
+        elif self.optionMap.has_key("prrephtml"):
+            return MakeProgressReportHTML(self.optionValue("prrep"), self.optionValue("prrephtml"))
         else:
             return MakeProgressReport(self.optionValue("prrep"))
     def getRuleBuildObject(self, testRunner, jobNameCreator):
@@ -610,21 +617,23 @@ class MakeProgressReport(optimization.MakeProgressReport):
             print wText, self.referenceVersion, "=", str(qNumber) + "%"
         optimization.MakeProgressReport.__del__(self)
         if len(self.weightKPI) > 1:
-            # The weighted KPI is prodsum(KPIx * Tx / Tmin) ^ (1 / sum(Tx/Tmin))
+            # The weighted KPI is prod(KPIx ^ (Tx / Ttot)) (weighted geometric average)
             # Tx is the kpi time limit for a specific test case's kpi group.
             # If no such time limit is set then the average total time of the testcase is used, ie
             # Tx = (curTotalTime + refTotalTime) / 2
+            # Ttot = sum Tx
             #
-            sumKPI = 1.0
-            sumTimeParts = 0.0
+            sumkpiTime = 0.0
+            for tup in self.weightKPI:
+                kpiS, kpiTime = tup
+                sumkpiTime += kpiTime
+            self.prodKPI = 1.0
             for tup in self.weightKPI:
                 kpiS, kpiTime = tup
                 kpi = float(kpiS.split("%")[0]) / 100
-                sumKPI *= math.pow(kpi, 1.0 * kpiTime / self.minKPITime)
-                sumTimeParts += 1.0 * kpiTime / self.minKPITime
-            avg = math.pow(sumKPI, 1.0 / float(sumTimeParts))
+                self.prodKPI *= math.pow(kpi, 1.0 * kpiTime / sumkpiTime)
             wText = "Overall time weighted KPI with respect to version"
-            print wText, self.referenceVersion, "=", self.percent(avg)
+            print wText, self.referenceVersion, "=", self.percent(self.prodKPI)
 
     def getPerformance(self, test, currentVersion, referenceVersion):
         return 0.0, 0.0
@@ -768,7 +777,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
         MakeProgressReport.__init__(self, referenceVersion)
         self.matplotlibPresent = 0
         try:
-            from matplotlib.pylab import figure, axes, plot, show, title, legend, FuncFormatter
+            from matplotlib.pylab import figure, axes, plot, show, title, legend, FuncFormatter, savefig
             self.figure = figure
             self.axes = axes
             self.plot = plot
@@ -776,6 +785,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
             self.title = title
             self.legend = legend
             self.FuncFormatter = FuncFormatter
+            self.savefig = savefig
             self.matplotlibPresent = 1
         except:
             print "The matplotlib package doesn't seem to be in PYTHONPATH." + os.linesep + "No graphical output will be avaliable."
@@ -802,7 +812,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
     def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi):
         if not self.matplotlibPresent:
             return
-        self.figure(testCount, facecolor = 'w', figsize = (13,6))
+        self.figure(testCount, facecolor = 'w', figsize = (12,5))
         axesBG  = '#f6f6f6'
         height = 0.79
         width = 0.38
@@ -835,6 +845,55 @@ class MakeProgressReportGraphical(MakeProgressReport):
             self.lowestValue = lowestValue
         def formatterFcn(self, y, pos):
             return '%.2e(%.1f%%)' % (y, 100*y/self.lowestValue-100)     
+
+# Class that uses the graphical progress report to produce an html report.
+class MakeProgressReportHTML(MakeProgressReportGraphical):
+    def __init__(self, referenceVersion, arguments):
+        MakeProgressReportGraphical.__init__(self, referenceVersion)
+        self.writeHTML = 0
+        try:
+            from HTMLgen import SimpleDocument, Text, HR, Image, Heading, Center, Container
+            self.htmlText = Text
+            self.htmlHR = HR
+            self.htmlImage = Image
+            self.htmlHeading = Heading
+            self.htmlCenter = Center
+            self.htmlContainer = Container
+            self.writeHTML = 1
+        except:
+            print "The HTMLGen package doesn't seem to be in PYTHONPATH."
+        self.savePlots = 0
+        if arguments:
+            self.dirForPlots = arguments
+            if os.path.isdir(self.dirForPlots):
+                self.savePlots = 1
+                if self.writeHTML:
+                    self.indexDoc = SimpleDocument()
+                    headline = "APC version " + self.currentVersion + ", compared to version " + self.referenceVersion
+                    self.indexDoc.title = "KPI: " + headline
+                    self.indexDoc.append(self.htmlCenter(self.htmlHeading(1, headline)))
+                    self.summaryContainer = self.htmlContainer()
+                    self.indexDoc.append(self.summaryContainer)
+                    self.indexDoc.append(self.htmlHR())
+            else:
+                print "The directory", self.dirForPlots, "doesn't exist. No plots will be saved."
+                self.writeHTML = 0
+    def __del__(self):
+        MakeProgressReport.__del__(self)
+        if self.writeHTML:
+            self.summaryContainer.append((self.htmlHeading(2, "Overall average KPI = " + self.percent(math.pow(self.totalKpi, 1.0 / float(self.testCount))))))
+            if len(self.weightKPI) > 1:
+                self.summaryContainer.append((self.htmlHeading(2, "Overall time weighted average KPI = " + self.percent(self.prodKPI))))
+            self.summaryContainer.append((self.htmlHeading(2, "Best KPI = " + self.percent(self.bestKpi))))
+            self.summaryContainer.append((self.htmlHeading(2, "Worst KPI = " + self.percent(self.worstKpi))))            
+            self.indexDoc.append(self.htmlHR())
+            self.indexDoc.write(os.path.join(self.dirForPlots, "index.html"))
+    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi):
+        MakeProgressReportGraphical.plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi)
+        if self.savePlots:
+            self.savefig(os.path.join(self.dirForPlots, groupName))
+            if self.writeHTML:
+                self.indexDoc.append(self.htmlImage(groupName + ".png"))
 
 class ApcTestCaseInformation(optimization.TestCaseInformation):
     def isComplete(self):

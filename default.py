@@ -64,7 +64,7 @@ class Config(plugins.Configuration):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
     def printHelpDescription(self):
-        print helpDescription, comparetest.helpDescription
+        print helpDescription, comparetest.helpDescription, respond.helpDescription
     def printHelpOptions(self, builtInOptions):
         print helpOptions, builtInOptions
     def printHelpText(self, builtInOptions):

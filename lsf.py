@@ -2,6 +2,7 @@
 
 import os, time, string, signal, sys, default, performance, respond, batch, plugins, types
 
+# Text only relevant to using the LSF configuration directly
 helpDescription = """
 The LSF configuration is designed to run on a UNIX system with the LSF (Load Sharing Facility)
 product from Platform installed.
@@ -9,9 +10,12 @@ product from Platform installed.
 It's default operation is to submit all tests to LSF's "normal" queue. For this reason
 it is probably not so useful as a standalone configuration, because most people will
 want to configure which queue they send jobs to, and hence need a derived configuration.
+"""
 
-After submitting all tests, it will then wait for each test in turn, and provide comparison when
-each has finished.
+# Text for use by derived configurations as well
+lsfGeneral = """
+When all tests have been submitted to LSF, the configuration will then wait for each test in turn,
+and provide comparison when each has finished.
 
 Because UNIX is assumed anyway, results are presented using "tkdiff" for the file matching
 the "log_file" entry in the config file, and "diff" for everything else. These are more
@@ -21,6 +25,11 @@ It also generates performance checking and memory checking by using the LSF repo
 extract this information. The reliability of memory checking is however uncertain, hence
 it is currently disabled by default.
 """
+
+batchInfo = """
+             Note that it can be useful to send the whole TextTest run to LSF in batch mode, using LSF's termination
+             time feature. If this is done, LSF will send TextTest a signal 10 minutes before the termination time,
+             which allows TextTest to kill all remaining jobs and report them as unfinished in its report."""
 
 helpOptions = """
 -l         - run in local mode. This means that the framework will not use LSF, but will behave as
@@ -32,11 +41,7 @@ helpOptions = """
              list of its capabilities, consult the LSF manual. However, it is particularly useful to use this
              to force a test to go to certain machines, using -R "hname == <hostname>", or to avoid similar machines
              using -R "hname != <hostname>"
-""" + batch.helpOptions + """
-             Note that it can be useful to send the whole TextTest run to LSF in batch mode, using LSF's termination
-             time feature. If this is done, LSF will send TextTest a signal 10 minutes before the termination time,
-             which allows TextTest to kill all remaining jobs and report them as unfinished in its report.
-"""
+""" + batch.helpOptions             
 
 def getConfig(optionMap):
     return LSFConfig(optionMap)
@@ -92,9 +97,10 @@ class LSFConfig(default.Config):
     def checkPerformance(self):
         return 1
     def printHelpDescription(self):
-        print helpDescription, performance.helpDescription 
+        print helpDescription, lsfGeneral, performance.helpDescription, respond.helpDescription 
     def printHelpOptions(self, builtInOptions):
-        print helpOptions, default.helpOptions, builtInOptions
+        print helpOptions + batchInfo
+        default.Config.printHelpOptions(self, builtInOptions)
 
 class LSFJob:
     def __init__(self, test):

@@ -1,5 +1,58 @@
 #!/usr/local/bin/python
-import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal
+
+helpDescription = """
+The Carmen configuration is based on the LSF configuration. Its default operation is therefore to
+submit all jobs to LSF, rather than run them locally.
+
+It determines the queue as follows: if a test takes less than 10 minutes, it will be submitted
+to short_<arch>, where <arch> is the architecture where TextTest was called from. If it takes
+more than 2 hours, it will go to idle_<arch>. If neither of these, or if the specified queue
+does not exist, it will be submitted to the queue <arch>.
+
+The Carmen configuration is also somewhat architecture-conscious in other ways. It reads the required config file
+entry "default_architecture", to determine where the basic results are created. It also reads
+"supported_architecture" to determine if the currently run architecture is OK. If the supported_architecture
+list is present and the current one does not match, the configuration will exit with an error.
+
+Running on an architecture other than default_architecture will cause the test suite to automatically
+use the version <arch><version>, where <version> was the original version it was running. Hopefully this
+will soon be replaced with a version hierarchy, when the framework can handle that.
+"""
+
+helpOptions = """
+-u <text>  - select only user suites whose name contains <text>. A user suite is defined as a test suite which
+             defines CARMUSR locally.
+
+-lprof     - Run LProf on the test concerned. This will automatically profile the job and generate the textual
+             data in the test directory, in a file called lprof.<app>. It is proposed to automatically generate
+             the graphical information also
+
+-rulecomp  - Instead of running normally, compile all rule sets that are relevant to the tests selected (if any)
+
+-build <t> - Prior to running any tests, build in the appropriate location specified by <t>. This is specified in
+             the config file as the entries "build_xxx". So if my config file contains the lines
+             build_codebase:Rules_and_Reports
+             build_codebase:Optimization
+             then specifying -build codebase will cause a build (= gmake) to be run in these places (relative to checkout
+             of course), before anything else is done.
+
+             It is expected that this option is used on linux. Note that in addition, a build is kicked off in parallel
+             on sparc (sundance) and parisc_2_0 (ramechap), which run in the background while your tests run,
+             and are reported on at the end. This should ensure that they don't delay the appearance of test information.
+"""
+
+batchInfo = """             <bname>_architecture, these entries form a list and ensure that only runs on the architectures listed are accepted.
+             If the list is empty, all architectures are allowed.
+
+             The reason for this is that the Carmen nightjob will run TextTest on all versions and on all architectures. It
+             will do so with the batch session name "nightjob" on Monday to Thursday nights, and "wkendjob" on Friday night.
+             If you do not want this, you should therefore restrict or disable these session names in your config file, as
+             indicated above.
+
+             Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
+             at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
+
+import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -95,6 +148,13 @@ class CarmenConfig(lsf.LSFConfig):
             else:
                 print "Non-default architecture: using version", architecture + versionString
                 return architecture + versionString
+    def printHelpOptions(self, builtInOptions):
+        print lsf.helpOptions + batchInfo
+        default.Config.printHelpOptions(self, builtInOptions)
+        print "(Carmen-specific options...)"
+        print helpOptions
+    def printHelpDescription(self):
+        print helpDescription, lsf.lsfGeneral, performance.helpDescription, respond.helpDescription 
     
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")

@@ -671,7 +671,9 @@ class ApplicationRunner:
         self._performAction(actionTests, action)
     def _performAction(self, suite, action):
         debugLog.debug("Performing action " + repr(action))
+        suite.setUpEnvironment()
         action.setUpApplication(suite.app)
+        suite.tearDownEnvironment()
         debugLog.debug("Current config dictionary for " + repr(suite.app) + ": " + os.linesep + repr(suite.app.configDir.dict))
         suite.performAction(action)    
 

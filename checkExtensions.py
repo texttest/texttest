@@ -5,7 +5,7 @@ from glob import glob
 
 #Generic test plugin which will not only compare stdout and stderr but
 #also files created in the test directory that have specified extensions.
-#If the files created are compressed they will automaticly be uncompressed.
+#If the files created are compressed they will automatically be uncompressed.
 
 #Specify file extensions to check in "config.app":
 #
@@ -33,8 +33,7 @@ def isCompressed(path):
     else:
         return 0
 
-class CheckExtConfig(carmen.CarmenConfig):
-    
+class CheckExtConfig(carmen.CarmenConfig):   
     def interpretBinary(self, binaryString):
         return binaryString.replace("ARCHITECTURE", carmen.architecture)
     def getTestCollator(self):

@@ -93,7 +93,7 @@ class SubPlanDirManager:
         baseName =  subPlanDir.split(os.sep)[-1]
         return baseName
     def getTmpSubdir(self, test, subDir, baseName, mode):
-        prefix = os.path.join(subDir, baseName) + "." + test.app.name
+        prefix = os.path.join(subDir, baseName) + "." + test.app.name + "_" + test.name + "_"
         dirName = prefix + test.getTmpExtension()
         if not test.parallelMode():
             currTmpString = prefix + test.getTestUser()
@@ -115,7 +115,11 @@ class SubPlanDirManager:
         try:
             os.remove(subDir)
         except:
-            os.rmdir(subDir)
+            try:
+                os.rmdir(subDir)
+            except:
+                os.system("rm -rf " + subDir);
+                
 
 class RemoveTemporarySubplan(plugins.Action):
     def __init__(self, subplanManager):

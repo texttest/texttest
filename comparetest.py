@@ -473,7 +473,7 @@ class RunDependentTextFilter:
         if self.hasFilters():
             return 1
         # Force recomputation of files that come from other operating systems...
-        return self.osChange and newFileName.endswith("origcmp")
+        return self.osChange
     def filterFile(self, fileName, newFileName, makeNew = 0):
         if not self.shouldFilter(fileName, newFileName):
             self.diag.info("No filter for " + fileName)

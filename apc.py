@@ -170,7 +170,10 @@ def verifyAirportFile(arch):
             if os.path.isfile(apCompile):
                 print "Missing AirportFile detected, building:", airportFile
                 carmen.ensureDirectoryExists(os.path.dirname(airportFile))
-                os.system(apCompile + " " + srcFile + " > " + airportFile)
+                # We need to source the CONFIG file in order to get some
+                # important environment variables set, i.e. PRODUCT and BRANCH.
+                configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
+                os.system(". " + configFile + "; " + apCompile + " " + srcFile + " > " + airportFile)
             if os.path.isfile(airportFile):
                 return
     raise plugins.TextTestError, "Failed to find AirportFile"

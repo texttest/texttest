@@ -284,8 +284,9 @@ class FetchApcCore(plugins.Action):
                         os.remove(tgzFile)
                     cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; tar cf - . | gzip -c > " + tgzFile
                     os.system("rsh " + machine + " '" + cmdLine + "'")
-            cmdLine = "rm -rf " + apcHostTmp + "/*" + testDirEnd + "_*"
-            os.system("rsh " + machine + " '" + cmdLine + "'")
+            if self.config.isNightJob():
+                cmdLine = "rm -rf " + apcHostTmp + "/*" + testDirEnd + "_*"
+                os.system("rsh " + machine + " '" + cmdLine + "'")
     def __repr__(self):
         return "Fetching core for"
         

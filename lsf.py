@@ -171,14 +171,7 @@ class SubmitTest(plugins.Action):
         if len(resource):
             lsfOptions += " -R '" + resource + "'"
         unixPerfFile = test.getTmpFileName("unixperf", "w")
-        # put the command in a file to avoid quoting problems,
-        # also fix env.variables that LSF doesn't reset
-        cmdFile = test.getTmpFileName("cmd", "w")
-        f = open(cmdFile, "w")
-        f.write("HOST=`hostname`; export HOST\n")
-        f.write(testCommand + "\n")
-        f.close()
-        timedTestCommand = '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
+        timedTestCommand = '\\time -p sh ' + testCommand + ' 2> ' + unixPerfFile
         commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile + " 2>&1"
         os.system(commandLine)
     def getExecuteCommand(self, test):
@@ -188,7 +181,14 @@ class SubmitTest(plugins.Action):
             testCommand = testCommand + " < " + inputFileName
         outfile = test.getTmpFileName("output", "w")
         errfile = test.getTmpFileName("errors", "w")
-        return testCommand + " > " + outfile + " 2> " + errfile
+        # put the command in a file to avoid quoting problems,
+        # also fix env.variables that LSF doesn't reset
+        cmdFile = test.getTmpFileName("cmd", "w")
+        f = open(cmdFile, "w")
+        f.write("HOST=`hostname`; export HOST\n")
+        f.write(testCommand + " > " + outfile + " 2> " + errfile + "\n")
+        f.close()
+        return cmdFile
     def setUpSuite(self, suite):
         self.describe(suite)
     def getCleanUpAction(self):

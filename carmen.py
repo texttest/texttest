@@ -166,7 +166,7 @@ class CarmenConfig(lsf.LSFConfig):
         return batchSession == "nightjob" or batchSession == "wkendjob"
     def isSlowdownJob(self, user, jobName):
         # APC is observed to slow down the other job on its machine by up to 20%. Detect it
-        apcDevelopers = [ "curt", "lennart", "johani", "rastjo" ]
+        apcDevelopers = [ "curt", "lennart", "johani", "rastjo", "tomasg", "fredrik", "henrike" ]
         if user in apcDevelopers:
             return 1
 

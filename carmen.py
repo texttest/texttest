@@ -115,7 +115,9 @@ class CompileRules(plugins.Action):
         self.rulesCompiled = []
         if self.raveName == None:
             self.raveName = getRaveName(suite)
-
+    def getFilter(self):
+        return self.filter
+    
 class RuleSet:
     def __init__(self, ruleSetName, raveName):
         self.name = ruleSetName

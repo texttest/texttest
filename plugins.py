@@ -33,6 +33,8 @@ class Action:
         pass
     def setUpApplication(self, app):
         pass
+    def getFilter(self):
+        return None
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText

@@ -415,9 +415,9 @@ class TextTest:
             return
         allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
         for action in actionSequence:
-            try:
-                self.performActionWithFilter(app, action, action.filter, filterList)
-            except:
+            if action.getFilter() != None:
+                self.performActionWithFilter(app, action, action.getFilter(), filterList)
+            else:
                 self.performAction(allTests, action)
     def performActionWithFilter(self, app, action, newFilter, filterList):
         newFilterList = filterList

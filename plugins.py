@@ -9,7 +9,7 @@ class Configuration:
         self.optionMap = optionMap
     def addToOptionGroup(self, group):
         pass
-    def getActionSequence(self):
+    def getActionSequence(self, useGui):
         return []
     def getFilterList(self):
         return []
@@ -19,9 +19,6 @@ class Configuration:
         return [ app.getBinary() ]
     def keepTmpFiles(self):
         return 0
-    # Useful features that a GUI might like
-    def getInteractiveActions(self):
-        return []
     def printHelpText(self):
         pass
     def extraReadFiles(self, test):
@@ -38,7 +35,7 @@ class Filter:
     def acceptsApplication(self, app):
         return 1
 
-# Generic action to be performed: all actions need to provide these four methods
+# Generic action to be performed: all actions need to provide these methods
 class Action:
     def __call__(self, test):
         pass
@@ -50,15 +47,13 @@ class Action:
         pass
     def getCleanUpAction(self):
         return None
-    # Return a list of atomic instructions of action, test pairs that can be applied
-    # Should not involve waiting or hanging on input
-    def getInstructions(self, test):
-        return [ (test, self) ]
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText
     def __repr__(self):
         return "Doing nothing on"
+    def __str__(self):
+        return str(self.__class__)
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
@@ -90,56 +85,6 @@ def samefile(writeDir, currDir):
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):
     pass
-
-# Action composed of other sub-parts
-class CompositeAction(Action):
-    def __init__(self, subActions):
-        self.subActions = subActions
-    def __repr__(self):
-        return "Performing " + repr(self.subActions) + " on"
-    def __call__(self, test):
-        for subAction in self.subActions:
-            subAction(test)
-    def setUpSuite(self, suite):
-        for subAction in self.subActions:
-            subAction.setUpSuite(suite)
-    def tearDownSuite(self, suite):
-        for subAction in self.subActions:
-            subAction.tearDownSuite(suite)
-    def setUpApplication(self, app):
-        for subAction in self.subActions:
-            subAction.setUpApplication(app)
-    def getInstructions(self, test):
-        instructions = []
-        for subAction in self.subActions:
-            instructions += subAction.getInstructions(test)
-        return instructions
-    def getCleanUpAction(self):
-        cleanUpSubActions = []
-        for subAction in self.subActions:
-            cleanUp = subAction.getCleanUpAction()
-            if cleanUp != None:
-                cleanUpSubActions.append(cleanUp)
-        if len(cleanUpSubActions):
-            return CompositeAction(cleanUpSubActions)
-        else:
-            return None
-
-# Action for wrapping the calls to setUpEnvironment
-class SetUpEnvironment(Action):
-    def __init__(self, parents=0):
-        self.parents = parents
-    def __call__(self, test):
-        test.setUpEnvironment(self.parents)
-    def setUpSuite(self, suite):
-        suite.setUpEnvironment(self.parents)
-
-# Action for wrapping the calls to tearDownEnvironment
-class TearDownEnvironment(Action):
-    def __call__(self, test):
-        test.tearDownEnvironment()
-    def setUpSuite(self, suite):
-        suite.tearDownEnvironment()
 
 # Action for wrapping an executable that isn't Python, or can't be imported in the usual way
 class NonPythonAction(Action):

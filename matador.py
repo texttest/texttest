@@ -80,7 +80,7 @@ class MatadorConfig(optimization.OptimizationConfig):
             group.addSwitch("diag", "Use Matador Codebase diagnostics")
     def getPerformanceFileMaker(self):
         if self.optionMap.has_key("diag"):
-            return plugins.Action()
+            return None
         else:
             return optimization.OptimizationConfig.getPerformanceFileMaker(self)
     def getLibraryFile(self, app):

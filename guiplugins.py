@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, string
+import plugins, os, sys, shutil, string, log4py
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
@@ -13,7 +13,7 @@ class InteractiveAction(plugins.Action):
         # Don't leak processes
         for process in self.processes:
             if not process.hasTerminated():
-                print "Killing '", process.program + "' interactive process"
+                guilog.info("Killing '" + process.program + "' interactive process")
                 process.kill()
     def canPerformOnTest(self):
         return self.test
@@ -29,12 +29,14 @@ class InteractiveAction(plugins.Action):
         return process
     def viewFile(self, fileName, wait = 0):
         viewProgram = self.test.getConfigValue("view_program")
-        print "Viewing file", os.path.basename(fileName), "using '" + viewProgram + "'"
+        guilog.info("Viewing file " + os.path.basename(fileName) + " using '" + viewProgram + "'")
         process = self.startExternalProgram(viewProgram + " " + fileName)
         if wait:
             process.waitForTermination()
     def getTextTestName(self):
         return "python " + sys.argv[0]
+    def describe(self, testObj, postText = ""):
+        guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     
 # Plugin for saving tests (standard)
 class SaveTest(InteractiveAction):
@@ -102,7 +104,7 @@ class ViewFile(InteractiveAction):
         baseName = os.path.basename(fileName)
         title = self.test.name + " (" + baseName + ")"
         followProgram = self.test.app.getConfigValue("follow_program")
-        print "Following file", title, "using '" + followProgram + "'"
+        guilog.info("Following file " + title + " using '" + followProgram + "'")
         self.startExternalProgram(followProgram + " " + fileName, shellTitle=title)
     def view(self, comparison, fileName):
         if self.optionGroup.getSwitchValue("f"):
@@ -114,7 +116,7 @@ class ViewFile(InteractiveAction):
             self.viewFile(newFile)
         else:
             diffProgram = self.test.app.getConfigValue("diff_program")
-            print "Comparing file", os.path.basename(newFile), "with previous version using '" + diffProgram + "'"
+            guilog.info("Comparing file " + os.path.basename(newFile) + "with previous version using '" + diffProgram + "'")
             self.startExternalProgram("tkdiff " + self.stdFile(comparison) + " " + newFile)
 
 # And a generic import test. Note acts on test suites
@@ -132,7 +134,7 @@ class ImportTest(InteractiveAction):
         return ""
     def setUpSuite(self, suite):
         testName = self.optionGroup.getOptionValue("name")
-        print "Adding", self.testType(), testName, "under test suite", suite
+        guilog.info("Adding " + self.testType() + testName + " under test suite " + repr(suite))
         testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
         newTest = suite.addTest(testName, testDir)
@@ -270,7 +272,7 @@ class SelectTests(InteractiveAction):
         return "Select indicated tests"
     def performOn(self, app, selTests):
         valid, testSuite = app.createTestSuite(self.optionGroup)
-        print "Created test suite of size", testSuite.size()
+        guilog.info("Created test suite of size " + str(testSuite.size()))
         return testSuite
 
 class ResetGroups(InteractiveAction):
@@ -355,6 +357,12 @@ class InteractiveActionHandler:
             raise sys.exc_type, sys.exc_value
         
 interactiveActionHandler = InteractiveActionHandler()
+guilog = None
 
-        
-
+def setUpGuiLog():
+    global guilog
+    guilog = plugins.getDiagnostics("GUI behaviour")
+    if os.environ.has_key("TEXTTEST_NO_SPAWN"):
+        guilog.set_loglevel(log4py.LOGLEVEL_NORMAL)
+        guilog.set_target(os.path.abspath("gui_log.texttest"))
+        guilog.set_formatstring("%M")

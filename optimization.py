@@ -115,7 +115,7 @@ class OptimizationConfig(carmen.CarmenConfig):
             group.addOption("prrep", "Run KPI progress report")
             group.addOption("kpiData", "Output KPI curve data etc.")
             group.addOption("kpi", "Run Henrik's old KPI")
-    def getActionSequence(self):
+    def getActionSequence(self, useGui):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
                         KPI.cFullRosteringOptTimeKPI,
@@ -127,7 +127,7 @@ class OptimizationConfig(carmen.CarmenConfig):
             return [ WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
-        return carmen.CarmenConfig.getActionSequence(self)
+        return carmen.CarmenConfig.getActionSequence(self, useGui)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def getVitalFiles(self, app):
@@ -141,7 +141,7 @@ class OptimizationConfig(carmen.CarmenConfig):
         # Assume we always want to build at least some rules, by default...
         return 1
     def getTestRunner(self):
-        return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
+        return [ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ]
     def extraReadFiles(self, test):
         readDirs = seqdict()
         if test.classId() == "test-case":
@@ -1014,11 +1014,11 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
     def hasStaticLinkage(self):
         return 1
     def openFile(self, fileName):
-        print "Writing file", os.path.basename(fileName)
+        guiplugins.guilog.info("Writing file " + os.path.basename(fileName))
         return open(fileName, "w")
     def writeLine(self, file, line):
         file.write(line + os.linesep)
-        print line
+        guiplugins.guilog.info(line)
     def writeEnvironmentFiles(self, suite, testDir):
         carmUsr = self.getCarmusr()
         envFile = os.path.join(testDir, "environment")
@@ -1101,10 +1101,7 @@ class PlotTest(plugins.Action):
     def setUpApplication(self, app):
         app.makeWriteDirectory()
     def getCleanUpAction(self):
-        if commonPlotter.plotForTest:
-            plotOptions = commonPlotter.plotForTest.getPlotOptions()
-            commonPlotter.plotForTest = None
-            return GraphPlot(commonPlotter.testGraph, plotOptions)
+        return GraphPlot()
         
 # Class for using gnuplot to plot test curves of tests
 #
@@ -1119,11 +1116,12 @@ class _PlotTest(plugins.Action):
         self.plotForTest(test)
     
 class GraphPlot(plugins.Action):
-    def __init__(self, graph, plotOptions):
-        self.graph = graph
-        self.timeRange, self.targetFile, self.colour = plotOptions
     def setUpApplication(self, app):
-        self.graph.plot(self.timeRange, self.targetFile, self.colour, wait=1)
+        if commonPlotter.plotForTest:
+            timeRange, targetFile, colour = commonPlotter.plotForTest.getPlotOptions()
+            commonPlotter.plotForTest = None
+            os.chdir(app.writeDirectory)
+            commonPlotter.testGraph.plot(timeRange, targetFile, colour, wait=1)
     
 class TestGraph:
     def __init__(self):

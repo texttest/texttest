@@ -95,7 +95,8 @@ categoryDescriptions = [ "had internal errors", "CRASHED", "caused exception", "
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):
-    def __init__(self, lineCount):
+    def __init__(self, lineCount, sessionName):
+        self.sessionName = sessionName
         self.failureDetail = {}
         self.crashDetail = {}
         self.deadDetail = {}
@@ -176,7 +177,9 @@ class BatchResponder(respond.Responder):
                 mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
                 os.chdir(test.getDirectory(temporary=1))
                 self.responder.displayComparisons(comparisonList, mailFile, self.mainSuite.app)
-        
+    def getCleanUpAction(self):
+        return MailSender(self.sessionName) 
+
 class MailSender(plugins.Action):
     def __init__(self, sessionName):
         self.sessionName = sessionName
@@ -278,28 +281,6 @@ class MailSender(plugins.Action):
                 if not version in resp.mainSuite.app.versions:
                     versions.remove(version)
         return versions
-    def getCleanUpAction(self):
-        return SendException(self) 
-
-class SendException(plugins.Action):
-    def __init__(self, mailSender):
-        self.mailSender = mailSender
-    def setUpApplication(self, app):
-        type, value, traceback = sys.exc_info()
-        excData = str(value)
-        if len(excData) == 0:
-            excData = "caught exception " + str(type)
-        appResponders = self.mailSender.getResponders(app)
-        if len(appResponders) == 0:
-            return
-        mailTitle = self.mailSender.getMailHeader(app, appResponders) + "did not run : " + excData
-        mailFile = self.mailSender.createMail(mailTitle, app, appResponders)
-        sys.stderr = mailFile
-        sys.excepthook(type, value, traceback)
-        sys.stderr = sys.__stderr__
-        mailFile.close()
-        for responder in appResponders:
-            allBatchResponders.remove(responder)
         
 class CollectFiles(plugins.Action):
     def __init__(self):

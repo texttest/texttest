@@ -17,12 +17,12 @@ def decompressAndRename(src,dst):
     
 class Ctf2RrlConfig(checkExtensions.CheckExtConfig):
     def getTestCollator(self):
-        return plugins.CompositeAction([checkExtensions.HandleCompressedFiles(UNCOMPRESS,'check_extension'),
+        return [ checkExtensions.HandleCompressedFiles(UNCOMPRESS,'check_extension'),
                                         carmen.CarmenConfig.getTestCollator(self),
                                         RenamePlans(),
                                         GetEtabs(),
                                         checkExtensions.CreateCompareFiles(),
-                                        checkExtensions.HandleCompressedFiles(COMPRESS)])
+                                        checkExtensions.HandleCompressedFiles(COMPRESS)]
     
                 
 class RenamePlans(plugins.Action):

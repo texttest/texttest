@@ -237,11 +237,11 @@ class EventHandler:
         self.recordScript = None
     def hasScript(self):
         return self.replayScript or self.recordScript
-    def setScripts(self, replayScriptName, recordScriptName):
+    def setScripts(self, replayScriptName, recordScriptName, logger = None):
         if replayScriptName and replayScriptName == recordScriptName:
             raise GtkScriptError, "Cannot record to the same script we are replaying"
         if replayScriptName:
-            self.replayScript = ReplayScript(replayScriptName)
+            self.replayScript = ReplayScript(replayScriptName, logger)
         if recordScriptName:
             self.recordScript = RecordScript(recordScriptName)
     def connect(self, eventName, signalName, widget, method = None, argumentParseData = None, sense = 1, *data):
@@ -317,10 +317,11 @@ class EventHandler:
 eventHandler = EventHandler()
 
 class ReplayScript:
-    def __init__(self, scriptName):
+    def __init__(self, scriptName, logger):
         self.events = {}
         self.commands = []
         self.pointer = 0
+        self.logger = logger
         if not os.path.isfile(scriptName):
             raise GtkScriptError, "Cannot replay script " + scriptName + ", no such file or directory"
         for line in open(scriptName).xreadlines():
@@ -346,16 +347,22 @@ class ReplayScript:
             return self.generateEvent(nextCommand)
         except GtkScriptError:
             type, value, traceback = sys.exc_info()
-            print "ERROR:", value
+            self.write("ERROR: " + value)
             # We don't terminate scripts if they contain errors
             return gtk.TRUE
         return gtk.TRUE
+    def write(self, line):
+        if self.logger:
+            self.logger.info(line)
+        else:
+            print line
     def generateEvent(self, scriptCommand):
         eventName = self.findEvent(scriptCommand)
         if not eventName:
             raise GtkScriptError, "Could not parse script command '" + scriptCommand + "'"
         argumentString = scriptCommand.replace(eventName, "").strip()
-        print os.linesep + "'" + eventName + "' event created with arguments '" + argumentString + "'"
+        self.write("")
+        self.write("'" + eventName + "' event created with arguments '" + argumentString + "'")
         event = self.events[eventName]
         if event.generate(argumentString):
             # Can be useful to uncomment if you want a slow-motion replay...

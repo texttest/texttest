@@ -74,6 +74,9 @@ helpScripts = """carmen.TraverseCarmUsers   - Traverses all CARMUSR's associated
 
 import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, time, predict
 
+# Extra states for tests to be in!
+RULESET_NOT_BUILT = -1
+
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
 
@@ -119,10 +122,10 @@ class CarmenConfig(lsf.LSFConfig):
         filters = lsf.LSFConfig.getFilterList(self)
         self.addFilter(filters, "u", UserFilter)
         return filters
-    def getActionSequence(self):
+    def getActionSequence(self, useGui):
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
         return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getRuleBuilder() ] + \
-                 lsf.LSFConfig._getActionSequence(self, makeDirs = 0)
+                 lsf.LSFConfig._getActionSequence(self, useGui, makeDirs = 0)
     def getRuleCleanup(self):
         return CleanupRules(self.getRuleSetName)
     def isRaveRun(self):
@@ -137,17 +140,22 @@ class CarmenConfig(lsf.LSFConfig):
             if self.optionValue("rulecomp") != "clean":
                 return realBuilder
             else:
-                return plugins.CompositeAction([ self.getRuleCleanup(), realBuilder ])
+                return [ self.getRuleCleanup(), realBuilder ]
         else:
-            return plugins.Action()
+            return None
     def getRealRuleBuilder(self):
         ruleRunner = None
         if self.useLSF() and not self.isNightJob():
             ruleRunner = lsf.SubmitTest(self.findLSFQueue, self.findLSFResource)
-        return plugins.CompositeAction([ self.getRuleBuildObject(ruleRunner), self.getWaitingAction(self.getRuleSetName), \
-                                         EvaluateRuleBuild(self.getRuleSetName) ])
+        return [ self.getRuleBuildObject(ruleRunner), self.getRuleWaitingAction(), \
+                                         EvaluateRuleBuild(self.getRuleSetName) ]
     def getRuleBuildObject(self, ruleRunner):
         return CompileRules(self.getRuleSetName, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
+    def getRuleWaitingAction(self):
+        if self.useLSF() and not self.isNightJob():
+            return lsf.UpdateLSFStatus(self.getRuleSetName, RULESET_NOT_BUILT)
+        else:
+            return None
     def buildRules(self):
         if self.optionMap.has_key("skip") or self.isReconnecting():
             return 0
@@ -167,16 +175,16 @@ class CarmenConfig(lsf.LSFConfig):
         elif self.optionMap.has_key("buildl"):
             return BuildCode(self.optionValue("buildl"), remote = 0)
         else:
-            return plugins.Action()
+            return None
     def getTestRunner(self):
         if self.optionMap.has_key("lprof"):
             subActions = [ lsf.LSFConfig.getTestRunner(self), AttachProfiler() ]
-            return plugins.CompositeAction(subActions)
+            return subActions
         else:
             return lsf.LSFConfig.getTestRunner(self)
     def getTestCollator(self):
         if self.optionMap.has_key("lprof"):
-            return plugins.CompositeAction([ lsf.LSFConfig.getTestCollator(self), ProcessProfilerResults() ])
+            return [ lsf.LSFConfig.getTestCollator(self), ProcessProfilerResults() ]
         else:
             return lsf.LSFConfig.getTestCollator(self)
     def findLSFQueue(self, test):
@@ -322,7 +330,8 @@ class CompileRules(plugins.Action):
         if not ruleset.isValid():
             return
         if ruleset.name in self.rulesCompiled:
-            return test.changeState(test.NOT_STARTED, "Compiling ruleset " + ruleset.name)
+            self.describe(test, " - ruleset " + ruleset.name + " already being compiled")
+            return test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + ruleset.name)
         
         self.describe(test, " - ruleset " + ruleset.name)
         self.ensureCarmTmpDirExists()
@@ -363,7 +372,7 @@ class CompileRules(plugins.Action):
         os.chdir(test.abspath)
         self.diag.info("Compiling with command '" + commandLine + "'")
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
-        test.changeState(test.NOT_STARTED, "Compiling ruleset " + self.getRuleSetName(test))
+        test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + self.getRuleSetName(test))
         if self.ruleRunner:
             self.ruleRunner.runCommand(test, fullCommand, self.getRuleSetName)
         else:
@@ -389,8 +398,10 @@ class CompileRules(plugins.Action):
 class EvaluateRuleBuild(plugins.Action):
     def __init__(self, getRuleSetName):
         self.getRuleSetName = getRuleSetName
-        self.rulesCompileFailed = []
+        self.rulesCompiled = {}
     def __call__(self, test):
+        if test.state != RULESET_NOT_BUILT:
+            return
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         if not os.path.isfile(compTmp):
             return self.checkForPreviousFailure(test)
@@ -398,18 +409,21 @@ class EvaluateRuleBuild(plugins.Action):
         ruleset = self.getRuleSetName(test)
         # The first is C-compilation error, the second generation error...
         # Would be better if there was something unambiguous to look for!
-        if errContents.find("failed!") != -1 or errContents.find("ERROR:") != -1:
-            self.raiseFailure(ruleset, errContents)
-        else:
+        success = errContents.find("failed!") == -1 and errContents.find("ERROR:") == -1
+        self.rulesCompiled[ruleset] = success
+        if success:
             test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
+        else:
+            self.raiseFailure(ruleset, errContents)
     def raiseFailure(self, ruleset, errContents):
-        self.rulesCompileFailed.append(ruleset)
         errMsg = "Failed to build ruleset " + ruleset + os.linesep + errContents 
         print errMsg
         raise plugins.TextTestError, errMsg
     def checkForPreviousFailure(self, test):
         ruleset = self.getRuleSetName(test)
-        if ruleset in self.rulesCompileFailed:
+        if not self.rulesCompiled.has_key(ruleset):
+            return "wait"
+        if self.rulesCompiled[ruleset] == 0:
             raise plugins.TextTestError, "Trying to use ruleset '" + ruleset + "' that failed to build."
         else:
             test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
@@ -604,7 +618,7 @@ class BuildCode(plugins.Action):
         if self.remote:
             return CheckBuild(self)
         else:
-            return plugins.Action()
+            return None
 
 class CheckBuild(plugins.Action):
     def __init__(self, builder):

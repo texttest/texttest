@@ -58,18 +58,18 @@ class CheckExtConfig(carmen.CarmenConfig):
         return binary.replace("ARCHITECTURE", carmen.getArchitecture(test.app)) + " " + test.options
 
     def getTestCollator(self):
-        return plugins.CompositeAction([ HandleCompressedFiles(UNCOMPRESS,'check_extension'),
+        return [ HandleCompressedFiles(UNCOMPRESS,'check_extension'),
                                          carmen.CarmenConfig.getTestCollator(self),
                                          CreateCompareFiles(),
-                                         HandleCompressedFiles(COMPRESS) ])
+                                         HandleCompressedFiles(COMPRESS) ]
 
     def getTestEvaluator(self):
-        return plugins.CompositeAction([ carmen.CarmenConfig.getTestEvaluator(self) ,
-                                         HandleCompressedFiles(COMPRESS,'check_extension') ])
+        return [ carmen.CarmenConfig.getTestEvaluator(self) ,
+                                         HandleCompressedFiles(COMPRESS,'check_extension') ]
 
     def getTestRunner(self):
-        return plugins.CompositeAction([ HandleCompressedFiles(UNCOMPRESS),
-                                         carmen.CarmenConfig.getTestRunner(self)])
+        return [ HandleCompressedFiles(UNCOMPRESS),
+                                         carmen.CarmenConfig.getTestRunner(self)]
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)

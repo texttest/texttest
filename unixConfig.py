@@ -26,11 +26,6 @@ class UNIXConfig(default.Config):
         self.addFilter(filters, "b", batch.BatchFilter)
         self.addFilter(filters, "r", performance.TimeFilter)
         return filters
-    def _getActionSequence(self, makeDirs=1):
-        seq = default.Config._getActionSequence(self, makeDirs)
-        if self.batchMode():
-            seq.append(batch.MailSender(self.optionValue("b")))
-        return seq
     def batchMode(self):
         # If running multiple times, batch mode is assumed
         return self.optionMap.has_key("b") or self.optionMap.has_key("m")
@@ -45,7 +40,7 @@ class UNIXConfig(default.Config):
     def getTestResponder(self):
         diffLines = 30
         if self.batchMode():
-            return batch.BatchResponder(diffLines)
+            return batch.BatchResponder(diffLines, self.optionValue("b"))
         elif self.optionMap.has_key("o"):
             return default.Config.getTestResponder(self)
         else:

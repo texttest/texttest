@@ -71,7 +71,7 @@ class ApcConfig(optimization.OptimizationConfig):
         if group.name.startswith("How"):
             group.addOption("rundebug", "Run debugger")
             group.addOption("extractlogs", "Extract Apc Logs")
-    def getActionSequence(self):
+    def getActionSequence(self, useGui):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI,
                         KPI.cWorstBestPairingOptTimeKPI,
@@ -82,7 +82,7 @@ class ApcConfig(optimization.OptimizationConfig):
         if self.optionMap.has_key("kpiData"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI]
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
-        return optimization.OptimizationConfig.getActionSequence(self)
+        return optimization.OptimizationConfig.getActionSequence(self, useGui)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def getLibraryFile(self, app):
@@ -96,7 +96,7 @@ class ApcConfig(optimization.OptimizationConfig):
             subActions.append(carmen.AttachProfiler())
         if self.optionMap.has_key("extractlogs"):
             subActions.append(KeepApcLogs())
-        return plugins.CompositeAction(subActions)
+        return subActions
     def _getApcTestRunner(self):
         if self.useLSF():
             return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
@@ -112,7 +112,7 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions.append(RemoveLogs())
         if self.optionMap.has_key("extractlogs"):
             subActions.append(ExtractApcLogs(self.optionValue("extractlogs")))
-        return plugins.CompositeAction(subActions)
+        return subActions
     def _getSubPlanDirName(self, test):
         statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
         dirs = statusFile.split(os.sep)[:-2]
@@ -126,11 +126,8 @@ class ApcConfig(optimization.OptimizationConfig):
                 if option.find("crc" + os.sep + "rule_set") != -1:
                     return option.split(os.sep)[-1]
         return None
-    def updaterLSFStatus(self, jobNameFunction):
-        if jobNameFunction:
-            return optimization.OptimizationConfig.updaterLSFStatus(self, jobNameFunction)
-        else:
-            return ApcUpdateLSFStatus()
+    def updaterLSFStatus(self):
+        return ApcUpdateLSFStatus()
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)

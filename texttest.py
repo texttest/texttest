@@ -34,8 +34,6 @@ builtInOptions = """
              a ".", an attempt will be made to understand it as the Python class <module>.<classname>. If this fails,
              it will be interpreted as an external script.
 
--m <times> - perform the actions usually performed by the configuration, but repeated <times> times.
-
 -keeptmp   - Keep any temporary directories where test(s) write files. Note that once you run the test again the old
              temporary dirs will be removed.       
 
@@ -114,6 +112,11 @@ class Test:
         return self.makePathName(fileName, parent)
     def extraReadFiles(self):
         return self.app.configObject.extraReadFiles(self)
+    def performAction(self, action):
+        self.setUpEnvironment()
+        retValue = self.callAction(action)
+        self.tearDownEnvironment()
+        return retValue
     def notifyChanged(self):
         for observer in self.observers:
             observer.notifyChange(self)
@@ -124,15 +127,6 @@ class Test:
         return relPath
     def getDirectory(self, temporary):
         return self.abspath
-    def getInstructions(self, action):
-        return [ (self, plugins.SetUpEnvironment()) ] + action.getInstructions(self) \
-               + self.getSubInstructions(action) + [ (self, plugins.TearDownEnvironment()) ]
-    def performAction(self, action):
-        self.setUpEnvironment()
-        self.callAction(action)
-        self.performOnSubTests(action)
-        self.undoAction(action)
-        self.tearDownEnvironment()
     def setUpEnvironment(self, parents=0):
         if parents and self.parent:
             self.parent.setUpEnvironment(1)
@@ -140,17 +134,17 @@ class Test:
             if os.environ.has_key(var):
                 self.previousEnv[var] = os.environ[var]
             os.environ[var] = value
-            debugLog.info("Setting " + var + " to " + os.environ[var])
+            debugLog.debug("Setting " + var + " to " + os.environ[var])
     def tearDownEnvironment(self, parents=0):
         # Note this has no effect on the real environment, but can be useful for internal environment
         # variables. It would be really nice if Python had a proper "unsetenv" function...
-        debugLog.info("Restoring environment for " + self.name + " to " + repr(self.previousEnv))
+        debugLog.debug("Restoring environment for " + self.name + " to " + repr(self.previousEnv))
         for var in self.environment.keys():
             if os.environ.has_key(var):
                 if self.previousEnv.has_key(var):
                     os.environ[var] = self.previousEnv[var]
                 else:
-                    debugLog.info("Removed variable " + var)
+                    debugLog.debug("Removed variable " + var)
                     del os.environ[var]
         if parents and self.parent:
             self.parent.tearDownEnvironment(1)
@@ -190,6 +184,8 @@ class TestCase(Test):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
         return "test-case"
+    def testCaseList(self):
+        return [ self ]
     def getDirectory(self, temporary):
         if temporary:
             return self.writeDirs[0]
@@ -198,13 +194,7 @@ class TestCase(Test):
     def callAction(self, action):
         if os.path.isdir(self.writeDirs[0]):
             os.chdir(self.writeDirs[0])
-        try:
-            return action(self)
-        except plugins.TextTestError, e:
-            self.changeState(self.UNRUNNABLE, e)
-    def undoAction(self, action):
-        # Nothing to do
-        pass
+        return action(self)
     def changeState(self, state, details = ""):
         # Once we've left the pathway, we can't return...
         if self.state == self.UNRUNNABLE or self.state == self.KILLED:
@@ -216,8 +206,6 @@ class TestCase(Test):
             self.notifyChanged()
     def performOnSubTests(self, action):
         pass
-    def getSubInstructions(self, action):
-        return []
     def getExecuteCommand(self):
         return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
@@ -315,22 +303,23 @@ class TestSuite(Test):
         self.tearDownEnvironment()
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
+    def testCaseList(self):
+        list = []
+        for case in self.testcases:
+            list += case.testCaseList()
+        return list
     def classId(self):
         return "test-suite"
     def isEmpty(self):
         return len(self.testcases) == 0
     def callAction(self, action):
         return action.setUpSuite(self)
-    def undoAction(self, action):
-        return action.tearDownSuite(self)
-    def performOnSubTests(self, action):
-        for testcase in self.testcases:
-            testcase.performAction(action)
-    def getSubInstructions(self, action):
-        instructions = []
-        for testcase in self.testcases:
-            instructions += testcase.getInstructions(action)
-        return instructions
+    def setUpFor(self, action):
+        self.setUpEnvironment()
+        action.setUpSuite(self)
+    def tearDownFor(self, action):
+        action.tearDownSuite(self)
+        self.tearDownEnvironment()
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
     def reFilter(self, filters):
@@ -403,10 +392,94 @@ class TestSuite(Test):
             if test.name == testName:
                 return 1
         return 0
-    def cleanNonBasicWriteDirectories(self):
-        for test in self.testcases:
-            test.cleanNonBasicWriteDirectories()
-            
+
+class BadConfigError(RuntimeError):
+    pass
+        
+class ConfigurationWrapper:
+    def __init__(self, moduleName, optionMap):
+        self.moduleName = moduleName
+        importCommand = "from " + moduleName + " import getConfig"
+        try:
+            exec importCommand
+        except:
+            errorString = "No module named " + moduleName
+            if sys.exc_type == exceptions.ImportError and str(sys.exc_value) == errorString:
+                self.raiseException(msg = "could not find config_module " + moduleName, useOrigException=0)
+            else:
+                self.raiseException(msg = "config_module " + moduleName + " contained errors and could not be imported") 
+        self.target = getConfig(optionMap)
+    def raiseException(self, msg = None, req = None, useOrigException = 1):
+        message = msg
+        if not msg:
+            message = "Exception thrown by '" + self.moduleName + "' configuration, while requesting '" + req + "'"
+        if useOrigException:
+            printException()
+        raise BadConfigError, message
+    def getFilterList(self, optionGroup = None):
+        if optionGroup:
+            for key, option in optionGroup.options.items():
+                if len(option.getValue()):
+                    self.target.optionMap[key] = option.getValue()
+                elif self.target.optionMap.has_key(key):
+                    del self.target.optionMap[key]
+        try:
+            return self.target.getFilterList()
+        except:
+            self.raiseException(req = "filter list")
+    def keepTmpFiles(self):
+        try:
+            return self.target.keepTmpFiles()
+        except:
+            self.raiseException(req = "keep tmpfiles")
+    def setApplicationDefaults(self, app):
+        try:
+            return self.target.setApplicationDefaults(app)
+        except:
+            self.raiseException(req = "set defaults")
+    def addToOptionGroup(self, group):
+        try:
+            return self.target.addToOptionGroup(group)
+        except:
+            self.raiseException(req = "add to option group")
+    def getActionSequence(self, useGui):
+        try:
+            actionSequenceFromConfig = self.target.getActionSequence(useGui)
+        except:
+            self.raiseException(req = "action sequence")
+        actionSequence = []
+        # Collapse lists and remove None actions
+        for action in actionSequenceFromConfig:
+            self.addActionToList(action, actionSequence)
+        return actionSequence
+    def addActionToList(self, action, actionSequence):
+        if type(action) == types.ListType:
+            for subAction in action:
+                self.addActionToList(subAction, actionSequence)
+        elif action != None:
+            actionSequence.append(action)
+            debugLog.info("Adding to action sequence : " + str(action))
+    def printHelpText(self, builtInOptions):
+        try:
+            return self.target.printHelpText(builtInOptions)
+        except:
+            self.raiseException(req = "help text")
+    def getVitalFiles(self, app):
+        try:
+            return self.target.getVitalFiles(app)
+        except:
+            self.raiseException(req = "vital files")
+    def extraReadFiles(self, test):
+        try:
+            return self.target.extraReadFiles(test)
+        except:
+            self.raiseException(req = "extra read files")
+    def getExecuteCommand(self, test, binary):
+        try:
+            return self.target.getExecuteCommand(test, binary)
+        except:
+            self.raiseException(req = "execute command")
+
 class Application:
     def __init__(self, name, abspath, configFile, version, optionMap):
         self.name = name
@@ -421,7 +494,7 @@ class Application:
         debugLog.info("Found application " + repr(self))
         self.checkout = self.makeCheckout(optionMap)
         debugLog.info("Checkout set to " + self.checkout)
-        self.configObject = self.makeConfigObject(optionMap)
+        self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), optionMap)
         self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
         self.writeDirectory = self._getWriteDirectory()
         # Fill in the values we expect from the configurations, and read the file a second time
@@ -475,7 +548,7 @@ class Application:
         for option in optionMap.keys():
             optionGroup = self.findOptionGroup(option, optionGroups)
             if not optionGroup:
-                raise plugins.TextTestError, "unrecognised option -" + option
+                raise BadConfigError, "unrecognised option -" + option
         return optionGroups
     def addToOptionGroup(self, group):
         if group.name.startswith("What"):
@@ -488,7 +561,6 @@ class Application:
         elif group.name.startswith("Invisible"):
             group.addOption("a", "Applications containing")
             group.addOption("d", "Run tests at")
-            group.addOption("m", "Run this number of times")
             group.addOption("record", "Record user actions to this script")
             group.addOption("replay", "Replay user actions from this script")
             group.addOption("help", "Print help text")
@@ -521,13 +593,7 @@ class Application:
             return ""
         return "." + fullVersion
     def createTestSuite(self, optionGroup = None):
-        if optionGroup:
-            for key, option in optionGroup.options.items():
-                if len(option.getValue()):
-                    self.configObject.optionMap[key] = option.getValue()
-                elif self.configObject.optionMap.has_key(key):
-                    del self.configObject.optionMap[key]
-        valid, filters = self.getFilterList()
+        valid, filters = self.getFilterList(optionGroup)
         suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters)
         suite.reFilter(filters)
         return valid, suite
@@ -632,21 +698,8 @@ class Application:
             return path
         else:
             return os.path.join(self.checkout, path)
-    def makeConfigObject(self, optionMap):
-        configModule = self.getConfigValue("config_module")
-        importCommand = "from " + configModule + " import getConfig"
-        try:
-            exec importCommand
-        except:
-            errorString = "No module named " + configModule
-            if sys.exc_type == exceptions.ImportError and str(sys.exc_value) == errorString:
-                raise KeyError, "could not find config_module " + configModule
-            else:
-                printException()
-                raise KeyError, "config_module " + configModule + " contained errors and could not be imported"  
-        return getConfig(optionMap)
-    def getActionSequence(self):
-        return self.configObject.getActionSequence()
+    def getActionSequence(self, useGui):
+        return self.configObject.getActionSequence(useGui)
     def printHelpText(self):
         print helpIntro
         header = "Description of the " + self.getConfigValue("config_module") + " configuration"
@@ -656,8 +709,8 @@ class Application:
             header += "-"
         print header
         self.configObject.printHelpText(builtInOptions)
-    def getFilterList(self):
-        filters = self.configObject.getFilterList()
+    def getFilterList(self, optionGroup = None):
+        filters = self.configObject.getFilterList(optionGroup)
         success = 1
         for filter in filters:
             if not filter.acceptsApplication(self):
@@ -771,7 +824,7 @@ class OptionFinder:
                         appList += self.addApplications(appName, dirName, pathname, version)
                 except (SystemExit, KeyboardInterrupt):
                     raise sys.exc_type, sys.exc_value
-                except:
+                except BadConfigError:
                     print "Could not use application", appName, "-", sys.exc_value
                     raisedError = 1
             elif os.path.isdir(pathname) and recursive:
@@ -819,11 +872,6 @@ class OptionFinder:
             appDict[appName].append(versionName)
         else:
             appDict[appName] = [ versionName ]
-    def timesToRun(self):
-        if self.inputOptions.has_key("m"):
-            return int(self.inputOptions["m"])
-        else:
-            return 1
     def helpMode(self):
         return self.inputOptions.has_key("help")
     def useGUI(self):
@@ -857,12 +905,12 @@ class OptionFinder:
             return os.path.abspath(os.environ["TEXTTEST_HOME"])
         else:
             return os.getcwd()
-    def getActionSequence(self, app):
+    def getActionSequence(self, app, useGui):
         if self.inputOptions.has_key("gx"):
             return []
         
         if not self.inputOptions.has_key("s"):
-            return app.getActionSequence()
+            return app.getActionSequence(useGui)
             
         actionCom = self.inputOptions["s"].split(" ")[0]
         actionArgs = self.inputOptions["s"].split(" ")[1:]
@@ -878,10 +926,14 @@ class OptionFinder:
             return self.getNonPython()
 
         # Assume if we succeed in importing then a python module is intended.
-        if len(actionArgs) > 0:
-            return [ _pclass(actionArgs) ]
-        else:
-            return [ _pclass() ]
+        try:
+            if len(actionArgs) > 0:
+                return [ _pclass(actionArgs) ]
+            else:
+                return [ _pclass() ]
+        except:
+            printException()
+            raise BadConfigError, "Could not instantiate script action " + repr(actionCom) + " with arguments " + repr(actionArgs) 
     def getNonPython(self):
         return [ plugins.NonPythonAction(self.inputOptions["s"]) ]
             
@@ -946,57 +998,173 @@ class MultiEntryDictionary(seqdict):
             self.currDict[entryName] = int(entry)
         else:
             self.currDict[entryName] = entry        
-    
+
+class TestRunner:
+    def __init__(self, test, actionSequence, cleanupSequence, diag):
+        self.test = test
+        self.diag = diag
+        self.interrupted = 0
+        self.actionSequence = []
+        self.cleanupSequence = cleanupSequence
+        # Copy the action sequence, so we can edit it and mark progress
+        for action in actionSequence:
+            self.actionSequence.append(action)
+    def interrupt(self):
+        self.interrupted = 1
+    def performActions(self, previousTestRunner, runToCompletion):
+        tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
+        while len(self.actionSequence):
+            if self.interrupted:
+                raise KeyboardInterrupt, "Interrupted externally"
+            action = self.actionSequence[0]
+            retValue = None
+            try:
+                self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
+                for suite in tearDownSuites:
+                    self.diag.info("Tear down " + repr(suite))
+                    suite.tearDownFor(action)
+                for suite in setUpSuites:
+                    suite.setUpFor(action)
+                    self.diag.info("Set up " + repr(suite))
+                retValue = self.test.performAction(action)
+                self.diag.info("<-End Performing action " + str(action) + " returned " + str(retValue))
+            except plugins.TextTestError, e:
+                self.test.changeState(self.test.UNRUNNABLE, e)
+            except KeyboardInterrupt:
+                raise sys.exc_type, sys.exc_info
+            except:
+                print "WARNING : caught exception while running", self.test, "changing state to UNRUNNABLE :"
+                printException()
+                self.test.changeState(self.test.UNRUNNABLE, sys.exc_value)
+            if retValue == "retry":
+                # Don't busy-wait
+                time.sleep(0.1)
+            elif retValue == "wait":
+                if not runToCompletion:
+                    return 0
+                # Don't busy-wait
+                time.sleep(0.1)
+            else:
+                self.actionSequence.pop(0)
+        return 1
+    def performCleanUpActions(self):
+        for action in self.cleanupSequence:
+            self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.test))
+            self.test.performAction(action)
+        if not self.test.app.keepTmpFiles:
+            self.test.cleanNonBasicWriteDirectories()
+    def findSuitesToChange(self, previousTestRunner):
+        tearDownSuites = []
+        commonAncestor = None
+        if previousTestRunner:
+            commonAncestor = self.findCommonAncestor(self.test, previousTestRunner.test)
+            self.diag.info("Common ancestor : " + repr(commonAncestor))
+            tearDownSuites = previousTestRunner.findSuitesUpTo(commonAncestor)
+        setUpSuites = self.findSuitesUpTo(commonAncestor)
+        # We want to set up the earlier ones first
+        setUpSuites.reverse()
+        return tearDownSuites, setUpSuites
+    def findCommonAncestor(self, test1, test2):
+        if self.hasAncestor(test1, test2):
+            self.diag.info(test1.getRelPath() + " has ancestor " + test2.getRelPath())
+            return test2
+        if self.hasAncestor(test2, test1):
+            self.diag.info(test2.getRelPath() + " has ancestor " + test1.getRelPath())
+            return test1
+        if test1.parent:
+            return self.findCommonAncestor(test1.parent, test2)
+        else:
+            self.diag.info(test1.getRelPath() + " unrelated to " + test2.getRelPath())
+            return None
+    def hasAncestor(self, test1, test2):
+        if test1 == test2:
+            return 1
+        if test1.parent:
+            return self.hasAncestor(test1.parent, test2)
+        else:
+            return 0
+    def findSuitesUpTo(self, ancestor):
+        suites = []
+        currCheck = self.test.parent
+        while currCheck != ancestor:
+            suites.append(currCheck)
+            currCheck = currCheck.parent
+        return suites
+
 class ApplicationRunner:
-    def __init__(self, app, inputOptions, gui):
-        self.app = app
-        self.actionSequence = inputOptions.getActionSequence(app)
-        debugLog.debug("Action sequence = " + repr(self.actionSequence))
-        if inputOptions.helpMode():
-            app.printHelpText()
-            self.valid = 0
-            return
-        self.valid, tmpSuite = app.createTestSuite()
-        self.gui = gui
-        if tmpSuite.size() == 0:
-            print "No tests found for", app.description()
-            self.valid = 0
-        else:
-            self.testSuite = tmpSuite
-            if gui:
-                gui.addSuite(self.testSuite)
-    def actionCount(self):
-        return len(self.actionSequence)
-    def performAction(self, actionNum):
-        debugLog.debug("Performing action number " + str(actionNum) + " of " + str(self.actionCount()))
-        if actionNum < self.actionCount():
-            action = self.actionSequence[actionNum]
-            self._performAction(self.testSuite, action)
-    def performCleanUp(self):
-        self.valid = 0 # Make sure no future runs are made
-        self.gui = None # The GUI has been exited
-        self.actionSequence.reverse()
-        for action in self.actionSequence:
-            cleanUp = action.getCleanUpAction()
-            if cleanUp != None:
-                self._performAction(self.testSuite, cleanUp)
-        # Hardcoded destructor-like cleanup (the destructor isn't called for some reason)
-        self.app.removeWriteDirectory()
-        if not self.app.keepTmpFiles:
-            self.testSuite.cleanNonBasicWriteDirectories()
-    def _performAction(self, suite, action):
-        debugLog.debug("Performing action " + repr(action))
-        suite.setUpEnvironment()
-        action.setUpApplication(suite.app)
-        suite.tearDownEnvironment()
-        debugLog.debug("Current config dictionary for " + repr(suite.app) + ": " + os.linesep + repr(suite.app.configDir))
-        if self.gui:
-            instructionList = suite.getInstructions(action)
-            self.gui.storeInstructions(instructionList)
-        else:
-            suite.performAction(action)    
+    def __init__(self, testSuite, actionSequence, diag):
+        self.testSuite = testSuite
+        self.actionSequence = actionSequence
+        self.cleanupSequence = self.getCleanUpSequence(actionSequence)
+        self.diag = diag
+    def getCleanUpSequence(self, actionSequence):
+        cleanupSequence = []
+        for action in actionSequence:
+            cleanAction = action.getCleanUpAction()
+            if cleanAction:
+                cleanupSequence.append(cleanAction)
+        cleanupSequence.reverse()
+        return cleanupSequence
+    def startRun(self):
+        self.setUpApplications(self.actionSequence)
+    def performCleanup(self):
+        self.setUpApplications(self.cleanupSequence)
+        self.testSuite.app.removeWriteDirectory()
+    def setUpApplications(self, sequence):
+        self.testSuite.setUpEnvironment()
+        for action in sequence:
+            self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.testSuite.app))
+            action.setUpApplication(self.testSuite.app)
+        self.testSuite.tearDownEnvironment()
+
+class ActionRunner:
+    def __init__(self):
+        self.interrupted = 0
+        self.previousTestRunner = None
+        self.currentTestRunner = None
+        self.allTests = []
+        self.testQueue = []
+        self.appRunners = []
+        self.diag = plugins.getDiagnostics("Action Runner")
+    def addTestActions(self, testSuite, actionSequence):
+        self.diag.info("Processing test suite of size " + str(testSuite.size()) + " for app " + testSuite.app.name)
+        appRunner = ApplicationRunner(testSuite, actionSequence, self.diag)
+        self.appRunners.append(appRunner)
+        for test in testSuite.testCaseList():
+            self.diag.info("Adding test runner for test " + test.getRelPath())
+            testRunner = TestRunner(test, actionSequence, appRunner.cleanupSequence, self.diag)
+            self.testQueue.append(testRunner)
+            self.allTests.append(testRunner)
+    def hasTests(self):
+        return len(self.allTests) > 0
+    def runCleanup(self):
+        for testRunner in self.allTests:
+            self.diag.info("Running cleanup actions for test " + testRunner.test.getRelPath())
+            testRunner.performCleanUpActions()
+        for appRunner in self.appRunners:
+            appRunner.performCleanup()
+    def run(self):
+        for appRunner in self.appRunners:
+            appRunner.startRun()
+        while len(self.testQueue):
+            if self.interrupted:
+                raise KeyboardInterrupt, "Interrupted externally"
+            self.currentTestRunner = self.testQueue[0]
+            self.diag.info("Running actions for test " + self.currentTestRunner.test.getRelPath())
+            runToCompletion = len(self.testQueue) == 1
+            completed = self.currentTestRunner.performActions(self.previousTestRunner, runToCompletion)
+            self.testQueue.pop(0)
+            if not completed:
+                self.diag.info("Incomplete - putting to back of queue")
+                self.testQueue.append(self.currentTestRunner)
+            self.previousTestRunner = self.currentTestRunner
+    def interrupt(self):
+        self.interrupted = 1
+        if self.currentTestRunner:
+            self.currentTestRunner.interrupt()
 
 def printException():
+    sys.stderr.write("Description of exception thrown :" + os.linesep)
     type, value, traceback = sys.exc_info()
     sys.excepthook(type, value, traceback)
     
@@ -1013,11 +1181,10 @@ class TextTest:
     def __init__(self):
         self.inputOptions = OptionFinder()
         global globalRunIdentifier
-        useGui = self.inputOptions.useGUI()
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
         self.allApps = self.inputOptions.findApps()
         self.gui = None
-        if useGui:
+        if self.inputOptions.useGUI():
             try:
                 import texttestgui
                 recordScript = self.inputOptions.recordScript()
@@ -1032,63 +1199,42 @@ class TextTest:
             return "%d%b%H:%M:%S"
         else:
             return "%H%M%S"
+    def createActionRunner(self):
+        actionRunner = ActionRunner()
+        for app in self.allApps:
+            try:
+                valid, testSuite = app.createTestSuite()
+                if testSuite.size() == 0:
+                    print "No tests found for", app.description()
+                elif valid:
+                    useGui = self.inputOptions.useGUI()
+                    actionSequence = self.inputOptions.getActionSequence(app, useGui)
+                    actionRunner.addTestActions(testSuite, actionSequence)
+                    if self.gui:
+                        self.gui.addSuite(testSuite)
+                    print "Using", app.description() + ", checkout", app.checkout
+            except BadConfigError:
+                print "Error in set-up of application", app, "-", sys.exc_value
+        return actionRunner
     def run(self):
         try:
+            if self.inputOptions.helpMode():
+                self.allApps[0].printHelpText()
+                return
             self._run()
-        except SystemExit:# Assumed to be a child thread, in any case exit silently
-            pass
         except KeyboardInterrupt:
             print "Terminated due to interruption"
     def _run(self):
-        applicationRunners = self.createAppRunners()
-        if len(applicationRunners) == 0:
+        actionRunner = self.createActionRunner()
+        if not actionRunner.hasTests():
             return
-        maxActionCount = max(map(lambda x: x.actionCount(), applicationRunners))
-        # Run actions one at a time for each application. This should ensure a fair spread of machine time when this is limited
-        for run in range(self.inputOptions.timesToRun()):
-            for actionNum in range(maxActionCount):
-                self.performActionOnApps(applicationRunners, actionNum)
+        try:
             if self.gui:
-                self.gui.takeControl()
-            for appRunner in applicationRunners:
-                appRunner.performCleanUp()
-    def createAppRunners(self):
-        applicationRunners = []
-        for app in self.allApps:
-            try:
-                appRunner = ApplicationRunner(app, self.inputOptions, self.gui)
-                if appRunner.valid:
-                    print "Using", app.description() + ", checkout", app.checkout
-                    applicationRunners.append(appRunner)
-            except (SystemExit, KeyboardInterrupt):
-                printException()
-                raise sys.exc_type, sys.exc_value
-            except:
-                print "Not running tests of application", app, "due to exception in set-up:"
-                printException()
-        return applicationRunners
-    def performActionOnApps(self, applicationRunners, actionNum):
-        try:
-            for appRunner in applicationRunners:
-                if appRunner.valid:
-                    self.performAction(appRunner, actionNum)
-        except SystemExit:
-            # Assumed to be a child thread, in any case exit silently
-            raise sys.exc_type, sys.exc_value
-        except KeyboardInterrupt:
-            print "Received kill signal, cleaning up all applications..."
-            for appRunner in applicationRunners:
-                appRunner.performCleanUp()
-            raise sys.exc_type, sys.exc_value
-    def performAction(self, appRunner, actionNum):
-        try:
-            appRunner.performAction(actionNum)
-        except (SystemExit, KeyboardInterrupt):
-            raise sys.exc_type, sys.exc_value
-        except:
-            print "Caught exception from application", appRunner.app, ", cleaning up and terminating its tests:"
-            printException()
-            appRunner.performCleanUp()
+                self.gui.takeControl(actionRunner)
+            else:
+                actionRunner.run()
+        finally:
+            actionRunner.runCleanup()
 
 if __name__ == "__main__":
     program = TextTest()

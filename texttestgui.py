@@ -8,17 +8,29 @@ from gtkscript import eventHandler
 from Queue import Queue, Empty
 from ndict import seqdict
 
+class ActionThread(Thread):
+    def __init__(self, actionRunner):
+        Thread.__init__(self)
+        self.actionRunner = actionRunner
+    def run(self):
+        try:
+            self.actionRunner.run()
+        except KeyboardInterrupt:
+            print "Terminated before tests complete: cleaning up..." 
+    def terminate(self):
+        self.actionRunner.interrupt()
+        self.join()
+
 class TextTestGUI:
     def __init__(self, dynamic, replayScriptName, recordScriptName):
-        eventHandler.setScripts(replayScriptName, recordScriptName)
+        guiplugins.setUpGuiLog()
+        global guilog
+        from guiplugins import guilog
+        eventHandler.setScripts(replayScriptName, recordScriptName, guilog)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.dynamic = dynamic
-        self.instructions = []
-        self.postponedInstructions = []
-        self.postponedTests = []
         self.itermap = seqdict()
         self.actionThread = None
-        self.quitGUI = 0
         self.rightWindowGUI = None
         self.contents = None
         self.workQueue = Queue()
@@ -137,16 +149,14 @@ class TextTestGUI:
         scrolled.add(view)
         scrolled.show()    
         return scrolled
-    def storeInstructions(self, instructions):
-        self.instructions += instructions
-    def takeControl(self):
+    def takeControl(self, actionRunner):
         # We've got everything and are ready to go
         self.createIterMap()
         testWins = self.createTestWindows()
         self.createDefaultRightGUI()
         topWindow = self.createTopWindow(testWins)
         if self.dynamic:
-            self.actionThread = Thread(None, self.runActionThread, "action", ())
+            self.actionThread = ActionThread(actionRunner)
             self.actionThread.start()
             eventHandler.addIdle("test actions", self.pickUpChange)
         # Run the Gtk+ main loop.
@@ -157,13 +167,14 @@ class TextTestGUI:
     def pickUpChange(self):
         try:
             test = self.workQueue.get_nowait()
-            if test == "actions finished":
-                self.actionThread.join()
-                return gtk.FALSE
             if test:
                 self.testChanged(test)
             return gtk.TRUE
         except Empty:
+            # Maybe it's empty because the action thread has terminated
+            if not self.actionThread.isAlive():
+                self.actionThread.join()
+                return gtk.FALSE
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
             return gtk.TRUE
@@ -174,41 +185,6 @@ class TextTestGUI:
             self.redrawSuite(test)
         if self.rightWindowGUI and self.rightWindowGUI.test == test:
             self.recreateTestView(test)
-    def runActionThread(self):
-        while len(self.instructions):
-            prevTest = None
-            for test, action in self.instructions:
-                if self.quitGUI:
-                    return
-                self.performAction(test, action, prevTest)
-                prevTest = test
-            self.instructions = self.postponedInstructions
-            self.postponedTests = []
-            self.postponedInstructions = []
-        self.workQueue.put("actions finished")
-    def performAction(self, test, action, prevTest):
-        while 1:
-            if self.quitGUI:
-                return 0
-
-            if test in self.postponedTests:
-                if test != prevTest:
-                    self.postponedInstructions.append((test, plugins.SetUpEnvironment(1)))
-                self.postponedInstructions.append((test, action))
-                return 1
-            else:
-                retValue = test.callAction(action)
-                if retValue == "retry":
-                    # Don't busy-wait
-                    time.sleep(0.1)
-                    continue
-                elif retValue == "wait":
-                    self.postponedTests.append(test)
-                    # Must restore environment when postponing..., when the tests differ
-                    if test != prevTest:
-                        self.postponedInstructions.append((test, plugins.SetUpEnvironment(1)))
-                    self.postponedInstructions.append((test, action))
-            return 1
     def notifyChange(self, test):
         if currentThread() == self.actionThread:
             self.workQueue.put(test)
@@ -225,11 +201,10 @@ class TextTestGUI:
         self.itermap[newTest] = iter.copy()
         newTest.observers.append(self)
     def quit(self, *args):
-        self.quitGUI = 1
         gtk.main_quit()
         self.rightWindowGUI.killProcesses()
         if self.actionThread:
-            self.actionThread.join()
+            self.actionThread.terminate()
     def saveAll(self, *args):
         saveTestAction = self.rightWindowGUI.getSaveTestAction()
         for test in self.itermap.keys():
@@ -241,7 +216,7 @@ class TextTestGUI:
         self.viewTestAtIter(self.model.get_iter(path))
     def viewTestAtIter(self, iter):
         test = self.model.get_value(iter, 2)
-        print "Viewing test", test
+        guilog.info("Viewing test " + repr(test))
         colour = self.model.get_value(iter, 1)
         self.recreateTestView(test, colour)
     def recreateTestView(self, test, colour = ""):
@@ -304,7 +279,7 @@ class RightWindowGUI:
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
         heading = self.model.get_value(iter, 0)
-        print "Adding file", baseName, "under heading '" + heading + "', coloured", colour 
+        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour) 
         self.model.set_value(fciter, 0, baseName)
         self.model.set_value(fciter, 1, colour)
         self.model.set_value(fciter, 2, name)
@@ -319,7 +294,8 @@ class RightWindowGUI:
         for instance in interactiveActions:
             for optionGroup in instance.getOptionGroups():
                 if optionGroup.switches or optionGroup.options:
-                    print os.linesep + "Creating notebook page for '" + optionGroup.name + "'"
+                    guilog.info("") # blank line
+                    guilog.info("Creating notebook page for '" + optionGroup.name + "'")
                     display = self.createDisplay(optionGroup)
                     pages.append((display, optionGroup.name))
         notebook = eventHandler.createNotebook("notebook", pages)
@@ -352,7 +328,7 @@ class RightWindowGUI:
         vbox = gtk.VBox()
         for option in optionGroup.options.values():
             hbox = gtk.HBox()
-            print "Creating entry for option '" + option.name + "'"
+            guilog.info("Creating entry for option '" + option.name + "'")
             label = gtk.Label(option.name + "  ")
             entry = eventHandler.createEntry(option.name, option.getValue())
             option.setMethods(entry.get_text, entry.set_text)
@@ -363,7 +339,7 @@ class RightWindowGUI:
             hbox.show()
             vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
         for switch in optionGroup.switches.values():
-            print "Creating check button for switch '" + switch.name + "'"
+            guilog.info("Creating check button for switch '" + switch.name + "'")
             checkButton = eventHandler.createCheckButton(switch.name, switch.getValue())
             switch.setMethods(checkButton.get_active, checkButton.set_active)
             checkButton.show()
@@ -519,7 +495,7 @@ class TestCaseGUI(RightWindowGUI):
             return test.stateDetails
         return ""
     def runInteractive(self, button, action, *args):
-        self.test.callAction(action)
+        self.test.performAction(action)
 
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):

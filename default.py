@@ -9,9 +9,6 @@ Its default behaviour is to run all tests on the local machine.
 """
 
 helpOptions = """
--i         - run in interactive mode. This means that the framework will interleave running and comparing
-             the tests, so that test 2 is not run until test 1 has been run and compared.
-
 -o         - run in overwrite mode. This means that the interactive dialogue is replaced by simply
              overwriting all previous results with new ones.
 
@@ -55,19 +52,15 @@ class Config(plugins.Configuration):
         elif group.name.startswith("What"):
             group.addOption("reconnect", "Reconnect to previous run")
         elif group.name.startswith("How"):
-            group.addSwitch("i", "Interactive mode")
             group.addSwitch("o", "Overwrite all failures")
             group.addSwitch("n", "Create new results files (overwrite everything)")
-    def getActionSequence(self):
-        return self._getActionSequence(makeDirs=1)
-    def _getActionSequence(self, makeDirs):
-        actions = [ self.tryGetTestRunner(), self.getTestEvaluator() ]
+    def getActionSequence(self, useGui):
+        return self._getActionSequence(useGui, makeDirs=1)
+    def _getActionSequence(self, useGui, makeDirs):
+        actions = [ self.tryGetTestRunner(), self.getTestEvaluator(useGui) ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
-        if self.optionMap.has_key("i"):
-            return [ plugins.CompositeAction(actions) ]
-        else:
-            return actions
+        return actions
     def getFilterList(self):
         filters = []
         self.addFilter(filters, "t", TestNameFilter)
@@ -79,25 +72,27 @@ class Config(plugins.Configuration):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
         if self.isReconnecting():
-            return plugins.Action()
+            return None
         else:
             return MakeWriteDirectory()
     def tryGetTestRunner(self):
         if self.isReconnecting():
-            return plugins.Action()
+            return None
         else:
             return self.getTestRunner()
     def getTestRunner(self):
         return RunTest()
-    def getTestEvaluator(self):
-        subParts = [ self.getFileExtractor(), self.getCatalogueCreator(), \
-                     self.getTestPredictionChecker(), self.getTestComparator(), self.getTestResponder() ]
-        return plugins.CompositeAction(subParts)
+    def getTestEvaluator(self, useGui):
+        actions = [ self.getFileExtractor(), self.getCatalogueCreator(), \
+                 self.getTestPredictionChecker(), self.getTestComparator() ]
+        if not useGui:
+            actions.append(self.getTestResponder())
+        return actions
     def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"))
         else:
-            return plugins.CompositeAction([self.getTestCollator(), self.getPerformanceFileMaker(), self.getMemoryFileMaker()])
+            return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getMemoryFileMaker() ] 
     def getCatalogueCreator(self):
         return CreateCatalogue()
     def getTestCollator(self):
@@ -105,7 +100,7 @@ class Config(plugins.Configuration):
     def getMemoryFileMaker(self):
         return MakeMemoryFile()
     def getPerformanceFileMaker(self):
-        return plugins.Action()
+        return None
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getTestComparator(self):

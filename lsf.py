@@ -126,16 +126,16 @@ class LSFConfig(unixConfig.UNIXConfig):
                 resourceList.append(resource)
         return resourceList
     def getTestCollator(self):
-        return plugins.CompositeAction([ self.getWaitingAction(), self.getFileCollator() ])
+        return [ self.getWaitingAction(), self.getFileCollator() ]
     def getFileCollator(self):
         return unixConfig.UNIXConfig.getTestCollator(self)
-    def getWaitingAction(self, jobNameFunction = None):
+    def getWaitingAction(self):
         if not self.useLSF():
-            return plugins.Action()
+            return None
         else:
-            return plugins.CompositeAction([ Wait(jobNameFunction), self.updaterLSFStatus(jobNameFunction) ])
-    def updaterLSFStatus(self, jobNameFunction):
-        return UpdateLSFStatus(jobNameFunction)
+            return self.updaterLSFStatus()
+    def updaterLSFStatus(self):
+        return UpdateTestLSFStatus()
     def isSlowdownJob(self, jobUser, jobName):
         return 0
     def printHelpDescription(self):
@@ -282,6 +282,8 @@ class KillTest(plugins.Action):
     def __repr__(self):
         return "Cancelling"
     def __call__(self, test):
+        if test.state > test.RUNNING:
+            return
         job = LSFJob(test)
         if job.hasFinished():
             return
@@ -310,9 +312,6 @@ class Wait(plugins.Action):
                 test.changeState(test.KILLED, "Killed by LSF emergency finish")
                 return
             time.sleep(2)
-    # Involves sleeping, don't do it from GUI
-    def getInstructions(self, test):
-        return []
     def checkCondition(self, job):
         try:
             return job.hasFinished()
@@ -320,28 +319,43 @@ class Wait(plugins.Action):
         except IOError:
             return 0
 
+
 class UpdateLSFStatus(plugins.Action):
-    def __init__(self, jobNameFunction = None):
-        self.logFile = None
+    def __init__(self, jobNameFunction = None, startState = None):
         self.jobNameFunction = jobNameFunction
+        self.diag = plugins.getDiagnostics("LSF Status")
+        self.startState = startState
     def __repr__(self):
         return "Updating LSF status for"
     def __call__(self, test):
+        if self.startState and test.state != self.startState:
+            return
+        
         job = LSFJob(test, self.jobNameFunction)
         status, machine = job.getStatus()
+        self.diag.info("Job " + job.name + " in state " + status + " for test " + test.name)
         if status == "DONE" or status == "EXIT":
             return
         if status != "PEND" and not self.jobNameFunction:
-            perc = self.calculatePercentage(test)
-            details = ""
-            if machine != None:
-                details += "Executing on " + machine + os.linesep
-
-            details += "Current LSF status = " + status + os.linesep
-            if perc > 0:
-                details += "From log file reckoned to be " + str(perc) + "% complete."
-            test.changeState(test.RUNNING, details)
+            self.getRunningInformation(test, status, machine)
         return "wait"
+    def getRunningInformation(self, test, status, machine):
+        pass
+
+class UpdateTestLSFStatus(UpdateLSFStatus):
+    def __init__(self):
+        UpdateLSFStatus.__init__(self)
+        self.logFile = None
+    def getRunningInformation(self, test, status, machine):
+        perc = self.calculatePercentage(test)
+        details = ""
+        if machine != None:
+            details += "Executing on " + machine + os.linesep
+            
+        details += "Current LSF status = " + status + os.linesep
+        if perc > 0:
+            details += "From log file reckoned to be " + str(perc) + "% complete."
+        test.changeState(test.RUNNING, details)
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
     def calculatePercentage(self, test):
@@ -354,7 +368,7 @@ class UpdateLSFStatus(plugins.Action):
         if stdSize == 0:
             return 0
         return (tmpSize * 100) / stdSize 
-    
+
 class MakePerformanceFile(unixConfig.MakePerformanceFile):
     def __init__(self, isSlowdownJob):
         unixConfig.MakePerformanceFile.__init__(self)

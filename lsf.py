@@ -375,7 +375,7 @@ class MakeResourceFiles(plugins.Action):
         if self.checkPerformance:
             self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3][0]], resourceDict[textList[4]], test.makeFileName("performance", temporary=1))
         if self.checkMemory:
-            self.writeMemoryFile(resourceDict[textList[0]], resourceDict[textList[1]], test.makeFileName("memory", temporary=1))
+            self.writeMemoryFile(test, textList, resourceDict)
     def parseUnixTime(self, timeVal):
         if timeVal.find(":") == -1:
             return string.rjust(timeVal, 9)
@@ -430,10 +430,10 @@ class MakeResourceFiles(plugins.Action):
                 descriptor = "Suspected of SLOWING DOWN "
             jobs.append(descriptor + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
-    def writeMemoryFile(self, memLine, swapLine, fileName):
-        file = open(fileName, "w")
-        file.write(string.lstrip(memLine))
-        file.write(string.lstrip(swapLine))
+    def writeMemoryFile(self, test, textList, resourceDict):
+        file = open(test.makeFileName("memory", temporary=1), "w")
+        file.write(string.lstrip(resourceDict[textList[0]]))
+        file.write(string.lstrip(resourceDict[textList[1]]))
         file.close()
 
 

@@ -386,7 +386,7 @@ class SubmitTest(plugins.Action):
         lsfOptions = " -q " + queueToUse + commandLsfOptions
         resource = self.resourceFunction(test)
         if len(resource):
-            lsfOptions += " -R '" + resource + "'"
+            lsfOptions += " -R \"" + resource + "\""
         machine = self.machineFunction(test)
         if len(machine):
             lsfOptions += " -m '" + machine + "'"

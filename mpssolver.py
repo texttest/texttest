@@ -1,7 +1,13 @@
 helpDescription = """
 The MpsSolver configuration is based on the Carmen configuration. """ 
 
-helpOptions = """
+helpOptions = """-memstat version,version:limit    Give memory statistics
+    Print only tests with difference larger than limit
+    
+-perfstat version,version:limit    Give performance statistics
+    Print only tests with difference larger than limit
+-feasstat version,version          Give infeasibility statistics
+
 """
 
 helpScripts = """
@@ -24,10 +30,24 @@ class MpsSolverConfig(carmen.CarmenConfig):
         if self.optionMap.has_key("diag"):
             del os.environ["DIAGNOSTICS_IN"]
             del os.environ["DIAGNOSTICS_OUT"]
+    def getArgumentOptions(self):
+        options = carmen.CarmenConfig.getArgumentOptions(self)
+        options["memstat"] = "Show memory statistics for versions"
+        options["perfstat"] = "Show performance statistics for versions"
+        options["feasstat"] = "Show feasibility statistics for versions"
+        return options
     def getSwitches(self):
         switches = carmen.CarmenConfig.getSwitches(self)
         switches["diag"] = "Use MpsSolver Codebase diagnostics"
         return switches
+    def getActionSequence(self):
+        if self.optionMap.has_key("memstat"):
+            return [ MemoryStatisticsBuilder(self.optionValue("memstat")) ]
+        if self.optionMap.has_key("perfstat"):
+            return [ PerformanceStatisticsBuilder(self.optionValue("perfstat")) ]
+        if self.optionMap.has_key("feasstat"):
+            return [ FeasibilityStatisticsBuilder(self.optionValue("feasstat")) ]
+        return carmen.CarmenConfig.getActionSequence(self)
     def checkMemory(self):
         return 1
     def getTestComparator(self):
@@ -120,7 +140,7 @@ class OutputFileComparison(comparetest.FileComparison):
                 if self.tableEnds(line, cols):
                     inTable = 0
                 else:
-                    cols[-1] = "XXX"
+                    cols[-1] = "XXX" + os.linesep
                     line = string.join(cols, " ")
             else:
                 if self.tableStarts(line, cols):
@@ -132,7 +152,7 @@ class OutputFileComparison(comparetest.FileComparison):
     def tableStarts(self, line, cols):
         return string.lower(cols[-1]).strip() == "time"
     def tableEnds(self, line, cols):
-        return not line.startswith(" ")
+        return line.strip() == ""
 
 # Returns -1 as error value, if the file is the wrong format
 def getMaxMemory(fileName):
@@ -144,6 +164,9 @@ def getMaxMemory(fileName):
         return float(string.strip(fullName))
     except:
         return float(-1)
+
+def getTestMemory(test, version = None):
+    return getMaxMemory(test.makeFileName("memory", version))
 
 class MemoryFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile):
@@ -189,3 +212,91 @@ class MemoryFileComparison(comparetest.FileComparison):
         newFile.write(lineToWrite)
         newFile.write(swapLine)
         os.remove(self.tmpFile)
+
+def minsec(minFloat):
+    intMin = int(minFloat)
+    secPart = minFloat - intMin
+    return str(intMin) + "m" + str(int(secPart * 60)) + "s"
+
+def percentDiff(perf1, perf2):
+    if perf2 != 0:
+        return int((perf1 / perf2) * 100.0)
+    else:
+        return 0
+
+def pad(str, padSize):
+    padStr = str
+    il = len(str)
+    while il < padSize:
+        padStr += " "
+        il += 1
+    return padStr
+        
+class PerformanceStatisticsBuilder(plugins.Action):
+    def __init__(self, argString):
+        args = argString.split(":")
+        versionString = args[0]
+        try:
+            self.limit = int(args[1])
+        except:
+            self.limit = 0
+        versions = versionString.split(",")
+        self.referenceVersion = versions[0]
+        self.currentVersion = None
+        if len(versions) > 1:
+            self.currentVersion = versions[1]
+    def setUpSuite(self, suite):
+        self.suiteName = suite.name + os.linesep + "   "
+    def __call__(self, test):
+        refPerf = performance.getTestPerformance(test, self.referenceVersion)
+        currPerf = performance.getTestPerformance(test, self.currentVersion)
+        pDiff = percentDiff(currPerf, refPerf)
+        if self.limit == 0 or pDiff > self.limit:
+            print self.suiteName + pad(test.name, 30) + "\t", minsec(refPerf), minsec(currPerf), "\t" + str(pDiff) + "%"
+            self.suiteName = "   "
+            
+class MemoryStatisticsBuilder(plugins.Action):
+    def __init__(self, argString):
+        args = argString.split(":")
+        versionString = args[0]
+        try:
+            self.limit = int(args[1])
+        except:
+            self.limit = 0
+        versions = versionString.split(",")
+        self.referenceVersion = versions[0]
+        self.currentVersion = None
+        if len(versions) > 1:
+            self.currentVersion = versions[1]
+    def setUpSuite(self, suite):
+        self.suiteName = suite.name + os.linesep + "   "
+    def __call__(self, test):
+        refMem = getTestMemory(test, self.referenceVersion)
+        currMem = getTestMemory(test, self.currentVersion)
+        pDiff = percentDiff(currMem, refMem)
+        if self.limit == 0 or pDiff > self.limit:
+            print self.suiteName + pad(test.name, 30) + "\t", refMem, currMem, "\t" + str(pDiff) + "%"
+            self.suiteName = "   "
+
+class FeasibilityStatisticsBuilder(plugins.Action):
+    def __init__(self, versionString):
+        versions = versionString.split(",")
+        self.referenceVersion = versions[0]
+        self.currentVersion = None
+        if len(versions) > 1:
+            self.currentVersion = versions[1]
+    def setUpSuite(self, suite):
+        self.suiteName = suite.name + os.linesep + "   "
+    def numInfeasibilities(self, test, version):
+        fileName = test.makeFileName("errors", version)
+        if not os.path.isfile(fileName):
+            return 0
+        grepCommand = "grep -E 'Solver fail' " + fileName
+        return len(os.popen(grepCommand).readlines())
+    def __call__(self, test):
+        refErrors = self.numInfeasibilities(test, self.referenceVersion)
+        currErrors = self.numInfeasibilities(test, self.currentVersion)
+        if refErrors + currErrors > 0:
+            print self.suiteName + pad(test.name, 30) + "\t", refErrors, currErrors
+            self.suiteName = "   "
+

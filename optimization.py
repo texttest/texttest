@@ -134,7 +134,12 @@ class OptimizationConfig(carmen.CarmenConfig):
             return None
         return carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
     def getVitalFiles(self, app):
-        return carmen.CarmenConfig.getVitalFiles(self, app) + [ os.path.join(os.environ["CARMSYS"], self.getLibraryFile(app)) ]
+        libFile = self.getLibraryFile(app)
+        baseFiles = carmen.CarmenConfig.getVitalFiles(self, app)
+        if libFile:
+            return baseFiles + [ os.path.join(os.environ["CARMSYS"], libFile) ]
+        else:
+            return baseFiles
     def getTestRunner(self):
         return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
     def getSpecificTestRunner(self):

@@ -6,7 +6,7 @@ Note though that the 'matador.ImportTest' script is not implemeted for Fleet yet
 helpOptions = """
 """
 
-import os, string, optimization, matador, plugins, shutil
+import os, string, carmen, optimization, matador, plugins, shutil
 
 def getConfig(optionMap):
     return FleetConfig(optionMap)
@@ -36,11 +36,8 @@ class FleetConfig(matador.MatadorConfig):
     def printHelpDescription(self):
         print helpDescription
         matador.MatadorConfig.printHelpDescription(self)
-    def getBinaryFile(self, test):
-        return os.path.join("bin", carmen.getArchitecture(test.app), "opt_tail")
-    def getLibraryFile(self, test):
-        # Don't try to use Matador's library file!
-        return None
+    def getBinaryFile(self, app):
+        return os.path.join("bin", carmen.getArchitecture(app), "opt_tail")
     def setUpApplication(self, app):
         matador.MatadorConfig.setUpApplication(self, app)
         self.itemNamesInFile[optimization.costEntryName] = "Optimizer cost"

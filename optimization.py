@@ -9,8 +9,7 @@ class OptimizationConfig(carmen.CarmenConfig):
 
         return carmen.CarmenConfig.getActionSequence(self)
     def getRuleBuilder(self, neededOnly):
-        batchSession = self.optionValue("b")
-        if batchSession == "nightjob" or batchSession == "wkendjob" or not neededOnly:
+        if self.isNightJob() or not neededOnly:
             return self.getCompileRules(None)
         else:
             localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())

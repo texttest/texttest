@@ -73,13 +73,17 @@ class CarmenConfig(lsf.LSFConfig):
             return architecture
         else:
             return "idle_" + architecture
+    def isNightJob(self):
+        batchSession = self.optionValue("b")
+        return batchSession == "nightjob" or batchSession == "wkendjob"
     def interpretVersion(self, app, versionString):
         defaultArch = app.getConfigValue("default_architecture")
         if architecture == defaultArch:
             return versionString
         else:
             supportedArchs = app.getConfigList("supported_architecture")
-            if len(supportedArchs) and not architecture in supportedArchs:
+            # In batch mode, don't throw exceptions. Let the Batch Filter deal with it
+            if len(supportedArchs) and not architecture in supportedArchs and not self.optionMap.has_key("b"):
                 raise "Unsupported architecture " + architecture + "!!!"
             else:
                 print "Non-default architecture: using version", architecture + versionString
@@ -101,6 +105,9 @@ class CompileRules(plugins.Action):
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName)
         if ruleset.isValid() and not ruleset.name in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name)
+            if not os.path.isdir(os.environ["CARMTMP"]):
+                print "CARMTMP", os.environ["CARMTMP"], "did not exist, attempting to create it"
+                os.mkdir(os.environ["CARMTMP"])
             ruleset.backup()
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
             commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile

@@ -19,7 +19,7 @@ class MakeComparisons(plugins.Action):
         postText +=  " (on " + string.join(attemptedComparisons, ",") + ")"
         self.describe(test, postText)
     def fileFinders(self, test):
-        defaultFinder = test.getTmpExtension(), ""
+        defaultFinder = test.app.name + test.getTmpExtension(), ""
         return [ defaultFinder ]
     def makeComparisons(self, test, tmpExt, subDirectory, comparisons, attemptedComparisons):
         dirPath = os.path.join(test.abspath, subDirectory)

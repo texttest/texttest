@@ -154,8 +154,12 @@ class CarmenConfig(lsf.LSFConfig):
         else:
             ruleRunner = default.RunTest()
         return [ self.getRuleBuildObject(ruleRunner), UpdateRulesetBuildStatus(self.getRuleSetName, self.getRulesetBuildJobName) ]
+    def getUserParentName(self, test):
+        if isUserSuite(test.parent):
+            return test.parent.name
+        return self.getUserParentName(test.parent)
     def getRulesetBuildJobName(self, test):
-        return getRaveName(test) + "." + test.parent.name + "." + self.getRuleSetName(test)
+        return getRaveName(test) + "." + self.getUserParentName(test) + "." + self.getRuleSetName(test)
     def getRuleBuildObject(self, ruleRunner):
         return CompileRules(self.getRuleSetName, self.getRulesetBuildJobName, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
     def buildRules(self):

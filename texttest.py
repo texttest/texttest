@@ -745,7 +745,7 @@ class OptionFinder:
     def _findApps(self, dirName, recursive):
         appList = []
         raisedError = 0
-        selectedAppList = self.findSelectedAppNames()
+        selectedAppDict = self.findSelectedAppNames()
         for f in os.listdir(dirName):
             pathname = os.path.join(dirName, f)
             if os.path.isfile(pathname):
@@ -753,9 +753,12 @@ class OptionFinder:
                 if len(components) != 2 or components[0] != "config":
                     continue
                 appName = components[1]
-                if len(selectedAppList) and not appName in selectedAppList:
+                if len(selectedAppDict) and not selectedAppDict.has_key(appName):
                     continue
+
                 versionList = self.findVersionList()
+                if selectedAppDict.has_key(appName):
+                    versionList = selectedAppDict[appName]
                 try:
                     for version in versionList:
                         appList += self.addApplications(appName, dirName, pathname, version)
@@ -763,6 +766,7 @@ class OptionFinder:
                     raise sys.exc_type, sys.exc_value
                 except:
                     print "Could not use application", appName, "-", sys.exc_value
+                    printException()
                     raisedError = 1
             elif os.path.isdir(pathname) and recursive:
                 subRaisedError, subApps = self._findApps(pathname, 0)
@@ -790,10 +794,25 @@ class OptionFinder:
         else:
             return [""]
     def findSelectedAppNames(self):
-        if self.inputOptions.has_key("a"):
-            return plugins.commasplit(self.inputOptions["a"])
+        if not self.inputOptions.has_key("a"):
+            return {}
+
+        apps = plugins.commasplit(self.inputOptions["a"])
+        appDict = {}
+        versionList = self.findVersionList()
+        for app in apps:
+            if "." in app:
+                appName, versionName = app.split(".", 1)
+                self.addToAppDict(appDict, appName, versionName)
+            else:
+                for version in versionList:
+                    self.addToAppDict(appDict, app, version)
+        return appDict
+    def addToAppDict(self, appDict, appName, versionName):
+        if appDict.has_key(appName):
+            appDict[appName].append(versionName)
         else:
-            return []
+            appDict[appName] = [ versionName ]
     def timesToRun(self):
         if self.inputOptions.has_key("m"):
             return int(self.inputOptions["m"])

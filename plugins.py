@@ -17,8 +17,6 @@ class Configuration:
         return binary + " " + test.options
     def getApplicationEnvironment(self, app):
         return [ ("TEXTTEST_CHECKOUT", app.checkout) ]
-    def hasPerformanceComparison(self, app):
-        return 0
     def keepTmpFiles(self):
         return 0
     def printHelpText(self):

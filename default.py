@@ -106,8 +106,6 @@ class Config(plugins.Configuration):
         return MakeMemoryFile()
     def getPerformanceFileMaker(self):
         return None
-    def hasPerformanceComparison(self, app):
-        return not self.optionMap.has_key("noperf") and len(app.getConfigValue("string_before_memory")) > 0
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getFailureExplainer(self):
@@ -157,8 +155,16 @@ class Config(plugins.Configuration):
             if os.path.isfile(fullPath):
                 return sys.executable + " " + fullPath + " -q"
         return None
+    def defaultSeverities(self):
+        severities = {}
+        severities["output"] = 1
+        severities["usecase"] = 2
+        severities["catalogue"] = 2
+        severities["memory"] = 3
+        return severities
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output")
+        app.setConfigDefault("failure_severity", self.defaultSeverities())
         app.setConfigDefault("diff_program", self.defaultGraphicalDiffTool())
         app.setConfigDefault("text_diff_program", self.defaultTextDiffTool())
         app.setConfigDefault("lines_of_text_difference", 30)

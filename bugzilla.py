@@ -2,6 +2,7 @@
 
 import plugins, os
 from ConfigParser import ConfigParser
+from predict import FailedPrediction
 
 class CheckForBugs(plugins.Action):
     def __init__(self):
@@ -23,7 +24,10 @@ class CheckForBugs(plugins.Action):
                 for line in open(fileName).xreadlines():
                     for trigger, bugNum in entryDict.items():
                         if trigger.matches(line):
-                            test.stateDetails.failedPrediction = os.popen("bugcli -b " + bugNum).read()
+                            fullBugText = os.popen("bugcli -b " + bugNum).read()
+                            test.stateDetails.failedPrediction = FailedPrediction("bug", fullBugText)
+                            # Make sure this is reflected in the GUI...
+                            test.notifyChanged()
         self.unreadBugs(test)
     def readBugs(self, suite):
         if not self.testBugParserMap.has_key(suite):

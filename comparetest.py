@@ -39,14 +39,9 @@ is interpreted as a test failure.
 
 import os, filecmp, string, plugins
 from ndict import seqdict
+from predict import FailedPrediction
 
 class TestComparison:
-    scoreTable = {}
-    scoreTable["difference"] = 2
-    scoreTable["faster"] = 1
-    scoreTable["slower"] = 1
-    scoreTable["larger"] = 0
-    scoreTable["smaller"] = 0
     def __init__(self, test):
         self.test = test
         self.allResults = []
@@ -54,7 +49,7 @@ class TestComparison:
         self.newResults = []
         self.correctResults = []
         self.failedPrediction = None
-        if test.state == test.FAILED:
+        if isinstance(test.stateDetails, FailedPrediction):
             self.failedPrediction = test.stateDetails
         self.diag = plugins.getDiagnostics("TestComparison")
     def __repr__(self):
@@ -70,25 +65,37 @@ class TestComparison:
         return len(self.changedResults) > 0
     def getType(self):
         if self.failedPrediction:
-            if self.failedPrediction.find("Stack trace") != -1:
-                return "crash"
-            elif self.failedPrediction.find("BugId") != -1:
-                return "bug"
-            else:
-                return "badPredict"
-        worstType = None
-        for result in self.changedResults:
-            type = result.getType()
-            if not worstType or self.isWorseThan(type, worstType):
-                worstType = type
-        if worstType:
-            return worstType
+            return self.failedPrediction.type
         else:
-            return self.newResults[0].getType()
+            return self.getMostSevereFileComparison().getType()
+    def getMostSevereFileComparison(self):
+        worstSeverity = None
+        worstResult = None
+        for result in self.changedResults:
+            severity = result.getSeverity()
+            if not worstSeverity or severity < worstSeverity:
+                worstSeverity = severity
+                worstResult = result
+        if worstResult:
+            return worstResult
+        else:
+            return self.newResults[0]
+        return worstResult
     def getTypeBreakdown(self):
-        return "failure", ""
-    def isWorseThan(self, type, worstType):
-        return self.scoreTable[type] > self.scoreTable[worstType]
+        if self.failedPrediction:
+            if self.failedPrediction.type == "crash":
+                return "failure", "CRASHED"
+            elif self.failedPrediction.type == "bug":
+                return "success", "known bug"
+            else:
+                return "failure", "internal error"
+        worstResult = self.getMostSevereFileComparison()
+        worstSeverity = worstResult.getSeverity()
+        self.diag.info("Severity " + str(worstSeverity) + " for failing test")
+        if worstSeverity == 1:
+            return "failure", worstResult.getSummary()
+        else:
+            return "success", worstResult.getSummary()
     def getComparisons(self):
         return self.changedResults + self.newResults
     def _comparisonsString(self, comparisons):
@@ -208,8 +215,8 @@ class FileComparison:
     def __init__(self, test, standardFile, tmpFile, makeNew = 0):
         self.stdFile = standardFile
         self.tmpFile = tmpFile
-        stem = os.path.basename(tmpFile).split('.')[0]
-        filter = RunDependentTextFilter(test.app, stem)
+        self.stem = os.path.basename(tmpFile).split('.')[0]
+        filter = RunDependentTextFilter(test.app, self.stem)
         self.stdCmpFile = filter.filterFile(standardFile, tmpFile + "origcmp")
         tmpCmpFileName = tmpFile + "cmp"
         if makeNew:
@@ -224,6 +231,17 @@ class FileComparison:
         return 0
     def getType(self):
         return "difference"
+    def getSummary(self):
+        if self.newResult():
+            return "new files"
+        else:
+            return self.stem + " different"
+    def getSeverity(self):
+        dict = self.test.getConfigValue("failure_severity")
+        if dict.has_key(self.stem):
+            return dict[self.stem]
+        else:
+            return 99
     def newResult(self):
         return not os.path.exists(self.stdFile)
     def hasDifferences(self):

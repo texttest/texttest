@@ -34,8 +34,6 @@ class UNIXConfig(default.Config):
         return self.batchMode()
     def getTestCollator(self):
         return CollateUNIXFiles()
-    def hasPerformanceComparison(self, app):
-        return default.Config.hasPerformanceComparison(self, app) or len(app.getConfigValue("performance_test_machine")) > 0
     def getPerformanceFileMaker(self):
         return MakePerformanceFile()
     def getTestRunner(self):
@@ -52,6 +50,11 @@ class UNIXConfig(default.Config):
         return "tkdiff"
     def defaultTextDiffTool(self):
         return "diff"
+    def defaultSeverities(self):
+        severities = default.Config.defaultSeverities(self)
+        severities["errors"] = 1
+        severities["performance"] = 2
+        return severities
     def printHelpDescription(self):
         print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
     def printHelpScripts(self):

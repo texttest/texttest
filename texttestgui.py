@@ -43,7 +43,6 @@ class TextTestGUI:
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic
-        self.performanceColumn = 0
         self.itermap = seqdict()
         self.actionThread = None
         self.topWindow = None
@@ -77,8 +76,8 @@ class TextTestGUI:
         return (gtk.gdk.screen_height() * 5) / 6
     def getWindowWidth(self):
         screenWidth = gtk.gdk.screen_width()
-        if self.performanceColumn:
-            return (screenWidth * 5) / 11
+        if self.dynamic:
+            return (screenWidth) / 2
         else:
             return (screenWidth * 2) / 5
     def createIterMap(self):
@@ -115,8 +114,6 @@ class TextTestGUI:
             scriptEngine.enableShortcuts = 1
         if not self.dynamic:
             self.addApplication(suite.app)
-        if self.dynamic and suite.app.hasPerformanceComparison():
-            self.performanceColumn = 1
         self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
         iter = self.model.insert_before(parent, None)
@@ -139,17 +136,14 @@ class TextTestGUI:
         try:
             return test.stateDetails.getTypeBreakdown()
         except AttributeError:
-            return "failure", "success"
+            return "failure", "UNRUNNABLE"
     def updateStateInModel(self, test, iter, state = None):
         colours = test.getConfigValue("test_colours")
         if not self.dynamic:
             return self.modelUpdate(iter, colours["static"])
         if state == test.FAILED or state == test.UNRUNNABLE:
-            behaviourType, performanceType = self.getTypeBreakdown(test)
-            if performanceType == "success":
-                return self.modelUpdate(iter, colours[behaviourType])
-            else:
-                return self.modelUpdate(iter, colours[behaviourType], performanceType, colours["failure"])
+            resultType, summary = self.getTypeBreakdown(test)
+            return self.modelUpdate(iter, colours[resultType], summary, colours["failure"])
         if state == test.SUCCEEDED:
             return self.modelUpdate(iter, colours["success"])
         if state == test.RUNNING:
@@ -161,7 +155,7 @@ class TextTestGUI:
         if not colour2:
             colour2 = colour
         self.model.set_value(iter, 1, colour)
-        if self.performanceColumn:
+        if self.dynamic:
             self.model.set_value(iter, 4, details)
             self.model.set_value(iter, 5, colour2)
     def createWindowContents(self, testWins):
@@ -203,8 +197,8 @@ class TextTestGUI:
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Test Behaviour", renderer, text=0, background=1)
         view.append_column(column)
-        if self.performanceColumn:
-            perfColumn = gtk.TreeViewColumn("Performance", renderer, text=4, background=5)
+        if self.dynamic:
+            perfColumn = gtk.TreeViewColumn("Details", renderer, text=4, background=5)
             view.append_column(perfColumn)
         view.expand_all()
         if not self.dynamic:
@@ -286,8 +280,9 @@ class TextTestGUI:
         iter = self.itermap[test]
         self.updateStateInModel(test, iter, state)
         guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
-        if self.performanceColumn:
-            guilog.info("(Second column '" + self.model.get_value(iter, 4) + "' coloured " + self.model.get_value(iter, 5) + ")")
+        secondColumnText = self.model.get_value(iter, 4)
+        if self.dynamic and secondColumnText:
+            guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 5) + ")")
     def redrawSuite(self, suite):
         if suite.size() == 0:
             return
@@ -660,7 +655,7 @@ class TestCaseGUI(RightWindowGUI):
         elif test.state == test.FAILED:
             try:
                 if test.stateDetails.failedPrediction:
-                    return test.stateDetails.failedPrediction
+                    return repr(test.stateDetails.failedPrediction)
             except AttributeError:
                 return test.stateDetails
         elif test.state != test.SUCCEEDED and test.stateDetails:

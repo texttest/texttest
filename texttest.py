@@ -481,11 +481,6 @@ class ConfigurationWrapper:
             return self.target.setApplicationDefaults(app)
         except:
             self.raiseException(req = "set defaults")
-    def hasPerformanceComparison(self, app):
-        try:
-            return self.target.hasPerformanceComparison(app)
-        except:
-            self.raiseException(req = "perf comparison")
     def addToOptionGroup(self, group):
         try:
             return self.target.addToOptionGroup(group)
@@ -678,8 +673,6 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
-    def hasPerformanceComparison(self):
-        return self.configObject.hasPerformanceComparison(self)
     def createTestSuite(self, filters = None):
         if not filters:
             filters = self.configObject.getFilterList()
@@ -806,6 +799,8 @@ class Application:
                     newDict[key] = os.path.expandvars(val)
                 elif type(val) == types.ListType:
                     newDict[key] = map(os.path.expandvars, val)
+                else:
+                    newDict[key] = val
             return newDict
         else:
             return value
@@ -1059,15 +1054,23 @@ class MultiEntryDictionary(seqdict):
                 self.currDict[entryName] = []
         elif not entryExists:
             if insert or not self.currDict is self:
-                val = self.currDict.values()
-                if len(val) == 0 or type(val[0]) != types.ListType:
-                    self.currDict[entryName] = entry
-                else:
+                dictValType = self.getDictionaryValueType()
+                if dictValType == types.ListType:
                     self.currDict[entryName] = [ entry ]
+                elif dictValType == types.IntType:
+                    self.currDict[entryName] = int(entry)
+                else:
+                    self.currDict[entryName] = entry
             elif errorOnUnknown:
                 print "ERROR : config entry name '" + entryName + "' not recognised"
         else:
             self.insertEntry(entryName, entry)
+    def getDictionaryValueType(self):
+        val = self.currDict.values()
+        if len(val) == 0:
+            return types.StringType
+        else:
+            return type(val[0])
     def insertEntry(self, entryName, entry):
         currType = type(self.currDict[entryName]) 
         if currType == types.ListType:

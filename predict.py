@@ -18,6 +18,13 @@ helpScripts = """predict.PredictionStatistics
 
 import os, filecmp, string, plugins, copy
 
+class FailedPrediction:
+    def __init__(self, type, fullText):
+        self.type = type
+        self.fullText = fullText
+    def __repr__(self):
+        return self.fullText
+
 class CheckLogFilePredictions(plugins.Action):
     def __init__(self, version = None):
         self.logFile = None
@@ -29,8 +36,8 @@ class CheckLogFilePredictions(plugins.Action):
             if not os.path.isfile(logFile):
                 return None
         return logFile
-    def insertError(self, test, error):
-        test.changeState(test.FAILED, error)
+    def insertError(self, test, errType, error):
+        test.changeState(test.state, FailedPrediction(errType, error))
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")   
 
@@ -48,7 +55,7 @@ class CheckPredictions(CheckLogFilePredictions):
         stackTraceFile = test.makeFileName("stacktrace", temporary=1)
         if os.path.isfile(stackTraceFile):
             errorInfo = open(stackTraceFile).read()
-            self.insertError(test, errorInfo)
+            self.insertError(test, "crash", errorInfo)
             os.remove(stackTraceFile)
             return 1
         
@@ -60,7 +67,7 @@ class CheckPredictions(CheckLogFilePredictions):
         errorsFound += self.extractErrorsFrom(test, "errors", compsNotFound)
         errorsFound += len(compsNotFound)
         for comp in compsNotFound:
-            self.insertError(test, "ERROR : Compulsory message missing (" + comp + ")")
+            self.insertError(test, "badPredict", "ERROR : Compulsory message missing (" + comp + ")")
         return errorsFound
     def extractErrorsFrom(self, test, fileStem, compsNotFound):
         errorsFound = 0
@@ -71,7 +78,7 @@ class CheckPredictions(CheckLogFilePredictions):
             for error in self.internalErrorList:
                 if line.find(error) != -1:
                     errorsFound += 1
-                    self.insertError(test, "Internal ERROR (" + error + ")")
+                    self.insertError(test, "badPredict", "Internal ERROR (" + error + ")")
             for comp in compsNotFound:
                 if line.find(comp) != -1:
                     compsNotFound.remove(comp)

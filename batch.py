@@ -124,7 +124,7 @@ class BatchResponder(respond.Responder):
     def handleFailure(self, test, testComparison):
         category = testComparison.getType()
         if category == "crash":
-            self.crashDetail[test] = testComparison.failedPrediction
+            self.crashDetail[test] = repr(testComparison.failedPrediction)
             self.addTestToCategory(category, test)
         else:
             self.failureDetail[test] = testComparison
@@ -132,9 +132,12 @@ class BatchResponder(respond.Responder):
             self.addTestToCategory(category, test, summary)
     def getSummary(self, category, description):
         if category != "bug":
-            return category, description
+            if description:
+                return category, repr(description)
+            else:
+                return category, ""
         else:
-            bugId, status = self.parseBugDescription(description)
+            bugId, status = self.parseBugDescription(repr(description))
             newDesc = "(" + status + " bug " + bugId + ")"
             if status == "RESOLVED" or status == "CLOSED":
                 return "badPredict", newDesc

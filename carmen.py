@@ -149,6 +149,7 @@ def getRaveName(test):
 class CompileRules(plugins.Action):
     def __init__(self, getRuleSetName, modeString = "-optimize", filter = None):
         self.rulesCompiled = []
+        self.rulesCompileFailed = []
         self.raveName = None
         self.getRuleSetName = getRuleSetName
         self.modeString = modeString
@@ -157,6 +158,8 @@ class CompileRules(plugins.Action):
         return "Compiling rules for"
     def __call__(self, test):
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName)
+        if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
+            raise EnvironmentError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
         if ruleset.isValid() and not ruleset.name in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name)
             if not os.path.isdir(os.environ["CARMTMP"]):
@@ -166,9 +169,15 @@ class CompileRules(plugins.Action):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
             commandLine = compiler + " -" + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile
             self.rulesCompiled.append(ruleset.name)
-            returnValue = os.system(commandLine)
+            compTmp = test.getTmpFileName("ravecompile", "w")
+            returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
             if returnValue:
-                raise EnvironmentError, "Failed to build ruleset " + ruleset.name
+                self.rulesCompileFailed.append(ruleset.name)
+                errContents = string.join(open(compTmp).readlines(),"")
+                os.remove(compTmp)
+                print "Failed to build ruleset " + ruleset.name + os.linesep + errContents
+                raise EnvironmentError, "Failed to build ruleset " + ruleset.name + os.linesep + errContents
+            os.remove(compTmp)
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
     def setUpSuite(self, suite):

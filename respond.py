@@ -34,6 +34,13 @@ class Responder(plugins.Action):
         testComparison = comparetest.testComparisonMap[test]
         diffText = " differences in " + self.comparisonsString(testComparison.comparisons)
         return repr(testComparison) + diffText
+    def processUnRunnable(self, test):
+        print test.getIndent() + repr(test), "Failed: ", str(test.deathReason).split(os.linesep)[0]
+        self.handleDead(test)
+    def handleDead(self, test):
+        pass
+    def __repr__(self):
+        return "Responding to"
 
 # Uses the python ndiff library, which should work anywhere. Override display method to use other things
 class InteractiveResponder(Responder):

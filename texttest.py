@@ -87,6 +87,8 @@ class Test:
 class TestCase(Test):
     def __init__(self, name, abspath, app):
         Test.__init__(self, name, abspath, app)
+        self.isDead = 0
+        self.deathReason = None
         self.inputFile = self.makeFileName("input")
         optionsFile = self.makeFileName("options")
         self.options = ""
@@ -100,7 +102,14 @@ class TestCase(Test):
         return os.path.isfile(self.inputFile) or len(self.options) > 0
     def callAction(self, action):
         os.chdir(self.abspath)
-        action(self)
+        try:
+            if self.isDead:
+                action.processUnRunnable(self)
+            else:
+                action(self)
+        except (EnvironmentError), e:
+            self.isDead = 1
+            self.deathReason = e
     def performOnSubTests(self, action):
         pass
     def getExecuteCommand(self):

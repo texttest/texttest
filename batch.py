@@ -97,6 +97,7 @@ class BatchResponder(respond.Responder):
         self.sessionName = sessionName
         self.failureDetail = {}
         self.crashDetail = {}
+        self.deadDetail = {}
         self.categories = {}
         self.categories["crash"] = BatchCategory("CRASHED")
         self.categories["difference"] = BatchCategory("FAILED")
@@ -115,9 +116,11 @@ class BatchResponder(respond.Responder):
         mailFile = self.createMail(self.getMailTitle(), self.mainSuite.app)
         for categoryName in self.orderedCategories:
             self.categories[categoryName].describe(mailFile)
+        if len(self.deadDetail) > 0:
+            self.writeDeadDetail(mailFile)
         if len(self.crashDetail) > 0:
             self.writeCrashDetail(mailFile)
-        if self.failureCount() > 0:
+        if len(self.failureDetail) > 0:
             self.writeFailureDetail(mailFile)
         mailFile.close()
     def createMail(self, title, app):
@@ -159,18 +162,20 @@ class BatchResponder(respond.Responder):
     def handleCoreFile(self, test):
         crashText = self.responder.getCrashText(test)
         self.crashDetail[test] = crashText
+    def handleDead(self, test):
+        self.deadDetail[test] = test.deathReason
     def setUpSuite(self, suite):
         if self.mainSuite == None:
             self.mainSuite = suite
         for category in self.categories.values():
             category.addSuite(suite)
     def failureCount(self):
-        return len(self.failureDetail) + len(self.crashDetail)
+        return len(self.failureDetail) + len(self.crashDetail) + len(self.deadDetail)
     def testCount(self):
         count = 0
         for category in self.categories.values():
             count += category.count
-        return count
+        return count + len(self.deadDetail)
     def getMailHeader(self, app):
         versionString = ""
         if len(app.versions) == 1:
@@ -186,8 +191,16 @@ class BatchResponder(respond.Responder):
         title += " :"
         for categoryName in self.orderedCategories:
             title += self.categories[categoryName].briefText()
+        if len(self.deadDetail) > 0:
+            title += " " + str(len(self.deadDetail)) + " caused exception,"
         # Lose trailing comma
         return title[:-1]
+    def writeDeadDetail(self, mailFile):
+        mailFile.write(os.linesep + "Exception information for the tests that did not run follows..." + os.linesep)
+        for test, exc in self.deadDetail.items():
+            mailFile.write("--------------------------------------------------------" + os.linesep)
+            mailFile.write("TEST UNRUNNABLE -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
+            mailFile.write(str(exc) + os.linesep)
     def writeCrashDetail(self, mailFile):
         mailFile.write(os.linesep + "Crash information for the tests that crashed follows..." + os.linesep)
         for test, stackTrace in self.crashDetail.items():

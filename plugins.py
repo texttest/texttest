@@ -37,6 +37,8 @@ class Action:
         pass
     def getFilter(self):
         return None
+    def processUnRunnable(self, test):
+        pass
     def getCleanUpAction(self):
         return None
     # Useful for printing in a certain format...
@@ -60,6 +62,9 @@ class CompositeAction(Action):
     def setUpApplication(self, app):
         for subAction in self.subActions:
             subAction.setUpApplication(app)
+    def processUnRunnable(self, test):
+        for subAction in self.subActions:
+            subAction.processUnRunnable(test)
     def getCleanUpAction(self):
         cleanUpSubActions = []
         for subAction in self.subActions:

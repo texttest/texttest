@@ -203,7 +203,11 @@ class Application:
             debugPrint("No filter for " + fileName)
             return fileName
 
-        newFileName = fileName + "cmp"
+        if fileName.find(globalRunIdentifier) != -1:
+            newFileName = fileName + "cmp"
+        else:
+            newFileName = fileName + ".original." + globalRunIdentifier + "cmp"
+        
         oldFile = open(fileName)
         newFile = open(newFileName, "w")
         forbiddenText = self.getConfigList(stem)

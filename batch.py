@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import os, performance, plugins, respond
+import os, performance, plugins, respond, sys
 
 class BatchFilter(plugins.Filter):
     def __init__(self, batchSession):
@@ -93,13 +93,7 @@ class BatchResponder(respond.Responder):
         if self.testCount() > 0:
             self.sendMail()
     def sendMail(self):
-        mailFile = os.popen("sendmail -t", "w")
-        fromAddress = os.environ["USER"]
-        toAddress = self.getRecipient(fromAddress)
-        mailFile.write("From: " + fromAddress + os.linesep)
-        mailFile.write("To: " + toAddress + os.linesep)
-        mailFile.write("Subject: " + self.getMailTitle() + os.linesep)
-        mailFile.write(os.linesep) # blank line separating headers from body
+        mailFile = self.createMail(self.getMailTitle())
         for categoryName in self.orderedCategories:
             self.categories[categoryName].describe(mailFile)
         if len(self.crashDetail) > 0:
@@ -107,6 +101,15 @@ class BatchResponder(respond.Responder):
         if self.failureCount() > 0:
             self.writeFailureDetail(mailFile)
         mailFile.close()
+    def createMail(self, title):
+        mailFile = os.popen("sendmail -t", "w")
+        fromAddress = os.environ["USER"]
+        toAddress = self.getRecipient(fromAddress)
+        mailFile.write("From: " + fromAddress + os.linesep)
+        mailFile.write("To: " + toAddress + os.linesep)
+        mailFile.write("Subject: " + title + os.linesep)
+        mailFile.write(os.linesep) # blank line separating headers from body
+        return mailFile
     def getRecipient(self, fromAddress):
         # See if the session name has an entry, if not, send to the user
         try:
@@ -149,8 +152,13 @@ class BatchResponder(respond.Responder):
         for category in self.categories.values():
             count += category.count
         return count
+    def getMailHeader(self, app):
+        versionString = ""
+        if app.version != "":
+            versionString = "(version " + app.version + ") "
+        return repr(app) + " Test Suite " + versionString + ": "
     def getMailTitle(self):
-        title = repr(self.mainSuite.app) + " Test Suite (" + self.mainSuite.name + " in " + self.mainSuite.app.checkout + ") : "
+        title = self.getMailHeader(self.mainSuite.app)
         title += str(self.testCount()) + " tests ran"
         if self.failureCount() == 0:
             return title + ", all successful"
@@ -172,4 +180,21 @@ class BatchResponder(respond.Responder):
             mailFile.write("TEST FAILED -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             os.chdir(test.abspath)
             self.responder.displayComparisons(comparisons, mailFile, self.mainSuite.app)
+    def getCleanUpAction(self):
+        return SendException(self) 
+
+class SendException(plugins.Action):
+    def __init__(self, batchResponder):
+        self.batchResponder = batchResponder
+    def setUpApplication(self, app):
+        type, value, traceback = sys.exc_info()
+        excData = str(value)
+        if len(excData) == 0:
+            excData = "caught exception " + str(type)
+        mailTitle = self.batchResponder.getMailHeader(app) + "did not run : " + excData
+        mailFile = self.batchResponder.createMail(mailTitle)
+        sys.stderr = mailFile
+        sys.excepthook(type, value, traceback)
+        sys.stderr = sys.__stderr__
+        mailFile.close()
         

@@ -33,7 +33,7 @@ class Test:
         for var, value in self.environment.items():
             if value.find("/") != -1:
                 varValue = os.path.expandvars(value)
-                os.environ[var] = self.app.makeAbsPath(os.path.normpath(varValue))
+                os.environ[var] = self.app.makeAbsPath(varValue)
             else:
                 os.environ[var] = value
             # Ensure multiple expansion doesn't occur

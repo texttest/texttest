@@ -79,6 +79,7 @@ def movefile(sourcePath, targetFile):
     try:
         # This generally fails due to cross-device link problems
         os.rename(sourcePath, targetFile)
+        os.utime(targetFile, None)
     except:
         shutil.copyfile(sourcePath, targetFile)
         os.remove(sourcePath)

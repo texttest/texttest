@@ -223,6 +223,8 @@ class MailSender(plugins.Action):
         if len(appResponders) == 0:
             self.diag.info("No responders for " + repr(app))
             return
+        sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + repr(app) + " ...")
+        sys.stdout.flush()
         mailTitle = self.getMailTitle(app, appResponders)
         mailFile = self.createMail(mailTitle, app, appResponders)
         if len(appResponders) > 1:
@@ -239,6 +241,7 @@ class MailSender(plugins.Action):
         mailFile.close()
         for responder in appResponders:
             allBatchResponders.remove(responder)
+        sys.stdout.write("done." + os.linesep)
     def createMail(self, title, app, appResponders):
         fromAddress = os.environ["USER"]
         toAddress = self.getRecipient(app)

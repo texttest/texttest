@@ -43,6 +43,13 @@ import default, carmen, lsf, performance, os, sys, stat, string, shutil, optimiz
 def getConfig(optionMap):
     return ApcConfig(optionMap)
 
+def getApcHostTmp():
+    configFile = os.path.join(os.environ["CARMSYS"],"CONFIG")
+    resLine = os.popen("source " + configFile + "; echo ${APC_TEMP_DIR}").readlines()[-1].strip()
+    if resLine.find("/") != -1:
+        return resLine
+    return "/tmp"
+
 class ApcConfig(optimization.OptimizationConfig):
     def __init__(self, optionMap):
         optimization.OptimizationConfig.__init__(self, optionMap)
@@ -107,8 +114,9 @@ class SubmitApcTest(lsf.SubmitTest):
         inputFileName = test.getInputFileName()
         if os.path.isfile(inputFileName):
             testCommand = testCommand + " < " + inputFileName
+        outfile = test.getTmpFileName("output", "w")
         errfile = test.getTmpFileName("errors", "w")
-        return testCommand + " 2> " + errfile
+        return testCommand + " | tee " + outfile + " 2> " + errfile
 
 class ApcSubPlanDirManager(optimization.SubPlanDirManager):
     def __init__(self, config):
@@ -262,7 +270,8 @@ class FetchApcCore(plugins.Action):
             self.describe(test, " from " + machine)
             binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.architecture)
             binCmd = "echo ' " + binName +  "' >> core"
-            cmdLine = "cd /tmp/*" + testDirEnd + "_*;" + binCmd + ";compress -c core > " + coreFileName
+            apcHostTmp = getApcHostTmp()
+            cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*;" + binCmd + ";compress -c core > " + coreFileName
             os.system("rsh " + machine + " '" + cmdLine + "'")
             if self.config.keepTemporarySubplans() and self.config.subplanManager.tmpDirs.has_key(test):
                 tmpDir = self.config.subplanManager.tmpDirs[test]
@@ -270,9 +279,9 @@ class FetchApcCore(plugins.Action):
                     tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
                     if os.path.isfile(tgzFile):
                         os.remove(tgzFile)
-                    cmdLine = "cd /tmp/*" + testDirEnd + "_*; tar cf - . | gzip -c > " + tgzFile
+                    cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; tar cf - . | gzip -c > " + tgzFile
                     os.system("rsh " + machine + " '" + cmdLine + "'")
-            cmdLine = "rm -rf /tmp/*" + testDirEnd + "_*"
+            cmdLine = "rm -rf " + apcHostTmp + "/*" + testDirEnd + "_*"
             os.system("rsh " + machine + " '" + cmdLine + "'")
     def __repr__(self):
         return "Fetching core for"
@@ -608,8 +617,8 @@ class GrepApcLog(plugins.Action):
         grepLines = os.popen(grepCommand).readlines()
         if len(grepLines) > 0:
             machine = grepLines[0].split()[-1]
-            Command = "rsh " + machine + " 'cd /tmp/*" + test.name + "*; egrep \"" + self.grepwhat + "\" apclog'" 
-            grepLines = os.popen(Command).read()
+            cmdLine = "cd " + getApcHostTmp() + "/*" + test.name + "*; egrep \"" + self.grepwhat + "\" apclog"
+            grepLines = os.popen("rsh " + machine + " '" + cmdLine + "'").read()
             print grepLines
 
 class UpdateCvsIgnore(plugins.Action):

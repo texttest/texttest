@@ -311,7 +311,13 @@ def findAllProcesses(pid):
     if os.name != "posix":
         return [ pid ]
     processes = []
-    for line in os.popen("ps -efl | grep " + str(pid)).xreadlines():
+    stdin, stdout, stderr = os.popen3("ps -efl | grep " + str(pid))
+    errMsg = stderr.read()
+    outLines = stdout.readlines()
+    if len(errMsg) > 0 and len(outLines) == 0:
+        return findAllProcesses(pid)
+    
+    for line in outLines:
         entries = line.split()
         if entries[3] == str(pid):
             processes.insert(0, pid)

@@ -29,7 +29,10 @@ builtInOptions = """
 
 -help      - Do not run anything. Instead, generate useful text, such as this.
 
--x         - debug the framework (produces lots of output)
+-x         - Enable log4py diagnostics for the framework. This will use a diagnostic directory from the environment
+             variable TEXTTEST_DIAGNOSTICS, if defined, or the directory <root>/Diagnostics/ if not. It will read
+             the log4py configuration file present in that directory and write all diagnostic files there as well.
+             More details can be had from the log4py documentation.
 """
 
 # Base class for TestCase and TestSuite

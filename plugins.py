@@ -39,6 +39,8 @@ class Filter:
 
 # Generic action to be performed: all actions need to provide these methods
 class Action:
+    RETRY = 1
+    WAIT = 2
     def __call__(self, test):
         pass
     def setUpSuite(self, suite):

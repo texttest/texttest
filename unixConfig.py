@@ -93,12 +93,12 @@ class RunTest(default.RunTest):
                 self.process = None
                 return
             else:
-                return "retry"
+                return self.RETRY
 
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
         self.process = plugins.BackgroundProcess(testCommand, testRun=1)
-        return "retry"
+        return self.RETRY
     def getExecuteCommand(self, test):
         testCommand = default.RunTest.getExecuteCommand(self, test)
         if self.collectStdErr:

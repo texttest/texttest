@@ -323,7 +323,7 @@ class CompileRules(plugins.Action):
         return "Compiling rules for"
     def __call__(self, test):
         if self.raveName and (not self.filter or self.filter.acceptsTestCase(test)):
-            self.compileRulesForTest(test)
+            return self.compileRulesForTest(test)
     def compileRulesForTest(self, test):
         arch = getArchitecture(test.app)
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
@@ -331,12 +331,13 @@ class CompileRules(plugins.Action):
             return
         if ruleset.name in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name + " already being compiled")
-            return test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + ruleset.name)
-        
+            test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + ruleset.name)
+            return
         self.describe(test, " - ruleset " + ruleset.name)
         self.ensureCarmTmpDirExists()
         ruleset.backup()
         self.rulesCompiled.append(ruleset.name)
+        retStatus = None
         if ruleset.precompiled:
             shutil.copyfile(ruleset.precompiled, ruleset.targetFile)
         else:
@@ -348,9 +349,10 @@ class CompileRules(plugins.Action):
                 extra = "-"
             commandLine = compiler + " " + extra + self.raveName + " " + self.getModeString() \
                           + " -archs " + arch + " " + ruleset.sourceFile
-            self.performCompile(test, commandLine)
+            retStatus = self.performCompile(test, commandLine)
         if self.getModeString() == "-debug":
             ruleset.moveDebugVersion()
+        return retStatus
     def getModeString(self):
         if os.environ.has_key("TEXTTEST_RAVE_MODE"):
             return self.modeString + " " + os.environ["TEXTTEST_RAVE_MODE"]
@@ -374,16 +376,16 @@ class CompileRules(plugins.Action):
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
         test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + self.getRuleSetName(test))
         if self.ruleRunner:
-            self.ruleRunner.runCommand(test, fullCommand, self.getRuleSetName)
-        else:
-            returnValue = os.system(fullCommand)
-            if returnValue:
-                errContents = string.join(open(compTmp).readlines(),"")
-                if errContents.find("already being compiled by") != -1:
-                    print test.getIndent() + "Waiting for other compilation to finish..."
-                    time.sleep(30)
-                    os.remove(compTmp)
-                    self.performCompile(test, commandLine)
+            return self.ruleRunner.runCommand(test, fullCommand, self.getRuleSetName)
+        
+        returnValue = os.system(fullCommand)
+        if returnValue:
+            errContents = string.join(open(compTmp).readlines(),"")
+            if errContents.find("already being compiled by") != -1:
+                print test.getIndent() + "Waiting for other compilation to finish..."
+                time.sleep(30)
+                os.remove(compTmp)
+                self.performCompile(test, commandLine)
     def setUpSuite(self, suite):
         if self.filter and not self.filter.acceptsTestSuite(suite):
             self.raveName = None
@@ -422,7 +424,7 @@ class EvaluateRuleBuild(plugins.Action):
     def checkForPreviousFailure(self, test):
         ruleset = self.getRuleSetName(test)
         if not self.rulesCompiled.has_key(ruleset):
-            return "wait"
+            return self.WAIT | self.RETRY
         if self.rulesCompiled[ruleset] == 0:
             raise plugins.TextTestError, "Trying to use ruleset '" + ruleset + "' that failed to build."
         else:

@@ -235,7 +235,7 @@ class SubmitTest(unixConfig.RunTest):
         lsfOptions = ""
         if os.environ.has_key("LSF_PROCESSES"):
             lsfOptions += " -n " + os.environ["LSF_PROCESSES"]
-        self.runCommand(test, testCommand, None, lsfOptions)
+        return self.runCommand(test, testCommand, None, lsfOptions)
     def runCommand(self, test, command, jobNameFunction = None, commandLsfOptions = ""):
         self.describe(test, jobNameFunction)
         
@@ -255,6 +255,7 @@ class SubmitTest(unixConfig.RunTest):
         errorMessage = stderr.readline()
         if errorMessage and errorMessage.find("still trying") == -1:
             raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
+        return self.WAIT
     def describe(self, test, jobNameFunction = None):
         queueToUse = self.queueFunction(test)
         if jobNameFunction:
@@ -346,7 +347,7 @@ class UpdateLSFStatus(plugins.Action):
             job.kill()
             test.changeState(test.KILLED, "Killed by LSF emergency finish")
             return
-        return "wait"
+        return self.WAIT | self.RETRY
     def getRunningInformation(self, test, status, machine):
         pass
 

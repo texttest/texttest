@@ -405,7 +405,7 @@ class ApcUpdateLSFStatus(plugins.Action):
             details += "Current LSF status = " + status + os.linesep
             details += self.showRunStatusHead(test)
             test.changeState(test.RUNNING, details)
-        return "wait"
+        return self.WAIT | self.RETRY
     def showRunStatusHead(self, test):
          subplanDir = test.writeDirs[-1];
          runStatusHeadFile = os.path.join(subplanDir, "run_status_head")

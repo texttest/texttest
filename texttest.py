@@ -1055,22 +1055,38 @@ class TestRunner:
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
             for suite in setUpSuites:
                 self.handleExceptions(self.appRunner.setUpSuite, action, suite)
-            completed = self.performAction(action, runToCompletion)
-            self.diag.info("<-End Performing action " + str(action) + " returned " + str(completed))
+            completed, tryOthersNow = self.performAction(action, runToCompletion)
+            self.diag.info("<-End Performing action " + str(action) + self.returnString(completed, tryOthersNow))
             if completed:
                 self.actionSequence.pop(0)
-            else:
+            if tryOthersNow:
                 return 0
         return 1
+    def returnString(self, completed, tryOthersNow):
+        retString = " - "
+        if completed:
+            retString += "COMPLETE"
+        else:
+            retString += "RETRY"
+        if tryOthersNow:
+            retString += ", CHANGE TEST"
+        else:
+            retString += ", CONTINUE"
+        return retString
     def performAction(self, action, runToCompletion):
         while 1:
             if self.interrupted:
                 raise KeyboardInterrupt, "Interrupted externally"
             retValue = self.handleExceptions(self.test.performAction, action)
-            if retValue != "wait" and retValue != "retry":
-                return 1
-            if retValue == "wait" and not runToCompletion:
-                return 0
+            if not retValue:
+                # No return value: we've finished and should proceed
+                return 1, 0
+
+            completed = not retValue & plugins.Action.RETRY
+            tryOthers = retValue & plugins.Action.WAIT and not runToCompletion
+            if completed or tryOthers:
+                # Don't attempt to retry the action, mark complete
+                return completed, tryOthers 
             # Don't busy-wait
             time.sleep(0.1)
     def performCleanUpActions(self):

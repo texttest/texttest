@@ -278,7 +278,9 @@ class ReconnectTest(plugins.Action):
             if os.path.isdir(fullPath) and subDir.startswith(pattern):
                 for file in os.listdir(fullPath):
                     if not file.endswith("cmp"):
-                        shutil.copyfile(os.path.join(fullPath, file), os.path.join(os.getcwd(), file))
+                        fullFilePath = os.path.join(fullPath, file)
+                        if os.path.isfile(fullFilePath):
+                            shutil.copyfile(fullFilePath, os.path.join(os.getcwd(), file))
                 break
     def setUpSuite(self, suite):
         self.describe(suite)

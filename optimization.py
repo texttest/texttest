@@ -903,7 +903,7 @@ class PlotTest(plugins.Action):
                     counter = counter + 1
             # Choose point type.
             self.testPointType = {}
-            counter = 0
+            counter = 1
             for file in self.plotFiles:
                 name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
                 if not self.testPointType.has_key(name):

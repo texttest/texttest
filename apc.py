@@ -252,6 +252,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.sumRefTime = 0
         self.qualKPI = 1.0
         self.qualKPICount = 0
+        self.lastKPITime = 0
     def __del__(self):
         for groupName in self.finalCostsInGroup.keys():
             fcTupleList = self.finalCostsInGroup[groupName]
@@ -265,7 +266,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         print os.linesep
         if self.sumRefTime > 0:
             speedKPI = 1.0 * self.sumCurTime / self.sumRefTime
-            wText = "PS1 (average time to cost ratio) with respect to version"
+            wText = "PS1 (sum of time to cost, ratio) with respect to version"
             print wText, self.referenceVersion, "=", self.percent(speedKPI)
         if self.qualKPICount > 0:
             avg = math.pow(self.qualKPI, 1.0 / float(self.qualKPICount))
@@ -275,8 +276,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         optimization.MakeProgressReport.__del__(self)
         if len(self.weightKPI) > 1:
             # The weighted KPI is prodsum(KPIx * Tx / Tmin) ^ (1 / sum(Tx/Tmin))
-            # Tx is the average of the 'time to worst cost' for a specific test case, ie
-            # Tx = (curTTWC + refTTWC) / 2
+            # Tx is the average of the 'total time' for a specific test case, ie
+            # Tx = (curTotalTime + refTotalTime) / 2
             #
             sumKPI = 1.0
             sumTimeParts = 0.0
@@ -350,6 +351,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         worstCost = self._kpiCalculateWorstCost(test, referenceRun, currentRun)
         self.sumCurTime += currentRun.timeToCost(worstCost)
         self.sumRefTime += referenceRun.timeToCost(worstCost)
+        self.lastKPITime = (currentRun.getPerformance() + referenceRun.getPerformance()) / 2.0
         return worstCost
     def _kpiCalculateWorstCost(self, test, referenceRun, currentRun):
         if self.kpiGroupForTest.has_key(test.name):
@@ -360,7 +362,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
     def computeKPI(self, currTTWC, refTTWC):
         kpi = optimization.MakeProgressReport.computeKPI(self, currTTWC, refTTWC)
         if kpi != "NaN%":
-            kpiTime = (currTTWC + refTTWC) / 2.0
+            kpiTime = self.lastKPITime
             self.sumKPITime += kpiTime
             if len(self.weightKPI) == 0 or kpiTime < self.minKPITime:
                 self.minKPITime = kpiTime

@@ -131,6 +131,7 @@ class Test:
         self.setUpEnvironment()
         self.callAction(action)
         self.performOnSubTests(action)
+        self.undoAction(action)
         self.tearDownEnvironment()
     def setUpEnvironment(self, parents=0):
         if parents and self.parent:
@@ -201,6 +202,9 @@ class TestCase(Test):
             return action(self)
         except plugins.TextTestError, e:
             self.changeState(self.UNRUNNABLE, e)
+    def undoAction(self, action):
+        # Nothing to do
+        pass
     def changeState(self, state, details = ""):
         # Once we've left the pathway, we can't return...
         if self.state == self.UNRUNNABLE or self.state == self.KILLED:
@@ -317,6 +321,8 @@ class TestSuite(Test):
         return len(self.testcases) == 0
     def callAction(self, action):
         return action.setUpSuite(self)
+    def undoAction(self, action):
+        return action.tearDownSuite(self)
     def performOnSubTests(self, action):
         for testcase in self.testcases:
             testcase.performAction(action)

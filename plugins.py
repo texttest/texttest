@@ -46,6 +46,8 @@ class Action:
         pass
     def setUpApplication(self, app):
         pass
+    def tearDownSuite(self, suite):
+        pass
     def getCleanUpAction(self):
         return None
     # Return a list of atomic instructions of action, test pairs that can be applied
@@ -101,6 +103,9 @@ class CompositeAction(Action):
     def setUpSuite(self, suite):
         for subAction in self.subActions:
             subAction.setUpSuite(suite)
+    def tearDownSuite(self, suite):
+        for subAction in self.subActions:
+            subAction.tearDownSuite(suite)
     def setUpApplication(self, app):
         for subAction in self.subActions:
             subAction.setUpApplication(app)

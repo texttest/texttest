@@ -9,16 +9,8 @@ def getConfig(optionMap):
     return MpsSolverConfig(optionMap)
 
 class MpsSolverConfig(carmen.CarmenConfig):
-    def getQueuePerformancePrefix(self, test, arch):
-        if not os.environ.has_key("MPSSOLVER_LSFQUEUE_PREFIX"):
-            return carmen.CarmenConfig.getQueuePerformancePrefix(self, test, arch)
-        if arch == "powerpc" or arch == "parisc_2_0":
-            return ""
-        else:
-            return os.environ["MPSSOLVER_LSFQUEUE_PREFIX"] + "_";
     def getExecuteCommand(self, binary, test):
-        mpsFiles = self.makeMpsSymLinks(test)
-        return binary + " " + self.getExecuteArguments(test, mpsFiles)
+        return binary + " " + test.options + " " + self.makeMpsSymLinks(test)
     def makeMpsSymLinks(self, test):
         #
         # We need to symlink in a temp testdir to the actual .mps files
@@ -36,23 +28,6 @@ class MpsSolverConfig(carmen.CarmenConfig):
                         mpsFiles += " " + file
                         os.symlink(sourcePath, file)
         return mpsFiles
-    def getExecuteArguments(self, test, files):
-        solverVersion = "1429"
-        problemType = "ROSTERING"
-        timeoutValue = "60"
-        presolveValue = "0"
-        if os.environ.has_key("MPSSOLVER_VERSION"):
-            solverVersion = os.environ["MPSSOLVER_VERSION"]
-        if os.environ.has_key("MPSSOLVER_PROBLEM_TYPE"):
-            problemType = os.environ["MPSSOLVER_PROBLEM_TYPE"]
-        if len(test.options) > 0:
-            parts = test.options.split(":")
-            if len(parts) > 0:
-                timeoutValue = parts[0]
-            if len(parts) > 1:
-                presolveValue = parts[1]
-        args = solverVersion + " " + problemType + " " + presolveValue + " " + timeoutValue
-        return args + " " + files
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)

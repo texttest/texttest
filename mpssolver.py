@@ -126,7 +126,8 @@ class MpsSolverTestComparison(performance.PerformanceTestComparison):
 class OutputFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile):
         comparetest.FileComparison.__init__(self, test, standardFile, tmpFile)
-        self.columnFilter(self.stdCmpFile)
+        if os.path.isfile(self.stdCmpFile):
+            self.columnFilter(self.stdCmpFile)
         self.columnFilter(self.tmpCmpFile)
     def columnFilter(self, fileName):
         tmpName = fileName + ".mpssolver_extra";
@@ -140,8 +141,9 @@ class OutputFileComparison(comparetest.FileComparison):
                 if self.tableEnds(line, cols):
                     inTable = 0
                 else:
-                    cols[-1] = "XXX" + os.linesep
-                    line = string.join(cols, " ")
+                    sVal = cols[-1].strip()
+                    ix = line.rfind(sVal);
+                    line = line[0:ix] + "XXX" + line[ix + len(sVal):]
             else:
                 if self.tableStarts(line, cols):
                     inTable = 1
@@ -165,8 +167,17 @@ def getMaxMemory(fileName):
     except:
         return float(-1)
 
-def getTestMemory(test, version = None):
-    return getMaxMemory(test.makeFileName("memory", version))
+def getOutputMemory(fileName):
+    if not os.path.isfile(fileName):
+        return float(-1)
+    try:
+        line = os.popen("grep 'Maximum memory used' " + fileName).readline()
+        start = line.find(":")
+        end = line.find("k", start)
+        fullSize = line[start + 1:end - 1]
+        return int((float(string.strip(fullSize)) / 1024.0) * 10.0) / 10.0
+    except:
+        return float(-1)
 
 class MemoryFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile):
@@ -225,12 +236,7 @@ def percentDiff(perf1, perf2):
         return 0
 
 def pad(str, padSize):
-    padStr = str
-    il = len(str)
-    while il < padSize:
-        padStr += " "
-        il += 1
-    return padStr
+    return str.ljust(padSize)
         
 class PerformanceStatisticsBuilder(plugins.Action):
     def __init__(self, argString):
@@ -254,6 +260,16 @@ class PerformanceStatisticsBuilder(plugins.Action):
         if self.limit == 0 or pDiff > self.limit:
             print self.suiteName + pad(test.name, 30) + "\t", minsec(refPerf), minsec(currPerf), "\t" + str(pDiff) + "%"
             self.suiteName = "   "
+
+def getTestMemory(test, version = None):
+    stemWithApp = "output" + "." + test.app.name
+    if version != None and version != "":
+        stemWithApp = stemWithApp + "." + version
+    fileName = os.path.join(test.abspath, stemWithApp)
+    outputMemory = getOutputMemory(fileName)
+    if outputMemory > 0.0:
+        return outputMemory
+    return -1.0
             
 class MemoryStatisticsBuilder(plugins.Action):
     def __init__(self, argString):
@@ -273,10 +289,29 @@ class MemoryStatisticsBuilder(plugins.Action):
     def __call__(self, test):
         refMem = getTestMemory(test, self.referenceVersion)
         currMem = getTestMemory(test, self.currentVersion)
+        refOutput = 1
+        currOutput = 1
+        if refMem < 0.0:
+            refMem = getMaxMemory(test.makeFileName("memory", self.referenceVersion))
+            refOutput = 0
+        if currMem < 0.0:
+            currMem = getMaxMemory(test.makeFileName("memory", self.currentVersion))
+            currOutput = 0
         pDiff = percentDiff(currMem, refMem)
         if self.limit == 0 or pDiff > self.limit:
-            print self.suiteName + pad(test.name, 30) + "\t", refMem, currMem, "\t" + str(pDiff) + "%"
+            title = self.suiteName + pad(test.name, 30)
             self.suiteName = "   "
+            if refOutput == 0 and currOutput == 0:
+                print title
+                return
+            pDiff = str(pDiff) + "%"
+            if refOutput == 0:
+                refMem = "(" + str(refMem) + ")"
+                pDiff = "(" + pDiff + ")"
+            if currOutput == 0:
+                currMem = "(" + str(currMem) + ")"
+                pDiff = "(" + pDiff + ")"
+            print title + "\t", refMem, currMem, "\t" + pDiff
 
 class FeasibilityStatisticsBuilder(plugins.Action):
     def __init__(self, versionString):

@@ -406,14 +406,19 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
         ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test), getArchitecture(test.app))
         self.diag.info("Checking " + self.getRuleSetName(test))
         self.diag.info("Target file is " + ruleset.targetFile)
-        self.diag.info("Library files is " + self.getLibraryFile(test))
+        libFile = self.getLibraryFile(test)
+        if libFile:
+            self.diag.info("Library files is " + libFile)
         if not ruleset.isValid():
             self.diag.info("Invalid")
             return 0
         if not ruleset.isCompiled():
             self.diag.info("Not compiled")
             return 1
-        return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test)))
+        if libFile:
+            return self.modifiedTime(ruleset.targetFile) < self.modifiedTime(os.path.join(os.environ["CARMSYS"], libFile))
+        else:
+            return 1
     def acceptsTestSuite(self, suite):
         if not isUserSuite(suite):
             return 1

@@ -36,6 +36,9 @@ class FleetConfig(matador.MatadorConfig):
     def printHelpDescription(self):
         print helpDescription
         matador.MatadorConfig.printHelpDescription(self)
+    def getLibraryFile(self, test):
+        # Don't try to use Matador's library file!
+        return None
     def setUpApplication(self, app):
         matador.MatadorConfig.setUpApplication(self, app)
         self.itemNamesInFile[optimization.costEntryName] = "Optimizer cost"

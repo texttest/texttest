@@ -271,7 +271,11 @@ class UpdateLSFStatus(plugins.Action):
             return
         if status != "PEND":
             perc = self.calculatePercentage(test)
-            details = "Executing on " + machine + os.linesep + "Current LSF status = " + status + os.linesep
+            details = ""
+            if machine != None:
+                details += "Executing on " + machine + os.linesep
+
+            details += "Current LSF status = " + status + os.linesep
             if perc > 0:
                 details += "From log file reckoned to be " + str(perc) + "% complete."
             test.changeState(test.RUNNING, details)

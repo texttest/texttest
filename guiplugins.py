@@ -207,7 +207,12 @@ class ImportTest(InteractiveAction):
         file.write("# " + description + os.linesep)
         file.write(testName + os.linesep)
         testDir = os.path.join(suite.abspath, testName.strip())
-        os.mkdir(testDir)
+        if os.path.isdir(testDir):
+            return testDir
+        try:
+            os.mkdir(testDir)
+        except OSError:
+            raise plugins.TextTestError, "Cannot create test - problems creating directory named " + testName.strip()
         return testDir
 
 class RecordTest(InteractiveAction):
@@ -281,7 +286,10 @@ class ImportTestCase(ImportTest):
         self.writeEnvironmentFile(suite, testDir)
         self.writeResultsFiles(suite, testDir)
     def getWriteFile(self, name, suite, testDir):
-        return open(os.path.join(testDir, name + "." + suite.app.name), "w")
+        fileName = os.path.join(testDir, name + "." + suite.app.name)
+        if os.path.isfile(fileName):
+            raise plugins.TextTestError, "Test already exists for application " + suite.app.fullName + " : " + os.path.basename(testDir)
+        return open(fileName, "w")
     def writeEnvironmentFile(self, suite, testDir):
         envDir = self.getEnvironment(suite)
         if len(envDir) == 0:

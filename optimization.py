@@ -157,7 +157,7 @@ class SubPlanDirManager:
         prefix = os.path.join(subDir, baseName) + "."
         prefix += test.app.name + test.app.versionSuffix() + "_" + test.name + "_"
         dirName = prefix + test.getTmpExtension()
-        if not test.parallelMode():
+        if not test.app.parallelMode:
             currTmpString = prefix + test.getTestUser()
             for file in os.listdir(subDir):
                 fpath = os.path.join(subDir,file)

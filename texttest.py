@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, string, getopt, types, time, re, plugins, exceptions, stat
+import os, sys, string, getopt, types, time, re, plugins, exceptions, stat, log4py
 from stat import *
 
 helpIntro = """
@@ -71,7 +71,7 @@ class Test:
                 os.environ[var] = value
             # Ensure multiple expansion doesn't occur
             self.environment[var] = os.environ[var]
-            debugPrint("Setting " + var + " to " + os.environ[var])
+            debugLog.info("Setting " + var + " to " + os.environ[var])
     def getIndent(self):
         dirCount = string.count(self.getRelPath(), os.sep)
         retstring = ""
@@ -80,9 +80,9 @@ class Test:
         return retstring
     def isAcceptedByAll(self, filters):
         for filter in filters:
-            debugPrint(repr(self) + " filter " + repr(filter))
+            debugLog.info(repr(self) + " filter " + repr(filter))
             if not self.isAcceptedBy(filter):
-                debugPrint("REJECTED")
+                debugLog.info("REJECTED")
                 return 0
         return 1
         
@@ -120,8 +120,6 @@ class TestCase(Test):
         return globalRunIdentifier
     def getTestUser(self):
         return tmpString()
-    def parallelMode(self):
-        return inputOptions.parallelMode()
     def getTmpFileName(self, text, mode):
         prefix = text + "." + self.app.name + self.app.versionSuffix()
         fileName = prefix + globalRunIdentifier
@@ -130,7 +128,7 @@ class TestCase(Test):
         if mode == "w":
             for file in os.listdir(self.abspath):
                 if file.find(prefix) != -1 and file.find(self.getTestUser()) != -1:
-                    if not inputOptions.parallelMode() or self.isOutdated(file):
+                    if not self.app.parallelMode or self.isOutdated(file):
                         os.remove(file)
         return fileName
     def isOutdated(self, filename):
@@ -199,11 +197,12 @@ class Application:
         self.name = name
         self.abspath = abspath
         self.versions = versions
+        self.parallelMode = optionMap.has_key("p")
         self.configDir = MultiEntryDictionary(configFile, name, self.getVersionFileExtensions(0))
         self.fullName = self._getFullName()
-        debugPrint("Found application " + repr(self))
-        self.checkout = self.makeCheckout()
-        debugPrint("Checkout set to " + self.checkout)
+        debugLog.info("Found application " + repr(self))
+        self.checkout = self.makeCheckout(optionMap)
+        debugLog.info("Checkout set to " + self.checkout)
         self.configObject = self.makeConfigObject(optionMap)
         allowedOptions = self.configObject.getOptionString() + builtInOptions
         newVersions = self.configObject.getVersions(self)
@@ -306,7 +305,7 @@ class Application:
     def filterFile(self, fileName):
         stem = fileName.split('.')[0]
         if not self.configDir.has_key(stem) or not os.path.isfile(fileName):
-            debugPrint("No filter for " + fileName)
+            debugLog.info("No filter for " + fileName)
             return fileName
 
         if fileName.find(globalRunIdentifier) != -1:
@@ -325,7 +324,7 @@ class Application:
             else:
                 linesToRemove -= 1
         newFile.close()
-        debugPrint("Filter for " + fileName + " returned " + newFileName)
+        debugLog.info("Filter for " + fileName + " returned " + newFileName)
         return newFileName
 #private:
     def matchRE(self, ptn, text):
@@ -353,9 +352,10 @@ class Application:
                 else:
                     return 1
         return 0
-    def makeCheckout(self):
-        checkout = inputOptions.checkoutName()
-        if checkout == None:
+    def makeCheckout(self, optionMap):
+        if optionMap.has_key("c"):
+            checkout = optionMap["c"]
+        else:
             checkout = self.getConfigValue("default_checkout")
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
         return os.path.join(checkoutLocation, checkout)
@@ -372,6 +372,13 @@ class Application:
 class OptionFinder:
     def __init__(self):
         self.inputOptions = self.buildOptions()
+        # At some stage we should find a scheme to use the log4py configuration files: for now just do this
+        # rather coarse thing
+        if self.inputOptions.has_key("x"):
+            debugLog.set_loglevel(log4py.LOGLEVEL_DEBUG)
+            debugLog.set_formatstring("%C %L - %M")
+        else:
+            debugLog.set_loglevel(log4py.LOGLEVEL_NONE)
     # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
     def buildOptions(self):
         inputOptions = {}
@@ -388,7 +395,7 @@ class OptionFinder:
     def findApps(self):
         dirName = self.directoryName()
         os.chdir(dirName)
-        debugPrint("Using test suite at " + dirName)
+        debugLog.info("Using test suite at " + dirName)
         appList = self._findApps(dirName, 1)
         appList.sort()
         return appList
@@ -433,10 +440,6 @@ class OptionFinder:
             return 1
     def helpMode(self):
         return self.inputOptions.has_key("help")
-    def debugMode(self):
-        return self.inputOptions.has_key("x")
-    def parallelMode(self):
-        return self.inputOptions.has_key("p")
     def directoryName(self):
         if self.inputOptions.has_key("d"):
             return os.path.abspath(self.inputOptions["d"])
@@ -444,11 +447,6 @@ class OptionFinder:
             return os.environ["TEXTTEST_HOME"]
         else:
             return os.getcwd()
-    def checkoutName(self):
-        if self.inputOptions.has_key("c"):
-            return self.inputOptions["c"]
-        else:
-            return None
     def getActionSequence(self, app):
         if self.inputOptions.has_key("s"):
             actionCom = self.inputOptions["s"].split(" ")[0]
@@ -487,7 +485,7 @@ class MultiEntryDictionary:
     def updateFor(self, filename, extra):
         if len(extra) == 0:
             return
-        debugPrint("Updating " + filename + " for version " + extra) 
+        debugLog.info("Updating " + filename + " for version " + extra) 
         extraFileName = filename + "." + extra
         if not os.path.isfile(extraFileName):
             return
@@ -542,7 +540,7 @@ class MultiEntryDictionary:
             return []
 
 class ApplicationRunner:
-    def __init__(self, app):
+    def __init__(self, app, inputOptions):
         self.app = app
         self.actionSequence = inputOptions.getActionSequence(app)
         self.valid, self.filterList = app.getFilterList()
@@ -569,17 +567,13 @@ class ApplicationRunner:
     def _performActionWithFilter(self, action):
         newFilterList = self.filterList
         newFilterList.append(action.getFilter())
-        debugPrint("Creating extra test suite from new filter " + repr(action.getFilter()))
-        debugPrint(os.getcwd())
+        debugLog.info("Creating extra test suite from new filter " + repr(action.getFilter()))
+        debugLog.info(os.getcwd())
         actionTests = TestSuite(os.path.basename(self.app.abspath), self.app.abspath, self.app, newFilterList)
         self._performAction(actionTests, action)
     def _performAction(self, suite, action):
         action.setUpApplication(suite.app)
         suite.performAction(action)    
-
-def debugPrint(text):
-    if inputOptions.debugMode():
-        print text
 
 def printException():
     type, value, traceback = sys.exc_info()
@@ -596,12 +590,13 @@ def tmpString():
 
 class TextTest:
     def __init__(self):
-        # Declared global for debugPrint() above
-        global inputOptions
-        inputOptions = OptionFinder()
+        global debugLog
+        debugLog = log4py.Logger().get_instance("TextTest")
+        # Module level debugging logger
+        self.inputOptions = OptionFinder()
         global globalRunIdentifier
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
-        self.allApps = inputOptions.findApps()
+        self.allApps = self.inputOptions.findApps()
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names
         if os.environ.has_key("USER"):
@@ -621,14 +616,14 @@ class TextTest:
             return
         maxActionCount = max(map(lambda x: x.actionCount(), applicationRunners))
         # Run actions one at a time for each application. This should ensure a fair spread of machine time when this is limited
-        for run in range(inputOptions.timesToRun()):
+        for run in range(self.inputOptions.timesToRun()):
             for actionNum in range(maxActionCount):
                 self.performActionOnApps(applicationRunners, actionNum)
     def createAppRunners(self):
         applicationRunners = []
         for app in self.allApps:
             try:
-                appRunner = ApplicationRunner(app)
+                appRunner = ApplicationRunner(app, self.inputOptions)
                 if appRunner.valid:
                     print app.description()
                     applicationRunners.append(appRunner)

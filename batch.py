@@ -14,7 +14,7 @@ helpOptions = """
              If the list is empty, all versions are allowed.
 """
 
-import os, performance, plugins, respond, sys, predict
+import os, performance, plugins, respond, sys, predict, string
 
 class BatchFilter(plugins.Filter):
     def __init__(self, batchSession):
@@ -88,6 +88,8 @@ class BatchCategory:
 
 killedTests = []
 allBatchResponders = []
+categoryNames = [ "badPredict", "crash", "dead", "difference", "faster", "slower", "success", "unfinished" ]
+categoryDescriptions = [ "had internal errors", "CRASHED", "caused exception", "FAILED", "ran faster", "ran slower", "succeeded", "were unfinished" ]
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):
@@ -96,14 +98,8 @@ class BatchResponder(respond.Responder):
         self.crashDetail = {}
         self.deadDetail = {}
         self.categories = {}
-        self.categories["crash"] = BatchCategory("CRASHED")
-        self.categories["difference"] = BatchCategory("FAILED")
-        self.categories["faster"] = BatchCategory("ran faster")
-        self.categories["slower"] = BatchCategory("ran slower")
-        self.categories["success"] = BatchCategory("succeeded")
-        self.categories["unfinished"] = BatchCategory("were unfinished")
-        self.categories["badPredict"] = BatchCategory("had internal errors")
-        self.categories["dead"] = BatchCategory("caused exception")
+        for i in range(len(categoryNames)):
+            self.categories[categoryNames[i]] = BatchCategory(categoryDescriptions[i])
         self.mainSuite = None
         self.responder = respond.UNIXInteractiveResponder(lineCount)
         allBatchResponders.append(self)
@@ -153,9 +149,7 @@ class BatchResponder(respond.Responder):
             count += category.count
         return count
     def writeMailBody(self, mailFile):
-        orderedCategories = self.categories.keys()
-        orderedCategories.sort()
-        for categoryName in orderedCategories:
+        for categoryName in categoryNames:
             self.categories[categoryName].describe(mailFile)
         if len(self.deadDetail) > 0:
             self.writeDeadDetail(mailFile)
@@ -197,7 +191,7 @@ class MailSender(plugins.Action):
         if len(appResponders) == 0:
             return
         mailTitle = self.getMailTitle(app, appResponders)
-        mailFile = self.createMail(mailTitle, app)
+        mailFile = self.createMail(mailTitle, app, appResponders)
         if len(appResponders) > 1:
             for resp in appResponders:
                 mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
@@ -212,15 +206,29 @@ class MailSender(plugins.Action):
         mailFile.close()
         for responder in appResponders:
             allBatchResponders.remove(responder)
-    def createMail(self, title, app):
-        mailFile = os.popen("/usr/lib/sendmail -t", "w")
+    def createMail(self, title, app, appResponders):
         fromAddress = os.environ["USER"]
         toAddress = self.getRecipient(fromAddress, app)
-        mailFile.write("From: " + fromAddress + os.linesep)
-        mailFile.write("To: " + toAddress + os.linesep)
-        mailFile.write("Subject: " + title + os.linesep)
-        mailFile.write(os.linesep) # blank line separating headers from body
-        return mailFile
+        if self.useCollection(app):
+            collFile = os.path.join(app.abspath, "batchreport." + app.name + app.versionSuffix())
+            mailFile = open(collFile, "w")
+            mailFile.write(toAddress + os.linesep)
+            mailFile.write(self.getMachineTitle(app, appResponders) + os.linesep)
+            mailFile.write(title + os.linesep)
+            mailFile.write(os.linesep) # blank line separating headers from body
+            return mailFile
+        else:
+            mailFile = os.popen("/usr/lib/sendmail -t", "w")
+            mailFile.write("From: " + fromAddress + os.linesep)
+            mailFile.write("To: " + toAddress + os.linesep)
+            mailFile.write("Subject: " + title + os.linesep)
+            mailFile.write(os.linesep) # blank line separating headers from body
+            return mailFile
+    def useCollection(self, app):
+        try:
+            return app.getConfigValue(self.sessionName + "_use_collection") == "true"
+        except:
+            return 0
     def getRecipient(self, fromAddress, app):
         # See if the session name has an entry, if not, send to the user
         try:
@@ -229,7 +237,7 @@ class MailSender(plugins.Action):
             return fromAddress
     def getMailHeader(self, app, appResponders):
         title = repr(app) + " Test Suite "
-        versions = self.findCommonVersions(appResponders)
+        versions = self.findCommonVersions(app, appResponders)
         return title + self.getVersionString(versions) + ": "
     def getMailTitle(self, app, appResponders):
         title = self.getMailHeader(app, appResponders)
@@ -237,14 +245,16 @@ class MailSender(plugins.Action):
         if self.getTotalString(appResponders, BatchResponder.failureCount) == "0":
             return title + ", all successful"
         title += " :"
-        failureCategories = appResponders[0].categories.keys()
-        failureCategories.remove("success")
-        failureCategories.sort()
-        for categoryName in failureCategories:
+        for categoryName in categoryNames:
             totalInCategory = self.getCategoryCount(categoryName, appResponders)
             title += self.briefText(totalInCategory, appResponders[0].categories[categoryName].description)
         # Lose trailing comma
         return title[:-1]
+    def getMachineTitle(self, app, appResponders):
+        values = []
+        for categoryName in categoryNames:
+            values.append(str(self.getCategoryCount(categoryName, appResponders)))
+        return string.join(values, ',')
     def getTotalString(self, appResponders, method):
         total = 0
         for resp in appResponders:
@@ -256,18 +266,18 @@ class MailSender(plugins.Action):
             total += resp.categories[categoryName].count
         return total
     def getVersionString(self, versions):
-        if len(versions) == 1:
-            return "(version " + versions[0] + ") "
-        elif len(versions) > 1:
-            return "(versions " + repr(versions) + ") "
+        if len(versions) > 0:
+            return "(version " + string.join(versions, ".") + ") "
         else:
             return ""
     def briefText(self, count, description):
-        if count == 0:
+        if count == 0 or description == "succeeded":
             return ""
         else:
             return " " + str(count) + " " + description + ","
-    def findCommonVersions(self, appResponders):
+    def findCommonVersions(self, app, appResponders):
+        if len(appResponders) == 0:
+            return app.versions
         versions = appResponders[0].mainSuite.app.versions
         for resp in appResponders[1:]:
             for version in versions:
@@ -289,7 +299,7 @@ class SendException(plugins.Action):
         if len(appResponders) == 0:
             return
         mailTitle = self.mailSender.getMailHeader(app, appResponders) + "did not run : " + excData
-        mailFile = self.mailSender.createMail(mailTitle, app)
+        mailFile = self.mailSender.createMail(mailTitle, app, appResponders)
         sys.stderr = mailFile
         sys.excepthook(type, value, traceback)
         sys.stderr = sys.__stderr__
@@ -297,3 +307,47 @@ class SendException(plugins.Action):
         for responder in appResponders:
             allBatchResponders.remove(responder)
         
+class CollectFiles(plugins.Action):
+    def __init__(self):
+        self.mailSender = MailSender("collection")
+    def setUpApplication(self, app):
+        fileBodies = []
+        totalValues = []
+        for category in categoryNames:
+            totalValues.append(0)
+        for filename in os.listdir(app.abspath):
+            prefix = "batchreport." + app.name + app.versionSuffix()
+            if filename.startswith(prefix):
+                file = open(os.path.join(app.abspath, filename))
+                app.setConfigDefault("collection_recipients", file.readline().strip())
+                catValues = file.readline().strip().split(",")
+                for i in range(len(categoryNames)):
+                    totalValues[i] += int(catValues[i])
+                fileBodies.append(file.read())
+        mailTitle = self.getTitle(app, totalValues)
+        mailFile = self.mailSender.createMail(mailTitle, app, [])
+        self.writeBody(mailFile, fileBodies)
+        mailFile.close()
+    def getTitle(self, app, totalValues):
+        title = self.mailSender.getMailHeader(app, [])
+        total = 0
+        for value in totalValues:
+            total += value
+        title += str(total) + " tests ran"
+        if totalValues[categoryNames.index("success")] == total:
+            return title + ", all successful"
+        title += " :"
+        for index in range(len(categoryNames)):
+            title += self.mailSender.briefText(totalValues[index], categoryDescriptions[index])
+        # Lose trailing comma
+        return title[:-1]
+    def writeBody(self, mailFile, bodies):
+        if len(bodies) > 1:
+            for body in bodies:
+                firstSep = body.find(os.linesep) + 1
+                mailFile.write(body[0:firstSep])
+            mailFile.write(os.linesep)
+        for body in bodies:
+            if len(bodies) > 1:
+                mailFile.write("------------------------------------------------------------------" + os.linesep + os.linesep)
+            mailFile.write(body)

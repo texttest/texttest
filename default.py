@@ -196,6 +196,8 @@ class ReconnectTest(plugins.Action):
                 return os.path.join(findDir, testCaseDir)
         return None
     def _shouldCopyFile(self, test, stem, file, pattern):
+        if stem == "cmd" or stem == "report" or stem == "unixperf":
+            return 0
         if self.endRegExp.search(file, 1):
             return file.startswith(stem + pattern)
         if not file.startswith(stem + "." + test.app.name):

@@ -248,4 +248,21 @@ class PrintRuleValue(plugins.Action):
                 print test.getIndent() + "INDEX GROUPS"
     def setUpSuite(self, suite):
         self.describe(suite)
-                
+
+class CopyOutput(plugins.Action):
+    def __repr__(self):
+        return "Copying errors file for"
+    def __call__(self, test):
+        if not os.path.isfile("errors.cas.9"):
+            status = os.popen("cvs update errors.cas").readline()
+            if status.startswith("M "):
+                self.describe(test)
+                os.rename("errors.cas", "errors.cas.tmpnow")
+                os.system("cvs update errors.cas")
+                os.rename("errors.cas", "errors.cas.9")
+                os.system("cvs add errors.cas.9")
+                os.rename("errors.cas.tmpnow", "errors.cas")
+    def setUpSuite(self, suite):
+        self.describe(suite)
+
+

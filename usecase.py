@@ -71,18 +71,19 @@ class UserEvent:
 # Behaves as a singleton...
 class ScriptEngine:
     instance = None
-    def __init__(self, replayScriptName, recordScriptName, stdinScriptName, logger = None):
+    def __init__(self, logger = None):
         self.replayScript = None
         self.recordScript = None
         self.stdinScript = None
-        if replayScriptName and replayScriptName == recordScriptName:
-            raise UseCaseScriptError, "Cannot record to the same script we are replaying"
-        if replayScriptName:
-            self.replayScript = self.createReplayScript(replayScriptName, logger)
-        if recordScriptName:
-            self.recordScript = UseCaseRecordScript(recordScriptName)
-        if stdinScriptName:
-            self.stdinScript = RecordScript(stdinScriptName)
+        prevArg = ""
+        for arg in sys.argv[1:]:
+            if prevArg.find("-replay") != -1:
+                self.replayScript = self.createReplayScript(arg, logger)
+            if prevArg.find("-record") != -1:
+                self.recordScript = UseCaseRecordScript(arg)
+            if prevArg.find("-recinp") != -1:
+                self.stdinScript = RecordScript(arg)
+            prevArg = arg
         self.thread = currentThread()
         ScriptEngine.instance = self
     def hasScript(self):
@@ -102,14 +103,7 @@ class ScriptEngine:
             self.stdinScript.record(line)
         return line
     def standardName(self, name):
-        firstIndex = None
-        lastIndex = len(name)
-        for i in range(len(name)):
-            if name[i] in string.letters or name[i] in string.digits:
-                if firstIndex is None:
-                    firstIndex = i
-                lastIndex = i
-        return name[firstIndex:lastIndex + 1].lower()
+        return name.strip().lower()
 
 class ReplayScript:
     def __init__(self, scriptName, logger):

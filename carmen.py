@@ -198,7 +198,7 @@ class CarmenConfig(lsf.LSFConfig):
             return usePrefix + "_"
     def getQueuePlatformSuffix(self, app, arch):
         if arch == "i386_linux":
-            return "_RH8"
+            return "_RHEL"
         elif arch == "sparc":
             return "_sol8"
         elif arch == "powerpc":

@@ -65,7 +65,7 @@ class MakeComparisons(comparetest.MakeComparisons):
     def __init__(self, newFiles):
         comparetest.MakeComparisons.__init__(self, newFiles)
     def createFileComparison(self, test, standardFile, tmpFile):
-        stem, ext = os.path.splitext(standardFile)
+        stem, ext = standardFile.split(".", 1)
         if (stem == "performance"):
             return PerformanceFileComparison(test, standardFile, tmpFile)
         else:

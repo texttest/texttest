@@ -28,6 +28,8 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                              The following options are supported:
                              - r=range
                                The x-axis has the range range. Default is the whole data set. Example: 60:
+                             - yr=range
+                               The y-axis has the y-range range. Default is the whole data set. Example: 2e7:3e7
                              - p=an absolute file name
                                Produces a postscript file instead of displaying the graph.
                              - pc
@@ -1108,10 +1110,10 @@ class _PlotTest(plugins.Action):
 class GraphPlot(plugins.Action):
     def setUpApplication(self, app):
         if commonPlotter.plotForTest:
-            timeRange, targetFile, colour = commonPlotter.plotForTest.getPlotOptions()
+            xrange, yrange, targetFile, colour = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
             os.chdir(app.writeDirectory)
-            commonPlotter.testGraph.plot(timeRange, targetFile, colour, wait=1)
+            commonPlotter.testGraph.plot(xrange, yrange, targetFile, colour, wait=1)
     
 class TestGraph:
     def __init__(self):
@@ -1155,7 +1157,7 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, timeRange, targetFile, colour, wait=0):
+    def plot(self, xrange, yrange, targetFile, colour, wait=0):
         if len(self.plotLines) == 0:
             return
 
@@ -1179,7 +1181,9 @@ class TestGraph:
         gnuplotFile.write("set xtics border nomirror norotate" + os.linesep)
         gnuplotFile.write("set ytics border nomirror norotate" + os.linesep)
         gnuplotFile.write("set border 3" + os.linesep)
-        gnuplotFile.write("set xrange [" + timeRange +"];" + os.linesep)
+        gnuplotFile.write("set xrange [" + xrange +"];" + os.linesep)
+        if yrange:
+            gnuplotFile.write("set yrange [" + yrange +"];" + os.linesep)
         plotArguments = self.getPlotArguments()
         plotCommand = "plot "
         for plotArgument in plotArguments:
@@ -1224,7 +1228,8 @@ class TestGraph:
 class PlotTestInGUI(guiplugins.InteractiveAction):
     def __init__(self, test, graph = None):
         guiplugins.InteractiveAction.__init__(self, test, "Graph")
-        self.optionGroup.addOption("r", "Time range in minutes", "1:")
+        self.optionGroup.addOption("r", "Horizontal range", "0:")
+        self.optionGroup.addOption("yr", "Vertical range")
         self.optionGroup.addOption("p", "Absolute file to print to")
         self.optionGroup.addOption("i", "Log file item to plot", costEntryName)
         self.optionGroup.addOption("v", "Extra versions to plot")
@@ -1262,14 +1267,15 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):
-        range, fileName, writeColour = self.getPlotOptions()
-        self.testGraph.plot(range, fileName, writeColour)
+        xrange, yrange, fileName, writeColour = self.getPlotOptions()
+        self.testGraph.plot(xrange, yrange, fileName, writeColour)
         self.testGraph = TestGraph()
     def getPlotOptions(self):
-        range = self.optionGroup.getOptionValue("r")
+        xrange = self.optionGroup.getOptionValue("r")
+        yrange = self.optionGroup.getOptionValue("yr")
         fileName = self.optionGroup.getOptionValue("p")
         writeColour = self.optionGroup.getSwitchValue("pc")
-        return range, fileName, writeColour
+        return xrange, yrange, fileName, writeColour
     def writePlotFiles(self, lineName, logFile, test):
         plotItems = self.getItemsToPlot()
         optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)

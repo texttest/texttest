@@ -1374,6 +1374,9 @@ class TextTest:
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
         self.allApps = self.inputOptions.findApps()
         self.gui = None
+        # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
+        if not os.environ.has_key("USECASE_HOME"):
+            os.environ["USECASE_HOME"] = os.path.join(self.inputOptions.directoryName, "usecases")
         if self.inputOptions.useGUI():
             try:
                 import texttestgui

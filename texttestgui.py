@@ -39,8 +39,6 @@ class TextTestGUI:
         guiplugins.setUpGuiLog()
         global guilog, scriptEngine
         from guiplugins import guilog
-        if not os.environ.has_key("USECASE_HOME"):
-            os.environ["USECASE_HOME"] = os.path.join(os.environ["TEXTTEST_HOME"], "usecases")
         scriptEngine = ScriptEngine(guilog)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)

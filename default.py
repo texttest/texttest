@@ -64,6 +64,7 @@ class Config(plugins.Configuration):
         elif group.name.startswith("Invisible"):
             # Only relevant without the GUI
             group.addSwitch("o", "Overwrite all failures")
+            group.addOption("tp", "Tests with exact path") # use for internal communication
             group.addSwitch("n", "Create new results files (overwrite everything)")
         elif group.name.startswith("Side"):
             group.addSwitch("keeptmp", "Keep temporary write-directories")
@@ -77,6 +78,7 @@ class Config(plugins.Configuration):
     def getFilterList(self):
         filters = []
         self.addFilter(filters, "t", TestNameFilter)
+        self.addFilter(filters, "tp", TestPathFilter)
         self.addFilter(filters, "ts", TestSuiteFilter)
         self.addFilter(filters, "f", FileFilter)
         self.addFilter(filters, "grep", GrepFilter)
@@ -288,15 +290,19 @@ class TextFilter(plugins.Filter):
         return 0
     def equalsText(self, test):
         return test.name in self.texts
+
+class TestPathFilter(TextFilter):
+    def acceptsTestCase(self, test):
+        return test.getRelPath() in self.texts
+    def acceptsTestSuite(self, suite):
+        for relPath in self.texts:
+            if relPath.startswith(suite.getRelPath()):
+                return 1
+        return 0
     
 class TestNameFilter(TextFilter):
-    def __init__(self, filterText):
-        TextFilter.__init__(self, filterText)
-        self.useRelPath = filterText.find(os.sep) != -1
     def acceptsTestCase(self, test):
-        if self.useRelPath:
-            return test.getRelPath() in self.texts
-        elif self.containsText(test):
+        if self.containsText(test):
             if not test.name in self.allTestCaseNames:
                 self.allTestCaseNames.append(test.name)
             return 1

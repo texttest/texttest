@@ -378,7 +378,7 @@ class SubmitTest(plugins.Action):
         slaveLog = test.makeFileName("slavelog", temporary=1, forComparison=0)
         slaveErrs = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
         commandLine = "python " + sys.argv[0] + " -d " + test.app.abspath + " -a " + test.app.name + test.app.versionSuffix() \
-                      + " -c " + test.app.checkout + " -t " + test.getRelPath() + " -slave " + test.getTmpExtension() \
+                      + " -c " + test.app.checkout + " -tp " + test.getRelPath() + " -slave " + test.getTmpExtension() \
                       + " -tmp " + tmpDir + " " + self.runOptions + " > " + slaveLog
         # C-shell based shells have different syntax here...
         if self.loginShell.find("csh") != -1:

@@ -1116,7 +1116,7 @@ class GraphPlot(plugins.Action):
             xrange, yrange, targetFile, colour = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
             os.chdir(app.writeDirectory)
-            commonPlotter.testGraph.plot(xrange, yrange, targetFile, colour, wait=1)
+            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, colour, wait=1)
     
 class TestGraph:
     def __init__(self):
@@ -1160,12 +1160,12 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, xrange, yrange, targetFile, colour, wait=0):
+    def plot(self, writeDir, xrange, yrange, targetFile, colour, wait=0):
         if len(self.plotLines) == 0:
             return
 
-        gnuplotFileName = os.path.abspath("gnuplot.input")
-        outputFileName = os.path.abspath("gnuplot.output")
+        gnuplotFileName = os.path.join(writeDir, "gnuplot.input")
+        outputFileName = os.path.join(writeDir, "gnuplot.output")
         gnuplotFile = open(gnuplotFileName, "w")
         if targetFile:
             absTargetFile = os.path.expanduser(targetFile)
@@ -1271,7 +1271,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             self.plotGraph()
     def plotGraph(self):
         xrange, yrange, fileName, writeColour = self.getPlotOptions()
-        self.testGraph.plot(xrange, yrange, fileName, writeColour)
+        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, writeColour)
         self.testGraph = TestGraph()
     def getPlotOptions(self):
         xrange = self.optionGroup.getOptionValue("r")
@@ -1338,6 +1338,9 @@ class PlotLine:
         else:
             return "plot-" + lineName.replace(" ", "-") + "-" + item.replace(" ", "-")
     def writeFile(self, optRun, item, plotAgainstSolution):
+        dir, localName = os.path.split(self.plotFileName)
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
         plotFile = open(self.plotFileName, "w")
         for solution in optRun.solutions:
             if solution.has_key(item):

@@ -794,8 +794,8 @@ class ImportTestCase(guiplugins.ImportTestCase):
             self.addSwitch(oldOptionGroup, "sing", "Only run test A03", 1)
             self.addSwitch(oldOptionGroup, "fail", "Include test failures", 1)
             self.addSwitch(oldOptionGroup, "version", "Run with Version 2.4")
-    def getOptions(self):
-        options = guiplugins.ImportTestCase.getOptions(self)
+    def getOptions(self, suite):
+        options = guiplugins.ImportTestCase.getOptions(self, suite)
         if self.optionGroup.getSwitchValue("sGUI"):
             options += " -gx"
         elif self.optionGroup.getSwitchValue("GUI"):

@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, time, string, signal, sys, default, unix, performance, respond, batch, plugins, types
+import os, time, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types
 
 # Text only relevant to using the LSF configuration directly
 helpDescription = """
@@ -55,11 +55,11 @@ def tenMinutesToGo(signal, stackFrame):
 
 signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
-class LSFConfig(unix.UNIXConfig):
+class LSFConfig(unixConfig.UNIXConfig):
     def getOptionString(self):
-        return "lr:R:" + unix.UNIXConfig.getOptionString(self)
+        return "lr:R:" + unixConfig.UNIXConfig.getOptionString(self)
     def getFilterList(self):
-        filters = unix.UNIXConfig.getFilterList(self)
+        filters = unixConfig.UNIXConfig.getFilterList(self)
         self.addFilter(filters, "r", performance.TimeFilter)
         return filters
     def getTestRunner(self):

@@ -10,8 +10,7 @@ class MakeComparisons:
         comparisons = []
         attemptedComparisons = []
         for file in os.listdir(test.abspath):
-            last3chars = file[-3:]
-            if last3chars == "tmp":
+            if file.endswith(test.getTmpExtension()):
                 stem, ext = os.path.splitext(file)
                 standardFile = os.path.basename(test.makeFileName(stem))
                 comparison = self.makeComparison(test, standardFile, file)

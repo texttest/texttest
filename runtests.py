@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import os, sys, string, getopt, types
+import os, sys, string, getopt, types, time
 from stat import *
 
 # Base class for TestCase and TestSuite
@@ -11,11 +11,13 @@ class Test:
         self.paddedName = self.name
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
-    def makeFileName(self, stem):
+    def makeFileName(self, stem, version = None):
+        if version == None:
+            version = self.app.version
         nonVersionName = os.path.join(self.abspath, stem + "." + self.app.name)
-        if len(self.app.version) == 0:
+        if len(version) == 0:
             return nonVersionName
-        versionName = nonVersionName + "." + self.app.version
+        versionName = nonVersionName + "." + version
         if os.path.isfile(versionName):
             return versionName
         else:
@@ -67,10 +69,16 @@ class TestCase(Test):
         pass
     def getExecuteCommand(self):
         return self.app.executeCommand + " " + self.options
+    def getTmpExtension(self):
+        return globalRunIdentifier
     def getTmpFileName(self, text, mode):
-        fileName = text + "." + self.app.name + "tmp"
-        if mode == "w" and os.path.isfile(fileName):
-            os.remove(fileName)
+        prefix = text + "." + self.app.name
+        fileName = prefix + globalRunIdentifier
+        if mode == "w" and not inputOptions.parallelMode():
+            tmpString = prefix + os.environ["USER"]
+            for file in os.listdir(self.abspath):
+                if file.find(tmpString) != -1:
+                    os.remove(file)
         return fileName
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
@@ -233,7 +241,7 @@ class OptionFinder:
                 if self.inputOptions.has_key("a") and appName != self.inputOptions["a"]:
                     continue
                 versionString = self.findVersionString()
-                app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:s:v:x")
+                app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:s:v:xp")
                 appList.append(app)
             elif os.path.isdir(pathname) and recursive:
                 for app in self._findApps(pathname, 0):
@@ -246,6 +254,8 @@ class OptionFinder:
             return ""
     def debugMode(self):
         return self.inputOptions.has_key("x")
+    def parallelMode(self):
+        return self.inputOptions.has_key("p")
     def directoryName(self):
         if self.inputOptions.has_key("d"):
             return os.path.abspath(self.inputOptions["d"])
@@ -350,6 +360,8 @@ def main():
     # Declared global for debugPrint() above
     global inputOptions
     inputOptions = OptionFinder()
+    global globalRunIdentifier
+    globalRunIdentifier = os.environ["USER"] + time.strftime("%H:%M:%S", time.localtime())
 
     debugPrint("Adding " + localDir + " to sys.path")
     for app in inputOptions.findApps():

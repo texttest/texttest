@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import lsf, default, respond, performance, os, string, shutil, stat
+import lsf, default, respond, performance, os, string, shutil, stat, time
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -27,7 +27,7 @@ def isUserSuite(suite):
 
 class CarmenConfig(default.Config):
     def getOptionString(self):
-        return "lb:r:u:R:" + default.Config.getOptionString(self)
+        return "lbr:u:R:" + default.Config.getOptionString(self)
     def getFilterList(self):
         filters = default.Config.getFilterList(self)
         self.addFilter(filters, "r", performance.TimeFilter)
@@ -42,6 +42,11 @@ class CarmenConfig(default.Config):
         else:
             return default.Config.getActionSequence(self)
     def getTestRunner(self):
+        if self.optionMap.has_key("lprof"):
+            return [ self._getTestRunner(), WaitForDispatch(), RunLProf() ]
+        else:
+            return self._getTestRunner()
+    def _getTestRunner(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestRunner(self)
         else:
@@ -93,7 +98,6 @@ class CompileRules:
 class RuleSet:
     def __init__(self, test, raveName):
         self.name = self.findName(test)
-        print self.name
         if self.name != None:
             self.targetFile = os.path.join(os.environ["CARMTMP"], "crc", "rule_set", string.upper(raveName), architecture, self.name)
             self.sourceFile = os.path.join(os.environ["CARMUSR"], "crc", "source", self.name)
@@ -126,4 +130,27 @@ class UpdatedStaticRulesetFilter:
         return 0
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
-        
+
+class WaitForDispatch(lsf.Wait):
+    def __init__(self):
+        self.eventName = "dispatch"
+    def checkCondition(self, job):
+        return len(job.getProcessIds()) >= 4
+
+class RunLProf:
+    def __repr__(self):
+        return "Running LProf profiler on"
+    def __call__(self, test, description):
+        job = lsf.LSFJob(test)
+        executionMachine = job.getExecutionMachine()
+        print description + ", executing on " + executionMachine
+        processId = job.getProcessIds()[-1]
+        runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId
+        outputFile = "prof." + processId
+        processLine = "/users/lennart/bin/process_gprof " + outputFile + " > lprof." + test.app.name
+        removeLine = "rm " + outputFile
+        commandLine = "rsh " + executionMachine + " '" + runLine + "; " + processLine + "; " + removeLine + "'"
+        os.system(commandLine)
+    def setUpSuite(self, suite, description):
+        pass
+ 

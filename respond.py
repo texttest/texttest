@@ -57,15 +57,20 @@ class InteractiveResponder(Responder):
 # Uses UNIX tkdiff
 class UNIXInteractiveResponder(InteractiveResponder):
     def __init__(self, lineCount):
-        self.lineCount = str(lineCount)
+        self.lineCount = lineCount
     def display(self, comparison, displayStream):
         argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
         if repr(comparison) == "output" and displayStream == sys.stdout:
             print "<See tkdiff window>"
             os.system("tkdiff" + argumentString + " &")
         else:
-            fileWritten = os.popen("diff" + argumentString + " | head -n " + self.lineCount)
-            displayStream.write(fileWritten.read())
+            stdin, stdout, stderr = os.popen3("diff" + argumentString)
+            linesWritten = 0
+            for line in stdout.xreadlines():
+                if linesWritten >= self.lineCount:
+                    return
+                displayStream.write(line)
+                linesWritten += 1
     
 class OverwriteOnFailures(Responder):
     def __init__(self, version):

@@ -1,9 +1,7 @@
 #!/usr/local/bin/python
 import os, time, string, signal, sys
 
-globalJobName = os.environ["USER"] + time.strftime("%H:%M:%S", time.localtime())
-def findJobName(test):
-    return globalJobName + repr(test.app) + test.getRelPath()
+globalJobName = ""
 
 def killJobs(signal, stackFrame):
     for job in os.popen("bjobs -w").readlines():
@@ -17,6 +15,37 @@ signal.signal(1, killJobs)
 signal.signal(2, killJobs)
 signal.signal(15, killJobs)
 
+class LSFJob:
+    def __init__(self, test):
+        globalJobName = test.getTmpExtension()
+        self.name = globalJobName + repr(test.app) + test.getRelPath()
+    def hasStarted(self):
+        retstring = self.getFile("-r").readline()
+        return string.find(retstring, "not found") == -1
+    def hasFinished(self):
+        retstring = self.getFile().readline()
+        return retstring.find("not found") != -1
+    def getExecutionMachine(self):
+        file = self.getFile("-w")
+        lastline = file.readlines()[-1]
+        fullName = self.getPreviousWord(lastline, self.name)
+        return fullName.split('.')[0]
+    def getProcessIds(self):
+        for line in self.getFile("-l").xreadlines():
+            pos = line.find("PIDs")
+            if pos != -1:
+                return line[pos + 6:].strip().split(' ')
+        return []
+    def getFile(self, options = ""):
+        return os.popen("bjobs -J " + self.name + " " + options + " 2>&1")
+    def getPreviousWord(self, line, field):
+        prevWord = ""
+        for word in line.split(' '):
+            if word == field:
+                return prevWord
+            prevWord = word
+        return ""
+    
 class SubmitTest:
     def __init__(self, queueFunction, resource = ""):
         self.queueFunction = queueFunction
@@ -33,7 +62,8 @@ class SubmitTest:
         testCommand = testCommand + " > " + outfile + "'"
         errfile = test.getTmpFileName("errors", "w")
         reportfile =  test.getTmpFileName("report", "w")
-        lsfOptions = "-J " + findJobName(test) + " -q " + queueToUse + " -o " + reportfile + " -e " + errfile
+        lsfJob = LSFJob(test)
+        lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -e " + errfile
         if len(self.resource):
             lsfOptions += " -R '" + self.resource + "'"
         commandLine = "bsub " + lsfOptions + " " + testCommand + " > " + reportfile + " 2>&1"
@@ -42,20 +72,21 @@ class SubmitTest:
         print description
     
 class Wait:
+    def __init__(self):
+        self.eventName = "completion"
     def __repr__(self):
-        return "Waiting for completion of"
+        return "Waiting for " + self.eventName + " of"
     def __call__(self, test, description):
-        if self.hasFinished(test):
+        job = LSFJob(test)
+        if self.checkCondition(job):
             return
         print description + "..."
-        while not self.hasFinished(test):
+        while not self.checkCondition(job):
             time.sleep(2)
     def setUpSuite(self, suite, description):
         pass
-#private:
-    def hasFinished(self, test):
-        retstring = os.popen("bjobs -J " + findJobName(test) + " 2>&1").readline()
-        return string.find(retstring, "not found") != -1
+    def checkCondition(self, job):
+        return job.hasFinished()
 
 class MakeResourceFiles:
     def __repr__(self):

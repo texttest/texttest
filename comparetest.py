@@ -157,7 +157,9 @@ class TestComparison(plugins.TestState):
             fileComparison = self.changedResults[0]
             del self.changedResults[0]
             self.correctResults.append(fileComparison)
-        self.categorise()
+        # No point categorising if we're overriding everything anyway...
+        if not makeNew:
+            self.categorise()
     def categorise(self):
         if not self.hasResults():
             raise plugins.TextTestError, "No output files at all produced, presuming problems running test"

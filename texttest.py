@@ -20,6 +20,12 @@ builtInOptions = """
 -d <root>  - use <root> as the root directory instead of the value of TEXTTEST_HOME,
              or the current working directory, which are used otherwise.
 
+-g         - run with GUI instead of text interface. Will only work if PyGTK is installed.
+
+-record <s>- record all user actions in the GUI to the script <s>
+
+-replay <s>- replay the script <s> created previously in the GUI. No effect without -g.
+
 -s <scrpt> - instead of the normal actions performed by the configuration, use the script <scpt>. If this contains
              a ".", an attempt will be made to understand it as the Python class <module>.<classname>. If this fails,
              it will be interpreted as an external script.
@@ -645,6 +651,8 @@ class OptionFinder:
         options["m"] = "Run this number of times"
         options["s"] = "Run this script"
         options["v"] = "Run this version"
+        options["record"] = "Record user actions to this script"
+        options["replay"] = "Replay user actions from this script"
         options.update(app.configObject.getArgumentOptions())
         return options
     def getSwitches(self, app):
@@ -693,15 +701,18 @@ class OptionFinder:
         return self.inputOptions.has_key("help")
     def keepWriteDirectories(self):
         return self.inputOptions.has_key("keeptmp")
-    def guiSettings(self):
-        if self.inputOptions.has_key("g"):
-            scriptFile = self.inputOptions["g"]
-            if len(scriptFile):
-                return 1, self.findGuiScript(scriptFile)
-            else:
-                return 1, None
+    def useGUI(self):
+        return self.inputOptions.has_key("g")
+    def recordScript(self):
+        if self.inputOptions.has_key("record"):
+            return self.findGuiScript(self.inputOptions["record"])
         else:
-            return 0, None
+            return ""
+    def replayScript(self):
+        if self.inputOptions.has_key("replay"):
+            return self.findGuiScript(self.inputOptions["replay"])
+        else:
+            return ""
     def findGuiScript(self, scriptFile):
         if os.path.isfile(scriptFile):
             return os.path.join(os.getcwd(), scriptFile)
@@ -903,7 +914,7 @@ class TextTest:
     def __init__(self):
         self.inputOptions = OptionFinder()
         global globalRunIdentifier
-        useGui, guiScript = self.inputOptions.guiSettings()
+        useGui = self.inputOptions.useGUI()
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
         self.allApps = self.inputOptions.findApps()
         self.gui = None
@@ -911,7 +922,9 @@ class TextTest:
             try:
                 self.ensureDisplaySet()
                 import texttestgui
-                self.gui = texttestgui.TextTestGUI(guiScript)
+                recordScript = self.inputOptions.recordScript()
+                replayScript = self.inputOptions.replayScript()
+                self.gui = texttestgui.TextTestGUI(replayScript, recordScript)
             except:
                 print "Cannot use GUI: caught exception:"
                 printException()

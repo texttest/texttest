@@ -3,151 +3,11 @@
 # GUI for TextTest written with PyGTK
 
 import plugins, gtk, gobject, os, string, time, sys
-
-class ActivateEvent:
-    def __init__(self, widget, active = gtk.TRUE):
-        self.widget = widget
-        self.active = active
-    def writeEventToScript(self, activeWidget, eventName):
-        global appendToScript
-        if appendToScript and activeWidget.get_active() == self.active:
-            appendToScript.write(eventName + os.linesep)
-    def generate(self, argumentString):
-        self.widget.set_active(self.active)
-        return 1
-
-class EntryEvent:
-    def __init__(self, widget):
-        self.widget = widget
-        self.oldText = ""
-    def writeEventToScript(self, entryWidget, event, eventName):
-        global appendToScript
-        if appendToScript:
-            text = entryWidget.get_text()
-            if text != self.oldText:
-                appendToScript.write(eventName + " " + text + os.linesep)
-                self.oldText = text
-    def generate(self, argumentString):
-        self.widget.set_text(argumentString)
-        return 1
-        
-class SignalEvent:
-    def __init__(self, signalName, widget):
-        self.signalName = signalName
-        self.widget = widget
-    def writeEventToScript(self, widget, eventName, *args):
-        global appendToScript
-        if appendToScript:
-            appendToScript.write(eventName + os.linesep)
-    def generate(self, argumentString):
-        self.widget.emit(self.signalName, *argumentString)
-        return 1
-
-class TreeViewSignalEvent(SignalEvent):
-    def __init__(self, signalName, widget, argumentParseData):
-        SignalEvent.__init__(self, signalName, widget)
-        self.column, self.valueId = argumentParseData
-        self.model = widget.get_model()
-    def writeEventToScript(self, view, path, column, eventName, *args):
-        nodeLabel = self.model.get_value(self.model.get_iter(path), self.valueId)
-        if appendToScript:
-            appendToScript.write(eventName + " " + nodeLabel + os.linesep)
-    def generate(self, argumentString):
-        arguments = argumentString.split(" ")
-        rowText = arguments[0]
-        path = self.findTreePath(self.model.get_iter_root(), rowText)
-        if not path:
-            print "Could not find row '" + rowText + "' in Tree View"
-            return 0
-        userArgs = argumentString.replace(rowText, "").strip()
-        self.widget.emit(self.signalName, path, self.column, *userArgs)
-        return 1
-    def pathHasText(self, iter, argumentText):
-        return self.model.get_value(iter, self.valueId) == argumentText
-    def findTreePath(self, iter, argumentText):
-        if self.pathHasText(iter, argumentText):
-            return self.model.get_path(iter)
-        childIter = self.model.iter_children(iter)
-        if childIter:
-            childPath = self.findTreePath(childIter, argumentText)
-            if childPath:
-                return childPath
-        nextIter = self.model.iter_next(iter)
-        if nextIter:
-            return self.findTreePath(nextIter, argumentText)
-        return None
-
-class EventHandler:
-    def __init__(self):
-        self.events = {}
-    def connect(self, eventName, signalName, widget, method, argumentParseData = None, *data):
-        stdName = self.standardName(eventName)
-        signalEvent = self.createSignalEvent(signalName, widget, argumentParseData)
-        self.events[stdName] = signalEvent
-        widget.connect(signalName, method, *data)
-        widget.connect(signalName, signalEvent.writeEventToScript, stdName)
-    def createSignalEvent(self, signalName, widget, argumentParseData):
-        if isinstance(widget, gtk.TreeView):
-            return TreeViewSignalEvent(signalName, widget, argumentParseData)
-        else:
-            return SignalEvent(signalName, widget)
-    def standardName(self, name):
-        firstIndex = None
-        lastIndex = len(name)
-        for i in range(len(name)):
-            if name[i] in string.letters or name[i] in string.digits:
-                if firstIndex is None:
-                    firstIndex = i
-                lastIndex = i
-        return name[firstIndex:lastIndex + 1].lower()
-    def generateEvent(self, scriptCommand):
-        eventName = self.findEvent(scriptCommand)
-        if not eventName:
-            raise plugins.TextTestError, "Could not parse script command '" + scriptCommand + "'"
-        argumentString = scriptCommand.replace(eventName, "").strip()
-        print "'" + eventName + "' event created with arguments '" + argumentString + "'"
-        event = self.events[eventName]
-        return event.generate(argumentString)
-    def createEntry(self, description):
-        entry = gtk.Entry()
-        stateChangeName = "enter " + self.standardName(description) + " ="
-        entryEvent = EntryEvent(entry)
-        self.events[stateChangeName] = entryEvent
-        entry.connect("focus-out-event", entryEvent.writeEventToScript, stateChangeName)
-        return entry
-    def createCheckButton(self, description):
-        button = gtk.CheckButton(description)
-        checkChangeName = "check " + self.standardName(description)
-        uncheckChangeName = "uncheck " + self.standardName(description)
-        checkEvent = ActivateEvent(button)
-        uncheckEvent = ActivateEvent(button, gtk.FALSE)
-        self.events[checkChangeName] = checkEvent
-        self.events[uncheckChangeName] = uncheckEvent
-        button.connect("toggled", checkEvent.writeEventToScript, checkChangeName)
-        button.connect("toggled", uncheckEvent.writeEventToScript, uncheckChangeName)
-        return button
-    def findEvent(self, command):
-        for eventName in self.events.keys():
-            if command.startswith(eventName):
-                return eventName
-        return None
-            
-eventHandler = EventHandler()
-
-
+from gtkscript import eventHandler
 
 class TextTestGUI:
-    def __init__(self, scriptName):
-        global appendToScript
-        appendToScript = None
-        self.scriptCommands = []
-        self.scriptPointer = 0
-        if scriptName:
-            if os.path.isfile(scriptName):
-                self.scriptCommands = map(string.strip, open(scriptName).readlines())
-            if len(self.scriptCommands) == 0:
-                appendToScript = open(scriptName, "a")
-        self.scriptName = scriptName
+    def __init__(self, replayScriptName, recordScriptName):
+        eventHandler.setScripts(replayScriptName, recordScriptName)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.instructions = []
         self.postponedInstructions = []
@@ -247,10 +107,8 @@ class TextTestGUI:
         self.createIterMap()
         self.testCaseGUI = TestCaseGUI(None)
         topWindow = self.createTopWindow()
+        eventHandler.addIdle("test actions", self.doNextAction)
         # Run the Gtk+ main loop.
-        if len(self.scriptCommands):
-            gtk.idle_add(self.runScriptCommands)
-        gtk.idle_add(self.doNextAction)
         gtk.main()
     def doNextAction(self):
         if len(self.instructions) == 0:
@@ -278,23 +136,6 @@ class TextTestGUI:
         iter = self.itermap[test]
         self.model.set_value(iter, 1, self.getTestColour(test))
         self.model.row_changed(self.model.get_path(iter), iter)
-    def runScriptCommands(self):
-        global appendToScript
-        if self.scriptPointer >= len(self.scriptCommands):
-            appendToScript = open(self.scriptName, "a")
-            return gtk.FALSE
-        nextCommand = self.scriptCommands[self.scriptPointer]
-        try:
-            if nextCommand == "" or eventHandler.generateEvent(nextCommand):
-                self.scriptPointer += 1
-            elif self.scriptPointer > 0:
-                self.scriptPointer -= 1
-        except:
-            print "Script terminated due to exception : "
-            type, value, traceback = sys.exc_info()
-            sys.excepthook(type, value, traceback)
-            return gtk.FALSE
-        return gtk.TRUE
     def quit(self, *args):
         gtk.main_quit()
     def viewTest(self, view, path, column, *args):

@@ -16,7 +16,7 @@ and Sun Grid Engine are supported via the corresponding modules.
 """
 
 # Text for use by derived configurations as well
-lsfGeneral = """
+queueGeneral = """
 When all tests have been submitted to the queueing system, the configuration will
 then wait for each test, and provide comparison when each has finished.
 
@@ -62,7 +62,7 @@ def getConfig(optionMap):
 emergencyFinish = 0
 
 def tenMinutesToGo(signal, stackFrame):
-    print "Received LSF signal for termination in 10 minutes, killing all remaining jobs"
+    print "Received signal for termination in 10 minutes, killing all remaining jobs"
     sys.stdout.flush() # Try not to lose log file information...
     global emergencyFinish
     emergencyFinish = 1
@@ -142,14 +142,15 @@ class SubmissionRules:
         self.nonTestProcess = nonTestProcess
         if not nonTestProcess and os.environ.has_key("QUEUE_SYSTEM_PROCESSES"):
             self.processesNeeded = os.environ["QUEUE_SYSTEM_PROCESSES"]
+        self.envResource = ""
+        if os.environ.has_key("QUEUE_SYSTEM_RESOURCE"):
+            self.envResource = os.getenv("QUEUE_SYSTEM_RESOURCE")
     def findResourceList(self):
         resourceList = []
         if self.optionMap.has_key("R"):
             resourceList.append(self.optionMap["R"])
-        if os.environ.has_key("QUEUE_SYSTEM_RESOURCE"):
-            resource = os.getenv("QUEUE_SYSTEM_RESOURCE")
-            if len(resource):
-                resourceList.append(resource)
+        if len(self.envResource):
+            resourceList.append(self.envResource)
         return resourceList
     def findQueue(self):
         if self.nonTestProcess:
@@ -478,6 +479,11 @@ class UpdateTestStatus(UpdateStatus):
         limitMessage = QueueSystemServer.instance.findJobLimitMessage(test, self.jobNameFunction)
         if limitMessage:
             raise plugins.TextTestError, limitMessage + os.linesep
+        slaveErrFile = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
+        if os.path.isfile(slaveErrFile):
+            errStr = open(slaveErrFile).read()
+            if errStr:
+                raise plugins.TextTestError, "Slave exited on " + machineStr + " : " + os.linesep + errStr
         raise plugins.TextTestError, "No results produced on " + machineStr + ", presuming problems running test there"
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
@@ -507,23 +513,20 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
     def __init__(self, isSlowdownJob):
         unixConfig.MakePerformanceFile.__init__(self)
         self.isSlowdownJob = isSlowdownJob
+        self.queueMachineInfo = None
     def findExecutionMachines(self, test):
+        # This is LSF-specific right now. Leave generalising until we understand
+        # how SGE works in these respects.
+        if not os.environ.has_key("LSB_HOSTS"):
+            return unixConfig.MakePerformanceFile.findExecutionMachines(self, test)
         hosts = os.environ["LSB_HOSTS"].split(":")
         return [ host.split(".")[0] for host in hosts ] 
     def findPerformanceMachines(self, app):
         rawPerfMachines = unixConfig.MakePerformanceFile.findPerformanceMachines(self, app)
         perfMachines = []
         for machine in rawPerfMachines:
-            perfMachines += self.findActualMachines(machine)
+            perfMachines += self.queueMachineInfo.findActualMachines(machine)
         return perfMachines
-    def findActualMachines(self, machine):
-        # 'machine' may actually be a host group
-        machines = []
-        for line in os.popen("bhosts " + machine + " 2>&1"):
-            if line.startswith("HOST_NAME"):
-                continue
-            machines.append(line.split()[0].split(".")[0])
-        return machines
     def writeMachineInformation(self, file, executionMachines):
         # Try and write some information about what's happening on the machine
         for machine in executionMachines:
@@ -533,21 +536,26 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         try:
             return self._findRunningJobs(machine)
         except IOError:
-            # If bjobs is interrupted, it shouldn't matter, try again
+            # If system calls to the queue system are interrupted, it shouldn't matter, try again
             return self._findRunningJobs(machine)
     def _findRunningJobs(self, machine):
         # On a multi-processor machine performance can be affected by jobs on other processors,
         # as for example a process can hog the memory bus. Allow subclasses to define how to
         # stop these "slowdown jobs" to avoid false performance failures. Even if they aren't defined
         # as such, print them anyway so the user can judge for himself...
+        jobsFromQueue = self.queueMachineInfo.findRunningJobs(machine)
         jobs = []
-        for line in os.popen("bjobs -m " + machine + " -u all -w 2>&1 | grep RUN").xreadlines():
-            fields = line.split()
-            user = fields[1]
-            jobName = fields[6]
+        for user, jobName in jobsFromQueue:
             descriptor = "Also on "
             if self.isSlowdownJob(user, jobName):
                 descriptor = "Suspected of SLOWING DOWN "
             jobs.append(descriptor + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
-
+    def setUpApplication(self, app):
+        moduleName = queueSystemName(app).lower()
+        command = "from " + moduleName + " import MachineInfo as _MachineInfo"
+        exec command
+        self.queueMachineInfo = _MachineInfo()
+        # This calls back to findPerformanceMachines, do it last.
+        unixConfig.MakePerformanceFile.setUpApplication(self, app)
+        

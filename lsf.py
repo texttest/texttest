@@ -116,3 +116,20 @@ class QueueSystem:
             return 1
         return 0
 
+class MachineInfo:
+    def findActualMachines(self, machine):
+        # 'machine' may actually be a host group
+        machines = []
+        for line in os.popen("bhosts " + machine + " 2>&1"):
+            if not line.startswith("HOST_NAME"):
+                machines.append(line.split()[0].split(".")[0])
+        return machines
+    def findRunningJobs(self, machine):
+        jobs = []
+        for line in os.popen("bjobs -m " + machine + " -u all -w 2>&1 | grep RUN").xreadlines():
+            fields = line.split()
+            user = fields[1]
+            jobName = fields[6]
+            jobs.append((user, jobName))
+        return jobs
+    

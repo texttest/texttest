@@ -60,8 +60,9 @@ class BatchFilter(plugins.Filter):
         return None
 
 class BatchCategory(plugins.Filter):
-    def __init__(self, description):
-        self.description = description
+    def __init__(self, briefDescription, longDescription):
+        self.briefDescription = briefDescription
+        self.longDescription = longDescription
         self.count = 0
         self.testLines = {}
     def addTest(self, test, postText):
@@ -75,7 +76,7 @@ class BatchCategory(plugins.Filter):
         return self.testLines.has_key(test.getRelPath())
     def describe(self, mailFile, app):
         if self.count > 0:
-            mailFile.write("The following tests " + self.description + " : " + os.linesep)
+            mailFile.write("The following tests " + self.longDescription + " : " + os.linesep)
             valid, suite = app.createTestSuite([ self ])
             self.writeTestLines(mailFile, suite)
             mailFile.write(os.linesep)
@@ -90,8 +91,10 @@ class BatchCategory(plugins.Filter):
 allBatchResponders = []
 categoryNames = [ "badPredict", "bug", "crash", "dead", "difference", "faster", "slower",\
                   "larger", "smaller", "success", "unfinished" ]
-categoryDescriptions = [ "had internal errors", "had known bugs", "CRASHED", "caused exception", "FAILED", \
-                         "ran faster", "ran slower", "used more memory", "used less memory", "succeeded", "were unfinished" ]
+longCategoryDescriptions = [ "had internal errors", "had known bugs", "CRASHED", "were unrunnable", "FAILED", \
+                             "ran faster", "ran slower", "used more memory", "used less memory", "succeeded", "were unfinished" ]
+briefCategoryDescriptions = [ "internal errors", "known bugs", "CRASHED", "unrunnable", "FAILED", \
+                              "faster", "slower", "memory+", "memory-", "succeeded", "unfinished" ]
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):
@@ -104,7 +107,7 @@ class BatchResponder(respond.Responder):
         self.orderedTests = []
         self.categories = {}
         for i in range(len(categoryNames)):
-            self.categories[categoryNames[i]] = BatchCategory(categoryDescriptions[i])
+            self.categories[categoryNames[i]] = BatchCategory(briefCategoryDescriptions[i], longCategoryDescriptions[i])
         self.mainSuite = None
         allBatchResponders.append(self)
     def addTestToCategory(self, category, test, postText = ""):
@@ -261,18 +264,18 @@ class MailSender(plugins.Action):
         # See if the session name has an entry, if not, send to the user
         return os.path.expandvars(getBatchConfigValue(app, "batch_recipients", self.sessionName))
     def getMailHeader(self, app, appResponders):
-        title = time.strftime("%y%m%d") + " " + repr(app) + " Test Suite "
+        title = time.strftime("%y%m%d") + " " + repr(app)
         versions = self.findCommonVersions(app, appResponders)
-        return title + self.getVersionString(versions) + ": "
+        return title + self.getVersionString(versions) + " : "
     def getMailTitle(self, app, appResponders):
         title = self.getMailHeader(app, appResponders)
-        title += self.getTotalString(appResponders, BatchResponder.testCount) + " tests ran"
+        title += self.getTotalString(appResponders, BatchResponder.testCount) + " tests"
         if self.getTotalString(appResponders, BatchResponder.failureCount) == "0":
             return title + ", all successful"
         title += " :"
         for categoryName in categoryNames:
             totalInCategory = self.getCategoryCount(categoryName, appResponders)
-            title += self.briefText(totalInCategory, appResponders[0].categories[categoryName].description)
+            title += self.briefText(totalInCategory, appResponders[0].categories[categoryName].briefDescription)
         # Lose trailing comma
         return title[:-1]
     def getMachineTitle(self, app, appResponders):
@@ -292,7 +295,7 @@ class MailSender(plugins.Action):
         return total
     def getVersionString(self, versions):
         if len(versions) > 0:
-            return "(version " + string.join(versions, ".") + ") "
+            return " " + string.join(versions, ".")
         else:
             return ""
     def briefText(self, count, description):
@@ -361,7 +364,7 @@ class CollectFiles(plugins.Action):
             return title + ", all successful"
         title += " :"
         for index in range(len(categoryNames)):
-            title += self.mailSender.briefText(totalValues[index], categoryDescriptions[index])
+            title += self.mailSender.briefText(totalValues[index], briefCategoryDescriptions[index])
         # Lose trailing comma
         return title[:-1]
     def writeBody(self, mailFile, bodies):

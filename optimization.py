@@ -266,7 +266,6 @@ class OptimizationRun:
         self.performance = performance.getTestPerformance(test, version) # float value
         logFinder = LogFileFinder(test, tryTmpFile)
         self.logFile = logFinder.findFile(version)
-        print self.logFile
         self.penaltyFactor = 1.0
         calculator = OptimizationValueCalculator(definingItems + interestingItems, self.logFile)
         self.solutions = calculator.getSolutions(definingItems)

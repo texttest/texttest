@@ -27,11 +27,11 @@ builtInOptions = """
 -gx        - run static GUI, which won't run tests unless instructed. Useful for creating new tests
              and viewing the test suite.
              
--record <s>- record all user actions in the GUI to the script <s>
+-record <s>- use PyUseCase to record all user actions in the GUI to the script <s>
 
--replay <s>- replay the script <s> created previously in the GUI. No effect without -g.
+-replay <s>- use PyUseCase to replay the script <s> created previously in the GUI. No effect without -g.
 
--recinp <s>- record everything received on standard input to the script <s> 
+-recinp <s>- use PyUseCase to record everything received on standard input to the script <s> 
 
 -s <scrpt> - instead of the normal actions performed by the configuration, use the script <scpt>. If this contains
              a ".", an attempt will be made to understand it as the Python class <module>.<classname>. If this fails,
@@ -50,6 +50,8 @@ builtInOptions = """
 
 # Base class for TestCase and TestSuite
 class Test:
+    # Used by the static GUI to say that a test's definition has changed and it needs to re-read its files
+    UPDATED = -3
     #State names. By default, the negative states are not used. We start in state NOT_STARTED
     NEED_PREPROCESS = -2
     RUNNING_PREPROCESS = -1
@@ -216,7 +218,7 @@ class TestCase(Test):
                 # Rely on the GUI to report the same event
                 pass
     def stateChangeEvent(self, state, oldState = None):
-        if oldState and oldState == self.FAILED:
+        if state == self.UPDATED or (oldState and oldState == self.FAILED):
             # Don't record event if we're being 'saved' or whatever
             return
         eventName = "test " + self.name + " to " + self.stateChangeDescription(state)
@@ -939,26 +941,6 @@ class OptionFinder:
         return self.inputOptions.has_key("g") or self.inputOptions.has_key("gx")
     def guiRunTests(self):
         return not self.inputOptions.has_key("gx")
-    def recordScript(self):
-        if self.inputOptions.has_key("record"):
-            return self.findGuiScript(self.inputOptions["record"])
-        else:
-            return ""
-    def replayScript(self):
-        if self.inputOptions.has_key("replay"):
-            return self.findGuiScript(self.inputOptions["replay"])
-        else:
-            return ""
-    def stdinScript(self):
-        if self.inputOptions.has_key("recinp"):
-            return self.findGuiScript(self.inputOptions["recinp"])
-        else:
-            return ""
-    def findGuiScript(self, scriptFile):
-        if os.path.isfile(scriptFile):
-            return os.path.join(os.getcwd(), scriptFile)
-        else:
-            return os.path.join(self.directoryName, scriptFile)
     def _getDiagnosticFile(self):
         if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
@@ -1310,19 +1292,16 @@ class TextTest:
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
         self.allApps = self.inputOptions.findApps()
         self.gui = None
-        recordScript = self.inputOptions.recordScript()
-        replayScript = self.inputOptions.replayScript()
-        stdinScript = self.inputOptions.stdinScript()        
         if self.inputOptions.useGUI():
             try:
                 import texttestgui
-                self.gui = texttestgui.TextTestGUI(self.inputOptions.guiRunTests(), replayScript, recordScript, stdinScript)
+                self.gui = texttestgui.TextTestGUI(self.inputOptions.guiRunTests())
             except:
                 print "Cannot use GUI: caught exception:"
                 printException()
         if not self.gui:
             logger = plugins.getSelfTestDiagnostics("Use-case log", "usecase_log.texttest")
-            self.scriptEngine = ScriptEngine(replayScript, recordScript, stdinScript, logger)
+            self.scriptEngine = ScriptEngine(logger)
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names
         if os.environ.has_key("USER"):

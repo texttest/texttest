@@ -166,7 +166,7 @@ class RecordTest(InteractiveAction):
         test.makeBasicWriteDirectory()
         test.setUpEnvironment(parents=1)
         os.chdir(test.writeDirs[0])
-        recordCommand = test.getExecuteCommand() + " -record " + test.useCaseFile + " -recinp " + test.inputFile
+        recordCommand = test.getExecuteCommand() + " --record " + test.useCaseFile + " --recinp " + test.inputFile
         shellTitle = None
         shellOptions = ""
         if test.getConfigValue("use_standard_input"):
@@ -175,6 +175,7 @@ class RecordTest(InteractiveAction):
         process.waitForTermination()
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
+        test.changeState(test.UPDATED, "Recorded use case")
     def matchesMode(self, dynamic):
         return not dynamic
     def __repr__(self):

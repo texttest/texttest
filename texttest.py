@@ -983,15 +983,17 @@ class TextTest:
             return "%d%b%H:%M:%S"
         else:
             return "%H%M%S"
-    def validDisplayValue(self):
+    def shouldFindTestDisplay(self):
         if not os.environ.has_key("DISPLAY"):
+            return 1
+        if self.inputOptions.useGUI() and self.inputOptions.recordScript() != "":
             return 0
-        if os.environ["DISPLAY"] != "TEXTTEST_GETDISPLAY":
+        if os.environ.has_key("TEST_DISPLAY") and os.environ["TEST_DISPLAY"] == "TEXTTEST_GETDISPLAY":
             return 1
         return 0
     def ensureDisplaySet(self):
         # DISPLAY variable must be set if we are to run the GUI on UNIX
-        if os.name == "posix" and not self.validDisplayValue():
+        if os.name == "posix" and self.shouldFindTestDisplay():
             for app in self.allApps:
                 try:
                     displayModule = app.getConfigValue("display_module")

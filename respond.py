@@ -102,7 +102,10 @@ class UNIXInteractiveResponder(InteractiveResponder):
                     return
                 displayStream.write(line)
                 linesWritten += 1
+            # Don't wait for the garbage collector - we risk a lot of failures otherwise...
             stdin.close()
+            stdout.close()
+            stderr.close()
     
 class OverwriteOnFailures(Responder):
     def responderText(self, test):

@@ -181,7 +181,20 @@ class BuildCode(plugins.Action):
         self.target = target
         self.childProcesses = []
     def setUpApplication(self, app):
-        absPath = self.getAbsPath(app, self.target)
+        for relPath in app.getConfigList("build_" + self.target):
+            absPath = app.makeAbsPath(relPath)
+            if os.path.isdir(absPath):
+                self.buildLocal(absPath, app)
+            else:
+                print "Not building in", absPath, "which doesn't exist!"
+        for relPath in app.getConfigList("build_codebase"):
+            absPath = app.makeAbsPath(relPath)
+            if os.path.isdir(absPath):
+                self.buildRemote("sundance", "sparc", absPath) 
+                self.buildRemote("ramechap", "parisc_2_0", absPath)
+            else:
+                print "Not building in", absPath, "which doesn't exist!"
+    def buildLocal(self, absPath, app):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."
         buildFile = "build.default"
@@ -190,9 +203,6 @@ class BuildCode(plugins.Action):
             raise "Product " + repr(app) + " did not build, exiting"
         print "Product", app, "built correctly in", absPath
         os.remove(buildFile)
-        absPath = self.getAbsPath(app, "codebase")
-        self.buildRemote("sundance", "sparc", absPath) 
-        self.buildRemote("ramechap", "parisc_2_0", absPath)
     def buildRemote(self, machine, arch, absPath):
         print "Building remotely in parallel on " + machine + "..."
         processId = os.fork()
@@ -200,7 +210,7 @@ class BuildCode(plugins.Action):
             signal.signal(1, self.killBuild)
             signal.signal(2, self.killBuild)
             signal.signal(15, self.killBuild)
-            commandLine = "cd " + absPath + "; gmake >& build." + arch
+            commandLine = "cd " + absPath + "; gmake < /dev/null >& build." + arch
             os.system("rsh " + machine + " '" + commandLine + "'")
             os.chdir(absPath)
             sys.exit(self.checkBuildFile("build." + arch))

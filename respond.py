@@ -43,7 +43,7 @@ class InteractiveResponder(Responder):
         if allowView:
             options = "View details(v), " + options
         print test.getIndent() + options
-        response = sys.stdin.readline();
+        response = sys.stdin.readline()
         if 's' in response:
             for comparison in comparisons:
                 comparison.overwrite()

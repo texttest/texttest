@@ -210,7 +210,7 @@ class ReplayScript:
             self.waitingForEvent = applicationEventName
             return 0
     def processSignalCommand(self, signalArg):
-        signalNum = int(signalArg)
+        exec "signalNum = signal." + signalArg
         self.write("Generating signal " + signalArg)
         os.kill(self.processId, signalNum)
         return 1
@@ -232,6 +232,11 @@ class UseCaseRecordScript(RecordScript):
         self.processId = os.getpid()
         self.applicationEvents = seqdict()
         self.realSignalHandlers = {}
+        self.signalNames = {}
+        for entry in dir(signal):
+            if entry.startswith("SIG") and not entry.startswith("SIG_"):
+                exec "number = signal." + entry
+                self.signalNames[number] = entry
         for signum in range(signal.NSIG):
             try:
                 # Don't record SIGCHLD unless told to, these are generally ignored
@@ -243,7 +248,7 @@ class UseCaseRecordScript(RecordScript):
                 pass
     def recordSignal(self, signum, stackFrame):
         self.writeApplicationEventDetails()
-        self.record(signalCommandName + " " + str(signum))
+        self.record(signalCommandName + " " + self.signalNames[signum])
         # Reset the handler and send the signal to ourselves again...
         realHandler = self.realSignalHandlers[signum]
         # If there was no handler-override installed, resend the signal with the handler reset

@@ -86,7 +86,7 @@ class SaveTest(InteractiveAction):
                 return 1
         return 0
     def getExactness(self):
-        return self.optionGroup.getSwitchValue("ex", 1)
+        return int(self.optionGroup.getSwitchValue("ex", 1))
     def __call__(self, test):
         version = self.optionGroup.getOptionValue("v")
         saveDesc = " - version " + version + ", exactness " + str(self.getExactness())
@@ -144,7 +144,7 @@ class ViewFile(InteractiveAction):
             return self.followFile(fileName)
         if not comparison:
             baseName = os.path.basename(fileName)
-            refresh = baseName.startswith("testsuite.") or baseName.startswith("options.")
+            refresh = int(baseName.startswith("testsuite.") or baseName.startswith("options."))
             return self.viewFile(fileName, refresh=refresh)
         if self.shouldTakeDiff(comparison):
             self.takeDiff(comparison)

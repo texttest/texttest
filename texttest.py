@@ -167,10 +167,12 @@ class TestCase(Test):
         # Once we've left the pathway, we can't return...
         if self.state == self.UNRUNNABLE or self.state == self.KILLED:
             return
+        oldState = self.state
         self.state = state
         self.stateDetails = details
-        for observer in self.observers:
-            observer.notifyChange(self)
+        if state != oldState:
+            for observer in self.observers:
+                observer.notifyChange(self)
     def performOnSubTests(self, action):
         pass
     def getSubInstructions(self, action):

@@ -523,11 +523,21 @@ class UpdateTestLSFStatus(UpdateLSFStatus):
         if not self.testsWaitingForFiles.has_key(test):
             self.testsWaitingForFiles[test] = 0
         if self.testsWaitingForFiles[test] > 10:
-            raise plugins.TextTestError, "No results produced on " + machineStr + ", presuming problems running test there"
+            return self.slaveFailed(test, machineStr)
 
         self.testsWaitingForFiles[test] += 1
         self.describe(test, " : results not yet available, file system wait time " + str(self.testsWaitingForFiles[test]))
         return self.WAIT | self.RETRY
+    def slaveFailed(self, test, machineStr):
+        job = LSFServer.instance.findJob(test, self.jobNameFunction)
+        for line in os.popen("bjobs -a -l " + job.jobId).readlines():
+            if line.find("signal 24") != -1:
+                raise plugins.TextTestError, "Test hit LSF's CPU time limit, and was killed." + os.linesep + \
+                      "Maybe it went into an infinite loop or maybe it needs to be run in another queue."
+            if line.find("exit code 140") != -1:
+                raise plugins.TextTestError, "Test hit LSF's total run time limit, and was killed." + os.linesep + \
+                      "Maybe it was hanging or maybe it needs to be run in another queue."
+        raise plugins.TextTestError, "No results produced on " + machineStr + ", presuming problems running test there"
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
     def getPostText(self, test):

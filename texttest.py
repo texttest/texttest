@@ -245,8 +245,13 @@ class TestCase(Test):
                 os.remove(fpath) 
             else:
                 self._removeDir(fpath)
-        os.rmdir(subDir)
-            
+        try:
+            os.rmdir(subDir)
+        except OSError:
+            # Seem to get "directory not empty here".
+            # Assume this is a race condition, so wait and try again
+            time.sleep(1)
+            self._removeDir(subDir)
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):
         Test.__init__(self, name, abspath, app)

@@ -35,6 +35,8 @@ helpOptions = """
 -l         - run in local mode. This means that the framework will not use LSF, but will behave as
              if the default configuration was being used, and run on the local machine.
 
+-q <queue> - run in named queue
+
 -r <limits>- run tests subject to the time limits (in minutes) represented by <limits>. If this is a single limit
              it will be interpreted as a minimum. If it is two comma-separated values, these are interpreted as
              <minimum>,<maximum>. Empty strings are treated as no limit.
@@ -63,7 +65,7 @@ signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
 class LSFConfig(unixConfig.UNIXConfig):
     def getOptionString(self):
-        return "elr:R:" + unixConfig.UNIXConfig.getOptionString(self)
+        return "qelr:R:" + unixConfig.UNIXConfig.getOptionString(self)
     def getFilterList(self):
         filters = unixConfig.UNIXConfig.getFilterList(self)
         self.addFilter(filters, "r", performance.TimeFilter)
@@ -77,7 +79,11 @@ class LSFConfig(unixConfig.UNIXConfig):
             return default.Config.getTestRunner(self)
         else:
             return SubmitTest(self.findLSFQueue, self.findLSFResource)
+    def queueDecided(self, test):
+        return self.optionMap.has_key("q")
     def findLSFQueue(self, test):
+        if self.queueDecided(test):
+            return self.optionMap["q"]
         return test.app.getConfigValue("lsf_queue")
     def findLSFResource(self, test):
         resourceList = self.findResourceList(test.app)

@@ -111,6 +111,8 @@ class CarmenConfig(lsf.LSFConfig):
         else:
             return lsf.LSFConfig.getTestRunner(self)
     def findLSFQueue(self, test):
+        if self.queueDecided(test):
+            return lsf.LSFConfig.findLSFQueue(self, test)
         if architecture == "powerpc" or architecture == "parisc_2_0":
             return architecture
         cpuTime = performance.getTestPerformance(test)

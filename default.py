@@ -67,10 +67,10 @@ class Config(plugins.Configuration):
             group.addSwitch("n", "Create new results files (overwrite everything)")
         elif group.name.startswith("Side"):
             group.addSwitch("keeptmp", "Keep temporary write-directories")
-    def getActionSequence(self, useGui):
-        return self._getActionSequence(useGui, makeDirs=1)
-    def _getActionSequence(self, useGui, makeDirs):
-        actions = [ self.tryGetTestRunner(), self.getTestEvaluator(useGui) ]
+    def getActionSequence(self):
+        return self._getActionSequence(makeDirs=1)
+    def _getActionSequence(self, makeDirs):
+        actions = [ self.tryGetTestRunner(), self.getTestEvaluator() ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
@@ -106,11 +106,11 @@ class Config(plugins.Configuration):
         return RunTest()
     def isReconnectingFast(self):
         return self.isReconnecting() and not self.optionMap.has_key("reconnfull")
-    def getTestEvaluator(self, useGui):
+    def getTestEvaluator(self):
         actions = [ self.getFileExtractor() ]
         if not self.isReconnectingFast():
             actions += [ self.getCatalogueCreator(), self.getTestPredictionChecker(), self.getTestComparator(), self.getFailureExplainer() ]
-        if not useGui:
+        if not self.optionMap.useGUI():
             actions.append(self.getTestResponder())
         return actions
     def getFileExtractor(self):

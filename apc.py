@@ -74,7 +74,7 @@ class ApcConfig(optimization.OptimizationConfig):
         if group.name.startswith("How"):
             group.addOption("rundebug", "Run debugger")
             group.addOption("extractlogs", "Extract Apc Logs")
-    def getActionSequence(self, useGui):
+    def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI,
                         KPI.cWorstBestPairingOptTimeKPI,
@@ -85,7 +85,7 @@ class ApcConfig(optimization.OptimizationConfig):
         if self.optionMap.has_key("kpiData"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI]
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
-        return optimization.OptimizationConfig.getActionSequence(self, useGui)
+        return optimization.OptimizationConfig.getActionSequence(self)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def getRuleBuildObject(self, testRunner, jobNameCreator):

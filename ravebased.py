@@ -104,10 +104,10 @@ class Config(carmen.CarmenConfig):
         filters = carmen.CarmenConfig.getFilterList(self)
         self.addFilter(filters, "u", UserFilter)
         return filters
-    def getActionSequence(self, useGui):
+    def getActionSequence(self):
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
         return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleBuilder() ] + \
-                 carmen.CarmenConfig._getActionSequence(self, useGui, makeDirs = 0)
+                 carmen.CarmenConfig._getActionSequence(self, makeDirs = 0)
     def getCarmVarChecker(self):
         if not self.isReconnecting():
             return CheckCarmVariables()

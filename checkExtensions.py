@@ -63,8 +63,8 @@ class CheckExtConfig(carmen.CarmenConfig):
                                          CreateCompareFiles(),
                                          HandleCompressedFiles(COMPRESS) ]
 
-    def getTestEvaluator(self, useGui):
-        return [ carmen.CarmenConfig.getTestEvaluator(self, useGui) ,
+    def getTestEvaluator(self):
+        return [ carmen.CarmenConfig.getTestEvaluator(self) ,
                                          HandleCompressedFiles(COMPRESS,'check_extension') ]
 
     def getTestRunner(self):

@@ -4,7 +4,7 @@
 # This plug-in is derived from CarmenConfig which is derived from LSF.
 # The main contribution of this plug-in is being able to allocate a display.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.5 2004/01/26 15:21:22 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.6 2004/10/01 12:55:54 geoff Exp $
 #
 import carmen, os, plugins
 
@@ -14,8 +14,8 @@ def getConfig(optionMap):
 class StudioConfig(carmen.CarmenConfig):
     def __init__(self, eh):
 	carmen.CarmenConfig.__init__(self, eh)
-    def getActionSequence(self, useGui):
-        return [ self.getTestSetup() ] + carmen.CarmenConfig.getActionSequence(self, useGui)
+    def getActionSequence(self):
+        return [ self.getTestSetup() ] + carmen.CarmenConfig.getActionSequence(self)
     def getTestCollator(self):
         return [ carmen.CarmenConfig.getTestCollator(self), self.getTestCleanup() ]
     def getTestSetup(self):

@@ -12,7 +12,7 @@ class Configuration:
         self.optionMap = optionMap
     def addToOptionGroup(self, group):
         pass
-    def getActionSequence(self, useGui):
+    def getActionSequence(self):
         return []
     def getFilterList(self):
         return []

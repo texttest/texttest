@@ -509,7 +509,7 @@ class BadConfigError(RuntimeError):
     pass
         
 class ConfigurationWrapper:
-    def __init__(self, moduleName, optionMap):
+    def __init__(self, moduleName, inputOptions):
         self.moduleName = moduleName
         importCommand = "from " + moduleName + " import getConfig"
         try:
@@ -520,7 +520,7 @@ class ConfigurationWrapper:
                 self.raiseException(msg = "could not find config_module " + moduleName, useOrigException=0)
             else:
                 self.raiseException(msg = "config_module " + moduleName + " contained errors and could not be imported") 
-        self.target = getConfig(optionMap)
+        self.target = getConfig(inputOptions)
     def raiseException(self, msg = None, req = None, useOrigException = 1):
         message = msg
         if not msg:
@@ -554,9 +554,9 @@ class ConfigurationWrapper:
             return self.target.addToOptionGroup(group)
         except:
             self.raiseException(req = "add to option group")
-    def getActionSequence(self, useGui):
+    def getActionSequence(self):
         try:
-            actionSequenceFromConfig = self.target.getActionSequence(useGui)
+            actionSequenceFromConfig = self.target.getActionSequence()
         except:
             self.raiseException(req = "action sequence")
         actionSequence = []
@@ -593,7 +593,7 @@ class ConfigurationWrapper:
             self.raiseException(req = "execute command")
 
 class Application:
-    def __init__(self, name, abspath, configFile, version, optionMap):
+    def __init__(self, name, abspath, configFile, version, inputOptions):
         self.name = name
         self.abspath = abspath
         # Place to store reference to extra_version application
@@ -607,9 +607,9 @@ class Application:
         self.configDir.readValuesFromFile(configFile, name, extensions, insert=0)
         self.fullName = self.getConfigValue("full_name")
         debugLog.info("Found application " + repr(self))
-        self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), optionMap)
+        self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), inputOptions)
         self.cleanMode = self.configObject.getCleanMode()
-        self.writeDirectory = self._getWriteDirectory(optionMap.has_key("gx"))
+        self.writeDirectory = self._getWriteDirectory(inputOptions.useStaticGUI())
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
@@ -617,11 +617,11 @@ class Application:
         self.configDir.readValuesFromFile(configFile, name, extensions, insert=0, errorOnUnknown=1)
         personalFile = self.getPersonalConfigFile()
         self.configDir.readValuesFromFile(personalFile, insert=0, errorOnUnknown=1)
-        self.checkout = self.makeCheckout(optionMap)
+        self.checkout = self.makeCheckout(inputOptions.checkoutOverride())
         debugLog.info("Checkout set to " + self.checkout)
-        self.optionGroups = self.createOptionGroups(optionMap)
-        self.useDiagnostics = self.setDiagnosticSettings(optionMap)
-        self.slowMotionReplaySpeed = self.setSlowMotionSettings(optionMap)
+        self.optionGroups = self.createOptionGroups(inputOptions)
+        self.useDiagnostics = self.setDiagnosticSettings(inputOptions)
+        self.slowMotionReplaySpeed = self.setSlowMotionSettings(inputOptions)
     def __repr__(self):
         return self.fullName
     def __cmp__(self, other):
@@ -689,7 +689,7 @@ class Application:
             self.setConfigDefault("interpreter", "python")
         else:
             self.setConfigDefault("interpreter", "")
-    def createOptionGroups(self, optionMap):
+    def createOptionGroups(self, inputOptions):
         defaultDict = self.getConfigValue("gui_entry_overrides")
         optionDict = self.getConfigValue("gui_entry_options")
         groupNames = [ "Select Tests", "What to run", "How to run", "Side effects", "Invisible" ]
@@ -699,20 +699,20 @@ class Application:
             self.addToOptionGroup(group)
             self.configObject.addToOptionGroup(group)
             optionGroups.append(group)
-        for option in optionMap.keys():
+        for option in inputOptions.keys():
             optionGroup = self.findOptionGroup(option, optionGroups)
             if not optionGroup:
                 raise BadConfigError, "unrecognised option -" + option
         return optionGroups
-    def setDiagnosticSettings(self, optionMap):
-        if optionMap.has_key("diag"):
+    def setDiagnosticSettings(self, inputOptions):
+        if inputOptions.has_key("diag"):
             return 1
-        elif optionMap.has_key("trace"):
+        elif inputOptions.has_key("trace"):
             envVarName = self.getConfigValue("diagnostics")["trace_level_variable"]
-            os.environ[envVarName] = optionMap["trace"]
+            os.environ[envVarName] = inputOptions["trace"]
         return 0
-    def setSlowMotionSettings(self, optionMap):
-        if optionMap.has_key("actrep"):
+    def setSlowMotionSettings(self, inputOptions):
+        if inputOptions.has_key("actrep"):
             return self.getConfigValue("slow_motion_replay_speed")
         else:
             return 0
@@ -873,8 +873,8 @@ class Application:
             return homeName
         # Return the name even though it doesn't exist, then it can be used
         return name
-    def getActionSequence(self, useGui):
-        return self.configObject.getActionSequence(useGui)
+    def getActionSequence(self):
+        return self.configObject.getActionSequence()
     def printHelpText(self):
         print helpIntro
         header = "Description of the " + self.getConfigValue("config_module") + " configuration"
@@ -906,9 +906,9 @@ class Application:
         self.configDir.addEntry(key, value, sectionName)
     def setConfigDefault(self, key, value):
         self.configDir[key] = value
-    def makeCheckout(self, optionMap):
-        if optionMap.has_key("c"):
-            checkout = optionMap["c"]
+    def makeCheckout(self, checkoutOverride):
+        if checkoutOverride:
+            checkout = checkoutOverride
         else:
             checkout = self.getConfigValue("default_checkout")
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
@@ -922,18 +922,19 @@ class Application:
         env = [ ("TEXTTEST_CHECKOUT", self.checkout) ]
         return env + self.configObject.getApplicationEnvironment(self)
             
-class OptionFinder:
+class OptionFinder(seqdict):
     def __init__(self):
-        self.inputOptions = self.buildOptions()
+        seqdict.__init__(self)
+        self.buildOptions()
         self.directoryName = os.path.normpath(self.findDirectoryName())
         os.environ["TEXTTEST_HOME"] = self.directoryName
         self._setUpLogging()
-        debugLog.debug(repr(self.inputOptions))
+        debugLog.debug(repr(self))
     def _setUpLogging(self):
         global debugLog
         # Don't use the default locations, particularly current directory causes trouble
         del log4py.CONFIGURATION_FILES[1]
-        if self.inputOptions.has_key("x") or os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
+        if self.has_key("x") or os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             diagFile = self._getDiagnosticFile()
             if os.path.isfile(diagFile):
                 diagDir = os.path.dirname(diagFile)
@@ -958,90 +959,30 @@ class OptionFinder:
         rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
     # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
     def buildOptions(self):                                                                                                              
-        inputOptions = {}                                                                                                 
         optionKey = None                                                                                                                 
         for item in sys.argv[1:]:                      
             if item[0] == "-":                         
                 optionKey = self.stripMinuses(item)
-                inputOptions[optionKey] = ""
+                self[optionKey] = ""
             elif optionKey:
-                if len(inputOptions[optionKey]):
-                    inputOptions[optionKey] += " "
-                inputOptions[optionKey] += item.strip()
-        return inputOptions
+                if len(self[optionKey]):
+                    self[optionKey] += " "
+                self[optionKey] += item.strip()
     def stripMinuses(self, item):
         if item[1] == "-":
             return item[2:].strip()
         else:
             return item[1:].strip()
-    def findApps(self):
-        dirName = self.directoryName
-        os.chdir(dirName)
-        debugLog.info("Using test suite at " + dirName)
-        raisedError, appList = self._findApps(dirName, 1)
-        appList.sort()
-        debugLog.info("Found applications : " + repr(appList))
-        if len(appList) == 0 and not raisedError:
-            print "Could not find any matching applications (files of the form config.<app>) under", dirName
-        return appList
-    def _findApps(self, dirName, recursive):
-        appList = []
-        raisedError = 0
-        selectedAppDict = self.findSelectedAppNames()
-        debugLog.info("Selecting apps according to dictionary :" + repr(selectedAppDict))
-        for f in os.listdir(dirName):
-            pathname = os.path.join(dirName, f)
-            if os.path.isfile(pathname):
-                components = string.split(f, '.')
-                if len(components) != 2 or components[0] != "config":
-                    continue
-                appName = components[1]
-                if len(selectedAppDict) and not selectedAppDict.has_key(appName):
-                    continue
-
-                versionList = self.findVersionList()
-                if selectedAppDict.has_key(appName):
-                    versionList = selectedAppDict[appName]
-                try:
-                    for version in versionList:
-                        appList += self.addApplications(appName, dirName, pathname, version)
-                except (SystemExit, KeyboardInterrupt):
-                    raise sys.exc_type, sys.exc_value
-                except BadConfigError:
-                    sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + os.linesep)
-                    raisedError = 1
-            elif os.path.isdir(pathname) and recursive:
-                subRaisedError, subApps = self._findApps(pathname, 0)
-                raisedError |= subRaisedError
-                for app in subApps:
-                    appList.append(app)
-        return raisedError, appList
-    def createApplication(self, appName, dirName, pathname, version):
-        return Application(appName, dirName, pathname, version, self.inputOptions)
-    def addApplications(self, appName, dirName, pathname, version):
-        appList = []
-        app = self.createApplication(appName, dirName, pathname, version)
-        appList.append(app)
-        extraVersion = app.getConfigValue("extra_version")
-        if extraVersion == "none":
-            return appList
-        aggVersion = extraVersion
-        if len(version) > 0:
-            aggVersion = version + "." + extraVersion
-        extraApp = self.createApplication(appName, dirName, pathname, aggVersion)
-        app.extra = extraApp
-        appList.append(extraApp)
-        return appList
     def findVersionList(self):
-        if self.inputOptions.has_key("v"):
-            return plugins.commasplit(self.inputOptions["v"])
+        if self.has_key("v"):
+            return plugins.commasplit(self["v"])
         else:
             return [""]
     def findSelectedAppNames(self):
-        if not self.inputOptions.has_key("a"):
+        if not self.has_key("a"):
             return {}
 
-        apps = plugins.commasplit(self.inputOptions["a"])
+        apps = plugins.commasplit(self["a"])
         appDict = {}
         versionList = self.findVersionList()
         for app in apps:
@@ -1057,33 +998,38 @@ class OptionFinder:
             appDict[appName].append(versionName)
         else:
             appDict[appName] = [ versionName ]
+    def checkoutOverride(self):
+        if self.has_key("c"):
+            return self["c"]
+        else:
+            return ""
     def helpMode(self):
-        return self.inputOptions.has_key("help")
+        return self.has_key("help")
     def useGUI(self):
-        return self.inputOptions.has_key("g") or self.inputOptions.has_key("gx")
-    def guiRunTests(self):
-        return not self.inputOptions.has_key("gx")
+        return self.has_key("g") or self.useStaticGUI()
+    def useStaticGUI(self):
+        return self.has_key("gx")
     def _getDiagnosticFile(self):
         if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
         else:
             return os.path.join(self.directoryName, "Diagnostics", "log4py.conf")
     def findDirectoryName(self):
-        if self.inputOptions.has_key("d"):
-            return plugins.abspath(self.inputOptions["d"])
+        if self.has_key("d"):
+            return plugins.abspath(self["d"])
         elif os.environ.has_key("TEXTTEST_HOME"):
             return plugins.abspath(os.environ["TEXTTEST_HOME"])
         else:
             return os.getcwd()
-    def getActionSequence(self, app, useGui):
-        if self.inputOptions.has_key("gx"):
+    def getActionSequence(self, app):
+        if self.useStaticGUI():
             return []
         
-        if not self.inputOptions.has_key("s"):
-            return app.getActionSequence(useGui)
+        if not self.has_key("s"):
+            return app.getActionSequence()
             
-        actionCom = self.inputOptions["s"].split(" ")[0]
-        actionArgs = self.inputOptions["s"].split(" ")[1:]
+        actionCom = self["s"].split(" ")[0]
+        actionArgs = self["s"].split(" ")[1:]
         actionOption = actionCom.split(".")
         if len(actionOption) != 2:
             return self.getNonPython()
@@ -1105,7 +1051,7 @@ class OptionFinder:
             printException()
             raise BadConfigError, "Could not instantiate script action " + repr(actionCom) + " with arguments " + repr(actionArgs) 
     def getNonPython(self):
-        return [ plugins.NonPythonAction(self.inputOptions["s"]) ]
+        return [ plugins.NonPythonAction(self["s"]) ]
             
 class MultiEntryDictionary(seqdict):
     def readValuesFromFile(self, filename, appName = "", versions = [], insert=1, errorOnUnknown=0):
@@ -1483,7 +1429,7 @@ class TextTest:
         self.inputOptions = OptionFinder()
         global globalRunIdentifier
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
-        self.allApps = self.inputOptions.findApps()
+        self.allApps = self.findApps()
         self.gui = None
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
         if not os.environ.has_key("USECASE_HOME"):
@@ -1491,13 +1437,71 @@ class TextTest:
         if self.inputOptions.useGUI():
             try:
                 import texttestgui
-                self.gui = texttestgui.TextTestGUI(self.inputOptions.guiRunTests())
+                self.gui = texttestgui.TextTestGUI(not self.inputOptions.useStaticGUI())
             except:
                 print "Cannot use GUI: caught exception:"
                 printException()
         if not self.gui:
             logger = plugins.getDiagnostics("Use-case log")
             self.scriptEngine = ScriptEngine(logger)
+    def findApps(self):
+        dirName = self.inputOptions.directoryName
+        os.chdir(dirName)
+        debugLog.info("Using test suite at " + dirName)
+        raisedError, appList = self._findApps(dirName, 1)
+        appList.sort()
+        debugLog.info("Found applications : " + repr(appList))
+        if len(appList) == 0 and not raisedError:
+            print "Could not find any matching applications (files of the form config.<app>) under", dirName
+        return appList
+    def _findApps(self, dirName, recursive):
+        appList = []
+        raisedError = 0
+        selectedAppDict = self.inputOptions.findSelectedAppNames()
+        debugLog.info("Selecting apps according to dictionary :" + repr(selectedAppDict))
+        for f in os.listdir(dirName):
+            pathname = os.path.join(dirName, f)
+            if os.path.isfile(pathname):
+                components = string.split(f, '.')
+                if len(components) != 2 or components[0] != "config":
+                    continue
+                appName = components[1]
+                if len(selectedAppDict) and not selectedAppDict.has_key(appName):
+                    continue
+
+                versionList = self.inputOptions.findVersionList()
+                if selectedAppDict.has_key(appName):
+                    versionList = selectedAppDict[appName]
+                try:
+                    for version in versionList:
+                        appList += self.addApplications(appName, dirName, pathname, version)
+                except (SystemExit, KeyboardInterrupt):
+                    raise sys.exc_type, sys.exc_value
+                except BadConfigError:
+                    sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + os.linesep)
+                    raisedError = 1
+            elif os.path.isdir(pathname) and recursive:
+                subRaisedError, subApps = self._findApps(pathname, 0)
+                raisedError |= subRaisedError
+                for app in subApps:
+                    appList.append(app)
+        return raisedError, appList
+    def createApplication(self, appName, dirName, pathname, version):
+        return Application(appName, dirName, pathname, version, self.inputOptions)
+    def addApplications(self, appName, dirName, pathname, version):
+        appList = []
+        app = self.createApplication(appName, dirName, pathname, version)
+        appList.append(app)
+        extraVersion = app.getConfigValue("extra_version")
+        if extraVersion == "none":
+            return appList
+        aggVersion = extraVersion
+        if len(version) > 0:
+            aggVersion = version + "." + extraVersion
+        extraApp = self.createApplication(appName, dirName, pathname, aggVersion)
+        app.extra = extraApp
+        appList.append(extraApp)
+        return appList
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names
         if os.environ.has_key("USER"):
@@ -1525,8 +1529,7 @@ class TextTest:
                 if empty:
                     print "No tests found for", app.description()
                 else:
-                    useGui = self.inputOptions.useGUI()
-                    actionSequence = self.inputOptions.getActionSequence(app, useGui)
+                    actionSequence = self.inputOptions.getActionSequence(app)
                     actionRunner.addTestActions(testSuite, actionSequence)
                     print "Using", app.description() + ", checkout", app.checkout
             except BadConfigError:

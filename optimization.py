@@ -117,7 +117,7 @@ class OptimizationConfig(ravebased.Config):
             group.addOption("prrep", "Run KPI progress report")
             group.addOption("kpiData", "Output KPI curve data etc.")
             group.addOption("kpi", "Run Henrik's old KPI")
-    def getActionSequence(self, useGui):
+    def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
                         KPI.cFullRosteringOptTimeKPI,
@@ -129,7 +129,7 @@ class OptimizationConfig(ravebased.Config):
             return [ WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
-        return ravebased.Config.getActionSequence(self, useGui)
+        return ravebased.Config.getActionSequence(self)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def defaultBuildRules(self):

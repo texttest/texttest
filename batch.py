@@ -322,6 +322,7 @@ class CollectFiles(plugins.Action):
         for filename in filelist:
             if filename.startswith(prefix):
                 fullname = os.path.join(app.abspath, filename)
+                print "Found file called", filename
                 file = open(fullname)
                 recipient = file.readline().strip()
                 if recipient:

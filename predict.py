@@ -18,12 +18,16 @@ helpScripts = """predict.PredictionStatistics
 
 import os, filecmp, string, plugins, copy
 
-class FailedPrediction:
-    def __init__(self, type, fullText):
-        self.type = type
-        self.fullText = fullText
-    def __repr__(self):
-        return self.fullText
+plugins.addCategory("badPredict", "internal errors", "had internal errors")
+plugins.addCategory("crash", "CRASHED")
+
+# For backwards compatibility...
+class FailedPrediction(plugins.TestState):
+    def getTypeBreakdown(self):
+        if self.freeText.find(os.linesep) != -1:
+            return self.category, self.category.upper()
+        else:
+            return self.category, self.freeText
 
 class CheckLogFilePredictions(plugins.Action):
     def __init__(self, version = None):
@@ -37,7 +41,7 @@ class CheckLogFilePredictions(plugins.Action):
                 return None
         return logFile
     def insertError(self, test, errType, error):
-        test.changeState(test.state, FailedPrediction(errType, error))
+        test.changeState(FailedPrediction(errType, error, started=1))
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")   
 

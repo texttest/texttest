@@ -20,84 +20,74 @@ class Responder(plugins.Action):
         self.logFile = None
         self.graphicalDiffTool = None
         self.textDiffTool = None
+    def __repr__(self):
+        # Default, don't comment what we're doing with failures
+        return ""
     def __call__(self, test):
-        if test.state == test.FAILED:
-            testComparison = test.stateDetails
-            print test.getIndent() + repr(test), self.responderText(test)
-            self.handleFailure(test, testComparison)
-        elif test.state == test.SUCCEEDED:
+        if test.state.hasFailed():
+            print test.getIndent() + repr(test), test.state.getDifferenceSummary(repr(self))
+            if test.state.hasResults():
+                self.handleFailure(test)
+        else:
             self.handleSuccess(test)
-        elif test.state == test.KILLED:
-            self.handleKilled(test)
-        elif test.state == test.UNRUNNABLE:
-            print test.getIndent() + repr(test), "Failed: ", str(test.stateDetails).split(os.linesep)[0]
-            self.handleUnrunnable(test)
+        self.handleAll(test)
+    def handleAll(self, test):
+        pass
     def handleSuccess(self, test):
         if self.overwriteSuccess:
             self.save(test, test.app.getFullVersion(forSave=1))
     def save(self, test, version, exact=1):
-        test.stateDetails.save(exact, version, self.overwriteSuccess)
-    def handleUnrunnable(self, test):
-        pass
-    def handleKilled(self, test):
-        pass
+        test.state.save(exact, version, self.overwriteSuccess)
     def setUpApplication(self, app):
         self.lineCount = app.getConfigValue("lines_of_text_difference")
         self.logFile = app.getConfigValue("log_file")
         self.graphicalDiffTool = app.getConfigValue("diff_program")
         self.textDiffTool = app.getConfigValue("text_diff_program")
-    def displayComparisons(self, comparisons, displayStream, app):
-        for comparison in comparisons:
-            if comparison.newResult():
-                titleText = "New result in"
-            else:
-                titleText = "Differences in"
-            titleText += " " + repr(comparison)
-            displayStream.write("------------------ " + titleText + " --------------------\n")
-            self.display(comparison, displayStream, app)
-    def useGraphicalComparison(self, comparison, displayStream, app):
-        if not self.graphicalDiffTool or not os.environ.has_key("DISPLAY") or plugins.BackgroundProcess.fakeProcesses:
-            return 0
-        return displayStream == sys.stdout and repr(comparison) == self.logFile
-    def display(self, comparison, displayStream, app):
+    def testComparisonOutput(self, test):
+        fullText = ""
+        for comparison in test.state.getComparisons():
+            fullText += self.fileComparisonTitle(comparison) + os.linesep
+            fullText += self.fileComparisonBody(comparison)
+        return fullText
+    def fileComparisonTitle(self, comparison):
         if comparison.newResult():
-            return self.writePreview(displayStream, open(comparison.tmpFile))
+            titleText = "New result in"
+        else:
+            titleText = "Differences in"
+        titleText += " " + repr(comparison)
+        return "------------------ " + titleText + " --------------------"
+    def useGraphicalComparison(self, comparison):
+        if not self.graphicalDiffTool or plugins.BackgroundProcess.fakeProcesses:
+            return 0
+        return repr(comparison) == self.logFile
+    def fileComparisonBody(self, comparison):
+        if comparison.newResult():
+            return self.getPreview(open(comparison.tmpFile))
         
         argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
-        if self.useGraphicalComparison(comparison, displayStream, app):
-            print "<See " + self.graphicalDiffTool + " window>"
+        if self.useGraphicalComparison(comparison):
             process = plugins.BackgroundProcess(self.graphicalDiffTool + argumentString)
+            return "<See " + self.graphicalDiffTool + " window>"
         else:
-            stdin, stdout, stderr = os.popen3(self.textDiffTool + argumentString)
-            try:
-                self.writePreview(displayStream, stdout)
-            finally:
-                # Don't wait for the garbage collector - we risk a lot of failures otherwise...
-                stdin.close()
-                stdout.close()
-                stderr.close()
-    def writePreview(self, displayStream, file):
+            stdout = os.popen(self.textDiffTool + argumentString)
+            return self.getPreview(stdout)
+    def getPreview(self, file):
         linesWritten = 0
+        fullText = ""
         for line in file.xreadlines():
-            if linesWritten >= self.lineCount:
-                return
-            displayStream.write(line)
-            linesWritten += 1
-    def responderText(self, test):
-        testComparison = test.stateDetails
-        diffText = testComparison.getDifferenceSummary()
-        return repr(testComparison) + diffText
-    def __repr__(self):
-        return "Responding to"
+            if linesWritten < self.lineCount:
+                fullText += line
+                linesWritten += 1
+        file.close()
+        return fullText
 
 # Generic interactive responder. Can be configured via the settings in setUpApplication method
 class InteractiveResponder(Responder):
-    def handleFailure(self, test, testComparison):
-        if testComparison.failedPrediction:
-            print testComparison.failedPrediction
+    def handleFailure(self, test):
         performView = self.askUser(test, allowView=1)
         if performView:
-            self.displayComparisons(testComparison.getComparisons(), sys.stdout, test.app)
+            outputText = self.testComparisonOutput(test)
+            sys.stdout.write(outputText)
             self.askUser(test, allowView=0)
     def askUser(self, test, allowView):      
         versions = test.app.getVersionFileExtensions(forSave=1)
@@ -122,9 +112,7 @@ class InteractiveResponder(Responder):
         return 0
     
 class OverwriteOnFailures(Responder):
-    def responderText(self, test):
-        testComparison = test.stateDetails
-        diffText = testComparison.getDifferenceSummary()
-        return "- overwriting" + diffText
-    def handleFailure(self, test, testComparison):
+    def __repr__(self):
+        return " overwriting"
+    def handleFailure(self, test):
         self.save(test, test.app.getFullVersion(forSave=1))

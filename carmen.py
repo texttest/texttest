@@ -296,6 +296,8 @@ class CarmenConfig(lsf.LSFConfig):
         app.setConfigDefault("maximum_cputime_for_short_queue", 10)
         # dictionary of lists
         app.setConfigDefault("build_targets", { "" : [] })
+        app.addConfigEntry("need_rulecompile", "white", "test_colours")
+        app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
     def getApplicationEnvironment(self, app):
         return lsf.LSFConfig.getApplicationEnvironment(self, app) + \
                [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]
@@ -397,7 +399,7 @@ class CompileRules(plugins.Action):
         jobName = self.jobNameCreator.getName(test)
         if jobName in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name + " already being compiled")
-            test.changeState(test.NEED_PREPROCESS, "Compiling ruleset " + ruleset.name)
+            test.changeState(plugins.TestState("need_rulecompile", "Compiling ruleset " + ruleset.name))
             return
         self.describe(test, " - ruleset " + ruleset.name)
         ruleset.backup()
@@ -434,7 +436,7 @@ class CompileRules(plugins.Action):
         os.environ["PWD"] = test.abspath
         self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.environ["PWD"])
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
-        test.changeState(test.NEED_PREPROCESS, "Compiling ruleset " + self.getRuleSetName(test))
+        test.changeState(plugins.TestState("need_rulecompile", "Compiling ruleset " + self.getRuleSetName(test)))
         return self.ruleRunner.runCommand(test, fullCommand, self.jobNameCreator.getName)
     def setUpSuite(self, suite):
         if self.filter and not self.filter.acceptsTestSuite(suite):
@@ -449,37 +451,44 @@ class CompileRules(plugins.Action):
     def getFilter(self):
         return self.filter
 
+class RunningRuleCompilation(plugins.TestState):
+    def __init__(self, details):
+        plugins.TestState.__init__(self, "running_rulecompile", details)
+    def changeDescription(self):
+        return "start ruleset compilation"
+    def timeElapsedSince(self, oldState):
+        return oldState.category == "need_rulecompile"
+
 class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
     ruleCompilations = []
     def __init__(self, getRuleSetName, jobNameCreator):
         lsf.UpdateLSFStatus.__init__(self, jobNameCreator.getName)
         self.getRuleSetName = getRuleSetName
     def __call__(self, test):
-        # Don't do anything unless we've been put in NEED_PREPROCESS state
-        if test.state < test.NOT_STARTED:
+        # Don't do anything unless we've been put in need_rulecompile state
+        if test.state.category.endswith("rulecompile"):
             return lsf.UpdateLSFStatus.__call__(self, test)
-        elif test.state == test.UNRUNNABLE:
+        elif test.state.isComplete():
             jobName = self.jobNameFunction(test)
             self.ruleCompilations.append(jobName)
             ruleset = self.getRuleSetName(test)
-            self.raiseFailureWithError(ruleset, str(test.stateDetails))
+            self.raiseFailureWithError(ruleset, str(test.state))
     def processStatus(self, test, status, machines):
         ruleset = self.getRuleSetName(test)
         details = "Compiling ruleset " + ruleset
         if len(machines):
             details += " on " + string.join(machines, ",")
         details += os.linesep + "Current LSF status = " + status + os.linesep
-        state = test.state
         if status == "PEND":
-            test.changeState(test.NEED_PREPROCESS, details)
+            test.state.freeText = details
         else:
-            test.changeState(test.RUNNING_PREPROCESS, details)
+            test.changeState(RunningRuleCompilation(details))
 
         if status == "EXIT":
             return self.raiseFailure(test, ruleset)
         elif status == "DONE":
             self.ruleCompilations.append(self.jobNameFunction(test))
-            test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
+            test.changeState(plugins.TestState("not_started", "Ruleset " + ruleset + " succesfully compiled"))
     def raiseFailure(self, test, ruleset):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         jobName = self.jobNameFunction(test)

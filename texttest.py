@@ -53,17 +53,6 @@ builtInOptions = """
 
 # Base class for TestCase and TestSuite
 class Test:
-    # Used by the static GUI to say that a test's definition has changed and it needs to re-read its files
-    UPDATED = -3
-    #State names. By default, the negative states are not used. We start in state NOT_STARTED
-    NEED_PREPROCESS = -2
-    RUNNING_PREPROCESS = -1
-    NOT_STARTED = 0
-    RUNNING = 1
-    KILLED = 2
-    SUCCEEDED = 3
-    FAILED = 4
-    UNRUNNABLE = 5
     def __init__(self, name, abspath, app, parent = None):
         self.name = name
         # There is nothing to stop several tests having the same name. Maintain another name known to be unique
@@ -72,9 +61,9 @@ class Test:
         self.parent = parent
         self.abspath = abspath
         self.valid = os.path.isdir(abspath)
+        # Test suites never change state, but it's convenient that they have one
+        self.state = plugins.TestState("not_started")
         self.paddedName = self.name
-        self.state = self.NOT_STARTED 
-        self.stateDetails = None
         self.previousEnv = {}
         # List of objects observing this test, to be notified when it changes state
         self.observers = []
@@ -236,43 +225,29 @@ class TestCase(Test):
         if os.path.isdir(self.writeDirs[0]):
             os.chdir(self.writeDirs[0])
         return action(self)
-    def waitingForProcess(self):
-        return isinstance(self.stateDetails, plugins.BackgroundProcess)
     def filesChanged(self):
         self._setOptions()
         self.notifyChanged()
-    def changeState(self, state, details = ""):
-        # Once we've left the pathway, we can't return...
-        if self.state == self.UNRUNNABLE or self.state == self.KILLED:
-            return
+    def changeState(self, state):
         oldState = self.state
         self.state = state
-        self.stateDetails = details
-        if state != oldState or self.waitingForProcess():
+        # Notify GUI of all category changes
+        if state.category != oldState.category:
             self.notifyChanged()
-            # Tests changing state are reckoned to be significant enough to wait for...
-            try:
-                self.stateChangeEvent(state, oldState)
-            except UseCaseScriptError:
-                # This will be raised if we're in a subthread, i.e. if the GUI is running
-                # Rely on the GUI to report the same event
-                pass
-    def stateChangeEvent(self, state, oldState = None):
-        if state == self.UPDATED or (oldState and oldState == self.FAILED):
-            # Don't record event if we're being 'saved' or whatever
-            return
-        eventName = "test " + self.uniqueName + " to " + self.stateChangeDescription(state)
+        # Check that the state change involved moving on in time, not just re-classifying
+        # Tests changing state are reckoned to be significant enough to wait for...
+        if state.timeElapsedSince(oldState):
+            self.stateChangeEvent(state)
+    def stateChangeEvent(self, state):
+        eventName = "test " + self.uniqueName + " to " + state.changeDescription()
         category = self.uniqueName
         # Files abound here, we wait a little for them to clear up
-        ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=1)
-    def stateChangeDescription(self, state):
-        if state == self.RUNNING:
-            return "start"
-        if state == self.FAILED or state == self.UNRUNNABLE or state == self.SUCCEEDED:
-            return "complete"
-        if state == self.RUNNING_PREPROCESS:
-            return "start preprocessing"
-        return "finish preprocessing"
+        try:
+            ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=1)
+        except UseCaseScriptError:
+            # This will be raised if we're in a subthread, i.e. if the GUI is running
+            # Rely on the GUI to report the same event
+            pass
     def getExecuteCommand(self):
         return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
@@ -638,7 +613,6 @@ class Application:
             self.setConfigDefault("diff_program", "tkdiff.tcl")
     def getGuiColourDictionary(self):
         dict = {}
-        dict["run_preprocess"] = "peach puff"
         dict["success"] = "green"
         dict["failure"] = "red"
         dict["running"] = "yellow"
@@ -1135,6 +1109,9 @@ class MultiEntryDictionary(seqdict):
                 print "ERROR : config entry name '" + entryName + "' not recognised"
         else:
             self.insertEntry(entryName, entry)
+        # Make sure we reset...
+        if sectionName:
+            self.currDict = self
     def getDictionaryValueType(self):
         val = self.currDict.values()
         if len(val) == 0:
@@ -1150,6 +1127,8 @@ class MultiEntryDictionary(seqdict):
             self.currDict[entryName] = int(entry)
         else:
             self.currDict[entryName] = entry        
+
+plugins.addCategory("unrunnable", "unrunnable", "could not be run")
 
 class TestRunner:
     def __init__(self, test, actionSequence, appRunner, diag):
@@ -1167,13 +1146,15 @@ class TestRunner:
         try:
             return method(*args)
         except plugins.TextTestError, e:
-            self.test.changeState(self.test.UNRUNNABLE, e)
+            self.failTest(str(sys.exc_value))
         except KeyboardInterrupt:
             raise sys.exc_type, sys.exc_info
         except:
             print "WARNING : caught exception while running", self.test, "changing state to UNRUNNABLE :"
             printException()
-            self.test.changeState(self.test.UNRUNNABLE, str(sys.exc_type) + ": " + str(sys.exc_value))
+            self.failTest(str(sys.exc_type) + ": " + str(sys.exc_value))
+    def failTest(self, excString):
+        self.test.changeState(plugins.TestState("unrunnable", excString, completed=1))
     def performActions(self, previousTestRunner, runToCompletion):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
         for suite in tearDownSuites:

@@ -4,6 +4,29 @@ import plugins, os
 from ConfigParser import ConfigParser
 from predict import FailedPrediction
 
+plugins.addCategory("bug", "known bugs", "had known bugs")
+
+class KnownBug(FailedPrediction):
+    def __init__(self, bugNum):
+        self.bugNumber = bugNum
+        fullBugText = os.popen("bugcli -b " + bugNum).read()
+        self.bugStatus = self.findStatus(fullBugText)
+        FailedPrediction.__init__(self, self.findCategory(), fullBugText, completed = 1)
+    def findStatus(self, description):
+        for line in description.split(os.linesep):
+            words = line.split()
+            if len(words) < 4:
+                continue
+            if words[2].startswith("Status"):
+                return words[3]
+    def findCategory(self):
+        if self.bugStatus == "RESOLVED" or self.bugStatus == "CLOSED":
+            return "badPredict"
+        else:
+            return "bug"
+    def getTypeBreakdown(self):
+        return "success", "bug " + self.bugNumber + " (" + self.bugStatus + ")"
+
 class CheckForBugs(plugins.Action):
     def __init__(self):
         self.bugMap = {}
@@ -14,7 +37,7 @@ class CheckForBugs(plugins.Action):
     def tearDownSuite(self, suite):
         self.unreadBugs(suite)
     def __call__(self, test):
-        if test.state != test.FAILED:
+        if not test.state.hasFailed():
             return
 
         self.readBugs(test)
@@ -24,9 +47,8 @@ class CheckForBugs(plugins.Action):
                 for line in open(fileName).xreadlines():
                     for trigger, bugNum in entryDict.items():
                         if trigger.matches(line):
-                            fullBugText = os.popen("bugcli -b " + bugNum).read()
-                            test.stateDetails.failedPrediction = FailedPrediction("bug", fullBugText)
-                            # Make sure this is reflected in the GUI...
+                            test.state.setFailedPrediction(KnownBug(bugNum))
+                            # Tell the GUI
                             test.notifyChanged()
         self.unreadBugs(test)
     def readBugs(self, suite):

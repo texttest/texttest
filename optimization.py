@@ -1243,7 +1243,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         return "Plotting"
     def __call__(self, test):
         logFileStem = test.app.getConfigValue("log_file")
-        if test.state == test.RUNNING or test.state == test.FAILED:
+        if test.state.hasStarted() and not test.state.hasSucceeded():
             logFileFinder = LogFileFinder(test, tryTmpFile = 1)
             foundTmp, logFile = logFileFinder.findFile()
             if foundTmp:

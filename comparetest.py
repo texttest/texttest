@@ -44,30 +44,39 @@ comparetest.RemoveObsoleteVersions
                              output.app.3, when only a warning is written.
 """ 
 
-
 import os, filecmp, string, plugins, time
 from ndict import seqdict
 from predict import FailedPrediction
 
-class TestComparison:
+plugins.addCategory("success", "succeeded")
+plugins.addCategory("failure", "FAILED")
+
+class TestComparison(plugins.TestState):
     def __init__(self, previousInfo, execHost):
+        plugins.TestState.__init__(self, "failure", "", started=1, completed=1)
         self.allResults = []
         self.changedResults = []
         self.newResults = []
         self.correctResults = []
         self.failedPrediction = None
         if isinstance(previousInfo, FailedPrediction):
-            self.failedPrediction = previousInfo
+            self.setFailedPrediction(previousInfo)
         self.diag = plugins.getDiagnostics("TestComparison")
     def __repr__(self):
         if len(self.changedResults) > 0 or self.failedPrediction:
-            return "FAILED :"
+            return plugins.TestState.__repr__(self)
         elif len(self.newResults) > 0:
             return ":"
         else:
             return ""
+    def setFailedPrediction(self, prediction):
+        self.failedPrediction = prediction
+        self.freeText = str(prediction)
+        self.category = prediction.category
     def hasNewResults(self):
         return len(self.newResults) > 0
+    def hasSucceeded(self):
+        return self.category == "success"
     def hasDifferences(self):
         return len(self.changedResults) > 0
     def needsRecalculation(self):
@@ -75,11 +84,6 @@ class TestComparison:
             if comparison.needsRecalculation():
                 return 1
         return 0
-    def getType(self):
-        if self.failedPrediction:
-            return self.failedPrediction.type
-        else:
-            return self.getMostSevereFileComparison().getType()
     def getMostSevereFileComparison(self):
         worstSeverity = None
         worstResult = None
@@ -90,13 +94,11 @@ class TestComparison:
                 worstResult = result
         return worstResult
     def getTypeBreakdown(self):
+        if self.hasSucceeded():
+            return self.category, ""
         if self.failedPrediction:
-            if self.failedPrediction.type == "crash":
-                return "failure", "CRASHED"
-            elif self.failedPrediction.type == "bug":
-                return "success", "known bug"
-            else:
-                return "failure", "internal error"
+            return self.failedPrediction.getTypeBreakdown()
+
         worstResult = self.getMostSevereFileComparison()
         worstSeverity = worstResult.getSeverity()
         self.diag.info("Severity " + str(worstSeverity) + " for failing test")
@@ -113,7 +115,13 @@ class TestComparison:
         return self.changedResults + self.newResults
     def _comparisonsString(self, comparisons):
         return string.join([repr(x) for x in comparisons], ",")
-    def getDifferenceSummary(self):
+    def getDifferenceSummary(self, actionDesc):
+        basicSummary = repr(self) + actionDesc + self._getDifferenceSummary()
+        if self.failedPrediction:
+            return basicSummary + os.linesep + str(self.failedPrediction)
+        else:
+            return basicSummary
+    def _getDifferenceSummary(self):
         diffText = ""
         if len(self.changedResults) > 0:
             diffText = " differences in " + self._comparisonsString(self.changedResults)
@@ -122,7 +130,7 @@ class TestComparison:
         newText = " new results in " + self._comparisonsString(self.newResults)
         if len(self.changedResults) == 0:
             return newText
-        return newText + "," + diffText
+        return newText + "," + diffText        
     def getPostText(self):
         if not self.hasResults():
             return " - NONE!"
@@ -149,6 +157,18 @@ class TestComparison:
             fileComparison = self.changedResults[0]
             del self.changedResults[0]
             self.correctResults.append(fileComparison)
+        self.categorise()
+    def categorise(self):
+        if not self.hasResults():
+            raise plugins.TextTestError, "No output files at all produced, presuming problems running test"
+        if self.failedPrediction:
+            # Keep the category we had before
+            return
+        worstResult = self.getMostSevereFileComparison()
+        if not worstResult:
+            self.category = "success"
+        else:
+            self.category = worstResult.getType()
     def makeComparisonsInDir(self, test, dir, makeNew = 0):
         fileList = os.listdir(dir)
         fileList.sort()
@@ -215,6 +235,7 @@ class TestComparison:
         self.correctResults += self.changedResults + self.newResults
         self.changedResults = []
         self.newResults = []
+        self.category = "success"
 
 class MakeComparisons(plugins.Action):
     testComparisonClass = TestComparison
@@ -226,18 +247,13 @@ class MakeComparisons(plugins.Action):
         except AttributeError:
             return None
     def __call__(self, test):
-        # Don't compare killed tests...
-        if test.state == test.KILLED:
+        # Don't compare already completed tests if they have errors
+        if test.state.isComplete() and not test.state.hasResults():
             return
-        testComparison = self.testComparisonClass(test.stateDetails, self.execHost(test))
+        testComparison = self.testComparisonClass(test.state, self.execHost(test))
         testComparison.makeComparisons(test)
         self.describe(test, testComparison.getPostText())
-        if not testComparison.hasResults():
-            raise plugins.TextTestError, "No output files at all produced, presuming problems running test"
-        elif testComparison.hasDifferences() or testComparison.hasNewResults() or testComparison.failedPrediction:
-            test.changeState(test.FAILED, testComparison)
-        else:
-            test.changeState(test.SUCCEEDED, testComparison)
+        test.changeState(testComparison)
     def fileFinders(self, test):
         defaultFinder = test.app.name + test.app.versionSuffix() + test.getTmpExtension(), ""
         return [ defaultFinder ]
@@ -272,7 +288,7 @@ class FileComparison:
             return 1
         return not self.newResult() and (plugins.modifiedTime(self.stdCmpFile) <= plugins.modifiedTime(self.stdFile))
     def getType(self):
-        return "difference"
+        return "failure"
     def isDiagnostic(self):
         root, local = os.path.split(self.stdFile)
         return os.path.basename(root) == "Diagnostics"

@@ -57,6 +57,64 @@ class Action:
     def __str__(self):
         return str(self.__class__)
 
+def addCategory(name, briefDesc, longDesc = ""):
+    if longDesc:
+        TestState.categoryDescriptions[name] = briefDesc, longDesc
+    else:
+        TestState.categoryDescriptions[name] = briefDesc, briefDesc
+
+# Generic state which tests can be in, should be overridden by subclasses
+# Acts as a static state for tests which have not run (yet)
+class TestState:
+    categoryDescriptions = seqdict()
+    def __init__(self, category, freeText = "", started = 0, completed = 0):
+        self.category = category
+        self.freeText = freeText
+        self.started = started
+        self.completed = completed
+    def __str__(self):
+        return self.freeText
+    def __repr__(self):
+        briefDescription, longDescription = self.categoryDescriptions[self.category]
+        return longDescription + " :"
+    def notifyInMainThread(self):
+        # Hook to tell the state we're in the main thread, as some things can only be done there
+        pass
+    def needsRecalculation(self):
+        # Is some aspect of the state out of date
+        return 0
+    def timeElapsedSince(self, oldState):
+        return (self.isComplete() != oldState.isComplete()) or (self.hasStarted() != oldState.hasStarted())
+    # Used by text interface to print states
+    def getDifferenceSummary(self, actionDesc):
+        if self.freeText:
+            return "not compared:  " + self.freeText.split(os.linesep)[0]
+        else:
+            return "not compared"
+    # Used by GUI to represent them graphically
+    def getTypeBreakdown(self):
+        if self.hasFailed():
+            return self.category, self.category.upper()
+        else:
+            return self.category, ""
+    def hasStarted(self):
+        return self.started or self.completed
+    def isComplete(self):
+        return self.completed
+    def hasSucceeded(self):
+        return 0
+    def hasFailed(self):
+        return self.isComplete() and not self.hasSucceeded()
+    def hasResults(self):
+        # Do we have actual results that can be compared
+        return 0
+    def changeDescription(self):
+        if self.isComplete():
+            return "complete"
+        elif self.hasStarted():
+            return "start"
+        return "become " + self.category
+
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
 def getDiagnostics(diagName):

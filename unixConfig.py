@@ -81,6 +81,21 @@ class UNIXConfig(default.Config):
         batchSession = self.optionValue("b")
         if batchSession:
             app.addConfigEntry("base_version", batchSession)
+        app.addConfigEntry("pending", "white", "test_colours")
+
+# Workaround for python bug 853411: tell main thread to start the process
+# if we aren't it...
+class Pending(plugins.TestState):
+    def __init__(self, process):
+        plugins.TestState.__init__(self, "pending")
+        self.process = process
+        if currentThread().getName() == "MainThread":
+            self.notifyInMainThread()
+    def notifyInMainThread(self):
+        self.process.doFork()
+    def timeElapsedSince(self, oldState):
+        # Going in to this state always means moving on..
+        return 1
 
 class RunTest(default.RunTest):
     def __init__(self, loginShell):
@@ -109,12 +124,7 @@ class RunTest(default.RunTest):
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
         self.process = plugins.BackgroundProcess(testCommand, testRun=1)
-        # Workaround for python bug 853411: tell main thread to start the process
-        # if we aren't it...
-        if currentThread().getName() == "MainThread":
-            self.process.doFork()
-        else:
-            test.changeState(test.state, self.process)
+        test.changeState(Pending(self.process))
         self.process.waitForStart()
         return self.RETRY
     def getExecuteCommand(self, test):
@@ -139,7 +149,7 @@ class RunTest(default.RunTest):
         f.close()
         return cmdFile
     def changeState(self, test):
-        test.changeState(test.RUNNING, "Running on " + hostname())
+        test.changeState(plugins.TestState("running", "Running on " + hostname(), started = 1))
     def getCleanUpAction(self):
         return KillTest(self)
     def setUpApplication(self, app):
@@ -336,7 +346,7 @@ class MakePerformanceFile(plugins.Action):
     def __repr__(self):
         return "Making performance file for"
     def __call__(self, test):
-        if test.state == test.UNRUNNABLE or test.state == test.KILLED:
+        if test.state.isComplete():
             return
 
         executionMachines = self.findExecutionMachines(test)

@@ -63,29 +63,26 @@ class SaveTest(InteractiveAction):
             extensions.append("")
             self.addOption(oldOptionGroup, "v", "Version to save", test.app.getFullVersion(forSave = 1), extensions)
             self.addSwitch(oldOptionGroup, "over", "Replace successfully compared files also", 0)
-            self.comparisons = self.getComparisons(test)
+            self.comparisons = test.state.getComparisons()
             multipleComparisons = (len(self.comparisons) > 1)
             if self.hasPerformance():
                 self.addSwitch(oldOptionGroup, "ex", "Exact Performance", multipleComparisons, "Average Performance")
             if multipleComparisons:
-                failedStems = map(lambda comp : comp.stem, self.comparisons)
+                failedStems = [ comp.stem for comp in self.comparisons]
                 self.addOption(oldOptionGroup, "sinf", "Save single file", possibleValues=failedStems)
     def __repr__(self):
         return "Saving"
     def canPerformOnTest(self):
-        return self.test and self.test.state == self.test.FAILED
+        return self.isSaveable(self.test)
+    def isSaveable(self, test):
+        return test and test.state.hasFailed() and test.state.hasResults()
     def getTitle(self):
         return "Save"
     def matchesMode(self, dynamic):
         return dynamic
-    def getComparisons(self, test):
-        try:
-            return test.stateDetails.getComparisons()
-        except AttributeError:
-            return []
     def hasPerformance(self):
         for comparison in self.comparisons:
-            if comparison.getType() != "difference" and comparison.hasDifferences():
+            if comparison.getType() != "failure" and comparison.hasDifferences():
                 return 1
         return 0
     def getExactness(self):
@@ -100,15 +97,13 @@ class SaveTest(InteractiveAction):
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
         self.describe(test, saveDesc)
-        testComparison = test.stateDetails
+        testComparison = test.state
         if testComparison:
             if singleFile:
                 testComparison.saveSingle(singleFile, self.getExactness(), version)
-                test.notifyChanged()
             else:
                 testComparison.save(self.getExactness(), version, overwriteSuccess)
-                # So it goes green in the GUI...
-                test.changeState(test.SUCCEEDED, testComparison)
+            test.notifyChanged()
 
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!
@@ -116,11 +111,11 @@ class ViewFile(InteractiveAction):
     def __init__(self, test, oldOptionGroup):
         InteractiveAction.__init__(self, test, oldOptionGroup, "Viewing")
         try:
-            if test.state >= test.RUNNING:
+            if test.state.hasStarted():
                 self.addSwitch(oldOptionGroup, "rdt", "Include Run-dependent Text", 0)
                 self.addSwitch(oldOptionGroup, "nf", "Show differences where present", 1)
-            if test.state == test.RUNNING:
-                self.addSwitch(oldOptionGroup, "f", "Follow file rather than view it", 1)
+                if not test.state.isComplete():
+                    self.addSwitch(oldOptionGroup, "f", "Follow file rather than view it", 1)
         except AttributeError:
             # Will get given applications too, don't need options there
             pass
@@ -176,8 +171,6 @@ class ImportTest(InteractiveAction):
         if self.canPerformOnTest():
             self.optionGroup.addOption("name", self.testType() + " Name")
             self.optionGroup.addOption("desc", self.testType() + " Description")
-    def canPerformOnTest(self):
-        return self.test and self.test.state == self.test.NOT_STARTED
     def getTitle(self):
         return "Add " + self.testType()
     def testType(self):
@@ -239,7 +232,8 @@ class RecordTest(InteractiveAction):
         guilog.info("Starting replay TextTest with options : " + ttOptions)
         process = self.startExternalProgram(commandLine)
         process.waitForTermination()
-        test.changeState(test.UPDATED, "Recorded use case")
+        test.state.freeText = "Recorded use case"
+        test.notifyChanged()
     def getRunOptions(self, test):
         basicOptions = "-t " + self.test.name + " -a " + self.test.app.name# + " -ts " + self.test.parent.name
         logFile = test.makeFileName(test.getConfigValue("log_file"))

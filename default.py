@@ -204,7 +204,7 @@ class CollateFiles(plugins.Action):
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
     def __call__(self, test):
-        if test.state > test.RUNNING:
+        if test.state.isComplete():
             return
 
         for targetStem, sourcePattern in self.collations.items():
@@ -298,14 +298,14 @@ class RunTest(plugins.Action):
     def __repr__(self):
         return "Running"
     def __call__(self, test):
-        if test.state == test.UNRUNNABLE:
+        if test.state.isComplete():
             return
         retValue = self.runTest(test)
         # Change state after we've started running!
         self.changeState(test)
         return retValue
     def changeState(self, test):
-        test.changeState(test.RUNNING, "Running on local machine")
+        test.changeState(plugins.TestState("running", "Running on local machine", started=1))
     def runTest(self, test):
         testCommand = self.getExecuteCommand(test)
         self.runCommand(test, testCommand)

@@ -18,6 +18,7 @@ helpOptions = """
 """
 
 import os, performance, plugins, respond, sys, string, time, types
+from ndict import seqdict
 
 def getBatchConfigValue(app, entryName, sessionName):
     dict = app.getConfigValue(entryName)
@@ -60,22 +61,24 @@ class BatchFilter(plugins.Filter):
         return None
 
 class BatchCategory(plugins.Filter):
-    def __init__(self, briefDescription, longDescription):
-        self.briefDescription = briefDescription
-        self.longDescription = longDescription
-        self.count = 0
+    def __init__(self, state):
+        self.name = state.category
+        self.briefDescription, self.longDescription = state.categoryDescriptions[self.name]
+        self.allTests = []
         self.testLines = {}
-    def addTest(self, test, postText):
-        if not postText:
+    def addTest(self, test):
+        overall, postText = test.state.getTypeBreakdown()
+        if postText == self.name.upper():
+            # Don't double report here
             postText = ""
-        if len(postText) > 0:
+        elif len(postText) > 0:
             postText = " : " + postText
         self.testLines[test.getRelPath()] = test.getIndent() + "- " + repr(test) + postText + os.linesep
-        self.count += 1
+        self.allTests.append(test)
     def acceptsTestCase(self, test):
         return self.testLines.has_key(test.getRelPath())
-    def describe(self, mailFile, app):
-        if self.count > 0:
+    def describeBrief(self, mailFile, app):
+        if len(self.allTests) > 0:
             mailFile.write("The following tests " + self.longDescription + " : " + os.linesep)
             valid, suite = app.createTestSuite([ self ])
             self.writeTestLines(mailFile, suite)
@@ -86,124 +89,74 @@ class BatchCategory(plugins.Filter):
         else:
             mailFile.write(test.getIndent() + "In " + repr(test) + ":" + os.linesep)
             for subtest in test.testcases:
-                self.writeTestLines(mailFile, subtest)         
+                self.writeTestLines(mailFile, subtest)
+    def describeFull(self, mailFile):
+        fullDescriptionString = self.getFullDescription()
+        if fullDescriptionString:
+            mailFile.write(os.linesep + "Detailed information for the tests that " + self.longDescription + " follows..." + os.linesep)
+            mailFile.write(fullDescriptionString)
+    def getFullDescription(self):
+        fullText = ""
+        for test in self.allTests:
+            freeText = test.state.freeText
+            if freeText:
+                fullText += "--------------------------------------------------------" + os.linesep
+                fullText += "TEST " + repr(test.state) + " " + repr(test) + " (under " + test.getRelPath() + ")" + os.linesep
+                fullText += freeText
+                if not freeText.endswith(os.linesep):
+                    fullText += os.linesep
+        return fullText
 
 allBatchResponders = []
-categoryNames = [ "badPredict", "bug", "crash", "dead", "difference", "faster", "slower",\
-                  "larger", "smaller", "success", "unfinished" ]
-longCategoryDescriptions = [ "had internal errors", "had known bugs", "CRASHED", "were unrunnable", "FAILED", \
-                             "ran faster", "ran slower", "used more memory", "used less memory", "succeeded", "were unfinished" ]
-briefCategoryDescriptions = [ "internal errors", "known bugs", "CRASHED", "unrunnable", "FAILED", \
-                              "faster", "slower", "memory+", "memory-", "succeeded", "unfinished" ]
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):
     def __init__(self, sessionName):
         respond.Responder.__init__(self, 0)
         self.sessionName = sessionName
-        self.failureDetail = {}
-        self.crashDetail = {}
-        self.deadDetail = {}
-        self.orderedTests = []
         self.categories = {}
-        for i in range(len(categoryNames)):
-            self.categories[categoryNames[i]] = BatchCategory(briefCategoryDescriptions[i], longCategoryDescriptions[i])
+        self.errorCategories = []
+        self.failureCategories = []
+        self.successCategories = []
         self.mainSuite = None
         allBatchResponders.append(self)
-    def addTestToCategory(self, category, test, postText = ""):
-        if category != None:
-            self.orderedTests.append(test)
-            self.categories[category].addTest(test, postText)
-    def handleSuccess(self, test):
-        self.addTestToCategory("success", test)
-    def handleKilled(self, test):
-        self.addTestToCategory("unfinished", test)
-    def handleUnrunnable(self, test):
-        self.addTestToCategory("dead", test)
-        self.deadDetail[test] = test.stateDetails
-    def handleFailure(self, test, testComparison):
-        category = testComparison.getType()
-        if category == "crash":
-            self.crashDetail[test] = repr(testComparison.failedPrediction)
-            self.addTestToCategory(category, test)
-        else:
-            self.failureDetail[test] = testComparison
-            category, summary = self.getSummary(category, testComparison)
-            self.addTestToCategory(category, test, summary)
-    def getSummary(self, category, testComparison):
-        if category != "bug":
-            if testComparison.failedPrediction:
-                return category, repr(testComparison.failedPrediction)
+    def handleAll(self, test):
+        category = test.state.category
+        if not self.categories.has_key(category):
+            batchCategory = BatchCategory(test.state)
+            if not test.state.hasResults():
+                self.errorCategories.append(batchCategory)
+            elif test.state.hasSucceeded():
+                self.successCategories.append(batchCategory)
             else:
-                return category, testComparison.getMostSevereFileComparison().getDetails()
-        else:
-            bugId, status = self.parseBugDescription(repr(testComparison.failedPrediction))
-            newDesc = "(" + status + " bug " + bugId + ")"
-            if status == "RESOLVED" or status == "CLOSED":
-                return "badPredict", newDesc
-            else:
-                return "bug", newDesc
-    def parseBugDescription(self, description):
-        bugId = ""
-        status = ""
-        for line in description.split(os.linesep):
-            words = line.split()
-            if len(words) < 4:
-                continue
-            if words[0].startswith("BugId"):
-                bugId = words[1]
-            if words[2].startswith("Status"):
-                return bugId, words[3]
-        return bugId, status
+                self.failureCategories.append(batchCategory)
+            self.categories[category] = batchCategory
+        self.categories[category].addTest(test)
+    def handleFailure(self, test):
+        # If free text is brief, override it with difference details
+        if test.state.freeText.find(os.linesep) == -1:
+            test.state.freeText = self.testComparisonOutput(test)
+    def useGraphicalComparison(self, comparison):
+        return 0
     def setUpSuite(self, suite):
         if self.mainSuite == None:
             self.mainSuite = suite
     def failureCount(self):
-        return self.testCount() - self.categories["success"].count
+        return self.totalTests(self.errorCategories + self.failureCategories)
+    def allCategories(self):
+        return self.errorCategories + self.failureCategories + self.successCategories
     def testCount(self):
+        return self.totalTests(self.allCategories())
+    def totalTests(self, categoryList):
         count = 0
-        for category in self.categories.values():
-            count += category.count
+        for category in categoryList:
+            count += len(category.allTests)
         return count
     def writeMailBody(self, mailFile):
-        for categoryName in categoryNames:
-            self.categories[categoryName].describe(mailFile, self.mainSuite.app)
-        if len(self.deadDetail) > 0:
-            self.writeDeadDetail(mailFile)
-        if len(self.crashDetail) > 0:
-            self.writeCrashDetail(mailFile)
-        if len(self.failureDetail) > 0:
-            self.writeFailureDetail(mailFile)
-    def writeDeadDetail(self, mailFile):
-        mailFile.write(os.linesep + "Exception information for the tests that did not run follows..." + os.linesep)
-        for test in self.orderedTests:
-            if not self.deadDetail.has_key(test):
-                continue
-            exc = self.deadDetail[test]
-            mailFile.write("--------------------------------------------------------" + os.linesep)
-            mailFile.write("TEST UNRUNNABLE -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
-            mailFile.write(str(exc) + os.linesep)
-    def writeCrashDetail(self, mailFile):
-        mailFile.write(os.linesep + "Crash information for the tests that crashed follows..." + os.linesep)
-        for test in self.orderedTests:
-            if not self.crashDetail.has_key(test):
-                continue
-            stackTrace = self.crashDetail[test]
-            mailFile.write("--------------------------------------------------------" + os.linesep)
-            mailFile.write("TEST CRASHED -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
-            mailFile.write(stackTrace)
-    def writeFailureDetail(self, mailFile):
-        mailFile.write(os.linesep + "Failure information for the tests that failed follows..." + os.linesep)
-        for test in self.orderedTests:
-            if not self.failureDetail.has_key(test):
-                continue
-            testComparison = self.failureDetail[test]
-            comparisonList = testComparison.getComparisons()
-            if len(comparisonList):
-                mailFile.write("--------------------------------------------------------" + os.linesep)
-                mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
-                os.chdir(test.getDirectory(temporary=1))
-                self.displayComparisons(comparisonList, mailFile, self.mainSuite.app)
+        for category in self.allCategories():
+            category.describeBrief(mailFile, self.mainSuite.app)
+        for category in self.allCategories():
+            category.describeFull(mailFile)
     def getCleanUpAction(self):
         return MailSender(self.sessionName) 
 
@@ -273,21 +226,39 @@ class MailSender(plugins.Action):
         title = time.strftime("%y%m%d") + " " + repr(app)
         versions = self.findCommonVersions(app, appResponders)
         return title + self.getVersionString(versions) + " : "
+    def getCategoryNames(self, appResponders):
+        names = []
+        for resp in appResponders:
+            for cat in resp.errorCategories:
+                if not cat.name in names:
+                    names.append(cat.name)
+        for resp in appResponders:
+            for cat in resp.failureCategories:
+                if not cat.name in names:
+                    names.append(cat.name)
+        for resp in appResponders:
+            for cat in resp.successCategories:
+                if not cat.name in names:
+                    names.append(cat.name)
+        return names
     def getMailTitle(self, app, appResponders):
         title = self.getMailHeader(app, appResponders)
         title += self.getTotalString(appResponders, BatchResponder.testCount) + " tests"
         if self.getTotalString(appResponders, BatchResponder.failureCount) == "0":
             return title + ", all successful"
         title += " :"
-        for categoryName in categoryNames:
+        for categoryName in self.getCategoryNames(appResponders):
             totalInCategory = self.getCategoryCount(categoryName, appResponders)
-            title += self.briefText(totalInCategory, appResponders[0].categories[categoryName].briefDescription)
+            briefDesc = self.getBriefDescription(categoryName, appResponders) 
+            title += self.briefText(totalInCategory, briefDesc)
         # Lose trailing comma
         return title[:-1]
     def getMachineTitle(self, app, appResponders):
         values = []
-        for categoryName in categoryNames:
-            values.append(str(self.getCategoryCount(categoryName, appResponders)))
+        for categoryName in self.getCategoryNames(appResponders):
+            countStr = str(self.getCategoryCount(categoryName, appResponders))
+            briefDesc = self.getBriefDescription(categoryName, appResponders)
+            values.append(briefDesc + "=" + countStr)
         return string.join(values, ',')
     def getTotalString(self, appResponders, method):
         total = 0
@@ -297,8 +268,13 @@ class MailSender(plugins.Action):
     def getCategoryCount(self, categoryName, appResponders):
         total = 0
         for resp in appResponders:
-            total += resp.categories[categoryName].count
+            if resp.categories.has_key(categoryName):
+                total += len(resp.categories[categoryName].allTests)
         return total
+    def getBriefDescription(self, categoryName, appResponders):
+        for resp in appResponders:
+            if resp.categories.has_key(categoryName):
+                return resp.categories[categoryName].briefDescription
     def getVersionString(self, versions):
         if len(versions) > 0:
             return " " + string.join(versions, ".")
@@ -325,9 +301,7 @@ class CollectFiles(plugins.Action):
         self.diag = plugins.getDiagnostics("batch collect")
     def setUpApplication(self, app):
         fileBodies = []
-        totalValues = []
-        for category in categoryNames:
-            totalValues.append(0)
+        totalValues = seqdict()
         prefix = "batchreport." + app.name + app.versionSuffix()
         # Don't collect to more collections!
         self.diag.info("Setting up application " + app.name + " looking for " + prefix) 
@@ -343,8 +317,11 @@ class CollectFiles(plugins.Action):
                     app.addConfigEntry("collection", recipient, "batch_recipients")
                 catValues = plugins.commasplit(file.readline().strip())
                 try:
-                    for i in range(len(categoryNames)):
-                        totalValues[i] += int(catValues[i])
+                    for value in catValues:
+                        catName, count = value.split("=")
+                        if not totalValues.has_key(catName):
+                            totalValues[catName] = 0
+                        totalValues[catName] += int(count)
                 except ValueError:
                     print "WARNING : found truncated or old format batch report (" + filename + ") - could not parse result correctly"
                 fileBodies.append(file.read())
@@ -368,14 +345,14 @@ class CollectFiles(plugins.Action):
     def getTitle(self, app, totalValues):
         title = self.mailSender.getMailHeader(app, [])
         total = 0
-        for value in totalValues:
+        for value in totalValues.values():
             total += value
         title += str(total) + " tests ran"
-        if totalValues[categoryNames.index("success")] == total:
-            return title + ", all successful"
+        if len(totalValues.keys()) == 1:
+            return title + ", all " + totalValues.keys()[0]
         title += " :"
-        for index in range(len(categoryNames)):
-            title += self.mailSender.briefText(totalValues[index], briefCategoryDescriptions[index])
+        for catName, count in totalValues.items():
+            title += self.mailSender.briefText(count, catName)
         # Lose trailing comma
         return title[:-1]
     def writeBody(self, mailFile, bodies):

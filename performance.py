@@ -62,6 +62,11 @@ performance.MemoryStatistics
 # For memory the same is true, and the format is
 # Max Memory :       45 MB
 
+plugins.addCategory("smaller", "memory-", "used less memory")
+plugins.addCategory("larger", "memory+", "used more memory")
+plugins.addCategory("faster", "faster", "ran faster")
+plugins.addCategory("slower", "slower", "ran slower")
+
 # Returns -1 as error value, if the file is the wrong format
 def getPerformance(fileName):
     try:
@@ -84,9 +89,11 @@ class PerformanceTestComparison(comparetest.TestComparison):
         comparetest.TestComparison.__init__(self, previousInfo, execHost)
         self.execHost = execHost
     def __repr__(self):
-        if self.execHost != None and self.hasDifferences():
-            return "FAILED on " + self.execHost + " :"
-        return comparetest.TestComparison.__repr__(self)
+        basicDesc = comparetest.TestComparison.__repr__(self)
+        if self.execHost != None and len(basicDesc) > 0:
+            return basicDesc.replace(":", "on " + self.execHost + " :")
+        else:
+            return basicDesc
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         baseName = os.path.basename(standardFile)
         if baseName.find(".") == -1:

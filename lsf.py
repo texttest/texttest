@@ -420,7 +420,7 @@ class KillTest(plugins.Action):
     def __repr__(self):
         return "Cancelling"
     def __call__(self, test):
-        if test.state > test.RUNNING or not LSFServer.instance:
+        if test.state.isComplete() or not LSFServer.instance:
             return
         job = LSFServer.instance.findJob(test, self.jobNameFunction)
         if not job.isActive() or job.jobId in self.jobsKilled:
@@ -453,6 +453,8 @@ class Wait(plugins.Action):
     def checkCondition(self, job):
         return job.hasFinished()
 
+plugins.addCategory("killed", "unfinished", "were unfinished")
+
 class UpdateLSFStatus(plugins.Action):
     def __init__(self, jobNameFunction = None):
         self.jobNameFunction = jobNameFunction
@@ -460,8 +462,7 @@ class UpdateLSFStatus(plugins.Action):
     def __repr__(self):
         return "Killing"
     def __call__(self, test):
-        # Don't look for unrunnable tests...
-        if test.state == test.UNRUNNABLE:
+        if test.state.isComplete():
             return
         job = LSFServer.instance.findJob(test, self.jobNameFunction)
         if job.errorMessage:
@@ -477,7 +478,7 @@ class UpdateLSFStatus(plugins.Action):
                 print test.getIndent() + "Killing", self.jobNameFunction(test), "(Emergency finish)"
             else:
                 self.describe(test, " (Emergency finish)")
-                test.changeState(test.KILLED, "Killed by LSF emergency finish")
+                test.changeState(plugins.TestState("killed", completed=1))
             job.kill()
             return
         return self.WAIT | self.RETRY
@@ -498,9 +499,9 @@ class UpdateTestLSFStatus(UpdateLSFStatus):
         details += "Current LSF status = " + status + os.linesep
         details += self.getExtraRunData(test)
         if status == "PEND":
-            test.changeState(test.NOT_STARTED, details)
+            test.state.freeText = details
         else:
-            test.changeState(test.RUNNING, details)
+            test.changeState(plugins.TestState("running", details, started=1))
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
     def getExtraRunData(self, test):

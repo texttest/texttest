@@ -123,32 +123,26 @@ class TextTestGUI:
         self.model.set_value(iter, 0, nodeName)
         self.model.set_value(iter, 2, suite)
         self.model.set_value(iter, 3, suite.uniqueName)
-        self.updateStateInModel(suite, iter)
+        self.updateStateInModel(suite, iter, suite.state)
         try:
             for test in suite.testcases:
                 self.addSuiteWithParent(test, iter)
         except:
             pass
         return iter
-    def getTypeBreakdown(self, test):
-        try:
-            return test.stateDetails.getTypeBreakdown()
-        except AttributeError:
-            return "failure", "UNRUNNABLE"
-    def updateStateInModel(self, test, iter, state = None):
-        colours = test.getConfigValue("test_colours")
+    def updateStateInModel(self, test, iter, state):
         if not self.dynamic:
-            return self.modelUpdate(iter, colours["static"])
-        if state == test.FAILED or state == test.UNRUNNABLE:
-            resultType, summary = self.getTypeBreakdown(test)
-            return self.modelUpdate(iter, colours[resultType], summary, colours["failure"])
-        if state == test.SUCCEEDED:
-            return self.modelUpdate(iter, colours["success"])
-        if state == test.RUNNING:
-            return self.modelUpdate(iter, colours["running"])
-        if state == test.RUNNING_PREPROCESS:
-            return self.modelUpdate(iter, colours["run_preprocess"])
-        return self.modelUpdate(iter, colours["not_started"])
+            return self.modelUpdate(iter, self.getTestColour(test, "static"))
+
+        resultType, summary = state.getTypeBreakdown()
+        return self.modelUpdate(iter, self.getTestColour(test, resultType), summary, self.getTestColour(test, state.category))
+    def getTestColour(self, test, category):
+        colours = test.getConfigValue("test_colours")
+        if colours.has_key(category):
+            return colours[category]
+        else:
+            # Everything unknown is assumed to be a new type of failure...
+            return colours["failure"]
     def modelUpdate(self, iter, colour, details="", colour2=None):
         if not colour2:
             colour2 = colour
@@ -259,13 +253,11 @@ class TextTestGUI:
         return gtk.TRUE
     def testChanged(self, test, state, byAction):
         if test.classId() == "test-case":
-            if test.waitingForProcess():
-                # Working around python bug 853411: main thread must do all forking
-                test.stateDetails.doFork()
-            else:
-                self.redrawTest(test, state)
-                if byAction:
-                    test.stateChangeEvent(state)
+            # Working around python bug 853411: main thread must do all forking
+            state.notifyInMainThread()
+            self.redrawTest(test, state)
+            if byAction:
+                test.stateChangeEvent(state)
         else:
             self.redrawSuite(test)
         if self.rightWindowGUI and self.rightWindowGUI.test == test:
@@ -334,10 +326,10 @@ class TextTestGUI:
         if saveTestAction:
             fullVersion = saveTestAction.test.app.getFullVersion()
         for test in self.itermap.keys():
-            if test.state == test.FAILED:
-                currFullVersion = test.app.getFullVersion()
-                if not saveTestAction or fullVersion != currFullVersion:
-                    saveTestAction = guiplugins.interactiveActionHandler.getInstance(test, guiplugins.SaveTest)
+            currFullVersion = test.app.getFullVersion()
+            if not saveTestAction or fullVersion != currFullVersion:
+                saveTestAction = guiplugins.interactiveActionHandler.getInstance(test, guiplugins.SaveTest)
+            if saveTestAction.isSaveable(test):
                 saveTestAction(test)
     def viewApp(self, *args):
         self.selection.selected_foreach(self.viewAppFromTest)
@@ -363,13 +355,10 @@ class TextTestGUI:
         if test.classId() == "test-app":
             self.rightWindowGUI = ApplicationGUI(test, self.selection, self.itermap)
         else:
-            if test.state == test.FAILED or test.state == test.SUCCEEDED:
-                try:
-                    if test.stateDetails.needsRecalculation():
-                        cmpAction = comparetest.MakeComparisons()
-                        cmpAction(test)
-                except AttributeError:
-                    pass
+            if test.state.isComplete() and test.state.needsRecalculation():
+                guilog.info("Recalculating result info for test: result file changed since created")
+                cmpAction = comparetest.MakeComparisons()
+                cmpAction(test)
             self.rightWindowGUI = TestCaseGUI(test, self.dynamic)
         if self.contents:
             self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=gtk.TRUE, fill=gtk.TRUE)
@@ -619,7 +608,7 @@ class TestCaseGUI(RightWindowGUI):
         textview = self.createTextView(self.test)
         return [(textview, "Text Info")]
     def addFilesToModel(self):
-        if self.test.state >= self.test.RUNNING:
+        if self.test.state.hasStarted():
             self.addDynamicFilesToModel(self.test)
         else:
             self.addStaticFilesToModel(self.test)
@@ -629,9 +618,9 @@ class TestCaseGUI(RightWindowGUI):
         newiter = self.model.insert_before(None, None)
         self.model.set_value(newiter, 0, "New Files")
 
-        self.testComparison = test.stateDetails
-        if test.state == test.RUNNING:
-            self.testComparison = comparetest.TestComparison(test.stateDetails, None)
+        self.testComparison = test.state
+        if not test.state.isComplete():
+            self.testComparison = comparetest.TestComparison(test.state, None)
             self.testComparison.makeComparisons(test, makeNew = 1)
         diagComps = []
         hasNewDiags, hasOldDiags = 0, 0
@@ -748,15 +737,15 @@ class TestCaseGUI(RightWindowGUI):
         stem = file.split(".")[0]
         return stem in app.getConfigValue("definition_file_stems")
     def getSuccessColour(self):
-        if self.test.state == self.test.RUNNING:
-            return self.colours["running"]
-        else:
+        if self.test.state.isComplete():
             return self.colours["success"]
-    def getFailureColour(self):
-        if self.test.state == self.test.RUNNING:
-            return self.colours["running"]
         else:
+            return self.colours["running"]
+    def getFailureColour(self):
+        if self.test.state.isComplete():
             return self.colours["failure"]
+        else:
+            return self.colours["running"]
     def getSaveTestAction(self):
         for instance in self.actionInstances:
             if isinstance(instance, guiplugins.SaveTest) and instance.canPerformOnTest():
@@ -780,17 +769,7 @@ class TestCaseGUI(RightWindowGUI):
     def getTestInfo(self, test):
         if not test:
             return ""
-        if test.state == test.UNRUNNABLE:
-            return str(test.stateDetails)
-        elif test.state == test.FAILED:
-            try:
-                if test.stateDetails.failedPrediction:
-                    return repr(test.stateDetails.failedPrediction)
-            except AttributeError:
-                return test.stateDetails
-        elif test.state != test.SUCCEEDED and test.stateDetails:
-            return test.stateDetails
-        return ""
+        return str(test.state.freeText)
     def performInteractiveAction(self, action):
         self.test.callAction(action)
     

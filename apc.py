@@ -244,7 +244,7 @@ class RunApcTestInDebugger(default.RunTest):
         return "Debugging"
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
-        if test.state == test.UNRUNNABLE:
+        if test.state.isComplete():
             return
         self.describe(test)
         # Get the options that are sent to APCbatch.sh

@@ -147,6 +147,8 @@ class TextTestGUI:
         buttons = [("Quit", self.quit)]
         if self.dynamic:
             buttons.append(("Save All", self.saveAll))
+        else:
+            buttons.append(("View App", self.viewApp))
         buttonbox = self.makeButtons(buttons)
         window = self.createTreeWindow()
 
@@ -260,12 +262,22 @@ class TextTestGUI:
                 if not saveTestAction:
                     saveTestAction = guiplugins.SaveTest(test)
                 saveTestAction(test)
+    def viewApp(self, *args):
+        self.selection.selected_foreach(self.viewAppFromTest)
+    def viewAppFromTest(self, model, path, iter, *args):
+        test = model.get_value(iter, 2)
+        if test.classId() == "test-case":
+            app = test.app
+            if self.rightWindowGUI.object != app:
+                guilog.info("Viewing app " + repr(app))
+                self.recreateTestView(app)
     def viewTest(self, view, path, column, *args):
-        self.viewTestAtIter(self.model.get_iter(path))
+        iter = self.model.get_iter(path)
+        self.selection.select_iter(iter)
+        self.viewTestAtIter(iter)
     def viewTestAtIter(self, iter):
         test = self.model.get_value(iter, 2)
         guilog.info("Viewing test " + repr(test))
-        colour = self.model.get_value(iter, 1)
         self.recreateTestView(test)
     def recreateTestView(self, test):
         if self.rightWindowGUI:
@@ -426,14 +438,15 @@ class ApplicationGUI(RightWindowGUI):
             for test in suite.testcases:
                 self.selectionChanged(test)
         except AttributeError:
-            self.selection.select_iter(self.itermap[suite.abspath])
+            self.selection.select_iter(self.itermap[suite.abspath])    
     def getSelectedTests(self):
         tests = []
         self.selection.selected_foreach(self.addSelTest, tests)
         return tests
     def addSelTest(self, model, path, iter, tests, *args):
         tests.append(model.get_value(iter, 0))
-            
+
+    
 class TestCaseGUI(RightWindowGUI):
     def __init__(self, test, dynamic):
         self.test = test

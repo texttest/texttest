@@ -183,9 +183,12 @@ class SubmitTest(plugins.Action):
             lsfOptions += " -R '" + resource + "'"
         unixPerfFile = test.getTmpFileName("unixperf", "w")
         timedTestCommand = '\\time -p sh ' + testCommand + ' 2> ' + unixPerfFile
-        commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile + " 2>&1"
+        commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile
         self.diag.info("Submitting with command : " + commandLine)
-        os.system(commandLine)
+        stdin, stdout, stderr = os.popen3(commandLine)
+        errorMessage = stderr.readline()
+        if errorMessage:
+            raise plugins.TextTestError, "Failed to submit to LSF (" + errorMessage.strip() + ")"
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()
         inputFileName = test.getInputFileName()

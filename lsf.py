@@ -336,7 +336,10 @@ class MakeResourceFiles(plugins.Action):
             for line in file.readlines():
                 if line.find("user") != -1:
                     cpuTime = line.strip().split()[-1]
-                    resourceDict["CPU time"] = "CPU time   : " + self.parseUnixTime(cpuTime) + " sec."
+                    try:
+                        resourceDict["CPU time"] = "CPU time   : " + self.parseUnixTime(cpuTime) + " sec."
+                    except:
+                        pass
                 if line.find("real") != -1:
                     realTime = line.strip().split()[-1]
                     resourceDict["Real time"] = "Real time  : " + self.parseUnixTime(realTime) + " sec." + os.linesep

@@ -95,6 +95,13 @@ class UserFilter(default.TextFilter):
             return 1
 
 class CarmenConfig(lsf.LSFConfig):
+    def __init__(self, optionMap):
+        lsf.LSFConfig.__init__(self, optionMap)
+        if self.optionMap.has_key("trace"):
+            os.environ["TEXTTEST_TRACE"] = self.optionMap["trace"]
+    def __del__(self):
+        if self.optionMap.has_key("trace"):
+            del os.environ["TEXTTEST_TRACE"]
     def addToOptionGroup(self, group):
         lsf.LSFConfig.addToOptionGroup(self, group)
         if group.name.startswith("Select"):
@@ -103,6 +110,7 @@ class CarmenConfig(lsf.LSFConfig):
             group.addSwitch("rulecomp", "Build all rulesets")
             group.addSwitch("skip", "Build no rulesets")
         elif group.name.startswith("How"):
+            group.addOption("trace", "Diagnostics trace level")
             group.addSwitch("debug", "Use debug rulesets")
             group.addSwitch("raveexp", "Run with RAVE Explorer")
             group.addSwitch("lprof", "Run with LProf profiler")

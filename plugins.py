@@ -5,6 +5,9 @@ from ndict import seqdict
 
 # Generic configuration class
 class Configuration:
+    CLEAN_NONE = 0
+    CLEAN_SELF = 1
+    CLEAN_PREVIOUS = 2
     def __init__(self, optionMap):
         self.optionMap = optionMap
     def addToOptionGroup(self, group):
@@ -17,8 +20,8 @@ class Configuration:
         return binary + " " + test.options
     def getApplicationEnvironment(self, app):
         return []
-    def keepTmpFiles(self):
-        return 0
+    def getCleanMode(self):
+        return self.CLEAN_SELF
     def printHelpText(self):
         pass
     def extraReadFiles(self, test):

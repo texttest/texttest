@@ -28,10 +28,13 @@ class UNIXConfig(default.Config):
         self.addFilter(filters, "r", performance.TimeFilter)
         return filters
     def batchMode(self):
-        # If running multiple times, batch mode is assumed
-        return self.optionMap.has_key("b") or self.optionMap.has_key("m")
-    def keepTmpFiles(self):
-        return self.batchMode()
+        return self.optionMap.has_key("b")
+    def getCleanMode(self):
+        defaultMode = default.Config.getCleanMode(self)
+        if self.batchMode() and defaultMode & self.CLEAN_SELF:
+            return self.CLEAN_PREVIOUS
+        else:
+            return defaultMode
     def getTestCollator(self):
         return CollateUNIXFiles()
     def getPerformanceFileMaker(self):

@@ -22,6 +22,9 @@ helpOptions = """
 -reconnfull - Only has an effect with reconnect. Essentially, recompute all filtering rather than trusting the run
               you are reconnecting to.
 
+-keeptmp   - Keep any temporary directories where test(s) write files. Note that once you run the test again the old
+             temporary dirs will be removed.       
+
 -t <text>   - only run tests whose names contain <text> as a substring. Note that <text> may be a comma-separated
               list
 
@@ -62,6 +65,8 @@ class Config(plugins.Configuration):
             # Only relevant without the GUI
             group.addSwitch("o", "Overwrite all failures")
             group.addSwitch("n", "Create new results files (overwrite everything)")
+        elif group.name.startswith("Side"):
+            group.addSwitch("keeptmp", "Keep temporary write-directories")
     def getActionSequence(self, useGui):
         return self._getActionSequence(useGui, makeDirs=1)
     def _getActionSequence(self, useGui, makeDirs):
@@ -76,6 +81,13 @@ class Config(plugins.Configuration):
         self.addFilter(filters, "f", FileFilter)
         self.addFilter(filters, "grep", GrepFilter)
         return filters
+    def getCleanMode(self):
+        if self.isReconnectingFast():
+            return self.CLEAN_NONE
+        elif self.optionMap.has_key("keeptmp"):
+            return self.CLEAN_PREVIOUS
+        else:
+            return self.CLEAN_SELF
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
@@ -92,9 +104,11 @@ class Config(plugins.Configuration):
             return self.getTestRunner()
     def getTestRunner(self):
         return RunTest()
+    def isReconnectingFast(self):
+        return self.isReconnecting() and not self.optionMap.has_key("reconnfull")
     def getTestEvaluator(self, useGui):
         actions = [ self.getFileExtractor() ]
-        if not self.isReconnecting() or self.optionMap.has_key("reconnfull"):
+        if not self.isReconnectingFast():
             actions += [ self.getCatalogueCreator(), self.getTestPredictionChecker(), self.getTestComparator(), self.getFailureExplainer() ]
         if not useGui:
             actions.append(self.getTestResponder())

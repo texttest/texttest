@@ -40,9 +40,6 @@ builtInOptions = """
              a ".", an attempt will be made to understand it as the Python class <module>.<classname>. If this fails,
              it will be interpreted as an external script.
 
--keeptmp   - Keep any temporary directories where test(s) write files. Note that once you run the test again the old
-             temporary dirs will be removed.       
-
 -help      - Do not run anything. Instead, generate useful text, such as this.
 
 -x         - Enable log4py diagnostics for the framework. This will use a diagnostic directory from the environment
@@ -486,11 +483,11 @@ class ConfigurationWrapper:
             return self.target.getFilterList()
         except:
             self.raiseException(req = "filter list")
-    def keepTmpFiles(self):
+    def getCleanMode(self):
         try:
-            return self.target.keepTmpFiles()
+            return self.target.getCleanMode()
         except:
-            self.raiseException(req = "keep tmpfiles")
+            self.raiseException(req = "clean mode")
     def setApplicationDefaults(self, app):
         try:
             return self.target.setApplicationDefaults(app)
@@ -555,7 +552,7 @@ class Application:
         self.fullName = self.getConfigValue("full_name")
         debugLog.info("Found application " + repr(self))
         self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), optionMap)
-        self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
+        self.cleanMode = self.configObject.getCleanMode()
         self.writeDirectory = self._getWriteDirectory(optionMap.has_key("gx"))
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
@@ -593,7 +590,6 @@ class Application:
         self.setConfigDefault("full_name", string.upper(self.name))
         self.setConfigDefault("checkout_location", ".")
         self.setConfigDefault("default_checkout", "")
-        self.setConfigDefault("keeptmp_default", 0)
         self.setConfigDefault("extra_version", "none")
         self.setConfigDefault("base_version", [])
         self.setConfigDefault("unsaveable_version", [])
@@ -678,7 +674,6 @@ class Application:
                 group.addOption("trace", "Target application trace level")
         elif group.name.startswith("Side"):
             group.addSwitch("x", "Write TextTest diagnostics")
-            group.addSwitch("keeptmp", "Keep temporary write-directories")
         elif group.name.startswith("Invisible"):
             # Options that don't make sense with the GUI should be invisible there...
             group.addOption("a", "Applications containing")
@@ -774,12 +769,14 @@ class Application:
         os.makedirs(self.writeDirectory)
         debugLog.info("Made root directory at " + self.writeDirectory)
     def removeWriteDirectory(self):
-        # Don't be somewhere under the directory when it's removed
-        os.chdir(self.abspath)
-        if not self.keepTmpFiles and os.path.isdir(self.writeDirectory):
+        doRemove = self.cleanMode & plugins.Configuration.CLEAN_SELF
+        if doRemove and os.path.isdir(self.writeDirectory):
+            # Don't be somewhere under the directory when it's removed
+            os.chdir(self.abspath)
             plugins.rmtree(self.writeDirectory)
     def tryCleanPreviousWriteDirs(self, rootDir, nameBase = ""):
-        if not self.keepTmpFiles or not os.path.isdir(rootDir):
+        doRemove = self.cleanMode & plugins.Configuration.CLEAN_PREVIOUS
+        if not doRemove or not os.path.isdir(rootDir):
             return
         currTmpString = nameBase + self.name + self.versionSuffix() + tmpString()
         for file in os.listdir(rootDir):
@@ -1217,7 +1214,7 @@ class TestRunner:
         for action in self.appRunner.cleanupSequence:
             self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.test))
             self.test.callAction(action)
-        if not self.test.app.keepTmpFiles:
+        if self.test.app.cleanMode & plugins.Configuration.CLEAN_SELF:
             self.test.cleanNonBasicWriteDirectories()
     def findSuitesToChange(self, previousTestRunner):
         tearDownSuites = []

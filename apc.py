@@ -1433,7 +1433,7 @@ class CVSBranchTests(plugins.Action):
 class CleanSubplans(plugins.Action):
     def __init__(self):
         self.config = ApcConfig(None)
-        self.user = "svante" #os.environ["USER"]
+        self.user = os.environ["USER"]
         self.cleanedPlans = 0
         self.totalMem = 0
         self.timeToRemove = time.time()-30*24*3600

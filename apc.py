@@ -455,7 +455,7 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         self.keepLogs = keepLogs
     def getApcHostTmp(self):
         configFile = os.path.join(os.environ["CARMSYS"],"CONFIG")
-        resLine = os.popen("source " + configFile + "; echo ${APC_TEMP_DIR}").readlines()[-1].strip()
+        resLine = os.popen(". " + configFile + "; echo ${APC_TEMP_DIR}").readlines()[-1].strip()
         if resLine.find("/") != -1:
             return resLine
         return "/tmp"

@@ -35,9 +35,9 @@ class PerformanceFileComparison(comparetest.FileComparison):
             self.oldCPUtime = getPerformance(self.stdCmpFile)
             self.newCPUtime = getPerformance(self.tmpCmpFile)
             self.percentageChange = self.calculatePercentageIncrease()
-        # If we didn't understand the old performance, overwrite it
-        if (self.oldCPUtime < 0):
-            os.remove(self.stdFile)
+            # If we didn't understand the old performance, overwrite it
+            if (self.oldCPUtime < 0):
+                os.remove(self.stdFile)
     def __repr__(self):
         return comparetest.FileComparison.__repr__(self) + "(" + self.getDirection() + ")"
     def getDirection(self):

@@ -1630,20 +1630,24 @@ class TextTest:
                     uniqueNameFinder.addSuite(testSuite)
             except BadConfigError:
                 print "Error creating test suite for application", app, "-", sys.exc_value
-                    
+
+        allEmpty = 1
         for app, testSuite in appSuites:
             try:
                 empty = testSuite.size() == 0
                 if self.gui and (not empty or not self.gui.dynamic):
                     self.gui.addSuite(testSuite)
-                if empty:
-                    sys.stderr.write("No tests found for " + app.description() + os.linesep)
-                else:
+                if not empty:
+                    allEmpty = 0
                     actionSequence = self.inputOptions.getActionSequence(app)
                     actionRunner.addTestActions(testSuite, actionSequence)
                     print "Using", app.description() + ", checkout", app.checkout
             except BadConfigError:
                 sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + os.linesep)
+        if allEmpty and len(appSuites) > 0:
+            sys.stderr.write("No tests matched the selected applications/versions. The following were tried: " + os.linesep)
+            for app, testSuite in appSuites:
+                sys.stderr.write(app.description() + os.linesep)
         return actionRunner
     def run(self):
         try:

@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, string, log4py
+import plugins, os, sys, shutil, string
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
@@ -205,9 +205,7 @@ class ImportTestCase(ImportTest):
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
     def getRecordOptions(self, test, actionsFromGui, actionsFromStdin):
-        options = ""
-        if actionsFromGui:
-            options += " -record " + test.useCaseFile
+        options = " -record " + test.useCaseFile
         if actionsFromStdin:
             options += " -recinp " + test.inputFile
         return options
@@ -361,8 +359,4 @@ guilog = None
 
 def setUpGuiLog():
     global guilog
-    guilog = plugins.getDiagnostics("GUI behaviour")
-    if os.environ.has_key("TEXTTEST_NO_SPAWN"):
-        guilog.set_loglevel(log4py.LOGLEVEL_NORMAL)
-        guilog.set_target(os.path.abspath("gui_log.texttest"))
-        guilog.set_formatstring("%M")
+    guilog = plugins.getSelfTestDiagnostics("GUI behaviour", "gui_log.texttest")

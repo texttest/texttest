@@ -22,11 +22,11 @@ class ActionThread(Thread):
         self.join()
 
 class TextTestGUI:
-    def __init__(self, dynamic, replayScriptName, recordScriptName):
+    def __init__(self, dynamic, replayScriptName, recordScriptName, stdinScriptName):
         guiplugins.setUpGuiLog()
         global guilog, scriptEngine
         from guiplugins import guilog
-        scriptEngine = ScriptEngine(replayScriptName, recordScriptName, guilog)
+        scriptEngine = ScriptEngine(replayScriptName, recordScriptName, stdinScriptName, guilog)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic

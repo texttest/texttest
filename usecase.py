@@ -67,20 +67,36 @@ class UserEvent:
     def generate(self, argumentString):
         pass
 
+# Behaves as a singleton...
 class ScriptEngine:
-    def __init__(self, replayScriptName, recordScriptName, logger = None):
+    instance = None
+    def __init__(self, replayScriptName, recordScriptName, stdinScriptName, logger = None):
         self.replayScript = None
         self.recordScript = None
+        self.stdinScript = None
         if replayScriptName and replayScriptName == recordScriptName:
             raise UseCaseScriptError, "Cannot record to the same script we are replaying"
         if replayScriptName:
             self.replayScript = self.createReplayScript(replayScriptName, logger)
         if recordScriptName:
-            self.recordScript = RecordScript(recordScriptName)
+            self.recordScript = UseCaseRecordScript(recordScriptName)
+        if stdinScriptName:
+            self.stdinScript = RecordScript(stdinScriptName)
+        ScriptEngine.instance = self
     def hasScript(self):
         return self.replayScript or self.recordScript
     def createReplayScript(self, scriptName, logger):
         return ReplayScript(scriptName, logger)
+    def applicationEvent(self, name, category = None):
+        if self.replayScript:
+            self.replayScript.registerApplicationEvent(name)
+        if self.recordScript:
+            self.recordScript.registerApplicationEvent(name, category)
+    def readStdin(self):
+        line = sys.stdin.readline().strip()
+        if self.stdinScript:
+            self.stdinScript.record(line)
+        return line
     def standardName(self, name):
         firstIndex = None
         lastIndex = len(name)
@@ -90,11 +106,6 @@ class ScriptEngine:
                     firstIndex = i
                 lastIndex = i
         return name[firstIndex:lastIndex + 1].lower()
-    def applicationEvent(self, name, category = None):
-        if self.replayScript:
-            self.replayScript.registerApplicationEvent(name)
-        if self.recordScript:
-            self.recordScript.registerApplicationEvent(name, category)
 
 class ReplayScript:
     def __init__(self, scriptName, logger):
@@ -188,9 +199,19 @@ class ReplayScript:
             self.write("Waiting for application event '" + applicationEventName + "' to occur.")
             return 0
 
+# Take care not to record empty files...
 class RecordScript:
     def __init__(self, scriptName):
-        self.fileForAppend = open(scriptName, "w")
+        self.scriptName = scriptName
+        self.fileForAppend = None
+    def record(self, line):
+        if not self.fileForAppend:
+            self.fileForAppend = open(self.scriptName, "w")
+        self.fileForAppend.write(line + os.linesep)
+
+class UseCaseRecordScript(RecordScript):
+    def __init__(self, scriptName):
+        RecordScript.__init__(self, scriptName)
         self.events = []
         self.applicationEvents = seqdict()
     def addEvent(self, event):
@@ -199,7 +220,7 @@ class RecordScript:
         event = self.findEvent(*args)
         if event.widgetHasChanged():
             self.writeApplicationEventDetails()
-            self.fileForAppend.write(event.outputForScript(*args) + os.linesep)
+            self.record(event.outputForScript(*args))
     def findEvent(self, *args):
         for arg in args:
             if isinstance(arg, UserEvent):
@@ -213,8 +234,5 @@ class RecordScript:
             self.applicationEvents["gtkscript_DEFAULT"] = eventName
     def writeApplicationEventDetails(self):
         for eventName in self.applicationEvents.values():
-            self.fileForAppend.write(waitCommandName + " " + eventName + os.linesep)
+            self.record(waitCommandName + " " + eventName)
         self.applicationEvents = seqdict()
-
-            
-

@@ -10,6 +10,7 @@ instead of files of the form <root>.<app>
 """
 
 import comparetest, ndiff, sys, string, os, plugins
+from usecase import ScriptEngine
     
 # Abstract base to make it easier to write test responders
 class Responder(plugins.Action):
@@ -69,7 +70,7 @@ class InteractiveResponder(Responder):
         if allowView:
             options = "View details(v), " + options
         print test.getIndent() + options
-        response = sys.stdin.readline().strip()
+        response = ScriptEngine.instance.readStdin()
         exactSave = response.find('+') != -1
         if response.startswith('s'):
             testComparison.save(exactSave)

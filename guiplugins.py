@@ -21,9 +21,9 @@ class InteractiveAction(plugins.Action):
         return None
     def getScriptTitle(self):
         return self.getTitle()
-    def startExternalProgram(self, commandLine, shellTitle = None):
+    def startExternalProgram(self, commandLine, shellTitle = None, shellOptions = ""):
         if shellTitle:
-            commandLine = "xterm -bg white -T '" + shellTitle + "' -e " + commandLine
+            commandLine = "xterm " + shellOptions + " -bg white -T '" + shellTitle + "' -e " + commandLine
         process = plugins.BackgroundProcess(commandLine)
         self.processes.append(process)
         return process
@@ -159,9 +159,6 @@ class ImportTestCase(ImportTest):
             self.addOptionsFileOption()
             if self.appIsGUI():
                 self.optionGroup.addSwitch("editsc", "Change user abilities (edit GUI script)")
-            # Assume GUIs never deal with standard input
-            if suite.app.getConfigValue("use_standard_input") and not self.appIsGUI():
-                self.optionGroup.addSwitch("editin", "Create standard input file", not self.appIsGUI())
             self.optionGroup.addSwitch("runstd", "Collect standard results immediately", self.assumeShortTests())
             self.optionGroup.addSwitch("editlog", "Change system behaviour (edit log file)")
     def testType(self):
@@ -174,25 +171,46 @@ class ImportTestCase(ImportTest):
         self.optionGroup.addOption("opt", "Command line options")
     def createTestContents(self, suite, testDir):
         self.writeOptionFile(suite, testDir)
-        self.writeInputFile(suite, testDir)
-    def recordResults(self, newTest):
-        if self.appIsGUI():
-            self.recordGUIActions(newTest)
-
+    def recordResults(self, newTest):    
+        self.recordUserActions(newTest)
         if self.optionGroup.getSwitchValue("runstd"):
             self.recordStandardResult(newTest)
-    def recordGUIActions(self, test):
-        print "Record your actions using the", test.app.fullName, "GUI..."
+    def recordUserActions(self, test):
+        actionsFromGui = self.appIsGUI()
+        actionsFromStdin = test.getConfigValue("use_standard_input")
+        if not actionsFromGui and not actionsFromStdin:
+            print "Not recording user actions as neither GUI nor standard input enabled"
+            return
+        
+        self.runRecordMode(test, actionsFromGui, actionsFromStdin)
+        if self.optionGroup.getSwitchValue("editsc"):
+            self.viewFile(test.useCaseFile, wait=1)
+    def runRecordMode(self, test, actionsFromGui, actionsFromStdin):
+        description = "Running " + test.app.fullName + " in order to capture user actions..."
+        print description
         test.app.makeWriteDirectory()
         test.makeBasicWriteDirectory()
         test.setUpEnvironment(parents=1)
         os.chdir(test.writeDirs[0])
-        recordCommand = test.getExecuteCommand() + " -record " + test.useCaseFile
-        os.system(recordCommand)
+        recordOptions = self.getRecordOptions(test, actionsFromGui, actionsFromStdin)
+        recordCommand = test.getExecuteCommand() + recordOptions
+        shellTitle = None
+        shellOptions = ""
+        if actionsFromStdin:
+            shellTitle = description
+        if not actionsFromGui:
+            shellOptions = "-hold"
+        process = self.startExternalProgram(recordCommand, shellTitle, shellOptions)
+        process.waitForTermination()
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
-        if self.optionGroup.getSwitchValue("editsc"):
-            self.viewFile(test.useCaseFile, wait=1)
+    def getRecordOptions(self, test, actionsFromGui, actionsFromStdin):
+        options = ""
+        if actionsFromGui:
+            options += " -record " + test.useCaseFile
+        if actionsFromStdin:
+            options += " -recinp " + test.inputFile
+        return options
     def recordStandardResult(self, test):
         print "Running test", test, "to get standard behaviour..."
         commandLine = self.getTextTestName() + " -a " + test.app.name + " -o -t " + test.name + " -ts " + self.test.name \
@@ -211,14 +229,6 @@ class ImportTestCase(ImportTest):
         optionFile = open(os.path.join(testDir, "options." + suite.app.name), "w")
         optionFile.write(optionString + os.linesep)
         return optionString
-    def writeInputFile(self, suite, testDir):
-        if not self.optionGroup.getSwitchValue("editin"):
-            return
-        inputFile = os.path.join(testDir, "input." + suite.app.name)
-        file = open(inputFile, "w")
-        file.write("<Enter standard input lines in this file>" + os.linesep)
-        file.close()
-        self.viewFile(inputFile, wait=1)
     def getOptions(self):
         return self.optionGroup.getOptionValue("opt")
 

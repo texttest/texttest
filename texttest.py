@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os, sys, types, string, getopt, types, time, plugins, exceptions, stat, log4py, shutil
 from stat import *
+from usecase import ScriptEngine
 from ndict import seqdict
 
 helpIntro = """
@@ -29,6 +30,8 @@ builtInOptions = """
 -record <s>- record all user actions in the GUI to the script <s>
 
 -replay <s>- replay the script <s> created previously in the GUI. No effect without -g.
+
+-recinp <s>- record everything received on standard input to the script <s> 
 
 -s <scrpt> - instead of the normal actions performed by the configuration, use the script <scpt>. If this contains
              a ".", an attempt will be made to understand it as the Python class <module>.<classname>. If this fails,
@@ -592,6 +595,7 @@ class Application:
             group.addOption("d", "Run tests at")
             group.addOption("record", "Record user actions to this script")
             group.addOption("replay", "Replay user actions from this script")
+            group.addOption("recinp", "Record standard input to this script")
             group.addOption("help", "Print help text")
             group.addSwitch("g", "use GUI", 1)
             group.addSwitch("gx", "use static GUI")
@@ -907,6 +911,11 @@ class OptionFinder:
     def replayScript(self):
         if self.inputOptions.has_key("replay"):
             return self.findGuiScript(self.inputOptions["replay"])
+        else:
+            return ""
+    def stdinScript(self):
+        if self.inputOptions.has_key("recinp"):
+            return self.findGuiScript(self.inputOptions["recinp"])
         else:
             return ""
     def findGuiScript(self, scriptFile):
@@ -1247,15 +1256,18 @@ class TextTest:
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
         self.allApps = self.inputOptions.findApps()
         self.gui = None
+        recordScript = self.inputOptions.recordScript()
+        replayScript = self.inputOptions.replayScript()
+        stdinScript = self.inputOptions.stdinScript()        
         if self.inputOptions.useGUI():
             try:
                 import texttestgui
-                recordScript = self.inputOptions.recordScript()
-                replayScript = self.inputOptions.replayScript()
-                self.gui = texttestgui.TextTestGUI(self.inputOptions.guiRunTests(), replayScript, recordScript)
+                self.gui = texttestgui.TextTestGUI(self.inputOptions.guiRunTests(), replayScript, recordScript, stdinScript)
             except:
                 print "Cannot use GUI: caught exception:"
                 printException()
+        if not self.gui:
+            self.scriptEngine = ScriptEngine(replayScript, recordScript, stdinScript)
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names
         if os.environ.has_key("USER"):

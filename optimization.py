@@ -122,7 +122,7 @@ class OptimizationConfig(carmen.CarmenConfig):
             return 1
         return 0
     def getInteractiveActions(self):
-        return [ PlotTest ]
+        return [ PlotTest, TableTest ]
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
@@ -546,6 +546,18 @@ class TableTest(plugins.Action):
                     self.interestingValues.append(entry.replace("_", " "))
             else:
                 print "Unknown option " + arr[0]
+    # Interactive stuff
+    def getTitle(self):
+        return "Show Table"
+    def getArgumentOptions(self):
+        options = {}
+        options["i"] = "Log file items for table columns"
+        return options
+    def getSwitches(self):
+        switches = {}
+        switches["nt"] = "Ignore temporary file"
+        switches["ns"] = "Don't scale times"
+        return switches
     def __call__(self, test):
         # Values that should be reported if present, but should not be fatal if not
         extraValues = [ "machine", "Crew Members" ]

@@ -153,6 +153,9 @@ class OptimizationConfig(carmen.CarmenConfig):
             if os.path.isfile(rulesFile):
                 readDirs["Subplan"] = [ rulesFile ]
                 readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", self.getRuleSetName(test)) ]
+            secretParamFile = test.makeFileName("secret_parameters.etab", forComparison=0)
+            if os.path.isfile(secretParamFile):
+                readDirs["Parameter"] = [ secretParamFile ]
             test.tearDownEnvironment(parents=1)
         elif test.environment.has_key("CARMUSR"):
             readDirs["Resource"] = [ os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab") ]

@@ -371,7 +371,7 @@ class ApplicationGUI(RightWindowGUI):
         self.model.set_value(confiter, 0, "Configuration Files")
         configFiles = []
         for file in os.listdir(self.app.abspath):
-            if file.startswith("config." + self.app.name):
+            if self.app.ownsFile(file) and file.startswith("config."):
                 configFiles.append(file)
         configFiles.sort()
         for file in configFiles:

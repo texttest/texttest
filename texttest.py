@@ -57,7 +57,7 @@ class TestCase(Test):
         optionsFile = self.makeFileName("options")
         self.options = ""
         if (os.path.isfile(optionsFile)):
-            self.options = os.path.expandvars(open(optionsFile).readline()[:-1])
+            self.options = os.path.expandvars(open(optionsFile).readline().strip())
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):

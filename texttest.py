@@ -299,8 +299,6 @@ class TestCase(Test):
         else:
             return self.abspath
     def callAction(self, action):
-        if os.path.isdir(self.writeDirs[0]):
-            os.chdir(self.writeDirs[0])
         return action(self)
     def filesChanged(self):
         self._setOptions()
@@ -1548,7 +1546,6 @@ class TextTest:
             del os.environ["USECASE_REPLAY_SCRIPT"]
     def findApps(self):
         dirName = self.inputOptions.directoryName
-        os.chdir(dirName)
         debugLog.info("Using test suite at " + dirName)
         raisedError, appList = self._findApps(dirName, 1)
         appList.sort()

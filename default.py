@@ -367,6 +367,8 @@ class RunTest(plugins.Action):
     def __call__(self, test):
         if test.state.isComplete():
             return
+        # Change to the directory so any incidental files can be found easily
+        os.chdir(test.writeDirs[0])
         retValue = self.runTest(test)
         # Change state after we've started running!
         self.changeState(test)

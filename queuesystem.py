@@ -276,6 +276,8 @@ class QueueSystemServer:
         submitCommand = queueSystem.getSubmitCommand(jobName, submissionRules)
         fullCommand = envString + submitCommand + " '" + command + "'"
         self.diag.info("Creating job " + jobName + " with command : " + fullCommand)
+        # Change directory to the appropriate test dir
+        os.chdir(submissionRules.test.writeDirs[0])
         stdin, stdout, stderr = os.popen3(fullCommand)
         errorMessage = queueSystem.findSubmitError(stderr)
         if errorMessage:

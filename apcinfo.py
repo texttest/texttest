@@ -244,6 +244,7 @@ class GenHTML(plugins.Action):
         self.raveSpentFile = self.htmlDir + os.sep + "ravespent.html"
         self.hatedFcnsFile = self.htmlDir + os.sep + "hatedfcns.html"
         self.variationFile = self.htmlDir + os.sep + "variation.html"
+        self.ruleFailureFile = self.htmlDir + os.sep + "rulefailures.html"
         
     def setUpApplication(self, app):
         self.RCFile = app.abspath + os.sep + "apcinfo.rc"
@@ -280,6 +281,16 @@ class GenHTML(plugins.Action):
         self.variationDoc.title = "Cost variation for different groups"
         self.variationDoc.append_file(os.path.join(self.htmlDir, 'variation-intro-txt.html'))
         self.variationDoc.append(self.variationChart)
+        
+        # Rule failures
+        self.ruleFailureChart = barchart.BarChart()
+        self.ruleFailureChart.datalist = barchart.DataList()
+        self.ruleFailureChart.thresholds = (20, 60)
+        self.ruleFailureChart.title = "Rule failures in percent"
+        self.ruleFailureDoc = CarmenDocument(self.RCFile)
+        self.ruleFailureDoc.title = "Rule failures for different groups"
+        self.ruleFailureDoc.append_file(os.path.join(self.htmlDir, 'rulefailures-intro-txt.html'))
+        self.ruleFailureDoc.append(self.ruleFailureChart)
         
         self.kpiGroupForTest = {}
         self.kpiGroups = []
@@ -334,6 +345,9 @@ class GenHTML(plugins.Action):
         # Write variation page
         self.variationDoc.write(self.variationFile)
 
+        # Write rule failure page
+        self.ruleFailureDoc.write(self.ruleFailureFile)
+
         # Write most hated page.
         hatedFcnsDoc = CarmenDocument(self.RCFile)
         hatedFcnsDoc.title = "The 10 most time consuming functions in APC"
@@ -361,15 +375,18 @@ class GenHTML(plugins.Action):
                 page.append(suitePage["group"][groups]["info"])
 
             if not groups == "common":
-                cost_spread, meanvar = self.calcCostAndPerfMeanAndVariation(suitePage["group"][groups]["table"])
+                linkToTest = HTMLgen.Href(name + ".html" + "#" + groups, groups)
+                
                 # append cost_spread to variationChart
+                cost_spread, meanvar = self.calcCostAndPerfMeanAndVariation(suitePage["group"][groups]["table"])
                 if cost_spread*1000 <= 20:
-                    linkToTest = HTMLgen.Href(name + ".html" + "#" + groups, groups)
                     self.variationChart.datalist.load_tuple((linkToTest, cost_spread*1000))
                 
+                ruleFailureAvg = suitePage["group"][groups]["rulecheckfailureavg"]/suitePage["group"][groups]["numtests"]
+                self.ruleFailureChart.datalist.load_tuple((linkToTest, 100*ruleFailureAvg))
             table = HTMLgen.Table()
             table.body = suitePage["group"][groups]["table"]
-            table.heading = ["Test", "Cost", "Perf. (min)", "Mem (MB)", "Uncov", "Overcov", "Illegal", "Date"]
+            table.heading = ["Test", "Cost", "Perf. (min)", "Mem (MB)", "Uncov", "Overcov", "Illegal", "Rule checks/failures", "Date"]
             page.append(table)
             if not groups == "common":
                 page.append(meanvar)
@@ -576,7 +593,7 @@ class GenHTML(plugins.Action):
             group = "common"
         # Create group if necessary.
         if not self.currentSuitePage["group"].has_key(group):
-            self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} }
+            self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} , 'rulecheckfailureavg': 0 , 'numtests': 0}
             if not group == "common":
                 self.createGroupInfo(group, test)
 
@@ -585,8 +602,11 @@ class GenHTML(plugins.Action):
         tableOvercovered = -1
         tableIllegal = -1
         tableCost = 0
+        tableRuleChecks = 0
+        tableRuleFailures = 0
         logFile = test.makeFileName(test.app.getConfigValue("log_file"), temporary = 0)
-        optRun = optimization.OptimizationRun(test.app,  [ optimization.timeEntryName, optimization.activeMethodEntryName, optimization.dateEntryName, optimization.costEntryName], ["uncovered legs\.", "overcovers", "^\ illegal trips"] + self.definingValues + self.interestingValues, logFile)
+        ruleFailureItems = ["Rule checks\.", "Failed due to rule violation\."]
+        optRun = optimization.OptimizationRun(test.app,  [ optimization.timeEntryName, optimization.activeMethodEntryName, optimization.dateEntryName, optimization.costEntryName], ["uncovered legs\.", "overcovers", "^\ illegal trips"] + self.definingValues + self.interestingValues + ruleFailureItems, logFile)
         if not len(optRun.solutions) == 0:
             lastSolution = optRun.solutions[-1]
             tableDate = lastSolution["Date"]
@@ -597,7 +617,13 @@ class GenHTML(plugins.Action):
                 tableOvercovered = lastSolution["overcovers"]
             if lastSolution.has_key("^\ illegal trips"):
                 tableIllegal = lastSolution["^\ illegal trips"]
-            self.extractTimeSpent(test, optRun.solutions, group)
+            # Rule checks
+            tableRuleChecks, tableRuleFailures = self.extractFromLastColGenSol(test, optRun.solutions, group)
+            avg = 0
+            if tableRuleChecks > 0:
+                avg = float(tableRuleFailures)/float(tableRuleChecks)
+                self.currentSuitePage["group"][group]["rulecheckfailureavg"] += avg
+            tableRuleStr = "%d/%d (%.2f)" % (tableRuleChecks, tableRuleFailures, avg)
         else:
             print "Warning, no solution in OptimizationRun!"
 
@@ -611,8 +637,9 @@ class GenHTML(plugins.Action):
         else:
             testMemory = "-"
         tableRow = [ test.name, tableCost, float(int(10*testPerformance))/10, testMemory,
-                     tableUncovered, tableOvercovered, tableIllegal, tableDate ]
+                     tableUncovered, tableOvercovered, tableIllegal, tableRuleStr, tableDate ]
         self.currentSuitePage["group"][group]["table"].append(tableRow)
+        self.currentSuitePage["group"][group]["numtests"] += 1
         self.totalCPUtime += testPerformance
         
     def extractProfiling(self, test, group):
@@ -634,19 +661,19 @@ class GenHTML(plugins.Action):
                     tl.append(0)
             self.raveBC.fillData(tl, data["ravebc"].datalist)
 
-    def extractTimeSpent(self, test, solution, group):
-        colgenNotFound = 1
+    def extractFromLastColGenSol(self, test, solution, group):
         while solution:
             lastSolution = solution.pop()
             if lastSolution["Active method"] == "column generator":
                 break
         if not lastSolution["Active method"] == "column generator":
-            return
+            print "Warning: didn't find last colgen solution!"
+            return 0, 0
         
         totTime = int(lastSolution["cpu time"]*60)
         # Skip runs shorter than 2 minutes. 
         if totTime < 2*60:
-            return
+            return 0, 0
         sum = 0
         tl = [ test.name ]
         for val in self.definingValues + self.interestingValues:
@@ -666,3 +693,10 @@ class GenHTML(plugins.Action):
         chartdata = chartabs.datalist, chartrel.datalist
         self.timeSpentBC.fillDataRelAbs(tl, totTime, chartdata)
 
+        ruleChecks = 0
+        ruleFailures = 0
+        if lastSolution.has_key("Rule checks\."):
+            ruleChecks = lastSolution["Rule checks\."]
+        if lastSolution.has_key("Failed due to rule violation\."):
+            ruleFailures = lastSolution["Failed due to rule violation\."]
+        return ruleChecks, ruleFailures

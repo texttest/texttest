@@ -151,18 +151,22 @@ class MakeProgressReport(optimization.MakeProgressReport):
     def __init__(self, referenceVersion):
         optimization.MakeProgressReport.__init__(self, referenceVersion)
     def compare(self, test, referenceFile, currentFile):
-
-        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile," TOTAL cost")
-        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile," TOTAL cost")
-
+        try:
+            margin = float(test.app.getConfigValue("kpi_cost_margin"))
+        except:
+            margin = 0.0
+        refMaxMemory, referenceCosts, refTimes = getSolutionStatistics(referenceFile, " TOTAL cost", margin)
+        currentMaxMemory, currentCosts, curTimes = getSolutionStatistics(currentFile, " TOTAL cost", margin)
         currPerf = int(performance.getTestPerformance(test))
         refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
         currTTWC = currPerf
         refTTWC = refPerf
         if currentCosts[-1] < referenceCosts[-1]:
             currTTWC = self.timeToCostFromTimes(curTimes, currPerf, currentCosts, referenceCosts[-1])
+            refTTWC = refTimes[-1]
         else:
             refTTWC = self.timeToCostFromTimes(refTimes, refPerf, referenceCosts, currentCosts[-1])
+            currTTWC = curTimes[-1]
         if float(refTTWC) < 1:
             return
         kpi = float(currTTWC) / float(refTTWC)
@@ -175,7 +179,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.reportLine("Final cost of plan       ", currentCosts[-1], referenceCosts[-1])
         self.reportLine("Memory used (Mb)         ", currentMaxMemory, refMaxMemory)
         self.reportLine("Total time (minutes)     ", currPerf, refPerf)
-        self.reportLine("Time to worst cost (mins)", currTTWC, refTTWC)
+        self.reportLine("Time to worst cost (mins)", int(currTTWC), int(refTTWC))
     def getCosts(self, file, type):
         costCommand = "grep '" + type + "' " + file + " | awk '{ print $3 }'"
         return map(self.makeInt, os.popen(costCommand).readlines())
@@ -333,7 +337,22 @@ def convertTime(timeEntry):
     timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip())
     return float(timeInSeconds) / 60.0
 
-def getSolutionStatistics(currentFile,statistics):
+def filterLastCosts(costs, times, margin):
+    if margin == 0.0 or len(costs) < 3:
+        return costs, times
+    
+    lastCost = costs[-1]
+    for ix in range(len(costs) - 2):
+        cost = costs[-1 * (ix + 2)]
+        diff = abs(cost - lastCost)
+        if (1.0 * diff / lastCost) * 100.0 > margin:
+            if ix == 0:
+                return costs, times
+            else:
+                return costs[:-1 * ix], times[:-1 * ix]
+    return costs[0:2], times[0:2]
+    
+def getSolutionStatistics(currentFile, statistics, margin = 0.0):
     grepCommand = "grep -E 'memory|" + statistics + "|cpu time' " + currentFile
     grepLines = os.popen(grepCommand).readlines()
     costs = []
@@ -352,6 +371,7 @@ def getSolutionStatistics(currentFile,statistics):
         if line.startswith(statistics):
             costs.append(int(line.split()[-1]))
             times.append(lastTime)
+    costs, times = filterLastCosts(costs, times, margin)
     return maxMemory, costs, times
 
 class PlotApcTest(plugins.Action):

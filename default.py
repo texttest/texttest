@@ -319,6 +319,9 @@ class ReconnectTest(plugins.Action):
         else:
             os.makedirs(test.writeDirs[0])
             os.chdir(test.writeDirs[0])
+        for file in os.listdir(os.getcwd()):
+            if file.endswith("cmp"):
+                os.remove(file)
     def setUpApplication(self, app):
         root, localDir = os.path.split(app.writeDirectory)
         if not os.path.isdir(root):

@@ -120,6 +120,21 @@ class MatadorConfig(optimization.OptimizationConfig):
             if line.startswith("153"):
                 return line.split(";")[3]
         return ""
+    def extraReadFiles(self, test):
+        readFiles = optimization.OptimizationConfig.extraReadFiles(self, test)
+        diagDir = os.path.join(test.abspath, "Diagnostics")
+        if os.path.isdir(diagDir):
+            etabPath = os.path.join(diagDir, "diagnostics.etab")
+            if os.path.isfile(etabPath):
+                readFiles["Diagnostics"] = [ etabPath ]
+            else:
+                return readFiles
+            diagFiles = os.listdir(diagDir)
+            diagFiles.sort()
+            for diagFile in diagFiles:
+                if diagFile.endswith(".diag"):
+                    readFiles["Diagnostics"].append(os.path.join(diagDir, diagFile))
+        return readFiles
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)

@@ -282,10 +282,10 @@ class MakeProgressReport(TestReport):
         currPerf = int(performance.getTestPerformance(test, self.currentVersion))
         refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
         referenceCosts = self.getCosts(referenceFile, "plan")
-        if len(referenceCosts) < 3 or refPerf == 0 or currPerf == 0:
+        currentCosts =  self.getCosts(currentFile, "plan")
+        if len (currentCosts) < 3 or len(referenceCosts) < 3 or refPerf == 0 or currPerf == 0:
             return
         
-        currentCosts =  self.getCosts(currentFile, "plan")
         refRosterCosts = self.getCosts(referenceFile, "roster")
         currRosterCosts = self.getCosts(currentFile, "roster")
         currTTWC = currPerf

@@ -10,7 +10,10 @@ this special strategy.
 It will fetch the optimizer's status file from the subplan (the "status" file) and write it for
 comparison as the file status.<app> after each test has run."""
 
-helpOptions = """
+helpOptions = """-rundebug  - (only APC) Runs the test in the debugger (gdb) and displays the log file. The run
+             is made locally, and if its successful, the debugger is exited, and texttest
+             continues as usual. If the run fails, the buffer is flushed and one are left 
+             in the debugger. To enter the debugger during the run, type C-c.
 """
 
 helpScripts = """apc.CleanTmpFiles          - Removes all temporary files littering the test directories
@@ -51,6 +54,10 @@ def getApcHostTmp():
     return "/tmp"
 
 class ApcConfig(optimization.OptimizationConfig):
+    def getArgumentOptions(self):
+        options = optimization.OptimizationConfig.getArgumentOptions(self)
+        options["rundebug"] = "Run debugger"
+        return options
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI,
@@ -80,10 +87,12 @@ class ApcConfig(optimization.OptimizationConfig):
         else:
             return self._getApcTestRunner()
     def _getApcTestRunner(self):
-        if not self.useLSF():
-            return RunApcTest()
-        else:
+        if self.useLSF():
             return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
+        elif self.optionMap.has_key("rundebug"):
+            return RunApcTestInDebugger()
+        else:
+            return RunApcTest()
     def getTestCollator(self):
         baseCollator = unixConfig.UNIXConfig.getTestCollator(self)
         subActions = []
@@ -161,15 +170,60 @@ def verifyAirportFile(arch):
                 return
     raise plugins.TextTestError, "Failed to find AirportFile"
 
-class RunApcTest(default.RunTest):
-    def __call__(self, test):
-        verifyAirportFile(carmen.getArchitecture(test.app))
-        default.RunTest.__call__(self, test)
-        
 class SubmitApcTest(lsf.SubmitTest):
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
         lsf.SubmitTest.__call__(self, test)
+        
+class RunApcTest(default.RunTest):
+    def __call__(self, test):
+        verifyAirportFile(carmen.getArchitecture(test.app))
+        default.RunTest.__call__(self, test)
+
+#
+# Runs the test in gdb and displays the log file. 
+#
+class RunApcTestInDebugger(default.RunTest):
+    def __repr__(self):
+        return "Debugging"
+    def __call__(self, test):
+        verifyAirportFile(carmen.getArchitecture(test.app))
+        if test.state == test.UNRUNNABLE:
+            return
+        self.describe(test)
+        # Get the options that are sent to APCbatch.sh
+        opts = test.options.split(" ")
+        # Create and show the log file.
+        apcLog = test.makeFileName("apclog", temporary=1)
+        apcLogFile = open(apcLog, "w")
+        apcLogFile.write("")
+        apcLogFile.close()
+        os.system("xon " + os.environ["HOST"] + " 'xterm -bg white -T " + test.name + " -e 'less +F " + apcLog + "''")
+        # Create a script for gdb to run.
+        gdbArgs = test.makeFileName("gdb_args", temporary=1)
+        gdbArgsFile = open(gdbArgs, "w")
+        gdbArgsFile.write("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep)
+        gdbArgsFile.write("run" + os.linesep)
+        gdbArgsFile.write("if $_exitcode" + os.linesep)
+        gdbArgsFile.write("print fflush(0)" + os.linesep)
+        gdbArgsFile.write("else" + os.linesep)
+        gdbArgsFile.write("quit" + os.linesep)
+        gdbArgsFile.write("end" + os.linesep)
+        gdbArgsFile.close()
+        # Create an output file. This file is read by LogFileFinder if we use PlotTest.
+        out = test.makeFileName("output", temporary=1)
+        outFile = open(out, "w")
+        outFile.write("SUBPLAN " + opts[0] + os.linesep)
+        outFile.close()
+        # Source the CONFIG file to get the environment correct and run gdb with the script.
+        binName = opts[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
+        configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
+        os.system("source " + configFile + ";gdb " + binName + " -silent -x " + gdbArgs)
+        # Remove the temp files, texttest will compare them if we dont remove them.
+        os.remove(gdbArgs)
+        os.remove(apcLog)
+    def setUpSuite(self, suite):
+        self.describe(suite)
     
 class ApcCompileRules(carmen.CompileRules):
     def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, forcedRuleCompile = 0):

@@ -87,7 +87,7 @@ class LSFConfig(unixConfig.UNIXConfig):
         self.addFilter(filters, "r", performance.TimeFilter)
         return filters
     def useLSF(self):
-        if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l"):
+        if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l") or self.optionMap.has_key("rundebug"):
             return 0
         return 1
     def getTestRunner(self):

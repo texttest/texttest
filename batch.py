@@ -113,7 +113,8 @@ class BatchResponder(respond.Responder):
         category = self.findFailureCategory(test, testComparison)
         self.addTestToCategory(category, test)
     def handleFailedPrediction(self, test, desc):
-        self.addTestToCategory("badPredict", test, desc)
+        if not test in killedTests and not test in self.crashDetail.keys():
+            self.addTestToCategory("badPredict", test, desc)
     def handleCoreFile(self, test):
         crashText = self.responder.getCrashText(test)
         self.crashDetail[test] = crashText

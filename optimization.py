@@ -908,8 +908,15 @@ class TestCaseInformation(TestInformation):
     def suiteDescription(self):
         return repr(self.suite.app) + " " + self.suite.classId() + " " + self.suite.name
     def chooseSubPlan(self):
-        suiteDescription = self.suiteDescription()        
+        suiteDescription = self.suiteDescription()
         subPlanTree = os.path.join(self.suite.environment["CARMUSR"], "LOCAL_PLAN")
+        if not os.path.isdir(subPlanTree):
+            if os.path.islink(subPlanTree):
+                print "LOCAL_PLAN directory", subPlanTree, "seems to be a deadlink."
+            else:
+                print "LOCAL_PLAN directory", subPlanTree, "did not exist."
+            return None
+        
         dirs = []
         tryName = self.name
         dirName = None

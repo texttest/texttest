@@ -31,7 +31,18 @@ matador.TimeSummary         - Show a summary of 'useful' time in generation solu
                                Display the solution details, ie useful percent for each solution
                              - v=version
                                Print result for specific version
-
+matador.MigrateApcTest      - Take a test present in APC and migrate it to Matador/Picador. Before running
+                            the script, make sure that the test is fully present for APC (use apc.ImportTest first if
+                            it wasn't there yet) and that an entry is added for it in the testsuite file for Matador/Picador.
+                            Also make sure that the file remap_rulesets.etab (under Testing/Automatic/<dirname>) is up to
+                            date with the corresponding ruleset that you are migrating, and that the parameter transform table
+                            remap_<app>.etab (installed into carmusr_default) is up to date with the latest parameter
+                            settings.
+                            The script will then replace the ruleset in the subplanHeader and problems
+                            files, showing you the differences locally. Press ^C if anything is wrong. It will also
+                            transform the module parameters in subplanRules and rules, again showing you the differences
+                            as above. When all this has been accepted, it will commit the changes, copying the subplan,
+                            making the changes it has shown, and writing an options.<app> file.
 """
 
 import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest, unixConfig, sys

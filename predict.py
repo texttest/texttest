@@ -7,7 +7,7 @@ is found, a warning is generated. predict.CheckPredictions can also be run as a 
 check the standard test results for internal errors.
 """
 
-import os, filecmp, string, plugins
+import os, filecmp, string, plugins, copy
 
 # Map from test to broken prediction text
 testBrokenPredictionMap = {}
@@ -41,11 +41,17 @@ class CheckPredictions(CheckLogFilePredictions):
             return
 
         logFile = self.getLogFile(test)
+        compsNotFound = copy.deepcopy(self.internalCompulsoryList)
         for line in open(logFile).xreadlines():
             for error in self.internalErrorList:
                 if line.find(error) != -1:
                     self.insertError(test, "Internal Error (" + error + ")")
+            for comp in compsNotFound:
+                if line.find(comp) != -1:
+                    compsNotFound.remove(comp)
+        for comp in compsNotFound:
+            self.insertError(test, "Compulsory message not present (" + comp + ")")
     def setUpApplication(self, app):
         CheckLogFilePredictions.setUpApplication(self, app)
         self.internalErrorList = app.getConfigList("internal_error_text")
-        
+        self.internalCompulsoryList = app.getConfigList("internal_compulsory_text")

@@ -173,7 +173,6 @@ class Logger:
             self.__Logger_ndc = []
             self.__Logger_classid = classid
 
-            cat.debug("instantiated")
             cache[classid] = cat
 
         return cat
@@ -245,6 +244,10 @@ class Logger:
     def get_time_format(self):
         """ Returns the current time format. """
         return self.__Logger_timeformat
+
+    def get_targets(self):
+        """ Returns the current targets. """
+        return self.__Logger_targets
 
     # Methods to push and pop trace messages for nested contexts
     def push(self, message):

@@ -80,9 +80,9 @@ class Test:
         return retstring
     def isAcceptedByAll(self, filters):
         for filter in filters:
-            debugLog.info(repr(self) + " filter " + repr(filter))
+            debugLog.debug(repr(self) + " filter " + repr(filter))
             if not self.isAcceptedBy(filter):
-                debugLog.info("REJECTED")
+                debugLog.debug("REJECTED")
                 return 0
         return 1
         
@@ -375,16 +375,28 @@ class OptionFinder:
         self._setUpLogging()
     def _setUpLogging(self):
         global debugLog
-        rootLogger = log4py.Logger().get_root()
         if self.inputOptions.has_key("x"):
-            diagPath = _getDiagnosticPath()
-            rootLogger.set_loglevel(log4py.LOGLEVEL_DEBUG)
-            rootLogger.set_formatstring("%C %L - %M")
+            diagFile = self._getDiagnosticFile()
+            if os.path.isfile(diagFile):
+                diagDir = os.path.dirname(diagFile)
+                print "TextTest will write diagnostics in", diagDir
+                for file in os.listdir(diagDir):
+                    if file.endswith("diag"):
+                        os.remove(file)
+                # To set new config files appears to require a constructor...
+                rootLogger = log4py.Logger(log4py.TRUE, diagFile)
+                rootLogger.set_target(os.path.join(diagDir, rootLogger.get_targets()[0]))
+            else:
+                print "Could not find diagnostic file at", diagFile, ": cannot run with diagnostics"
+                self._disableDiags()
         else:
-            rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
+            self._disableDiags()
         # Module level debugging logger
         global debugLog
-        debugLog = log4py.Logger().get_instance("TextTest")
+        debugLog = plugins.getDiagnostics("texttest")
+    def _disableDiags(self):
+        rootLogger = log4py.Logger().get_root()        
+        rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
     # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
     def buildOptions(self):
         inputOptions = {}
@@ -446,7 +458,7 @@ class OptionFinder:
             return 1
     def helpMode(self):
         return self.inputOptions.has_key("help")
-    def _getDiagnosticPath(self):
+    def _getDiagnosticFile(self):
         if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
         else:
@@ -496,7 +508,7 @@ class MultiEntryDictionary:
     def updateFor(self, filename, extra):
         if len(extra) == 0:
             return
-        debugLog.info("Updating " + filename + " for version " + extra) 
+        debugLog.debug("Updating " + filename + " for version " + extra) 
         extraFileName = filename + "." + extra
         if not os.path.isfile(extraFileName):
             return

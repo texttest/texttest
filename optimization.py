@@ -263,27 +263,25 @@ class LogFileFinder:
 
 class OptimizationRun:
     def __init__(self, test, version, definingItems, interestingItems, scale = 1, tryTmpFile = 0):
+        self.diag = plugins.getDiagnostics("optimization")
         self.performance = performance.getTestPerformance(test, version) # float value
         logFinder = LogFileFinder(test, tryTmpFile)
         self.logFile = logFinder.findFile(version)
+        self.diag.info("Reading data from " + self.logFile)
         self.penaltyFactor = 1.0
         calculator = OptimizationValueCalculator(definingItems + interestingItems, self.logFile)
         self.solutions = calculator.getSolutions(definingItems)
         if scale and self.solutions:
             self.scaleTimes()
+        self.diag.debug("Solutions :" + repr(self.solutions))
     def scaleTimes(self):
         finalTime = self.solutions[-1][timeEntryName]
         if finalTime == 0.0:
             return
         scaleFactor = self.performance / finalTime
+        self.diag.info("Scaling times by factor " + str(scaleFactor))
         for solution in self.solutions:
             solution[timeEntryName] *= scaleFactor    
-    def addSolutionData(self, item, valueList):
-        for i in range(len(valueList)):
-            if len(self.solutions) <= i:
-                self.solutions.append({})
-            entry = valueList[i]
-            self.solutions[i][item] = entry
     def isVeryShort(self):
         return len(self.solutions) < 3 or self.getPerformance() == 0
     def getCost(self, solNum = -1):

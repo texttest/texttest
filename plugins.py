@@ -1,5 +1,6 @@
 
-import os
+import os, log4py
+from types import FileType
 
 # Generic configuration class
 class Configuration:
@@ -46,6 +47,18 @@ class Action:
         print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText
     def __repr__(self):
         return "Doing nothing on"
+
+# Simple handle to get diagnostics object. Better than using log4py directly,
+# as it ensures everything appears by default in a standard place with a standard name.
+def getDiagnostics(diagName):
+    diag = log4py.Logger().get_instance(diagName)
+    fullName = diag.get_targets()[0]
+    dirName = os.path.dirname(diag.get_root().get_targets()[0])
+    if type(fullName) != FileType and os.path.basename(fullName) == "TextTestResponsible":
+        fullName = diagName + ".diag"
+    if fullName != "stdout" and fullName != "stderr":
+        diag.set_target(os.path.join(dirName, fullName))
+    return diag
 
 # Action composed of other sub-parts
 class CompositeAction(Action):

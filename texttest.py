@@ -140,6 +140,7 @@ class Application:
         self.name = name
         self.abspath = abspath
         self.configDir = MultiEntryDictionary(configFile, name, version)
+        self.fullName = self._getFullName()
         debugPrint("Found application " + repr(self))
         self.checkout = self.makeCheckout()
         debugPrint("Checkout set to " + self.checkout)
@@ -150,7 +151,12 @@ class Application:
         getopt.getopt(sys.argv[1:], allowedOptions)    
 	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
     def __repr__(self):
-        return string.upper(self.name)
+        return self.fullName
+    def _getFullName(self):
+        if self.configDir.has_key("full_name"):
+            return self.configDir["full_name"]
+        else:
+            return string.upper(self.name)
     def hasREpattern(self, txt):
     	# return 1 if txt contains a regular expression meta character
 	return self.specialChars.search(txt) != None

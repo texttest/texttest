@@ -574,6 +574,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
             test, referenceRun, currentRun, userName = testTuple
             app = test.app
             if not self.kpiGroupForTest.has_key(test.name):
+                print "Warning: Skipping test not in KPI group:", test.name
                 continue
             groupName = self.kpiGroupForTest[test.name]
             if not userNameForKPIGroup.has_key(groupName):
@@ -675,6 +676,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         if self.groupQualityLimit.has_key(groupName):
             worstCost = self.groupQualityLimit[groupName]
         else:
+            print "Warning, quality not defined for KPI group", groupName
             worstCost = optimization.MakeProgressReport.calculateWorstCost(self, referenceRun, currentRun, app, groupName)
         self.sumCurTime += currentRun.timeToCost(worstCost)
         self.sumRefTime += referenceRun.timeToCost(worstCost)

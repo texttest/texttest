@@ -1,3 +1,11 @@
+#
+#	Studio plug-in for Texttest framework
+#
+# This plug-in is derived from CarmenConfig which is derived from LSF.
+# The main contribution of this plug-in is being able to allocate a display.
+#
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.3 2003/04/11 08:30:28 perb Exp $
+#
 import carmen, os, plugins
 
 def getConfig(optionMap):
@@ -5,7 +13,6 @@ def getConfig(optionMap):
 
 class StudioConfig(carmen.CarmenConfig):
     def __init__(self, eh):
-	print "Hello, This is the studio plug-in for the test framework"
 	carmen.CarmenConfig.__init__(self, eh)
     def getActionSequence(self):
         return [ self.getTestSetup() ] + carmen.CarmenConfig.getActionSequence(self)
@@ -16,20 +23,58 @@ class StudioConfig(carmen.CarmenConfig):
     def getTestCleanup(self):
 	return CleanupTest(self)
 
+def probeDisplay(s):
+    """
+    	Check if screen 0 on display s exists
+	The function returns the display name if it doesn't exist,
+	it throws an exception if the display exists does.
+    """
+    cmd = "xdpyinfo -display " + s + " 2>&1 | grep 'screen #0' > /dev/null"
+    r = os.system(cmd)
+    if r:
+    	return s
+    raise "Display busy"
+
+def findDisplay(host=""):
+    """
+	Look for an available display on current host
+    """
+    for i in range(1,10):
+    	s = host + ":" + str(i)
+    	try:
+	    return probeDisplay(s)
+	except:
+	    pass
+    raise "No available display found on " + host
+
+def createDisplay(disp):
+    """
+    	Start a virtual X-display with a given name
+    """
+    pid = os.fork()
+    os.close(2)
+    if not pid:
+	os.execlp("Xvfb", "Xvfb", disp, "-ac")
+    return pid
+
 class SetupTest(plugins.Action):
     def __repr__(self):
         return "Setup"
     def __init__(self, studio):
 	self.studio = studio
-	self.studio.origScreen = os.getenv("DISPLAY")
+	self.studio.origDisplay = os.getenv("DISPLAY")
     def __call__(self, test):
         self.describe(test)
-	#self.studio.testScreen = ???????
-	self.studio.testScreen = os.getenv("DISPLAY")
-	os.putenv("DISPLAY", self.studio.testScreen)
+	self.studio.testDisplay = findDisplay(os.getenv("HOST"))
+	self.studio.pid = 0
+	if self.studio.useLSF():
+	    self.studio.pid = createDisplay(self.studio.testDisplay)
+	    os.environ["DISPLAY"] = self.studio.testDisplay
     def setUpSuite(self, suite):
 	self.describe(suite)
 
+
+SIGTERM = 15
 
 class CleanupTest(plugins.Action):
     def __repr__(self):
@@ -38,8 +83,10 @@ class CleanupTest(plugins.Action):
 	self.studio = studio
     def __call__(self, test):
         self.describe(test)
-	self.studio.screen = ""
-	os.putenv("DISPLAY", self.studio.origScreen)
+	if self.studio.pid:
+	    os.kill(self.studio.pid, SIGTERM)
+	    self.studio.pid = 0
+	self.studio.testDisplay = ""
+	os.environ["DISPLAY"] = self.studio.origDisplay
     def setUpSuite(self, suite):
 	self.describe(suite)
-

@@ -2,7 +2,7 @@
 <html>
 <head>
    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.18-26.7.xsmp i686) [Netscape]">
+   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.18-27.8.0smp i686) [Netscape]">
 </head>
 <body>
 
@@ -56,8 +56,7 @@ a file called "config.&lt;app>". TextTest
 it will run. It will start at the root
 <br>directory and look in that directory and one level down in the directory
 structure, and all files
-<br>beginning with "config." are considered. This file is written in 
-<a href="#Appendix - TextTest file formats">Standard
+<br>beginning with "config." are considered. This file is written in <a href="#Appendix - TextTest file formats">Standard
 Dictionary Format</a>, and its contents
 <br>will vary depending on the configuration used.
 <p>To tell TextTest to run just one particular application, specify "-a
@@ -80,6 +79,12 @@ will ask the configuration to write out what
 <p>A configuration can both extend the range of command line options available,
 and the config file entries that
 <br>will be interpreted and acted upon.
+<p>TextTest comes with 3 configurations to choose from - "default" which
+should work anywhere, "unixConfig" for use
+<br>on UNIX, and "lsf" for use on UNIX with LSF from Platform computing
+installed. It is expected that you will
+<br>want to extend these configurations to take advantage of local circumstances
+or to add features that you need.
 <p><u>Test Cases</u>
 <br>A test case is represented in TextTest by a particular directory in
 the file system, and the name of the test case
@@ -143,11 +148,16 @@ files),
 dictionary, so that entries not present in &lt;root>.&lt;app>.&lt;version>
 are
 <br>read from &lt;root>.&lt;app>.
-<p>Note that several versions can be used at the same time. This is done
-by specifying -v &lt;version1>,&lt;version2>,... on the command line.
-<br>Configurations can also add versions, which can be useful e.g. for
-different platforms, so there may be more than one version
-<br>aggregated at once.
+<p>Note that several versions can be "aggregated" and used at the same
+time. This is done by specifying -v &lt;version1>.&lt;version2> on the
+<br>command line, and can be applied to any number of versions. Note that
+the syntax -v &lt;version1>,&lt;version2> is similar to -a &lt;app1>,&lt;app2>:
+<br>i.e. it will first run everything with version1 and then run everything
+with version2.
+<p>You can also say that a version "inherits" settings from another by
+adding the "base_version" entry to the config file. Thus if config.&lt;app>.v1
+<br>contains the line "base_version:v2" then all the files for v1 are also
+read as well as those for v2.
 <p><u>Checkouts of Applications</u>
 <br>It is expected that TextTest test suites will want to be version-controlled,
 and hence an easy means of switching between
@@ -173,17 +183,18 @@ to the checkout, and
 used.
 <p><u>File Management and Parallel Mode</u>
 <br>Each time you call TextTest, your run is assigned a unique identifier
-based on your user name and the time stamp.
+based on the version, your user name and the time stamp.
 <br>All temporary files created will use this identifier.
 <p>The framework will generally clean up any files created by previous
-runs. If you wish to run the same tests in parallel, you must
-<br>specify -p on the command line, which essentially tells the framework
-to leave alone files and directories created by previous runs.
+runs that have the same version and user name. If you wish to
+<br>disable this to run the same tests in parallel, you must specify -p
+on the command line, which essentially tells the framework to
+<br>leave alone all files and directories created by previous runs.
 <p><u>Repeating things</u>
 <br>It can be useful to detect unreliable behaviour to repeat the test
 runs several times. To do this, specify -m &lt;number_of_times> on
 <br>the command line. This applies whatever your configuration does.
-<p><b><u>Some Examples</u></b>
+<p><b><u>Some simple command-line examples</u></b>
 <br><i>texttest</i>
 <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Runs all applications and
 all tests it can find, starting at the current directory
@@ -198,7 +209,21 @@ of my local one
 <br><i>texttest -a cas -v 9 -m 3</i>
 <br><i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </i>Run all tests for
 the application with extension "cas", using version 9 of that application.
-Do everything 3 times.
+Do everything 3 times.<b><u></u></b>
+<p><b><u>Real Examples</u></b>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TextTest comes with a test
+suite for itself. It is recommended that you look around this (or any other
+example you can find)
+<br>to get an idea of how the program works. It can easily be run via "texttest
+-a texttest", and when writing your own tests it is often
+<br>best to start with working files for another application and edit them
+suitably. This reduces the risk of typing things wrongly,
+<br>particularly in the config file.
+<p>It works by testing itself testing runs of a target application with
+various settings, and verifying correct TextTest behaviour
+<br>with success, failures, bad configurations etc. The target application
+is itself a toy Python program which adjudicates the popular board
+<br>game "Diplomacy".
 <p><a NAME="Appendix - TextTest file formats"></a><b><u>Appendix - TextTest
 file formats</u></b>
 <br>TextTest reads two file formats - Standard List Format and Standard

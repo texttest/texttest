@@ -62,29 +62,27 @@ class FileFilter(plugins.Filter):
     def acceptsTestCase(self, test):
         return test.name in self.texts
 
+# Use communication channels for stdin and stderr (because we don't know how to redirect these on windows).
+# Tried to use communication channels on all three, but read() blocks and deadlock between stderr and stdout can result.
 class RunTest(plugins.Action):
     def __repr__(self):
         return "Running"
     def __call__(self, test):
         self.describe(test)
-        stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test))
+        outfile = test.getTmpFileName("output", "w")
+        stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfile)
         if os.path.isfile(test.inputFile):
-            stdin.write(open(test.inputFile).read())
+            inputData = open(test.inputFile).read()
+            stdin.write(inputData)
         stdin.close()
-        outfile = open(test.getTmpFileName("output", "w"), "w")
-        outfile.write(stdout.read())
         errfile = open(test.getTmpFileName("errors", "w"), "w")
         errfile.write(stderr.read())
-        stdout.close()
-        stderr.close()
-        outfile.close()
         errfile.close()
-        #Added by sandborg 030219
         #needed to be sure command is finished
         try:
             os.wait()
-        except:
-            pass #should not end up here but you never know...
+        except AttributeError:
+            pass # Wait doesn't exist on Windows, but seems necessary on UNIX
     def getExecuteCommand(self, test):
         return test.getExecuteCommand()
     def setUpSuite(self, suite):

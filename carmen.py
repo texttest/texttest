@@ -52,7 +52,7 @@ batchInfo = """
              Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
              at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
-import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond, shlex
+import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal, respond
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -331,7 +331,7 @@ class ConfigEtable:
       self.inFile = open(fileName)
       self.applications = {}
       self.columns = self._readColumns()
-      self.parser = shlex.shlex(self.inFile)
+      self.parser = ConfigEtableParser(self.inFile)
       lineTuple = self._readTuple()
       while lineTuple != None:
          self._storeValue(lineTuple[0], lineTuple[1], lineTuple[2], lineTuple[4])
@@ -357,8 +357,6 @@ class ConfigEtable:
          if tok == "":
             break
          if tok != ",":
-            if tok.startswith('"'):
-               tok = tok[1:-1]
             tup.append(tok)
       if len(tup) == len(self.columns):
          return tup
@@ -409,6 +407,81 @@ class ConfigEtable:
       else:
          whole = "${" + value[2:lPos] + "}" + self._etabExpand(value[lPos + 1:])
          return os.path.expandvars(whole)
+
+class ConfigEtableParser:
+    def __init__(self, infile):
+        self.file = infile
+        self.quotes = [ '"', "'" ]
+        self.specials = {}
+        self.specials["n"] = "\n"
+        self.specials["r"] = "\r"
+        self.specials["t"] = "\t"
+        self.lastChar = None
+    def _readChar(self):
+        ch = self.__readChar()
+        return ch
+    def __readChar(self):
+        if self.lastChar != None:
+            ch = self.lastChar
+            self.lastChar = None
+            return ch
+        return self.file.read(1)
+    def _pushBack(self, ch):
+        self.lastChar = ch
+    def _peekCheck(self, ch, firstChar, nextChar):
+        if ch == firstChar:
+            ch2 = self._readChar()
+            if ch2 == nextChar:
+                return 1
+            self._pushBack(ch2)
+        return 0
+    def _readElement(self):
+        ch = self._readChar()
+        if self._peekCheck(ch, "/", "*"):
+            return "/*"
+        if self._peekCheck(ch, "*", "/"):
+            return "*/"
+        if len(os.linesep) > 1:
+            if self._peekCheck(ch, os.linesep[0], os.linesep[1]):
+                return os.linesep
+        if ch == "\\":
+            ch = self._readChar()
+        return ch
+    def _readQuote(self, quote):
+        text = ""
+        ch = self._readChar()
+        while len(ch) > 0 and ch != quote:
+            if ch == "\\":
+                ch = self._readChar()
+                if self.specials.has_key(ch):
+                    ch = self.specials[ch]
+            text += ch
+            ch = self._readChar()
+        return text
+
+    def get_token(self):
+        tok = ""
+        ch = self._readElement()
+        while len(ch) > 0:
+            if ch in self.quotes:
+                return tok + self._readQuote(ch)
+            if ch == "/*":
+                while ch != "" and ch != "*/":
+                    ch = self._readElement()
+                continue
+            if ch == ",":
+                if len(tok) > 0:
+                    self._pushBack(ch)
+                    return tok
+                else:
+                    return ch
+            if not ch in [ ' ', os.linesep, '\t' ]:
+                tok += ch
+            else:
+                if tok != "":
+                    return tok
+            ch = self._readElement()
+        return tok
 
 def ensureDirectoryExists(path):
     if len(path) == 0:

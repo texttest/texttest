@@ -183,7 +183,14 @@ class TestCase(Test):
         self._setOptions()
         # List of directories where this test will write files. First is where it executes from
         self.writeDirs = []
-        self.writeDirs.append(os.path.join(app.writeDirectory, self.getRelPath()))
+        basicWriteDir = os.path.join(app.writeDirectory, self.getRelPath())
+        self.writeDirs.append(basicWriteDir)
+        if self.app.useDiagnostics:
+            diagDict = self.app.getConfigValue("diagnostics")
+            inVarName = diagDict["input_directory_variable"]
+            self.environment[inVarName] = os.path.join(self.abspath, "Diagnostics")
+            outVarName = diagDict["write_directory_variable"]
+            self.environment[outVarName] = os.path.join(basicWriteDir, "Diagnostics")
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -256,6 +263,8 @@ class TestCase(Test):
         return filter.acceptsTestCase(self)
     def makeBasicWriteDirectory(self):
         os.makedirs(self.writeDirs[0])
+        if self.app.useDiagnostics:
+            os.mkdir(os.path.join(self.writeDirs[0], "Diagnostics"))
         self.collatePaths("copy_test_path", self.copyTestPath)
         self.collatePaths("link_test_path", self.linkTestPath)
     def cleanNonBasicWriteDirectories(self):
@@ -551,6 +560,7 @@ class Application:
         self.checkout = self.makeCheckout(optionMap)
         debugLog.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(optionMap)
+        self.useDiagnostics = self.setDiagnosticSettings(optionMap)
     def __repr__(self):
         return self.fullName
     def __cmp__(self, other):
@@ -577,7 +587,7 @@ class Application:
         self.setConfigDefault("extra_version", "none")
         self.setConfigDefault("base_version", [])
         self.setConfigDefault("unsaveable_version", [])
-        self.setConfigDefault("compare_extension", [])
+        self.setConfigDefault("diagnostics", {})
         self.setConfigDefault("copy_test_path", [])
         self.setConfigDefault("link_test_path", [])
         # External viewing tools
@@ -590,9 +600,11 @@ class Application:
         if os.name == "posix":
             self.setConfigDefault("view_program", "xemacs")
             self.setConfigDefault("follow_program", "tail -f")
+            self.setConfigDefault("diff_program", "tkdiff")
         elif os.name == "dos" or os.name == "nt":
             self.setConfigDefault("view_program", "wordpad.exe")
             self.setConfigDefault("follow_program", None)
+            self.setConfigDefault("diff_program", "tkdiff.tcl")
     def getGuiColourDictionary(self):
         dict = {}
         dict["run_preprocess"] = "peach puff"
@@ -627,11 +639,24 @@ class Application:
             if not optionGroup:
                 raise BadConfigError, "unrecognised option -" + option
         return optionGroups
+    def setDiagnosticSettings(self, optionMap):
+        if optionMap.has_key("diag"):
+            return 1
+        elif optionMap.has_key("trace"):
+            envVarName = self.getConfigValue("diagnostics")["trace_level_variable"]
+            os.environ[envVarName] = optionMap["trace"]
+        return 0
     def addToOptionGroup(self, group):
         if group.name.startswith("What"):
             group.addOption("c", "Use checkout")
             group.addOption("s", "Run this script")
             group.addOption("v", "Run this version")
+        elif group.name.startswith("How"):
+            diagDict = self.getConfigValue("diagnostics")
+            if diagDict.has_key("configuration_file"):
+                group.addSwitch("diag", "Write target application diagnostics")
+            if diagDict.has_key("trace_level_variable"):
+                group.addOption("trace", "Target application trace level")
         elif group.name.startswith("Side"):
             group.addSwitch("x", "Write TextTest diagnostics")
             group.addSwitch("keeptmp", "Keep write-directories on success")
@@ -758,7 +783,7 @@ class Application:
         if len(parts) == 1 or len(parts[0]) == 0:
             return 0
         ext = parts[1]
-        if ext == self.name or ext in self.getConfigValue("compare_extension"):
+        if ext == self.name:
             return 1
         elif parts[0] == "environment":
             return unknown
@@ -821,7 +846,12 @@ class Application:
             binary = self.configDir["interpreter"] + " " + binary
         return self.configObject.getExecuteCommand(binary, test)
     def getEnvironment(self):
-        return self.configObject.getApplicationEnvironment(self)
+        env = [ ("TEXTTEST_CHECKOUT", self.checkout) ]
+        diagDict = self.getConfigValue("diagnostics")
+        if diagDict.has_key("input_directory_variable"):
+            inVarName = diagDict["input_directory_variable"]
+            env.append((inVarName, self.abspath))
+        return env + self.configObject.getApplicationEnvironment(self)
             
 class OptionFinder:
     def __init__(self):
@@ -832,11 +862,12 @@ class OptionFinder:
         debugLog.debug(repr(self.inputOptions))
     def _setUpLogging(self):
         global debugLog
-        if self.inputOptions.has_key("x"):
+        if self.inputOptions.has_key("x") or os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             diagFile = self._getDiagnosticFile()
             if os.path.isfile(diagFile):
                 diagDir = os.path.dirname(diagFile)
-                os.environ["TEXTTEST_DIAGDIR"] = diagDir
+                if not os.environ.has_key("TEXTTEST_DIAGDIR"):
+                    os.environ["TEXTTEST_DIAGDIR"] = diagDir
                 print "TextTest will write diagnostics in", diagDir
                 for file in os.listdir(diagDir):
                     if file.endswith("diag"):
@@ -1383,7 +1414,7 @@ class TextTest:
                 print "Cannot use GUI: caught exception:"
                 printException()
         if not self.gui:
-            logger = plugins.getSelfTestDiagnostics("Use-case log", "usecase_log.texttest")
+            logger = plugins.getDiagnostics("Use-case log")
             self.scriptEngine = ScriptEngine(logger)
     def timeFormat(self):
         # Needs to work in files - Windows doesn't like : in file names

@@ -23,12 +23,12 @@ class InteractiveAction(plugins.Action):
         process = plugins.BackgroundProcess(commandLine, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         self.processes.append(process)
         return process
-    def viewFile(self, fileName, wait = 0):
+    def viewFile(self, fileName, wait = 0, refresh=0):
         viewProgram = self.test.getConfigValue("view_program")
         baseName = os.path.basename(fileName)
         guilog.info("Viewing file " + baseName + " using '" + viewProgram + "'")
         exitHandler = None
-        if baseName.startswith("options.") or baseName.startswith("testsuite."):
+        if refresh:
             exitHandler = self.test.filesChanged
         process = self.startExternalProgram(viewProgram + " " + fileName, exitHandler=exitHandler)
         if wait:
@@ -117,7 +117,9 @@ class ViewFile(InteractiveAction):
         if self.optionGroup.getSwitchValue("f"):
             return self.followFile(fileName)
         if not comparison:
-            return self.viewFile(fileName)
+            baseName = os.path.basename(fileName)
+            refresh = baseName.startswith("testsuite.") or baseName.startswith("options.")
+            return self.viewFile(fileName, refresh=refresh)
         if self.shouldTakeDiff(comparison):
             self.takeDiff(comparison)
         else:
@@ -365,10 +367,36 @@ class RunTests(InteractiveAction):
             ttOptions.append("-ts " + commonParentName)
         return ttOptions
 
+class EnableDiagnostics(InteractiveAction):
+    def __init__(self, test):
+        InteractiveAction.__init__(self, test)
+        configDir = test.app.getConfigValue("diagnostics")
+        self.configFile = None
+        if configDir.has_key("configuration_file"):
+            self.configFile = configDir["configuration_file"]
+    def __repr__(self):
+        return "Diagnostics"
+    def getTitle(self):
+        return "Diagnostics"
+    def getScriptTitle(self):
+        return "Enable Diagnostics"
+    def matchesMode(self, dynamic):
+        return not dynamic
+    def canPerformOnTest(self):
+        return self.test and self.configFile
+    def __call__(self, test):
+        diagDir = os.path.join(test.abspath, "Diagnostics")
+        if not os.path.isdir(diagDir):
+            os.mkdir(diagDir)
+        diagFile = os.path.join(test.app.abspath, self.configFile)
+        targetDiagFile = os.path.join(diagDir, self.configFile)
+        shutil.copyfile(diagFile, targetDiagFile)
+        self.viewFile(targetDiagFile, refresh=1)
+
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.testClasses =  [ SaveTest, RecordTest ]
+        self.testClasses =  [ SaveTest, RecordTest, EnableDiagnostics ]
         self.suiteClasses = [ ImportTestCase, ImportTestSuite ]
         self.appClasses = [ SelectTests, RunTests, ResetGroups ]
     def getInstances(self, test, dynamic):
@@ -404,4 +432,4 @@ guilog = None
 
 def setUpGuiLog():
     global guilog
-    guilog = plugins.getSelfTestDiagnostics("GUI behaviour", "gui_log.texttest")
+    guilog = plugins.getDiagnostics("GUI behaviour")

@@ -63,29 +63,9 @@ def getOption(options, optionVal):
     return None
 
 class MatadorConfig(optimization.OptimizationConfig):
-    def __init__(self, optionMap):
-        optimization.OptimizationConfig.__init__(self, optionMap)
-        if self.optionMap.has_key("diag"):
-            os.environ["DIAGNOSTICS_IN"] = "./Diagnostics"
-            os.environ["DIAGNOSTICS_OUT"] = "./Diagnostics"
-        if os.environ.has_key("DIAGNOSTICS_IN"):
-            print "Note: Running with Diagnostics on, so performance checking is disabled!"
-    def __del__(self):
-        if self.optionMap.has_key("diag"):
-            del os.environ["DIAGNOSTICS_IN"]
-            del os.environ["DIAGNOSTICS_OUT"]
-    def addToOptionGroup(self, group):
-        optimization.OptimizationConfig.addToOptionGroup(self, group)
-        if group.name.startswith("How"):
-            group.addSwitch("diag", "Use Matador Codebase diagnostics")
-    def getPerformanceFileMaker(self):
-        if self.optionMap.has_key("diag"):
-            return None
-        else:
-            return optimization.OptimizationConfig.getPerformanceFileMaker(self)
     def _getLocalPlanPath(self, test):
         path = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN")
-        if os.path.isdir(path) or not os.environ.has_key("CARM_LOCALPLAN"):
+        if os.path.isdir(path) and not os.environ.has_key("CARM_LOCALPLAN"):
             return path
         return os.environ["CARM_LOCALPLAN"]
     def _getSubPlanDirName(self, test):
@@ -113,21 +93,6 @@ class MatadorConfig(optimization.OptimizationConfig):
             if line.startswith("153"):
                 return line.split(";")[3]
         return ""
-    def extraReadFiles(self, test):
-        readFiles = optimization.OptimizationConfig.extraReadFiles(self, test)
-        diagDir = os.path.join(test.abspath, "Diagnostics")
-        if os.path.isdir(diagDir):
-            etabPath = os.path.join(diagDir, "diagnostics.etab")
-            if os.path.isfile(etabPath):
-                readFiles["Diagnostics"] = [ etabPath ]
-            else:
-                return readFiles
-            diagFiles = os.listdir(diagDir)
-            diagFiles.sort()
-            for diagFile in diagFiles:
-                if diagFile.endswith(".diag"):
-                    readFiles["Diagnostics"].append(os.path.join(diagDir, diagFile))
-        return readFiles
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -137,11 +102,14 @@ class MatadorConfig(optimization.OptimizationConfig):
     def printHelpScripts(self):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts
+    def getDiagnosticSettings(self):
+        diagDir = {}
+        diagDir["configuration_file"] = "diagnostics.etab"
+        diagDir["input_directory_variable"] = "DIAGNOSTICS_IN"
+        diagDir["write_directory_variable"] = "DIAGNOSTICS_OUT"
+        return diagDir
     def setApplicationDefaults(self, app):
         optimization.OptimizationConfig.setApplicationDefaults(self, app)
-        if os.environ.has_key("DIAGNOSTICS_IN"):
-            app.addConfigEntry("copy_test_path", "Diagnostics/diagnostics.etab")
-            app.addConfigEntry("compare_extension", "diag")
         self.itemNamesInFile[optimization.memoryEntryName] = "Memory"
         self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
         self.itemNamesInFile[optimization.solutionName] = "Solution\."
@@ -152,6 +120,7 @@ class MatadorConfig(optimization.OptimizationConfig):
         self.noIncreaseExceptMethods["broken hard trip constraints"] = [ "MaxRoster" ]
         self.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
         self.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]
+        app.setConfigDefault("diagnostics", self.getDiagnosticSettings())
 
 class MatadorTestCaseInformation(optimization.TestCaseInformation):
     def isComplete(self):
@@ -271,25 +240,6 @@ class ImportTestSuite(optimization.ImportTestSuite):
     def getCarmtmpPath(self, carmtmp):
         return os.path.join("/carm/proj/matador/carmtmps/${MAJOR_RELEASE_ID}/${ARCHITECTURE}", carmtmp)
 
-class EnableDiagnostics(guiplugins.InteractiveAction):
-    def __repr__(self):
-        return "Diagnostics"
-    def getTitle(self):
-        return "Diagnostics"
-    def getScriptTitle(self):
-        return "Enable Diagnostics"
-    def matchesMode(self, dynamic):
-        return not dynamic
-    def __call__(self, test):
-        diagDir = os.path.join(test.abspath, "Diagnostics")
-        os.mkdir(diagDir)
-        diagFile = os.path.join(test.app.abspath, "diagnostics.etab")
-        targetDiagFile = os.path.join(diagDir, "diagnostics.etab")
-        shutil.copyfile(diagFile, targetDiagFile)
-        self.viewFile(targetDiagFile)
-
-guiplugins.interactiveActionHandler.testClasses += [ EnableDiagnostics ]
-
 class MigrateApcTest(plugins.Action):
     def __init__(self):
         self.ruleSetMap = {}
@@ -394,11 +344,10 @@ class PrintRuleValue(plugins.Action):
     def __repr__(self):
         return "Printing rule values for"
     def __call__(self, test):
-        self.describe(test)
         rulesFile = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", getOption(test.options, "-s"), "APC_FILES", "rules")
         for line in open(rulesFile).xreadlines():
-            if line.find("index_group_generation TRUE") != -1:
-                print test.getIndent() + "INDEX GROUPS"
+            if line.find("use_random_dfs_method TRUE") != -1:
+                print test.getIndent() + "RANDOM DFS in " + repr(test)   
     def setUpSuite(self, suite):
         self.describe(suite)
 

@@ -1,11 +1,14 @@
 #!/usr/local/bin/python
 
 helpDescription = """
-Evaluation of test results consists by default of comparing all files that have been collected.
-If nothing else is specified, the application's standard output is collected in output.<app>
-and standard error is collected in errors.<app>.
+By default, TextTest collects the application's standard output in output.<app> and standard error
+in errors.<app> (this last on UNIX only). You can collect other files for comparison by specifying
+collate_file:<source>-><target>, where <source> is some file your application writes (standard UNIX
+pattern matching is allowed here, e.g *.myext), and <target> is what you want it to be called by TextTest.
 
-All files, including these two, are then filtered using the config file list entries corresponding
+Evaluation of test results consists by default of comparing all files that have been collected.
+
+All files are then filtered using the config file list entries corresponding
 to the stem of the file name (e.g  "output"). This will remove all run-dependent text like process
 IDs, timestamps etc., and ensure that false failures are avoided in this way.
 

@@ -43,7 +43,6 @@ class Config(plugins.Configuration):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
 
-
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):
         self.text = filterText

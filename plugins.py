@@ -11,11 +11,11 @@ class Configuration:
         return []
     def getFilterList(self):
         return []
-    def interpretBinary(self, binaryString):
-        return binaryString
     def interpretVersion(self, app, versionString):
         return versionString
-
+    def getExecuteCommand(self, binary, test):
+        return binary + " " + test.options
+    
 # Filter interface: all must provide these three methods
 class Filter:
     def acceptsTestCase(self, test):

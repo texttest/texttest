@@ -6,6 +6,7 @@ def getConfig(optionMap):
 class MatadorConfig(optimization.OptimizationConfig):
     def __init__(self, optionMap):
         optimization.OptimizationConfig.__init__(self, optionMap)
+        self.subplanManager = MatadorSubPlanDirManager(self)
         if self.optionMap.has_key("diag"):
             os.environ["DIAGNOSTICS_IN"] = "./Diagnostics"
             os.environ["DIAGNOSTICS_OUT"] = "./Diagnostics"
@@ -32,14 +33,17 @@ class MatadorConfig(optimization.OptimizationConfig):
         else:
             return self.inputSubPlanName(test)
     def optionsSubPlanName(self, test):
-        try:
-            opts, args = getopt.getopt(test.options.split(), "s:r:")
-        except getopt.GetoptError:
-            # print help information and exit:
-            return ""
-        for o, a in opts:
-            if o == "-s":
-                return a
+        optparts = test.options.split()
+        nextIsSubplan = 0
+        for option in optparts:
+            if nextIsSubplan == 1:
+                return option
+            if option == "-s":
+                nextIsSubplan = 1
+            else:
+                nextIsSubplan = 0
+        # print help information and exit:
+        return ""
     def inputSubPlanName(self, test):
         for line in open(test.inputFile).xreadlines():
             entries = line.split()
@@ -53,6 +57,8 @@ class MatadorConfig(optimization.OptimizationConfig):
                     finalWord = line.split(" ")[-1]
                     return finalWord.strip()
         return None
+    def getExecuteCommand(self, binary, test):
+        return self.subplanManager.getExecuteCommand(binary, test)
             
 #    def getTestCollator(self):
 #        return optimization.OptimizationConfig.getTestCollator(self) + [ MakeMatadorStatusFile() ]
@@ -68,4 +74,27 @@ class CompareTestWithDiagnostics(comparetest.MakeComparisons):
     def fileFinders(self, test):
         diagFinder = "diag", "Diagnostics"
         return comparetest.MakeComparisons.fileFinders(self, test) + [ diagFinder ]
+    
+class MatadorSubPlanDirManager(optimization.SubPlanDirManager):
+    def __init__(self, config):
+        optimization.SubPlanDirManager.__init__(self, config)
+    def getSubPlanDirFromTest(self, test):
+        fullPath = self.getFullPath(self.config.subPlanName(test))
+        return fullPath
+    def getFullPath(self, path):
+        fullPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", path)
+        return os.path.normpath(fullPath)
+    def getExecuteCommand(self, binary, test):
+        if len(test.options) == 0:
+            return binary
+        self.makeTemporary(test)
+        tmpDir = self.tmpDirs[test]
+        tmpDir = tmpDir.replace(self.getFullPath("") + os.sep,"")
+
+        optparts = test.options.split()
+        for ix in range(len(optparts) - 1):
+            if optparts[ix] == "-s" and (ix + 1) < len(optparts):
+                optparts[ix+1] = tmpDir
+        options = string.join(optparts, " ")
+        return binary + " " + options
     

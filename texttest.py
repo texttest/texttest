@@ -68,7 +68,7 @@ class TestCase(Test):
     def performOnSubTests(self, action):
         pass
     def getExecuteCommand(self):
-        return self.app.getExecuteCommand() + " " + self.options
+        return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
         return globalRunIdentifier
     def getTestUser(self):
@@ -239,9 +239,11 @@ class Application:
             checkout = self.getConfigValue("default_checkout")
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
         return os.path.join(checkoutLocation, checkout)
-    def getExecuteCommand(self):
-        binaryString = self.makeAbsPath(self.getConfigValue("binary"))
-        binary = self.configObject.interpretBinary(binaryString)
+    def getExecuteCommand(self, test):
+        binary = self._getBinary()
+        return self.configObject.getExecuteCommand(binary, test)
+    def _getBinary(self):
+        binary = self.makeAbsPath(self.getConfigValue("binary"))
         if self.configDir.has_key("interpreter"):
             return self.configDir["interpreter"] + " " + binary
         else:

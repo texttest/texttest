@@ -1,4 +1,4 @@
-import carmen, os, sys, shutil, KPI, plugins
+import carmen, os, sys, string, shutil, KPI, plugins
 
 class OptimizationConfig(carmen.CarmenConfig):
     def getOptionString(self):
@@ -43,6 +43,83 @@ class ExtractSubPlanFile(plugins.Action):
         else:
             return 0
 
+# Abstract base class for handling running tests in temporary subplan dirs
+# see example usage in apc.py
+#
+class SubPlanDirManager:
+    def __init__(self, config):
+        self.config = config
+        self.tmpDirs = {}
+    def getSubPlaDirFromTest(self, test):
+        pass
+    def getExecuteCommand(self, test):
+        pass
+    def getSubPlanFileName(self, test, sourceName):
+        if not self.tmpDirs.has_key(test):
+            return os.path.join(self.getSubPlanDirFromTest(test), sourceName)
+        else:
+            return os.path.join(self.tmpDirs[test], "APC_FILES", sourceName)
+    def makeTemporary(self, test):
+        dirName = self.getSubPlanDirName(test)
+        baseName = self.getSubPlanBaseName(test)
+        tmpDir = self.getTmpSubdir(test, dirName, baseName, "w")
+        self.tmpDirs[test] = tmpDir
+        os.mkdir(tmpDir)
+        self.makeLinksIn(tmpDir, os.path.join(dirName, baseName))
+    def makeLinksIn(self, inDir, fromDir):
+        for file in os.listdir(fromDir):
+            if file.find("Solution_") != -1:
+                continue
+            if file.find("status") != -1:
+                continue
+            if file.find("hostname") != -1:
+                continue
+            if file.find("best_solution") != -1:
+                continue
+            if file != "APC_FILES":
+                fromPath = os.path.join(fromDir, file)
+                toPath = os.path.join(inDir, file)
+                os.symlink(fromPath, toPath)
+            else:
+                apcFiles = os.path.join(inDir, file)
+                os.mkdir(apcFiles)
+                self.makeLinksIn(apcFiles, os.path.join(fromDir, file))
+
+    def removeTemporary(self, test):
+        self._removeDir(self.tmpDirs[test])
+    def getSubPlanDirName(self, test):
+        subPlanDir = self.getSubPlanDirFromTest(test)
+        dirs = subPlanDir.split(os.sep)[:-1]
+        return os.path.normpath(string.join(dirs, os.sep))
+    def getSubPlanBaseName(self, test):
+        subPlanDir = self.getSubPlanDirFromTest(test)
+        baseName =  subPlanDir.split(os.sep)[-1]
+        return baseName
+    def getTmpSubdir(self, test, subDir, baseName, mode):
+        prefix = os.path.join(subDir, baseName) + "." + test.app.name
+        dirName = prefix + test.getTmpExtension()
+        if not test.parallelMode():
+            currTmpString = prefix + test.getTestUser()
+            for file in os.listdir(subDir):
+                fpath = os.path.join(subDir,file)
+                if not os.path.isdir(fpath):
+                    continue
+                if fpath.find(currTmpString) != -1:
+                    self._removeDir(os.path.join(subDir, file))
+        return dirName
+    def _removeDir(self, subDir):
+        for file in os.listdir(subDir):
+            fpath = os.path.join(subDir,file)
+            try:
+                # if softlinked dir, remove as file and do not recurse
+                os.remove(fpath) 
+            except:
+                self._removeDir(fpath)
+        try:
+            os.remove(subDir)
+        except:
+            os.rmdir(subDir)
+
 class CalculateKPI(plugins.Action):
     def __init__(self, referenceVersion):
         self.referenceVersion = referenceVersion
@@ -66,6 +143,8 @@ class CalculateKPI(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 
+# This is for importing new tests and test suites
+#
 class TestInformation:
     def __init__(self, suite, name):
         self.suite = suite
@@ -86,6 +165,8 @@ class TestInformation:
     def makeCarmTmpName(self):
         return self.name + "_tmp" + self.appSuffix()
 
+# This is for importing new test suites
+#
 class TestSuiteInformation(TestInformation):
     def __init__(self, suite, name):
         TestInformation.__init__(self, suite, name)
@@ -144,6 +225,8 @@ class TestSuiteInformation(TestInformation):
     def userDesc(self):
         return "'" + self.name + "'(" + self.appSuffix() + ")"
         
+# This is for importing new test cases
+#
 class TestCaseInformation(TestInformation):
     def __init__(self, suite, name):
         TestInformation.__init__(self, suite, name)
@@ -260,6 +343,9 @@ class TestCaseInformation(TestInformation):
                 tryName = sys.stdin.readline().strip();
         return dirName
 
+# Base class for importing of test cases and test suites,
+# see example usage in apc.py
+#
 class ImportTest(plugins.Action):
     def __repr__(self):
         return "Importing into"

@@ -39,9 +39,9 @@ def isCompressed(path):
     else:
         return 0
 
-class CheckExtConfig(carmen.CarmenConfig):   
-    def interpretBinary(self, binaryString):
-        return binaryString.replace("ARCHITECTURE", carmen.architecture)
+class CheckExtConfig(carmen.Config):
+    def getExecuteCommand(self, binary, test):
+        return binary.replace("ARCHITECTURE", carmen.architecture) + " " + test.options
     def getTestCollator(self):
         return plugins.CompositeAction([ HandleCompressedFiles(0), carmen.CarmenConfig.getTestCollator(self),  createCompareFiles() ])
 

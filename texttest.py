@@ -69,11 +69,20 @@ class Test:
             diagConfigFile = os.path.join(self.abspath, diagDict["configuration_file"])
             if os.path.isfile(diagConfigFile):
                 inVarName = diagDict["input_directory_variable"]
-                self.environment[inVarName] = self.abspath
+                self.addDiagVariable(diagDict, inVarName, self.abspath)
         envFile = os.path.join(self.abspath, "environment")
         self.environment.readValuesFromFile(envFile, self.app.name, self.app.getVersionFileExtensions())
         # Should do this, but not quite yet...
         # self.properties.readValuesFromFile(os.path.join(self.abspath, "properties"), app.name, app.getVersionFileExtensions())
+    def addDiagVariable(self, diagDict, entryName, entry):
+        # Diagnostics are usually controlled from the environment, but in Java they have to work with properties...
+        if diagDict.has_key("properties_file"):
+            propFile = diagDict["properties_file"]
+            if not self.properties.has_key(propFile):
+                self.properties.addEntry(propFile, {}, insert=1)
+            self.properties.addEntry(entryName, entry, sectionName = propFile, insert=1)
+        else:
+            self.environment[entryName] = entry        
     def expandEnvironmentReferences(self, referenceVars = []):
         self._expandEnvironmentReferences(referenceVars)
         self.tearDownEnvironment()
@@ -217,12 +226,12 @@ class TestCase(Test):
         basicWriteDir = self.writeDirs[0]
         if self.app.useDiagnostics:
             inVarName = diagDict["input_directory_variable"]
-            self.environment[inVarName] = os.path.join(self.abspath, "Diagnostics")
+            self.addDiagVariable(diagDict, inVarName, os.path.join(self.abspath, "Diagnostics"))
             outVarName = diagDict["write_directory_variable"]
-            self.environment[outVarName] = os.path.join(basicWriteDir, "Diagnostics")
+            self.addDiagVariable(diagDict, outVarName, os.path.join(basicWriteDir, "Diagnostics"))
         elif diagDict.has_key("write_directory_variable"):
             outVarName = diagDict["write_directory_variable"]
-            self.environment[outVarName] = basicWriteDir
+            self.addDiagVariable(diagDict, outVarName, basicWriteDir)
         self.setUseCaseEnvironment()
     def setUseCaseEnvironment(self):
         if self.useJavaRecorder():

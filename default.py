@@ -283,7 +283,7 @@ class RunTest(plugins.Action):
         useCaseFileName = test.useCaseFile
         if os.path.isfile(useCaseFileName):
             recFile = test.makeFileName("usecase", temporary=1)
-            testCommand += " -replay " + useCaseFileName + " -record " + recFile
+            testCommand += " --replay " + useCaseFileName + " --record " + recFile
         testCommand += " < " + self.getInputFile(test)
         outfile = test.makeFileName("output", temporary=1)
         return testCommand + " > " + outfile

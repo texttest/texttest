@@ -64,7 +64,6 @@ class RunTest(default.RunTest):
         self.process = None
         self.collectStdErr = 1
     def runTest(self, test):
-        testCommand = self.getExecuteCommand(test)
         if self.process:
             # See if the running process is finished
             if self.process.hasTerminated():
@@ -73,6 +72,7 @@ class RunTest(default.RunTest):
             else:
                 return "retry"
 
+        testCommand = self.getExecuteCommand(test)
         self.describe(test)
         if self.interactive:
             self.process = plugins.BackgroundProcess(testCommand)

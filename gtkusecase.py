@@ -88,7 +88,7 @@ class ActivateEvent(SignalEvent):
     def __init__(self, name, widget, active = gtk.TRUE):
         SignalEvent.__init__(self, name, widget, "toggled")
         self.active = active
-    def shouldRecord(self):
+    def shouldRecord(self, *args):
         return self.widget.get_active() == self.active
     def generate(self, argumentString):
         self.widget.set_active(self.active)
@@ -97,7 +97,7 @@ class EntryEvent(SignalEvent):
     def __init__(self, name, widget):
         SignalEvent.__init__(self, name, widget, "focus-out-event")
         self.oldText = ""
-    def shouldRecord(self):
+    def shouldRecord(self, *args):
         text = self.widget.get_text()
         return text != self.oldText
     def _outputForScript(self, *args):
@@ -107,6 +107,15 @@ class EntryEvent(SignalEvent):
     def generate(self, argumentString):
         self.widget.set_text(argumentString)
         self.widget.editing_done()
+
+class ResponseEvent(SignalEvent):
+    def __init__(self, name, widget, responseId):
+        SignalEvent.__init__(self, name, widget, "response")
+        self.responseId = responseId
+    def shouldRecord(self, widget, responseId, *args):
+        return self.responseId == responseId
+    def generate(self, argumentString):
+        self.widget.emit(self.signalName, self.responseId)
 
 class NotebookPageChangeEvent(SignalEvent):
     def __init__(self, name, widget):
@@ -184,7 +193,7 @@ class TreeSelectionSignalEvent(TreeSignalEvent):
             self.oldSelectedPaths = self.newSelectedPaths
             return 0
         return 1
-    def shouldRecord(self):
+    def shouldRecord(self, *args):
         self.newSelectedPaths = self.findSelectedPaths()
         if self.sense > 0 and len(self.newSelectedPaths) > len(self.oldSelectedPaths):
             return self.reenableRecord()
@@ -223,12 +232,12 @@ class TreeSelectionSignalEvent(TreeSignalEvent):
 
 class ScriptEngine(usecase.ScriptEngine):
     def connect(self, eventName, signalName, widget, method = None, argumentParseData = None, *data):
-        if method:
-            widget.connect(signalName, method, *data)
         if self.hasScript():
             stdName = self.standardName(eventName)
             signalEvent = self._createSignalEvent(signalName, stdName, widget, argumentParseData)
             self._addEventToScripts(signalEvent)
+        if method:
+            widget.connect(signalName, method, *data)
     def monitorTreeSelection(self, additionName, removalName, selection, argumentParseData):
         if self.hasScript():
             addEvent = TreeSelectionSignalEvent(self.standardName(additionName), selection, "changed", 1, argumentParseData)
@@ -285,7 +294,9 @@ class ScriptEngine(usecase.ScriptEngine):
             self.recordScript.addEvent(event)
             event.widget.connect(event.signalName, self.recordScript.writeEvent, event)
     def _createSignalEvent(self, signalName, eventName, widget, argumentParseData):
-        if isinstance(widget, gtk.TreeView):
+        if signalName == "response":
+            return ResponseEvent(eventName, widget, argumentParseData)
+        elif isinstance(widget, gtk.TreeView):
             return TreeViewSignalEvent(eventName, widget, signalName, argumentParseData)
         else:
             return SignalEvent(eventName, widget, signalName)

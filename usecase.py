@@ -61,7 +61,7 @@ class UseCaseScriptError(RuntimeError):
 class UserEvent:
     def __init__(self, name):
         self.name = name
-    def shouldRecord(self):
+    def shouldRecord(self, *args):
         return 1
     def outputForScript(self, *args):
         return self.name
@@ -264,7 +264,7 @@ class UseCaseRecordScript(RecordScript):
         self.events.append(event)
     def writeEvent(self, *args):
         event = self.findEvent(*args)
-        if event.shouldRecord():
+        if event.shouldRecord(*args):
             self.writeApplicationEventDetails()
             self.record(event.outputForScript(*args))
     def findEvent(self, *args):

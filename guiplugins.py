@@ -176,6 +176,9 @@ class ImportTest(InteractiveAction):
         return testDir
 
 class RecordTest(InteractiveAction):
+    def __init__(self, test):
+        InteractiveAction.__init__(self, test, "Recording")
+        self.optionGroup.addSwitch("hold", "Hold record shell after recording")
     def __call__(self, test):
         description = "Running " + test.app.fullName + " in order to capture user actions..."
         guilog.info(description)
@@ -190,7 +193,10 @@ class RecordTest(InteractiveAction):
         shellOptions = ""
         if test.getConfigValue("use_standard_input"):
             shellTitle = description
-        process = self.startExternalProgram(recordCommand, shellTitle)
+        shellOptions = ""
+        if self.optionGroup.getSwitchValue("hold"):
+            shellOptions = "-hold"
+        process = self.startExternalProgram(recordCommand, shellTitle, shellOptions)
         process.waitForTermination()
         if os.path.isfile(errFile):
             errors = open(errFile).read()

@@ -1,5 +1,5 @@
 
-import os, log4py
+import os, log4py, string
 from types import FileType
 
 # Generic configuration class
@@ -52,6 +52,10 @@ class Action:
 # as it ensures everything appears by default in a standard place with a standard name.
 def getDiagnostics(diagName):
     return log4py.Logger().get_instance(diagName)
+
+# Useful utility, free text input as comma-separated list which may have spaces
+def commasplit(input):
+    return map(string.strip, input.split(","))
 
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):

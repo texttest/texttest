@@ -98,7 +98,7 @@ class Config(plugins.Configuration):
 
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):
-        self.texts = filterText.split(",")
+        self.texts = plugins.commasplit(filterText)
         self.allTestCaseNames = []
     def containsText(self, test):
         for text in self.texts:

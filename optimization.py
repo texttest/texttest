@@ -269,7 +269,8 @@ class CheckOptimizationRun(predict.CheckLogFilePredictions):
             if not solution.has_key(entry):
                 continue
             currEntry = solution[entry]
-            if lastEntry and self.hasIncreased(entry, currEntry, lastEntry) and self.shouldCheckMethod(entry, solution):
+            optRun.diag.info("Checking solution " + repr(solution))
+            if lastEntry != None and self.hasIncreased(entry, currEntry, lastEntry) and self.shouldCheckMethod(entry, solution):
                 return lastEntry, currEntry
             lastEntry = currEntry
         return None, None

@@ -557,9 +557,10 @@ class BuildCode(plugins.Action):
     def buildLocal(self, absPath, app):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."
-        buildFile = "build.default"
+        arch = getArchitecture(app)
+        buildFile = "build.default." + arch
         commandLine = "cd " + absPath + "; gmake >& " + buildFile
-        machine = self.getMachine(app, getArchitecture(app))
+        machine = self.getMachine(app, arch)
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
             raise "Product " + repr(app) + " did not build, exiting"

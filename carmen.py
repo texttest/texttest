@@ -15,8 +15,7 @@ entry "default_architecture", to determine where the basic results are created. 
 list is present and the current one does not match, the configuration will exit with an error.
 
 Running on an architecture other than default_architecture will cause the test suite to automatically
-use the version <arch><version>, where <version> was the original version it was running. Hopefully this
-will soon be replaced with a version hierarchy, when the framework can handle that.
+use the version <arch>, as well as any versions it was originally running.
 """
 
 helpOptions = """
@@ -41,11 +40,12 @@ helpOptions = """
              and are reported on at the end. This should ensure that they don't delay the appearance of test information.
 """
 
-batchInfo = """             <bname>_architecture, these entries form a list and ensure that only runs on the architectures listed are accepted.
-             If the list is empty, all architectures are allowed.
+batchInfo = """
+             Note that, because the Carmen configuration converts non-default architectures to versions, you can also
+             enable and disable architectures using <bname>_version.
 
-             The reason for this is that the Carmen nightjob will run TextTest on all versions and on all architectures. It
-             will do so with the batch session name "nightjob" on Monday to Thursday nights, and "wkendjob" on Friday night.
+             The Carmen nightjob will run TextTest on all versions and on all architectures. It will do so with the batch
+             session name "nightjob" on Monday to Thursday nights, and "wkendjob" on Friday night.
              If you do not want this, you should therefore restrict or disable these session names in your config file, as
              indicated above.
 

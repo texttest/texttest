@@ -46,14 +46,15 @@ class MpsSolverConfig(carmen.CarmenConfig):
         ldEnv = self.getLibPathEnvName(archName)
         binary = "env " + ldEnv + "=" + "${" + ldEnv + "}:" + ldPath1 + ":" + ldPath2 + " " + binary
         mpsFiles = "";
-        for file in os.listdir(test.abspath):
-            if file.endswith(".mps"):
-                mpsFiles += " " + file
-                sourcePath = os.path.join(test.abspath, file)
-                if not unixConfig.isCompressed(sourcePath):
-                    os.symlink(sourcePath, file)
-                else:
-                    os.system("uncompress -c " + sourcePath + " > " + file)
+        if os.environ.has_key("MPSDATA_PROBLEMS"):
+            mpsFilePath = os.environ["MPSDATA_PROBLEMS"]
+            for file in os.listdir(mpsFilePath):
+                filecmp = file.lower()
+                sourcePath = os.path.join(mpsFilePath, file)
+                if filecmp.endswith(".mps"):
+                    if not unixConfig.isCompressed(sourcePath):
+                        mpsFiles += " " + file
+                        os.symlink(sourcePath, file)
         return binary + " " + test.options + mpsFiles
     def checkPerformance(self):
         return not self.optionMap.has_key("diag")

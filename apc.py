@@ -329,8 +329,9 @@ class FetchApcCore(plugins.Action):
                 cmdLine = "cd " + apcHostTmp + "/*" + testDirEnd + "_*; " + binCmd + ";compress -c core > " + coreFileName
                 os.system("rsh " + machine + " '" + cmdLine + "'")
             # Show log file!
-            command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + apcHostTmp + "/*" + testDirEnd + "_*/apclog" + "''"
-            os.system(command)
+            if not self.config.isNightJob():
+                command = "xon " + machine + " 'xterm -bg white -T " + test.name + " -e 'less +F " + apcHostTmp + "/*" + testDirEnd + "_*/apclog" + "''"
+                os.system(command)
             tmpDir = test.writeDirs[0]
             if os.path.isdir(tmpDir):
                 tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")

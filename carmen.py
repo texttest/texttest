@@ -425,7 +425,7 @@ class BuildCode(plugins.Action):
             if version9:
                 return "morlaix"
             else:
-                return "naxos"
+                return "tororo"
     def buildLocal(self, absPath, app):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."

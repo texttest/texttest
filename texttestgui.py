@@ -276,7 +276,7 @@ class TextTestGUI:
         if self.dynamic and secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 5) + ")")
     def redrawSuite(self, suite):
-        if suite.size() == 0:
+        if len(suite.testcases) == 0:
             return
         maybeNewTest = suite.testcases[-1]
         suiteIter = self.itermap[suite]

@@ -934,6 +934,8 @@ class MultiEntryDictionary(seqdict):
             configFile = open(filename)
             for line in configFile.xreadlines():
                 self.parseConfigLine(line.strip(), insert, errorOnUnknown)
+        # Versions are in order of most specific first. We want to update with least specific first.
+        versions.reverse()
         self.updateFor(filename, appName)
         for version in versions:
             self.updateFor(filename, version)

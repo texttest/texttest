@@ -164,7 +164,9 @@ class CarmenConfig(lsf.LSFConfig):
     def defaultBuildRules(self):
         return 0
     def raveMode(self):
-        if self.optionMap.has_key("debug"):
+        if self.optionMap.has_key("raveexp"):
+            return "-explorer"
+        elif self.optionMap.has_key("debug"):
             return "-debug"
         else:
             return "-optimize"

@@ -396,8 +396,8 @@ class MakeMemoryFile(plugins.Action):
         
         maxMem = self.findMaxMemory(logFile)
         if maxMem:
-            # We save memory performance in steps of 0.5Mb
-            roundedMaxMem = float(int(2*maxMem))/2
+            # We save memory performance in steps of 0.01Mb
+            roundedMaxMem = float(int(100*maxMem))/100
             fileName = test.makeFileName("memory", temporary=temp)
             file = open(fileName, "w")
             file.write(string.lstrip("Max Memory  :      " + str(roundedMaxMem) + " MB") + os.linesep)
@@ -414,7 +414,11 @@ class MakeMemoryFile(plugins.Action):
         if pos == -1:
             return None
         endOfString = pos + len(self.memoryFinder)
-        return float(line[endOfString:].lstrip().split()[0])
+        memString = line[endOfString:].lstrip()
+        memNumber = float(memString.split()[0])
+        if memString.lower().find("kb") != -1:
+            memNumber = float(memNumber / 1024.0)
+        return memNumber
 
 # A standalone action, we add description and generate the main file instead...
 class ExtractMemory(MakeMemoryFile):

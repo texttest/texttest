@@ -82,7 +82,9 @@ class Config(plugins.Configuration):
     def getActionSequence(self):
         return self._getActionSequence(makeDirs=1)
     def _getActionSequence(self, makeDirs):
-        actions = [ self.getWriteDirectoryPreparer(), self.tryGetTestRunner(), self.getTestEvaluator() ]
+        catalogueCreator = self.getCatalogueCreator()
+        actions = [ self.getWriteDirectoryPreparer(), catalogueCreator, \
+                    self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
@@ -133,8 +135,8 @@ class Config(plugins.Configuration):
     def getTestEvaluator(self):
         actions = [ self.getFileExtractor() ]
         if not self.isReconnectingFast():
-            actions += [ self.getCatalogueCreator(), self.getTestPredictionChecker(), \
-                         self.getTestComparator(), self.getFailureExplainer(), SaveState() ]
+            actions += [ self.getTestPredictionChecker(), self.getTestComparator(),
+                         self.getFailureExplainer(), SaveState() ]
         if not self.optionMap.useGUI() and not self.optionMap.slaveRun():
             actions.append(self.getTestResponder())
         return actions
@@ -150,7 +152,10 @@ class Config(plugins.Configuration):
             else:
                 return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getPerformanceExtractor() ] 
     def getCatalogueCreator(self):
-        return CreateCatalogue()
+        if self.isReconnectingFast():
+            return None
+        else:
+            return CreateCatalogue()
     def getTestCollator(self):
         return CollateFiles()
     def getPerformanceExtractor(self):
@@ -415,22 +420,56 @@ class RunTest(plugins.Action):
         app.checkBinaryExists()
 
 class CreateCatalogue(plugins.Action):
+    def __init__(self):
+        self.catalogues = {}
+        self.diag = plugins.getDiagnostics("catalogues")
     def __call__(self, test):
         if test.app.getConfigValue("create_catalogues") != "true":
             return
+
+        if self.catalogues.has_key(test):
+            self.createCatalogueChangeFile(test)
+        else:
+            self.catalogues[test] = self.findAllFiles(test)
+    def createCatalogueChangeFile(self, test):
+        oldFiles = self.catalogues[test]
+        newFiles = self.findAllFiles(test)
+        filesLost, filesGained = self.findDifferences(oldFiles, newFiles, test.writeDirs)
+        if len(filesLost) == 0 and len(filesGained) == 0:
+            return
+        
         fileName = test.makeFileName("catalogue", temporary=1)
         file = open(fileName, "w")
-        currDir = os.getcwd()
+        file.write("The following new files were created:" + os.linesep)
+        self.writeFileStructure(file, filesGained)
+        if len(filesLost) > 0:
+            file.write(os.linesep + "The following existing files were deleted:" + os.linesep)
+            self.writeFileStructure(file, filesLost)
+        file.close()
+    def writeFileStructure(self, file, fileNames):
+        prevParts = []
+        for fileName in fileNames:
+            parts = fileName.split(os.sep)
+            indent = 0
+            for index in range(len(parts)):
+                part = parts[index]
+                indent += len(part)
+                if index >= len(prevParts) or part != prevParts[index]:
+                    prevParts = []
+                    file.write(part + os.linesep)
+                    if index != len(parts) - 1:
+                        file.write((" " * indent))
+                else:
+                    file.write(" " * len(part))
+            prevParts = parts
+    def findAllFiles(self, test):
+        fileList = []
         for writeDir in test.writeDirs:
             if os.path.isdir(writeDir):
-                os.chdir(writeDir)
-                realWriteDir = os.getcwd();
-                os.chdir(currDir)
-                self.listDirectory(test.app, file, realWriteDir, firstLevel = 1)
-        file.close()
-        if os.path.getsize(fileName) == 0:
-            os.remove(fileName)
-    def listDirectory(self, app, file, writeDir, firstLevel = 0):
+                fileList += self.listDirectory(test.app, writeDir, firstLevel = 1)
+        self.diag.info("Found all files present as follows : " + os.linesep + repr(fileList))
+        return fileList
+    def listDirectory(self, app, writeDir, firstLevel = 0):
         subDirs = []
         files = []
         availFiles = os.listdir(writeDir)
@@ -443,22 +482,33 @@ class CreateCatalogue(plugins.Action):
             if os.path.isdir(fullPath):
                 subDirs.append(fullPath)
             elif not app.ownsFile(writeFile, unknown=0):
-                files.append(writeFile)
-        if len(files) == 0 and len(subDirs) == 0:
-            return 0
-        file.write("Under " + self.getName(writeDir) + " :" + os.linesep)
-        for writeFile in files:
-            file.write(writeFile + os.linesep)
+                files.append(fullPath)
+                
         for subDir in subDirs:
-            self.listDirectory(app, file, subDir)
-        return 1
-    def getName(self, writeDir):
-        currDir = os.getcwd()
-        if plugins.samefile(writeDir, currDir):
-            return "Test Directory"
-        if writeDir.startswith(currDir):
-            return "Test subdirectory " + writeDir.replace(currDir + os.sep, "")
-        return os.path.basename(writeDir) + "(" + writeDir + " != " + currDir + ")"
+            files += self.listDirectory(app, subDir)
+        return files
+    def findDifferences(self, oldFiles, newFiles, writeDirs):
+        filesGained, filesLost = [], []
+        for file in newFiles:
+            if not file in oldFiles:
+                filesGained.append(self.outputFileName(file, writeDirs))
+        for file in oldFiles:
+            if not file in newFiles:
+                filesLost.append(self.outputFileName(file, writeDirs))
+        return filesLost, filesGained
+    def outputFileName(self, file, writeDirs):
+        self.diag.info("Output name for " + file)
+        for index in range(len(writeDirs)):
+            writeDir = writeDirs[index]
+            self.diag.info("Checked real write directory " + writeDir)
+            if file.startswith(writeDir):
+                return file.replace(writeDir, self.outputDirName(index))
+        return file
+    def outputDirName(self, index):
+        if index == 0:
+            return "<Test Directory>"
+        else:
+            return "<Temporary Write Directory " + str(index) + ">"
                     
 class CountTest(plugins.Action):
     def __init__(self):

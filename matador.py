@@ -140,6 +140,7 @@ class MatadorTestCaseInformation(optimization.TestCaseInformation):
         testPath = self.testPath()
         optionPath = self.makeFileName("options")
         perfPath = self.makeFileName("performance")
+        outputPath = self.makeFileName("output")
         createdPath = 0
         if not os.path.isdir(testPath):
             os.mkdir(testPath)
@@ -154,6 +155,10 @@ class MatadorTestCaseInformation(optimization.TestCaseInformation):
             ruleSet = self.getRuleSetName(subPlanDir)
             newOptions = "-s " + self.getOptionPart(dirName) + " -r " + ruleSet
             open(optionPath,"w").write(newOptions + os.linesep)
+
+            logFile = os.path.join(subPlanDir, "matador.log")
+            if not os.path.isfile(outputPath) and os.path.isfile(logFile):
+                shutil.copyfile(logFile, outputPath)
         else:
             relPath = getOption(open(optionPath).readline().strip(), "-s")
             subPlanDir = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", relPath, "APC_FILES")

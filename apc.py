@@ -70,12 +70,11 @@ class ApcConfig(optimization.OptimizationConfig):
     def getSubPlanFileName(self, test, sourceName):
         return self.subplanManager.getSubPlanFileName(test, sourceName)
     def getCompileRules(self, staticFilter):
-        libFile = self.getLibraryFile()
         if self.isNightJob():
             ruleCompile = 1
         else:
             ruleCompile = self.optionMap.has_key("rulecomp")
-        return ApcCompileRules(self.getRuleSetName, libFile, staticFilter, ruleCompile)
+        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, staticFilter, ruleCompile)
     def getTestRunner(self):
         if self.isReconnecting():
             return default.ReconnectTest(self.optionValue("reconnect"))
@@ -182,12 +181,12 @@ class ApcSubPlanDirManager(optimization.SubPlanDirManager):
         return binary + " " + string.join(options, " ")
     
 class ApcCompileRules(carmen.CompileRules):
-    def __init__(self, getRuleSetName, libraryFile, sFilter = None, forcedRuleCompile = 0):
+    def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, forcedRuleCompile = 0):
         carmen.CompileRules.__init__(self, getRuleSetName, "-optimize", sFilter)
         self.forcedRuleCompile = forcedRuleCompile
-        self.libraryFile = libraryFile
+        self.getLibraryFile = getLibraryFile
     def __call__(self, test):
-        self.apcLib = os.path.join(os.environ["CARMSYS"], self.libraryFile)
+        self.apcLib = os.path.join(os.environ["CARMSYS"], self.getLibraryFile(test))
         carmTmpDir = os.environ["CARMTMP"]
         if not os.path.isdir(carmTmpDir):
             os.mkdir(carmTmpDir)
@@ -196,7 +195,7 @@ class ApcCompileRules(carmen.CompileRules):
         else:
             carmen.CompileRules.__call__(self, test)
     def linuxRuleSetBuild(self, test):
-        ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName)
+        ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
         if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
             return
         apcExecutable = ruleset.targetFile

@@ -249,6 +249,7 @@ class TextTestGUI:
         if len(self.scriptCommands):
             gtk.idle_add(self.runScriptCommands)
         gtk.idle_add(self.doNextAction)
+        gtk.idle_add(self.updateForTest)
         gtk.main()
     def doNextAction(self):
         if len(self.instructions) == 0:
@@ -269,9 +270,21 @@ class TextTestGUI:
                 self.postponedTests.append(test)
                 self.postponedInstructions.append((test, action))
             if test.state != oldState:
-                iter = self.itermap[test]
-                self.model.set_value(iter, 1, self.getTestColour(test))
-                self.model.row_changed(self.model.get_path(iter), iter)
+                self.redrawTest(test)
+        return gtk.TRUE
+    def redrawTest(self, test):
+        iter = self.itermap[test]
+        self.model.set_value(iter, 1, self.getTestColour(test))
+        self.model.row_changed(self.model.get_path(iter), iter)
+    def updateForTest(self):
+        if not self.testCaseGUI or not self.testCaseGUI.test:
+            return gtk.TRUE
+        test = self.testCaseGUI.test
+        if self.testCaseGUI.oldState == test.state:
+            return gtk.TRUE
+
+        self.redrawTest(test)
+        self.recreateTestView(test)
         return gtk.TRUE
     def runScriptCommands(self):
         global appendToScript
@@ -295,6 +308,8 @@ class TextTestGUI:
     def viewTest(self, view, path, column, *args):
         test = self.model.get_value(self.model.get_iter(path), 2)
         print "Viewing test", test
+        self.recreateTestView(test)
+    def recreateTestView(self, test):
         self.contents.remove(self.testCaseGUI.getWindow())
         self.testCaseGUI = TestCaseGUI(test, self.interactiveActions)
         self.contents.pack_start(self.testCaseGUI.getWindow(), expand=gtk.TRUE, fill=gtk.TRUE)
@@ -315,6 +330,8 @@ class TestCaseGUI:
         self.exactButton = None
         self.optionChooser = None
         self.test = test
+        if test:
+            self.oldState = test.state
         self.interactiveDialogue = None
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.addFilesToModel(test)

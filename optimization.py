@@ -211,6 +211,8 @@ class MakeTmpSubPlan(plugins.Action):
                 continue
             if file.find("run_status") != -1:
                 continue
+            if file.find("colgen_analysis.example_rotations") != -1:
+                continue
             if file.find("hostname") != -1:
                 continue
             if file.find("best_solution") != -1:

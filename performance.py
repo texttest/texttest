@@ -25,6 +25,11 @@ and the new result. In order to override this and save the exact result, append 
 option that you type. (so "s+" to save the standard version, "1+" to save the first offered version etc.)
 """ + comparetest.helpDescription
 
+helpScripts = """performance.AddTestPerformance
+                           - Adds up the CPU time performance as specified by the test's
+                             performance file for the selected tests. 
+"""
+
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing
 # CPU time   :      30.31 sec. on heathlands

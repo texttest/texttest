@@ -9,7 +9,7 @@ to Python's ndiff, and sendmail is used to implement an email-sending batch mode
 The default behaviour is to run all tests locally.
 """
 
-import default, batch, respond, comparetest, predict, os, shutil
+import default, batch, respond, comparetest, performance, predict, os, shutil
 
 def getConfig(optionMap):
     return UNIXConfig(optionMap)
@@ -44,7 +44,9 @@ class UNIXConfig(default.Config):
         else:
             return respond.UNIXInteractiveResponder(diffLines)
     def printHelpDescription(self):
-        print helpDescription, predict.helpDescription, comparetest.helpDescription, respond.helpDescription 
+        print helpDescription, predict.helpDescription, comparetest.helpDescription, respond.helpDescription
+    def printHelpScripts(self):
+        print performance.helpScripts
     def printHelpOptions(self, builtInOptions):
         print batch.helpOptions
         default.Config.printHelpOptions(self, builtInOptions)

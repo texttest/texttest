@@ -72,7 +72,7 @@ class Config(plugins.Configuration):
     def getActionSequence(self):
         return self._getActionSequence(makeDirs=1)
     def _getActionSequence(self, makeDirs):
-        actions = [ PrepareWriteDirectory(), self.tryGetTestRunner(), self.getTestEvaluator() ]
+        actions = [ self.getWriteDirectoryPreparer(), self.tryGetTestRunner(), self.getTestEvaluator() ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
@@ -104,6 +104,11 @@ class Config(plugins.Configuration):
             return None
         else:
             return self._getWriteDirectoryMaker()
+    def getWriteDirectoryPreparer(self):
+        if self.isReconnectingFast():
+            return None
+        else:
+            return PrepareWriteDirectory()
     def _getWriteDirectoryMaker(self):
         return MakeWriteDirectory()
     def tryGetTestRunner(self):

@@ -19,10 +19,11 @@ class CheckForBugs(plugins.Action):
         self.readBugs(test)
         for stem, entryDict in self.bugMap.items():
             fileName = test.makeFileName(stem, temporary=1)
-            for line in open(fileName).xreadlines():
-                for text, bugNum in entryDict.items():
-                    if line.find(text) != -1:
-                        test.stateDetails.failedPrediction = os.popen("bugcli -b " + bugNum).read()
+            if os.path.isfile(fileName):
+                for line in open(fileName).xreadlines():
+                    for text, bugNum in entryDict.items():
+                        if line.find(text) != -1:
+                            test.stateDetails.failedPrediction = os.popen("bugcli -b " + bugNum).read()
         self.unreadBugs(test)
     def readBugs(self, suite):
         if not self.testBugParserMap.has_key(suite):

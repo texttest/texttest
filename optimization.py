@@ -983,6 +983,7 @@ class PlotTest(plugins.Action):
             commonPlotCount = 1
         else:
             commonPlotCount += 1
+            commonPlotter.__init__(args)
     def __del__(self):
         global commonPlotCount, commonPlotter
         commonPlotCount -= 1

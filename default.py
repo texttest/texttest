@@ -321,7 +321,7 @@ class RunTest(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
-        binary = app.getBinary()
+        binary = app.getConfigValue("binary")
         if not os.path.isfile(binary):
             raise plugins.TextTestError, binary + " has not been built."
 

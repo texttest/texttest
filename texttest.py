@@ -76,20 +76,16 @@ class Test:
         # List of objects observing this test, to be notified when it changes state
         self.observers = []
         self.environment = MultiEntryDictionary()
-        self.environment.readValuesFromFile(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
         if parent == None:
             for var, value in app.getEnvironment():
                 self.environment[var] = value
+        self.environment.readValuesFromFile(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
         # Single pass to expand all variables (don't want multiple expansion)
         for var, value in self.environment.items():
             expValue = os.path.expandvars(value)
             # If it constaints a separator, try to make it into an absolute path by pre-pending the checkout
-            if value.find(os.sep) != -1:
-                self.environment[var] = self.app.makeAbsPath(expValue)
-                debugLog.info("Expanded " + var + " path " + value + " to " + self.environment[var])
-            else:
-                self.environment[var] = expValue
-                debugLog.info("Expanded variable " + var + " to " + expValue + " in " + self.name)
+            self.environment[var] = expValue
+            debugLog.info("Expanded variable " + var + " to " + expValue + " in " + self.name)
             if os.environ.has_key(var):
                 self.previousEnv[var] = os.environ[var]
             os.environ[var] = self.environment[var]
@@ -786,15 +782,6 @@ class Application:
             return homeName
         # Return the name even though it doesn't exist, then it can be used
         return name
-    def makeAbsPath(self, path, checkExists=1):
-        if (os.path.isabs(path)):
-            return path
-
-        checkoutPath = os.path.join(self.checkout, path)
-        if checkExists and not os.path.exists(checkoutPath):
-            return path
-        else:
-            return checkoutPath
     def getActionSequence(self, useGui):
         return self.configObject.getActionSequence(useGui)
     def printHelpText(self):
@@ -812,6 +799,14 @@ class Application:
             return os.path.expandvars(value)
         elif type(value) == types.ListType:
             return map(os.path.expandvars, value)
+        elif type(value) == types.DictType:
+            newDict = {}
+            for key, val in value.items():
+                if type(val) == types.StringType:
+                    newDict[key] = os.path.expandvars(val)
+                elif type(val) == types.ListType:
+                    newDict[key] = map(os.path.expandvars, val)
+            return newDict
         else:
             return value
     def addConfigEntry(self, key, value, sectionName = ""):
@@ -826,13 +821,10 @@ class Application:
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
         return self.makePathName(os.path.join(checkoutLocation, checkout))
     def getExecuteCommand(self, test):
-        binary = self.getBinary()
+        binary = self.getConfigValue("binary")
         if self.configDir.has_key("interpreter"):
             binary = self.configDir["interpreter"] + " " + binary
         return self.configObject.getExecuteCommand(binary, test)
-    def getBinary(self):
-        # Assume binaries can relate to checkouts
-        return self.makeAbsPath(self.getConfigValue("binary"), checkExists=0)
     def getEnvironment(self):
         return self.configObject.getApplicationEnvironment(self)
             

@@ -612,8 +612,7 @@ class BuildCode(plugins.Action):
             self.builtDirs[arch] = []
             self.buildFailedDirs[arch] = []
         for optValue in targetDir[self.target]:
-            relPath, makeTargets = self.getPathAndTargets(optValue)
-            absPath = app.makeAbsPath(relPath)
+            absPath, makeTargets = self.getPathAndTargets(optValue)
             if absPath in self.builtDirs[arch]:
                 print "Already built on", arch, "under", absPath, "- skipping build"
                 continue
@@ -700,8 +699,7 @@ class BuildCode(plugins.Action):
         if not targetDir.has_key("codebase"):
             return 1
         for optValue in targetDir["codebase"]:
-            relPath, makeTargets = self.getPathAndTargets(optValue)
-            absPath = app.makeAbsPath(relPath)
+            absPath, makeTargets = self.getPathAndTargets(optValue)
             if os.path.isdir(absPath):
                 commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& build." + arch)
                 os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
@@ -731,8 +729,7 @@ class CheckBuild(plugins.Action):
             if not targetDir.has_key("codebase"):
                 return
             for optValue in targetDir["codebase"]:
-                relPath, makeTargets = self.builder.getPathAndTargets(optValue)
-                absPath = app.makeAbsPath(relPath)
+                absPath, makeTargets = self.builder.getPathAndTargets(optValue)
                 self.checkBuild(arch, absPath)
     def checkBuild(self, arch, absPath):
         if os.path.isdir(absPath):

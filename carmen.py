@@ -394,9 +394,11 @@ class CompileRules(plugins.Action):
             self.raveName = None
             self.diag.info("Rejecting ruleset compile for " + suite.name)
             return
-        self.describe(suite)
-        if self.raveName == None:
+        if self.raveName == None and isUserSuite(suite):
+            self.describe(suite)
             self.raveName = getRaveName(suite)
+        if suite.abspath == suite.app.abspath:
+            self.describe(suite)
     def getFilter(self):
         return self.filter
 

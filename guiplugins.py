@@ -162,7 +162,8 @@ class RecordTest(InteractiveAction):
         shellOptions = ""
         if test.getConfigValue("use_standard_input"):
             shellTitle = description
-        self.startExternalProgram(recordCommand, shellTitle)
+        process = self.startExternalProgram(recordCommand, shellTitle)
+        process.waitForTermination()
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
     def matchesMode(self, dynamic):

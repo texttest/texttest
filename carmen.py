@@ -71,7 +71,7 @@ class CarmenConfig(lsf.LSFConfig):
             return baseRunner
     def isExecutable(self, process, parentProcess, test):
         binaryName = os.path.basename(test.getConfigValue("binary"))
-        return binaryName.startswith(parentProcess) and process.find(".") == -1 and process.find("arch") == -1 and process.find("crsutil") == -1
+        return binaryName.startswith(parentProcess) and process.find(".") == -1 and process.find("arch") == -1 and process.find("crsutil") == -1 and process.find("CMD") == -1
     def binaryRunning(self, processNameDict):
         for name in processNameDict.values():
             if self.binaryName.startswith(name):

@@ -413,6 +413,8 @@ class SubmitTest(plugins.Action):
             if self.optionMap.has_key(option):
                 runOptions.append("-" + option)
                 runOptions.append(self.optionMap[option])
+        if self.optionMap.has_key("keeptmp"):
+            runOptions.append("-keeptmp")
         return string.join(runOptions)
     def findRunGroup(self, app):
         for group in app.optionGroups:

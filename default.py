@@ -87,12 +87,16 @@ class Config(plugins.Configuration):
     def getCleanMode(self):
         if self.isReconnectingFast():
             return self.CLEAN_NONE
-        elif self.optionMap.slaveRun():
+        if self.optionMap.has_key("keeptmp"):
+            if self.optionMap.slaveRun():
+                return self.CLEAN_NONE
+            else:
+                return self.CLEAN_PREVIOUS
+        
+        if self.optionMap.slaveRun():
             return self.CLEAN_NONBASIC # only clean extra directories that we create...
-        elif self.optionMap.has_key("keeptmp"):
-            return self.CLEAN_PREVIOUS
-        else:
-            return self.CLEAN_NONBASIC | self.CLEAN_BASIC
+        
+        return self.CLEAN_NONBASIC | self.CLEAN_BASIC
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):

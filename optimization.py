@@ -249,10 +249,21 @@ class MakeProgressReport(TestReport):
         print underline
     def percent(self, fValue):
         return str(int(round(100.0 * fValue))) + "%"
+    def computeKPI(self, currTTWC, refTTWC):
+        if refTTWC > 0:
+            kpi = float(currTTWC) / float(refTTWC)
+            if kpi > 0:
+                self.kpi *= kpi
+            return self.percent(kpi)
+        else:
+            return "NaN%"
     def compare(self, test, referenceFile, currentFile):
         currPerf = int(performance.getTestPerformance(test, self.currentVersion))
         refPerf = int(performance.getTestPerformance(test, self.referenceVersion))
         referenceCosts = self.getCosts(referenceFile, "plan")
+        if len(referenceCosts) < 3 or refPerf == 0 or currPerf == 0:
+            return
+        
         currentCosts =  self.getCosts(currentFile, "plan")
         refRosterCosts = self.getCosts(referenceFile, "roster")
         currRosterCosts = self.getCosts(currentFile, "roster")
@@ -262,11 +273,9 @@ class MakeProgressReport(TestReport):
             currTTWC = self.timeToCost(currentFile, currPerf, currentCosts, referenceCosts[-1])
         else:
             refTTWC = self.timeToCost(referenceFile, refPerf, referenceCosts, currentCosts[-1])
-        kpi = float(currTTWC) / float(refTTWC)
         self.testCount += 1
-        self.kpi *= kpi
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
-        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.percent(kpi)
+        print os.linesep, "Comparison on", test.app, "test", test.name, "(in user " + userName + ") : K.P.I. = " + self.computeKPI(currTTWC, refTTWC)
         self.reportLine("                         ", self.currentText(), "Version " + self.referenceVersion)
         self.reportLine("Initial cost of plan     ", currentCosts[0], referenceCosts[0])
         self.reportLine("Initial cost of rosters  ", currRosterCosts[0], refRosterCosts[0])

@@ -225,7 +225,7 @@ class MakeResourceFiles(plugins.Action):
     def findExecutionMachine(self, line):
         start = string.find(line, "<")
         end = string.find(line, ">", start)
-        fullName = line[start + 1:end - 1]
+        fullName = line[start + 1:end]
         return string.split(fullName, ".")[0]
     def writeMemoryFile(self, memLine, swapLine, fileName):
         file = open(fileName, "w")

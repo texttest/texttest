@@ -9,6 +9,8 @@ class MatadorConfig(carmen.CarmenConfig):
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             return [ CalculateKPI(self.optionValue("kpi")) ]
+        if self.optionMap.has_key("rulecomp"):
+            return carmen.CarmenConfig.getActionSequence(self)
         
         libraryFile = os.path.join("data", "crc", "MATADOR", carmen.architecture, "matador.o")
         staticFilter = carmen.UpdatedStaticRulesetFilter(libraryFile)

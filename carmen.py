@@ -201,7 +201,12 @@ class CompileRules(plugins.Action):
                 shutil.copyfile(ruleset.precompiled, ruleset.targetFile)
             else:
                 compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-                commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + arch + " " + ruleset.sourceFile
+                # Fix to be able to run crc_compile for apc also on Carmen 8.
+                # crc_compile provides backward compability, so we can always have the '-'.
+                extra = ""
+                if test.app.name == "apc":
+                    extra = "-"
+                commandLine = compiler + " " + extra + self.raveName + " " + self.modeString + " -archs " + arch + " " + ruleset.sourceFile
                 errorMessage = self.performCompile(test, commandLine)
                 if errorMessage:
                     self.rulesCompileFailed.append(ruleset.name)

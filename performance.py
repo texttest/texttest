@@ -143,6 +143,11 @@ class PerformanceFileComparison(comparetest.FileComparison):
     def getSummary(self):
         type = self.getType()
         return str(int(self.calculatePercentageIncrease())) + "% " + type
+    def getDetails(self):
+        if self.hasDifferences():
+            return self.getSummary()
+        else:
+            return ""
     def _hasDifferences(self):
         configDescriptor = self.descriptors["config"]
         if configDescriptor == "cputime":

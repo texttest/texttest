@@ -97,10 +97,9 @@ class ApcConfig(optimization.OptimizationConfig):
             else:
                 return baseRunner
     def isExecutable(self, process, test):
-        # Process name starts with a dot, ends with the process ID in brackets and may be truncated or have
+        # Process name starts with a dot and may be truncated or have
         # extra junk at the end added by APCbatch.sh
-        openBracket = process.find("(")
-        processData = process[1:openBracket]
+        processData = process[1:]
         rulesetName = self.getRuleSetName(test)
         return processData.startswith(rulesetName) or rulesetName.startswith(processData)
     def getFileCollator(self):
@@ -466,8 +465,8 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         baseSubPlan = os.path.basename(subplanName)
         return os.path.join(self.getApcHostTmp(), baseSubPlan + "_" + processId)
     def performParallelAction(self, test, processInfo):
-        processName, processId = processInfo[0]
-        runProcessName, runProcessId = processInfo[-1]
+        processId, processName = processInfo[0]
+        runProcessId, runProcessName = processInfo[-1]
         apcTmpDir = self.getApcLogDir(test, processId)
         self.diag.info("APC log directory is " + apcTmpDir + " based on process " + processName)
         if not os.path.isdir(apcTmpDir):

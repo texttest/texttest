@@ -35,6 +35,7 @@ batchInfo = """
              at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
 import lsf, default, performance, os, string, shutil, plugins, respond, predict, time
+from ndict import seqdict
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -142,17 +143,13 @@ class RunWithParallelAction(plugins.Action):
         self.diag = plugins.getDiagnostics("Parallel Action")
     def __repr__(self):
         return repr(self.baseRunner)
-    def pstreeExists(self):
-        return os.system("which pstree > /dev/null 2>&1") == 0
     def __call__(self, test):
-        if not self.pstreeExists():
-            return self.baseRunner(test)
         processId = os.fork()
         if processId == 0:
             self.baseRunner(test)
             os._exit(0)
         else:
-            processInfo = self.findProcessInfo(str(processId), test)
+            processInfo = self.findProcessInfo(processId, test)
             self.performParallelAction(test, processInfo)
             os.waitpid(processId, 0)
     def findProcessInfo(self, firstpid, test):
@@ -163,34 +160,34 @@ class RunWithParallelAction(plugins.Action):
             else:
                 time.sleep(0.1)
     def _findProcessInfo(self, firstpid, test):
-        self.diag.info("Looking for info from process " + firstpid)
+        self.diag.info("Looking for info from process " + str(firstpid))
         # Look for the binary process, or a child of it, that is a pure executable not a script
-        pslines = os.popen("pstree -p -l " + firstpid + " 2>&1").readlines()
-        if len(pslines) == 0:
+        allProcesses = plugins.findAllProcesses(firstpid)
+        if len(allProcesses) == 0:
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
-        psline = pslines[0]
-        batchpos = psline.find(self.binaryName)
-        if batchpos == -1:
-            self.diag.info("Failed to find '" + self.binaryName + "' in '" + psline + "'")
+        self.diag.info("All processes " + repr(allProcesses))
+        processNameDict = self.getProcessNames(allProcesses)
+        if not self.binaryName in processNameDict.values():
+            self.diag.info("Failed to find '" + self.binaryName + "' in " + repr(processNameDict.values()))
             return
-        binaryWithChildren = psline[batchpos:].split('---')
-        if self.isExecutable(binaryWithChildren[-1], test):
-            self.diag.info("Chose process as executable : " + binaryWithChildren[-1])
-            return map(self.parseProcess, binaryWithChildren)
+        executableProcessName = processNameDict.values()[-1]
+        if self.isExecutable(executableProcessName, test):
+            self.diag.info("Chose process as executable : " + executableProcessName)
+            return processNameDict.items()[-2:]
         else:
-            self.diag.info("Rejected process as executable : " + binaryWithChildren[-1])
-    def parseProcess(self, process):
-        openBracket = process.find("(")
-        closeBracket = process.find(")")
-        processName = process[:openBracket]
-        processId = process[openBracket + 1:closeBracket]
-        return processName, processId
+            self.diag.info("Rejected process as executable : " + executableProcessName + " in " + repr(processNameDict))
+    def getProcessNames(self, allProcesses):
+        dict = seqdict()
+        for processId in allProcesses:
+            psline = os.popen("ps -l -p " + str(processId)).readlines()[-1]
+            dict[str(processId)] = psline.split()[-1]
+        return dict        
     def setUpApplication(self, app):
         self.binaryName = os.path.basename(app.getConfigValue("binary"))
                 
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, processInfo):
-        processName, processId = processInfo[-1]
+        processId, processName = processInfo[-1]
         self.describe(test, ", profiling process '" + processName + "'")
         runLine = "/users/lennart/bin/gprofile " + processId + " >& gprof.output"
         os.system(runLine)

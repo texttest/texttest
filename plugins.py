@@ -260,7 +260,7 @@ class BackgroundProcess:
             return 1
         if not self._hasTerminated(self.processId):
             return 0
-        for process in self.findAllProcesses(self.processId):
+        for process in findAllProcesses(self.processId):
             if process != self.processId and not self._hasTerminated(process):
                 return 0
         return 1
@@ -277,13 +277,13 @@ class BackgroundProcess:
     def waitForTermination(self):
         if self.processId == None:
             return
-        for process in self.findAllProcesses(self.processId):
+        for process in findAllProcesses(self.processId):
             try:
                 os.waitpid(process, 0)
             except OSError:
                 pass
     def kill(self):
-        processes = self.findAllProcesses(self.processId)
+        processes = findAllProcesses(self.processId)
         # Just kill the deepest child process, that seems to work best...
         self.tryKillProcess(processes[-1])
     def tryKillProcess(self, process):
@@ -304,14 +304,19 @@ class BackgroundProcess:
             if self._hasTerminatedNotChild(process):
                 return 1
         return 0
-    def findAllProcesses(self, pid):
-        processes = []
-        processes.append(pid)
-        for line in os.popen("ps -efl | grep " + str(pid)).xreadlines():
-            entries = line.split()
-            if entries[4] == str(pid):
-                processes += self.findAllProcesses(int(entries[3]))
-        return processes
+
+# Find child processes. Note that this concept doesn't really exist on Windows, so we just return the process
+def findAllProcesses(pid):
+    if os.name != "posix":
+        return [ pid ]
+    processes = []
+    for line in os.popen("ps -efl | grep " + str(pid)).xreadlines():
+        entries = line.split()
+        if entries[3] == str(pid):
+            processes.insert(0, pid)
+        if entries[4] == str(pid):
+            processes += findAllProcesses(int(entries[3]))
+    return processes
 
 class Option:    
     def __init__(self, name, value):

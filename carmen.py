@@ -581,7 +581,10 @@ class BuildCode(plugins.Action):
         signal.signal(1, self.killBuild)
         signal.signal(2, self.killBuild)
         signal.signal(15, self.killBuild) 
-        for relPath in app.getConfigList("build_codebase"):
+        targetDir = app.getConfigValue("build_targets")
+        if not targetDir.has_key("codebase"):
+            return
+        for relPath in targetDir["codebase"]:
             absPath = app.makeAbsPath(relPath)
             if os.path.isdir(absPath):    
                 commandLine = "cd " + absPath + "; gmake >& build." + arch

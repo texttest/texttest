@@ -286,7 +286,10 @@ class BackgroundProcess:
     def kill(self):
         processes = findAllProcesses(self.processId)
         # Just kill the deepest child process, that seems to work best...
-        self.tryKillProcess(processes[-1])
+        if len(processes) > 0:
+            self.tryKillProcess(processes[-1])
+        else:
+            print "All child processes under", self.processId, "terminated, could not kill"
     def tryKillProcess(self, process):
         if self.tryKillProcessWithSignal(process, signal.SIGINT):
             return

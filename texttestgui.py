@@ -221,9 +221,13 @@ class TextTestGUI:
             return gtk.TRUE    
     def testChanged(self, test, state, byAction):
         if test.classId() == "test-case":
-            self.redrawTest(test, state)
-            if byAction:
-                test.stateChangeEvent(state)
+            if test.waitingForProcess():
+                # Working around python bug 853411: main thread must do all forking
+                test.stateDetails.doFork()
+            else:
+                self.redrawTest(test, state)
+                if byAction:
+                    test.stateChangeEvent(state)
         else:
             self.redrawSuite(test)
         if self.rightWindowGUI and self.rightWindowGUI.test == test:
@@ -258,7 +262,7 @@ class TextTestGUI:
         # Don't leak processes
         for process in guiplugins.InteractiveAction.processes:
             if not process.hasTerminated():
-                guilog.info("Killing '" + process.program + "' interactive process")
+                guilog.info("Killing '" + repr(process) + "' interactive process")
                 process.kill()
     def saveAll(self, *args):
         saveTestAction = self.rightWindowGUI.getSaveTestAction()

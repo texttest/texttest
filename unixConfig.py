@@ -10,6 +10,7 @@ The default behaviour is to run all tests locally.
 """
 
 import default, batch, respond, performance, predict, os, shutil, plugins, string, time
+from threading import currentThread
 
 def getConfig(optionMap):
     return UNIXConfig(optionMap)
@@ -98,6 +99,12 @@ class RunTest(default.RunTest):
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
         self.process = plugins.BackgroundProcess(testCommand, testRun=1)
+        # Workaround for python bug 853411: tell main thread to start the process
+        # if we aren't it...
+        if currentThread().getName() == "MainThread":
+            self.process.doFork()
+        else:
+            test.changeState(test.state, self.process)
         self.process.waitForStart()
         return self.RETRY
     def getExecuteCommand(self, test):
@@ -263,9 +270,6 @@ class CollateUNIXFiles(default.CollateFiles):
         for line in open(stderrFile).xreadlines():
             writeFile.write(line)
     def extract(self, sourcePath, targetFile):
-        if self.isCoreFile(targetFile):
-            # Try to avoid race conditions extracting core files
-            time.sleep(2)
         # Renaming links is fairly dangerous, if they point at relative paths. Copy these.
         if os.path.islink(sourcePath):
             shutil.copyfile(sourcePath, targetFile)

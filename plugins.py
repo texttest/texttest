@@ -136,30 +136,39 @@ class NonPythonAction(Action):
 class BackgroundProcess:
     fakeProcesses = os.environ.has_key("TEXTTEST_NO_SPAWN")
     def __init__(self, commandLine, testRun=0):
-        self.program = commandLine.split()[0].lstrip()
-        self.testRun = testRun
-        if self.testRun or not self.fakeProcesses:
-            processId = os.fork()
-            if processId == 0:
-                os.system(commandLine)
-                os._exit(0)
+        self.commandLine = commandLine
+        self.processId = None
+        if not testRun:
+            if not self.fakeProcesses:
+                self.doFork()
             else:
-                self.processId = processId
+                # When running self tests, we don't have time to start external programs and stop them
+                # again, so we provide an environment variable to fake them all
+                print "Faking start of external progam: '" + commandLine + "'"
+    def __repr__(self):
+        return self.commandLine.split()[0].lstrip()
+    def doFork(self):
+        processId = os.fork()
+        if processId == 0:
+            os.system(self.commandLine)
+            os._exit(0)
         else:
-            # When running self tests, we don't have time to start external programs and stop them
-            # again, so we provide an environment variable to fake them all
-            print "Faking start of external progam: '" + commandLine + "'"
-            self.processId = None
+            self.processId = processId
     def waitForStart(self):
-        processes = self.findAllProcesses(self.processId)
-        if len(processes) > 0:
-            return
-        self.waitForStart()
+        while self.processId == None:
+            time.sleep(0.1)
     def hasTerminated(self):
         if self.processId == None:
             return 1
+        if not self._hasTerminated(self.processId):
+            return 0
+        for process in self.findAllProcesses(self.processId):
+            if process != self.processId and not self._hasTerminated(process):
+                return 0
+        return 1
+    def _hasTerminated(self, processId):
         try:
-            procId, status = os.waitpid(self.processId, os.WNOHANG)
+            procId, status = os.waitpid(processId, os.WNOHANG)
             return procId > 0 or status > 0
         except OSError:
             return 1
@@ -172,10 +181,7 @@ class BackgroundProcess:
             except OSError:
                 pass
     def kill(self):
-        if self.testRun:
-            self.killWithSignal(signal.SIGKILL)
-        else:
-            self.killWithSignal(signal.SIGTERM)
+        self.killWithSignal(signal.SIGTERM)
     def killWithSignal(self, killSignal):
         for process in self.findAllProcesses(self.processId):
             try:

@@ -197,6 +197,8 @@ class TestCase(Test):
         if os.path.isdir(self.writeDirs[0]):
             os.chdir(self.writeDirs[0])
         return action(self)
+    def waitingForProcess(self):
+        return isinstance(self.stateDetails, plugins.BackgroundProcess)
     def changeState(self, state, details = ""):
         # Once we've left the pathway, we can't return...
         if self.state == self.UNRUNNABLE or self.state == self.KILLED:
@@ -204,14 +206,14 @@ class TestCase(Test):
         oldState = self.state
         self.state = state
         self.stateDetails = details
-        if state != oldState:
+        if state != oldState or self.waitingForProcess():
             self.notifyChanged()
             # Tests changing state are reckoned to be significant enough to wait for...
             try:
                 self.stateChangeEvent(state, oldState)
             except UseCaseScriptError:
                 # This will be raised if we're in a subthread, i.e. if the GUI is running
-                # Rely on the GUI to report the same event.
+                # Rely on the GUI to report the same event
                 pass
     def stateChangeEvent(self, state, oldState = None):
         if oldState and oldState == self.FAILED:
@@ -773,6 +775,8 @@ class Application:
         value = self.configDir[key]
         if type(value) == types.StringType:
             return os.path.expandvars(value)
+        elif type(value) == types.ListType:
+            return map(os.path.expandvars, value)
         else:
             return value
     def addConfigEntry(self, key, value, sectionName = ""):

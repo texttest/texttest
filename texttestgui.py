@@ -2,10 +2,114 @@
 
 # GUI for TextTest written with PyGTK
 
-import plugins, gtk, gobject, os, string
+import plugins, gtk, gobject, os, string, time, sys
+
+class ActivateEvent:
+    def __init__(self, widget):
+        self.widget = widget
+    def generate(self, argumentString):
+        self.widget.set_active(gtk.TRUE)
+        return 1
+
+class EntryEvent:
+    def __init__(self, widget):
+        self.widget = widget
+    def generate(self, argumentString):
+        self.widget.set_text(argumentString)
+        return 1
+        
+class SignalEvent:
+    def __init__(self, signalName, widget):
+        self.signalName = signalName
+        self.widget = widget
+    def generate(self, argumentString):
+        self.widget.emit(self.signalName, *argumentString)
+        return 1
+
+class TreeViewSignalEvent(SignalEvent):
+    def __init__(self, signalName, widget, argumentParseData):
+        SignalEvent.__init__(self, signalName, widget)
+        self.column, self.valueId = argumentParseData
+        self.model = widget.get_model()
+    def generate(self, argumentString):
+        arguments = argumentString.split(" ")
+        rowText = arguments[0]
+        path = self.findTreePath(self.model.get_iter_root(), rowText)
+        if not path:
+            print "Could not find row '" + rowText + "' in Tree View"
+            return 0
+        userArgs = argumentString.replace(rowText, "").strip()
+        self.widget.emit(self.signalName, path, self.column, *userArgs)
+        return 1
+    def pathHasText(self, iter, argumentText):
+        return self.model.get_value(iter, self.valueId) == argumentText
+    def findTreePath(self, iter, argumentText):
+        if self.pathHasText(iter, argumentText):
+            return self.model.get_path(iter)
+        childIter = self.model.iter_children(iter)
+        if childIter:
+            childPath = self.findTreePath(childIter, argumentText)
+            if childPath:
+                return childPath
+        nextIter = self.model.iter_next(iter)
+        if nextIter:
+            return self.findTreePath(nextIter, argumentText)
+        return None
+
+class EventHandler:
+    def __init__(self):
+        self.events = {}
+    def connect(self, eventName, signalName, widget, method, argumentParseData = None, *data):
+        stdName = self.standardName(eventName)
+        self.events[stdName] = self.createSignalEvent(signalName, widget, argumentParseData)
+        widget.connect(signalName, method, *data)
+    def createSignalEvent(self, signalName, widget, argumentParseData):
+        if isinstance(widget, gtk.TreeView):
+            return TreeViewSignalEvent(signalName, widget, argumentParseData)
+        else:
+            return SignalEvent(signalName, widget)
+    def standardName(self, name):
+        firstIndex = None
+        lastIndex = len(name)
+        for i in range(len(name)):
+            if name[i] in string.letters or name[i] in string.digits:
+                if firstIndex is None:
+                    firstIndex = i
+                lastIndex = i
+        return name[firstIndex:lastIndex + 1].lower()
+    def generateEvent(self, scriptCommand):
+        eventName = self.findEvent(scriptCommand)
+        if not eventName:
+            raise plugins.TextTestError, "Could not parse script command '" + scriptCommand + "'"
+        argumentString = scriptCommand.replace(eventName, "").strip()
+        print "'" + eventName + "' event created with arguments '" + argumentString + "'"
+        event = self.events[eventName]
+        return event.generate(argumentString)
+    def createEntry(self, description):
+        entry = gtk.Entry()
+        stateChangeName = "enter " + self.standardName(description) + " ="
+        self.events[stateChangeName] = EntryEvent(entry)
+        return entry
+    def createCheckButton(self, description):
+        button = gtk.CheckButton(description)
+        stateChangeName = "check " + self.standardName(description)
+        self.events[stateChangeName] = ActivateEvent(button)
+        return button
+    def findEvent(self, command):
+        for eventName in self.events.keys():
+            if command.startswith(eventName):
+                return eventName
+        return None
+            
+eventHandler = EventHandler()
 
 class TextTestGUI:
-    def __init__(self):
+    def __init__(self, scriptName):
+        self.scriptCommands = []
+        self.scriptPointer = 0
+        if scriptName:
+            self.scriptCommands = map(string.strip, open(scriptName).readlines())
+        self.scriptName = scriptName
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.instructions = []
         self.postponedInstructions = []
@@ -16,7 +120,7 @@ class TextTestGUI:
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
         win.set_title("TextTest functional tests")
-        win.connect("delete_event", self.quit)
+        eventHandler.connect("close", "delete_event", win, self.quit)
         vbox = self.createWindowContents()
         win.add(vbox)
         win.show()
@@ -88,7 +192,7 @@ class TextTestGUI:
         column = gtk.TreeViewColumn("All Tests", renderer, text=0, background=1)
         view.append_column(column)
         view.expand_all()
-        view.connect("row_activated", self.viewTest)
+        eventHandler.connect("select test", "row_activated", view, self.viewTest, (column, 0))
         view.show()
 
         # Create scrollbars around the view.
@@ -104,7 +208,9 @@ class TextTestGUI:
         self.testCaseGUI = TestCaseGUI(None)
         topWindow = self.createTopWindow()
         # Run the Gtk+ main loop.
-        idle_handler_id = gtk.idle_add(self.doNextAction)
+        if len(self.scriptCommands):
+            gtk.idle_add(self.runScriptCommands)
+        gtk.idle_add(self.doNextAction)
         gtk.main()
     def doNextAction(self):
         if len(self.instructions) == 0:
@@ -129,11 +235,25 @@ class TextTestGUI:
                 self.model.set_value(iter, 1, self.getTestColour(test))
                 self.model.row_changed(self.model.get_path(iter), iter)
         return gtk.TRUE
+    def runScriptCommands(self):
+        if self.scriptPointer >= len(self.scriptCommands):
+            return gtk.FALSE
+        nextCommand = self.scriptCommands[self.scriptPointer]
+        try:
+            if eventHandler.generateEvent(nextCommand):
+                self.scriptPointer += 1
+            elif self.scriptPointer > 0:
+                self.scriptPointer -= 1
+        except:
+            print "Script terminated due to exception : "
+            type, value, traceback = sys.exc_info()
+            sys.excepthook(type, value, traceback)
+            return gtk.FALSE
+        return gtk.TRUE
     def quit(self, *args):
         gtk.main_quit()
-    def viewTest(self, view, start_editing, *args):
-        model, iter = view.get_selection().get_selected()
-        test = self.model.get_value(iter, 2)
+    def viewTest(self, view, path, column, *args):
+        test = self.model.get_value(self.model.get_iter(path), 2)
         print "Viewing test", test
         self.contents.remove(self.testCaseGUI.getWindow())
         self.testCaseGUI = TestCaseGUI(test, self.interactiveActions)
@@ -144,7 +264,7 @@ class TextTestGUI:
         for label, func in list:
             button = gtk.Button()
             button.set_label(label)
-            button.connect("clicked", func)
+            eventHandler.connect(label, "clicked", button, func)
             button.show()
             buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
         buttonbox.show()
@@ -170,7 +290,7 @@ class TestCaseGUI:
         self.model.set_value(newiter, 0, "New Files")
         if not test:
             return
-        if test.state == test.FAILED or test.state == test.SUCCEEDED:
+        try:
             os.chdir(test.abspath)
             testComparison = test.stateDetails
             for name in testComparison.attemptedComparisons:
@@ -181,6 +301,8 @@ class TestCaseGUI:
                     self.addComparison(compiter, name, fileComparison, "red")
             for fc in testComparison.newResults:
                 self.addComparison(newiter, fc.stdFile, fc, "red")
+        except AttributeError:
+            pass
     def addComparison(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         self.model.set_value(fciter, 0, name)
@@ -209,7 +331,7 @@ class TestCaseGUI:
         column = gtk.TreeViewColumn(title, renderer, text=0, background=1)
         view.append_column(column)
         view.expand_all()
-        view.connect("row_activated", self.displayDifferences)
+        eventHandler.connect("select file", "row_activated", view, self.displayDifferences, (column, 0))
         view.show()
         return view
     def createTextView(self, test):
@@ -225,8 +347,11 @@ class TestCaseGUI:
         if test.state == test.UNRUNNABLE:
             return str(test.stateDetails).split(os.linesep)[0]
         elif test.state == test.FAILED:
-            if test.stateDetails.failedPrediction:
-                return test.stateDetails.failedPrediction
+            try:
+                if test.stateDetails.failedPrediction:
+                    return test.stateDetails.failedPrediction
+            except AttributeError:
+                return test.stateDetails
         elif test.state != test.SUCCEEDED and test.stateDetails:
             return test.stateDetails
         return ""
@@ -236,10 +361,9 @@ class TestCaseGUI:
         if not test:
             return "Test-case info"
         return repr(test).replace("_", "__")
-    def displayDifferences(self, view, enabled, *args):
+    def displayDifferences(self, view, path, column, *args):
         os.chdir(self.test.abspath)
-        model, iter = view.get_selection().get_selected()
-        comparison = self.model.get_value(iter, 2)
+        comparison = self.model.get_value(self.model.get_iter(path), 2)
         if comparison:
             if comparison.newResult():
                 os.system("xemacs " + comparison.tmpCmpFile + " &")
@@ -267,8 +391,11 @@ class TestCaseGUI:
     def makeRadioButtons(self, test):
         if not test or test.state != test.FAILED:
             return None
-        comparisonList = test.stateDetails.getComparisons()
-        if not self.hasPerformance(comparisonList):
+        try:
+            comparisonList = test.stateDetails.getComparisons()
+            if not self.hasPerformance(comparisonList):
+                return None
+        except AttributeError:
             return None
         buttonbox = gtk.HBox()
         averageButton = gtk.RadioButton(None)
@@ -286,7 +413,7 @@ class TestCaseGUI:
     def addButton(self, method, buttonbox, label, option):
         button = gtk.Button()
         button.set_label(label)
-        button.connect("clicked", method, option)
+        eventHandler.connect(label, "clicked", button, method, None, option)
         button.show()
         buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
     def getSaveExactness(self):
@@ -325,7 +452,7 @@ class OptionChooser:
         for key, description in action.getArgumentOptions().items():
             hbox = gtk.HBox()
             label = gtk.Label(description + "  ")
-            entry = gtk.Entry()
+            entry = eventHandler.createEntry(description)
             hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
             hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)
             label.show()
@@ -334,7 +461,7 @@ class OptionChooser:
             self.entries.append((entry, key))
             vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
         for key, description in action.getSwitches().items():
-            checkButton = gtk.CheckButton(description)
+            checkButton = eventHandler.createCheckButton(description)
             checkButton.show()
             self.checkButtons.append((checkButton, key))
             vbox.pack_start(checkButton, expand=gtk.FALSE, fill=gtk.FALSE)

@@ -559,8 +559,18 @@ class OptionFinder:
             return 1
     def helpMode(self):
         return self.inputOptions.has_key("help")
-    def useGui(self):
-        return self.inputOptions.has_key("g")
+    def guiSettings(self):
+        if self.inputOptions.has_key("g"):
+            scriptFile = self.inputOptions["g"]
+            if len(scriptFile):
+                if os.path.isfile(scriptFile):
+                    return 1, os.path.join(os.getcwd(), scriptFile)
+                else:
+                    return 1, os.path.join(self.directoryName(), scriptFile)
+            else:
+                return 1, None
+        else:
+            return 0, None
     def _getDiagnosticFile(self):
         if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
@@ -752,13 +762,14 @@ class TextTest:
     def __init__(self):
         self.inputOptions = OptionFinder()
         global globalRunIdentifier
+        useGui, guiScript = self.inputOptions.guiSettings()
         globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
         self.allApps = self.inputOptions.findApps()
         self.gui = None
-        if self.inputOptions.useGui():
+        if useGui:
             try:
                 import texttestgui
-                self.gui = texttestgui.TextTestGUI()
+                self.gui = texttestgui.TextTestGUI(guiScript)
             except:
                 print "Cannot use GUI: caught exception:"
                 printException()

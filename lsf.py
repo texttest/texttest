@@ -182,9 +182,8 @@ class LSFJob:
                     pid = apcj[1].split('(')[-1].split(')')[0]
                     return pid
         return []
-    def getProcessId2(self):
+    def getProcessId(self):
         for line in self.getFile("-l").xreadlines():
-            print line
             pos = line.find("PIDs")
             if pos != -1:
                 pids = line[pos + 6:].strip().split(' ')
@@ -194,7 +193,9 @@ class LSFJob:
                 if len(pids) == 1:
                     return self.getProcessIdWithoutLSF(pids[0])
         return []
-    def getProcessId(self):
+    # This "version" of getProcessId works even when LSF bjobs
+    # doesn't give any starting PID.
+    def getProcessId2(self):
         std = os.popen("bhist -l -J " + self.name + " 2>&1")
         for line in std.xreadlines():
             pos = line.find("Starting")

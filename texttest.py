@@ -1008,42 +1008,46 @@ class TestRunner:
             self.actionSequence.append(action)
     def interrupt(self):
         self.interrupted = 1
+    def handleExceptions(self, method, *args):
+        try:
+            return method(*args)
+        except plugins.TextTestError, e:
+            self.test.changeState(self.test.UNRUNNABLE, e)
+        except KeyboardInterrupt:
+            raise sys.exc_type, sys.exc_info
+        except:
+            print "WARNING : caught exception while running", self.test, "changing state to UNRUNNABLE :"
+            printException()
+            self.test.changeState(self.test.UNRUNNABLE, str(sys.exc_type) + ": " + str(sys.exc_value))
     def performActions(self, previousTestRunner, runToCompletion):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
         for suite in tearDownSuites:
-            previousTestRunner.appRunner.tearDownSuite(suite)
+            self.handleExceptions(previousTestRunner.appRunner.tearDownSuite, suite)
         for suite in setUpSuites:
             suite.setUpEnvironment()
         while len(self.actionSequence):
+            action = self.actionSequence[0]
+            self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
+            for suite in setUpSuites:
+                self.handleExceptions(self.appRunner.setUpSuite, action, suite)
+            completed = self.performAction(action, runToCompletion)
+            self.diag.info("<-End Performing action " + str(action) + " returned " + str(completed))
+            if completed:
+                self.actionSequence.pop(0)
+            else:
+                return 0
+        return 1
+    def performAction(self, action, runToCompletion):
+        while 1:
             if self.interrupted:
                 raise KeyboardInterrupt, "Interrupted externally"
-            action = self.actionSequence[0]
-            retValue = None
-            try:
-                self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
-                for suite in setUpSuites:
-                    self.appRunner.setUpSuite(action, suite)
-                retValue = self.test.performAction(action)
-                self.diag.info("<-End Performing action " + str(action) + " returned " + str(retValue))
-            except plugins.TextTestError, e:
-                self.test.changeState(self.test.UNRUNNABLE, e)
-            except KeyboardInterrupt:
-                raise sys.exc_type, sys.exc_info
-            except:
-                print "WARNING : caught exception while running", self.test, "changing state to UNRUNNABLE :"
-                printException()
-                self.test.changeState(self.test.UNRUNNABLE, sys.exc_value)
-            if retValue == "retry":
-                # Don't busy-wait
-                time.sleep(0.1)
-            elif retValue == "wait":
-                if not runToCompletion:
-                    return 0
-                # Don't busy-wait
-                time.sleep(0.1)
-            else:
-                self.actionSequence.pop(0)
-        return 1
+            retValue = self.handleExceptions(self.test.performAction, action)
+            if retValue != "wait" and retValue != "retry":
+                return 1
+            if retValue == "wait" and not runToCompletion:
+                return 0
+            # Don't busy-wait
+            time.sleep(0.1)
     def performCleanUpActions(self):
         for action in self.appRunner.cleanupSequence:
             self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.test))
@@ -1112,7 +1116,13 @@ class ApplicationRunner:
         self.testSuite.setUpEnvironment()
         for action in sequence:
             self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.testSuite.app))
-            action.setUpApplication(self.testSuite.app)
+            try:
+                action.setUpApplication(self.testSuite.app)
+            except KeyboardInterrupt:
+                raise sys.exc_type, sys.exc_value
+            except:
+                printException()
+                raise BadConfigError, str(sys.exc_type) + ": " + str(sys.exc_value)
         self.testSuite.tearDownEnvironment()
     def setUpSuite(self, action, suite):
         self.diag.info(str(action) + " set up " + repr(suite))
@@ -1146,6 +1156,7 @@ class ActionRunner:
             testRunner = TestRunner(test, actionSequence, appRunner, self.diag)
             self.testQueue.append(testRunner)
             self.allTests.append(testRunner)
+        appRunner.startRun()
     def hasTests(self):
         return len(self.allTests) > 0
     def runCleanup(self):
@@ -1155,8 +1166,6 @@ class ActionRunner:
         for appRunner in self.appRunners:
             appRunner.performCleanup()
     def run(self):
-        for appRunner in self.appRunners:
-            appRunner.startRun()
         while len(self.testQueue):
             if self.interrupted:
                 raise KeyboardInterrupt, "Interrupted externally"

@@ -18,6 +18,9 @@ helpOptions = """-rundebug <options>
              The following options are avaliable:
              - xemacs
                The debugger is run in xemacs, in gdbsrc mode.
+             - norun
+               The debugger is started, but the test is not run, useful if breakpoints
+               etc are to be set before the run is started.
              - nolog
                The log file is not displayed.
 
@@ -218,6 +221,7 @@ class RunApcTestInDebugger(default.RunTest):
         self.inXEmacs = None
         self.runPlain = None
         self.showLogFile = 1
+        self.noRun = None
         self.keepTmps = keepTmpFiles;
         opts = options.split(" ")
         if opts[0] == "":
@@ -229,6 +233,8 @@ class RunApcTestInDebugger(default.RunTest):
                 self.showLogFile = None
             elif opt == "plain":
                 self.runPlain = 1
+            elif opt == "norun":
+                self.noRun = 1
             else:
                 print "Ignoring unknown option " + opt
     def __repr__(self):
@@ -253,13 +259,14 @@ class RunApcTestInDebugger(default.RunTest):
         gdbArgsFile = open(gdbArgs, "w")
         gdbArgsFile.write("set pagination off" + os.linesep)
         gdbArgsFile.write("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep)
-        gdbArgsFile.write("run" + os.linesep)
-        gdbArgsFile.write("if $_exitcode" + os.linesep)
-        gdbArgsFile.write("print fflush(0)" + os.linesep)
-        gdbArgsFile.write("where" + os.linesep)
-        gdbArgsFile.write("else" + os.linesep)
-        gdbArgsFile.write("quit" + os.linesep)
-        gdbArgsFile.write("end" + os.linesep)
+        if not self.noRun:
+            gdbArgsFile.write("run" + os.linesep)
+            gdbArgsFile.write("if $_exitcode" + os.linesep)
+            gdbArgsFile.write("print fflush(0)" + os.linesep)
+            gdbArgsFile.write("where" + os.linesep)
+            gdbArgsFile.write("else" + os.linesep)
+            gdbArgsFile.write("quit" + os.linesep)
+            gdbArgsFile.write("end" + os.linesep)
         gdbArgsFile.close()
         # Create an output file. This file is read by LogFileFinder if we use PlotTest.
         out = test.makeFileName("output", temporary=1)

@@ -48,8 +48,6 @@ class MpsSolverConfig(carmen.CarmenConfig):
         if self.optionMap.has_key("feasstat"):
             return [ FeasibilityStatisticsBuilder(self.optionValue("feasstat")) ]
         return carmen.CarmenConfig.getActionSequence(self)
-    def checkMemory(self):
-        return 1
     def getTestComparator(self):
         return MakeComparisons(self.optionMap.has_key("n"))
     def getQueuePerformancePrefix(self, test, arch):

@@ -63,7 +63,10 @@ class OptimizationConfig(carmen.CarmenConfig):
         return "k:" + carmen.CarmenConfig.getOptionString(self)
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
-	    listKPIs = [KPI.cSimpleRosteringOptTimeKPI, KPI.cFullRosteringOptTimeKPI, KPI.cWorstBestRosteringOptTimeKPI]
+	    listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
+			KPI.cFullRosteringOptTimeKPI,
+			KPI.cWorstBestRosteringOptTimeKPI,
+			KPI.cRosteringQualityKPI]
             return [ CalculateKPIs(self.optionValue("kpi"), listKPIs) ]
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
@@ -537,18 +540,19 @@ class CalculateKPIs(TestReport):
             print os.linesep, "No KPI tests were found with respect to version " + self.referenceVersion
     def __repr__(self):
         return "KPI calc. for"
-    def compare(self, test, referenceFile, currentFile):
+    def compare(self, test, referenceRun, currentRun):
+	referenceFile = referenceRun.logFile
+	currentFile = currentRun.logFile
         floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion)
         floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion)
 	#print 'ref: %f, now: %f' %(floatRefPerfScale, floatNowPerfScale)
+	#print 'Ref : ' + referenceFile
+	#print 'Curr: ' + currentFile
         if currentFile != referenceFile:
 	    aKPI = None
 	    listKPIs = []
 	    for aKPIConstant in self.listKPIs:
-		if floatRefPerfScale > 0.0 and floatNowPerfScale > 0.0:
-		    aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile, floatRefPerfScale, floatNowPerfScale)
-		else:
-		    aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile)
+		aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile, floatRefPerfScale, floatNowPerfScale)
 		self.KPIHandler.addKPI(aKPI)
 		listKPIs.append(aKPI.getTextKPI())
             self.describe(test, ' vs ver. %s, (%d sol. KPIs: %s)' %(self.referenceVersion, aKPI.getNofSolutions(), ', '.join(listKPIs)))

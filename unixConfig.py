@@ -178,7 +178,7 @@ class VirtualDisplayFinder:
                 return display
             if display != None:
                 self.killServer(machine)
-        for machine in virtualDisplayMachines:
+        for machine in self.machines:
             display = self.startServer(machine)
             if display and display != "":
                 return display

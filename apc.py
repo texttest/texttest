@@ -218,14 +218,6 @@ class ViewApcLog(guiplugins.InteractiveAction):
         return
     def getTitle(self):
         return "View APC Log"
-    def getArgumentOptions(self):
-        options = {}
-        return options
-    def getSwitches(self):
-        switches = {}
-        #switches["lf"] = "APC log file"
-        #switches["st"] = "APC status file"
-        return switches
 
 guiplugins.interactiveActionHandler.testClasses.append(ViewApcLog)
 

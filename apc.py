@@ -620,7 +620,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
         if self.spreadKPICount > 0:
             avg = math.pow(self.spreadKPI, 1.0 / float(self.spreadKPICount))
             qNumber = round(avg,5) * 100.0
-            wText = "PUT_A_CODE_HERE (spread at end) with respect to version"
+            wText = "PV1 (spread at end) with respect to version"
             print wText, self.referenceVersion, "=", str(qNumber) + "%"
         optimization.MakeProgressReport.__del__(self)
         if len(self.weightKPI) > 1:

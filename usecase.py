@@ -164,7 +164,7 @@ class ReplayScript:
         if self.logger:
             try:
                 self.logger.info(line)
-            except OSError:
+            except IOError:
                 # Can get interrupted system call here as it tries to close the file
                 # This isn't worth crashing over!
                 pass

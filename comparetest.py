@@ -272,7 +272,8 @@ class RunDependentTextFilter:
                 os.remove(newFileName)
             else:
                 return newFileName
-        
+
+        self.resetFilters()
         newFile = open(newFileName, "w")
         lineNumber = 0
         for line in open(fileName).xreadlines():
@@ -283,6 +284,11 @@ class RunDependentTextFilter:
         self.writeUnorderedText(newFile)
         self.diag.info("Filter for " + fileName + " returned " + newFileName)
         return newFileName
+    def resetFilters(self):
+        for filter in self.contentFilters:
+            filter.reset()
+        for filter in self.orderFilters.keys():
+            filter.reset()
     def getFilteredLine(self, line, lineNumber):
         for contentFilter in self.contentFilters:
             changed, filteredLine = contentFilter.applyTo(line, lineNumber)
@@ -330,6 +336,8 @@ class LineFilter:
             self.trigger = TextTrigger(self.trigger)
         if self.untrigger:
             self.untrigger = TextTrigger(self.untrigger)
+    def reset(self):
+        self.autoRemove = 0
     def readSyntax(self, syntaxString, beforeText, afterText):
         if syntaxString == "{WORD ":
             self.trigger = beforeText

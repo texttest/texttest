@@ -196,7 +196,6 @@ class ReconnectTest(plugins.Action):
         return 1
     def __call__(self, test):
         translateUser = 0
-        okFlag = 1
         if self.fetchDir == None or not os.path.isdir(self.fetchDir):
             testDir = test.abspath
         else:
@@ -212,31 +211,25 @@ class ReconnectTest(plugins.Action):
             pattern += test.getTestUser()
         rexp = re.compile(pattern + "[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$")
         stemsFound = []
-        multiStems = []
+        mtimeForStem = {}
         for file in os.listdir(testDir):
             if rexp.search(file, 1) or self.newResult(test, file):
                 srcFile = os.path.join(testDir, file)
+                mTime = os.path.getmtime(srcFile)
                 stem = file.split(".")[0]
                 targetFile = stem + "." + test.app.name + test.app.versionSuffix() + test.getTmpExtension()
                 if stem in stemsFound:
-                    okFlag = 0
-                    if not stem in multiStems:
-                        multiStems.append(stem)
-                    try:
-                        os.remove(os.path.join(test.abspath, targetFile))
-                    except:
-                        pass
+                    mTimeOld = mtimeForStem[stem]
+                    if mTimeOld > mTime:
+                        continue
                 else:
-                    if translateUser == 1:
-                        targetFile = test.getTmpFileName(stem, "w")
-                    targetFile = os.path.join(test.abspath, targetFile)
-                    if srcFile != targetFile:
-                        shutil.copyfile(srcFile, targetFile)
-                stemsFound.append(stem)
-        if okFlag:
-            self.describe(test)
-        else:
-            self.describe(test, ", failed for multiple: " + string.join(multiStems, ",") + " files")
-
+                    stemsFound.append(stem)
+                mtimeForStem[stem] = mTime
+                if translateUser == 1:
+                    targetFile = test.getTmpFileName(stem, "w")
+                targetFile = os.path.join(test.abspath, targetFile)
+                if srcFile != targetFile:
+                    shutil.copyfile(srcFile, targetFile)
+        self.describe(test)
     def setUpSuite(self, suite):
         self.describe(suite)

@@ -4,7 +4,7 @@ import os, string, signal, sys, default, unixConfig, performance, respond, batch
 from Queue import Queue, Empty
 from threading import Thread
 from time import sleep
-from copy import deepcopy
+from copy import copy, deepcopy
 
 # Text only relevant to using the LSF configuration directly
 helpDescription = """
@@ -462,9 +462,11 @@ class UpdateLSFStatus(plugins.Action):
         job = LSFServer.instance.findJob(test, self.jobNameFunction)
         if job.errorMessage:
             raise plugins.TextTestError, "Failed to submit to LSF (" + job.errorMessage.strip() + ")"
-        self.diag.info("Job " + job.jobId + " in state " + job.status + " for test " + test.name)
-        exitStatus = self.processStatus(test, job.status, job.machines)
-        if job.status == "DONE" or job.status == "EXIT":
+        # Take a copy of the job status as it can be updated during this time by the LSF thread
+        jobStatus = copy(job.status)
+        self.diag.info("Job " + job.jobId + " in state " + jobStatus + " for test " + test.name)
+        exitStatus = self.processStatus(test, jobStatus, job.machines)
+        if jobStatus == "DONE" or jobStatus == "EXIT":
             return exitStatus
 
         global emergencyFinish

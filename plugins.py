@@ -137,7 +137,10 @@ class TextTrigger:
         self.text = text
         self.regex = None
         if self.specialChars.search(text) != None:
-            self.regex = re.compile(text)
+            try:
+                self.regex = re.compile(text)
+            except:
+                pass
     def matches(self, line):
         if self.regex:
             return self.regex.search(line)

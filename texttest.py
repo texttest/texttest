@@ -301,16 +301,22 @@ class TestCase(Test):
             return self.copyTestPath(fullPath, target)
         if os.path.exists(fullPath):
             os.symlink(fullPath, target)
+    # Find a name base which doesn't clash with existing tests
+    def getNameBaseToUse(self, rootDir, nameBase):
+        fullWriteDir = self.getFullWriteDir(rootDir, nameBase)
+        if os.path.isdir(fullWriteDir):
+            return self.getNameBaseToUse(rootDir, "x" + nameBase)
+        else:
+            return nameBase
+    def getFullWriteDir(self, rootDir, nameBase):
+        localName = nameBase + self.app.getTmpIdentifier()
+        return os.path.join(rootDir, localName)
     def createDir(self, rootDir, nameBase = "", subDir = None):
-        writeDir = os.path.join(rootDir, nameBase + self.app.getTmpIdentifier())
+        writeDir = self.getFullWriteDir(rootDir, nameBase)
         fullWriteDir = writeDir
         if subDir:
             fullWriteDir = os.path.join(writeDir, subDir)
-        # If started twice at the same time this can happen... add extra chars to avoid clash
-        if os.path.isdir(fullWriteDir):
-            return self.createDir(rootDir, "x" + nameBase, subDir)
-        else:
-            self.createDirs(fullWriteDir)
+        self.createDirs(fullWriteDir)
         return writeDir
     def createDirs(self, fullWriteDir):
         os.makedirs(fullWriteDir)    
@@ -318,7 +324,7 @@ class TestCase(Test):
         self.writeDirs.append(fullWriteDir)
         return fullWriteDir
     def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
-        nameBase = basicDir + "."
+        nameBase = self.getNameBaseToUse(rootDir, basicDir + ".")
         self.app.tryCleanPreviousWriteDirs(rootDir, nameBase)
         writeDir = self.createDir(rootDir, nameBase, subDir)
         newBasic = os.path.basename(writeDir)

@@ -181,8 +181,10 @@ class LSFJob:
     def getProcessIdWithoutLSF(self, firstpid):
         status, machine = self.getStatus()
         if machine:
-            stdout = os.popen("rsh " + machine + " pstree -p -l " + firstpid + " 2>&1")
-            psline = stdout.readlines()[0]
+            pslines = os.popen("rsh " + machine + " pstree -p -l " + firstpid + " 2>&1").readlines()
+            if len(pslines) == 0:
+                return []
+            psline = pslines[0]
             batchpos = psline.find(os.path.basename(self.app.getConfigValue("binary")))
             if batchpos != -1:
                 apcj = psline[batchpos:].split('---')

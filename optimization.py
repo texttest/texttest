@@ -428,16 +428,20 @@ class OptimizationRun:
     def costAtTime(self, targetTime):
         lastCost = 0
         lastTime = 0
+        bestCost = 0
+        if len(self.solutions)>0:
+            bestCost=self.solutions[0][costEntryName]
         for solution in self.solutions:
             if solution[timeEntryName] > targetTime:
                 timeGap = lastTime - solution[timeEntryName]
                 percent = float(lastTime - targetTime) / timeGap
                 cost = lastCost + (solution[costEntryName] - lastCost) * percent
-                return int(round(cost))
+                return min(bestCost,int(round(cost)))
             else:
                 lastCost = solution[costEntryName]
                 lastTime = solution[timeEntryName]
-        return lastCost
+                bestCost=min(lastCost,bestCost)
+        return bestCost;
     def getMeasuredSolution(self, margin):
         if margin == 0.0 or self.isVeryShort():
             return -1

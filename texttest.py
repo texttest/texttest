@@ -330,11 +330,11 @@ class TestCase(Test):
         fullWriteDir = writeDir
         if subDir:
             fullWriteDir = os.path.join(writeDir, subDir)
-        try:
+        # If started twice at the same time this can happen... add extra chars to avoid clash
+        if os.path.isdir(fullWriteDir):
+            return self.createDir(rootDir, "x" + nameBase, subDir)
+        else:
             self.createDirs(fullWriteDir)
-        except OSError:
-            # If started twice at the same time this can happen...
-            return self.createDir(rootDir, nameBase + "?", subDir)
         return writeDir
     def createDirs(self, fullWriteDir):
         os.makedirs(fullWriteDir)    

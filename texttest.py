@@ -627,6 +627,7 @@ class Application:
         self.setConfigDefault("file_colours", self.getGuiColourDictionary())
         self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ])
         self.setConfigDefault("gui_entry_overrides", {})
+        self.setConfigDefault("gui_entry_options", { "" : [] })
         if os.name == "posix":
             self.setConfigDefault("view_program", "xemacs")
             self.setConfigDefault("follow_program", "tail -f")
@@ -657,10 +658,11 @@ class Application:
             self.setConfigDefault("interpreter", "")
     def createOptionGroups(self, optionMap):
         defaultDict = self.getConfigValue("gui_entry_overrides")
+        optionDict = self.getConfigValue("gui_entry_options")
         groupNames = [ "Select Tests", "What to run", "How to run", "Side effects", "Invisible" ]
         optionGroups = []
         for name in groupNames:
-            group = plugins.OptionGroup(name, defaultDict)
+            group = plugins.OptionGroup(name, defaultDict, optionDict)
             self.addToOptionGroup(group)
             self.configObject.addToOptionGroup(group)
             optionGroups.append(group)

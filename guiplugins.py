@@ -6,7 +6,7 @@ class InteractiveAction(plugins.Action):
     processes = []    
     def __init__(self, test, optionName = ""):
         self.test = test
-        self.optionGroup = plugins.OptionGroup(optionName, test.getConfigValue("gui_entry_overrides"))
+        self.optionGroup = plugins.OptionGroup(optionName, test.getConfigValue("gui_entry_overrides"), test.getConfigValue("gui_entry_options"))
     def getOptionGroups(self):
         return [ self.optionGroup ]
     def canPerformOnTest(self):

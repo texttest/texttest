@@ -278,11 +278,12 @@ class Switch(Option):
             Option.reset(self)
 
 class OptionGroup:
-    def __init__(self, name, defaultDict):
+    def __init__(self, name, defaultDict, possibleValueDict):
         self.name = name
         self.options = seqdict()
         self.switches = seqdict()
         self.defaultDict = defaultDict
+        self.possibleValueDict = possibleValueDict
     def __repr__(self):
         return "OptionGroup " + self.name + os.linesep + repr(self.options) + os.linesep + repr(self.switches)
     def reset(self):
@@ -299,15 +300,28 @@ class OptionGroup:
             return 1
         return 0
     def getDefault(self, name, value):
-        entryName = name.lower().replace(" ", "_")
-        if self.defaultDict.has_key(entryName):
-            return self.defaultDict[entryName]
+        if self.defaultDict.has_key(name):
+            return self.defaultDict[name]
         else:
             return value
+    def getDefaultPossiblilities(self, name, defaultValue, values):
+        if self.possibleValueDict.has_key(name):
+            return [ defaultValue ] + self.possibleValueDict[name] + values
+        if not defaultValue in values:
+            return [ defaultValue ] + values
+        else:
+            return values
+    def getEntryName(self, name):
+        return name.lower().replace(" ", "_")
     def addSwitch(self, key, name, value = 0, nameForOff = None):
-        self.switches[key] = Switch(name, int(self.getDefault(name, value)), nameForOff)
+        entryName = self.getEntryName(name)
+        defaultValue = int(self.getDefault(entryName, value))
+        self.switches[key] = Switch(name, defaultValue, nameForOff)
     def addOption(self, key, name, value = "", possibleValues = []):
-        self.options[key] = TextOption(name, self.getDefault(name, value), possibleValues)
+        entryName = self.getEntryName(name)
+        defaultValue = self.getDefault(entryName, value)
+        defaultPossValues = self.getDefaultPossiblilities(entryName, defaultValue, possibleValues)
+        self.options[key] = TextOption(name, defaultValue, defaultPossValues)
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()

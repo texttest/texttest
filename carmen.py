@@ -579,9 +579,10 @@ class BuildCode(plugins.Action):
             raise plugins.TextTestError, "Product " + repr(app) + " did not build, exiting"
         print "Product", app, "built correctly in", absPath
         os.remove(buildFile)
-        commandLine = "cd " + absPath + "; gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"
-        os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
-        print "Making install from", absPath ,"to", os.environ["CARMSYS"]
+        if os.environ.has_key("CARMSYS"):
+            commandLine = "cd " + absPath + "; gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"
+            os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
+            print "Making install from", absPath ,"to", os.environ["CARMSYS"]
     def buildRemote(self, arch, app):
         machine = self.getMachine(app, arch)
         print "Building remotely in parallel on " + machine + " ..."

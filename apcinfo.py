@@ -44,6 +44,13 @@ class CarmenDocument(HTMLgen.SeriesDocument):
         s.append('<hr>\n</FONT>')
         return string.join(s, '')
 
+# We extend this class in order to be able to use more than 6 colors....
+class CarmenStackedBarChart(barchart.StackedBarChart):
+    def initialize(self):
+        barchart.StackedBarChart.initialize(self)
+        self.colors = ('blue','red','yellow','purple','orange','green','black')
+        barchart.barfiles['black'] = '../image/bar-black.gif'
+
 class BarChart:
     def __init__(self, entries):
         self.entries = entries
@@ -80,7 +87,7 @@ class BarChart:
         chartabs.datalist.load_tuple(tuple(means))
 
     def createBC(self, title):
-        chart = barchart.StackedBarChart()
+        chart = CarmenStackedBarChart()
         chart.title = title
         chart.datalist = barchart.DataList()
         chart.datalist.segment_names = tuple(self.entries)
@@ -220,16 +227,25 @@ class AnalyzeLProfData:
 
 
 class GenHTML(plugins.Action):
-    def setUpApplication(self, app):
+    def __init__(self, args = None):
+        htmlDir = None
+        if args:
+            htmlDir = args[0]
         self.htmlDir = "/carm/documents/Development/Optimization/Testing"
+        if htmlDir and os.path.isdir(htmlDir):
+            self.htmlDir = htmlDir
+        else:
+            print "No html dir specified/the dir does not exist, uses", self.htmlDir
+
         self.profilesDir = "/carm/documents/Development/Optimization/APC/profiles"
         self.profilesDirAsHtml = "http://www-oint.carmen.se/Development/Optimization/APC/profiles"
         self.indexFile = self.htmlDir + os.sep + "testindex.html"
         self.timeSpentFile = self.htmlDir + os.sep + "timespent.html"
         self.raveSpentFile = self.htmlDir + os.sep + "ravespent.html"
         self.hatedFcnsFile = self.htmlDir + os.sep + "hatedfcns.html"
-
+        self.variationFile = self.htmlDir + os.sep + "variation.html"
         
+    def setUpApplication(self, app):
         self.RCFile = app.abspath + os.sep + "apcinfo.rc"
         self.idoc = CarmenDocument(self.RCFile)
         self.ilist = HTMLgen.List(style="compact")
@@ -246,7 +262,7 @@ class GenHTML(plugins.Action):
         # The global chart for relative times.
         self.chartreldoc = CarmenDocument(self.RCFile)
         self.chartreldoc.title = "Where does APC spend time?"
-        self.chartrelglob = barchart.StackedBarChart()
+        self.chartrelglob = CarmenStackedBarChart()
         self.chartrelglob.title = "Relative times"
         self.chartrelglob.datalist = barchart.DataList()
         self.chartrelglob.datalist.segment_names = tuple(self.tsValues)
@@ -261,14 +277,16 @@ class GenHTML(plugins.Action):
 
         self.suitePages = {}
 
+        # Profiling data.
         self.lprof = AnalyzeLProfData()
-        self.raveBC = BarChart(self.lprof.raveFunctions)
+        self.raveBC = BarChart(self.lprof.raveFunctions) # Extract RAVE functions from profiling data.
         self.profilingGroups = HTMLgen.Container()
         self.profilingGroups.append(HTMLgen.Text("Used groups: "))
 
+        # Global chart for relative RAVE times.
         self.chartRavedoc = CarmenDocument(self.RCFile)
         self.chartRavedoc.title = "Relative time spent by RAVE in APC"
-        self.chartRaveglob = barchart.StackedBarChart()
+        self.chartRaveglob = CarmenStackedBarChart()
         self.chartRaveglob.title = "Relative time spent by RAVE in APC"
         self.chartRaveglob.datalist = barchart.DataList()
         self.chartRaveglob.datalist.segment_names = tuple(self.lprof.raveFunctions)
@@ -302,7 +320,7 @@ class GenHTML(plugins.Action):
         self.chartRaveglob.datalist.load_tuple(tuple(totalMeans))
         #self.chartRavedoc.append_file(os.path.join(self.htmlDir, 'timespent-expl-txt.html'))
         self.chartRavedoc.write(self.raveSpentFile)
-        
+
         # Write most hated page.
         hatedFcnsDoc = CarmenDocument(self.RCFile)
         hatedFcnsDoc.title = "The 10 most time consuming functions in APC"

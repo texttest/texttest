@@ -7,7 +7,7 @@ helpOptions = """
 helpScripts = """
 """
 
-import unixConfig, carmen, os, shutil, filecmp, optimization, string, plugins, comparetest
+import unixConfig, carmen, os, shutil, filecmp, optimization, string, plugins, comparetest, performance
 
 def getConfig(optionMap):
     return MpsSolverConfig(optionMap)
@@ -28,6 +28,10 @@ class MpsSolverConfig(carmen.CarmenConfig):
         switches = carmen.CarmenConfig.getSwitches(self)
         switches["diag"] = "Use MpsSolver Codebase diagnostics"
         return switches
+    def checkMemory(self):
+        return 1
+    def getTestComparator(self):
+        return MakeComparisons(self.optionMap.has_key("n"))
     def getQueuePerformancePrefix(self, test, arch):
         if not os.environ.has_key("MPSSOLVER_LSFQUEUE_PREFIX"):
             return carmen.CarmenConfig.getQueuePerformancePrefix(self, test, arch)
@@ -82,3 +86,106 @@ class MpsSolverConfig(carmen.CarmenConfig):
         if os.environ.has_key("DIAGNOSTICS_IN"):
             app.addToConfigList("copy_test_path", "Diagnostics")
             app.addToConfigList("compare_extension", "diag")
+
+# Does the same as the basic test comparison apart from when comparing
+# the performance file and the memory file
+class MakeComparisons(comparetest.MakeComparisons):
+    def makeTestComparison(self, test):
+        return MpsSolverTestComparison(test, self.overwriteOnSuccess)
+
+class MpsSolverTestComparison(performance.PerformanceTestComparison):
+    def createFileComparison(self, test, standardFile, tmpFile):
+        stem, ext = os.path.basename(standardFile).split(".", 1)
+        if (stem == "memory"):
+            return MemoryFileComparison(test, standardFile, tmpFile)
+        elif (stem == "output"):
+            return OutputFileComparison(test, standardFile, tmpFile)
+        else:
+            return performance.PerformanceTestComparison.createFileComparison(self, test, standardFile, tmpFile)
+
+class OutputFileComparison(comparetest.FileComparison):
+    def __init__(self, test, standardFile, tmpFile):
+        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile)
+        self.columnFilter(self.stdCmpFile)
+        self.columnFilter(self.tmpCmpFile)
+    def columnFilter(self, fileName):
+        tmpName = fileName + ".mpssolver_extra";
+        os.rename(fileName, tmpName)
+        oldFile = open(tmpName)
+        newFile = open(fileName, "w")
+        inTable = 0
+        for line in oldFile.readlines():
+            cols = line.split(" ")
+            if inTable:
+                if self.tableEnds(line, cols):
+                    inTable = 0
+                else:
+                    cols[-1] = "XXX"
+                    line = string.join(cols, " ")
+            else:
+                if self.tableStarts(line, cols):
+                    inTable = 1
+            newFile.write(line)
+        oldFile.close()
+        newFile.close()
+        os.remove(tmpName)
+    def tableStarts(self, line, cols):
+        return string.lower(cols[-1]).strip() == "time"
+    def tableEnds(self, line, cols):
+        return not line.startswith(" ")
+
+# Returns -1 as error value, if the file is the wrong format
+def getMaxMemory(fileName):
+    try:
+        line = open(fileName).readline()
+        start = line.find(":")
+        end = line.find("M", start)
+        fullName = line[start + 1:end - 1]
+        return float(string.strip(fullName))
+    except:
+        return float(-1)
+
+class MemoryFileComparison(comparetest.FileComparison):
+    def __init__(self, test, standardFile, tmpFile):
+        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile)
+        if (os.path.exists(self.stdCmpFile)):
+            self.oldMaxMemory = getMaxMemory(self.stdCmpFile)
+            self.newMaxMemory = getMaxMemory(self.tmpCmpFile)
+            self.percentageChange = self.calculatePercentageIncrease()
+            # If we didn't understand the old memory, overwrite it
+            if (self.oldMaxMemory < 0):
+                os.remove(self.stdFile)
+        else:
+            self.newMaxMemory = getMaxMemory(self.tmpFile)
+            self.oldMaxMemory = self.newMaxMemory
+            self.percentageChange = 0.0
+    def __repr__(self):
+        baseText = comparetest.FileComparison.__repr__(self)
+        if self.newResult():
+            return baseText
+        return baseText + "(" + self.getType() + ")"
+    def getType(self):
+        if self.newMaxMemory < self.oldMaxMemory:
+            return "smaller"
+        else:
+            return "larger"
+    def hasDifferences(self):
+        longEnough = self.newMaxMemory > float(self.test.app.getConfigValue("minimum_memory_for_test"))
+        varianceEnough = self.percentageChange > float(self.test.app.getConfigValue("memory_variation_%"))
+        return longEnough and varianceEnough;
+    def calculatePercentageIncrease(self):
+        largest = max(self.oldMaxMemory, self.newMaxMemory)
+        smallest = min(self.oldMaxMemory, self.newMaxMemory)
+        if smallest == 0.0:
+            return 0.0
+        return ((largest - smallest) / smallest) * 100
+    def saveResults(self, destFile):
+        # Here we save the average of the old and new performance, assuming fluctuation
+        avgMemory = round((self.oldMaxMemory + self.newMaxMemory) / 2.0, 2)
+        line = open(self.tmpFile).readlines()[0]
+        swapLine = open(self.tmpFile).readlines()[1]
+        lineToWrite = line.replace(str(self.newMaxMemory), str(avgMemory))
+        newFile = open(destFile, "w")
+        newFile.write(lineToWrite)
+        newFile.write(swapLine)
+        os.remove(self.tmpFile)

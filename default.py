@@ -341,15 +341,7 @@ class RunTest(plugins.Action):
         testCommand = self.getExecuteCommand(test)
         self.runCommand(test, testCommand)
     def getExecuteCommand(self, test):
-        testCommand = test.getExecuteCommand()
-        useCaseFileName = test.useCaseFile
-        if os.path.isfile(useCaseFileName):
-            recFile = test.makeFileName("usecase", temporary=1)
-            testCommand += " --replay " + useCaseFileName + " --record " + recFile
-            replaySpeed = test.app.slowMotionReplaySpeed
-            if replaySpeed:
-                testCommand += " --delay " + str(replaySpeed)
-        testCommand += " < " + self.getInputFile(test)
+        testCommand = test.getExecuteCommand() + " < " + self.getInputFile(test)
         outfile = test.makeFileName("output", temporary=1)
         return testCommand + " > " + outfile
     def runCommand(self, test, command, jobNameFunction = None, options = ""):

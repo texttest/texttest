@@ -65,6 +65,17 @@ class ApcConfig(optimization.OptimizationConfig):
         else:
             ruleCompile = self.optionMap.has_key("rulecomp")
         return ApcCompileRules(self.getRuleSetName, libFile, staticFilter, ruleCompile)
+    def getTestRunner(self):
+        if self.optionMap.has_key("lprof"):
+            subActions = [ self._getApcTestRunner(), WaitForDispatch(), RunLProf() ]
+            return plugins.CompositeAction(subActions)
+        else:
+            return self._getApcTestRunner()
+    def _getApcTestRunner(self):
+        if not self.useLSF():
+            return lsf.LSFConfig.getTestRunner(self)
+        else:
+            return SubmitApcTest(self.findLSFQueue, self.findLSFResource)
     def getTestCollator(self):
         subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
         subActions.append(RemoveLogs())
@@ -91,6 +102,17 @@ class ApcConfig(optimization.OptimizationConfig):
     def printHelpScripts(self):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts
+
+class SubmitApcTest(lsf.SubmitTest):
+    def __init__(self, queueFunction, resourceFunction):
+        lsf.SubmitTest.__init__(self, queueFunction, resourceFunction)
+    def getExecuteCommand(self, test):
+        testCommand = test.getExecuteCommand()
+        inputFileName = test.getInputFileName()
+        if os.path.isfile(inputFileName):
+            testCommand = testCommand + " < " + inputFileName
+        errfile = test.getTmpFileName("errors", "w")
+        return testCommand + " 2> " + errfile
 
 class ApcSubPlanDirManager(optimization.SubPlanDirManager):
     def __init__(self, config):

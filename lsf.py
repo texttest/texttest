@@ -165,12 +165,6 @@ class SubmitTest(plugins.Action):
         queueToUse = self.queueFunction(test)
         self.describe(test, " to LSF queue " + queueToUse)
         testCommand = self.getExecuteCommand(test)
-        inputFileName = test.getInputFileName()
-        if os.path.isfile(inputFileName):
-            testCommand = testCommand + " < " + inputFileName
-        outfile = test.getTmpFileName("output", "w")
-        errfile = test.getTmpFileName("errors", "w")
-        testCommand = testCommand + " > " + outfile + " 2> " + errfile
         reportfile =  test.getTmpFileName("report", "w")
         lsfJob = LSFJob(test)
         lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile
@@ -182,7 +176,13 @@ class SubmitTest(plugins.Action):
         commandLine = "bsub " + lsfOptions + " '" + timedTestCommand + "' > " + reportfile + " 2>&1"
         os.system(commandLine)
     def getExecuteCommand(self, test):
-        return test.getExecuteCommand()
+        testCommand = test.getExecuteCommand()
+        inputFileName = test.getInputFileName()
+        if os.path.isfile(inputFileName):
+            testCommand = testCommand + " < " + inputFileName
+        outfile = test.getTmpFileName("output", "w")
+        errfile = test.getTmpFileName("errors", "w")
+        return testCommand + " > " + outfile + " 2> " + errfile
     def setUpSuite(self, suite):
         self.describe(suite)
     def getCleanUpAction(self):

@@ -35,7 +35,9 @@ this has proved somewhat more stable than sampling approaches. This is controlle
 
 helpScripts = """performance.AddTestPerformance
                            - Adds up the CPU time performance as specified by the test's
-                             performance file for the selected tests. 
+                             performance file for the selected tests.
+performance.ShowMemoryUsage
+                           - Displays the memory usage as specified by the test's memory file.
 performance.PerformanceStatistics
                            - Displays 
                              Currently supports these options:
@@ -258,6 +260,16 @@ class AddTestPerformance(plugins.Action):
     def __del__(self):
         print "Added-up test performance (for " + str(self.numberTests) + " tests) is " + str(int(self.performance)) + " minutes (" + str(int(self.performance/60)) + " hours)"
         
+class ShowMemoryUsage(plugins.Action):
+    def __init__(self):
+        self.performance = 0.0
+        self.numberTests = 0
+    def __repr__(self):
+        return "Memory usage for"
+    def __call__(self, test):
+        testMemory = getTestMemory(test)
+        self.describe(test, ": " + str(testMemory) + " MB")
+
 def percentDiff(perf1, perf2):
     if perf2 != 0:
         return int((perf1 / perf2) * 100.0)

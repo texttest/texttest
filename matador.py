@@ -26,7 +26,7 @@ class MatadorConfig(optimization.OptimizationConfig):
     def getLibraryFile(self):
         return os.path.join("data", "crc", "MATADOR", carmen.architecture, "matador.o")
     def getSubPlanFileName(self, test, sourceName):
-        return os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", self.subPlanName(test), "APC_FILES", sourceName)
+        return self.subplanManager.getSubPlanFileName(test, sourceName)
     def subPlanName(self,test):
         if len(test.options):
             return self.optionsSubPlanName(test)

@@ -56,7 +56,7 @@ class SubPlanDirManager:
         pass
     def getSubPlanFileName(self, test, sourceName):
         if not self.tmpDirs.has_key(test):
-            return os.path.join(self.getSubPlanDirFromTest(test), sourceName)
+            return os.path.join(self.getSubPlanDirFromTest(test), "APC_FILES", sourceName)
         else:
             return os.path.join(self.tmpDirs[test], "APC_FILES", sourceName)
     def makeTemporary(self, test):

@@ -163,3 +163,18 @@ class TimeFilter(plugins.Filter):
     def acceptsTestCase(self, test):
         testPerformance = getTestPerformance(test)
         return testPerformance > self.minTime and (self.maxTime == None or testPerformance < self.maxTime)
+
+class AddTestPerformance(plugins.Action):
+    def __init__(self):
+        self.performance = 0.0
+        self.numberTests = 0
+    def __repr__(self):
+        return "Adding performance for"
+    def __call__(self, test):
+        testPerformance = getTestPerformance(test)
+        self.describe(test, ": " + str(int(testPerformance)) + " minutes")
+        self.performance += testPerformance
+        self.numberTests += 1
+    def __del__(self):
+        print "Added-up test performance (for " + str(self.numberTests) + " tests) is " + str(int(self.performance)) + " minutes (" + str(int(self.performance/60)) + " hours)"
+        

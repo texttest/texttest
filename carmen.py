@@ -86,6 +86,11 @@ class CarmenConfig(lsf.LSFConfig):
         return lsf.LSFConfig.getTestCollator(self)
     def findDefaultLSFQueue(self, test):
         arch = getArchitecture(test.app)
+        if arch == "i386_linux":
+            cpuTime = performance.getTestPerformance(test)
+            chunkLimit = float(test.app.getConfigValue("maximum_cputime_for_chunking"))
+            if cpuTime > 0 and cpuTime < chunkLimit:
+                return "short_rd_testing_chunked"
         return self.getQueuePerformancePrefix(test, arch) + self.getArchQueueName(arch) + self.getQueuePlatformSuffix(test.app, arch)
     def getArchQueueName(self, arch):
         if arch == "sparc_64":
@@ -137,6 +142,7 @@ class CarmenConfig(lsf.LSFConfig):
         lsf.LSFConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10)
+        app.setConfigDefault("maximum_cputime_for_chunking", 0.0)
     def getApplicationEnvironment(self, app):
         return lsf.LSFConfig.getApplicationEnvironment(self, app) + \
                [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]

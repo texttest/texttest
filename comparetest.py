@@ -213,9 +213,6 @@ class TestComparison(plugins.TestState):
     def getStandardFile(self, fullPath, test):
         realPath = os.path.normpath(fullPath)
         local = realPath.replace(test.abspath + os.sep, "")
-        if local.find(os.sep) == -1:
-            return realPath
-        # Find standard file in subdirectory
         return os.path.join(test.abspath, test.makeFileName(local))
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         return FileComparison(test, standardFile, tmpFile, makeNew)

@@ -57,6 +57,9 @@ class RecordTest(guiplugins.RecordTest):
     def __call__(self, test):
         serverLog = test.makeFileName("input")
         propFileInTest = test.makeFileName("properties")
+        newLogFile = test.makeFileName("dmserverlog")
+        if os.path.isfile(test.useCaseFile):
+            os.remove(test.useCaseFile)
         self.props.set("host", self.optionGroup.getOptionValue("host"))
         self.props.set("port", self.optionGroup.getOptionValue("port"))
         self.props.writeFile(propFileInTest)
@@ -64,7 +67,6 @@ class RecordTest(guiplugins.RecordTest):
         args = [ test.abspath, serverLog, propFileInTest, httpServerDir ]
         os.environ["DMG_RECORD_TEST"] = string.join(args,":")
         guiplugins.RecordTest.__call__(self, test)
-        newLogFile = test.makeFileName("dmserverlog")
         # Use the reran tests 'dmserverlog' as 'input' for the test not the
         # originally recorded 'input' file. i.e. copy 'dmserverlog' to 'input'
         if os.path.isfile(newLogFile):

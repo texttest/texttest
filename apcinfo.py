@@ -316,7 +316,7 @@ class GenHTML(plugins.Action):
         self.interParamsTable.heading = copy.deepcopy(self.interestingParameters)
         self.interParamsTable.heading.insert(0, "KPI group")
         self.interParamsTable.body = []
-        self.interParamsDoc.append(HTMLgen.Small(self.interParamsTable))
+        self.interParamsDoc.append(self.interParamsTable)
         
         self.kpiGroupForTest = {}
         self.kpiGroups = []

@@ -396,6 +396,7 @@ class OptionFinder:
 class MultiEntryDictionary:
     def __init__(self, filename, appName = "", version = ""):
         self.dict = {}
+        self.entries = []
         if os.path.isfile(filename):
             configFile = open(filename)
             for line in configFile.readlines():
@@ -414,6 +415,8 @@ class MultiEntryDictionary:
         overrideDir = MultiEntryDictionary(extraFileName)
         for key, value in overrideDir.items():
             self.dict[key] = value
+            if not key in self.entries:
+                self.entries.append(key)
     def addLine(self, line, separator = ':'):
         entryName, entry = string.split(line, separator, 1)
         if self.dict.has_key(entryName):
@@ -427,16 +430,24 @@ class MultiEntryDictionary:
                 self.dict[entryName] = entryList
         else:
             self.dict[entryName] = entry
+            self.entries.append(entryName)
     def has_key(self, key):
         return self.dict.has_key(key)
     def keys(self):
         return self.dict.keys()
     def items(self):
-        return self.dict.items()
+        itemList = []
+        for key in self.entries:
+            if self.dict.has_key(key):
+                t = key, self.dict[key]
+                itemList.append(t)
+        return itemList
     def __getitem__(self, key):
         return self.dict[key]
     def __setitem__(self, key, value):
         self.dict[key] = value
+        if not key in self.entries:
+            self.entries.append(key)
     def __repr__(self):
         return repr(self.dict)
     def getListValue(self, key):

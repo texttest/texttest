@@ -228,8 +228,7 @@ class Config(plugins.Configuration):
         return severities
     def getDefaultMailAddress(self):
         if os.name == "posix":
-            domainName = os.popen("hostname -d").read().strip()
-            return os.environ["USER"] + "@" + domainName
+            return os.environ["USER"] + "@localhost"
         else:
             return "non_existent_mail_address"
     def setApplicationDefaults(self, app):

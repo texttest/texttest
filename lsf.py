@@ -134,12 +134,14 @@ class LSFConfig(unixConfig.UNIXConfig):
             return baseCollator
         else:
             resourceAction = MakeResourceFiles(self.checkPerformance(), self.checkMemory(), self.isSlowdownJob)
-            return plugins.CompositeAction([ Wait(), UpdateLSFStatus(), resourceAction, baseCollator ])
+            return plugins.CompositeAction([ Wait(), self.updaterLSFStatus(), resourceAction, baseCollator ])
     def getTestComparator(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestComparator(self)
         else:
             return performance.MakeComparisons(self.optionMap.has_key("n"))
+    def updaterLSFStatus(self):
+        return UpdateLSFStatus()
     def checkMemory(self):
         return 0
     def checkPerformance(self):

@@ -95,7 +95,7 @@ class ApcConfig(optimization.OptimizationConfig):
             return localAction
         else:
             resourceAction = lsf.MakeResourceFiles(self.checkPerformance(), self.checkMemory(), self.isSlowdownJob)
-            return plugins.CompositeAction([ lsf.Wait(), lsf.UpdateLSFStatus(), resourceAction, localAction ])
+            return plugins.CompositeAction([ lsf.Wait(), self.updaterLSFStatus(), resourceAction, localAction ])
     def _getSubPlanDirName(self, test):
         statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
         dirs = statusFile.split(os.sep)[:-2]
@@ -109,6 +109,8 @@ class ApcConfig(optimization.OptimizationConfig):
                 if option.find("crc" + os.sep + "rule_set") != -1:
                     return option.split(os.sep)[-1]
         return None
+    def updaterLSFStatus(self):
+        return ApcUpdateLSFStatus()
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -247,7 +249,33 @@ class ApcCompileRules(carmen.CompileRules):
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
 
-      
+class ApcUpdateLSFStatus(plugins.Action):
+    def __init__(self):
+        self.logFile = None
+    def __repr__(self):
+        return "Updating LSF status for"
+    def __call__(self, test):
+        job = lsf.LSFJob(test)
+        status, machine = job.getStatus()
+        if status == "DONE" or status == "EXIT":
+            return
+        if status != "PEND":
+            details = ""
+            if machine != None:
+                details += "Executing on " + machine + os.linesep
+
+            details += "Current LSF status = " + status + os.linesep
+            details += self.showRunStatusHead(test)
+            test.changeState(test.RUNNING, details)
+        return "wait"
+    def showRunStatusHead(self, test):
+         subplanDir = test.writeDirs[-1];
+         runStatusHeadFile = os.path.join(subplanDir, "run_status_head")
+         if os.path.isfile(runStatusHeadFile):
+             runStatusHead = open(runStatusHeadFile).read()
+             return runStatusHead
+         else:
+             return "Run status file is not avaliable yet."
 class RemoveLogs(plugins.Action):
     def __call__(self, test):
         self.removeFile(test, "errors")

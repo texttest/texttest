@@ -562,84 +562,29 @@ def getSolutionStatistics(currentFile, statistics):
             times.append(lastTime)
     return maxMemory, costs, times
 
-class PlotApcTest(plugins.Action):
-    def __init__(self, args = ["0:"]):
-        self.plotFiles = []
-        self.statusFileName = None
+class PlotApcTest(optimization.PlotTest):
+    def __init__(self, args = []):
+        optimization.PlotTest.__init__(self, args)
         self.plotItem = " " + "TOTAL cost"
-        self.plotrange = "0:"
-        self.plotPrint = []
         self.plotUseTmpStatus = "t"
-        self.plotAgainstSolNum = []
-        self.plotVersions = [ "" ]
-        for ar in args:
-            arr = ar.split("=")
-            if arr[0]=="r":
-                self.plotrange = arr[1]
-            elif arr[0]=="p":
-                self.plotPrint = arr[1]
-            elif arr[0]=="i":
-                self.plotItem = " " + arr[1].replace("_"," ")
-            elif arr[0]=="nt":
-                self.plotUseTmpStatus = []
-            elif arr[0]=="s":
-                self.plotAgainstSolNum = "t"
-            elif arr[0]=="v":
-                self.plotVersions = arr[1].split(",")
-            else:
-                print "Unknown option " + arr[0]
-    def __repr__(self):
-        return "Plotting"
-    def __del__(self):
-        if len(self.plotFiles) > 0:
-            stdin, stdout, stderr = os.popen3("gnuplot -persist")
-            fileList = []
-            style = " with linespoints"
-            for file in self.plotFiles:
-                ver = file.split(os.sep)[-1].split(".",1)[-1]
-                title = " title \"" + ver + "_" + file.split(os.sep)[-2] + "_" + self.plotItem.strip().replace(" ","_") + "\" "
-                fileList.append("'" + file + "' " + title + style)
-#            print "plot " + string.join(fileList, ",") + os.linesep
-            if self.plotPrint:
-                absplotPrint = os.path.expanduser(self.plotPrint)
-                if not os.path.isabs(absplotPrint):
-                    print "An absolute path must be given."
-                    return
-                stdin.write("set terminal postscript" + os.linesep)
-            stdin.write("set xrange [" + self.plotrange +"];" + os.linesep)
-            stdin.write("plot " + string.join(fileList, ",") + os.linesep)
-            stdin.write("quit" + os.linesep)
-            if self.plotPrint:
-                stdin.close()
-                tmppf = stdout.read()
-                if len(tmppf) > 0:
-                    open(absplotPrint,"w").write(tmppf)
-                    
-    def __call__(self, test):
-        for version in self.plotVersions:
-            currentFile = findTemporaryStatusFile(test, version)
-            if self.plotUseTmpStatus and currentFile:
-                print "Using status file in temporary subplan directory for plotting test " + test.name
-            else:
-                currentFile = test.makeFileName(self.statusFileName, version)
-                if not os.path.isfile(currentFile):
-                    print "No status file does exist for test " + test.name + "(" + version + ")"
-                    return
-            maxMem, costs, times = getSolutionStatistics(currentFile,self.plotItem)
-            plotFileName = test.makeFileName("plot")
-            if len(version) > 0:
-                plotFileName += "." + version
-            plotFile = open(plotFileName,"w")
-            for il in range(len(costs)):
-                if self.plotAgainstSolNum:
-                    plotFile.write(str(costs[il]) + os.linesep)
-                else:
-                    plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
-            self.plotFiles.append(plotFileName)
-    def setUpSuite(self, suite):
-        pass
-    def setUpApplication(self, app):
-        self.statusFileName = app.getConfigValue("log_file")
+        self.interpretOptions(args)
+    def setOption(self, arr):
+        if arr[0]=="i":
+            self.plotItem = " " + arr[1].replace("_"," ")
+            return 1
+        elif arr[0]=="nt":
+            self.plotUseTmpStatus = []
+        return 0
+    def getCostsAndTimes(self, file, plotItem):
+        maxMem, costs, times = getSolutionStatistics(file, plotItem)
+        return costs, times
+    def getStatusFile(self, test, version):
+        currentFile = findTemporaryStatusFile(test, version)
+        if self.plotUseTmpStatus and currentFile:
+            print "Using status file in temporary subplan directory for plotting test " + test.name
+            return currentFile
+        else:
+            return optimization.PlotTest.getStatusFile(self, test, version)
 
 class GrepApcLog(plugins.Action):
     def __init__(self):

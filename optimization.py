@@ -537,3 +537,106 @@ class ImportTest(plugins.Action):
     def testForImportTestCase(self, testInfo):
         return 0
 
+# Base class for using gnuplot to plot test curves of tests
+#
+class PlotTest(plugins.Action):
+    def __init__(self, args = []):
+        self.plotFiles = []
+        self.statusFileName = None
+        self.plotItem = None
+        self.plotrange = "0:"
+        self.plotPrint = []
+        self.plotAgainstSolNum = []
+        self.plotVersions = [ "" ]
+    def interpretOptions(self, args):
+        for ar in args:
+            arr = ar.split("=")
+            if arr[0]=="r":
+                self.plotrange = arr[1]
+            elif arr[0]=="p":
+                self.plotPrint = arr[1]
+            elif arr[0]=="s":
+                self.plotAgainstSolNum = "t"
+            elif arr[0]=="v":
+                self.plotVersions = arr[1].split(",")
+            elif not self.setOption(arr):
+                print "Unknown option " + arr[0]
+    def setOption(self, arr):
+        return 0
+    def getYlabel(self):
+        return self.plotItem
+    def __repr__(self):
+        return "Plotting"
+    def __del__(self):
+        if len(self.plotFiles) > 0:
+            stdin, stdout, stderr = os.popen3("gnuplot -persist")
+            fileList = []
+            style = " with linespoints"
+            for file in self.plotFiles:
+                ver = file.split(os.sep)[-1].split(".",1)[-1]
+                name = file.split(os.sep)[-3] + "::" + file.split(os.sep)[-2]
+                title = " title \"" + name + " " + ver + "\" "
+                fileList.append("'" + file + "' " + title + style)
+            if self.plotPrint:
+                absplotPrint = os.path.expanduser(self.plotPrint)
+                if not os.path.isabs(absplotPrint):
+                    print "An absolute path must be given."
+                    return
+                stdin.write("set terminal postscript" + os.linesep)
+
+            stdin.write("set ylabel '" + self.getYlabel() + "'" + os.linesep)
+            stdin.write("set xlabel 'CPU time (min)'" + os.linesep)
+            stdin.write("set time" + os.linesep)
+            stdin.write("set xtics border nomirror norotate" + os.linesep)
+            stdin.write("set ytics border nomirror norotate" + os.linesep)
+            stdin.write("set border 3" + os.linesep)
+            stdin.write("set xrange [" + self.plotrange +"];" + os.linesep)
+            stdin.write("plot " + string.join(fileList, ",") + os.linesep)
+            stdin.write("quit" + os.linesep)
+            if self.plotPrint:
+                stdin.close()
+                tmppf = stdout.read()
+                if len(tmppf) > 0:
+                    open(absplotPrint,"w").write(tmppf)
+
+    def getCostsAndTimes(self, file, plotItem):
+        costs = []
+        times = []
+        return costs, times
+    def getStatusFile(self, test, version):
+        currentFile = test.makeFileName(self.statusFileName, version)
+        if not os.path.isfile(currentFile):
+            return None
+        return currentFile
+    def scaleTimes(self, times, test, version):
+        totPerf = int(performance.getTestPerformance(test, version))
+        if totPerf < 1:
+            return times
+        scaleFactor = float(1.0 * totPerf / times[-1])
+        print times[-1], totPerf, scaleFactor
+        ntimes = []
+        for t in times:
+            ntimes.append(t * scaleFactor)
+        return ntimes
+    def __call__(self, test):
+        for version in self.plotVersions:
+            currentFile = self.getStatusFile(test, version)
+            if currentFile == None:
+                print "No status file does exist for test " + test.name + "(" + version + ")"
+                return
+            costs, times = self.getCostsAndTimes(currentFile, self.plotItem)
+            times = self.scaleTimes(times, test, version)
+            plotFileName = test.makeFileName("plot")
+            if len(version) > 0:
+                plotFileName += "." + version
+            plotFile = open(plotFileName,"w")
+            for il in range(len(costs)):
+                if self.plotAgainstSolNum:
+                    plotFile.write(str(costs[il]) + os.linesep)
+                else:
+                    plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
+            self.plotFiles.append(plotFileName)
+    def setUpSuite(self, suite):
+        pass
+    def setUpApplication(self, app):
+        self.statusFileName = app.getConfigValue("log_file")

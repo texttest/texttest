@@ -18,6 +18,22 @@ helpScripts = """matador.ImportTest         - Import new test cases and test use
                              'template' for temporary subplandirs as created when the test is run.
                              The action will look for available subplandirectories under
                              CARMUSR and present them to you.
+
+matador.PlotTest [options] - Displays a gnuplot graph with the cpu time (in minutes) versus total cost. 
+                             The data is extracted from the log file of test(s)
+                             All tests selected are plotted in the same graph.
+                             The following options are supported:
+                             - r=range
+                               The x-axis has the range range. Default is the whole data set. Example: 60:
+                             - p=an absolute file name
+                               Prints the graph to a postscript file instead of displaying it.
+                             - i=item
+                               Which item to plot from the status file. Note that whitespaces are replaced
+                               by underscores. Default is 'plan'. Example: i=roster
+                             - s
+                               Plot against solution number instead of cpu time.
+                             - v=v1,v2
+                               Plot multiple versions in same dia, ie 'v=,9' means master and version 9
 """
 
 import carmen, os, shutil, filecmp, optimization, string, plugins, comparetest
@@ -222,3 +238,30 @@ class ImportTest(optimization.ImportTest):
         else:
             self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
     
+class PlotTest(optimization.PlotTest):
+    def __init__(self, args = []):
+        optimization.PlotTest.__init__(self, args)
+        self.plotItem = "plan"
+        self.interpretOptions(args)
+    def setOption(self, arr):
+        if arr[0]=="i":
+            self.plotItem = arr[1].replace("_"," ")
+            return 1
+        return 0
+    def getYlabel(self):
+        return "Cost of " + self.plotItem
+    def getCostsAndTimes(self, file, plotItem):
+        costCommand = "grep 'cost of " + plotItem + "' " + file + " | awk -F':' '{ print $2 }'"
+        timeCommand = "grep 'cpu time' " + file + " | awk '{ print $6 }'"
+        times = map(self._convertTime, os.popen(timeCommand).readlines())
+        times.insert(0, 0.0)
+        costs = map(self._makeInt, os.popen(costCommand).readlines())
+        return costs, times
+    def _makeInt(self, val):
+        return int(string.strip(val))
+    def _convertTime(self, timeEntry):
+        entries = timeEntry.split(":")
+        timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip())
+        return float(timeInSeconds) / 60.0
+    def getStatusFile(self, test, version):
+        return optimization.PlotTest.getStatusFile(self, test, version)

@@ -84,10 +84,14 @@ class ApcConfig(optimization.OptimizationConfig):
             ruleCompile = 1
         else:
             ruleCompile = self.optionMap.has_key("rulecomp")
-        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, staticFilter, ruleCompile)
+        if self.optionMap.has_key("debug"):
+            modeString = "-debug"
+        else:
+            modeString = "-optimize"
+        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, staticFilter, ruleCompile, modeString)
     def getSpecificTestRunner(self):
         if self.optionMap.has_key("lprof"):
-            subActions = [ self._getApcTestRunner(), carmen.WaitForDispatch(), carmen.RunLProf(-2) ]
+            subActions = [ self._getApcTestRunner(), carmen.WaitForDispatch(), carmen.RunLProf(-1) ]
             return plugins.CompositeAction(subActions)
         else:
             return self._getApcTestRunner()
@@ -268,8 +272,8 @@ class RunApcTestInDebugger(default.RunTest):
         self.describe(suite)
     
 class ApcCompileRules(carmen.CompileRules):
-    def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, forcedRuleCompile = 0):
-        carmen.CompileRules.__init__(self, getRuleSetName, "-optimize", sFilter)
+    def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, forcedRuleCompile = 0, modeString = "-optimize"):
+        carmen.CompileRules.__init__(self, getRuleSetName, modeString, sFilter)
         self.forcedRuleCompile = forcedRuleCompile
         self.getLibraryFile = getLibraryFile
         self.diag = plugins.getDiagnostics("ApcCompileRules")

@@ -98,6 +98,10 @@ class OptimizationConfig(carmen.CarmenConfig):
         options["kpiData"] = "Output KPI curve data etc."
         options["kpi"] = "Run Henrik's old KPI"
         return options
+    def getSwitches(self):
+        switches = carmen.CarmenConfig.getSwitches(self)
+        switches["debug"] = "Build debug compiled ruleset"
+        return switches
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
@@ -122,7 +126,11 @@ class OptimizationConfig(carmen.CarmenConfig):
             localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
             return self.getCompileRules(localFilter)
     def getCompileRules(self, localFilter):
-        return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
+        if self.optionMap.has_key("debug"):
+            modeString = "-debug"
+        else:
+            modeString = "-optimize"
+        return carmen.CompileRules(self.getRuleSetName, modeString, localFilter)
     def getTestRunner(self):
         return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
     def getSpecificTestRunner(self):

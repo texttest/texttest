@@ -40,6 +40,7 @@ class Responder(plugins.Action):
         test.state.save(exact, version, self.overwriteSuccess)
     def setUpApplication(self, app):
         self.lineCount = app.getConfigValue("lines_of_text_difference")
+        self.maxLineWidth = app.getConfigValue("max_width_text_difference")
         self.logFile = app.getConfigValue("log_file")
         self.graphicalDiffTool = app.getConfigValue("diff_program")
         self.textDiffTool = app.getConfigValue("text_diff_program")
@@ -76,10 +77,16 @@ class Responder(plugins.Action):
         fullText = ""
         for line in file.xreadlines():
             if linesWritten < self.lineCount:
-                fullText += line
+                fullText += self.getWrappedLine(line)
                 linesWritten += 1
         file.close()
         return fullText
+    def getWrappedLine(self, line):
+        if len(line) <= self.maxLineWidth:
+            return line
+        truncatedLine = line[:self.maxLineWidth]
+        return truncatedLine + os.linesep + self.getWrappedLine(line[self.maxLineWidth:])
+
 
 # Generic interactive responder. Can be configured via the settings in setUpApplication method
 class InteractiveResponder(Responder):

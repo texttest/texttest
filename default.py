@@ -129,6 +129,7 @@ class CollateFile(plugins.Action):
     def __init__(self, sourcePattern, targetStem):
         self.sourcePattern = sourcePattern
         self.targetStem = targetStem
+	self.errText = "Expected file '" + sourcePattern + "' not created by test"
     def __call__(self, test):
         if test.state > test.RUNNING:
             return
@@ -138,8 +139,7 @@ class CollateFile(plugins.Action):
             self.extract(fullpath, targetFile)
             self.transformToText(targetFile)
         elif os.path.isfile(test.makeFileName(self.targetStem)):
-            errText = "Expected file '" + self.sourcePattern + "' not created by test"
-            open(targetFile, "w").write(errText + os.linesep)
+            open(targetFile, "w").write(self.errText + os.linesep)
     def findPath(self, test):
         for writeDir in test.writeDirs:
             pattern = os.path.join(writeDir, self.sourcePattern)

@@ -162,14 +162,6 @@ class SubmitApcTest(lsf.SubmitTest):
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))
         lsf.SubmitTest.__call__(self, test)
-    def getExecuteCommand(self, test):
-        testCommand = test.getExecuteCommand()
-        inputFileName = test.inputFile
-        if os.path.isfile(inputFileName):
-            testCommand = testCommand + " < " + inputFileName
-        outfile = test.getTmpFileName("output", "w")
-        errfile = test.getTmpFileName("errors", "w")
-        return testCommand + " | tee " + outfile + " 2> " + errfile
     
 class ApcCompileRules(carmen.CompileRules):
     def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, forcedRuleCompile = 0):

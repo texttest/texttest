@@ -30,7 +30,9 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                              - r=range
                                The x-axis has the range range. Default is the whole data set. Example: 60:
                              - p=an absolute file name
-                               Prints the graph to a postscript file instead of displaying it.
+                               Produces a postscript file instead of displaying the graph.
+                             - pc
+                               The postscript file will be in color.
                              - i=item
                                Which item to plot from the status file. Note that whitespaces are replaced
                                by underscores. Default is TOTAL cost. Example: i=overcover_cost.
@@ -857,6 +859,7 @@ class PlotTest(plugins.Action):
         self.plotItem = costEntryName
         self.plotrange = "0:"
         self.plotPrint = None
+        self.plotPrintColor = None
         self.plotAgainstSolNum = 0
         self.plotVersions = [ "" ]
         self.plotScaleTime = 1
@@ -871,6 +874,8 @@ class PlotTest(plugins.Action):
                 self.plotrange = arr[1]
             elif arr[0]=="p":
                 self.plotPrint = arr[1]
+            elif arr[0]=="pc":
+                self.plotPrintColor = 1
             elif arr[0]=="s":
                 self.plotAgainstSolNum = 1
             elif arr[0]=="v":
@@ -935,7 +940,10 @@ class PlotTest(plugins.Action):
                 if not os.path.isabs(absplotPrint):
                     print "An absolute path must be given."
                     return
-                stdin.write("set terminal postscript" + os.linesep)
+                stdin.write("set terminal postscript")
+                if self.plotPrintColor:
+                    stdin.write(" color")
+                stdin.write(os.linesep)
 
             stdin.write("set ylabel '" + self.getYlabel() + "'" + os.linesep)
             if self.plotAgainstSolNum:

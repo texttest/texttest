@@ -63,6 +63,8 @@ class UNIXInteractiveResponder(InteractiveResponder):
     def __init__(self, lineCount):
         self.lineCount = lineCount
     def handleCoreFile(self, test):
+        print self.getCrashText(test)
+    def getCrashText(self, test):
         fileName = "coreCommands.gdb"
         file = open(fileName, "w")
         file.write("bt\nq\n")
@@ -71,12 +73,14 @@ class UNIXInteractiveResponder(InteractiveResponder):
         # Unfortunately running gdb is not the answer, because it truncates the data...
         binary = os.popen("csh -c 'echo `tail -c 1024 core`'").read().split(" ")[-1].strip()        
         gdbData = os.popen("gdb -q -x " + fileName + " " + binary + " core")
+        crashText = ""
         for line in gdbData.xreadlines():
             if line.find("Program terminated") != -1:
-                print test.getIndent() + repr(test) + " CRASHED (" + line.strip() + ") : stack trace from gdb follows"
+                crashText += test.getIndent() + repr(test) + " CRASHED (" + line.strip() + ") : stack trace from gdb follows" + os.linesep
             if line[0] == "#":
-                print line.strip()
+                crashText += line
         os.remove(fileName)
+        return crashText
     def display(self, comparison, displayStream, logFile):
         argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
         if repr(comparison) == logFile and displayStream == sys.stdout:
@@ -100,15 +104,54 @@ class OverwriteOnFailures(Responder):
         for comparison in comparisons:
             comparison.overwrite(self.version)
 
+class BatchCategory:
+    def __init__(self, description):
+        self.description = description
+        self.count = 0
+        self.text = []
+    def addTest(self, test):
+        self.text.append(test.getIndent() + "- " + repr(test) + os.linesep)
+        self.count += 1
+    def addSuite(self, suite, description):
+        line = description + ":" + os.linesep
+        currentIndent = len(suite.getIndent())
+        # Remove lines corresponding to suites with no entries
+        if len(self.text) > 0:
+            lastLine = self.text[-1]
+            lastIndent = len(lastLine) - len(lastLine.lstrip())
+            if lastIndent == currentIndent:
+                self.text.pop()
+        self.text.append(line)
+    def briefText(self):
+        if self.description == "succeeded" or self.count == 0:
+            return ""
+        else:
+            return " " + str(self.count) + " " + self.description + ","
+    def describe(self, mailFile):
+        lastLine = self.text[-1]
+        # If the last line talked about a suite, it's not interesting...
+        if lastLine.find("test-suite") != -1:
+            self.text.pop()
+        if self.count > 0:
+            mailFile.write("The following tests " + self.description + " : " + os.linesep)
+            mailFile.writelines(self.text)
+            mailFile.write(os.linesep)
+
 # Works only on UNIX
 class BatchResponder(Responder):
     def __repr__(self):
         return "In"
     def __init__(self, lineCount):
-        self.failures = {}
-        self.successText = []
-        self.failuresText = []
-        self.testCount = 0
+        self.failureDetail = {}
+        self.crashDetail = {}
+        self.categories = {}
+        self.categories["crash"] = BatchCategory("CRASHED")
+        self.categories["difference"] = BatchCategory("FAILED")
+        self.categories["faster"] = BatchCategory("ran faster")
+        self.categories["slower"] = BatchCategory("ran slower")
+        self.categories["success"] = BatchCategory("succeeded")
+        self.orderedCategories = self.categories.keys()
+        self.orderedCategories.sort()
         self.mainSuite = None
         self.responder = UNIXInteractiveResponder(lineCount)
     def __del__(self):
@@ -119,11 +162,12 @@ class BatchResponder(Responder):
         mailFile.write("To: " + toAddress + os.linesep)
         mailFile.write("Subject: " + self.getMailTitle() + os.linesep)
         mailFile.write(os.linesep) # blank line separating headers from body
-        if self.successCount() > 0:
-            mailFile.write("The following tests succeeded : " + os.linesep)
-            mailFile.writelines(self.successText)
+        for categoryName in self.orderedCategories:
+            self.categories[categoryName].describe(mailFile)
+        if len(self.crashDetail) > 0:
+            self.writeCrashDetail(mailFile)
         if self.failureCount() > 0:
-            self.reportFailures(mailFile)
+            self.writeFailureDetail(mailFile)
         mailFile.close()
     def getRecipient(self, fromAddress):
         app = self.mainSuite.app
@@ -132,32 +176,58 @@ class BatchResponder(Responder):
         else:
             return fromAddress
     def handleSuccess(self, test):
-        self.successText.append(test.getIndent() + "- " + repr(test) + os.linesep)
-        self.testCount += 1
+        category = self.findSuccessCategory(test)
+        self.categories[category].addTest(test)
     def handleFailure(self, test, comparisons):
-        self.failuresText.append(test.getIndent() + "- " + repr(test) + os.linesep)
-        self.failures[test] = comparisons
-        self.testCount += 1
+        category = self.findFailureCategory(test, comparisons)
+        self.categories[category].addTest(test)
+        self.failureDetail[test] = comparisons
+    def findFailureCategory(self, test, comparisons):
+        if test in self.crashDetail.keys():
+            return "crash"
+        if len(comparisons) > 1:
+            return "difference"
+        return comparisons[0].getType()
+    def findSuccessCategory(self, test):
+        if test in self.crashDetail.keys():
+            return "crash"
+        return "success"
+    def handleCoreFile(self, test):
+        crashText = self.responder.getCrashText(test)
+        self.crashDetail[test] = crashText
     def setUpSuite(self, suite, description):
         if self.mainSuite == None:
             self.mainSuite = suite
-        line = description + ":" + os.linesep
-        self.successText.append(line)
-        self.failuresText.append(line)
+        for category in self.categories.values():
+            category.addSuite(suite, description)
     def failureCount(self):
-        return len(self.failures)
-    def successCount(self):
-        return self.testCount - self.failureCount()
+        return len(self.failureDetail)
+    def testCount(self):
+        count = 0
+        for category in self.categories.values():
+            count += category.count
+        return count
     def getMailTitle(self):
-        suiteDescription = repr(self.mainSuite.app) + " Test Suite (" + self.mainSuite.name + " in " + self.mainSuite.app.checkout + ") : "
-        return suiteDescription + str(self.failureCount()) + " out of " + str(self.testCount) + " tests failed"
-    def reportFailures(self, mailFile):
-        mailFile.write(os.linesep + "The following tests failed : " + os.linesep)
-        mailFile.writelines(self.failuresText)
+        title = repr(self.mainSuite.app) + " Test Suite (" + self.mainSuite.name + " in " + self.mainSuite.app.checkout + ") : "
+        title += str(self.testCount()) + " tests ran"
+        if self.failureCount() == 0:
+            return title + ", all successful"
+        title += " :"
+        for categoryName in self.orderedCategories:
+            title += self.categories[categoryName].briefText()
+        # Lose trailing comma
+        return title[:-1]
+    def writeCrashDetail(self, mailFile):
+        mailFile.write(os.linesep + "Crash information for the tests that crashed follows..." + os.linesep)
+        for test, stackTrace in self.crashDetail.items():
+            mailFile.write("--------------------------------------------------------" + os.linesep)
+            mailFile.write("TEST CRASHED -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
+            mailFile.write(stackTrace)
+    def writeFailureDetail(self, mailFile):
         mailFile.write(os.linesep + "Failure information for the tests that failed follows..." + os.linesep)
-        for test in self.failures.keys():
+        for test, comparisons in self.failureDetail.items():
             mailFile.write("--------------------------------------------------------" + os.linesep)
             mailFile.write("TEST FAILED -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             os.chdir(test.abspath)
-            self.responder.displayComparisons(self.failures[test], mailFile, None)
+            self.responder.displayComparisons(comparisons, mailFile, None)
         

@@ -1,5 +1,8 @@
 #!/usr/local/bin/python
-import os, time, string, signal, sys
+import os, time, string, signal, sys, default, performance, respond
+
+def getConfig(optionMap):
+    return LSFConfig(optionMap)
 
 globalJobName = ""
 
@@ -14,6 +17,41 @@ def killJobs(signal, stackFrame):
 signal.signal(1, killJobs)
 signal.signal(2, killJobs)
 signal.signal(15, killJobs)
+
+class LSFConfig(default.Config):
+    def getOptionString(self):
+        return "lbr:R:" + default.Config.getOptionString(self)
+    def getFilterList(self):
+        filters = default.Config.getFilterList(self)
+        self.addFilter(filters, "r", performance.TimeFilter)
+        return filters
+    def getTestRunner(self):
+        if self.optionMap.has_key("l"):
+            return default.Config.getTestRunner(self)
+        else:
+            return SubmitTest(self.findLSFQueue, self.optionValue("R"))
+    # Default queue function, users probably need to override
+    def findLSFQueue(self, test):
+        return "normal"
+    def getTestCollator(self):
+        if self.optionMap.has_key("l"):
+            return default.Config.getTestCollator(self)
+        else:
+            return [ Wait(), MakeResourceFiles() ]
+    def getTestComparator(self):
+        if self.optionMap.has_key("l"):
+            return default.Config.getTestComparator(self)
+        else:
+            return [ performance.MakeComparisons() ]
+    def getTestResponder(self):
+        diffLines = 30
+        # If running multiple times, batch mode is assumed
+        if self.optionMap.has_key("b") or self.optionMap.has_key("m"):
+            return [ respond.BatchResponder(diffLines) ]
+        elif self.optionMap.has_key("o"):
+            return default.Config.getTestResponder(self)
+        else:
+            return [ respond.UNIXInteractiveResponder(diffLines) ]
 
 class LSFJob:
     def __init__(self, test):

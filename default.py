@@ -8,7 +8,7 @@ class Config:
     def __init__(self, optionMap):
         self.optionMap = optionMap
     def getOptionString(self):
-        return "iot:"
+        return "iot:f:"
     def optionValue(self, option):
         if self.optionMap.has_key(option):
             return self.optionMap[option]
@@ -22,7 +22,10 @@ class Config:
     def getFilterList(self):
         filters = []
         self.addFilter(filters, "t", TestNameFilter)
+        self.addFilter(filters, "f", FileFilter)
         return filters
+    def interpret(self, binaryString):
+        return binaryString
     def addFilter(self, list, optionName, filterObj):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
@@ -56,3 +59,10 @@ class TestNameFilter(TextFilter):
     def acceptsTestCase(self, test):
         return self.containsText(test)
     
+class FileFilter:
+    def __init__(self, filterFile):
+        self.texts = map(string.strip, open(filterFile).readlines())
+    def acceptsTestCase(self, test):
+        return test.name in self.texts
+    def acceptsTestSuite(self, suite):
+        return 1

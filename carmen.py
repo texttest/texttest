@@ -10,76 +10,40 @@ class UserFilter(default.TextFilter):
             return self.containsText(suite)
         else:
             return 1
-
-class FileFilter(default.TextFilter):
-    def __init__(self, filterFile):
-        self.texts = map(string.strip, open(filterFile).readlines())
-    def acceptsTestCase(self, test):
-        return test.name in self.texts
         
 architecture = os.popen("arch").readline()[:-1]
-
-def findLSFQueue(test):
-    if architecture == "powerpc" or architecture == "parisc_2_0":
-        return architecture
-    cpuTime = performance.getTestPerformance(test)
-    if cpuTime < 15:
-        return "short_" + architecture
-    elif cpuTime < 120:
-        return architecture
-    else:
-        return "idle_" + architecture
 
 def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
-class CarmenConfig(default.Config):
+class CarmenConfig(lsf.LSFConfig):
     def getOptionString(self):
-        return "lbf:r:u:R:" + default.Config.getOptionString(self)
+        return "u:" + lsf.LSFConfig.getOptionString(self)
     def getFilterList(self):
-        filters = default.Config.getFilterList(self)
-        self.addFilter(filters, "r", performance.TimeFilter)
+        filters = lsf.LSFConfig.getFilterList(self)
         self.addFilter(filters, "u", UserFilter)
-        self.addFilter(filters, "f", FileFilter)
         return filters
-    def addFilter(self, list, optionName, filterObj):
-        if self.optionMap.has_key(optionName):
-            list.append(filterObj(self.optionMap[optionName]))
     def getActionSequence(self):
         if self.optionMap.has_key("rulecomp"):
             return [ CompileRules(self.getRuleSetName) ]
         else:
-            return default.Config.getActionSequence(self)
+            return lsf.LSFConfig.getActionSequence(self)
     def getTestRunner(self):
         if self.optionMap.has_key("lprof"):
-            return [ self._getTestRunner(), WaitForDispatch(), RunLProf() ]
+            return [ lsf.LSFConfig.getTestRunner(self), WaitForDispatch(), RunLProf() ]
         else:
-            return self._getTestRunner()
-    def _getTestRunner(self):
-        if self.optionMap.has_key("l"):
-            return default.Config.getTestRunner(self)
+            return lsf.LSFConfig.getTestRunner(self)
+    def findLSFQueue(self, test):
+        if architecture == "powerpc" or architecture == "parisc_2_0":
+            return architecture
+        cpuTime = performance.getTestPerformance(test)
+        if cpuTime < 15:
+            return "short_" + architecture
+        elif cpuTime < 120:
+            return architecture
         else:
-            return lsf.SubmitTest(findLSFQueue, self.optionValue("R"))
-    def getTestCollator(self):
-        if self.optionMap.has_key("l"):
-            return default.Config.getTestCollator(self)
-        else:
-            return [ lsf.Wait(), lsf.MakeResourceFiles() ]
-    def getTestComparator(self):
-        if self.optionMap.has_key("l"):
-            return default.Config.getTestComparator(self)
-        else:
-            return [ performance.MakeComparisons() ]
-    def getTestResponder(self):
-        diffLines = 30
-        # If running multiple times, batch mode is assumed
-        if self.optionMap.has_key("b") or self.optionMap.has_key("m"):
-            return [ respond.BatchResponder(diffLines) ]
-        elif self.optionMap.has_key("o"):
-            return default.Config.getTestResponder(self)
-        else:
-            return [ respond.UNIXInteractiveResponder(diffLines) ]
-
+            return "idle_" + architecture
+    
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
 

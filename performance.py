@@ -39,8 +39,8 @@ class PerformanceFileComparison(comparetest.FileComparison):
             if (self.oldCPUtime < 0):
                 os.remove(self.stdFile)
     def __repr__(self):
-        return comparetest.FileComparison.__repr__(self) + "(" + self.getDirection() + ")"
-    def getDirection(self):
+        return comparetest.FileComparison.__repr__(self) + "(" + self.getType() + ")"
+    def getType(self):
         if self.newCPUtime < self.oldCPUtime:
             return "faster"
         else:

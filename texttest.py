@@ -229,7 +229,8 @@ class Application:
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
         return os.path.join(checkoutLocation, checkout)
     def getExecuteCommand(self):
-        binary = self.makeAbsPath(self.getConfigValue("binary"))
+        binaryString = self.makeAbsPath(self.getConfigValue("binary"))
+        binary = self.configObject.interpret(binaryString)
         if self.configDir.has_key("interpreter"):
             return self.configDir["interpreter"] + " " + binary
         else:

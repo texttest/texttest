@@ -53,6 +53,8 @@ class FileComparison:
             os.remove(self.stdCmpFile)
     def __repr__(self):
         return self.stdFile.split('.')[0]
+    def getType(self):
+        return "difference"
     def hasDifferences(self):
         return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile)
     def overwrite(self, version = ""):

@@ -117,8 +117,6 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions.append(FetchApcCore(self))
         subActions.append(baseCollator)
         subActions.append(RemoveLogs())
-        if self.optionMap.has_key("lprof"):
-            subActions.append(carmen.ProcessProfilerResults())
         if self.optionMap.has_key("extractlogs"):
             subActions.append(ExtractApcLogs(self.optionValue("extractlogs")))
         return plugins.CompositeAction(subActions)

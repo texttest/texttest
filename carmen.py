@@ -132,7 +132,7 @@ class RuleSet:
             self.targetFile = os.path.join(os.environ["CARMTMP"], "crc", "rule_set", string.upper(raveName), architecture, self.name)
             self.sourceFile = os.path.join(os.environ["CARMUSR"], "crc", "source", self.name)
     def isValid(self):
-        return self.name != None
+        return self.name != None and os.path.isfile(self.sourceFile)
     def isCompiled(self):
         return os.path.isfile(self.targetFile)
     def backup(self):

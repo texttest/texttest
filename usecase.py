@@ -177,10 +177,10 @@ class UseCaseReplayer:
         if nextCommand:
             return nextCommand
 
-        if len(self.scripts) == 1:
+        del self.scripts[-1]
+        if len(self.scripts) == 0:
             return None
 
-        del self.scripts[-1]
         return self.getCommand()
     def runNextCommand(self):
         command = self.getCommand()

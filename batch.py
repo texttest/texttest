@@ -171,5 +171,5 @@ class BatchResponder(respond.Responder):
             mailFile.write("--------------------------------------------------------" + os.linesep)
             mailFile.write("TEST FAILED -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             os.chdir(test.abspath)
-            self.responder.displayComparisons(comparisons, mailFile, None)
+            self.responder.displayComparisons(comparisons, mailFile, self.mainSuite.app)
         

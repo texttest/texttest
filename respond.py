@@ -79,7 +79,7 @@ class UNIXInteractiveResponder(InteractiveResponder):
         return crashText
     def display(self, comparison, displayStream, app):
         argumentString = " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
-        if repr(comparison) == app.getConfigValue("log_file") and displayStream == sys.stdout:
+        if displayStream == sys.stdout and repr(comparison) == app.getConfigValue("log_file"):
             print "<See tkdiff window>"
             os.system("tkdiff" + argumentString + " &")
         else:

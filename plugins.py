@@ -245,10 +245,11 @@ class Switch(Option):
         self.nameForOff = nameForOff
 
 class OptionGroup:
-    def __init__(self, name):
+    def __init__(self, name, defaultDict):
         self.name = name
         self.options = seqdict()
         self.switches = seqdict()
+        self.defaultDict = defaultDict
     def __repr__(self):
         return "OptionGroup " + self.name + os.linesep + repr(self.options) + os.linesep + repr(self.switches)
     def reset(self):
@@ -264,20 +265,26 @@ class OptionGroup:
             self.switches[key].defaultValue = 1
             return 1
         return 0
+    def getDefault(self, name, value):
+        entryName = name.lower().replace(" ", "_")
+        if self.defaultDict.has_key(entryName):
+            return self.defaultDict[entryName]
+        else:
+            return value
     def addSwitch(self, key, name, value = 0, nameForOff = None):
-        self.switches[key] = Switch(name, value, nameForOff)
+        self.switches[key] = Switch(name, int(self.getDefault(name, value)), nameForOff)
     def addOption(self, key, name, value = "", possibleValues = None):
-        self.options[key] = TextOption(name, value, possibleValues)
+        self.options[key] = TextOption(name, self.getDefault(name, value), possibleValues)
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()
         else:
-            return defValue
+            return self.getDefault(key, defValue)
     def getOptionValue(self, key, defValue = None):
         if self.options.has_key(key):
             return self.options[key].getValue()
         else:
-            return defValue
+            return self.getDefault(key, defValue)
     def getCommandLines(self):
         commandLines = []
         for key, option in self.options.items():

@@ -567,13 +567,12 @@ class Application:
         # anywhere it needs to be set up
         self.setConfigDefault("test_colours", self.getGuiColourDictionary())
         self.setConfigDefault("file_colours", self.getGuiColourDictionary())
+        self.setConfigDefault("gui_entry_overrides", {})
         if os.name == "posix":
             self.setConfigDefault("view_program", "xemacs")
-            self.setConfigDefault("diff_program", "tkdiff")
             self.setConfigDefault("follow_program", "tail -f")
         elif os.name == "dos" or os.name == "nt":
             self.setConfigDefault("view_program", "wordpad.exe")
-            self.setConfigDefault("diff_program", "tkdiff.tcl")
             self.setConfigDefault("follow_program", None)
     def getGuiColourDictionary(self):
         dict = {}
@@ -596,10 +595,11 @@ class Application:
         else:
             self.setConfigDefault("interpreter", "")
     def createOptionGroups(self, optionMap):
+        defaultDict = self.getConfigValue("gui_entry_overrides")
         groupNames = [ "Select Tests", "What to run", "How to run", "Side effects", "Invisible" ]
         optionGroups = []
         for name in groupNames:
-            group = plugins.OptionGroup(name)
+            group = plugins.OptionGroup(name, defaultDict)
             self.addToOptionGroup(group)
             self.configObject.addToOptionGroup(group)
             optionGroups.append(group)

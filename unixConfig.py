@@ -279,7 +279,7 @@ class MakePerformanceFile(plugins.Action):
     def __repr__(self):
         return "Making performance file for"
     def __call__(self, test):
-        if test.state == test.UNRUNNABLE:
+        if test.state == test.UNRUNNABLE or test.state == test.KILLED:
             return
 
         cpuTime, realTime = self.readTimes(test)

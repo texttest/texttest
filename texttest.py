@@ -45,6 +45,16 @@ class Test:
         self.abspath = abspath
         self.paddedName = self.name
         self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())
+        # Single pass to expand all variables (don't want multiple expansion)
+        for var, value in self.environment.items():
+            expValue = os.path.expandvars(value)
+            if value.find(os.sep) != -1:
+                self.environment[var] = self.app.makeAbsPath(expValue)
+                debugLog.info("Expanded " + var + " path " + value + " to " + self.environment[var])
+            else:
+                self.environment[var] = expValue
+                debugLog.info("Expanded variable " + var + " to " + expValue)
+            os.environ[var] = self.environment[var]
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
     def makeFileName(self, stem, refVersion = None):
@@ -69,13 +79,7 @@ class Test:
         self.performOnSubTests(action)
     def setUpEnvironment(self):
         for var, value in self.environment.items():
-            if value.find(os.sep) != -1:
-                varValue = os.path.expandvars(value)
-                os.environ[var] = self.app.makeAbsPath(varValue)
-            else:
-                os.environ[var] = os.path.expandvars(value)
-            # Ensure multiple expansion doesn't occur
-            self.environment[var] = os.environ[var]
+            os.environ[var] = value
             debugLog.info("Setting " + var + " to " + os.environ[var])
     def getIndent(self):
         dirCount = string.count(self.getRelPath(), os.sep)
@@ -195,7 +199,6 @@ class TestSuite(Test):
             self.rejected = 1
             return testCaseList
 
-        self.setUpEnvironment()
         for testline in open(self.testCaseFile).readlines():
             if testline == '\n' or testline[0] == '#':
                 continue

@@ -269,6 +269,7 @@ class BuildCode(plugins.Action):
                 print "Not building in", absPath, "which doesn't exist!"
         self.buildRemote("sundance", "sparc", app) 
         self.buildRemote("ramechap", "parisc_2_0", app)
+        self.buildRemote("naxos", "powerpc", app)
     def buildLocal(self, absPath, app):
         os.chdir(absPath)
         print "Building", app, "in", absPath, "..."

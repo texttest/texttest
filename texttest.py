@@ -458,9 +458,6 @@ class Application:
     def getTestUser(self):
         return tmpString()
     def ownsFile(self, fileName):
-        # We can claim all environment files...
-        if fileName.startswith("environment"):
-            return 1
         # And anything ending in cmp we don't want...
         if fileName.endswith("cmp"):
             return 0

@@ -3,7 +3,9 @@
 # GUI for TextTest written with PyGTK
 
 import plugins, gtk, gobject, os, string, time, sys
+from threading import Thread
 from gtkscript import eventHandler
+from Queue import Queue, Empty
 
 class TextTestGUI:
     def __init__(self, replayScriptName, recordScriptName):
@@ -14,6 +16,8 @@ class TextTestGUI:
         self.postponedTests = []
         self.interactiveActions = []
         self.itermap = {}
+        self.quitGUI = 0
+        self.workQueue = Queue()
     def createTopWindow(self):
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -22,7 +26,7 @@ class TextTestGUI:
         vbox = self.createWindowContents()
         win.add(vbox)
         win.show()
-        win.resize(600, 500)
+        win.resize(600, 1000)
         return win
     def createIterMap(self):
         iter = self.model.get_iter_root()
@@ -107,19 +111,37 @@ class TextTestGUI:
         self.createIterMap()
         self.testCaseGUI = TestCaseGUI(None)
         topWindow = self.createTopWindow()
-        eventHandler.addIdle("test actions", self.doNextAction)
+        self.actionThread = Thread(None, self.runActionThread, "action", ())
+        self.actionThread.start()
+        eventHandler.addIdle("test actions", self.pickUpChange)
         # Run the Gtk+ main loop.
         gtk.main()
-    def doNextAction(self):
-        if len(self.instructions) == 0:
+    def pickUpChange(self):
+        try:
+            test = self.workQueue.get_nowait()
+            if test == "actions finished":
+                self.actionThread.join()
+                return gtk.FALSE
+            if test:
+                self.redrawTest(test)
+                if self.testCaseGUI and self.testCaseGUI.test == test:
+                    self.recreateTestView(test)
+            return gtk.TRUE
+        except Empty:
+            # We must sleep for a bit, or we use the whole CPU (busy-wait)
+            time.sleep(0.1)
+            return gtk.TRUE
+    def runActionThread(self):
+        while len(self.instructions):
+            for test, action in self.instructions:
+                if self.quitGUI:
+                    return
+                self.performAction(test, action)
             self.instructions = self.postponedInstructions
             self.postponedTests = []
             self.postponedInstructions = []
-            if len(self.instructions) == 0:
-                return gtk.FALSE
-        test, action = self.instructions[0]
-        del self.instructions[0]
-        
+        self.workQueue.put("actions finished")
+    def performAction(self, test, action):
         if test in self.postponedTests:
             self.postponedInstructions.append((test, action))
         else:
@@ -127,16 +149,15 @@ class TextTestGUI:
             if retValue != None:
                 self.postponedTests.append(test)
                 self.postponedInstructions.append((test, action))
-        return gtk.TRUE
     def notifyChange(self, test):
-        self.redrawTest(test)
-        if self.testCaseGUI and self.testCaseGUI.test == test:
-            self.recreateTestView(test)
+        self.workQueue.put(test)
     def redrawTest(self, test):
         iter = self.itermap[test]
         self.model.set_value(iter, 1, self.getTestColour(test))
         self.model.row_changed(self.model.get_path(iter), iter)
     def quit(self, *args):
+        self.quitGUI = 1
+        self.actionThread.join()
         gtk.main_quit()
     def viewTest(self, view, path, column, *args):
         test = self.model.get_value(self.model.get_iter(path), 2)
@@ -179,7 +200,6 @@ class TestCaseGUI:
         if not test or test.state < test.RUNNING:
             return
         try:
-            os.chdir(test.getDirectory(temporary=1))
             testComparison = test.stateDetails
             for name in testComparison.attemptedComparisons:
                 fileComparison = testComparison.findFileComparison(name)
@@ -250,7 +270,6 @@ class TestCaseGUI:
             return "Test-case info"
         return repr(test).replace("_", "__")
     def displayDifferences(self, view, path, column, *args):
-        os.chdir(self.test.getDirectory(temporary=1))
         comparison = self.model.get_value(self.model.get_iter(path), 2)
         if comparison:
             if comparison.newResult():
@@ -313,7 +332,6 @@ class TestCaseGUI:
         else:
             return 1
     def save(self, button, option, *args):
-        os.chdir(self.test.getDirectory(temporary=1))
         print "Saving", self.test, "version", option
         testComparison = self.test.stateDetails
         if testComparison:

@@ -309,6 +309,7 @@ class UpdateLSFStatus(plugins.Action):
 class MakePerformanceFile(unixConfig.MakePerformanceFile):
     def __init__(self, isSlowdownJob):
         self.isSlowdownJob = isSlowdownJob
+        self.timesWaitedForLSF = 0
     def findExecutionMachines(self, test):
         tmpFile = test.makeFileName("lsfreport", temporary=1, forComparison=0)
         executionMachines = []
@@ -321,8 +322,13 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
                 activeRegion = 0
         if len(executionMachines) == 0:
             # Assume race condition with LSF writing the report... wait a bit and try again
-            time.sleep(2)
-            return self.findExecutionMachines(test)
+            if self.timesWaitedForLSF < 10:
+                time.sleep(2)
+                self.timesWaitedForLSF += 1
+                return self.findExecutionMachines(test)
+            else:
+                print "WARNING : Could not find machines in LSF report, keeping it"
+                return executionMachines
 
         os.remove(tmpFile)
         return executionMachines

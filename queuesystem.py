@@ -232,7 +232,18 @@ class QueueSystemServer:
     def findJobLimitMessage(self, test, jobNameFunction):
         job = self.findJob(test, jobNameFunction)
         queueSystem = self.getQueueSystem(test)
-        return queueSystem.findJobLimitMessage(job.jobId)
+        exceededLimit = queueSystem.findExceededLimit(job.jobId)
+        if not exceededLimit:
+            return ""
+        name = queueSystemName(test)
+        if exceededLimit == "cpu":
+            return "Test hit " + name + "'s CPU time limit, and was killed." + os.linesep + \
+                   "Maybe it went into an infinite loop or maybe it needs to be run in another queue."
+        elif exceededLimit == "real":
+            return "Test hit " + name + "'s total run time limit, and was killed." + os.linesep + \
+                   "Maybe it was hanging or maybe it needs to be run in another queue."
+        else:
+            return "Test exceeded limit " + exceededLimit
     def killJob(self, test, jobNameFunction):
         job = self.findJob(test, jobNameFunction)
         queueSystem = self.getQueueSystem(test)

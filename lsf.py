@@ -25,14 +25,12 @@ class QueueSystem:
             if errorMessage and errorMessage.find("still trying") == -1:
                 return errorMessage
         return ""
-    def findJobLimitMessage(self, jobId):
+    def findExceededLimit(self, jobId):
         for line in os.popen("bjobs -a -l " + jobId).readlines():
             if line.find("signal 24") != -1:
-                return "Test hit LSF's CPU time limit, and was killed." + os.linesep + \
-                      "Maybe it went into an infinite loop or maybe it needs to be run in another queue."
+                return "cpu"
             if line.find("exit code 140") != -1:
-                return "Test hit LSF's total run time limit, and was killed." + os.linesep + \
-                       "Maybe it was hanging or maybe it needs to be run in another queue."
+                return "real"
         return ""
     def killJob(self, jobId):
         os.system("bkill " + jobId + " > /dev/null 2>&1")

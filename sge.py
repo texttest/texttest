@@ -1,5 +1,5 @@
 
-import os, string
+import os, string, signal
 from plugins import getDiagnostics
 
 class QueueSystem:
@@ -27,8 +27,13 @@ class QueueSystem:
             return errLines[0].strip()
         else:
             return ""
-    def findJobLimitMessage(self, jobId):
-        # Don't yet know how to do this
+    def findExceededLimit(self, jobId):
+        exitStatus = self.exitStatus(jobId)
+        terminatingSignal = exitStatus & 0x7f
+        if terminatingSignal == signal.SIGXCPU:
+            return "cpu"
+        if terminatingSignal == signal.SIGUSR1:
+            return "real"
         return ""
     def killJob(self, jobId):
         os.system("qdel " + jobId + " > /dev/null 2>&1")
@@ -59,7 +64,7 @@ class QueueSystem:
             return "PEND"
         elif sgeStat.startswith("q"):
             if states == "z":
-                return self.exitStatus(jobId)
+                return self.completedState(jobId)
             else:
                 return "PEND"
         elif sgeStat.startswith("s") or sgeStat.startswith("S") or sgeStat.startswith("T"):
@@ -68,20 +73,25 @@ class QueueSystem:
             return "USUSP"
         else:
             return sgeStat
+    def completedState(self, jobId):
+        exitStatus = self.exitStatus(jobId)
+        if exitStatus is None:
+            return "RUN"
+        if exitStatus == 0:
+            return "DONE"
+        else:
+            return "EXIT"
     def exitStatus(self, jobId):
         stdin, stdout, stderr = os.popen3("qacct -j " + jobId)
         errMsg = stderr.readlines()
         lines = stdout.readlines()
         if len(errMsg):
             # assume this is because the job hasn't propagated yet, wait a bit
-            return "RUN"
+            return None
         for line in lines:
             if line.startswith("exit_status"):
-                exitStatus = int(line.strip().split()[-1])
-                if exitStatus == 0:
-                    return "DONE"
-                else:
-                    return "EXIT"
+                return int(line.strip().split()[-1])
+        return 1
     def updateJobs(self):
         self._updateJobs("prs")
         self._updateJobs("z")

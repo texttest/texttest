@@ -650,6 +650,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
             print "Test", test.name, "has no status file version", version, "Skipping this test."
             logFile = None
         return logFile
+    def getConstantItemsToExtract(self):
+        return [ "Machine", optimization.apcLibraryDateName ]
     def _calculateMargin(self, fcTupleList):
         if len(fcTupleList) < 2:
             return 0.1, 0.1
@@ -810,9 +812,15 @@ class MakeProgressReportGraphical(MakeProgressReport):
     def plotRun(self, optRun, options):
         xVals = []
         yVals = []
-        for solution in optRun.solutions:
+        solutionPrev = optRun.solutions[0]
+        for solution in optRun.solutions[1:]:
+            xVals.append(solutionPrev[optimization.timeEntryName])
+            yVals.append(solutionPrev[optimization.costEntryName])
             xVals.append(solution[optimization.timeEntryName])
-            yVals.append(solution[optimization.costEntryName])
+            yVals.append(solutionPrev[optimization.costEntryName])
+            solutionPrev = solution
+        xVals.append(solutionPrev[optimization.timeEntryName])
+        yVals.append(solutionPrev[optimization.costEntryName])
         self.plot(xVals, yVals, options)
     def plotKPILimits(self, worstCost, currTTWC, refTTWC):
         self.plot([0,1.1*max(currTTWC,refTTWC)],[worstCost, worstCost],"r")

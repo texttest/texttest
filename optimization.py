@@ -402,6 +402,8 @@ class OptimizationRun:
         return len(self.solutions) < 3 or self.getPerformance() == 0
     def getCost(self, solNum = -1):
         return self.solutions[solNum][costEntryName]
+    def getTime(self, solNum = -1):
+        return self.solutions[solNum][timeEntryName]
     def getPerformance(self, solNum = -1): # return int for presentation
         return int(round(self.solutions[solNum][timeEntryName]))
     def getMaxMemory(self):
@@ -780,8 +782,7 @@ class MakeProgressReport(TestReport):
         self.doCompare(referenceRun, currentRun, test.app, test.name, userName)
     def doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition = "test",appSpecificData=None):
         if currentRun.isVeryShort() or referenceRun.isVeryShort():
-            return
-
+            return None
         worstCost = self.calculateWorstCost(referenceRun, currentRun, app, groupName)
         currTTWC = currentRun.timeToCost(worstCost)
         refTTWC = referenceRun.timeToCost(worstCost)
@@ -790,11 +791,18 @@ class MakeProgressReport(TestReport):
         kpi = self.computeKPI(currTTWC, refTTWC)
         print os.linesep, "Comparison on", app, groupNameDefinition, groupName, "(in user " + userName + ") : K.P.I. = " + kpi
         self.reportLine("                         ", self.currentText(), "Version " + self.referenceVersion)
-        self.reportCosts(currentRun, referenceRun, app, groupName,appSpecificData)
+        retVal2=self.reportCosts(currentRun, referenceRun, app, groupName,appSpecificData)
         self.reportLine("Max memory (MB)", currentRun.getMaxMemory(), referenceRun.getMaxMemory())
         self.reportLine("Total time (minutes)     ", currentRun.getPerformance(), referenceRun.getPerformance())
         self.reportLine("Time to cost " + str(worstCost) + " (mins)", currTTWC, refTTWC)
-        return kpi
+
+        # add data for plotting
+        retVal={"KPILine":((currTTWC,worstCost),(refTTWC,worstCost),1)}
+        retVal["kpi"]=kpi;
+        retVal["worstCost"]=worstCost
+        if (retVal2):
+            retVal.update(retVal2);
+        return retVal
     def calculateWorstCost(self, referenceRun, currentRun, app, groupName):
         currMargin, refMargin = self.getMargins(app, groupName)
         currSol = currentRun.getMeasuredSolution(currMargin)
@@ -818,6 +826,7 @@ class MakeProgressReport(TestReport):
             self.reportLine("Initial " + entry, currentRun.solutions[0][entry], referenceRun.solutions[0][entry])
         for entry in costEntries:
             self.reportLine("Final " + entry, currentRun.solutions[-1][entry], referenceRun.solutions[-1][entry])
+        return {}
     def currentText(self):
         if self.currentVersion == None:
             return "Current"

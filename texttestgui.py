@@ -194,6 +194,8 @@ class TextTestGUI:
             view.append_column(perfColumn)
         view.expand_all()
         modelIndexer = TreeModelIndexer(self.model, column, 3)
+        # This does not interact with TextTest at all, so don't bother to connect to PyUseCase
+        view.connect("row_expanded", self.expandSuite)
         # The order of these two is vital!
         scriptEngine.connect("select test", "row_activated", view, self.viewTest, modelIndexer)
         if not self.dynamic:
@@ -205,6 +207,9 @@ class TextTestGUI:
         scrolled.add(view)
         scrolled.show()    
         return scrolled
+    def expandSuite(self, view, iter, path, *args):
+        # Make sure expanding expands everything, better than just one level as default...
+        view.expand_row(path, open_all=gtk.TRUE)
     def takeControl(self, actionRunner):
         # We've got everything and are ready to go
         self.createIterMap()

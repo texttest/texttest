@@ -527,7 +527,7 @@ class KeepApcLogs(plugins.Action):
             return
         machine = job.machines[0]
         subplanName = test.writeDirs[-1].split(os.sep)[-2]
-        apcHostTmp = "/tmp" # Using getApcHostTmp() does not work, since (for some unknown reason) CARMSYS is not set.
+        apcHostTmp = getApcHostTmp()
         apcTmpDir = apcHostTmp + os.sep + subplanName + "_*"
         cmdLine = "cd " + apcTmpDir + ";touch apc_debug"
         os.system("rsh " + machine + " '" + cmdLine + "'")

@@ -689,7 +689,7 @@ class UpdatePerformance(plugins.Action):
             statusFile = self.getStatusFile(test, version)
             performanceFile = self.getPerformanceFile(test, version)
             if statusFile == None or performanceFile == None:
-                return
+                continue
             lastTime = self.getLastTime(test, version, statusFile)
             runHost = self.getExecHost(statusFile)
             totPerf = int(performance.getPerformance(performanceFile))
@@ -698,10 +698,10 @@ class UpdatePerformance(plugins.Action):
                 verText = " (" + version + ")"
             if not runHost in test.app.getConfigList("performance_test_machine"):
                 self.describe(test, verText + " no update for run on " + runHost)
-                return
+                continue
             if lastTime == totPerf:
                 self.describe(test, verText + " no need for update")
-                return
+                continue
             self.describe(test, verText + " perf:" + str(totPerf) + ", status: " + str(lastTime) + ", on " + runHost)
             open(performanceFile,"w").write("CPU time   :      " + str(lastTime) + ".0 sec. on " + runHost + os.linesep)
     def interpretOptions(self, args):

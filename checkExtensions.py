@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, plugins, default
+import os, plugins, carmen
 from glob import glob
 
 #Generic test plugin which will not only compare stdout and stderr but
@@ -27,19 +27,19 @@ def getConfig(optionMap):
 def isCompressed(path):
     magic = open(path).read(2)
     if len(magic) < 2:
-        return
+        return 0
     if magic[0] == chr(0x1f) and magic[1] == chr(0x9d):
         return 1
     else:
         return 0
 
-class CheckExtConfig(default.Config):
+class CheckExtConfig(carmen.CarmenConfig):
     
     def interpretBinary(self, binaryString):
-        return binaryString.replace("ARCHITECTURE", os.popen("arch").readline()[:-1])
+        return binaryString.replace("ARCHITECTURE", carmen.architecture)
     def getTestCollator(self):
-        return createCompareFiles()
-        
+        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self),  createCompareFiles() ])
+    
 class createCompareFiles(plugins.Action):
     def __call__(self, test):
         checkExtensions=[]
@@ -57,13 +57,10 @@ class createCompareFiles(plugins.Action):
             #the current standard compare can't handle dots in the names
             f = file.replace('.','_')
             compareFile=test.getTmpFileName(f,'w')
-            #print os.stat
             if isCompressed(file):
                 os.system('zcat '+file+' > '+compareFile)
                 os.unlink(file)
             else:
                 os.rename(file,compareFile)
-            #print os.stat(compareFile)
-
 
 

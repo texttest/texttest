@@ -284,6 +284,7 @@ class LogFileFinder:
     def __init__(self, test, tryTmpFile = 1):
         self.tryTmpFile = tryTmpFile
         self.test = test
+        test.app.setConfigDefault("log_file", "output")
         self.logStem = test.app.getConfigValue("log_file")
     def findFile(self, version = ""):
         if self.tryTmpFile:

@@ -88,9 +88,9 @@ class BatchCategory(plugins.Filter):
                 self.writeTestLines(mailFile, subtest)         
 
 allBatchResponders = []
-categoryNames = [ "badPredict", "crash", "dead", "difference", "faster", "slower",\
+categoryNames = [ "badPredict", "bug", "crash", "dead", "difference", "faster", "slower",\
                   "larger", "smaller", "success", "unfinished" ]
-categoryDescriptions = [ "had internal errors", "CRASHED", "caused exception", "FAILED", \
+categoryDescriptions = [ "had internal errors", "had known bugs", "CRASHED", "caused exception", "FAILED", \
                          "ran faster", "ran slower", "used more memory", "used less memory", "succeeded", "were unfinished" ]
 
 # Works only on UNIX
@@ -125,7 +125,30 @@ class BatchResponder(respond.Responder):
             self.addTestToCategory(category, test)
         else:
             self.failureDetail[test] = testComparison
-            self.addTestToCategory(category, test, testComparison.failedPrediction)
+            category, summary = self.getSummary(category, testComparison.failedPrediction)
+            self.addTestToCategory(category, test, summary)
+    def getSummary(self, category, description):
+        if category != "bug":
+            return category, description
+        else:
+            bugId, status = self.parseBugDescription(description)
+            newDesc = "(" + status + " bug " + bugId + ")"
+            if status == "RESOLVED" or status == "CLOSED":
+                return "badPredict", newDesc
+            else:
+                return "bug", newDesc
+    def parseBugDescription(self, description):
+        bugId = ""
+        status = ""
+        for line in description.split(os.linesep):
+            words = line.split()
+            if len(words) < 4:
+                continue
+            if words[0].startswith("BugId"):
+                bugId = words[1]
+            if words[2].startswith("Status"):
+                return bugId, words[3]
+        return bugId, status
     def setUpSuite(self, suite):
         if self.mainSuite == None:
             self.mainSuite = suite

@@ -36,7 +36,7 @@ default.CountTest          - produce a brief report on the number of tests in th
 default.ExtractMemory      - update the memory files from the standard log files
 """
 
-import os, shutil, plugins, respond, performance, string, predict, sys
+import os, shutil, plugins, respond, performance, string, predict, sys, bugzilla
 from glob import glob
 
 def getConfig(optionMap):
@@ -85,7 +85,8 @@ class Config(plugins.Configuration):
         return RunTest()
     def getTestEvaluator(self, useGui):
         actions = [ self.getFileExtractor(), self.getCatalogueCreator(), \
-                 self.getTestPredictionChecker(), self.getTestComparator() ]
+                 self.getTestPredictionChecker(), self.getTestComparator(), \
+                 self.getFailureExplainer() ]
         if not useGui:
             actions.append(self.getTestResponder())
         return actions
@@ -109,6 +110,13 @@ class Config(plugins.Configuration):
         return not self.optionMap.has_key("noperf") and len(app.getConfigValue("string_before_memory")) > 0
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
+    def getFailureExplainer(self):
+        if self.bugzillaInstalled():
+            return bugzilla.CheckForBugs()
+        else:
+            return None
+    def bugzillaInstalled(self):
+        return os.system("which bugcli > /dev/null") == 0
     def getTestComparator(self):
         return performance.MakeComparisons()
     def getTestResponder(self):

@@ -72,6 +72,8 @@ class TestComparison:
         if self.failedPrediction:
             if self.failedPrediction.find("Stack trace") != -1:
                 return "crash"
+            elif self.failedPrediction.find("BugId") != -1:
+                return "bug"
             else:
                 return "badPredict"
         worstType = None

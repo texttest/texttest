@@ -1,4 +1,4 @@
-import carmen, os, matador
+import carmen, os, matador, plugins
 
 def getConfig(optionMap):
     return RaveConfig(optionMap)
@@ -6,15 +6,15 @@ def getConfig(optionMap):
 class RaveConfig(carmen.CarmenConfig):
     def getOptionString(self):
         return "k:" + carmen.CarmenConfig.getOptionString(self)
-    def getActionSequence(self):
+    def getRuleBuilder(self, neededOnly):
         if self.optionMap.has_key("skip"):
-            return carmen.CarmenConfig.getActionSequence(self)
+            return plugins.Action()
 
         buildMode = "-optimize"
         if self.optionMap.has_key("debug"):
             buildMode = "-debug"
             
-        return [ carmen.CompileRules(self.getRuleSetName, buildMode) ] + carmen.CarmenConfig.getActionSequence(self)
+        return carmen.CompileRules(self.getRuleSetName, buildMode)
     def getSubPlanFileName(self, test, sourceName):
         firstWord = test.options.split()[0]
         subPlan = firstWord[1:-1]

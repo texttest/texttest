@@ -6,17 +6,18 @@ class OptimizationConfig(carmen.CarmenConfig):
     def getActionSequence(self):
         if self.optionMap.has_key("kpi"):
             return [ CalculateKPI(self.optionValue("kpi")) ]
-        if self.optionMap.has_key("rulecomp"):
-            return carmen.CarmenConfig.getActionSequence(self)
-        
-        return [ self.getRaveBuildAction() ] + carmen.CarmenConfig.getActionSequence(self)
-    def getRaveBuildAction(self):
-        batchSession = self.optionValue("b")
-        if batchSession == "nightjob" or batchSession == "wkendjob":
-            return carmen.CompileRules(self.getRuleSetName)
 
-        localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
-        return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
+        return carmen.CarmenConfig.getActionSequence(self)
+    def getRuleBuilder(self, neededOnly):
+        batchSession = self.optionValue("b")
+        if batchSession == "nightjob" or batchSession == "wkendjob" or not neededOnly:
+            return self.getCompileRules(None)
+        else:
+            print "Filtered"
+            localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
+            return self.getCompileRules(filter)
+    def getCompileRules(self, filter):
+        return carmen.CompileRules(self.getRuleSetName, "-optimize", filter)
     def getTestCollator(self):
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), ExtractSubPlanFile(self, "best_solution", "solution") ])
 

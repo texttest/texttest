@@ -8,14 +8,8 @@ class ApcConfig(optimization.OptimizationConfig):
         return os.path.join("data", "apc", carmen.architecture, "libapc.a")
     def getSubPlanFileName(self, test, sourceName):
         return os.path.join(test.options.split()[0], sourceName)
-    def getActionSequence(self):
-        if self.optionMap.has_key("rulecomp"):
-            return [ ApcCompileRules(self.getRuleSetName, self.getLibraryFile(), None, 1) ]
-        
-        staticFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
-        return [ self.getCompileRules(staticFilter) ] + carmen.CarmenConfig.getActionSequence(self)
-    def getCompileRules(self, staticFilter):
-        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile(), staticFilter, self.optionMap.has_key("rulecomp"))
+    def getCompileRules(self, filter):
+        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile(), filter, self.optionMap.has_key("rulecomp"))
     def getTestCollator(self):
         subActions = [ optimization.OptimizationConfig.getTestCollator(self), RemoveLogs(), optimization.ExtractSubPlanFile(self, "status", "status") ]
         return plugins.CompositeAction(subActions)
@@ -33,17 +27,18 @@ class ApcCompileRules(carmen.CompileRules):
     def __init__(self, getRuleSetName, libraryFile, filter = None, forcedRuleCompile = 0):
         carmen.CompileRules.__init__(self, getRuleSetName, "-optimize", filter)
         self.forcedRuleCompile = forcedRuleCompile
-        self.apcLib = os.path.join(os.environ["CARMSYS"], libraryFile)
+        self.libraryFile = libraryFile
     def __call__(self, test):
+        self.apcLib = os.path.join(os.environ["CARMSYS"], self.libraryFile)
         carmTmpDir = os.environ["CARMTMP"]
         if not os.path.isdir(carmTmpDir):
             os.mkdir(carmTmpDir)
         if self.forcedRuleCompile == 0 and carmen.architecture == "i386_linux":
-            self.linuxRuleSetBuild(test, description)
+            self.linuxRuleSetBuild(test)
         else:
-            carmen.CompileRules.__call__(self, test, description)
+            carmen.CompileRules.__call__(self, test)
 
-    def linuxRuleSetBuild(self, test, description):
+    def linuxRuleSetBuild(self, test):
         ruleset = carmen.RuleSet(self.getRuleSetName(test), self.raveName)
         if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
             return
@@ -55,7 +50,9 @@ class ApcCompileRules(carmen.CompileRules):
         ruleset.backup()
         if not os.path.isfile(ruleLib):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-            os.system(self.ruleCompileCommand(ruleset.sourceFile))
+            returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile))
+            if returnValue:
+                raise "Failed to build ruleset, exiting"
         commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib) + "-o " + apcExecutable
         si, so, se = os.popen3(commandLine)
         lastErrors = se.readlines()

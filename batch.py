@@ -93,7 +93,7 @@ class BatchResponder(respond.Responder):
         if self.testCount() > 0:
             self.sendMail()
     def sendMail(self):
-        mailFile = self.createMail(self.getMailTitle())
+        mailFile = self.createMail(self.getMailTitle(), self.mainSuite.app)
         for categoryName in self.orderedCategories:
             self.categories[categoryName].describe(mailFile)
         if len(self.crashDetail) > 0:
@@ -101,19 +101,19 @@ class BatchResponder(respond.Responder):
         if self.failureCount() > 0:
             self.writeFailureDetail(mailFile)
         mailFile.close()
-    def createMail(self, title):
+    def createMail(self, title, app):
         mailFile = os.popen("sendmail -t", "w")
         fromAddress = os.environ["USER"]
-        toAddress = self.getRecipient(fromAddress)
+        toAddress = self.getRecipient(fromAddress, app)
         mailFile.write("From: " + fromAddress + os.linesep)
         mailFile.write("To: " + toAddress + os.linesep)
         mailFile.write("Subject: " + title + os.linesep)
         mailFile.write(os.linesep) # blank line separating headers from body
         return mailFile
-    def getRecipient(self, fromAddress):
+    def getRecipient(self, fromAddress, app):
         # See if the session name has an entry, if not, send to the user
         try:
-            return self.mainSuite.app.getConfigValue(self.sessionName + "_recipients")
+            return app.getConfigValue(self.sessionName + "_recipients")
         except:
             return fromAddress
     def handleSuccess(self, test):
@@ -192,7 +192,7 @@ class SendException(plugins.Action):
         if len(excData) == 0:
             excData = "caught exception " + str(type)
         mailTitle = self.batchResponder.getMailHeader(app) + "did not run : " + excData
-        mailFile = self.batchResponder.createMail(mailTitle)
+        mailFile = self.batchResponder.createMail(mailTitle, app)
         sys.stderr = mailFile
         sys.excepthook(type, value, traceback)
         sys.stderr = sys.__stderr__

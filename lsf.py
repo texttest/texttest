@@ -17,6 +17,7 @@ signal.signal(15, killJobs)
 
 class LSFJob:
     def __init__(self, test):
+        global globalJobName
         globalJobName = test.getTmpExtension()
         self.name = globalJobName + repr(test.app) + test.getRelPath()
     def hasStarted(self):

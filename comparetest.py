@@ -155,10 +155,10 @@ class FileComparison:
     def hasDifferences(self):
         return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
     def overwrite(self, exact, versionString = ""):
-        parts = self.stdFile.split(".")[:2] 
+        parts = os.path.basename(self.stdFile).split(".")[:2] 
         if len(versionString):
             parts += versionString.split(".")
-        stdFile = string.join(parts, ".")
+        stdFile = os.path.join(os.path.dirname(self.stdFile), string.join(parts, "."))
         if os.path.isfile(stdFile):
             os.remove(stdFile)
         # Allow for subclasses to differentiate between a literal overwrite and a

@@ -71,7 +71,7 @@ class SignalEvent(usecase.UserEvent):
             except TypeError:
                 pass
     def storeEvent(self, widget, event, *args):
-        self.anyEvent = event
+        SignalEvent.anyEvent = event
         self.widget.disconnect(self.anyEventHandler)
     def outputForScript(self, widget, *args):
         return self._outputForScript(*args)
@@ -83,7 +83,7 @@ class SignalEvent(usecase.UserEvent):
         except TypeError:
             # The simplest way I could find to fake a gtk.gdk.Event
             self.widget.emit(self.signalName, self.anyEvent)
-
+            
 class ActivateEvent(SignalEvent):
     def __init__(self, name, widget, active = gtk.TRUE):
         SignalEvent.__init__(self, name, widget, "toggled")
@@ -96,7 +96,7 @@ class ActivateEvent(SignalEvent):
 class EntryEvent(SignalEvent):
     def __init__(self, name, widget):
         SignalEvent.__init__(self, name, widget, "focus-out-event")
-        self.oldText = ""
+        self.oldText = widget.get_text()
     def shouldRecord(self, *args):
         text = self.widget.get_text()
         return text != self.oldText
@@ -106,7 +106,7 @@ class EntryEvent(SignalEvent):
         return self.name + " " + text
     def generate(self, argumentString):
         self.widget.set_text(argumentString)
-        self.widget.editing_done()
+        self.widget.emit(self.signalName, self.anyEvent)
 
 class ResponseEvent(SignalEvent):
     def __init__(self, name, widget, responseId):
@@ -258,7 +258,7 @@ class ScriptEngine(usecase.ScriptEngine):
             stateChangeName = self.standardName(description)
             entryEvent = EntryEvent(stateChangeName, entry)
             if self.recordScript:
-                entryEvent.widget.connect("editing-done", self.recordScript.writeEvent, entryEvent)
+                entryEvent.widget.connect("activate", self.recordScript.writeEvent, entryEvent)
             self._addEventToScripts(entryEvent)
         return entry
     def createNotebook(self, description, pages):
@@ -267,7 +267,7 @@ class ScriptEngine(usecase.ScriptEngine):
             label = gtk.Label(tabText)
             notebook.append_page(page, label)
         if self.hasScript():
-            stateChangeName = "page " + self.standardName(description) + " to"
+            stateChangeName = self.standardName(description)
             event = NotebookPageChangeEvent(stateChangeName, notebook)
             self._addEventToScripts(event)
         return notebook

@@ -187,6 +187,19 @@ class TestComparison:
         return os.path.join(test.abspath, test.makeFileName(local))
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         return FileComparison(test, standardFile, tmpFile, makeNew)
+    def saveSingle(self, stem, exact = 1, versionString = ""):
+        comparison, storageList = self.findComparison(stem)
+        comparison.overwrite(exact, versionString)
+        storageList.remove(comparison)
+        self.correctResults.append(comparison)
+        self.test.notifyChanged()
+    def findComparison(self, stem):
+        for comparison in self.changedResults:
+            if comparison.stem == stem:
+                return comparison, self.changedResults
+        for comparison in self.newResults:
+            if comparison.stem == stem:
+                return comparison, self.newResults
     def save(self, exact = 1, versionString = "", overwriteSuccessFiles = 0):
         # Force exactness unless there is only one difference : otherwise
         # performance is averaged when results have changed as well

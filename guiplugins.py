@@ -52,19 +52,20 @@ class InteractiveAction(plugins.Action):
 class SaveTest(InteractiveAction):
     def __init__(self, test, oldOptionGroup):
         InteractiveAction.__init__(self, test, oldOptionGroup, "Saving")
+        self.comparisons = []
         if self.canPerformOnTest():
             extensions = test.app.getVersionFileExtensions(forSave = 1)
             # Include the default version always
             extensions.append("")
             self.addOption(oldOptionGroup, "v", "Version to save", test.app.getFullVersion(forSave = 1), extensions)
             self.addSwitch(oldOptionGroup, "over", "Replace successfully compared files also", 0)
-            try:
-                comparisonList = test.stateDetails.getComparisons()
-                if self.hasPerformance(comparisonList):
-                    exact = (len(comparisonList) != 1)
-                    self.addSwitch(oldOptionGroup, "ex", "Exact Performance", exact, "Average Performance")
-            except AttributeError:
-                pass
+            self.comparisons = self.getComparisons(test)
+            multipleComparisons = (len(self.comparisons) > 1)
+            if self.hasPerformance():
+                self.addSwitch(oldOptionGroup, "ex", "Exact Performance", multipleComparisons, "Average Performance")
+            if multipleComparisons:
+                failedStems = map(lambda comp : comp.stem, self.comparisons)
+                self.addOption(oldOptionGroup, "sinf", "Save single file", possibleValues=failedStems)
     def __repr__(self):
         return "Saving"
     def canPerformOnTest(self):
@@ -73,8 +74,13 @@ class SaveTest(InteractiveAction):
         return "Save"
     def matchesMode(self, dynamic):
         return dynamic
-    def hasPerformance(self, comparisonList):
-        for comparison in comparisonList:
+    def getComparisons(self, test):
+        try:
+            return test.stateDetails.getComparisons()
+        except AttributeError:
+            return []
+    def hasPerformance(self):
+        for comparison in self.comparisons:
             if comparison.getType() != "difference" and comparison.hasDifferences():
                 return 1
         return 0
@@ -83,13 +89,19 @@ class SaveTest(InteractiveAction):
     def __call__(self, test):
         version = self.optionGroup.getOptionValue("v")
         saveDesc = " - version " + version + ", exactness " + str(self.getExactness())
+        singleFile = self.optionGroup.getOptionValue("sinf")
+        if singleFile:
+            saveDesc += ", only file with stem " + singleFile
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
         self.describe(test, saveDesc)
         testComparison = test.stateDetails
         if testComparison:
-            testComparison.save(self.getExactness(), version, overwriteSuccess)
+            if singleFile:
+                testComparison.saveSingle(singleFile, self.getExactness(), version)
+            else:
+                testComparison.save(self.getExactness(), version, overwriteSuccess)
 
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!

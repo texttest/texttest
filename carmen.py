@@ -609,7 +609,10 @@ class CheckBuild(plugins.Action):
         for process, arch in self.builder.childProcesses:
             pid, status = os.waitpid(process, 0)
             # In theory we should be able to trust the status. In practice, it seems to be 0, even when the build failed.
-            for relPath in app.getConfigValue("build_targets")["codebase"]:
+            targetDir = app.getConfigValue("build_targets")
+            if not targetDir.has_key("codebase"):
+                return
+            for relPath in targetDir["codebase"]:
                 absPath = app.makeAbsPath(relPath)
                 self.checkBuild(arch, absPath)
     def checkBuild(self, arch, absPath):

@@ -182,7 +182,7 @@ class MakeTmpSubPlan(plugins.Action):
     def __call__(self, test):
         dirName = self.subplanFunction(test)
         if not os.path.isdir(dirName):
-            raise plugins.TextTestError, "Cannot run test, subplan directory does not exist"
+            raise plugins.TextTestError, "Cannot run test, subplan directory at " + dirName + " does not exist"
         rootDir, baseDir = os.path.split(dirName)
         tmpDir = test.makeWriteDirectory(rootDir, baseDir, "APC_FILES")
         self.readRaveParameters(test.makeFileName("raveparameters"))

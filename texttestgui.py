@@ -185,6 +185,7 @@ class TextTestGUI:
                 return 0
 
             if test in self.postponedTests:
+                self.postponedInstructions.append((test, plugins.SetUpEnvironment(1)))
                 self.postponedInstructions.append((test, action))
                 return 1
             else:

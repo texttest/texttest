@@ -35,6 +35,8 @@ class Action:
         pass
     def getFilter(self):
         return None
+    def getCleanUpAction(self):
+        return None
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText
@@ -56,6 +58,16 @@ class CompositeAction(Action):
     def setUpApplication(self, app):
         for subAction in self.subActions:
             subAction.setUpApplication(app)
+    def getCleanUpAction(self):
+        cleanUpSubActions = []
+        for subAction in self.subActions:
+            cleanUp = subAction.getCleanUpAction()
+            if cleanUp != None:
+                cleanUpSubActions.append(cleanUp)
+        if len(cleanUpSubActions):
+            return CompositeAction(cleanUpSubActions)
+        else:
+            return None
 
 # Action for wrapping an executable that isn't Python, or can't be imported in the usual way
 class NonPythonAction(Action):

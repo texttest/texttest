@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, string, getopt, types, time, re, plugins
+import os, sys, string, getopt, types, time, re, plugins, exceptions
 from stat import *
 
 # Base class for TestCase and TestSuite
@@ -164,8 +164,12 @@ class Application:
         importCommand = "from " + configModule + " import getConfig"
         try:
             exec importCommand
-        except ImportError:
-            raise "Could not find config_module " + configModule
+        except:
+            if sys.exc_type == exceptions.ImportError:
+                raise KeyError, "could not find config_module " + configModule
+            else:
+                printException()
+                raise KeyError, "config_module " + configModule + " contained errors and could not be imported"  
         return getConfig(optionMap)
     def getActionSequence(self):
         return self.configObject.getActionSequence()
@@ -180,7 +184,7 @@ class Application:
         if self.configDir.has_key(key):
             return os.path.expandvars(self.configDir[key])
         else:
-            raise "Error: " + repr(self) + " cannot find config entry " + key
+            raise KeyError, "Error: " + repr(self) + " cannot find config entry " + key
     def getConfigList(self, key):
         return self.configDir.getListValue(key)
     def filterFile(self, fileName):
@@ -275,8 +279,11 @@ class OptionFinder:
                 if self.inputOptions.has_key("a") and appName != self.inputOptions["a"]:
                     continue
                 versionString = self.findVersionString()
-                app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:m:s:v:xp")
-                appList.append(app)
+                try:
+                    app = Application(appName, dirName, pathname, versionString, self.inputOptions, "a:c:d:m:s:v:xp")
+                    appList.append(app)
+                except KeyError, e:
+                    print "Could not use application", appName, "-", e
             elif os.path.isdir(pathname) and recursive:
                 for app in self._findApps(pathname, 0):
                     appList.append(app)
@@ -383,6 +390,10 @@ def debugPrint(text):
     if inputOptions.debugMode():
         print text
 
+def printException():
+    type, value, traceback = sys.exc_info()
+    sys.excepthook(type, value, traceback)
+    
 # Need somewhat different formats on Windows/UNIX
 def tmpString():
     if os.environ.has_key("USER"):
@@ -406,21 +417,46 @@ class TextTest:
             return "%H:%M:%S"
         else:
             return "%H%M%S"
-    def run(self):        
+    def run(self):
         for run in range(inputOptions.timesToRun()):
             for app in self.allApps:
-                self.runApp(app)
+                try:
+                    self.runApp(app)
+                except:
+                    if sys.exc_type == exceptions.KeyboardInterrupt:
+                        print "Terminated due to interruption"
+                        return
+                    else:
+                        print "Terminated tests of application", app, "due to exception:"
+                        printException()
     def runApp(self, app):
         actionSequence = inputOptions.getActionSequence(app)
         acceptsApp, filterList = app.getFilterList()
         if not acceptsApp:
             return
         allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
+        try:
+            self.performActionSequence(allTests, actionSequence, app, filterList)
+        except:
+            self.performCleanUp(allTests, actionSequence, app)
+    def performCleanUp(self, suite, actionSequence, app):    
+        print "Caught exception, cleaning up..."
+        for action in actionSequence:
+            cleanUp = action.getCleanUpAction()
+            if cleanUp != None:
+                self.performAction(suite, cleanUp)
+        # Keyboard interrupts should terminate everything, otherwise we should continue with other apps
+        if sys.exc_type == exceptions.KeyboardInterrupt:
+            raise sys.exc_type, sys.exc_value
+        else:
+            print "Terminated tests of application", app, "due to exception:"
+            printException()
+    def performActionSequence(self, suite, actionSequence, app, filterList):
         for action in actionSequence:
             if action.getFilter() != None:
                 self.performActionWithFilter(app, action, action.getFilter(), filterList)
             else:
-                self.performAction(allTests, action)
+                self.performAction(suite, action)
     def performActionWithFilter(self, app, action, newFilter, filterList):
         newFilterList = filterList
         newFilterList.append(newFilter)

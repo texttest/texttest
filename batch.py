@@ -68,6 +68,8 @@ class BatchCategory:
             mailFile.writelines(self.text)
             mailFile.write(os.linesep)
 
+killedTests = []
+
 # Works only on UNIX
 class BatchResponder(respond.Responder):
     def __repr__(self):
@@ -82,6 +84,7 @@ class BatchResponder(respond.Responder):
         self.categories["faster"] = BatchCategory("ran faster")
         self.categories["slower"] = BatchCategory("ran slower")
         self.categories["success"] = BatchCategory("succeeded")
+        self.categories["unfinished"] = BatchCategory("were unfinished")
         self.orderedCategories = self.categories.keys()
         self.orderedCategories.sort()
         self.mainSuite = None
@@ -116,16 +119,18 @@ class BatchResponder(respond.Responder):
     def handleFailure(self, test, comparisons):
         category = self.findFailureCategory(test, comparisons)
         self.categories[category].addTest(test)
-        # Don't provide failure information on crashes, it's confusing...
-        if category != "crash":
-            self.failureDetail[test] = comparisons
     def findFailureCategory(self, test, comparisons):
-        if test in self.crashDetail.keys():
-            return "crash"
+        successCategory = self.findSuccessCategory(test)
+        if successCategory != "success":
+            return successCategory
+        # Don't provide failure information on crashes and unfinished tests, it's confusing...
+        self.failureDetail[test] = comparisons
         if len(comparisons) > 1:
             return "difference"
         return comparisons[0].getType()
     def findSuccessCategory(self, test):
+        if test in killedTests:
+            return "unfinished"
         if test in self.crashDetail.keys():
             return "crash"
         return "success"

@@ -4,20 +4,14 @@ import os, time, string, signal, sys, default, performance, respond, batch, plug
 def getConfig(optionMap):
     return LSFConfig(optionMap)
 
-globalJobName = ""
+emergencyFinish = 0
 
-def killJobs(signal, stackFrame):
-    if len(globalJobName):
-        for job in os.popen("bjobs -w").readlines():
-            if job.find(globalJobName) != -1:
-                jobId = string.split(job, " ")[0]
-                os.system("bkill " + jobId)
-    print "Test run terminated due to interrupt"
-    sys.exit(2)
+def tenMinutesToGo(signal, stackFrame):
+    print "Received LSF signal for termination in 10 minutes, killing all remaining jobs"
+    global emergencyFinish
+    emergencyFinish = 1
 
-signal.signal(1, killJobs)
-signal.signal(2, killJobs)
-signal.signal(15, killJobs)
+signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
 class LSFConfig(default.Config):
     def getOptionString(self):
@@ -63,15 +57,15 @@ class LSFConfig(default.Config):
 
 class LSFJob:
     def __init__(self, test):
-        global globalJobName
-        globalJobName = test.getTmpExtension()
-        self.name = globalJobName + repr(test.app) + test.getRelPath()
+        self.name = test.getTmpExtension() + repr(test.app) + test.getRelPath()
     def hasStarted(self):
         retstring = self.getFile("-r").readline()
         return string.find(retstring, "not found") == -1
     def hasFinished(self):
         retstring = self.getFile().readline()
         return retstring.find("not found") != -1
+    def kill(self):
+        os.system("bkill -J " + self.name + " >& /dev/null")
     def getExecutionMachine(self):
         file = self.getFile("-w")
         lastline = file.readlines()[-1]
@@ -119,7 +113,21 @@ class SubmitTest(plugins.Action):
         return test.getExecuteCommand()
     def setUpSuite(self, suite):
         self.describe(suite)
-    
+    def getCleanUpAction(self):
+        return KillTest()
+
+class KillTest(plugins.Action):
+    def __repr__(self):
+        return "Cancelling"
+    def __call__(self, test):
+        job = LSFJob(test)
+        if job.hasFinished():
+            return
+        self.describe(test, " in LSF")
+        job.kill()
+    def setUpSuite(self, suite):
+        self.describe(suite)
+        
 class Wait(plugins.Action):
     def __init__(self):
         self.eventName = "completion"
@@ -131,6 +139,13 @@ class Wait(plugins.Action):
             return
         self.describe(test, "...")
         while not self.checkCondition(job):
+            global emergencyFinish
+            if emergencyFinish:
+                print "Emergency finish: killing job!"
+                job.kill()
+                # This will only happen in batch mode: tell batch to treat the job as unfinished
+                batch.killedTests.append(test)
+                return
             time.sleep(2)
     def checkCondition(self, job):
         return job.hasFinished()
@@ -148,6 +163,9 @@ class MakeResourceFiles(plugins.Action):
             time.sleep(2)
             resourceDict = self.makeResourceDict(tmpFile, textList)
         os.remove(tmpFile)
+        # There was still an error (jobs killed in emergency), so don't write resource files
+        if len(resourceDict) < len(textList):
+            return
         if self.checkPerformance:
             self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3]], test.getTmpFileName("performance", "w"))
         if self.checkMemory:

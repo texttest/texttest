@@ -600,6 +600,8 @@ class BuildCode(plugins.Action):
         buildFile = "build.default." + arch
         commandLine = "cd " + absPath + "; gmake " + makeTargets + " >& " + buildFile
         machine = self.getMachine(app, arch)
+        if arch == "sparc_64":
+            commandLine = "setenv BITMODE 64; " + commandLine
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         if self.checkBuildFile(buildFile):
             raise plugins.TextTestError, "Product " + repr(app) + " did not build, exiting"

@@ -276,6 +276,10 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.weightKPI = []
         self.sumKPITime = 0.0
         self.minKPITime = 0.0
+        self.sumCurTime = 0
+        self.sumRefTime = 0
+        self.qualKPI = 1.0
+        self.qualKPICount = 0
     def getOptimizationRuns(self, test):
         interestingValues = [ optimization.costEntryName, optimization.timeEntryName, optimization.memoryEntryName ]
         currentRun = OptimizationRun(test, self.currentVersion, interestingValues)
@@ -291,6 +295,21 @@ class MakeProgressReport(optimization.MakeProgressReport):
             test, referenceRun, currentRun, userName = testTuple
             self.doCompare(test, referenceRun, currentRun, userName)
 
+        print os.linesep
+        if self.sumRefTime > 0:
+            speedKPI = 1.0 * self.sumCurTime / self.sumRefTime
+            wText = "Overall speed with respect to version"
+            print wText, self.referenceVersion, "=", self.percent(speedKPI)
+        if self.qualKPICount > 0:
+            avg = math.pow(self.qualKPI, 1.0 / float(self.qualKPICount))
+            if avg > 1.0:
+                changeText = "reduction"
+            else:
+                changeText = "improvement"
+            qNumber = abs(round(avg - 1.0,5) * 100.0)
+            wText = "Overall quality " + changeText + " with respect to version"
+            print wText, self.referenceVersion, "=", str(qNumber) + "%"
+        optimization.MakeProgressReport.__del__(self)
         if len(self.weightKPI) > 1:
             # The weighted KPI is prodsum(KPIx * Tx / Tmin) ^ (1 / sum(Tx/Tmin))
             # Tx is the average of the 'time to worst cost' for a specific test case, ie
@@ -304,8 +323,9 @@ class MakeProgressReport(optimization.MakeProgressReport):
                 sumKPI *= math.pow(kpi, 1.0 * kpiTime / self.minKPITime)
                 sumTimeParts += 1.0 * kpiTime / self.minKPITime
             avg = math.pow(sumKPI, 1.0 / float(sumTimeParts))
-            print os.linesep, "Overall time weighted KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
-        optimization.MakeProgressReport.__del__(self)
+            wText = "Overall time weighted KPI with respect to version"
+            print wText, self.referenceVersion, "=", self.percent(avg)
+
     def _calculateMargin(self, fcTupleList):
         if len(fcTupleList) < 2:
             return 0.1, 0.1
@@ -364,6 +384,11 @@ class MakeProgressReport(optimization.MakeProgressReport):
         currentMargin = self.currentMargins[self.kpiGroupForTest[test.name]]
         return currentMargin, refMargin
     def calculateWorstCost(self, test, referenceRun, currentRun):
+        worstCost = self._kpiCalculateWorstCost(test, referenceRun, currentRun)
+        self.sumCurTime += currentRun.timeToCost(worstCost)
+        self.sumRefTime += referenceRun.timeToCost(worstCost)
+        return worstCost
+    def _kpiCalculateWorstCost(self, test, referenceRun, currentRun):
         if self.kpiGroupForTest.has_key(test.name):
             groupName = self.kpiGroupForTest[test.name]
             if self.groupQualityLimit.has_key(groupName):
@@ -387,7 +412,12 @@ class MakeProgressReport(optimization.MakeProgressReport):
                 qualTime = self.groupTimeLimit[groupName]
                 curCost = currentRun.costAtTime(qualTime)
                 refCost = referenceRun.costAtTime(qualTime)
-                self.reportLine("Cost at " + str(qualTime) + " mins time", curCost, refCost)
+                kpi = float(curCost) / float(refCost)
+                if kpi > 0:
+                    self.qualKPI *= kpi
+                    self.qualKPICount += 1
+                    qKPI = str(round(kpi - 1.0,5) * 100.0) + "%"
+                self.reportLine("Cost at " + str(qualTime) + " mins, qD=" + qKPI, curCost, refCost)
         currentMargin, refMargin = self.getMargins(test)
         self.reportLine("Cost variance tolerance (%) ", currentMargin, refMargin)
                 

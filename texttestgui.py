@@ -4,7 +4,7 @@
 
 import guiplugins, plugins, comparetest, gtk, gobject, os, string, time, sys
 from threading import Thread, currentThread
-from gtkscript import eventHandler
+from gtkusecase import ScriptEngine
 from Queue import Queue, Empty
 from ndict import seqdict
 
@@ -24,9 +24,9 @@ class ActionThread(Thread):
 class TextTestGUI:
     def __init__(self, dynamic, replayScriptName, recordScriptName):
         guiplugins.setUpGuiLog()
-        global guilog
+        global guilog, scriptEngine
         from guiplugins import guilog
-        eventHandler.setScripts(replayScriptName, recordScriptName, guilog)
+        scriptEngine = ScriptEngine(replayScriptName, recordScriptName, guilog)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic
@@ -40,7 +40,7 @@ class TextTestGUI:
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
         win.set_title("TextTest functional tests")
-        eventHandler.connect("close", "delete_event", win, self.quit)
+        scriptEngine.connect("close", "delete_event", win, self.quit)
         vbox = self.createWindowContents(testWins)
         win.add(vbox)
         win.show()
@@ -178,9 +178,9 @@ class TextTestGUI:
             perfColumn = gtk.TreeViewColumn("Performance", renderer, text=3, background=4)
             view.append_column(perfColumn)
         view.expand_all()
-        eventHandler.connect("select test", "row_activated", view, self.viewTest, argumentParseData=(column, 0))
-        eventHandler.connect("add to test selection", "changed", self.selection, sense=1, argumentParseData=(column, 0))
-        eventHandler.connect("remove from test selection", "changed", self.selection, sense=-1, argumentParseData=(column, 0))
+        scriptEngine.connect("select test", "row_activated", view, self.viewTest, argumentParseData=(column, 0))
+        scriptEngine.connect("add to test selection", "changed", self.selection, sense=1, argumentParseData=(column, 0))
+        scriptEngine.connect("remove from test selection", "changed", self.selection, sense=-1, argumentParseData=(column, 0))
         view.show()
 
         # Create scrollbars around the view.
@@ -213,7 +213,7 @@ class TextTestGUI:
             # Maybe it's empty because the action thread has terminated
             if not self.actionThread.isAlive():
                 self.actionThread.join()
-                eventHandler.nonGuiEvent("completion of test actions")
+                scriptEngine.applicationEvent("completion of test actions")
                 return gtk.FALSE
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
@@ -222,7 +222,7 @@ class TextTestGUI:
     def stateChangeEvent(self, test, state):
         eventName = "test " + test.name + " to " + self.stateChangeDescription(test, state)
         category = test.name
-        eventHandler.nonGuiEvent(eventName, category)
+        scriptEngine.applicationEvent(eventName, category)
     def testChanged(self, test, state, byAction):
         if test.classId() == "test-case":
             self.redrawTest(test, state)
@@ -294,7 +294,7 @@ class TextTestGUI:
         for label, func in list:
             button = gtk.Button()
             button.set_label(label)
-            eventHandler.connect(label, "clicked", button, func)
+            scriptEngine.connect(label, "clicked", button, func)
             button.show()
             buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
         buttonbox.show()
@@ -321,7 +321,7 @@ class RightWindowGUI:
         column = gtk.TreeViewColumn(title, renderer, text=0, background=1)
         view.append_column(column)
         view.expand_all()
-        eventHandler.connect("select file", "row_activated", view, self.displayDifferences, (column, 0))
+        scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, (column, 0))
         view.show()
         return view
     def makeActionInstances(self):
@@ -358,7 +358,7 @@ class RightWindowGUI:
                     guilog.info("Creating notebook page for '" + optionGroup.name + "'")
                     display = self.createDisplay(optionGroup)
                     pages.append((display, optionGroup.name))
-        notebook = eventHandler.createNotebook("notebook", pages)
+        notebook = scriptEngine.createNotebook("notebook", pages)
         notebook.show()
         return notebook
     def getHardcodedNotebookPages(self):
@@ -381,7 +381,7 @@ class RightWindowGUI:
     def addButton(self, method, buttonbox, label, scriptTitle, option):
         button = gtk.Button()
         button.set_label(label)
-        eventHandler.connect(scriptTitle, "clicked", button, method, None, 1, option)
+        scriptEngine.connect(scriptTitle, "clicked", button, method, None, 1, option)
         button.show()
         buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
     def createDisplay(self, optionGroup):
@@ -390,7 +390,7 @@ class RightWindowGUI:
             hbox = gtk.HBox()
             guilog.info("Creating entry for option '" + option.name + "'")
             label = gtk.Label(option.name + "  ")
-            entry = eventHandler.createEntry(option.name, option.getValue())
+            entry = scriptEngine.createEntry(option.name, option.getValue())
             option.setMethods(entry.get_text, entry.set_text)
             hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
             hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)
@@ -400,7 +400,7 @@ class RightWindowGUI:
             vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
         for switch in optionGroup.switches.values():
             guilog.info("Creating check button for switch '" + switch.name + "'")
-            checkButton = eventHandler.createCheckButton(switch.name, switch.getValue())
+            checkButton = scriptEngine.createCheckButton(switch.name, switch.getValue())
             switch.setMethods(checkButton.get_active, checkButton.set_active)
             checkButton.show()
             vbox.pack_start(checkButton, expand=gtk.FALSE, fill=gtk.FALSE)

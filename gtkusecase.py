@@ -5,6 +5,8 @@ will create scripts in terms of the domain language. These will then be much mor
 than traditional such tools that create complicated Tcl scripts with lots of references
 to pixel positions etc., which tend to be extremely brittle if the GUI is updated.
 
+It is based on the generic usecase.py, read the documentation there too.
+
 (1) For user actions such as clicking a button, selecting a list item etc., the general idea
 is to add an extra argument to the call to 'connect', so that instead of writing
 
@@ -12,7 +14,7 @@ button.connect("clicked", myMethod)
 
 you would write
 
-eventHandler.connect("save changes", "clicked", button, myMethod)
+scriptEngine.connect("save changes", "clicked", button, myMethod)
 
 thus tying the user action to the script command "save changes". If you set up a record
 script, then the module will write "save changes" to the script whenever the button is clicked.
@@ -32,7 +34,7 @@ entry = gtk.Entry()
 
 you would write
 
-entry = eventHandler.createEntry("file name")
+entry = scriptEngine.createEntry("file name")
 
 which would tie the "focus-out-event" to the script command "enter file name = ".
 
@@ -44,55 +46,27 @@ treeView.connect("row_activated", myMethod)
 
 might become
 
-eventHandler.connect("select file", "row_activated", treeView, myMethod, (column, dataIndex))
+scriptEngine.connect("select file", "row_activated", treeView, myMethod, (column, dataIndex))
 
 (column, dataIndex) is a tuple to tell it which data in the tree view we are looking for. So that
 the command "select file foobar.txt" will search the tree's column <column> and data index <dataIndex>
 for the text "foobar.txt" and select that row accordingly.
-
-(4) You can also declare non-gui events (significant things that are not caused by the user doing something).
-When replaying the script the engine will wait for these events to occur before proceeding.
-
-eventHandler.nonGuiEvent("idle handler exit")
-
-By default, these will overwrite each other, so that only the last one before a GUI event is recorded
-in the script, in this case as "wait for idle handler exit".
-
-To override this, you can provide an optional second argument as a 'category', meaning that only events
-in the same category will overwrite each other. Events with no category will overwrite all events in
-all categories.
 """
 
-import gtk, os, string, sys
-from ndict import seqdict
+import usecase, gtk, os, string
 
-# Exception to throw when scripts go wrong
-class GtkScriptError(RuntimeError):
-    pass
-
-class Event:
-    def __init__(self, name, widget):
-        self.name = name
-        self.widget = widget
-    def widgetHasChanged(self):
-        return 1
-    def outputForScript(self, *args):
-        return self.name
-    def generate(self, argumentString):
-        pass
-
-class ActivateEvent(Event):
+class ActivateEvent(usecase.UserEvent):
     def __init__(self, name, widget, active = gtk.TRUE):
-        Event.__init__(self, name, widget)
+        usecase.UserEvent.__init__(self, name, widget)
         self.active = active
     def widgetHasChanged(self):
         return self.widget.get_active() == self.active
     def generate(self, argumentString):
         self.widget.set_active(self.active)
 
-class EntryEvent(Event):
+class EntryEvent(usecase.UserEvent):
     def __init__(self, name, widget):
-        Event.__init__(self, name, widget)
+        usecase.UserEvent.__init__(self, name, widget)
         self.oldText = ""
     def widgetHasChanged(self):
         text = self.widget.get_text()
@@ -104,9 +78,9 @@ class EntryEvent(Event):
     def generate(self, argumentString):
         self.widget.set_text(argumentString)
 
-class SignalEvent(Event):
+class SignalEvent(usecase.UserEvent):
     def __init__(self, name, widget, signalName):
-        Event.__init__(self, name, widget)
+        usecase.UserEvent.__init__(self, name, widget)
         self.signalName = signalName
     def generate(self, argumentString):
         self.widget.emit(self.signalName, *argumentString)
@@ -206,59 +180,21 @@ class TreeSelectionSignalEvent(TreeSignalEvent):
         else:
             self.widget.unselect_path(path)
 
-class EventHandler:
-    def __init__(self):
-        self.replayScript = None
-        self.recordScript = None
-    def hasScript(self):
-        return self.replayScript or self.recordScript
-    def setScripts(self, replayScriptName, recordScriptName, logger = None):
-        if replayScriptName and replayScriptName == recordScriptName:
-            raise GtkScriptError, "Cannot record to the same script we are replaying"
-        if replayScriptName:
-            self.replayScript = ReplayScript(replayScriptName, logger)
-        if recordScriptName:
-            self.recordScript = RecordScript(recordScriptName)
+class ScriptEngine(usecase.ScriptEngine):
     def connect(self, eventName, signalName, widget, method = None, argumentParseData = None, sense = 1, *data):
         if method:
             widget.connect(signalName, method, *data)
         if self.hasScript():
             stdName = self.standardName(eventName)
-            signalEvent = self.createSignalEvent(signalName, stdName, widget, sense, argumentParseData)
-            self.addEventToScripts(signalEvent, signalName)
-    def addEventToScripts(self, event, signalName):
-        if self.replayScript:
-            self.replayScript.addEvent(event)
-        if self.recordScript:
-            self.recordScript.addEvent(event, signalName)
-    def createSignalEvent(self, signalName, eventName, widget, sense, argumentParseData):
-        if isinstance(widget, gtk.TreeView):
-            return TreeViewSignalEvent(eventName, widget, signalName, argumentParseData)
-        elif isinstance(widget, gtk.TreeSelection):
-            return TreeSelectionSignalEvent(eventName, widget, signalName, sense, argumentParseData)
-        else:
-            return SignalEvent(eventName, widget, signalName)
-    def standardName(self, name):
-        firstIndex = None
-        lastIndex = len(name)
-        for i in range(len(name)):
-            if name[i] in string.letters or name[i] in string.digits:
-                if firstIndex is None:
-                    firstIndex = i
-                lastIndex = i
-        return name[firstIndex:lastIndex + 1].lower()
-    def nonGuiEvent(self, name, category = None):
-        if self.replayScript:
-            self.replayScript.registerNonGuiEvent(name)
-        if self.recordScript:
-            self.recordScript.registerNonGuiEvent(name, category)
+            signalEvent = self._createSignalEvent(signalName, stdName, widget, sense, argumentParseData)
+            self._addEventToScripts(signalEvent, signalName)
     def createEntry(self, description, defaultValue):
         entry = gtk.Entry()
         entry.set_text(defaultValue)
         if self.hasScript():
             stateChangeName = "enter " + self.standardName(description) + " ="
             entryEvent = EntryEvent(stateChangeName, entry)
-            self.addEventToScripts(entryEvent, "focus-out-event")
+            self._addEventToScripts(entryEvent, "focus-out-event")
         return entry
     def createNotebook(self, description, pages):
         notebook = gtk.Notebook()
@@ -268,7 +204,7 @@ class EventHandler:
         if self.hasScript():
             stateChangeName = "page " + self.standardName(description) + " to"
             event = NotebookPageChangeEvent(stateChangeName, notebook)
-            self.addEventToScripts(event, event.signalName)
+            self._addEventToScripts(event, event.signalName)
         return notebook
     def createCheckButton(self, description, defaultValue):
         button = gtk.CheckButton(description)
@@ -280,124 +216,33 @@ class EventHandler:
             uncheckChangeName = "uncheck " + self.standardName(description)
             checkEvent = ActivateEvent(checkChangeName, button)
             uncheckEvent = ActivateEvent(uncheckChangeName, button, gtk.FALSE)
-            self.addEventToScripts(checkEvent, "toggled")
-            self.addEventToScripts(uncheckEvent, "toggled")
+            self._addEventToScripts(checkEvent, "toggled")
+            self._addEventToScripts(uncheckEvent, "toggled")
         return button
-
-eventHandler = EventHandler()
-waitCommandName = "wait for"
-
-class ReplayScript:
-    def __init__(self, scriptName, logger):
-        self.events = {}
-        self.nonGuiEventNames = []
-        self.commands = []
-        self.pointer = 0
-        self.logger = logger
-        if not os.path.isfile(scriptName):
-            raise GtkScriptError, "Cannot replay script " + scriptName + ", no such file or directory"
-        for line in open(scriptName).xreadlines():
-            if line != "" and line[0] != "#":
-                self.commands.append(line.strip())
-        self.enableReading()
-    def addEvent(self, event):
-        self.events[event.name] = event
-    def enableReading(self):
-        # If events fail, we store them and wait for the relevant handler
-        self.waitingForEvent = None
-        gtk.idle_add(self.runCommands)
-    def registerNonGuiEvent(self, eventName):
-        if self.waitingForEvent == eventName:
-            self.write("Expected non-gui event '" + eventName + "' occurred, proceeding.")
-            self.enableReading()
-        self.nonGuiEventNames.append(eventName)
-    def isFinished(self):
-        return self.pointer >= len(self.commands)
-    def runCommands(self):
-        if self.isFinished():
-            return gtk.FALSE
-
-        nextCommand = self.commands[self.pointer]
-        # Filter blank lines and comments
-        self.pointer += 1
-        try:
-            return self.processCommand(nextCommand)
-        except GtkScriptError:
-            type, value, traceback = sys.exc_info()
-            self.write("ERROR: " + value)
-            # We don't terminate scripts if they contain errors
-        return gtk.TRUE
-    def write(self, line):
-        if self.logger:
-            self.logger.info(line)
+#private
+    def createReplayScript(self, scriptName, logger):
+        return ReplayScript(scriptName, logger)
+    def _addEventToScripts(self, event, signalName):
+        if self.replayScript:
+            self.replayScript.addEvent(event)
+        if self.recordScript:
+            self.recordScript.addEvent(event)
+            event.widget.connect(signalName, self.recordScript.writeEvent, event)
+    def _createSignalEvent(self, signalName, eventName, widget, sense, argumentParseData):
+        if isinstance(widget, gtk.TreeView):
+            return TreeViewSignalEvent(eventName, widget, signalName, argumentParseData)
+        elif isinstance(widget, gtk.TreeSelection):
+            return TreeSelectionSignalEvent(eventName, widget, signalName, sense, argumentParseData)
         else:
-            print line
-    def processCommand(self, scriptCommand):
-        commandName, argumentString = self.parseCommand(scriptCommand)
-        # Blank line... to make clear what belongs to what script command
-        self.write("")
-        if commandName == waitCommandName:
-            return self.processWaitCommand(argumentString)
-        else:
-            self.generateEvent(commandName, argumentString)
-            return gtk.TRUE
-    def parseCommand(self, scriptCommand):
-        commandName = self.findCommandName(scriptCommand)
-        if not commandName:
-            raise GtkScriptError, "Could not parse script command '" + scriptCommand + "'"
-        argumentString = scriptCommand.replace(commandName, "").strip()
-        return commandName, argumentString
-    def findCommandName(self, command):
-        if command.startswith(waitCommandName):
-            return waitCommandName
-        for eventName in self.events.keys():
-            if command.startswith(eventName):
-                return eventName
-        return None            
-    def generateEvent(self, eventName, argumentString):
-        self.write("'" + eventName + "' event created with arguments '" + argumentString + "'")
-        event = self.events[eventName]
-        event.generate(argumentString)
-        # Can be useful to uncomment if you want a slow-motion replay...
-        #import time
-        #time.sleep(2)
-    def processWaitCommand(self, nonGuiEventName):
-        if nonGuiEventName in self.nonGuiEventNames:
-            self.write("Non-gui event '" + nonGuiEventName + "' already occurred, not waiting.")
-            return gtk.TRUE
-        else:
-            self.waitingForEvent = nonGuiEventName
-            self.write("Waiting for non-gui event '" + nonGuiEventName + "' to occur.")
-            return gtk.FALSE
+            return SignalEvent(eventName, widget, signalName)
 
-class RecordScript:
-    def __init__(self, scriptName):
-        self.fileForAppend = open(scriptName, "w")
-        self.events = []
-        self.nonGuiEvents = seqdict()
-    def addEvent(self, event, signalName):
-        self.events.append(event)
-        event.widget.connect(signalName, self.writeEvent, event)
-    def writeEvent(self, widget, *args):
-        event = self.findEvent(*args)
-        if event.widgetHasChanged():
-            self.writeNonGuiEventDetails()
-            self.fileForAppend.write(event.outputForScript(*args) + os.linesep)
-    def findEvent(self, *args):
-        for arg in args:
-            if isinstance(arg, Event):
-                return arg
-    def registerNonGuiEvent(self, eventName, category):
-        if category:
-            self.nonGuiEvents[category] = eventName
-        else:
-            # Non-categorised event makes all previous ones irrelevant
-            self.nonGuiEvents = seqdict()
-            self.nonGuiEvents["gtkscript_DEFAULT"] = eventName
-    def writeNonGuiEventDetails(self):
-        for eventName in self.nonGuiEvents.values():
-            self.fileForAppend.write(waitCommandName + " " + eventName + os.linesep)
-        self.nonGuiEvents = seqdict()
-
-            
-
+# Use the GTK idle handlers instead of a separate thread for replay execution
+class ReplayScript(usecase.ReplayScript):
+     def executeCommandsInBackground(self):
+         gtk.idle_add(self.runNextCommand)
+     def runNextCommand(self):
+         retValue = usecase.ReplayScript.runNextCommand(self)
+         if retValue:
+             return gtk.TRUE
+         else:
+             return gtk.FALSE

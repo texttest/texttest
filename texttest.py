@@ -182,7 +182,8 @@ class TestSuite(Test):
         if len(self.testcases):
             maxNameLength = max([len(test.name) for test in self.testcases])
             for test in self.testcases:
-                test.paddedName = string.ljust(test.name, maxNameLength) 
+                test.paddedName = string.ljust(test.name, maxNameLength)
+        self.tearDownEnvironment()
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
     def classId(self):
@@ -225,7 +226,6 @@ class TestSuite(Test):
             testName = string.strip(testline)
             testPath = os.path.join(self.abspath, testName)
             testSuite = TestSuite(testName, testPath, self.app, filters)
-            testSuite.tearDownEnvironment()
             if testSuite.isValid():
                 if not testSuite.rejected:
                     testCaseList.append(testSuite)
@@ -254,6 +254,7 @@ class Application:
         # Force exit if something isn't present
         getopt.getopt(sys.argv[1:], allowedOptions)    
 	self.specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")
+        self.setConfigDefault("extra_version", "none")
         self.configObject.setUpApplication(self)
     def __repr__(self):
         return self.fullName
@@ -480,8 +481,7 @@ class OptionFinder:
                 versionList = self.findVersionList()
                 try:
                     for version in versionList:
-                        app = Application(appName, dirName, pathname, version, self.inputOptions, "a:c:d:h:m:s:v:xp")
-                        appList.append(app)
+                        appList += self.addApplications(appName, dirName, pathname, version)
                 except (SystemExit, KeyboardInterrupt):
                     raise sys.exc_type, sys.exc_value
                 except:
@@ -489,6 +489,20 @@ class OptionFinder:
             elif os.path.isdir(pathname) and recursive:
                 for app in self._findApps(pathname, 0):
                     appList.append(app)
+        return appList
+    def addApplications(self, appName, dirName, pathname, version):
+        appList = []
+        builtInOptions = "a:c:d:h:m:s:v:xp"
+        app = Application(appName, dirName, pathname, version, self.inputOptions, builtInOptions)
+        appList.append(app)
+        extraVersion = app.getConfigValue("extra_version")
+        if extraVersion == "none":
+            return appList
+        aggVersion = extraVersion
+        if len(version) > 0:
+            aggVersion = version + "." + extraVersion
+        newApp = Application(appName, dirName, pathname, aggVersion, self.inputOptions, builtInOptions)
+        appList.append(newApp)
         return appList
     def findVersionList(self):
         if self.inputOptions.has_key("v"):

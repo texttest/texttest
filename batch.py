@@ -198,7 +198,7 @@ class MailSender(plugins.Action):
             mailFile.write(os.linesep)
         for resp in appResponders:
             if len(appResponders) > 1:
-                mailFile.write("------------------------------------------------------------------" + os.linesep)
+                mailFile.write("---------------------------------------------------------------------------------" + os.linesep)
                 mailFile.write(self.getMailTitle(app, [ resp ]) + os.linesep)
                 mailFile.write(os.linesep)
             resp.writeMailBody(mailFile)
@@ -315,8 +315,8 @@ class CollectFiles(plugins.Action):
         totalValues = []
         for category in categoryNames:
             totalValues.append(0)
+        prefix = "batchreport." + app.name + app.versionSuffix()
         for filename in os.listdir(app.abspath):
-            prefix = "batchreport." + app.name + app.versionSuffix()
             if filename.startswith(prefix):
                 fullname = os.path.join(app.abspath, filename)
                 file = open(fullname)
@@ -358,5 +358,5 @@ class CollectFiles(plugins.Action):
             mailFile.write(os.linesep)
         for body in bodies:
             if len(bodies) > 1:
-                mailFile.write("------------------------------------------------------------------" + os.linesep + os.linesep)
+                mailFile.write("================================================================================" + os.linesep + os.linesep)
             mailFile.write(body)

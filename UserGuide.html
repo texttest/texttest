@@ -2,7 +2,7 @@
 <html>
 <head>
    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.18-27.8.0smp i686) [Netscape]">
+   <meta name="GENERATOR" content="Mozilla/4.78 [en] (X11; U; Linux 2.4.20-13.8smp i686) [Netscape]">
 </head>
 <body>
 
@@ -158,6 +158,11 @@ with version2.
 adding the "base_version" entry to the config file. Thus if config.&lt;app>.v1
 <br>contains the line "base_version:v2" then all the files for v1 are also
 read as well as those for v2.
+<p>It can be useful to start another version all the time when running
+tests, so that -v &lt;version1> behaves like - v &lt;version1>,&lt;version2>
+at all
+<br>times (or no option behaves like -v ,&lt;version1>).&nbsp;This is achieved
+by adding the line "extra_version:v1" to the relevant config file.
 <p><u>Checkouts of Applications</u>
 <br>It is expected that TextTest test suites will want to be version-controlled,
 and hence an easy means of switching between
@@ -209,7 +214,7 @@ of my local one
 <br><i>texttest -a cas -v 9 -m 3</i>
 <br><i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </i>Run all tests for
 the application with extension "cas", using version 9 of that application.
-Do everything 3 times.<b><u></u></b>
+Do everything 3 times.
 <p><b><u>Real Examples</u></b>
 <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TextTest comes with a test
 suite for itself. It is recommended that you look around this (or any other

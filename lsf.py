@@ -201,7 +201,7 @@ class SubmitTest(plugins.Action):
         testCommand = self.getExecuteCommand(test)
         reportfile =  test.makeFileName("report", temporary=1)
         lsfJob = LSFJob(test)
-        lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -u /dev/null"
+        lsfOptions = "-J " + lsfJob.name + " -q " + queueToUse + " -o " + reportfile + " -u nobody"
         resource = self.resourceFunction(test)
         if len(resource):
             lsfOptions += " -R '" + resource + "'"

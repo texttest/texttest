@@ -280,9 +280,10 @@ class BuildCode(plugins.Action):
                 self.buildLocal(absPath, app)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
-        self.buildRemote("sparc", app) 
-        self.buildRemote("parisc_2_0", app)
-        self.buildRemote("powerpc", app)
+        if getArchitecture(app) == "i386_linux":
+            self.buildRemote("sparc", app) 
+            self.buildRemote("parisc_2_0", app)
+            self.buildRemote("powerpc", app)
     def getMachine(self, app, arch):
         version9 = "9" in app.versions
         if arch == "i386_linux":

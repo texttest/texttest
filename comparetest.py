@@ -98,10 +98,13 @@ class TestComparison:
         worstResult = self.getMostSevereFileComparison()
         worstSeverity = worstResult.getSeverity()
         self.diag.info("Severity " + str(worstSeverity) + " for failing test")
+        details = worstResult.getSummary()
+        if len(self.getComparisons()) > 1:
+            details += "(+)"
         if worstSeverity == 1:
-            return "failure", worstResult.getSummary()
+            return "failure", details
         else:
-            return "success", worstResult.getSummary()
+            return "success", details
     def getComparisons(self):
         return self.changedResults + self.newResults
     def _comparisonsString(self, comparisons):
@@ -251,6 +254,9 @@ class FileComparison:
     def isDiagnostic(self):
         root, local = os.path.split(self.stdFile)
         return os.path.basename(root) == "Diagnostics"
+    def getDetails(self):
+        # Nothing to report above what is already known
+        return ""
     def getSummary(self):
         if self.newResult():
             return "new files"

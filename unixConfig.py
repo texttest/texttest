@@ -25,8 +25,8 @@ class UNIXConfig(default.Config):
         self.addFilter(filters, "b", batch.BatchFilter)
         self.addFilter(filters, "r", performance.TimeFilter)
         return filters
-    def getActionSequence(self):
-        seq = default.Config.getActionSequence(self)
+    def _getActionSequence(self, makeDirs=1):
+        seq = default.Config._getActionSequence(self, makeDirs)
         if self.batchMode():
             seq.append(batch.MailSender(self.optionValue("b")))
         return seq

@@ -152,7 +152,7 @@ class RunTest(default.RunTest):
         print "Tests will run with DISPLAY variable set to", display
     def killServer(self, server):
         # Xvfb servers get overloaded after a while. If they do, kill them
-        line = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep 42 | grep -v grep'").readline()
+        line = self.getPsOutput(server, ownProcesses=1)
         if len(line) == 0:
             # We will only kill servers that were started by TextTest (have number 42!)
             return
@@ -170,8 +170,14 @@ class RunTest(default.RunTest):
         os.system("remsh " + server + " 'xclock -display " + serverName + " >& /dev/null &' < /dev/null >& /dev/null & ")
         os.system("remsh " + server + " 'xterm -display " + serverName + " -e xhost + >& /dev/null &'< /dev/null >& /dev/null & ")
         return serverName
+    def getPsOutput(self, server, ownProcesses):
+        lines = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep -v grep'").readlines()
+        for line in lines:
+            if line.find("Xvfb") != -1 and (not ownProcesses or line.find("42") != -1):
+                return line
+        return ""
     def findDisplay(self, server):
-        line = os.popen("remsh " + server + " 'ps -efl | grep Xvfb | grep -v grep'").readline()
+        line = self.getPsOutput(server, ownProcesses=0)
         if len(line):
             self.virtualDisplayDiag.info("Found Xvfb process running:" + os.linesep + line)
             serverName = server + line.split()[-1] + ".0"
@@ -242,7 +248,7 @@ class CollateUNIXFiles(default.CollateFiles):
         file.close()
         # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
         # Unfortunately running gdb is not the answer, because it truncates the data...
-        binary = os.popen("csh -c 'echo `tail -c 1024 " + path + "`' 2> /dev/null").read().split(" ")[-1].strip()
+        binary = self.getBinaryFromCore(path)
         newPath = path + "tmp" 
         writeFile = open(newPath, "w")
         if os.path.isfile(binary):
@@ -261,10 +267,12 @@ class CollateUNIXFiles(default.CollateFiles):
             os.remove(stderrFile)
         else:
             writeFile.write("Could not find binary name from core file : Stack trace not produced for crash" + os.linesep)
-            # Keep the core file for later viewing
             os.rename(path, "core")
         os.remove(fileName)
         os.rename(newPath, path)
+    def getBinaryFromCore(self, path):
+        finalWord = os.popen("csh -c 'echo `tail -c 1024 " + path + "`' 2> /dev/null").read().split(" ")[-1].strip()
+        return finalWord.split(os.linesep)[-1]
     def writeStackTrace(self, stdoutFile, writeFile):
         prevLine = ""
         foundStack = 0

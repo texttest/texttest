@@ -5,8 +5,24 @@ By default, TextTest collects the application's standard output in output.<app> 
 in errors.<app> (this last on UNIX only). You can collect other files for comparison by specifying
 [collate_file]
 <target>:<source>
-, where <source> is some file your application writes (standard UNIX
-pattern matching is allowed here, e.g *.myext), and <target> is what you want it to be called by TextTest.
+where <source> is some file your application writes and <target> is what you
+want it to be called by TextTest.
+Standard UNIX pattern matching is allowed on both sides. On the source side
+it means that the produced file name differs slightly from the saved one, e.g.:
+	result:*.myext
+When patterns are used on the target side it means that all saved files
+that matches the target pattern and all files written by the test
+that matches the source pattern become collated files.
+E.g., if [collate_file] includes:
+    data*:data*.dump
+and if an earlier saved run produced
+    data1.<app> and data2.<app>
+and the latest run produced
+    data1.dump and data3.dump
+then the list of collated files becomes:
+    data1, data2, data3
+and in the latest run data1 will be compared against the save result,
+data2 will be flagged as missing and data3 flagged as new result.
 
 Evaluation of test results consists by default of comparing all files that have been collected.
 

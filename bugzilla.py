@@ -32,8 +32,13 @@ class CheckForBugs(plugins.Action):
                 parser = ConfigParser()
                 # Default behaviour transforms to lower case: we want case-sensitive
                 parser.optionxform = str
-                parser.read(bugFile)
-                self.testBugParserMap[suite] = parser
+                try:
+                    parser.read(bugFile)
+                except:
+                    print "Bug file at", bugFile, "not understood, ignoring"
+                    return
+                
+                self.testBugParserMap[suite] = parser    
             else:
                 return
             

@@ -261,13 +261,13 @@ class ImportTestSuite(optimization.ImportTestSuite):
                     return 1
         return 0
     def getCarmtmpPath(self, carmtmp, version=""):
-        rootDir = "/carm/proj/matador/"
+        rootDir = "/carm/proj/matador/carmtmps"
         if version == "":
             return os.path.join(rootDir, "master", carmtmp)
         elif version == "10":
-            return os.path.join(rootDir, "carmen_10", "tmps_for_RD", "Matador", carmtmp)
+            return os.path.join(rootDir, "carmen_10", carmtmp)
         elif version == "9":
-            return os.path.join(rootDir, "carmen_9.0_deliver", "tmps_for_Matador_9", carmtmp)
+            return os.path.join(rootDir, "carmen_9", carmtmp)
 
 class MigrateApcTest(plugins.Action):
     def __init__(self):

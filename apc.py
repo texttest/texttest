@@ -295,6 +295,9 @@ class RunApcTestInDebugger(default.RunTest):
             executeCommand = binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
         else:
             executeCommand = "gdb " + binName + " -silent -x " + gdbArgs
+        # Check for personal .gdbinit.
+        if os.path.isfile(os.path.join(os.environ["HOME"], ".gdbinit")):
+            print "Warning: You have a personal .gdbinit. This may create unexpected behaviour."
         # Source the CONFIG file to get the environment correct and run gdb with the script.
         configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
         os.system(". " + configFile + "; " + executeCommand)

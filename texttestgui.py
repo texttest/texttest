@@ -37,7 +37,7 @@ class TextTestGUI:
         childIter = self.model.iter_children(iter)
         if childIter:
             self.createSubIterMap(childIter)
-        else:
+        if test.classId() == "test-case":
             test.observers.append(self)
         nextIter = self.model.iter_next(iter)
         if nextIter:

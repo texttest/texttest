@@ -1,4 +1,4 @@
-import carmen, os, sys, stat, string, shutil, optimization
+import carmen, os, sys, stat, string, shutil, optimization, plugins
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -17,7 +17,8 @@ class ApcConfig(optimization.OptimizationConfig):
     def getCompileRules(self, staticFilter):
         return ApcCompileRules(self.getRuleSetName, self.getLibraryFile(), staticFilter, self.optionMap.has_key("rulecomp"))
     def getTestCollator(self):
-        return optimization.OptimizationConfig.getTestCollator(self) + [ RemoveLogs(), optimization.ExtractSubPlanFile(self, "status", "status") ]
+        subActions = [ optimization.OptimizationConfig.getTestCollator(self), RemoveLogs(), optimization.ExtractSubPlanFile(self, "status", "status") ]
+        return plugins.CompositeAction(subActions)
     def getRuleSetName(self, test):
         fileName = test.makeFileName("options")
         if os.path.isfile(fileName):
@@ -33,7 +34,7 @@ class ApcCompileRules(carmen.CompileRules):
         carmen.CompileRules.__init__(self, getRuleSetName, "-optimize", filter)
         self.forcedRuleCompile = forcedRuleCompile
         self.apcLib = os.path.join(os.environ["CARMSYS"], libraryFile)
-    def __call__(self, test, description):
+    def __call__(self, test):
         carmTmpDir = os.environ["CARMTMP"]
         if not os.path.isdir(carmTmpDir):
             os.mkdir(carmTmpDir)
@@ -50,7 +51,7 @@ class ApcCompileRules(carmen.CompileRules):
         ruleLib = self.getRuleLib(ruleset.name)
         if self.isNewer(apcExecutable, self.apcLib):
             return
-        print description + " -  ruleset " + ruleset.name
+        self.describe(test, " -  ruleset " + ruleset.name)
         ruleset.backup()
         if not os.path.isfile(ruleLib):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
@@ -96,29 +97,21 @@ class ApcCompileRules(carmen.CompileRules):
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
 
-class RemoveLogs:
-    def __repr__(self):
-        return "Removing log files for"
-    def __call__(self, test, description):
+class RemoveLogs(plugins.Action):
+    def __call__(self, test):
         self.removeFile(test, "errors")
         self.removeFile(test, "output")
     def removeFile(self, test, stem):
         os.remove(test.getTmpFileName(stem, "r"))
-    def setUpSuite(self, suite, description):
-        pass
 
-class StartStudio:
-    def __repr__(self):
-        return "Starting Studio for"
-    def __call__(self, test, description):
+class StartStudio(plugins.Action):
+    def __call__(self, test):
         print "CARMSYS:", os.environ["CARMSYS"]
         print "CARMUSR:", os.environ["CARMUSR"]
         print "CARMTMP:", os.environ["CARMTMP"]
         commandLine = os.path.join(os.environ["CARMSYS"], "bin", "studio")
         print os.popen(commandLine).readline()
         sys.exit(0)
-    def setUpSuite(self, suite, description):
-        pass
 
 class ApcTestCaseInformation(optimization.TestCaseInformation):
     def __init__(self, suite, name):
@@ -175,10 +168,10 @@ class ImportTest(optimization.ImportTest):
         return ApcTestSuiteInformation(suite, name)
 
 
-class PortApcTest:
+class PortApcTest(plugins.Action):
     def __repr__(self):
         return "Porting old"
-    def __call__(self, test, description):
+    def __call__(self, test):
         testInfo = ApcTestCaseInformation(self.suite, test.name)
         hasPorted = 0
         if test.options[0] == "-":
@@ -216,8 +209,8 @@ class PortApcTest:
                     open(perfFileName,"w").write(perfContent + os.linesep)
                     hasPorted = 1
         if hasPorted != 0:
-            print description, "in", testInfo.suiteDescription()
-    def setUpSuite(self, suite, description):
+            self.describe(test, " in " + testInfo.suiteDescription())
+    def setUpSuite(self, suite):
         self.suite = suite
 
 

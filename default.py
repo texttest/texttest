@@ -1,55 +1,52 @@
 #!/usr/local/bin/python
-import os, localrun, respond, comparetest
+import os, plugins, respond, comparetest
 
 def getConfig(optionMap):
     return Config(optionMap)
 
-class Config:
-    def __init__(self, optionMap):
-        self.optionMap = optionMap
+class Config(plugins.Configuration):
     def getOptionString(self):
         return "iot:f:"
-    def optionValue(self, option):
-        if self.optionMap.has_key(option):
-            return self.optionMap[option]
-        else:
-            return ""
     def getActionSequence(self):
+        actions = [ self.getTestRunner(), self.getTestEvaluator() ]
         if self.optionMap.has_key("i"):
-            return [ [ self.getTestRunner() ] + self.getTestEvaluator() ]
+            return [ plugins.CompositeAction(actions) ]
         else:
-            return [ self.getTestRunner(), self.getTestEvaluator() ]
+            return actions
     def getFilterList(self):
         filters = []
         self.addFilter(filters, "t", TestNameFilter)
         self.addFilter(filters, "f", FileFilter)
         return filters
-    def interpret(self, binaryString):
-        return binaryString
+    def getTestRunner(self):
+        return RunTest()
+    def getTestEvaluator(self):
+        subParts = [ self.getTestCollator(), self.getTestComparator(), self.getTestResponder() ]
+        return plugins.CompositeAction(subParts)
+    def getTestCollator(self):
+        # Won't do anything, of course
+        return plugins.Action()
+    def getTestComparator(self):
+        return comparetest.MakeComparisons()
+    def getTestResponder(self):
+        if self.optionMap.has_key("o"):
+            return respond.OverwriteOnFailures(self.optionValue("v"))
+        else:
+            return respond.InteractiveResponder()
+    # Utilities, which prove useful in many derived classes
+    def optionValue(self, option):
+        if self.optionMap.has_key(option):
+            return self.optionMap[option]
+        else:
+            return ""
     def addFilter(self, list, optionName, filterObj):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
-    def getTestRunner(self):
-        return localrun.RunTest()
-    def getTestEvaluator(self):
-        return self.getTestCollator() + self.getTestComparator() + self.getTestResponder()
-    def getTestCollator(self):
-        return []
-    def getTestComparator(self):
-        return [ comparetest.MakeComparisons() ]
-    def getTestResponder(self):
-        if self.optionMap.has_key("o"):
-            return [ respond.OverwriteOnFailures(self.optionValue("v")) ]
-        else:
-            return [ respond.InteractiveResponder() ]
 
-class TextFilter:
+
+class TextFilter(plugins.Filter):
     def __init__(self, filterText):
         self.text = filterText
-    def acceptsTestCase(self, test):
-        return 1
-    def acceptsTestSuite(self, suite):
-        return 1
     def containsText(self, test):
         return test.name.find(self.text) != -1
     def equalsText(self, test):
@@ -59,10 +56,24 @@ class TestNameFilter(TextFilter):
     def acceptsTestCase(self, test):
         return self.containsText(test)
     
-class FileFilter:
+class FileFilter(plugins.Filter):
     def __init__(self, filterFile):
         self.texts = map(string.strip, open(filterFile).readlines())
     def acceptsTestCase(self, test):
         return test.name in self.texts
-    def acceptsTestSuite(self, suite):
-        return 1
+
+class RunTest(plugins.Action):
+    def __repr__(self):
+        return "Running"
+    def __call__(self, test):
+        self.describe(test)
+        stdin, stdout, stderr = os.popen3(test.getExecuteCommand())
+        if os.path.isfile(test.inputFile):
+            stdin.write(open(test.inputFile).read())
+            stdin.close()
+        outfile = open(test.getTmpFileName("output", "w"), "w")
+        outfile.write(stdout.read())
+        errfile = open(test.getTmpFileName("errors", "w"), "w")
+        errfile.write(stderr.read())
+    def setUpSuite(self, suite):
+        self.describe(suite)

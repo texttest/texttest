@@ -1,4 +1,4 @@
-import carmen, os, shutil, getopt, optimization, string
+import carmen, os, shutil, getopt, optimization, string, plugins
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
@@ -39,13 +39,9 @@ class MatadorConfig(optimization.OptimizationConfig):
 #    def getTestCollator(self):
 #        return optimization.OptimizationConfig.getTestCollator(self) + [ MakeMatadorStatusFile() ]
 
-class MakeMatadorStatusFile:
-    def __repr__(self):
-        return "Collecting status file for"
-    def __call__(self, test, description):
+class MakeMatadorStatusFile(plugins.Action):
+    def __call__(self, test):
         scriptPath = os.path.join(os.environ["CARMSYS"], "bin", "makestatusfiles.sh")
         outputFile = test.getTmpFileName("output", "r")
         os.system(scriptPath + " . " + outputFile)
         os.rename("status", test.getTmpFileName("status", "w"))
-    def setUpSuite(self, suite, description):
-        pass

@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import os, time, string, signal, sys, default, performance, respond
+import os, time, string, signal, sys, default, performance, respond, batch, plugins
 
 def getConfig(optionMap):
     return LSFConfig(optionMap)
@@ -24,8 +24,10 @@ class LSFConfig(default.Config):
     def getFilterList(self):
         filters = default.Config.getFilterList(self)
         self.addFilter(filters, "r", performance.TimeFilter)
-        self.addFilter(filters, "b", respond.BatchFilter)
+        self.addFilter(filters, "b", self.batchFilterClass())
         return filters
+    def batchFilterClass(self):
+        return batch.BatchFilter
     def getTestRunner(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestRunner(self)
@@ -38,21 +40,21 @@ class LSFConfig(default.Config):
         if self.optionMap.has_key("l"):
             return default.Config.getTestCollator(self)
         else:
-            return [ Wait(), MakeResourceFiles() ]
+            return plugins.CompositeAction([ Wait(), MakeResourceFiles() ])
     def getTestComparator(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestComparator(self)
         else:
-            return [ performance.MakeComparisons() ]
+            return performance.MakeComparisons()
     def getTestResponder(self):
         diffLines = 30
         # If running multiple times, batch mode is assumed
         if self.optionMap.has_key("b") or self.optionMap.has_key("m"):
-            return [ respond.BatchResponder(diffLines, self.optionValue("b")) ]
+            return batch.BatchResponder(diffLines, self.optionValue("b"))
         elif self.optionMap.has_key("o"):
             return default.Config.getTestResponder(self)
         else:
-            return [ respond.UNIXInteractiveResponder(diffLines) ]
+            return respond.UNIXInteractiveResponder(diffLines)
 
 class LSFJob:
     def __init__(self, test):
@@ -86,15 +88,15 @@ class LSFJob:
             prevWord = word
         return ""
     
-class SubmitTest:
+class SubmitTest(plugins.Action):
     def __init__(self, queueFunction, resource = ""):
         self.queueFunction = queueFunction
         self.resource = resource
     def __repr__(self):
         return "Submitting"
-    def __call__(self, test, description):
+    def __call__(self, test):
         queueToUse = self.queueFunction(test)
-        print description + " to LSF queue " + queueToUse
+        self.describe(test, " to LSF queue " + queueToUse)
         testCommand = "'" + test.getExecuteCommand() 
         if os.path.isfile(test.inputFile):
             testCommand = testCommand + " < " + test.inputFile
@@ -108,30 +110,26 @@ class SubmitTest:
             lsfOptions += " -R '" + self.resource + "'"
         commandLine = "bsub " + lsfOptions + " " + testCommand + " > " + reportfile + " 2>&1"
         os.system(commandLine)
-    def setUpSuite(self, suite, description):
-        print description
+    def setUpSuite(self, suite):
+        self.describe(suite)
     
-class Wait:
+class Wait(plugins.Action):
     def __init__(self):
         self.eventName = "completion"
     def __repr__(self):
         return "Waiting for " + self.eventName + " of"
-    def __call__(self, test, description):
+    def __call__(self, test):
         job = LSFJob(test)
         if self.checkCondition(job):
             return
-        print description + "..."
+        self.describe(test, "...")
         while not self.checkCondition(job):
             time.sleep(2)
-    def setUpSuite(self, suite, description):
-        pass
     def checkCondition(self, job):
         return job.hasFinished()
 
-class MakeResourceFiles:
-    def __repr__(self):
-        return "Making resource files for"
-    def __call__(self, test, description):
+class MakeResourceFiles(plugins.Action):
+    def __call__(self, test):
         textList = [ "Max Memory", "Max Swap", "CPU time", "executed on host" ]
         tmpFile = test.getTmpFileName("report", "r")
         resourceDict = self.makeResourceDict(tmpFile, textList)
@@ -142,8 +140,6 @@ class MakeResourceFiles:
         os.remove(tmpFile)
         self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3]], test.getTmpFileName("performance", "w"))
         #self.writeMemoryFile(resourceDict[textList[0]], resourceDict[textList[1]], test.getTmpFileName("memory", "w"))
-    def setUpSuite(self, suite, description):
-        pass
 #private
     def makeResourceDict(self, tmpFile, textList):
         resourceDict = {}

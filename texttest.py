@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, string, getopt, types, time, re
+import os, sys, string, getopt, types, time, re, plugins
 from stat import *
 
 # Base class for TestCase and TestSuite
@@ -27,11 +27,7 @@ class Test:
         return string.replace(self.abspath, self.app.abspath, "")
     def performAction(self, action):
         self.setUpEnvironment()
-        if type(action) == types.ListType:
-            for subAction in action:
-                self.performSubAction(subAction)
-        else:
-            self.performSubAction(action)
+        self.callAction(action)
         self.performOnSubTests(action)
     def setUpEnvironment(self):
         for var, value in self.environment.items():
@@ -64,10 +60,9 @@ class TestCase(Test):
         return "test-case"
     def isValidSpecific(self):
         return os.path.isfile(self.inputFile) or len(self.options) > 0
-    def performSubAction(self, subAction):
+    def callAction(self, action):
         os.chdir(self.abspath)
-        description = self.getIndent() + repr(subAction) + " " + repr(self)
-        subAction(self, description)
+        action(self)
     def performOnSubTests(self, action):
         pass
     def getExecuteCommand(self):
@@ -104,9 +99,8 @@ class TestSuite(Test):
         return os.path.isfile(self.testCaseFile)
     def isEmpty(self):
         return len(self.testcases) == 0
-    def performSubAction(self, subAction):
-        description = self.getIndent() + repr(subAction) + " " + repr(self)
-        subAction.setUpSuite(self, description)
+    def callAction(self, action):
+        action.setUpSuite(self)
     def performOnSubTests(self, action):
         for testcase in self.testcases:
             testcase.performAction(action)
@@ -170,7 +164,12 @@ class Application:
     def getActionSequence(self):
         return self.configObject.getActionSequence()
     def getFilterList(self):
-        return self.configObject.getFilterList()
+        filters = self.configObject.getFilterList()
+        success = 1
+        for filter in filters:
+            if not filter.acceptsApplication(self):
+                success = 0
+        return success, filters
     def getConfigValue(self, key):
         if self.configDir.has_key(key):
             return os.path.expandvars(self.configDir[key])
@@ -305,25 +304,14 @@ class OptionFinder:
                 module, pclass = actionOption
 
                 importCommand = "from " + module + " import " + pclass + " as _pclass"
-                exec importCommand
-                return [ _pclass() ]
-            else:
-                return [ NonPythonAction(self.inputOptions["s"]) ]
+                try:
+                    exec importCommand
+                    return [ _pclass() ]
+                except:
+                    pass
+            return [ plugins.NonPythonAction(self.inputOptions["s"]) ]
         else:
             return app.getActionSequence()
-
-class NonPythonAction:
-    def __init__(self, actionText):
-        self.script = os.path.abspath(actionText)
-    def __repr__(self):
-        return "Running script " + os.path.basename(self.script) + " for"
-    def __call__(self, test, description):
-        self.callScript(test, description, "test_level")
-    def setUpSuite(self, suite, description):
-        os.chdir(suite.abspath)
-        self.callScript(suite, description, "suite_level")
-    def callScript(self, test, description, level):
-        os.system(self.script + " " + level + " " + test.name + " " + test.app.name + " '" + description + "'")
             
 class MultiEntryDictionary:
     def __init__(self, filename, appName = "", version = ""):
@@ -387,12 +375,6 @@ def debugPrint(text):
     if inputOptions.debugMode():
         print text
 
-def extraFilter(action):
-    try:
-        return action.filter
-    except:
-        return None
-
 # Need somewhat different formats on Windows/UNIX
 def tmpString():
     if os.environ.has_key("USER"):
@@ -400,38 +382,48 @@ def tmpString():
     else:
         return "tmp"
 
-# Needs to work in files - Windows doesn't like : in file names
-def timeFormat():
-    if os.environ.has_key("USER"):
-        return "%H:%M:%S"
-    else:
-        return "%H%M%S"
-
 # --- MAIN ---
 
-def main():
-    # Declared global for debugPrint() above
-    global inputOptions
-    inputOptions = OptionFinder()
-    global globalRunIdentifier
-    globalRunIdentifier = tmpString() + time.strftime(timeFormat(), time.localtime())
-
-    allApps = inputOptions.findApps()
-    for run in range(inputOptions.timesToRun()):
-        for app in allApps:
-            actionSequence = inputOptions.getActionSequence(app)
-            allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, app.getFilterList())
-            for action in actionSequence:
-                filter = extraFilter(action)
-                if filter != None:
-                    filterList = app.getFilterList()
-                    filterList.append(filter)
-                    debugPrint("Creating extra test suite from new filter " + repr(filter))
-                    debugPrint(os.getcwd())
-                    actionTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
-                    actionTests.performAction(action)
-                else:
-                    allTests.performAction(action)
+class TextTest:
+    def __init__(self):
+        # Declared global for debugPrint() above
+        global inputOptions
+        inputOptions = OptionFinder()
+        global globalRunIdentifier
+        globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
+        self.allApps = inputOptions.findApps()
+    def timeFormat(self):
+        # Needs to work in files - Windows doesn't like : in file names
+        if os.environ.has_key("USER"):
+            return "%H:%M:%S"
+        else:
+            return "%H%M%S"
+    def run(self):        
+        for run in range(inputOptions.timesToRun()):
+            for app in self.allApps:
+                self.runApp(app)
+    def runApp(self, app):
+        actionSequence = inputOptions.getActionSequence(app)
+        acceptsApp, filterList = app.getFilterList()
+        if not acceptsApp:
+            return
+        allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
+        for action in actionSequence:
+            try:
+                self.performActionWithFilter(app, action, action.filter, filterList)
+            except:
+                self.performAction(allTests, action)
+    def performActionWithFilter(self, app, action, newFilter, filterList):
+        newFilterList = filterList
+        newFilterList.append(newFilter)
+        debugPrint("Creating extra test suite from new filter " + repr(newFilter))
+        debugPrint(os.getcwd())
+        actionTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, newFilterList)
+        self.performAction(actionTests, action)
+    def performAction(self, suite, action):
+        action.setUpApplication(suite.app)
+        suite.performAction(action)
 
 if __name__ == "__main__":
-    main()
+    program = TextTest()
+    program.run()

@@ -1,8 +1,11 @@
 #!/usr/local/bin/python
-import lsf, default, respond, performance, os, string, shutil, stat, time
+import lsf, default, performance, os, string, shutil, stat, plugins, batch
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
+
+def isUserSuite(suite):
+    return suite.environment.has_key("CARMUSR")
 
 class UserFilter(default.TextFilter):
     def acceptsTestSuite(self, suite):
@@ -10,11 +13,19 @@ class UserFilter(default.TextFilter):
             return self.containsText(suite)
         else:
             return 1
-        
+
 architecture = os.popen("arch").readline()[:-1]
 
-def isUserSuite(suite):
-    return suite.environment.has_key("CARMUSR")
+class CarmenBatchFilter(batch.BatchFilter):
+    def acceptsApplication(self, app):
+        if self.acceptsArchitecture(app):
+            return batch.BatchFilter.acceptsApplication(self, app)
+        else:
+            print "Rejected application", app, "on architecture", architecture 
+            return 0
+    def acceptsArchitecture(self, app):
+        allowedArchs = app.getConfigList(self.batchSession + "_architecture")
+        return len(allowedArchs) == 0 or architecture in allowedArchs
 
 class CarmenConfig(lsf.LSFConfig):
     def getOptionString(self):
@@ -23,6 +34,8 @@ class CarmenConfig(lsf.LSFConfig):
         filters = lsf.LSFConfig.getFilterList(self)
         self.addFilter(filters, "u", UserFilter)
         return filters
+    def batchFilterClass(self):
+        return CarmenBatchFilter
     def getActionSequence(self):
         if self.optionMap.has_key("rulecomp"):
             return [ CompileRules(self.getRuleSetName) ]
@@ -30,7 +43,8 @@ class CarmenConfig(lsf.LSFConfig):
             return lsf.LSFConfig.getActionSequence(self)
     def getTestRunner(self):
         if self.optionMap.has_key("lprof"):
-            return [ lsf.LSFConfig.getTestRunner(self), WaitForDispatch(), RunLProf() ]
+            subActions = [ lsf.LSFConfig.getTestRunner(self), WaitForDispatch(), RunLProf() ]
+            return plugins.CompositeAction(subActions)
         else:
             return lsf.LSFConfig.getTestRunner(self)
     def findLSFQueue(self, test):
@@ -47,7 +61,7 @@ class CarmenConfig(lsf.LSFConfig):
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
 
-class CompileRules:
+class CompileRules(plugins.Action):
     def __init__(self, getRuleSetName, modeString = "-optimize", filter = None):
         self.rulesCompiled = []
         self.raveName = None
@@ -56,10 +70,10 @@ class CompileRules:
         self.filter = filter
     def __repr__(self):
         return "Compiling rules for"
-    def __call__(self, test, description):
+    def __call__(self, test):
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName)
         if ruleset.isValid() and not ruleset.name in self.rulesCompiled:
-            print description + " - ruleset " + ruleset.name
+            self.describe(test, " - ruleset " + ruleset.name)
             ruleset.backup()
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
             commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile
@@ -67,8 +81,8 @@ class CompileRules:
             os.system(commandLine)
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
-    def setUpSuite(self, suite, description):
-        print description
+    def setUpSuite(self, suite):
+        self.describe(suite)
         self.rulesCompiled = []
         if self.raveName == None:
             self.raveName = getRaveName(suite)
@@ -92,7 +106,7 @@ class RuleSet:
             os.remove(self.targetFile)
             os.rename(debugVersion, self.targetFile)
         
-class UpdatedLocalRulesetFilter:
+class UpdatedLocalRulesetFilter(plugins.Filter):
     def __init__(self, getRuleSetName, libraryFile):
         self.getRuleSetName = getRuleSetName
         self.libraryFile = libraryFile
@@ -118,13 +132,13 @@ class WaitForDispatch(lsf.Wait):
     def checkCondition(self, job):
         return len(job.getProcessIds()) >= 4
 
-class RunLProf:
+class RunLProf(plugins.Action):
     def __repr__(self):
         return "Running LProf profiler on"
-    def __call__(self, test, description):
+    def __call__(self, test):
         job = lsf.LSFJob(test)
         executionMachine = job.getExecutionMachine()
-        print description + ", executing on " + executionMachine
+        self.describe(test, ", executing on " + executionMachine)
         processId = job.getProcessIds()[-1]
         runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId
         outputFile = "prof." + processId
@@ -132,6 +146,4 @@ class RunLProf:
         removeLine = "rm " + outputFile
         commandLine = "rsh " + executionMachine + " '" + runLine + "; " + processLine + "; " + removeLine + "'"
         os.system(commandLine)
-    def setUpSuite(self, suite, description):
-        pass
  

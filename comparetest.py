@@ -1,12 +1,12 @@
 #!/usr/local/bin/python
-import os, filecmp, string
+import os, filecmp, string, plugins
 
 testComparisonMap = {}
 
-class MakeComparisons:
+class MakeComparisons(plugins.Action):
     def __repr__(self):
         return "Comparing differences for" 
-    def __call__(self, test, description):
+    def __call__(self, test):
         comparisons = []
         attemptedComparisons = []
         for file in os.listdir(test.abspath):
@@ -17,14 +17,15 @@ class MakeComparisons:
                 attemptedComparisons.append(standardFile)
                 if comparison != None:
                     comparisons.append(comparison)
+        postText = ""
         if len(comparisons) > 0:
             testComparisonMap[test] = comparisons
         else:
-            description += " - SUCCESS!"
-        description +=  " (on " + string.join(attemptedComparisons, ",") + ")"
-        print description
-    def setUpSuite(self, suite, description):
-        print description
+            postText += " - SUCCESS!"
+        postText +=  " (on " + string.join(attemptedComparisons, ",") + ")"
+        self.describe(test, postText)
+    def setUpSuite(self, suite):
+        self.describe(suite)
 #private:
     def makeComparison(self, test, standardFile, tmpFile):
         comparison = self.createFileComparison(test, standardFile, tmpFile)

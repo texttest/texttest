@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import os, comparetest, string
+import os, comparetest, string, plugins
 
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing
@@ -54,11 +54,9 @@ class PerformanceFileComparison(comparetest.FileComparison):
         smallest = min(self.oldCPUtime, self.newCPUtime)
         return ((largest - smallest) / smallest) * 100
 
-class TimeFilter:
+class TimeFilter(plugins.Filter):
     def __init__(self, timeLimit):
         self.timeLimit = float(timeLimit)
     def acceptsTestCase(self, test):
         testPerformance = getTestPerformance(test)
         return testPerformance < self.timeLimit
-    def acceptsTestSuite(self, suite):
-        return 1

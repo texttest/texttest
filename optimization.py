@@ -1,4 +1,4 @@
-import carmen, os, sys, shutil, KPI
+import carmen, os, sys, shutil, KPI, plugins
 
 class OptimizationConfig(carmen.CarmenConfig):
     def getOptionString(self):
@@ -14,20 +14,20 @@ class OptimizationConfig(carmen.CarmenConfig):
         batchSession = self.optionValue("b")
         if batchSession == "nightjob" or batchSession == "wkendjob":
             return carmen.CompileRules(self.getRuleSetName)
-        
+
         localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
         return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
-        return carmen.CarmenConfig.getTestCollator(self) + [ ExtractSubPlanFile(self, "best_solution", "solution") ]
+        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), ExtractSubPlanFile(self, "best_solution", "solution") ])
 
-class ExtractSubPlanFile:
+class ExtractSubPlanFile(plugins.Action):
     def __init__(self, config, sourceName, targetName):
         self.config = config
         self.sourceName = sourceName
         self.targetName = targetName
     def __repr__(self):
         return "Extracting subplan file " + self.sourceName + " to " + self.targetName + " on"
-    def __call__(self, test, description):
+    def __call__(self, test):
         sourcePath = self.config.getSubPlanFileName(test, self.sourceName)
         if os.path.isfile(sourcePath):
             if self.isCompressed(sourcePath):
@@ -43,11 +43,8 @@ class ExtractSubPlanFile:
             return 1
         else:
             return 0
-    def setUpSuite(self, suite, description):
-        pass
 
-
-class CalculateKPI:
+class CalculateKPI(plugins.Action):
     def __init__(self, referenceVersion):
         self.referenceVersion = referenceVersion
         self.totalKPI = 0
@@ -59,16 +56,16 @@ class CalculateKPI:
             print "No KPI tests were found with respect to version " + self.referenceVersion
     def __repr__(self):
         return "Calculating KPI for"
-    def __call__(self, test, description):
+    def __call__(self, test):
         currentFile = test.makeFileName("status")
         referenceFile = test.makeFileName("status", self.referenceVersion)
         if currentFile != referenceFile:
             kpiValue = KPI.calculate(referenceFile, currentFile)
-            print description + ", with respect to version", self.referenceVersion, "- returns", kpiValue
+            self.describe(test, ", with respect to version " + self.referenceVersion + " - returns " + str(kpiValue))
             self.totalKPI += kpiValue
             self.numberOfValues += 1
-    def setUpSuite(self, suite, description):
-        print description
+    def setUpSuite(self, suite):
+        self.describe(suite)
 
 class TestInformation:
     def __init__(self, suite, name):
@@ -101,7 +98,7 @@ class TestSuiteInformation(TestInformation):
         if not os.path.isfile(self.makeFileName("environment")):
             return 0
         return 1
-    def makeImport(self, description):
+    def makeImport(self):
         if not os.path.isdir(self.testPath()):
             os.mkdir(self.testPath())
         suitePath = self.makeFileName("testsuite")
@@ -113,8 +110,8 @@ class TestSuiteInformation(TestInformation):
             carmUsrDir = self.chooseCarmUsr()
             if carmUsrDir != None:
                 open(envPath,"w").write(self.getEnvContent(carmUsrDir) + os.linesep)
-        if description != None:
-            print description + ", User: '" + self.name + "'"
+    def postText(self):
+        return ", User: '" + self.name + "'"
     def getEnvContent(self, carmUsrDir):
         carmTmpDir = carmUsrDir[:-4] + "tmp"
         return "CARMUSR:" + carmUsrDir + os.linesep + "CARMTMP:" + carmTmpDir
@@ -161,7 +158,7 @@ class TestCaseInformation(TestInformation):
         if not os.path.isfile(self.makeFileName("performance")):
             return 0
         return 1
-    def makeImport(self, description):
+    def makeImport(self):
         testPath = self.testPath()
         optionPath = self.makeFileName("options")
         envPath = self.makeFileName("environment")
@@ -185,8 +182,8 @@ class TestCaseInformation(TestInformation):
         if not os.path.isfile(perfPath):
             perfContent = self.buildPerformance(carmUsrSubPlanDirectory)
             open(perfPath, "w").write(perfContent + os.linesep)
-        if description != None:
-            print description + ", Test: '" + self.name + "'"
+    def postText(self):
+        return ", Test: '" + self.name + "'"
     def subPlanFromOptions(self, optionPath):
         return None
     def buildOptions(self, path, ruleSet):
@@ -264,19 +261,16 @@ class TestCaseInformation(TestInformation):
                 tryName = sys.stdin.readline().strip();
         return dirName
 
-class ImportTest:
+class ImportTest(plugins.Action):
     def __repr__(self):
         return "Importing into"
-    def __call__(self, test, description):
-        pass
-    
     def getTestCaseInformation(self, suite, name):
         return TestCaseInformation(suite, name)
 
     def getTestSuiteInformation(self, suite, name):
         return TestSuiteInformation(suite, name)
     
-    def setUpSuite(self, suite, description):
+    def setUpSuite(self, suite):
         if not os.environ.has_key("CARMSYS"):
             return
         for testline in open(suite.testCaseFile).readlines():
@@ -286,8 +280,8 @@ class ImportTest:
                 else:
                     testInfo = self.getTestSuiteInformation(suite, testline.strip())
                 if not testInfo.isComplete():
-                    testInfo.makeImport(description)
-
+                    testInfo.makeImport()
+                    self.describe(suite, testInfo.postText())
 
     def makeUser(self, userInfo, carmUsrDir):
         return 0

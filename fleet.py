@@ -11,11 +11,16 @@ import os, string, optimization, matador
 def getConfig(optionMap):
     return FleetConfig(optionMap)
 
-def subPlanInput(inputFile):
-    for line in open(inputFile).xreadlines():
-        entries = line.split()
-        if entries[0] == "loadsp":
-            return string.join(entries[1:], os.sep)
+def getOption(options, optionVal):
+    optparts = options.split()
+    nextWanted = 0
+    for option in optparts:
+        if nextWanted:
+            return option
+        if option == optionVal:
+            nextWanted = 1
+        else:
+            nextWanted = 0
     return None
 
 class FleetConfig(matador.MatadorConfig):
@@ -23,7 +28,7 @@ class FleetConfig(matador.MatadorConfig):
         matador.MatadorConfig.__init__(self, optionMap)
         self.subplanManager = FleetSubPlanDirManager(self)
     def subPlanName(self, test):
-        subPlan = subPlanInput(test.inputFile)
+        subPlan = getOption(test.options, "-s")
         if subPlan == None:
             # print help information and exit:
             return ""
@@ -56,15 +61,13 @@ class FleetSubPlanDirManager(optimization.SubPlanDirManager):
         self.makeTemporary(test)
         tmpDir = self.tmpDirs[test]
         tmpDir = tmpDir.replace(self.getFullPath("") + os.sep,"")
-        loadspEntry = string.join(tmpDir.split(os.sep))
-        tmpInputFile = test.getTmpFileName("input", "w")
-        oldFile = open(test.inputFile)
-        newFile = open(tmpInputFile, "w")
-        for line in oldFile.readlines():
-            entries = line.split()
-            if len(entries) > 1 and entries[0] == "loadsp":
-                newFile.write("loadsp " + loadspEntry + os.linesep)
-            else:
-                newFile.write(line)
-        return binary
-    
+        optparts = test.options.split()
+        for ix in range(len(optparts) - 1):
+            if optparts[ix] == "-s" and (ix + 1) < len(optparts):
+                optparts[ix + 1] = tmpDir
+            if optparts[ix] == "-c" and (ix + 1) < len(optparts):
+                optparts[ix + 1] = test.abspath + os.sep + optparts[ix + 1]
+        options = string.join(optparts, " ")
+        return binary + " " + options
+
+

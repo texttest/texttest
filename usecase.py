@@ -38,6 +38,7 @@ These will then be capable of
 
 import os, string, sys, signal, time
 from threading import Thread, currentThread
+from ConfigParser import ConfigParser, NoSectionError, NoOptionError
 from ndict import seqdict
 
 # Hard coded commands
@@ -75,6 +76,8 @@ class ScriptEngine:
         self.replayScript = None
         self.recordScript = None
         self.stdinScript = None
+        if not os.environ.has_key("USECASE_HOME"):
+            os.environ["USECASE_HOME"] = os.path.expanduser("~/usecases")
         prevArg = ""
         for arg in sys.argv[1:]:
             if prevArg.find("-replay") != -1:
@@ -104,7 +107,7 @@ class ScriptEngine:
         return line
     def standardName(self, name):
         return name.strip().lower()
-
+    
 class ReplayScript:
     def __init__(self, scriptName, logger):
         self.events = {}
@@ -230,6 +233,7 @@ class UseCaseRecordScript(RecordScript):
         self.events = []
         self.processId = os.getpid()
         self.applicationEvents = seqdict()
+        self.translationParser = self.readTranslationFile()
         self.realSignalHandlers = {}
         self.signalNames = {}
         for entry in dir(signal):
@@ -245,6 +249,11 @@ class UseCaseRecordScript(RecordScript):
             except:
                 # Various signals aren't really valid here...
                 pass
+    def readTranslationFile(self):
+        fileName = os.path.join(os.environ["USECASE_HOME"], "usecase_translation")
+        configParser = ConfigParser()
+        configParser.read(fileName)
+        return configParser
     def recordSignal(self, signum, stackFrame):
         self.writeApplicationEventDetails()
         self.record(signalCommandName + " " + self.signalNames[signum])
@@ -260,13 +269,20 @@ class UseCaseRecordScript(RecordScript):
         else:
             # If there was a handler, just call it
             realHandler(signum, stackFrame)
+    def translate(self, line, eventName):
+        try:
+            newName = self.translationParser.get("use case actions", eventName)
+            return line.replace(eventName, newName)
+        except (NoSectionError, NoOptionError):
+            return line
     def addEvent(self, event):
         self.events.append(event)
     def writeEvent(self, *args):
         event = self.findEvent(*args)
         if event.shouldRecord(*args):
             self.writeApplicationEventDetails()
-            self.record(event.outputForScript(*args))
+            scriptOutput = event.outputForScript(*args) 
+            self.record(self.translate(scriptOutput, event.name))
     def findEvent(self, *args):
         for arg in args:
             if isinstance(arg, UserEvent):

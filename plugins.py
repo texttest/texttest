@@ -16,7 +16,7 @@ class Configuration:
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options
     def getApplicationEnvironment(self, app):
-        return [ ("TEXTTEST_CHECKOUT", app.checkout) ]
+        return []
     def keepTmpFiles(self):
         return 0
     def printHelpText(self):
@@ -61,14 +61,6 @@ class Action:
 # as it ensures everything appears by default in a standard place with a standard name.
 def getDiagnostics(diagName):
     return log4py.Logger().get_instance(diagName)
-
-def getSelfTestDiagnostics(diagName, fileName):
-    diag = getDiagnostics(diagName)
-    if os.environ.has_key("TEXTTEST_NO_SPAWN"):
-        diag.set_loglevel(log4py.LOGLEVEL_NORMAL)
-        diag.set_target(os.path.abspath(fileName))
-        diag.set_formatstring("%M")
-    return diag
 
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):

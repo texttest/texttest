@@ -453,6 +453,12 @@ class RunDependentTextFilter:
         for text in self.findConfigTexts(dict, stem):
             orderFilter = LineFilter(text, self.diag)
             self.orderFilters[orderFilter] = []
+        self.osChange = self.changedOs(app)
+    def changedOs(self, app):
+        homeOs = app.getConfigValue("home_operating_system")
+        if homeOs == "any":
+            return 0
+        return os.name != homeOs
     def hasFilters(self):
         return len(self.contentFilters) > 0 or len(self.orderFilters) > 0
     def findConfigTexts(self, dict, stem):
@@ -461,8 +467,15 @@ class RunDependentTextFilter:
             if fnmatch(stem, key):
                 texts += dict[key]
         return texts
+    def shouldFilter(self, fileName, newFileName):
+        if not os.path.isfile(fileName):
+            return 0
+        if self.hasFilters():
+            return 1
+        # Force recomputation of files that come from other operating systems...
+        return self.osChange and newFileName.endswith("origcmp")
     def filterFile(self, fileName, newFileName, makeNew = 0):
-        if not self.hasFilters() or not os.path.isfile(fileName):
+        if not self.shouldFilter(fileName, newFileName):
             self.diag.info("No filter for " + fileName)
             return fileName
 

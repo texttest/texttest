@@ -219,6 +219,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("text_diff_program", self.defaultTextDiffTool())
         app.setConfigDefault("lines_of_text_difference", 30)
         app.setConfigDefault("max_width_text_difference", 900)
+        app.setConfigDefault("home_operating_system", "any")
         app.setConfigDefault("collate_file", {})
         app.setConfigDefault("run_dependent_text", { "" : [] })
         app.setConfigDefault("unordered_text", { "" : [] })

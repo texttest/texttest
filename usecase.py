@@ -52,16 +52,16 @@ class UseCaseScriptError(RuntimeError):
 # to be doing something on a particular widget, and being named explicitly by the
 # programmer in some language domain.
 
-# Record scripts will call widgetHasChanged and will not record anything if this
-# returns false: this is mainly for widgets with state. They will then call outputForScript
+# Record scripts will call shouldRecord and will not record anything if this
+# returns false: this is to allow for widgets with state which may not necessarily
+# have changed in an appopriate way just because of the signal. They will then call outputForScript
 # and write this to the script
 
 # Replay scripts will call generate in order to simulate the event over again.
 class UserEvent:
-    def __init__(self, name, widget):
+    def __init__(self, name):
         self.name = name
-        self.widget = widget
-    def widgetHasChanged(self):
+    def shouldRecord(self):
         return 1
     def outputForScript(self, *args):
         return self.name
@@ -255,9 +255,9 @@ class UseCaseRecordScript(RecordScript):
             realHandler(signum, stackFrame)
     def addEvent(self, event):
         self.events.append(event)
-    def writeEvent(self, widget, *args):
+    def writeEvent(self, *args):
         event = self.findEvent(*args)
-        if event.widgetHasChanged():
+        if event.shouldRecord():
             self.writeApplicationEventDetails()
             self.record(event.outputForScript(*args))
     def findEvent(self, *args):

@@ -55,40 +55,47 @@ for the text "foobar.txt" and select that row accordingly.
 
 import usecase, gtk, os, string
 
-class ActivateEvent(usecase.UserEvent):
+# Base class for all GTK events due to widget signals
+class SignalEvent(usecase.UserEvent):
+    def __init__(self, name, widget, signalName):
+        usecase.UserEvent.__init__(self, name)
+        self.widget = widget
+        self.signalName = signalName
+    def outputForScript(self, widget, *args):
+        return self._outputForScript(*args)
+    def _outputForScript(self, *args):
+        return self.name
+    def generate(self, argumentString):
+        self.widget.emit(self.signalName)
+
+class ActivateEvent(SignalEvent):
     def __init__(self, name, widget, active = gtk.TRUE):
-        usecase.UserEvent.__init__(self, name, widget)
+        SignalEvent.__init__(self, name, widget, "toggled")
         self.active = active
-    def widgetHasChanged(self):
+    def shouldRecord(self):
         return self.widget.get_active() == self.active
     def generate(self, argumentString):
         self.widget.set_active(self.active)
-
-class EntryEvent(usecase.UserEvent):
+        
+class EntryEvent(SignalEvent):
     def __init__(self, name, widget):
-        usecase.UserEvent.__init__(self, name, widget)
+        SignalEvent.__init__(self, name, widget, "focus-out-event")
         self.oldText = ""
-    def widgetHasChanged(self):
+    def shouldRecord(self):
         text = self.widget.get_text()
         return text != self.oldText
-    def outputForScript(self, *args):
+    def _outputForScript(self, *args):
         text = self.widget.get_text()
         self.oldText = text
         return self.name + " " + text
     def generate(self, argumentString):
         self.widget.set_text(argumentString)
-
-class SignalEvent(usecase.UserEvent):
-    def __init__(self, name, widget, signalName):
-        usecase.UserEvent.__init__(self, name, widget)
-        self.signalName = signalName
-    def generate(self, argumentString):
-        self.widget.emit(self.signalName, *argumentString)
+        self.widget.editing_done()
 
 class NotebookPageChangeEvent(SignalEvent):
     def __init__(self, name, widget):
         SignalEvent.__init__(self, name, widget, "switch-page")
-    def outputForScript(self, page, page_num, *args):
+    def _outputForScript(self, page, page_num, *args):
         newPage = self.widget.get_nth_page(page_num)
         return self.name + " " + self.widget.get_tab_label_text(newPage)
     def generate(self, argumentString):
@@ -129,29 +136,47 @@ class TreeSignalEvent(SignalEvent):
 class TreeViewSignalEvent(TreeSignalEvent):
     def getModel(self):
         return self.widget.get_model()
-    def outputForScript(self, path, *args):
+    def _outputForScript(self, path, *args):
         return self.getOutput(path)
     def generate(self, argumentString):
         path = self.getPathData(argumentString)
         self.widget.emit(self.signalName, path, self.column)
-    
+
 class TreeSelectionSignalEvent(TreeSignalEvent):
     def __init__(self, name, widget, signalName, sense, argumentParseData):
         TreeSignalEvent.__init__(self, name, widget, signalName, argumentParseData)
         self.oldSelectedPaths = self.findSelectedPaths()
         self.newSelectedPaths = self.oldSelectedPaths
         self.sense = sense
+        self.skipNextRecord = 0
+        self.recordActive = 1
+        if self.sense > 0:
+            widget.get_tree_view().connect("row_activated", self.disableNext)
     def getModel(self):
         return self.widget.get_tree_view().get_model()
-    def widgetHasChanged(self):
+    def disableNext(self, *args):
+        self.skipNextRecord = 1
+    def setMonitoring(self, active):
+        self.recordActive = active
+        if active:
+            self.oldSelectedPaths = self.newSelectedPaths
+    def reenableRecord(self):
+        if not self.recordActive:
+            return 0
+        if self.skipNextRecord:
+            self.skipNextRecord = 0
+            self.oldSelectedPaths = self.newSelectedPaths
+            return 0
+        return 1
+    def shouldRecord(self):
         self.newSelectedPaths = self.findSelectedPaths()
         if self.sense > 0 and len(self.newSelectedPaths) > len(self.oldSelectedPaths):
-            return 1
+            return self.reenableRecord()
         elif self.sense < 0 and len(self.newSelectedPaths) < len(self.oldSelectedPaths):
-            return 1
+            return self.reenableRecord()
         self.oldSelectedPaths = self.newSelectedPaths
         return 0
-    def outputForScript(self, *args):
+    def _outputForScript(self, *args):
         extraPaths = self.extraPaths()
         self.oldSelectedPaths = self.newSelectedPaths
         outputList = map(self.getOutput, extraPaths)
@@ -181,20 +206,34 @@ class TreeSelectionSignalEvent(TreeSignalEvent):
             self.widget.unselect_path(path)
 
 class ScriptEngine(usecase.ScriptEngine):
-    def connect(self, eventName, signalName, widget, method = None, argumentParseData = None, sense = 1, *data):
+    def connect(self, eventName, signalName, widget, method = None, argumentParseData = None, *data):
         if method:
             widget.connect(signalName, method, *data)
         if self.hasScript():
             stdName = self.standardName(eventName)
-            signalEvent = self._createSignalEvent(signalName, stdName, widget, sense, argumentParseData)
-            self._addEventToScripts(signalEvent, signalName)
+            signalEvent = self._createSignalEvent(signalName, stdName, widget, argumentParseData)
+            self._addEventToScripts(signalEvent)
+    def monitorTreeSelection(self, additionName, removalName, selection, argumentParseData):
+        if self.hasScript():
+            addEvent = TreeSelectionSignalEvent(self.standardName(additionName), selection, "changed", 1, argumentParseData)
+            remEvent = TreeSelectionSignalEvent(self.standardName(removalName), selection, "changed", -1, argumentParseData)
+            self._addEventToScripts(addEvent)
+            self._addEventToScripts(remEvent)
+    def setMonitoring(self, selection, active):
+        # Allow disabling and enabling of the tree selection monitoring. This to avoid recording changes made programatically
+        if self.recordScript:
+            for event in self.recordScript.events:
+                if event.widget == selection:
+                    event.setMonitoring(active)
     def createEntry(self, description, defaultValue):
         entry = gtk.Entry()
         entry.set_text(defaultValue)
         if self.hasScript():
             stateChangeName = "enter " + self.standardName(description) + " ="
             entryEvent = EntryEvent(stateChangeName, entry)
-            self._addEventToScripts(entryEvent, "focus-out-event")
+            if self.recordScript:
+                entryEvent.widget.connect("editing-done", self.recordScript.writeEvent, entryEvent)
+            self._addEventToScripts(entryEvent)
         return entry
     def createNotebook(self, description, pages):
         notebook = gtk.Notebook()
@@ -204,7 +243,7 @@ class ScriptEngine(usecase.ScriptEngine):
         if self.hasScript():
             stateChangeName = "page " + self.standardName(description) + " to"
             event = NotebookPageChangeEvent(stateChangeName, notebook)
-            self._addEventToScripts(event, event.signalName)
+            self._addEventToScripts(event)
         return notebook
     def createCheckButton(self, description, defaultValue):
         button = gtk.CheckButton(description)
@@ -216,23 +255,21 @@ class ScriptEngine(usecase.ScriptEngine):
             uncheckChangeName = "uncheck " + self.standardName(description)
             checkEvent = ActivateEvent(checkChangeName, button)
             uncheckEvent = ActivateEvent(uncheckChangeName, button, gtk.FALSE)
-            self._addEventToScripts(checkEvent, "toggled")
-            self._addEventToScripts(uncheckEvent, "toggled")
+            self._addEventToScripts(checkEvent)
+            self._addEventToScripts(uncheckEvent)
         return button
 #private
     def createReplayScript(self, scriptName, logger):
         return ReplayScript(scriptName, logger)
-    def _addEventToScripts(self, event, signalName):
+    def _addEventToScripts(self, event):
         if self.replayScript:
             self.replayScript.addEvent(event)
         if self.recordScript:
             self.recordScript.addEvent(event)
-            event.widget.connect(signalName, self.recordScript.writeEvent, event)
-    def _createSignalEvent(self, signalName, eventName, widget, sense, argumentParseData):
+            event.widget.connect(event.signalName, self.recordScript.writeEvent, event)
+    def _createSignalEvent(self, signalName, eventName, widget, argumentParseData):
         if isinstance(widget, gtk.TreeView):
             return TreeViewSignalEvent(eventName, widget, signalName, argumentParseData)
-        elif isinstance(widget, gtk.TreeSelection):
-            return TreeSelectionSignalEvent(eventName, widget, signalName, sense, argumentParseData)
         else:
             return SignalEvent(eventName, widget, signalName)
 

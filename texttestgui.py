@@ -178,9 +178,8 @@ class TextTestGUI:
             perfColumn = gtk.TreeViewColumn("Performance", renderer, text=3, background=4)
             view.append_column(perfColumn)
         view.expand_all()
+        scriptEngine.monitorTreeSelection("add to test selection", "remove from test selection", self.selection, argumentParseData=(column, 0))
         scriptEngine.connect("select test", "row_activated", view, self.viewTest, argumentParseData=(column, 0))
-        scriptEngine.connect("add to test selection", "changed", self.selection, sense=1, argumentParseData=(column, 0))
-        scriptEngine.connect("remove from test selection", "changed", self.selection, sense=-1, argumentParseData=(column, 0))
         view.show()
 
         # Create scrollbars around the view.
@@ -376,7 +375,7 @@ class RightWindowGUI:
     def addButton(self, method, buttonbox, label, scriptTitle, option):
         button = gtk.Button()
         button.set_label(label)
-        scriptEngine.connect(scriptTitle, "clicked", button, method, None, 1, option)
+        scriptEngine.connect(scriptTitle, "clicked", button, method, None, option)
         button.show()
         buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
     def createDisplay(self, optionGroup):
@@ -425,9 +424,12 @@ class ApplicationGUI(RightWindowGUI):
     def runInteractive(self, button, action, *args):
         newSuite = action.performOn(self.app, self.getSelectedTests())
         if newSuite:
+            # Disable recording of selection changes: they're happening programatically
+            scriptEngine.setMonitoring(self.selection, 0)
             self.selection.unselect_all()
             self.selectionChanged(newSuite)
             self.selection.get_tree_view().grab_focus()
+            scriptEngine.setMonitoring(self.selection, 1)
     def selectionChanged(self, suite):
         try:
             for test in suite.testcases:

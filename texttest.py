@@ -1603,6 +1603,9 @@ class TextTest:
     def _findApps(self, dirName, recursive):
         appList = []
         raisedError = 0
+        if not os.path.isdir(dirName):
+            sys.stderr.write("Test suite root directory does not exist: " + dirName + "\n")
+            return 1, []
         selectedAppDict = self.inputOptions.findSelectedAppNames()
         debugLog.info("Selecting apps according to dictionary :" + repr(selectedAppDict))
         for f in os.listdir(dirName):

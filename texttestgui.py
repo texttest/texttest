@@ -26,7 +26,9 @@ class TextTestGUI:
         vbox = self.createWindowContents()
         win.add(vbox)
         win.show()
-        win.resize(600, 1000)
+        screenWidth = gtk.gdk.screen_width()
+        screenHeight = gtk.gdk.screen_height()
+        win.resize((screenWidth * 2) / 5, (screenHeight * 4) / 5)
         return win
     def createIterMap(self):
         iter = self.model.get_iter_root()

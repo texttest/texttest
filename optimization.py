@@ -30,7 +30,7 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Produces a postscript file instead of displaying the graph.
                              - pc
                                The postscript file will be in color.
-                             - i=[appname:]item,item,...
+                             - i=item,item,...
                                Which item to plot from the status file. Note that whitespaces are replaced
                                by underscores. Default is TOTAL cost. Example: i=overcover_cost.
                                If a comma-seperated list is given, all the listed items are plotted.
@@ -1011,6 +1011,7 @@ class PlotTest(plugins.Action):
     def getCleanUpAction(self):
         if commonPlotter.plotForTest:
             plotOptions = commonPlotter.plotForTest.getPlotOptions()
+            commonPlotter.plotForTest = None
             return GraphPlot(commonPlotter.testGraph, plotOptions)
         
 # Class for using gnuplot to plot test curves of tests
@@ -1050,32 +1051,38 @@ class TestGraph:
         user, testName = test.getRelPath().split(os.sep)
         if not user in self.users:
             self.users.append(user)
-        if not test in self.pointTypes.keys():
+        if not testName in self.pointTypes.keys():
             plotLine.pointType = str(self.pointTypeCounter)
-            self.pointTypes[test] = plotLine.pointType
+            self.pointTypes[testName] = plotLine.pointType
             self.pointTypeCounter += 1
         else:
-            plotLine.pointType = self.pointTypes[test]
-            
-        if not plotLine.name in self.lineTypes.keys():
-            plotLine.lineType = str(self.lineTypeCounter)
-            self.lineTypes[plotLine.name] = plotLine.lineType
-            self.lineTypeCounter += 1
-        else:
-            plotLine.lineType = self.lineTypes[plotLine.name]
+            plotLine.pointType = self.pointTypes[testName]
+        # Fill in the map for later deduction
+        self.lineTypes[plotLine.name] = 0
+    def getPlotArguments(self):
+        multipleApps = len(self.apps) > 1
+        multipleLines = (len(self.plotLines) > 1)
+        multipleUsers = len(self.users) > 1
+        multipleTests = len(self.pointTypes) > 1
+        multipleLineTypes = len(self.lineTypes) > 1
+        plotArguments = []
+        for plotLine in self.plotLines:
+            if not multipleTests or not multipleLineTypes or self.lineTypes[plotLine.name] == 0:
+                plotLine.lineType = str(self.lineTypeCounter)
+                self.lineTypes[plotLine.name] = plotLine.lineType
+                self.lineTypeCounter += 1
+            else:
+                plotLine.lineType = self.lineTypes[plotLine.name]
+            plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
+        return plotArguments
     def plot(self, timeRange, targetFile, colour):
         if len(self.plotLines) == 0:
             return
 
         stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
-        
-        multipleLines = (len(self.plotLines) > 1)
-        multipleUsers = len(self.users) > 1
-        multipleTests = len(self.pointTypes) > 1
-        plotArguments = []
-        for plotLine in self.plotLines:
-            plotArguments.append(plotLine.getPlotArguments(multipleUsers, multipleLines, multipleTests))
 
+        plotArguments = self.getPlotArguments()
+        
         if targetFile:
             absTargetFile = os.path.expanduser(targetFile)
             if not os.path.isabs(absplotPrint):
@@ -1121,9 +1128,9 @@ class TestGraph:
         firstUser = self.users[0]
         if len(self.users) == 1:
             title += "(in user " + firstUser + ") " 
-        firstTest = self.pointTypes.keys()[0]
+        firstTestName = self.pointTypes.keys()[0]
         if len(self.pointTypes) == 1:
-            title += ": Test " + firstTest.name
+            title += ": Test " + firstTestName
         return title
         
 # Same as above, but from GUI. Refactor!
@@ -1151,7 +1158,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         text = self.options["i"].getValue()
         if text == "apctimes":
             text = "OC_to_DH_time,Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time"
-        return plugins.commasplit(text)
+        return plugins.commasplit(text.replace("_", " "))
     def __repr__(self):
         return "Plotting"
     def __call__(self, test):
@@ -1180,7 +1187,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         return range, fileName, writeColour
     def writePlotFiles(self, lineName, logFile, test):
         plotItems = self.getItemsToPlot()
-        optRun = OptimizationRun(test.app, [ timeEntryName ] + plotItems, [], logFile)
+        optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
         if len(optRun.solutions) == 0:
             return
 
@@ -1216,14 +1223,17 @@ class PlotLine:
     def writeFile(self, optRun, item, plotAgainstSolution):
         plotFile = open(self.plotFileName, "w")
         for solution in optRun.solutions:
-            if plotAgainstSolution:
-                plotFile.write(str(solution[item]) + os.linesep)
-            else:
-                plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[item]) + os.linesep)
-    def getPlotArguments(self, multipleUsers, multipleLines, multipleTests):
-        return "'" + self.plotFileName + "' " + self.getPlotName(multipleUsers, multipleTests) + self.getStyle(multipleLines)
-    def getPlotName(self, addUserDescriptor, addTestDescriptor):
+            if solution.has_key(item):
+                if plotAgainstSolution:
+                    plotFile.write(str(solution[item]) + os.linesep)
+                else:
+                    plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[item]) + os.linesep)
+    def getPlotArguments(self, multipleApps, multipleUsers, multipleLines, multipleTests):
+        return "'" + self.plotFileName + "' " + self.getPlotName(multipleApps, multipleUsers, multipleTests) + self.getStyle(multipleLines)
+    def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):
         title = " title \""
+        if addAppDescriptor:
+            title += self.test.app.fullName + "."
         if addUserDescriptor:
             user, name = self.test.getRelPath.split(os.sep)
             title += user + "."

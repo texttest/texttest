@@ -19,6 +19,8 @@ class InteractiveAction(plugins.Action):
         return self.test
     def getTitle(self):
         return None
+    def matchesMode(self, dynamic):
+        return 1
     def getScriptTitle(self):
         return self.getTitle()
     def startExternalProgram(self, commandLine, shellTitle = None, shellOptions = ""):
@@ -58,6 +60,8 @@ class SaveTest(InteractiveAction):
         return self.test and self.test.state == self.test.FAILED
     def getTitle(self):
         return "Save"
+    def matchesMode(self, dynamic):
+        return dynamic
     def hasPerformance(self, comparisonList):
         for comparison in comparisonList:
             if comparison.getType() != "difference" and comparison.hasDifferences():
@@ -138,10 +142,9 @@ class ImportTest(InteractiveAction):
         testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
         newTest = suite.addTest(testName, testDir)
-        self.recordResults(newTest)
+    def matchesMode(self, dynamic):
+        return not dynamic
     def createTestContents(self, suite, testDir):
-        pass
-    def recordResults(self, newTest):
         pass
     def createTest(self, suite, testName, description):
         file = open(suite.testCaseFile, "a")
@@ -151,79 +154,45 @@ class ImportTest(InteractiveAction):
         testDir = os.path.join(suite.abspath, testName.strip())
         os.mkdir(testDir)
         return testDir
+
+class RecordTest(InteractiveAction):
+    def __call__(self, test):
+        description = "Running " + test.app.fullName + " in order to capture user actions..."
+        guilog.info(description)
+        test.app.makeWriteDirectory()
+        test.makeBasicWriteDirectory()
+        test.setUpEnvironment(parents=1)
+        os.chdir(test.writeDirs[0])
+        recordCommand = test.getExecuteCommand() + " -record " + test.useCaseFile + " -recinp " + test.inputFile
+        shellTitle = None
+        shellOptions = ""
+        if test.getConfigValue("use_standard_input"):
+            shellTitle = description
+        process = self.startExternalProgram(recordCommand, shellTitle)
+        process.waitForTermination()
+        test.tearDownEnvironment(parents=1)
+        test.app.removeWriteDirectory()
+    def matchesMode(self, dynamic):
+        return not dynamic
+    def __repr__(self):
+        return "Recording"
+    def getTitle(self):
+        return "Record Use-Case"
     
 class ImportTestCase(ImportTest):
     def __init__(self, suite):
         ImportTest.__init__(self, suite)
         if self.canPerformOnTest():
             self.addOptionsFileOption()
-            if self.appIsGUI():
-                self.optionGroup.addSwitch("editsc", "Change user abilities (edit GUI script)")
-            self.optionGroup.addSwitch("runstd", "Collect standard results immediately", self.assumeShortTests())
-            self.optionGroup.addSwitch("editlog", "Change system behaviour (edit log file)")
     def testType(self):
         return "Test"
-    def assumeShortTests(self):
-        return 1
-    def appIsGUI(self):
-        return 0
     def addOptionsFileOption(self):
         self.optionGroup.addOption("opt", "Command line options")
     def createTestContents(self, suite, testDir):
         self.writeOptionFile(suite, testDir)
-    def recordResults(self, newTest):    
-        self.recordUserActions(newTest)
-        if self.optionGroup.getSwitchValue("runstd"):
-            self.recordStandardResult(newTest)
-    def recordUserActions(self, test):
-        actionsFromGui = self.appIsGUI()
-        actionsFromStdin = test.getConfigValue("use_standard_input")
-        if not actionsFromGui and not actionsFromStdin:
-            print "Not recording user actions as neither GUI nor standard input enabled"
-            return
-        
-        self.runRecordMode(test, actionsFromGui, actionsFromStdin)
-        if self.optionGroup.getSwitchValue("editsc"):
-            self.viewFile(test.useCaseFile, wait=1)
-    def runRecordMode(self, test, actionsFromGui, actionsFromStdin):
-        description = "Running " + test.app.fullName + " in order to capture user actions..."
-        print description
-        test.app.makeWriteDirectory()
-        test.makeBasicWriteDirectory()
-        test.setUpEnvironment(parents=1)
-        os.chdir(test.writeDirs[0])
-        recordOptions = self.getRecordOptions(test, actionsFromGui, actionsFromStdin)
-        recordCommand = test.getExecuteCommand() + recordOptions
-        shellTitle = None
-        shellOptions = ""
-        if actionsFromStdin:
-            shellTitle = description
-        if not actionsFromGui:
-            shellOptions = "-hold"
-        process = self.startExternalProgram(recordCommand, shellTitle, shellOptions)
-        process.waitForTermination()
-        test.tearDownEnvironment(parents=1)
-        test.app.removeWriteDirectory()
-    def getRecordOptions(self, test, actionsFromGui, actionsFromStdin):
-        options = " -record " + test.useCaseFile
-        if actionsFromStdin:
-            options += " -recinp " + test.inputFile
-        return options
-    def recordStandardResult(self, test):
-        print "Running test", test, "to get standard behaviour..."
-        commandLine = self.getTextTestName() + " -a " + test.app.name + " -o -t " + test.name + " -ts " + self.test.name \
-                      + self.getStdResultOptions()
-        stdout = os.popen(commandLine)
-        for line in stdout.readlines():
-            sys.stdout.write("> " + line)
-        if self.optionGroup.getSwitchValue("editlog"):
-            logFile = test.makeFileName(test.app.getConfigValue("log_file"))
-            self.viewFile(logFile, wait=1)
-    def getStdResultOptions(self):
-        return ""
     def writeOptionFile(self, suite, testDir):
         optionString = self.getOptions()
-        print "Using option string :", optionString
+        guilog.info("Using option string : " + optionString)
         optionFile = open(os.path.join(testDir, "options." + suite.app.name), "w")
         optionFile.write(optionString + os.linesep)
         return optionString
@@ -272,7 +241,7 @@ class SelectTests(InteractiveAction):
         app.configObject.updateOptions(self.optionGroup)
         valid, testSuite = app.createTestSuite()
         guilog.info("Created test suite of size " + str(testSuite.size()))
-        return testSuite
+        return testSuite    
 
 class ResetGroups(InteractiveAction):
     def getTitle(self):
@@ -324,15 +293,16 @@ class RunTests(InteractiveAction):
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.testClasses =  [ SaveTest ]
+        self.testClasses =  [ SaveTest, RecordTest ]
         self.suiteClasses = [ ImportTestCase, ImportTestSuite ]
         self.appClasses = [ SelectTests, RunTests, ResetGroups ]
-    def getInstances(self, test):
+    def getInstances(self, test, dynamic):
         instances = []
         classList = self.getClassList(test)
         for intvActionClass in classList:
             instance = self.makeInstance(intvActionClass, test)
-            instances.append(instance)
+            if instance.matchesMode(dynamic):
+                instances.append(instance)
         return instances
     def getClassList(self, test):
         if test.classId() == "test-case":

@@ -84,7 +84,7 @@ optimization.TraverseSubPlans
 """
 
 
-import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, lsf, guiplugins
+import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, guiplugins
 from ndict import seqdict
 
 itemNamesConfigKey = "_itemnames_map"
@@ -998,11 +998,9 @@ class ImportTest(plugins.Action):
         return 0
 
 # Graphical import test
-class ImportTestCase(lsf.ImportTestCase):
+class ImportTestCase(guiplugins.ImportTestCase):
     def addOptionsFileOption(self):
         self.optionGroup.addOption("sp", "Subplan name")
-    def assumeShortTests(self):
-        return 0
     def getSubplanName(self):
         return self.optionGroup.getOptionValue("sp")
     def getOptions(self):

@@ -219,12 +219,13 @@ class ScriptEngine(usecase.ScriptEngine):
             remEvent = TreeSelectionSignalEvent(self.standardName(removalName), selection, "changed", -1, argumentParseData)
             self._addEventToScripts(addEvent)
             self._addEventToScripts(remEvent)
-    def setMonitoring(self, selection, active):
-        # Allow disabling and enabling of the tree selection monitoring. This to avoid recording changes made programatically
-        if self.recordScript:
-            for event in self.recordScript.events:
-                if event.widget == selection:
-                    event.setMonitoring(active)
+    def setSelection(self, selection, iters):
+        # Disable recording of changes while we set the selection programatically
+        self._setMonitoring(selection, 0)
+        selection.unselect_all()
+        for iter in iters:
+            selection.select_iter(iter)
+        self._setMonitoring(selection, 1)
     def createEntry(self, description, defaultValue):
         entry = gtk.Entry()
         entry.set_text(defaultValue)
@@ -272,6 +273,13 @@ class ScriptEngine(usecase.ScriptEngine):
             return TreeViewSignalEvent(eventName, widget, signalName, argumentParseData)
         else:
             return SignalEvent(eventName, widget, signalName)
+    def _setMonitoring(self, selection, active):
+        # Allow disabling and enabling of the tree selection monitoring. This to avoid recording changes made programatically
+        if self.recordScript:
+            for event in self.recordScript.events:
+                if event.widget == selection:
+                    event.setMonitoring(active)
+    
 
 # Use the GTK idle handlers instead of a separate thread for replay execution
 class ReplayScript(usecase.ReplayScript):

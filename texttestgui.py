@@ -244,6 +244,9 @@ class TextTestGUI:
         iter = self.addSuiteWithParent(newTest, suiteIter)
         self.itermap[newTest] = iter.copy()
         newTest.observers.append(self)
+        scriptEngine.setSelection(self.selection, [ iter ]) 
+        guilog.info("Viewing new test " + newTest.name)
+        self.recreateTestView(newTest)
     def quit(self, *args):
         gtk.main_quit()
         self.rightWindowGUI.killProcesses()
@@ -267,7 +270,7 @@ class TextTestGUI:
                 self.recreateTestView(app)
     def viewTest(self, view, path, column, *args):
         iter = self.model.get_iter(path)
-        self.selection.select_iter(iter)
+        scriptEngine.setSelection(self.selection, [ iter ])
         self.viewTestAtIter(iter)
     def viewTestAtIter(self, iter):
         test = self.model.get_value(iter, 2)
@@ -295,8 +298,9 @@ class TextTestGUI:
         return buttonbox
 
 class RightWindowGUI:
-    def __init__(self, object):
+    def __init__(self, object, dynamic):
         self.object = object
+        self.dynamic = dynamic
         self.fileViewAction = guiplugins.ViewFile(object)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.addFilesToModel()
@@ -320,7 +324,7 @@ class RightWindowGUI:
         return view
     def makeActionInstances(self):
         # The file view action is a special one that we "hardcode" so we can find it...
-        return [ self.fileViewAction ] + guiplugins.interactiveActionHandler.getInstances(self.object)
+        return [ self.fileViewAction ] + guiplugins.interactiveActionHandler.getInstances(self.object, self.dynamic)
     def makeButtons(self, interactiveActions):
         executeButtons = gtk.HBox()
         for instance in interactiveActions:
@@ -404,7 +408,7 @@ class RightWindowGUI:
 class ApplicationGUI(RightWindowGUI):
     def __init__(self, app, selection, itermap):
         self.app = app
-        RightWindowGUI.__init__(self, app)
+        RightWindowGUI.__init__(self, app, 1)
         self.selection = selection
         self.itermap = {}
         for test, iter in itermap.items():
@@ -425,17 +429,17 @@ class ApplicationGUI(RightWindowGUI):
         newSuite = action.performOn(self.app, self.getSelectedTests())
         if newSuite:
             # Disable recording of selection changes: they're happening programatically
-            scriptEngine.setMonitoring(self.selection, 0)
-            self.selection.unselect_all()
-            self.selectionChanged(newSuite)
+            iterlist = self.getSelectedIters(newSuite)
+            scriptEngine.setSelection(self.selection, iterlist)
             self.selection.get_tree_view().grab_focus()
-            scriptEngine.setMonitoring(self.selection, 1)
-    def selectionChanged(self, suite):
+    def getSelectedIters(self, suite):
+        iters = []
         try:
             for test in suite.testcases:
-                self.selectionChanged(test)
+                iters += self.getSelectedIters(test)
+            return iters
         except AttributeError:
-            self.selection.select_iter(self.itermap[suite.abspath])    
+            return [ self.itermap[suite.abspath] ]    
     def getSelectedTests(self):
         tests = []
         self.selection.selected_foreach(self.addSelTest, tests)
@@ -447,9 +451,8 @@ class ApplicationGUI(RightWindowGUI):
 class TestCaseGUI(RightWindowGUI):
     def __init__(self, test, dynamic):
         self.test = test
-        self.dynamic = dynamic
         self.colours = test.getConfigValue("file_colours")
-        RightWindowGUI.__init__(self, test)
+        RightWindowGUI.__init__(self, test, dynamic)
         self.testComparison = None
     def getHardcodedNotebookPages(self):
         textview = self.createTextView(self.test)
@@ -577,7 +580,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
         options = guiplugins.ImportTestCase.getOptions(self)
         if self.optionGroup.getSwitchValue("sGUI"):
             options += " -gx"
-        elif self.appIsGUI():
+        elif self.optionGroup.getSwitchValue("GUI"):
             options += " -g"
         if self.defaultTargetApp:
             if self.optionGroup.getSwitchValue("sing"):
@@ -587,8 +590,6 @@ class ImportTestCase(guiplugins.ImportTestCase):
             if self.optionGroup.getSwitchValue("version"):
                 options += " -v 2.4"
         return options
-    def appIsGUI(self):
-        return self.optionGroup.getSwitchValue("GUI")
         
 class UpdateScripts(plugins.Action):
     def __call__(self, test):

@@ -67,9 +67,6 @@ class Test:
             if os.environ.has_key(var):
                 self.previousEnv[var] = os.environ[var]
             os.environ[var] = self.environment[var]
-    def __del__(self):
-        # Because this may delete local files
-        os.chdir(self.abspath)
     def isValid(self):
         return os.path.isdir(self.abspath) and self.isValidSpecific()
     def makeFileName(self, stem, refVersion = None):

@@ -224,7 +224,7 @@ class TestCase(Test):
         eventName = "test " + self.name + " to " + self.stateChangeDescription(state)
         category = self.name
         # Files abound here, we wait a little for them to clear up
-        ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=0.5)
+        ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=1)
     def stateChangeDescription(self, state):
         if state == self.RUNNING:
             return "start"
@@ -1089,7 +1089,7 @@ class TestRunner:
             self.handleExceptions(previousTestRunner.appRunner.tearDownSuite, suite)
         for suite in setUpSuites:
             suite.setUpEnvironment()
-            self.appRunner.markForSetUp(suite, self.actionSequence)
+            self.appRunner.markForSetUp(suite)
         while len(self.actionSequence):
             action = self.actionSequence[0]
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
@@ -1207,9 +1207,9 @@ class ApplicationRunner:
                     message = str(sys.exc_type) + ": " + message
                 raise BadConfigError, message
         self.testSuite.tearDownEnvironment()
-    def markForSetUp(self, suite, actions):
+    def markForSetUp(self, suite):
         newActions = []
-        for action in actions:
+        for action in self.actionSequence:
             newActions.append(action)
         self.suitesToSetUp[suite] = newActions
     def setUpSuites(self, action, test):

@@ -148,6 +148,10 @@ class Test:
                     os.environ[var] = self.previousEnv[var]
                 else:
                     debugLog.debug("Removed variable " + var)
+                    # Set to empty string as a fake-remove. Some versions of
+                    # python do not have os.unsetenv and hence del only has an internal
+                    # effect. It's better to leave an empty value than to leak the set value
+                    os.environ[var] = ""
                     del os.environ[var]
         if parents and self.parent:
             self.parent.tearDownEnvironment(1)

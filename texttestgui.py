@@ -16,6 +16,7 @@ class TextTestGUI:
         self.instructions = []
         self.postponedInstructions = []
         self.postponedTests = []
+        self.allTests = []
         self.itermap = {}
         self.quitGUI = 0
         self.workQueue = Queue()
@@ -54,6 +55,7 @@ class TextTestGUI:
                 self.addSuite(test, iter)
             self.model.set_value(iter, 1, "white")
         except:
+            self.allTests.append(suite)
             self.model.set_value(iter, 1, self.getTestColour(suite))
     def getTestColour(self, test):
         if test.state == test.FAILED or test.state == test.UNRUNNABLE:
@@ -73,7 +75,7 @@ class TextTestGUI:
         return self.contents
     def createTestWindows(self):
         # Create some command buttons.
-        buttonbox = self.makeButtons([("Quit", self.quit)])
+        buttonbox = self.makeButtons([("Quit", self.quit), ("Save All", self.saveAll)])
         window = self.createTreeWindow()
 
         # Create a vertical box to hold the above stuff.
@@ -165,6 +167,13 @@ class TextTestGUI:
         self.quitGUI = 1
         self.actionThread.join()
         gtk.main_quit()
+    def saveAll(self, *args):
+        saveTestAction = self.testCaseGUI.getSaveTestAction()
+        for test in self.allTests:
+            if test.state == test.FAILED:
+                if not saveTestAction:
+                    saveTestAction = guiplugins.SaveTest(test)
+                saveTestAction(test)
     def viewTest(self, view, path, column, *args):
         test = self.model.get_value(self.model.get_iter(path), 2)
         print "Viewing test", test
@@ -193,10 +202,10 @@ class TestCaseGUI:
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.addFilesToModel(test)
         view = self.createView(self.createTitle(test))
-        actionInstances = self.makeActionInstances(test)
-        buttons = self.makeButtons(actionInstances)
+        self.actionInstances = self.makeActionInstances(test)
+        buttons = self.makeButtons(self.actionInstances)
         textview = self.createTextView(test)
-        notebook = self.createNotebook(textview, actionInstances)
+        notebook = self.createNotebook(textview, self.actionInstances)
         self.window = self.createWindow(buttons, view, notebook)
     def addFilesToModel(self, test):
         compiter = self.model.insert_before(None, None)
@@ -231,6 +240,11 @@ class TestCaseGUI:
             return "yellow"
         else:
             return "red"
+    def getSaveTestAction(self):
+        for instance in self.actionInstances:
+            if isinstance(instance, guiplugins.SaveTest):
+                return instance
+        return None
     def addComparison(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         self.model.set_value(fciter, 0, os.path.basename(name))

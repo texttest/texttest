@@ -1036,7 +1036,11 @@ class MultiEntryDictionary(seqdict):
     def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
         if sectionName:
             self.currDict = self[sectionName]
-        if not self.currDict.has_key(entryName):
+        entryExists = self.currDict.has_key(entryName)
+        if entry == "{CLEAR LIST}":
+            if entryExists:
+                self.currDict[entryName] = []
+        elif not entryExists:
             if insert or not self.currDict is self:
                 val = self.currDict.values()
                 if len(val) == 0 or type(val[0]) != types.ListType:

@@ -52,13 +52,10 @@ start to look for tests. It is determined as follows:
 </p>
 <ol>
   <li> If the command line option "-d" has been set, use the value of
-that.
-  </li>
+that. </li>
   <li> If not, but the environment variable "TEXTTEST_HOME" is set, use
-that.
-  </li>
-  <li> If neither of the above, use the current working directory.
-  </li>
+that. </li>
+  <li> If neither of the above, use the current working directory. </li>
 </ol>
 <p></p>
 <h3>Applications</h3>
@@ -386,6 +383,12 @@ consisting of A,B, this is done by
 V:A
 <br>
 V:B<br>
+</p>
+<p>Providing the entry<br>
+V:{CLEAR LIST}<br>
+</p>
+<p>allows overriding files to remove entries added in a parent version
+file.<br>
 </p>
 <p>It can also be useful to have the value be a dictionary. This is
 achieved by the "section header" format, i.e.<br>

@@ -720,7 +720,7 @@ class MakeProgressReport(TestReport):
         self.totalKpi = 1.0
         self.testCount = 0
         self.bestKpi = 1.0
-        self.worstKpi = 1.0
+        self.worstKpi = 0.00001
     def __del__(self):
         if self.testCount > 0:
             avg = math.pow(self.totalKpi, 1.0 / float(self.testCount))

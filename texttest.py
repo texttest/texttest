@@ -76,6 +76,7 @@ class Test:
         # Single pass to expand all variables (don't want multiple expansion)
         for var, value in self.environment.items():
             expValue = os.path.expandvars(value)
+            # If it constaints a separator, try to make it into an absolute path by pre-pending the checkout
             if value.find(os.sep) != -1:
                 self.environment[var] = self.app.makeAbsPath(expValue)
                 debugLog.info("Expanded " + var + " path " + value + " to " + self.environment[var])
@@ -746,11 +747,15 @@ class Application:
             return homeName
         # Return the name even though it doesn't exist, then it can be used
         return name
-    def makeAbsPath(self, path):
+    def makeAbsPath(self, path, checkExists=1):
         if (os.path.isabs(path)):
             return path
+
+        checkoutPath = os.path.join(self.checkout, path)
+        if checkExists and not os.path.exists(checkoutPath):
+            return path
         else:
-            return os.path.join(self.checkout, path)
+            return checkoutPath
     def getActionSequence(self, useGui):
         return self.configObject.getActionSequence(useGui)
     def printHelpText(self):
@@ -785,7 +790,8 @@ class Application:
             binary = self.configDir["interpreter"] + " " + binary
         return self.configObject.getExecuteCommand(binary, test)
     def getBinary(self):
-        return self.makeAbsPath(self.getConfigValue("binary"))
+        # Assume binaries can relate to checkouts
+        return self.makeAbsPath(self.getConfigValue("binary"), checkExists=0)
     def getVitalFiles(self):
         return self.configObject.getVitalFiles(self)
             

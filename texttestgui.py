@@ -511,7 +511,7 @@ class ApplicationGUI(RightWindowGUI):
         self.selection.selected_foreach(self.addSelTest, tests)
         return tests
     def addSelTest(self, model, path, iter, tests, *args):
-        tests.append(model.get_value(iter, 0))
+        tests.append(model.get_value(iter, 2))
 
     
 class TestCaseGUI(RightWindowGUI):

@@ -92,8 +92,11 @@ def samefile(writeDir, currDir):
         # do a simpler version
         return os.path.normpath(writeDir) == os.path.normpath(currDir)
 
-# Version of rmtree not prone to crashing if directory in use
+# Version of rmtree not prone to crashing if directory in use or externally removed
 def rmtree(dir, attempts=5):
+    if not os.path.isdir(dir):
+        print "Write directory", dir, "externally removed"
+        return
     for i in range(attempts):
         try:
             shutil.rmtree(dir)

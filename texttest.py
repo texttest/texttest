@@ -1488,7 +1488,12 @@ class TextTest:
     def run(self):
         try:
             if self.inputOptions.helpMode():
-                self.allApps[0].printHelpText()
+                if len(self.allApps) > 0:
+                    self.allApps[0].printHelpText()
+                else:
+                    print "You probably need to tell TextTest where to find your test files."
+                    print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
+                    print "If this makes no sense, read the user guide..."
                 return
             self._run()
         except KeyboardInterrupt:

@@ -344,7 +344,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
             groupName = self.kpiGroupForTest[test.name]
             if self.groupQualityLimit.has_key(groupName):
                 return self.groupQualityLimit[groupName]
-        return optimization.MakeProgressReport.calculateWorstCost(self, test)
+        return optimization.MakeProgressReport.calculateWorstCost(self, test, referenceRun, currentRun)
     def computeKPI(self, currTTWC, refTTWC):
         kpi = optimization.MakeProgressReport.computeKPI(self, currTTWC, refTTWC)
         if kpi != "NaN%":

@@ -240,7 +240,7 @@ class FileComparison:
         return 0
     def needsRecalculation(self):
         # A test that has been saved doesn't need recalculating
-        if self.tmpFile == self.stdFile or self.stdCmpFile == self.stdFile:
+        if self.tmpCmpFile == self.stdCmpFile or self.stdCmpFile == self.stdFile:
             return 0
         
         if plugins.modifiedTime(self.tmpCmpFile) < plugins.modifiedTime(self.tmpFile):

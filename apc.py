@@ -74,11 +74,12 @@ class ApcCompileRules(carmen.CompileRules):
             return
         self.describe(test, " -  ruleset " + ruleset.name)
         ruleset.backup()
+        self.rulesCompiled.append(ruleset.name)
         if not os.path.isfile(ruleLib):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
             returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile))
             if returnValue:
-                raise "Failed to build ruleset, exiting"
+                raise EnvironmentError, "Failed to build library for APC ruleset " + ruleset.name
         commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib)
         commandLine += "-o " + apcExecutable
         si, so, se = os.popen3(commandLine)
@@ -88,8 +89,7 @@ class ApcCompileRules(carmen.CompileRules):
                 print "Building", ruleset.name, "failed!"
                 for line in lastErrors:
                     print "   ", line.strip()
-                return
-        self.rulesCompiled.append(ruleset.name)
+                raise EnvironmentError, "Failed to link APC ruleset " + ruleset.name
 
     def getRuleLib(self, ruleSetName):
         optArch = carmen.architecture + "_opt"

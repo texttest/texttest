@@ -531,7 +531,7 @@ class Application:
         debugLog.info("Checkout set to " + self.checkout)
         self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), optionMap)
         self.keepTmpFiles = (optionMap.has_key("keeptmp") or self.configObject.keepTmpFiles() or self.getConfigValue("keeptmp_default"))
-        self.writeDirectory = self._getWriteDirectory()
+        self.writeDirectory = self._getWriteDirectory(optionMap.has_key("gx"))
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
@@ -636,7 +636,7 @@ class Application:
             if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):
                 return optionGroup
         return None
-    def _getWriteDirectory(self):
+    def _getWriteDirectory(self, staticGUI):
         if not os.environ.has_key("TEXTTEST_TMP"):
             if os.name == "posix":
                 os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
@@ -646,7 +646,10 @@ class Application:
         absroot = os.path.abspath(root)
         if not os.path.isdir(absroot):
             os.makedirs(absroot)
-        return os.path.join(absroot, self.getTmpIdentifier())
+        localName = self.getTmpIdentifier()
+        if staticGUI:
+            localName = "static_gui." + localName
+        return os.path.join(absroot, localName)
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:

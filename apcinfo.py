@@ -267,7 +267,9 @@ class GenHTML(plugins.Action):
         self.chartrelglob.title = "Relative times"
         self.chartrelglob.datalist = barchart.DataList()
         self.chartrelglob.datalist.segment_names = tuple(self.tsValues)
-        self.chartreldoc.append_file(os.path.join(self.htmlDir, 'timespent-intro-txt.html'))
+        timeIntroFileName = os.path.join(self.htmlDir, 'timespent-intro-txt.html')
+        if os.path.isfile(timeIntroFileName):
+            self.chartreldoc.append_file(timeIntroFileName)
         self.chartreldoc.append(self.chartrelglob)
         self.chartreldoc.append(HTMLgen.Paragraph())
         self.chartreldoc.append(HTMLgen.Href('testindex.html', 'To test set page'))
@@ -279,7 +281,9 @@ class GenHTML(plugins.Action):
         self.variationChart.title = "Variation in per mil"
         self.variationDoc = CarmenDocument(self.RCFile)
         self.variationDoc.title = "Cost variation for different groups"
-        self.variationDoc.append_file(os.path.join(self.htmlDir, 'variation-intro-txt.html'))
+        variationIntroFileName = os.path.join(self.htmlDir, 'variation-intro-txt.html')
+        if os.path.isfile(variationIntroFileName):
+            self.variationDoc.append_file(variationIntroFileName)
         self.variationDoc.append(self.variationChart)
         
         # Rule failures
@@ -289,7 +293,9 @@ class GenHTML(plugins.Action):
         self.ruleFailureChart.title = "Rule failures in percent"
         self.ruleFailureDoc = CarmenDocument(self.RCFile)
         self.ruleFailureDoc.title = "Rule failures for different groups"
-        self.ruleFailureDoc.append_file(os.path.join(self.htmlDir, 'rulefailures-intro-txt.html'))
+        ruleFailureIntroFileName = os.path.join(self.htmlDir, 'rulefailures-intro-txt.html')
+        if os.path.isfile(ruleFailureIntroFileName):
+            self.ruleFailureDoc.append_file(ruleFailureIntroFileName)
         self.ruleFailureDoc.append(self.ruleFailureChart)
         
         self.kpiGroupForTest = {}
@@ -333,7 +339,9 @@ class GenHTML(plugins.Action):
         # Write the time spent page.
         totalMeans = self.timeSpentBC.doMeans(self.chartrelglob.datalist, "ALL")
         self.chartrelglob.datalist.load_tuple(tuple(totalMeans))
-        self.chartreldoc.append_file(os.path.join(self.htmlDir, 'timespent-expl-txt.html'))
+        timeExplFileName = os.path.join(self.htmlDir, 'timespent-expl-txt.html')
+        if os.path.isfile(timeExplFileName):
+            self.chartreldoc.append_file(timeExplFileName)
         self.chartreldoc.write(self.timeSpentFile)
 
         # Write the Rave spent page.

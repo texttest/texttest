@@ -87,7 +87,7 @@ class RunTest(default.RunTest):
         if self.testDisplay:
             os.environ["DISPLAY"] = self.testDisplay
         default.RunTest.__call__(self, test)
-        if self.testDisplay:
+        if self.testDisplay and self.realDisplay:
             os.environ["DISPLAY"] = self.realDisplay
     def runTest(self, test):
         if self.process:

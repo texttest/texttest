@@ -320,7 +320,7 @@ class TestCaseGUI:
         self.fileViewAction.view(comparison, fileName)
     def makeActionInstances(self, test):
         instances = []
-        if not test:
+        if not test or test.classId() != "test-case":
             return instances
         # A special one that we "hardcode" so we can find it...
         instances.append(self.fileViewAction)

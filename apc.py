@@ -40,6 +40,8 @@ apc.PlotApcTest [options]  - Displays a gnuplot graph with the cpu time (in minu
                                Plot against solution number instead of cpu time.
                              - nt
                                Do not use status file from the currently running test.
+                             - v=v1,v2
+                               Plot multiple versions in same dia, ie 'v=,9' means master and version 9
 
 apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
                              This is intended to be used on a single specified test and will terminate
@@ -547,6 +549,7 @@ class PlotApcTest(plugins.Action):
         self.plotPrint = []
         self.plotUseTmpStatus = "t"
         self.plotAgainstSolNum = []
+        self.plotVersions = [ "" ]
         for ar in args:
             arr = ar.split("=")
             if arr[0]=="r":
@@ -559,6 +562,8 @@ class PlotApcTest(plugins.Action):
                 self.plotUseTmpStatus = []
             elif arr[0]=="s":
                 self.plotAgainstSolNum = "t"
+            elif arr[0]=="v":
+                self.plotVersions = arr[1].split(",")
             else:
                 print "Unknown option " + arr[0]
     def __repr__(self):
@@ -569,7 +574,8 @@ class PlotApcTest(plugins.Action):
             fileList = []
             style = " with linespoints"
             for file in self.plotFiles:
-                title = " title \"" + file.split(os.sep)[-2] + "_" + self.plotItem.strip().replace(" ","_") + "\" "
+                ver = file.split(os.sep)[-1].split(".",1)[-1]
+                title = " title \"" + ver + "_" + file.split(os.sep)[-2] + "_" + self.plotItem.strip().replace(" ","_") + "\" "
                 fileList.append("'" + file + "' " + title + style)
 #            print "plot " + string.join(fileList, ",") + os.linesep
             if self.plotPrint:
@@ -588,23 +594,26 @@ class PlotApcTest(plugins.Action):
                     open(absplotPrint,"w").write(tmppf)
                     
     def __call__(self, test):
-        currentFile = findTemporaryStatusFile(test)
-        if self.plotUseTmpStatus and currentFile:
-            print "Using status file in temporary subplan directory for plotting test " + test.name
-        else:
-            currentFile = test.makeFileName(self.statusFileName)
-            if not os.path.isfile(currentFile):
-                print "No status file does exist for test " + test.name
-                return
-        maxMem, costs, times = getSolutionStatistics(currentFile,self.plotItem)
-        plotFileName = test.makeFileName("plot")
-        plotFile = open(plotFileName,"w")
-        for il in range(len(costs)):
-            if self.plotAgainstSolNum:
-                plotFile.write(str(costs[il]) + os.linesep)
+        for version in self.plotVersions:
+            currentFile = findTemporaryStatusFile(test, version)
+            if self.plotUseTmpStatus and currentFile:
+                print "Using status file in temporary subplan directory for plotting test " + test.name
             else:
-                plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
-        self.plotFiles.append(plotFileName)
+                currentFile = test.makeFileName(self.statusFileName, version)
+                if not os.path.isfile(currentFile):
+                    print "No status file does exist for test " + test.name + "(" + version + ")"
+                    return
+            maxMem, costs, times = getSolutionStatistics(currentFile,self.plotItem)
+            plotFileName = test.makeFileName("plot")
+            if len(version) > 0:
+                plotFileName += "." + version
+            plotFile = open(plotFileName,"w")
+            for il in range(len(costs)):
+                if self.plotAgainstSolNum:
+                    plotFile.write(str(costs[il]) + os.linesep)
+                else:
+                    plotFile.write(str(times[il]) + "  " + str(costs[il]) + os.linesep)
+            self.plotFiles.append(plotFileName)
     def setUpSuite(self, suite):
         pass
     def setUpApplication(self, app):
@@ -634,10 +643,10 @@ class GrepApcLog(plugins.Action):
     def setUpApplication(self, app):
         pass
         
-def findTemporaryStatusFile(test):
+def findTemporaryStatusFile(test,version = ""):
     foundoutputfile = 0
     for file in os.listdir(test.abspath):
-        if file.startswith("output") and file.find(test.getTestUser()) != -1:
+        if file.startswith("output") and file.find(version + test.getTestUser()) != -1:
             foundoutputfile = 1
             break
     if not foundoutputfile:

@@ -113,24 +113,33 @@ class CarmenConfig(lsf.LSFConfig):
     def findLSFQueue(self, test):
         if self.queueDecided(test):
             return lsf.LSFConfig.findLSFQueue(self, test)
+
+        return self.getQueuePerformancePrefix(test) + architecture + self.getQueuePlatformSuffix(test.app)
+    def getQueuePerformancePrefix(self, test):
         if architecture == "powerpc" or architecture == "parisc_2_0":
-            return architecture
+            return ""
         cpuTime = performance.getTestPerformance(test)
         if cpuTime < 10:
-            return "short_" + architecture
+            return "short_"
         elif cpuTime < 120:
-            return architecture
+            return ""
         else:
-            return "idle_" + architecture
-    def findResourceList(self, app):
-        resourceList = lsf.LSFConfig.findResourceList(self, app)
-        # Sparc queue requires this resource
-        if "9" in app.versions:
-            if architecture != "i386_linux":
-                resourceList.append("carmen_9")
-        else:
-            resourceList.append("master")
-        return resourceList
+            return "idle_"
+    def getQueuePlatformSuffix(self, app):
+        version9 = "9" in app.versions
+        if architecture == "i386_linux":
+            if version9:
+                return "_RH7"
+            else:
+                return "_RH8"
+        elif architecture == "sparc":
+            return "_sol8"
+        elif architecture == "powerpc":
+            if version9:
+                return "_aix4"
+            else:
+                return "_aix5"
+        return ""
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob"

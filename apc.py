@@ -165,7 +165,7 @@ class ApcCompileRules(carmen.CompileRules):
     def ruleCompileCommand(self, sourceFile):
        compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
        params = " -optimize -makelib -archs " + carmen.architecture
-       return compiler + " -" + self.raveName + params + " " + sourceFile
+       return compiler + " " + self.raveName + params + " " + sourceFile
                     
     def linkLibs(self, apcLib, ruleLib):
        path1 = os.path.join(os.environ["CARMSYS"], "data", "crc", carmen.architecture)
@@ -240,6 +240,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         costs, times = filterLastCosts(costs, times, margin)
         lastCost = costs[-1]
         lastPerf = times[-1]
+        if finalPerf * totPerf < 1.0:
+            return -1, 0
         return lastCost, float(lastPerf / finalPerf * totPerf)
     def compare(self, test, referenceFile, currentFile):
         try:
@@ -252,6 +254,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         totRefPerf = int(performance.getTestPerformance(test, self.referenceVersion))
         lastCCost, lastCP = self.getKPIValues(currentCosts, curTimes, totCurrPerf, margin)
         lastRCost, lastRP = self.getKPIValues(referenceCosts, refTimes, totRefPerf, margin)
+        if lastCCost < 0 or lastRCost < 0:
+            return
         currTTWC = lastCP
         refTTWC = lastRP
         if lastCCost < lastRCost:

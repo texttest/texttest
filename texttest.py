@@ -266,7 +266,7 @@ class Application:
             return []
         exts = self._getVersionExtensions(self.versions)
         if baseVersion:
-            return exts + self.getConfigList("base_version")
+            return self.getConfigList("base_version") + exts
         else:
             return exts
     def _getVersionExtensions(self, versions):

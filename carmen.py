@@ -568,40 +568,6 @@ class TraverseCarmUsers(plugins.Action):
         switches = {}
         return switches
 
-
-class TraverseSubPlans(plugins.Action):
-    def __init__(self, args = []):
-        self.traversedUsers = {}
-        self.Command = string.join(args)
-        if not self.Command:
-            raise "No command given"
-    def __repr__(self):
-        return "Traversing subplan "
-    def __call__(self, test):
-        self.describe(test)
-        sys.stdout.flush()
-        # Save the old dir, so we can restore it later.
-        saveDir = os.getcwd()
-        statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
-        dirs = statusFile.split(os.sep)[:-1]
-        subplanPath = os.path.normpath(string.join(dirs, os.sep))
-        try:
-            os.chdir(subplanPath)
-            os.system(self.Command)
-        except OSError, detail:
-            print "Failed due to " + str(detail)
-        # Restore dir
-        os.chdir(saveDir)
-    # Interactive stuff
-    def getTitle(self):
-        return "Traversing subplans"
-    def getArgumentOptions(self):
-        options = {}
-        return options
-    def getSwitches(self):
-        switches = {}
-        return switches
-
 #
 # This class reads a CarmResources etab file and gives access to it
 #

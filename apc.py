@@ -284,8 +284,8 @@ class FetchApcCore(plugins.Action):
         extractFile = optimization.ExtractSubPlanFile(self.config, "run_status_script_error", "error")
         extractFile(test)
         logFinder = optimization.LogFileFinder(test)
-        tmpStatusFile = logFinder.findFile()
-        if tmpStatusFile.find(test.getTestUser()) == -1:
+        foundTmp, tmpStatusFile = logFinder.findFile()
+        if not foundTmp:
             return
         grepCommand = "grep Machine " + tmpStatusFile
         grepLines = os.popen(grepCommand).readlines()
@@ -626,8 +626,8 @@ class GrepApcLog(plugins.Action):
         return "Greping"
     def __call__(self, test):
         logFinder = optimization.LogFileFinder(test)
-        tmpStatusFile = logFinder.findFile()
-        if tmpStatusFile.find(test.getTestUser()) == -1:
+        foundTmp, tmpStatusFile = logFinder.findFile()
+        if not foundTmp:
             print "Test " + test.name + " is not running."
             return
         grepCommand = "grep Machine " + tmpStatusFile

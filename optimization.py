@@ -328,10 +328,10 @@ class LogFileFinder:
             logFile = self.findTempFile(self.test, version) 
             if logFile and os.path.isfile(logFile):
                 print "Using temporary log file for test " + self.test.name + " version " + version
-                return logFile
+                return 1, logFile
         logFile = self.test.makeFileName(self.logStem, version)
         if os.path.isfile(logFile):
-            return logFile
+            return 0, logFile
         else:
             raise plugins.TextTestError, "Could not find log file for Optimization Run in test" + repr(self.test)
     def findSpecifiedFile(self, version, spec):
@@ -383,7 +383,10 @@ class OptimizationRun:
         self.performance = performance.getTestPerformance(test, version) # float value
         logFinder = LogFileFinder(test, tryTmpFile)
         if specFile == "":
-            self.logFile = logFinder.findFile(version)
+            foundTmp, self.logFile = logFinder.findFile(version)
+            # Doesn't make sense to scale temporary files, as they probably aren't complete
+            if foundTmp:
+                scale = 0
         else:
             self.logFile = logFinder.findSpecifiedFile(version, specFile)
         self.diag.info("Reading data from " + self.logFile)

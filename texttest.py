@@ -267,6 +267,7 @@ class TestCase(Test):
             # Assume this is a race condition, so wait and try again
             time.sleep(1)
             self._removeDir(subDir)
+            
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters):
         Test.__init__(self, name, abspath, app)
@@ -329,6 +330,9 @@ class TestSuite(Test):
             testName = testline.strip()
             if len(testName) == 0  or testName[0] == '#':
                 continue
+            if self.alreadyContains(testCaseList, testName):
+                print "WARNING: the test", testName, "was included several times in the test suite file - please check!"
+                continue
             testPath = os.path.join(self.abspath, testName)
             testSuite = TestSuite(testName, testPath, self.app, filters)
             if testSuite.isValid():
@@ -341,6 +345,11 @@ class TestSuite(Test):
                     testCase.makeBasicWriteDirectory()
                     testCaseList.append(testCase)
         return testCaseList
+    def alreadyContains(self, testCaseList, testName):
+        for test in testCaseList:
+            if test.name == testName:
+                return 1
+        return 0
             
 class Application:
     def __init__(self, name, abspath, configFile, version, optionMap):

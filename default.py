@@ -130,6 +130,7 @@ class Config(plugins.Configuration):
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeBasicWriteDirectory()
+        os.chdir(test.writeDirs[0])
 
 class CollateFile(plugins.Action):
     def __init__(self, sourcePattern, targetStem):

@@ -1121,7 +1121,16 @@ class PlotAverager:
         #print "Average", averageXValues
         #print "Graph", graphXValues
         prev_xvals = graphXValues[0]
-        old_average = self.average[prev_xvals]
+        # Find the old_average value to start with.
+        if self.average.has_key(prev_xvals):
+            old_average = self.average[prev_xvals]
+        elif averageXValues[0] < prev_xvals:
+            avPos = 0
+            while averageXValues[avPos] < prev_xvals:
+                old_average = self.average[averageXValues[avPos]]
+                avPos += 1
+        else:
+            old_average = self.average[averageXValues[0]]
         for xvals in graphXValues:
             #print xvals,averageXValues[averagePos]
             # The same x-value exists both in graph and average.
@@ -1339,7 +1348,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
     def getItemsToPlot(self):
         text = self.optionGroup.getOptionValue("i")
         if text == "apctimes":
-            text = "OC_to_DH_time,Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time"
+            text = "DH_post_processing,Generation_time,Coordination_time,Conn_fixing_time,Optimization_time,Network_generation_time"
         return plugins.commasplit(text.replace("_", " "))
     def __repr__(self):
         return "Plotting"

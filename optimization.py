@@ -548,6 +548,7 @@ class PlotTest(plugins.Action):
         self.plotPrint = []
         self.plotAgainstSolNum = []
         self.plotVersions = [ "" ]
+        self.plotScaleTime = "t"
     def interpretOptions(self, args):
         for ar in args:
             arr = ar.split("=")
@@ -559,6 +560,8 @@ class PlotTest(plugins.Action):
                 self.plotAgainstSolNum = "t"
             elif arr[0]=="v":
                 self.plotVersions = arr[1].split(",")
+            elif arr[0]=="ns":
+                self.plotScaleTime = None
             elif not self.setOption(arr):
                 print "Unknown option " + arr[0]
     def setOption(self, arr):
@@ -625,7 +628,8 @@ class PlotTest(plugins.Action):
                 print "No status file does exist for test " + test.name + "(" + version + ")"
                 return
             costs, times = self.getCostsAndTimes(currentFile, self.plotItem)
-            times = self.scaleTimes(times, test, version)
+            if self.plotScaleTime:
+                times = self.scaleTimes(times, test, version)
             plotFileName = test.makeFileName("plot")
             if len(version) > 0:
                 plotFileName += "." + version

@@ -32,6 +32,8 @@ matador.PlotTest [options] - Displays a gnuplot graph with the cpu time (in minu
                                by underscores. Default is 'plan'. Example: i=roster
                              - s
                                Plot against solution number instead of cpu time.
+                             - ns
+                               CPU times are not rescaled using performance files.
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
 """

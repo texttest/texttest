@@ -235,7 +235,8 @@ class UseCaseRecordScript(RecordScript):
         for signum in range(signal.NSIG):
             try:
                 # Don't record SIGCHLD unless told to, these are generally ignored
-                if signum != signal.SIGCHLD:
+                # Also don't record SIGCONT, which is sent by LSF when suspension resumed
+                if signum != signal.SIGCHLD and signum != signal.SIGCONT:
                     self.realSignalHandlers[signum] = signal.signal(signum, self.recordSignal)
             except:
                 # Various signals aren't really valid here...

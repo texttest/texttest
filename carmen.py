@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import lsf, default, performance, os, string, shutil, stat, plugins, batch
+import lsf, default, performance, os, string, shutil, stat, plugins, batch, sys, signal
 
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
@@ -38,9 +38,25 @@ class CarmenConfig(lsf.LSFConfig):
         return CarmenBatchFilter
     def getActionSequence(self):
         if self.optionMap.has_key("rulecomp"):
-            return [ CompileRules(self.getRuleSetName) ]
+            return [ self.getRuleBuilder(0) ]
         else:
-            return lsf.LSFConfig.getActionSequence(self)
+            builder = self.getAppBuilder()
+            return [ builder, self.getRuleBuilder(1) ] + lsf.LSFConfig.getActionSequence(self) + [ self.getBuildChecker(builder) ]
+    def getRuleBuilder(self, neededOnly):
+        if neededOnly:
+            return plugins.Action()
+        else:
+            return CompileRules(self.getRuleSetName)
+    def getAppBuilder(self):
+        if self.optionMap.has_key("build"):
+            return BuildCode(self.optionValue("build"))
+        else:
+            return plugins.Action()
+    def getBuildChecker(self, builder):
+        if self.optionMap.has_key("build"):
+            return CheckBuild(builder)
+        else:
+            return plugins.Action()
     def getTestRunner(self):
         if self.optionMap.has_key("lprof"):
             subActions = [ lsf.LSFConfig.getTestRunner(self), WaitForDispatch(), RunLProf() ]
@@ -51,12 +67,23 @@ class CarmenConfig(lsf.LSFConfig):
         if architecture == "powerpc" or architecture == "parisc_2_0":
             return architecture
         cpuTime = performance.getTestPerformance(test)
-        if cpuTime < 15:
+        if cpuTime < 10:
             return "short_" + architecture
         elif cpuTime < 120:
             return architecture
         else:
             return "idle_" + architecture
+    def interpretVersion(self, app, versionString):
+        defaultArch = app.getConfigValue("default_architecture")
+        if architecture == defaultArch:
+            return versionString
+        else:
+            supportedArchs = app.getConfigList("supported_architecture")
+            if len(supportedArchs) and not architecture in supportedArchs:
+                raise "Unsupported architecture " + architecture + "!!!"
+            else:
+                print "Non-default architecture: using version", architecture + versionString
+                return architecture + versionString
     
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
@@ -78,7 +105,9 @@ class CompileRules(plugins.Action):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
             commandLine = compiler + " " + self.raveName + " " + self.modeString + " -archs " + architecture + " " + ruleset.sourceFile
             self.rulesCompiled.append(ruleset.name)
-            os.system(commandLine)
+            returnValue = os.system(commandLine)
+            if returnValue:
+                raise "Failed to build ruleset, exiting"
             if self.modeString == "-debug":
                 ruleset.moveDebugVersion()
     def setUpSuite(self, suite):
@@ -146,4 +175,59 @@ class RunLProf(plugins.Action):
         removeLine = "rm " + outputFile
         commandLine = "rsh " + executionMachine + " '" + runLine + "; " + processLine + "; " + removeLine + "'"
         os.system(commandLine)
- 
+
+class BuildCode(plugins.Action):
+    def __init__(self, target):
+        self.target = target
+        self.childProcesses = []
+    def setUpApplication(self, app):
+        absPath = self.getAbsPath(app, self.target)
+        os.chdir(absPath)
+        print "Building", app, "in", absPath, "..."
+        buildFile = "build.default"
+        os.system("gmake >& " + buildFile)
+        if self.checkBuildFile(buildFile):
+            raise "Product " + repr(app) + " did not build, exiting"
+        print "Product", app, "built correctly in", absPath
+        os.remove(buildFile)
+        absPath = self.getAbsPath(app, "codebase")
+        self.buildRemote("sundance", "sparc", absPath) 
+        self.buildRemote("ramechap", "parisc_2_0", absPath)
+    def buildRemote(self, machine, arch, absPath):
+        print "Building remotely in parallel on " + machine + "..."
+        processId = os.fork()
+        if processId == 0:
+            signal.signal(1, self.killBuild)
+            signal.signal(2, self.killBuild)
+            signal.signal(15, self.killBuild)
+            commandLine = "cd " + absPath + "; gmake >& build." + arch
+            os.system("rsh " + machine + " '" + commandLine + "'")
+            os.chdir(absPath)
+            sys.exit(self.checkBuildFile("build." + arch))
+        else:
+            tuple = processId, arch
+            self.childProcesses.append(tuple)
+    def getAbsPath(self, app, target):
+        relPath = app.getConfigValue("build_" + target)
+        return app.makeAbsPath(relPath)
+    def checkBuildFile(self, buildFile):
+        for line in open(buildFile).xreadlines():
+            if line.find("***") != -1 and line.find("Error") != -1:
+                return 1
+        return 0
+    def killBuild(self):
+        print "Terminating remote build."
+
+class CheckBuild(plugins.Action):
+    def __init__(self, builder):
+        self.builder = builder
+    def setUpApplication(self, app):
+        print "Waiting for remote builds..." 
+        for process, arch in self.builder.childProcesses:
+            pid, status = os.waitpid(process, 0)
+            if status:
+                print "Build on", arch, "FAILED!"
+            else:
+                print "Build on", arch, "SUCCEEDED!"
+                absPath = self.builder.getAbsPath(app, "codebase")
+                os.remove(os.path.join(absPath, "build." + arch))

@@ -18,9 +18,9 @@ helpOptions = """
 -n         - run in new-file mode. Tests that succeed will still overwrite the standard file, rather than
              leaving it, as is the deafult behaviour.
 
--reconnect <fetchdir:user>
-            - Reconnect to already run tests, optionally takes a directory and user from which to
-              fetch temporary files.
+-reconnect <user>
+            - Reconnect to already run tests, optionally takes a user from which to
+              fetch temporary files. If not provided, will look for calling user.
 
 -t <text>  - only run tests whose names contain <text> as a substring. Note that <text> may be a comma-separated
              list

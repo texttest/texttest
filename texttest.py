@@ -349,6 +349,8 @@ class Application:
         return getConfig(optionMap)
     def getActionSequence(self):
         return self.configObject.getActionSequence()
+    def getInteractiveActions(self):
+        return self.configObject.getInteractiveActions()
     def printHelpText(self):
         print helpIntro
         header = "Description of the " + self.getConfigValue("config_module") + " configuration"
@@ -694,6 +696,7 @@ class ApplicationRunner:
             self.testSuite = tmpSuite
             if gui:
                 gui.addSuite(self.testSuite)
+                gui.addInteractiveActions(app.getInteractiveActions())
     def actionCount(self):
         return len(self.actionSequence)
     def performAction(self, actionNum):

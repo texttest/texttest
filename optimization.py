@@ -121,6 +121,8 @@ class OptimizationConfig(carmen.CarmenConfig):
         if self.optionMap.has_key("keeptmp"):
             return 1
         return 0
+    def getInteractiveActions(self):
+        return [ PlotTest ]
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
@@ -963,13 +965,32 @@ class PlotTest(plugins.Action):
         self.plotPrint = None
         self.plotPrintColor = None
         self.plotAgainstSolNum = 0
-        self.plotVersions = [ None ]
+        self.plotVersions = [ "" ]
         self.plotScaleTime = 1
         self.plotVersionColoring = 1
         self.plotUseTmpStatus = 1
         self.plotStates = [ "" ]
         self.interpretOptions(args)
         self.yLabel = ""
+    # Interactive stuff
+    def getTitle(self):
+        return "Plot Graph"
+    def getArgumentOptions(self):
+        options = {}
+        options["r"] = "Time range in minutes"
+        options["p"] = "Absolute file to print to"
+        options["i"] = "Log file item to plot"
+        options["v"] = "Versions to plot"
+        return options
+    def getSwitches(self):
+        switches = {}
+        switches["pc"] = "Plot in colour"
+        switches["s"] = "Plot against solution number rather than time"
+        switches["nt"] = "Ignore temporary file"
+        switches["b"] = "Plot original and temporary file"
+        switches["ns"] = "Don't scale times"
+        switches["nv"] = "No line type grouping for versions"
+        return switches
     def interpretOptions(self, args):
         for ar in args:
             arr = ar.split("=")
@@ -1034,7 +1055,7 @@ class PlotTest(plugins.Action):
         return style
     def __repr__(self):
         return "Plotting"
-    def __del__(self):
+    def plotGraph(self):
         if len(self.plotFiles) > 0:
             stdin, stdout, stderr = os.popen3("gnuplot -persist -background white")
             self.setPointandLineTypes()
@@ -1070,11 +1091,12 @@ class PlotTest(plugins.Action):
             stdin.write("set xrange [" + self.plotrange +"];" + os.linesep)
             stdin.write("plot " + string.join(fileList, ",") + os.linesep)
             stdin.write("quit" + os.linesep)
+            stdin.close()
             if self.plotPrint:
-                stdin.close()
                 tmppf = stdout.read()
                 if len(tmppf) > 0:
                     open(absplotPrint,"w").write(tmppf)
+            self.plotFiles = []
     def __call__(self, test):
         if self.plotItemApp.has_key(test.app.name):
             usePlotItem = self.plotItemApp[test.app.name]
@@ -1097,4 +1119,4 @@ class PlotTest(plugins.Action):
                     else:
                         plotFile.write(str(solution[timeEntryName]) + "  " + str(solution[usePlotItem]) + os.linesep)
                 self.plotFiles.append(plotFileName)
-
+        self.plotGraph()

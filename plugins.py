@@ -14,6 +14,9 @@ class Configuration:
         return []
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options
+    # Useful features that a GUI might like
+    def getInteractiveActions(self):
+        return []
     def printHelpText(self):
         pass
     def setUpApplication(self, app):

@@ -391,7 +391,8 @@ class Application:
         return fullList
     def makeWriteDirectory(self):
         root, tmpId = os.path.split(self.writeDirectory)
-        self.cleanPreviousWriteDirs(root)
+        if self.keepTmpFiles:
+            self.cleanPreviousWriteDirs(root)
         os.makedirs(self.writeDirectory)
         debugLog.info("Made root directory at " + self.writeDirectory)
     def removeWriteDirectory(self):

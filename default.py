@@ -276,9 +276,8 @@ class RunTest(plugins.Action):
     def changeState(self, test):
         test.changeState(test.RUNNING, "Running on local machine")
     def runTest(self, test):
-        self.describe(test)
         testCommand = self.getExecuteCommand(test)
-        os.system(testCommand)
+        self.runCommand(test, testCommand)
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand()
         useCaseFileName = test.useCaseFile
@@ -288,6 +287,12 @@ class RunTest(plugins.Action):
         testCommand += " < " + self.getInputFile(test)
         outfile = test.makeFileName("output", temporary=1)
         return testCommand + " > " + outfile
+    def runCommand(self, test, command, jobNameFunction = None, options = ""):
+        if jobNameFunction:
+            print test.getIndent() + "Running", jobNameFunction(test), "locally"
+        else:
+            self.describe(test)
+        os.system(command)
     def getInputFile(self, test):
         inputFileName = test.inputFile
         if os.path.isfile(inputFileName):

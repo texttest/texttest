@@ -44,7 +44,8 @@ class MakeComparisons(plugins.Action):
                 postText += " - NONE!"
             else:
                 postText += " - SUCCESS!"
-                postText +=  " (on " + string.join(testComparison.attemptedComparisons, ",") + ")"
+        if len(testComparison.attemptedComparisons) > 0:
+            postText +=  " (on " + string.join(testComparison.attemptedComparisons, ",") + ")"
         self.describe(test, postText)
     def makeTestComparison(self, test):
         return TestComparison(test)

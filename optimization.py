@@ -409,19 +409,18 @@ class OptimizationValueCalculator:
         self.diag = plugins.getDiagnostics("optimization")
         self.diag.info("Building calculator for: " + logfile + ", items:" + string.join(items,","))
         self.itemNamesInFile = itemNamesInFile
-        regexps = {}
+        self.regexps = {}
         for item in items:
-            regexps[item] = self.getItemRegexp(item)
+            self.regexps[item] = self.getItemRegexp(item)
         newSolutionRegexp = self.getItemRegexp(newSolutionMarker)
         self.solutions = [{}]
         for line in open(logfile).xreadlines():
             if newSolutionRegexp.search(line):
                 self.solutions.append({})
                 continue
-            for item, regexp in regexps.items():
+            for item, regexp in self.regexps.items():
                 if regexp.search(line):
                      self.solutions[-1][item] = self.calculateEntry(item, line)
-
     def getSolutions(self, definingItems):
         solutions = []
         for solution in self.solutions:
@@ -457,23 +456,20 @@ class OptimizationValueCalculator:
         except ValueError:
             return lastField.strip()
     def convertTime(self, timeLine):
-        timeEntry = self.getTimeEntry(timeLine.strip())
-        entries = timeEntry.split(":")
+        # Get line _after_ timeEntryName
+        position = self.regexps[timeEntryName].search(timeLine.strip())
+	cutLine = timeLine[position.start():]
+        # Find first pattern after timeEntryName
+        timeEntry = re.findall(r'[0-9]{2}:[0-9]{2}:[0-9]{2}', cutLine)
+	if len(timeEntry) == 0:
+            # No match, return 0
+	    return 0
+        entries = timeEntry[0].split(":")
         timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip()) 
         return float(timeInSeconds) / 60.0
     def getMethod(self, methodLine):
         method = methodLine.replace("Running ", "")
         return method.replace("...", "")
-    def getTimeEntry(self, line):
-        entries = line.split(" ")
-        for index in range(len(entries)):
-            if entries[index] == "cpu":
-                sIx = index + 2
-                while sIx < len(entries):
-                    if entries[sIx] != "":
-                        return entries[sIx]
-                    sIx += 1
-        return line
     def getMemory(self, memoryLine):
         entries = memoryLine.split(" ")
         for index in range(len(entries)):
@@ -574,7 +570,7 @@ class TestReport(plugins.Action):
         referenceRun = OptimizationRun(test, self.referenceVersion, definingValues, interestingValues)
         if currentRun.logFile != referenceRun.logFile:
             self.compare(test, referenceRun, currentRun)
-    
+
 class CalculateKPIs(TestReport):
     def __init__(self, referenceVersion, listKPIs):
         TestReport.__init__(self, referenceVersion)

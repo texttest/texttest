@@ -89,7 +89,7 @@ class CollateCore(CollateFile):
                     writeFile.write("Stack trace from gdb :" + os.linesep)
                 if line[0] == "#" and line != prevLine:
                     startPos = line.find("in ") + 3
-                    endPos = line.rfind("()")
+                    endPos = line.rfind("(")
                     writeFile.write(line[startPos:endPos] + os.linesep)
                 prevLine = line
         else:

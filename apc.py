@@ -67,7 +67,7 @@ apc.CVSBranchTests         - This script is useful when two versions of a test s
 
 """
 
-import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions
+import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions, time
 from time import sleep
 from ndict import seqdict
 
@@ -526,6 +526,7 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
 
 class ExtractApcLogs(plugins.Action):
     def __init__(self, args):
+        self.diag = plugins.getDiagnostics("ExtractApcLogs")
         self.args = args
         if not self.args:
             print "No argument given, using default value for extract_logs"
@@ -534,6 +535,7 @@ class ExtractApcLogs(plugins.Action):
         apcTmpDir = test.writeDirs[-1]
         if not os.path.isdir(apcTmpDir):
             return
+        self.diag.info("Extracting from APC tmp directory " + apcTmpDir)
 
         dict = test.app.getConfigValue("extract_logs")
         if not dict.has_key(self.args):
@@ -555,7 +557,11 @@ class ExtractApcLogs(plugins.Action):
             os.system(cmdLine)
         if os.path.isfile(os.path.join(apcTmpDir, "mpatrol.log")):
             cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.log" + " > " + test.makeFileName("mpatrol_log", temporary = 1)
-        os.system(cmdLine)
+            os.system(cmdLine)
+        # Extract scprob prototype...
+        #if os.path.isfile(os.path.join(apcTmpDir, "APC_rot.scprob")):
+        #    cmdLine = "cd " + apcTmpDir + "; " + "cat  APC_rot.scprob" + " > " + test.makeFileName(" APC_rot.scprob", temporary = 1)
+        #    os.system(cmdLine) 
         # Remove dir
         plugins.rmtree(apcTmpDir)
         # Remove the error file (which is create because we are keeping the logfiles,
@@ -1424,3 +1430,37 @@ class CVSBranchTests(plugins.Action):
                         os.system("cvs add " + fullFileNameNewVersion)
                 
                 
+class CleanSubplans(plugins.Action):
+    def __init__(self):
+        self.config = ApcConfig(None)
+        self.user = os.environ["USER"]
+        self.cleanedPlans = 0
+        self.totalMem = 0
+        self.timeToRemove = time.time()-30*24*3600
+    def __del__(self):
+        print "Removed ", self.cleanedPlans, " temporary subplan directories (" + str(self.totalMem/1024) + "M)"
+    def __repr__(self):
+        return "Cleaning subplans for"
+    def __call__(self, test):
+        subplan = self.config._getSubPlanDirName(test)
+        localplan, subdir = os.path.split(subplan)
+        searchStr = subdir + "." + test.app.name
+        cleanedPlansTest = 0
+        usedMem = 0
+        for file in os.listdir(localplan):
+            startsubplan = file.find(searchStr)
+            if startsubplan == -1:
+                continue
+            if file.find(self.user, startsubplan + len(searchStr)) != -1:
+                subplanName = os.path.join(localplan, file)
+                fileTime = os.path.getmtime(subplanName)
+                if fileTime > self.timeToRemove:
+                    print "Not removing due to too new time stamp " + time.ctime(fileTime)
+                    continue
+                cleanedPlansTest += 1
+                usedMem += int(os.popen("du -s " + subplanName).readlines()[0].split("\t")[0])
+        self.describe(test, " (" + str(cleanedPlansTest) + ", " +  str(usedMem/1024) + "M)")
+        self.cleanedPlans += cleanedPlansTest
+        self.totalMem += usedMem
+    def setUpSuite(self, suite):
+        self.describe(suite)

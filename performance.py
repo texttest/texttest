@@ -122,7 +122,7 @@ class PerformanceFileComparison(comparetest.FileComparison):
     def hasExternalExcuse(self):
         if self.getType() != "slower":
             return 0
-        for line in open(self.tmpCmpFile):
+        for line in open(self.tmpCmpFile).xreadlines():
             if line.find("SLOWING DOWN") != -1:
                 return 1
         return 0

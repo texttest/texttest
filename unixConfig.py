@@ -2,50 +2,25 @@
 
 # Text only relevant to using the LSF configuration directly
 helpDescription = """
-The UNIX configuration is designed to run on a UNIX system. It therefore makes use of some
-UNIX tools, such as tkdiff, diff and /usr/lib/sendmail. The difference tools are used in preference
-to Python's ndiff, and sendmail is used to implement an email-sending batch mode (see options)
+The UNIX configuration is designed to run on a UNIX system. It will collect and process core files
+produced by the application, will make use of UNIX 'time' to performance-test the application (if
+enabled) and will also use UNIX diff for textual differences by default.
 
 The default behaviour is to run all tests locally.
 """
 
-import default, batch, respond, performance, predict, os, shutil, plugins, string, time
+import default, respond, performance, predict, os, shutil, plugins, string, time
 
 def getConfig(optionMap):
     return UNIXConfig(optionMap)
 
 class UNIXConfig(default.Config):
-    def addToOptionGroups(self, app, groups):
-        default.Config.addToOptionGroups(self, app, groups)
-        for group in groups:
-            if group.name.startswith("Select"):
-                group.addOption("r", "Execution time <min, max>")
-            elif group.name.startswith("How"):
-                group.addOption("b", "Run batch mode session")
-    def getFilterList(self):
-        filters = default.Config.getFilterList(self)
-        self.addFilter(filters, "b", batch.BatchFilter)
-        self.addFilter(filters, "r", performance.TimeFilter)
-        return filters
-    def batchMode(self):
-        return self.optionMap.has_key("b")
-    def getCleanMode(self):
-        defaultMode = default.Config.getCleanMode(self)
-        if self.batchMode() and defaultMode & self.CLEAN_BASIC:
-            return self.CLEAN_PREVIOUS
-        else:
-            return defaultMode
     def getTestCollator(self):
         return CollateUNIXFiles(self.optionMap.has_key("keeptmp"))
     def getPerformanceFileMaker(self):
         return MakePerformanceFile(self.getMachineInfoFinder())
     def getTestRunner(self):
         return RunTest()
-    def getTestResponder(self):
-        if self.batchMode():
-            return batch.BatchResponder(self.optionValue("b"))
-        else:
-            return default.Config.getTestResponder(self)
     def defaultLoginShell(self):
         return "sh"
     def defaultTextDiffTool(self):
@@ -60,27 +35,14 @@ class UNIXConfig(default.Config):
     def printHelpScripts(self):
         print performance.helpScripts
         default.Config.printHelpScripts(self)
-    def printHelpOptions(self, builtInOptions):
-        print batch.helpOptions
-        default.Config.printHelpOptions(self, builtInOptions)
     def setApplicationDefaults(self, app):
         default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("virtual_display_machine", [])
+        app.setConfigDefault("login_shell", self.defaultLoginShell())
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0)
         app.setConfigDefault("cputime_slowdown_variation_%", 30)
-        # Batch values. Maps from session name to values
-        app.setConfigDefault("batch_recipients", { "default" : "$USER" })
-        app.setConfigDefault("batch_timelimit", { "default" : None })
-        app.setConfigDefault("batch_use_collection", { "default" : "false" })
-        # Sample to show that values are lists
-        app.setConfigDefault("batch_version", { "default" : [] })
-        app.setConfigDefault("login_shell", self.defaultLoginShell())
-        # Use batch session as a base version
-        batchSession = self.optionValue("b")
-        if batchSession:
-            app.addConfigEntry("base_version", batchSession)
-        
+                
 class RunTest(default.RunTest):
     def __init__(self):
         default.RunTest.__init__(self)

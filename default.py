@@ -42,9 +42,10 @@ default.CountTest          - produce a brief report on the number of tests in th
 default.ExtractStandardPerformance     - update the standard performance files from the standard log files
 """
 
-import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, knownbugs
+import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, batch
 import glob
 from threading import currentThread
+from knownbugs import CheckForBugs
 from cPickle import Unpickler
 
 def getConfig(optionMap):
@@ -68,10 +69,12 @@ class Config(plugins.Configuration):
                 group.addOption("f", "Tests listed in file")
                 group.addOption("ts", "Suite names containing")
                 group.addOption("grep", "Log files containing")
+                group.addOption("r", "Execution time <min, max>")
             elif group.name.startswith("What"):
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
             elif group.name.startswith("How"):
+                group.addOption("b", "Run batch mode session")
                 group.addSwitch("noperf", "Disable any performance testing")
             elif group.name.startswith("Invisible"):
                 # Only relevant without the GUI
@@ -96,7 +99,11 @@ class Config(plugins.Configuration):
         self.addFilter(filters, "ts", TestSuiteFilter)
         self.addFilter(filters, "f", FileFilter)
         self.addFilter(filters, "grep", GrepFilter)
+        self.addFilter(filters, "b", batch.BatchFilter)
+        self.addFilter(filters, "r", performance.TimeFilter)
         return filters
+    def batchMode(self):
+        return self.optionMap.has_key("b")
     def getCleanMode(self):
         if self.isReconnectingFast():
             return self.CLEAN_NONE
@@ -108,6 +115,8 @@ class Config(plugins.Configuration):
         
         if self.optionMap.slaveRun():
             return self.CLEAN_NONBASIC # only clean extra directories that we create...
+        if self.batchMode():
+            return self.CLEAN_PREVIOUS
         
         return self.CLEAN_NONBASIC | self.CLEAN_BASIC
     def isReconnecting(self):
@@ -168,11 +177,14 @@ class Config(plugins.Configuration):
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getFailureExplainer(self):
-        return knownbugs.CheckForBugs()
+        return CheckForBugs()
     def getTestComparator(self):
         comparetest.MakeComparisons.testComparisonClass = performance.PerformanceTestComparison
         return comparetest.MakeComparisons()
     def getTestResponder(self):
+        if self.batchMode():
+            return batch.BatchResponder(self.optionValue("b"))
+    
         overwriteSuccess = self.optionMap.has_key("n")
         if self.optionMap.has_key("o"):
             return respond.OverwriteOnFailures(overwriteSuccess)
@@ -192,6 +204,7 @@ class Config(plugins.Configuration):
     def printHelpDescription(self):
         print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
     def printHelpOptions(self, builtInOptions):
+        print batch.helpOptions
         print helpOptions, builtInOptions
     def printHelpText(self, builtInOptions):
         self.printHelpDescription()
@@ -236,6 +249,16 @@ class Config(plugins.Configuration):
         app.setConfigDefault("collect_standard_error", 1)
         app.addConfigEntry("pending", "white", "test_colours")
         app.addConfigEntry("definition_file_stems", "knownbugs")
+        # Batch values. Maps from session name to values
+        app.setConfigDefault("batch_recipients", { "default" : "$USER" })
+        app.setConfigDefault("batch_timelimit", { "default" : None })
+        app.setConfigDefault("batch_use_collection", { "default" : "false" })
+        # Sample to show that values are lists
+        app.setConfigDefault("batch_version", { "default" : [] })
+        # Use batch session as a base version
+        batchSession = self.optionValue("b")
+        if batchSession:
+            app.addConfigEntry("base_version", batchSession)
         
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):

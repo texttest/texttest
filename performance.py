@@ -153,7 +153,7 @@ class TimeFilter(plugins.Filter):
     def __init__(self, timeLimit):
         self.minTime = 0.0
         self.maxTime = None
-        times = timeLimit.split(",")
+        times = plugins.commasplit(timeLimit)
         if len(times) == 1:
             self.maxTime = float(timeLimit)
         else:

@@ -322,7 +322,7 @@ class CollectFiles(plugins.Action):
                 fullname = os.path.join(app.abspath, filename)
                 file = open(fullname)
                 app.setConfigDefault("collection_recipients", file.readline().strip())
-                catValues = file.readline().strip().split(",")
+                catValues = plugins.commasplit(file.readline().strip())
                 for i in range(len(categoryNames)):
                     totalValues[i] += int(catValues[i])
                 fileBodies.append(file.read())

@@ -518,12 +518,12 @@ class OptionFinder:
         return appList
     def findVersionList(self):
         if self.inputOptions.has_key("v"):
-            return self.inputOptions["v"].split(",")
+            return plugins.commasplit(self.inputOptions["v"])
         else:
             return [""]
     def findSelectedAppNames(self):
         if self.inputOptions.has_key("a"):
-            return self.inputOptions["a"].split(",")
+            return plugins.commasplit(self.inputOptions["a"])
         else:
             return []
     def timesToRun(self):

@@ -251,9 +251,15 @@ class TextTestGUI:
         self.recreateTestView(newTest)
     def quit(self, *args):
         gtk.main_quit()
-        self.rightWindowGUI.killProcesses()
+        self.killInteractiveProcesses()
         if self.actionThread:
             self.actionThread.terminate()
+    def killInteractiveProcesses(self):
+        # Don't leak processes
+        for process in guiplugins.InteractiveAction.processes:
+            if not process.hasTerminated():
+                guilog.info("Killing '" + process.program + "' interactive process")
+                process.kill()
     def saveAll(self, *args):
         saveTestAction = self.rightWindowGUI.getSaveTestAction()
         for test in self.itermap.keys():
@@ -346,9 +352,6 @@ class RightWindowGUI:
         if comp:
             self.model.set_value(fciter, 3, comp)
         return fciter
-    def killProcesses(self):
-        for instance in self.actionInstances:
-            instance.killProcesses()
     def createNotebook(self, interactiveActions):
         pages = self.getHardcodedNotebookPages()
         for instance in interactiveActions:

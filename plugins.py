@@ -178,8 +178,11 @@ class BackgroundProcess:
             self.killWithSignal(signal.SIGTERM)
     def killWithSignal(self, killSignal):
         for process in self.findAllProcesses(self.processId):
-            print "Killing process", process, "with signal", killSignal
-            os.kill(process, killSignal)
+            try:
+                os.kill(process, killSignal)
+                print "Killed process", process, "with signal", killSignal
+            except OSError:
+                pass
     def findAllProcesses(self, pid):
         processes = []
         processes.append(pid)

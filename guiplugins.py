@@ -3,18 +3,12 @@ import plugins, os, sys, shutil, string
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
+    processes = []    
     def __init__(self, test, optionName = ""):
         self.test = test
-        self.processes = []
         self.optionGroup = plugins.OptionGroup(optionName)
     def getOptionGroups(self):
         return [ self.optionGroup ]
-    def killProcesses(self):
-        # Don't leak processes
-        for process in self.processes:
-            if not process.hasTerminated():
-                guilog.info("Killing '" + process.program + "' interactive process")
-                process.kill()
     def canPerformOnTest(self):
         return self.test
     def getTitle(self):
@@ -168,8 +162,7 @@ class RecordTest(InteractiveAction):
         shellOptions = ""
         if test.getConfigValue("use_standard_input"):
             shellTitle = description
-        process = self.startExternalProgram(recordCommand, shellTitle)
-        process.waitForTermination()
+        self.startExternalProgram(recordCommand, shellTitle)
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()
     def matchesMode(self, dynamic):
@@ -225,7 +218,6 @@ class SelectTests(InteractiveAction):
     def __init__(self, app):
         self.app = app
         self.test = app
-        self.processes = []
         for group in app.optionGroups:
             if group.name.startswith("Select"):
                 self.optionGroup = group
@@ -256,7 +248,6 @@ class RunTests(InteractiveAction):
     def __init__(self, app):
         self.app = app
         self.test = app
-        self.processes = []
         self.optionGroups = []
         for group in app.optionGroups:
             if group.name.startswith("Invisible"):

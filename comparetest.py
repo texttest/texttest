@@ -143,7 +143,7 @@ class TestComparison:
         if comparison.newResult() or comparison.hasDifferences():
             return comparison
         if self.overwriteOnSuccess:
-            os.rename(tmpFile, standardFile)
+            plugins.movefile(tmpFile, standardFile)
         return None
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         return FileComparison(test, standardFile, tmpFile, makeNew)
@@ -218,11 +218,11 @@ class FileComparison:
         # more intelligent save, e.g. for performance. Default is the same for exact
         # and inexact save
         if exact:
-            os.rename(self.tmpFile, stdFile)
+            plugins.movefile(self.tmpFile, stdFile)
         else:
             self.saveResults(stdFile)
     def saveResults(self, destFile):
-        os.rename(self.tmpFile, destFile)
+        plugins.movefile(self.tmpFile, destFile)
         
 class RunDependentTextFilter:
     def __init__(self, app, stem):

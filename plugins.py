@@ -1,5 +1,5 @@
 
-import os, log4py, string, signal
+import os, log4py, string, signal, shutil
 from types import FileType
 
 # Generic configuration class
@@ -63,6 +63,15 @@ def getDiagnostics(diagName):
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
     return map(string.strip, input.split(","))
+
+# Another useful utility, for moving files around
+def movefile(sourcePath, targetFile):
+    try:
+        # This generally fails due to cross-device link problems
+        os.rename(sourcePath, targetFile)
+    except:
+        shutil.copyfile(sourcePath, targetFile)
+        os.remove(sourcePath)
 
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):

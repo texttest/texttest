@@ -184,12 +184,7 @@ class CollateUNIXFiles(default.CollateFiles):
         if os.path.islink(sourcePath):
             shutil.copyfile(sourcePath, targetFile)
         else:
-            try:
-                # This generally fails due to cross-device link problems
-                os.rename(sourcePath, targetFile)
-            except:
-                shutil.copyfile(sourcePath, targetFile)
-                os.remove(sourcePath)
+            plugins.movefile(sourcePath, targetFile)
 
 class MakePerformanceFile(plugins.Action):
     def __init__(self):

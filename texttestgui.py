@@ -298,6 +298,7 @@ class RightWindowGUI:
         self.model.set_value(fciter, 2, name)
         if comp:
             self.model.set_value(fciter, 3, comp)
+        return fciter
     def killProcesses(self):
         for instance in self.actionInstances:
             instance.killProcesses()
@@ -437,17 +438,29 @@ class TestCaseGUI(RightWindowGUI):
             self.model.set_value(stditer, 0, "Standard Files")
         defiter = self.model.insert_before(None, None)
         self.model.set_value(defiter, 0, "Definition Files")
-        ownedFiles = []
+        stdFiles = []
+        defFiles = []
         for file in os.listdir(test.abspath):
             if test.app.ownsFile(file):
-                ownedFiles.append(file)
-        ownedFiles.sort()
-        for file in ownedFiles:
-            fullPath = os.path.join(test.abspath, file)
-            if self.isDefinitionFile(file):
-                self.addFileToModel(defiter, fullPath, None, self.staticColour)
-            elif test.classId() == "test-case":
-                self.addFileToModel(stditer, fullPath, None, self.staticColour)
+                if self.isDefinitionFile(file):
+                    defFiles.append(file)
+                elif test.classId() == "test-case":
+                    stdFiles.append(file)
+        self.addFilesUnderIter(defiter, defFiles, test.abspath)
+        if len(stdFiles):
+            self.addFilesUnderIter(stditer, stdFiles, test.abspath)
+        for name, filelist in test.extraReadFiles().items():
+            exiter = self.model.insert_before(None, None)
+            self.model.set_value(exiter, 0, name + " Files")
+            self.addFilesUnderIter(exiter, filelist)
+    def addFilesUnderIter(self, iter, files, dir = None):
+        files.sort()
+        for file in files:
+            if dir:
+                fullPath = os.path.join(dir, file)
+            else:
+                fullPath = file
+            newiter = self.addFileToModel(iter, fullPath, None, self.staticColour)
     def isDefinitionFile(self, file):
         definitions = [ "options.", "input.", "environment", "testsuite" ]
         for defin in definitions:

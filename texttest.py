@@ -111,6 +111,8 @@ class Test:
             return fullPath
         parent, current = os.path.split(startDir)
         return self.makePathName(fileName, parent)
+    def extraReadFiles(self):
+        return self.app.configObject.extraReadFiles(self)
     def notifyChanged(self):
         for observer in self.observers:
             observer.notifyChange(self)

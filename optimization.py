@@ -85,6 +85,7 @@ optimization.TraverseSubPlans
 
 
 import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, lsf, guiplugins
+from ndict import seqdict
 
 itemNamesConfigKey = "_itemnames_map"
 noIncreasMethodsConfigKey = "_noincrease_methods_map"
@@ -145,6 +146,20 @@ class OptimizationConfig(carmen.CarmenConfig):
             return baseFiles
     def getTestRunner(self):
         return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
+    def extraReadFiles(self, test):
+        readDirs = seqdict()
+        if test.classId() == "test-case":
+            test.setUpEnvironment(parents=1)
+            dirName = self._getSubPlanDirName(test)
+            readDirs["Subplan"] = [ os.path.join(dirName, "APC_FILES", "rules") ]
+            readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", self.getRuleSetName(test)) ]
+            test.tearDownEnvironment(parents=1)
+        elif test.environment.has_key("CARMUSR"):
+            readDirs["Resource"] = [ os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab") ]
+        elif test.environment.has_key("CARMSYS"):
+            readDirs["RAVE module"] = [ os.path.join(test.environment["CARMSYS"], \
+            "carmusr_default", "crc", "modules", test.getConfigValue("rave_name")) ]
+        return readDirs
     def getSpecificTestRunner(self):
         return carmen.CarmenConfig.getTestRunner(self) 
     def printHelpDescription(self):

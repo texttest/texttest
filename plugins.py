@@ -24,6 +24,8 @@ class Configuration:
         return []
     def printHelpText(self):
         pass
+    def extraReadFiles(self, test):
+        return {}
     def setApplicationDefaults(self, app):
         pass
     

@@ -226,7 +226,7 @@ class TestCase(Test):
                 continue
             if keeptmp:
                 print self.getIndent() + "Keeping write-directory for", self.name, "in", writeDir
-            elif self.state == self.SUCCEEDED:
+            elif self.state != self.FAILED:
                 debugLog.info("Removing write-directory for " + self.name + " in " + writeDir)
                 self.removeAtRightLevel(writeDir)
     def removeAtRightLevel(self, writeDir):

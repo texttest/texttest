@@ -528,6 +528,7 @@ class RightWindowGUI:
             scriptEngine.registerToggleButton(radioButton1, "choose " + switch.name)
             scriptEngine.registerToggleButton(radioButton2, "choose " + switch.nameForOff)
             switch.setMethods(radioButton1.get_active, radioButton1.set_active)
+            switch.resetMethod = radioButton2.set_active
             hbox = gtk.HBox()
             hbox.pack_start(radioButton1, expand=gtk.TRUE, fill=gtk.TRUE)
             hbox.pack_start(radioButton2, expand=gtk.TRUE, fill=gtk.TRUE)

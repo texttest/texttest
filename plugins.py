@@ -270,6 +270,12 @@ class Switch(Option):
     def __init__(self, name, value, nameForOff):
         Option.__init__(self, name, value)
         self.nameForOff = nameForOff
+        self.resetMethod = None
+    def reset(self):
+        if self.defaultValue == 0 and self.resetMethod:
+            self.resetMethod(1)
+        else:
+            Option.reset(self)
 
 class OptionGroup:
     def __init__(self, name, defaultDict):

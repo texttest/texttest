@@ -211,6 +211,7 @@ class CollateFiles(plugins.Action):
         if test.state.isComplete():
             return
 
+        errorWrites = []
         for targetStem, sourcePattern in self.collations.items():
             targetFile = test.makeFileName(targetStem, temporary=1)
             fullpath = self.findPath(test, sourcePattern)
@@ -219,8 +220,19 @@ class CollateFiles(plugins.Action):
                 self.extract(fullpath, targetFile)
                 self.transformToText(targetFile)
             elif os.path.isfile(test.makeFileName(targetStem)):
+                errorWrites.append((sourcePattern, targetFile))
+
+        # Don't write collation failures if there aren't any files anyway : the point
+        # is to highlight partial failure to collect files
+        if self.hasAnyFiles(test):
+            for sourcePattern, targetFile in errorWrites:
                 errText = self.getErrorText(sourcePattern)
                 open(targetFile, "w").write(errText + os.linesep)
+    def hasAnyFiles(self, test):
+        for file in os.listdir(test.getDirectory(temporary=1)):
+            if os.path.isfile(file) and test.app.ownsFile(file):
+                return 1
+        return 0
     def getErrorText(self, sourcePattern):
         return "Expected file '" + sourcePattern + "' not created by test"
     def findPath(self, test, sourcePattern):

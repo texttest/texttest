@@ -45,6 +45,8 @@ apc.PlotApcTest [options]  - Displays a gnuplot graph with the cpu time (in minu
 
 apc.UpdateCvsIgnore        - Make the .cvsignore file in each test directory identical to 'cvsignore.master'
 
+apc.PrintAirport           - Prints the target AirportFile location for each user
+
 apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
                              This is intended to be used on a single specified test and will terminate
                              the testsuite after it starts Studio. It is a simple shortcut to set the
@@ -585,4 +587,25 @@ class UpdateCvsIgnore(plugins.Action):
         fileName = os.path.join(app.abspath, "cvsignore.master")
         if os.path.isfile(fileName):
             self.masterCvsIgnoreFile = fileName
+
+class PrintAirport(plugins.Action):
+    def __repr__(self):
+        return "Print AirportFile"
+    def __call__(self, test):
+        pass
+    def setUpSuite(self, suite):
+        if suite.name == "picador":
+            return
+        etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
+        customerEtab = os.path.join(etabPath, "Customer.etab")
+        if os.path.isfile(customerEtab):
+            etab = carmen.ConfigEtable(customerEtab)
+            airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
+            if airportFile != None:
+                self.describe(suite, ": " + airportFile)
+                return
+        self.describe(suite, " without airportfile in: " + customerEtab)
+        pass
+    def setUpApplication(self, app):
+        pass
 

@@ -6,9 +6,11 @@ It also uses the temporary subplan concept, such that all tests will actually be
 subplans when the tests are run. These subplans should then be cleaned up afterwards. The point of this
 is to avoid clashes in solution due to two runs of the same test writing to the same subplan.
 
-Also, you can specify a "rave_parameter" entry in your config file, typically in a version file. The value
-of this should be a line to insert into the rules file after the subplan is copied. By doing this you can
-experiment with a new feature on a lot of tests without having to manually create new tests.
+Also, you can specify values of RAVE parameters in special raveparameters.<app>.<ver> file(s). The lines
+listed in these file(s) will be insert into the rules file after the subplan is copied. Observe that
+this is done hierarchiclly, i.e. lines in raveparameters suite files will be written before lines
+in raveparameters test files. By doing this you can experiment with a new feature on a lot of tests
+without having to manually create new tests.
 
 In other respects, it follows the usage of the Carmen configuration.""" 
 
@@ -161,19 +163,22 @@ class OptimizationConfig(carmen.CarmenConfig):
 class MakeTmpSubPlan(plugins.Action):
     def __init__(self, subplanFunction):
         self.subplanFunction = subplanFunction
+        self.raveParameters = []
+    def setUpSuite(self, suite):
+        self.readRaveParameters(suite.makeFileName("raveparameters"))
     def __call__(self, test):
         dirName = self.subplanFunction(test)
         if not os.path.isdir(dirName):
             raise plugins.TextTestError, "Cannot run test, subplan directory does not exist"
         rootDir, baseDir = os.path.split(dirName)
         tmpDir = test.makeWriteDirectory(rootDir, baseDir, "APC_FILES")
-        parameterOverrides = test.app.getConfigList("rave_parameter")
-        self.makeLinksIn(tmpDir, dirName, parameterOverrides)
-    def makeLinksIn(self, inDir, fromDir, parameterOverrides):
+        self.readRaveParameters(test.makeFileName("raveparameters"))
+        self.makeLinksIn(tmpDir, dirName)
+    def makeLinksIn(self, inDir, fromDir):
         for file in os.listdir(fromDir):
             if file == "APC_FILES":
                 apcFiles = os.path.join(inDir, file)
-                self.makeLinksIn(apcFiles, os.path.join(fromDir, file), parameterOverrides)
+                self.makeLinksIn(apcFiles, os.path.join(fromDir, file))
                 continue
             if file.find("Solution_") != -1:
                 continue
@@ -194,16 +199,20 @@ class MakeTmpSubPlan(plugins.Action):
 
             fromPath = os.path.join(fromDir, file)
             toPath = os.path.join(inDir, file)
-            if len(parameterOverrides) > 0 and file.find("rules") != -1:
+            if (len(self.raveParameters) > 0) and file.find("rules") != -1:
                 file = open(toPath, 'w')
                 for line in open(fromPath).xreadlines():
                     if line.find("<SETS>") != -1:        
-                        for override in parameterOverrides:
-                            file.write(override + os.linesep)
+                        for override in self.raveParameters:
+                            file.write(override.strip(os.linesep) + os.linesep)
                     file.write(line)
             else:
                 os.symlink(fromPath, toPath)            
-            
+    def readRaveParameters(self, fileName):
+        if not os.path.isfile(fileName):
+            return
+        self.raveParameters += open(fileName).readlines()
+        
 class StartStudio(plugins.Action):
     def __call__(self, test):
         print "CARMSYS:", os.environ["CARMSYS"]

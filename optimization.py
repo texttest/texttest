@@ -130,13 +130,6 @@ class OptimizationConfig(carmen.CarmenConfig):
         return carmen.CarmenConfig.getActionSequence(self)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
-    def buildRules(self):
-        # Always try to build at least some rules, whatever happens
-        return not self.isReconnecting()
-    def getRuleBuildFilter(self):
-        if self.isNightJob() or self.optionMap.has_key("rulecomp"):
-            return None
-        return carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
     def getVitalFiles(self, app):
         libFile = self.getLibraryFile(app)
         baseFiles = carmen.CarmenConfig.getVitalFiles(self, app)
@@ -144,6 +137,9 @@ class OptimizationConfig(carmen.CarmenConfig):
             return baseFiles + [ os.path.join(os.environ["CARMSYS"], libFile) ]
         else:
             return baseFiles
+    def defaultBuildRules(self):
+        # Assume we always want to build at least some rules, by default...
+        return 1
     def getTestRunner(self):
         return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
     def extraReadFiles(self, test):

@@ -24,7 +24,7 @@ helpOptions = """
              data in the test directory, in a file called lprof.<app>. It is proposed to automatically generate
              the graphical information also
 
--rulecomp  - Instead of running normally, compile all rule sets that are relevant to the tests selected (if any)
+-rulecomp  - Build all rulesets before running the tests
 
 -rulecomp clean
            - As '-rulecomp' above, but will attempt to remove ruleset files first, such that ruleset is
@@ -42,7 +42,11 @@ helpOptions = """
              and are reported on at the end. This should ensure that they don't delay the appearance of test information.
 
 -buildl <t>
-           - As above, but no parallel builds are done.             
+           - As above, but no parallel builds are done.
+
+-skip      - Don't build any rulesets before running the tests.
+
+-debug     - Compile a debug ruleset, and rename it so that it is used instead of the normal one.
 """
 
 batchInfo = """
@@ -96,7 +100,8 @@ class CarmenConfig(lsf.LSFConfig):
         if group.name.startswith("Select"):
             group.addOption("u", "CARMUSRs containing")
         elif group.name.startswith("What"):
-            group.addSwitch("rulecomp", "Build rulesets only")
+            group.addSwitch("rulecomp", "Build all rulesets")
+            group.addSwitch("skip", "Build no rulesets")
         elif group.name.startswith("How"):
             group.addSwitch("debug", "Use debug rulesets")
             group.addSwitch("raveexp", "Run with RAVE Explorer")
@@ -115,23 +120,24 @@ class CarmenConfig(lsf.LSFConfig):
         self.addFilter(filters, "u", UserFilter)
         return filters
     def getActionSequence(self):
-        if self.optionMap.has_key("rulecomp"):
-            if self.optionValue("rulecomp") != "clean":
-                return [ self.getWriteDirectoryMaker(), self.getRuleBuilder() ]
-            else:
-                return [ self.getWriteDirectoryMaker(), self.getRuleCleanup(), self.getRuleBuilder() ]
-        else:
-            builder = self.getAppBuilder()
-            # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
-            return [ builder, self.getWriteDirectoryMaker(), self.getRuleBuilder() ] + \
-                   lsf.LSFConfig._getActionSequence(self, makeDirs = 0)
+        # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
+        return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getRuleBuilder() ] + \
+                 lsf.LSFConfig._getActionSequence(self, makeDirs = 0)
     def getRuleCleanup(self):
         return CleanupRules(self.getRuleSetName)
+    def isRaveRun(self):
+        return self.optionValue("a").find("rave") != -1 or self.optionValue("v").find("rave") != -1
     def getRuleBuildFilter(self):
-        return None
+        if self.isNightJob() or self.optionMap.has_key("rulecomp") or self.isRaveRun():
+            return None
+        return UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile)
     def getRuleBuilder(self):
         if self.buildRules():
-            return self.getRealRuleBuilder()
+            realBuilder = self.getRealRuleBuilder()
+            if self.optionValue("rulecomp") != "clean":
+                return realBuilder
+            else:
+                return plugins.CompositeAction([ self.getRuleCleanup(), realBuilder ])
         else:
             return plugins.Action()
     def getRealRuleBuilder(self):
@@ -143,7 +149,13 @@ class CarmenConfig(lsf.LSFConfig):
     def getRuleBuildObject(self, ruleRunner):
         return CompileRules(self.getRuleSetName, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
     def buildRules(self):
-        return self.optionMap.has_key("rulecomp")
+        if self.optionMap.has_key("skip") or self.isReconnecting():
+            return 0
+        if self.optionMap.has_key("rulecomp"):
+            return 1
+        return self.defaultBuildRules()
+    def defaultBuildRules(self):
+        return 0
     def raveMode(self):
         if self.optionMap.has_key("debug"):
             return "-debug"

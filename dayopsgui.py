@@ -1,7 +1,7 @@
 helpDescription = """
 It follows the usage of the Carmen configuration.""" 
 
-import unixConfig, guiplugins, os, string
+import unixConfig, guiplugins, os, string, shutil
 
 def getConfig(optionMap):
     return DayOPsGUIConfig(optionMap)
@@ -51,26 +51,24 @@ class RecordTest(guiplugins.RecordTest):
         defaultHTTPdir = os.environ["DMG_RECORD_HTTP_DIR"]
         self.test.tearDownEnvironment(1)
         self.props = JavaPropertyReader(propFileInCheckout)
-        self.addOption(oldOptionGroup, "v", "Version", "")
         self.addOption(oldOptionGroup, "host", "DMServer host", self.props.get("host"))
         self.addOption(oldOptionGroup, "port", "Port", self.props.get("port"))
         self.addOption(oldOptionGroup, "w", "HTTP dir", defaultHTTPdir)
-    def canPerformOnTest(self):
-        existName = self.test.makeFileName("input")
-        if os.path.isfile(existName):
-            return 0
-        return 1
     def __call__(self, test):
         serverLog = test.makeFileName("input")
         propFileInTest = test.makeFileName("properties")
-        args = [ test.abspath, serverLog, propFileInTest ]
-        os.environ["DMG_RECORD_TEST"] = string.join(args,":")
         self.props.set("host", self.optionGroup.getOptionValue("host"))
         self.props.set("port", self.optionGroup.getOptionValue("port"))
-        #
-        # TODO: Change testPropFile file according to option for HTTP dir too
-        #
         self.props.writeFile(propFileInTest)
+        httpServerDir = self.optionGroup.getOptionValue("w")
+        args = [ test.abspath, serverLog, propFileInTest, httpServerDir ]
+        os.environ["DMG_RECORD_TEST"] = string.join(args,":")
         guiplugins.RecordTest.__call__(self, test)
+        newLogFile = test.makeFileName("dmserverlog")
+        # Use the reran tests 'dmserverlog' as 'input' for the test not the
+        # originally recorded 'input' file. i.e. copy 'dmserverlog' to 'input'
+        if os.path.isfile(newLogFile):
+            shutil.copyfile(newLogFile, serverLog)
+
         
 

@@ -80,6 +80,7 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions = [ optimization.OptimizationConfig.getTestCollator(self) ]
         subActions.append(RemoveLogs())
         subActions.append(optimization.ExtractSubPlanFile(self, "status", "status"))
+        subActions.append(FetchApcCore(self))
         subActions.append(optimization.RemoveTemporarySubplan(self.subplanManager))
         return plugins.CompositeAction(subActions)
     def getRuleSetName(self, test):
@@ -239,6 +240,47 @@ class RemoveLogs(plugins.Action):
             os.remove(filePath)
     def __repr__(self):
         return "Remove logs"
+
+class FetchApcCore(plugins.Action):
+    def __init__(self, config):
+        self.config = config
+    def __call__(self, test):
+        if self.config.isReconnecting():
+            return
+        coreFileName = os.path.join(test.abspath, "core.Z")
+        if os.path.isfile(coreFileName):
+            os.remove(coreFileName)
+        scriptError = self.config.getSubPlanFileName(test, "run_status_script_error")
+        if not os.path.isfile(scriptError):
+            return
+        extractFile = optimization.ExtractSubPlanFile(self.config, "run_status_script_error", "error")
+        extractFile(test)
+        logFinder = optimization.LogFileFinder(test)
+        tmpStatusFile = logFinder.findFile()
+        if tmpStatusFile.find(test.getTestUser()) == -1:
+            return
+        grepCommand = "grep Machine " + tmpStatusFile
+        grepLines = os.popen(grepCommand).readlines()
+        if len(grepLines) > 0:
+            machine = grepLines[0].split()[-1]
+            testDirEnd = test.app.name + test.app.versionSuffix() + "_" + test.name + "_" + test.getTmpExtension()
+            self.describe(test, " from " + machine)
+            binName = test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.architecture)
+            binCmd = "echo ' " + binName +  "' >> core"
+            cmdLine = "cd /tmp/*" + testDirEnd + "_*;" + binCmd + ";compress -c core > " + coreFileName
+            os.system("rsh " + machine + " '" + cmdLine + "'")
+            if self.config.keepTemporarySubplans() and self.config.subplanManager.tmpDirs.has_key(test):
+                tmpDir = self.config.subplanManager.tmpDirs[test]
+                if os.path.isdir(tmpDir):
+                    tgzFile = os.path.join(tmpDir,"apc_crash_" + machine + ".tgz")
+                    if os.path.isfile(tgzFile):
+                        os.remove(tgzFile)
+                    cmdLine = "cd /tmp/*" + testDirEnd + "_*; tar cf - . | gzip -c > " + tgzFile
+                    os.system("rsh " + machine + " '" + cmdLine + "'")
+            cmdLine = "rm -rf /tmp/*" + testDirEnd + "_*"
+            os.system("rsh " + machine + " '" + cmdLine + "'")
+    def __repr__(self):
+        return "Fetching core for"
 
 class StartStudio(plugins.Action):
     def __call__(self, test):

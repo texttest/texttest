@@ -29,19 +29,13 @@ class ExtractSubPlanFile(plugins.Action):
     def __call__(self, test):
         sourcePath = self.config.getSubPlanFileName(test, self.sourceName)
         if os.path.isfile(sourcePath):
-            if self.isCompressed(sourcePath):
+            if carmen.isCompressed(sourcePath):
                 targetFile = test.getTmpFileName(self.targetName, "w") + ".Z"
                 shutil.copyfile(sourcePath, targetFile)
                 os.system("uncompress " + targetFile)
             else:
                 targetFile = test.getTmpFileName(self.targetName, "w")
                 shutil.copyfile(sourcePath, targetFile)
-    def isCompressed(self,path):
-        magic = open(path).read(2)
-        if magic[0] == chr(0x1f) and magic[1] == chr(0x9d):
-            return 1
-        else:
-            return 0
 
 # Abstract base class for handling running tests in temporary subplan dirs
 # see example usage in apc.py
@@ -198,26 +192,30 @@ class TestSuiteInformation(TestInformation):
             open(suitePath, "w").write(suiteContent + os.linesep)
         envPath = self.makeFileName("environment")
         if not os.path.isfile(envPath):
-            carmUsrDir = self.chooseCarmUsr()
-            if carmUsrDir != None:
-                open(envPath,"w").write(self.getEnvContent(carmUsrDir) + os.linesep)
+            envContent = self.getEnvContent()
+            if envContent != None:
+                open(envPath,"w").write(envContent + os.linesep)
+        return 1
     def postText(self):
         return ", User: '" + self.name + "'"
-    def getEnvContent(self, carmUsrDir):
-        carmTmpDir = carmUsrDir[:-4] + "tmp"
-        return "CARMUSR:" + carmUsrDir + os.linesep + "CARMTMP:" + carmTmpDir
-    def findCarmUsrFrom(self, fileList):
+    def getEnvContent(self):
+        carmUsrDir = self.chooseCarmDir("CARMUSR")
+        carmTmpDir = self.chooseCarmDir("CARMTMP")
+        usrContent = "CARMUSR:" + carmUsrDir
+        tmpContent = "CARMTMP:" + carmTmpDir;
+        return usrContent + os.linesep + tmpContent
+    def findCarmVarFrom(self, fileList, envVariableName):
         for file in fileList:
             if not os.path.isfile(self.filePath(file)):
                 continue
             for line in open(self.filePath(file)).xreadlines():
-                if line[0:7] == "CARMUSR":
+                if line[0:7] == envVariableName:
                     return line.split(":")[1].strip()
         return None
-    def chooseCarmUsr(self):
-        dirName = self.findCarmUsrFrom(self.findStems("environment"))
+    def chooseCarmDir(self, envVariableName):
+        dirName = self.findCarmVarFrom(self.findStems("environment"), envVariableName)
         while dirName == None:
-            print "Please give CARMUSR directory to use for user " + self.userDesc()
+            print "Please give " + envVariableName + " directory to use for user " + self.userDesc()
             dirName = sys.stdin.readline().strip();
             if not os.path.isdir(dirName):
                 print "Not found: '" + dirName + "'"
@@ -242,60 +240,25 @@ class TestCaseInformation(TestInformation):
     def __init__(self, suite, name):
         TestInformation.__init__(self, suite, name)
     def isComplete(self):
-        if not os.path.isdir(self.testPath()):
-            return 0
-        if not os.path.isfile(self.makeFileName("options")):
-            return 0
-        if not os.path.isfile(self.makeFileName("environment")):
-            return 0
-        if not os.path.isfile(self.makeFileName("performance")):
-            return 0
         return 1
     def makeImport(self):
-        testPath = self.testPath()
-        optionPath = self.makeFileName("options")
-        envPath = self.makeFileName("environment")
-        perfPath = self.makeFileName("performance")
-        if not os.path.isdir(testPath):
-            os.mkdir(testPath)
-        if not os.path.isfile(optionPath):
-            dirName = self.chooseSubPlan()
-            if dirName == None:
-                return
-            subPlanDir = os.path.join(dirName, "APC_FILES")
-            ruleSet = self.getRuleSetName(subPlanDir)
-            carmUsrSubPlanDirectory = self.replaceCarmUsr(subPlanDir)
-            newOptions = self.buildOptions(carmUsrSubPlanDirectory, ruleSet)
-            open(optionPath,"w").write(newOptions + os.linesep)
-        else:
-            carmUsrSubPlanDirectory = self.subPlanFromOptions(optionPath)
-        if not os.path.isfile(envPath):
-            envContent = self.buildEnvironment(carmUsrSubPlanDirectory)
-            open(envPath,"w").write(envContent + os.linesep)
-        if not os.path.isfile(perfPath):
-            perfContent = self.buildPerformance(carmUsrSubPlanDirectory)
-            open(perfPath, "w").write(perfContent + os.linesep)
+        return 0
     def postText(self):
         return ", Test: '" + self.name + "'"
-    def subPlanFromOptions(self, optionPath):
-        return None
-    def buildOptions(self, path, ruleSet):
-        return None
-    def buildEnvironment(self, carmUsrSubPlanDirectory):
-        return None
-    def buildPerformance(self, carmUsrSubPlanDirectory):
-        return None
-    def getRuleSetName(self, subPlanDir):
-        problemLines = open(os.path.join(subPlanDir,"problems")).xreadlines()
+    def getRuleSetName(self, absSubPlanDir):
+        problemPath = os.path.join(absSubPlanDir,"problems")
+        if not carmen.isCompressed(problemPath):
+            problemLines = open(problemPath).xreadlines()
+        else:
+            tmpName = os.tmpnam()
+            shutil.copyfile(problemPath, tmpName + ".Z")
+            os.system("uncompress " + tmpName + ".Z")
+            problemLines = open(tmpName).xreadlines()
+            os.remove(tmpName)
         for line in problemLines:
             if line[0:4] == "153;":
                 return line.split(";")[3]
         return ""
-    def replaceCarmUsr(self, path):
-        carmUser = os.environ["CARMUSR"]
-        if path[0:len(carmUser)] == carmUser:
-            return "${CARMUSR}" + os.path.join("/", path[len(carmUser) : len(path)])
-        return path
     def chooseDir(self, dirs, suiteDesc, tryName):
         answer = -1
         while answer == -1:
@@ -376,8 +339,8 @@ class ImportTest(plugins.Action):
                 else:
                     testInfo = self.getTestSuiteInformation(suite, testline.strip())
                 if not testInfo.isComplete():
-                    testInfo.makeImport()
-                    self.describe(suite, testInfo.postText())
+                    if testInfo.makeImport() == 1:
+                        self.describe(suite, testInfo.postText())
 
     def makeUser(self, userInfo, carmUsrDir):
         return 0

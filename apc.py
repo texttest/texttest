@@ -142,8 +142,51 @@ class StartStudio(plugins.Action):
 class ApcTestCaseInformation(optimization.TestCaseInformation):
     def __init__(self, suite, name):
         optimization.TestCaseInformation.__init__(self, suite, name)
-    def ruleSetPath(self):
-        return "${CARMTMP}" + os.sep + os.path.join("crc", "rule_set", "APC", "PUTS_ARCH_HERE")
+    def isComplete(self):
+        if not os.path.isdir(self.testPath()):
+            return 0
+        if not os.path.isfile(self.makeFileName("options")):
+            return 0
+        if not os.path.isfile(self.makeFileName("environment")):
+            return 0
+        if not os.path.isfile(self.makeFileName("performance")):
+            return 0
+        return 1
+    def makeImport(self):
+        testPath = self.testPath()
+        optionPath = self.makeFileName("options")
+        envPath = self.makeFileName("environment")
+        perfPath = self.makeFileName("performance")
+        createdPath = 0
+        if not os.path.isdir(testPath):
+            os.mkdir(testPath)
+            createdPath = 1
+        if not os.path.isfile(optionPath):
+            dirName = self.chooseSubPlan()
+            if dirName == None:
+                if createdPath == 1:
+                    os.rmdir(testPath)
+                return 0
+            subPlanDir = os.path.join(dirName, "APC_FILES")
+            ruleSet = self.getRuleSetName(subPlanDir)
+            carmUsrSubPlanDirectory = self.replaceCarmUsr(subPlanDir)
+            newOptions = self.buildOptions(carmUsrSubPlanDirectory, ruleSet)
+            open(optionPath,"w").write(newOptions + os.linesep)
+        else:
+            subPlanDir = self.subPlanFromOptions(optionPath)
+            carmUsrSubPlanDirectory = self.replaceCarmUsr(subPlanDir)
+        if not os.path.isfile(envPath):
+            envContent = self.buildEnvironment(carmUsrSubPlanDirectory)
+            open(envPath,"w").write(envContent + os.linesep)
+        if not os.path.isfile(perfPath):
+            perfContent = self.buildPerformance(subPlanDir)
+            open(perfPath, "w").write(perfContent + os.linesep)
+        return 1
+    def replaceCarmUsr(self, path):
+        carmUser = os.environ["CARMUSR"]
+        if path[0:len(carmUser)] == carmUser:
+            return "${CARMUSR}" + os.path.join("/", path[len(carmUser) : len(path)])
+        return path
     def subPlanFromOptions(self, optionPath):
         path = open(optionPath).readline().split()[0]
         if path[0:10] != "${CARMUSR}":
@@ -155,10 +198,11 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
         return os.path.normpath(npath)
 
     def buildOptions(self, path, ruleSet):
-       subPlan = path
-       statusFile = path + os.sep + "run_status"
-       ruleSetFile = self.ruleSetPath() + os.sep + ruleSet
-       return subPlan + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
+        subPlan = path
+        statusFile = path + os.sep + "run_status"
+        ruleSetPath = "${CARMTMP}" + os.sep + os.path.join("crc", "rule_set", "APC", "PUTS_ARCH_HERE")
+        ruleSetFile = ruleSetPath + os.sep + ruleSet
+        return subPlan + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
 
     def buildEnvironment(self, carmUsrSubPlanDirectory):
         lpEtab = carmUsrSubPlanDirectory.split(os.sep)[0:-2]
@@ -182,7 +226,8 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
 class ApcTestSuiteInformation(optimization.TestSuiteInformation):
     def __init__(self, suite, name):
         optimization.TestSuiteInformation.__init__(self, suite, name)
-    def getEnvContent(self, carmUsrDir):
+    def getEnvContent(self):
+        carmUsrDir = self.chooseCarmDir("CARMUSR")
         usrContent = "CARMUSR:" + carmUsrDir
         tmpContent = "CARMTMP:${CARMSYS}" + os.sep + self.makeCarmTmpName()
         return usrContent + os.linesep + tmpContent

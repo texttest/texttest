@@ -7,6 +7,13 @@ def getConfig(optionMap):
 def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
+def isCompressed(path):
+    magic = open(path).read(2)
+    if magic[0] == chr(0x1f) and magic[1] == chr(0x9d):
+        return 1
+    else:
+        return 0
+
 class UserFilter(default.TextFilter):
     def acceptsTestSuite(self, suite):
         if isUserSuite(suite):

@@ -353,40 +353,42 @@ class CountTest(plugins.Action):
 class ReconnectTest(plugins.Action):
     def __init__(self, fetchUser):
         self.fetchUser = fetchUser
+        self.userDepWriteDir = self.hasUserDependentWriteDir()
+        self.rootDirToCopy = None
     def __repr__(self):
         return "Reconnect to"
     def __call__(self, test):
         print "Reconnecting to test", test.name
-        if os.path.isdir(test.writeDirs[0]):
-            os.chdir(test.writeDirs[0])
-        else:
-            os.makedirs(test.writeDirs[0])
-            os.chdir(test.writeDirs[0])
-        for file in os.listdir(os.getcwd()):
+        reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
+        writeDir = test.writeDirs[0]
+        shutil.copytree(reconnLocation, writeDir)
+        for file in os.listdir(writeDir):
             if file.endswith("cmp"):
-                os.remove(file)
+                os.remove(os.path.join(writeDir, file))
     def setUpApplication(self, app):
         root, localDir = os.path.split(app.writeDirectory)
         if not os.path.isdir(root):
             os.makedirs(root)
         fetchDir = root
         userId = app.getTestUser()
-        if self.fetchUser and self.hasUserDependentWriteDir(app, userId):
+        if self.fetchUser and self.userDepWriteDir:
             fetchDir = fetchDir.replace(userId, self.fetchUser)
         userToFind = self.fetchUser
         if not self.fetchUser:
             userToFind = userId
         patternToFind = app.name + app.versionSuffix() + userToFind
+        self.rootDirToCopy = None
         for subDir in os.listdir(fetchDir):
             fullPath = os.path.join(fetchDir, subDir)
             if os.path.isdir(fullPath) and subDir.startswith(patternToFind):
                 print "Reconnecting to test results in directory", fullPath
-                shutil.copytree(fullPath, app.writeDirectory)
-        if not os.path.isdir(app.writeDirectory):
+                self.rootDirToCopy = fullPath
+        if not self.rootDirToCopy:
             raise plugins.TextTestError, "Could not find any runs matching " + patternToFind + " under " + fetchDir
-    def hasUserDependentWriteDir(self, app, userId):
-        origWriteDir = os.environ["TEXTTEST_TMP"]
-        return origWriteDir.find(userId) != -1 or origWriteDir.find("~") != -1
+    def setUpSuite(self, suite):
+        os.makedirs(os.path.join(suite.app.writeDirectory, suite.getRelPath()))        
+    def hasUserDependentWriteDir(self):
+        return os.environ["TEXTTEST_TMP"].find("~") != -1
 
 # Relies on the config entry string_before_memory, so looks in the log file for anything reported
 # by the program

@@ -1081,8 +1081,6 @@ class TestGraph:
         gnuplotFileName = os.path.abspath("gnuplot.input")
         outputFileName = os.path.abspath("gnuplot.output")
         gnuplotFile = open(gnuplotFileName, "w")
-        plotArguments = self.getPlotArguments()
-        
         if targetFile:
             absTargetFile = os.path.expanduser(targetFile)
             if not os.path.isabs(absplotPrint):
@@ -1101,7 +1099,11 @@ class TestGraph:
         gnuplotFile.write("set ytics border nomirror norotate" + os.linesep)
         gnuplotFile.write("set border 3" + os.linesep)
         gnuplotFile.write("set xrange [" + timeRange +"];" + os.linesep)
-        gnuplotFile.write("plot " + string.join(plotArguments, ",") + os.linesep)
+        plotArguments = self.getPlotArguments()
+        plotCommand = "plot "
+        for plotArgument in plotArguments:
+            gnuplotFile.write(plotCommand + plotArgument + os.linesep)
+            plotCommand = "replot "
         gnuplotFile.write("quit" + os.linesep)
         gnuplotFile.close()
         commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName

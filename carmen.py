@@ -416,7 +416,9 @@ class CompileRules(plugins.Action):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         # Hack to work around crc_compile bug which fails if ":" in directory
         os.chdir(test.abspath)
-        self.diag.info("Compiling with command '" + commandLine + "'")
+        # Hack to work around AMD automounter which creates weird temporary path
+        os.environ["PWD"] = test.abspath
+        self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.environ["PWD"])
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
         test.changeState(test.NEED_PREPROCESS, "Compiling ruleset " + self.getRuleSetName(test))
         return self.ruleRunner.runCommand(test, fullCommand, self.jobNameCreator.getName)

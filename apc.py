@@ -476,7 +476,7 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         os.symlink(sourceName, targetName)
         viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
         file = open(viewLogScript, "w")
-        logFileName = os.path.join(apcTmpDir, "apc_log")
+        logFileName = os.path.join(apcTmpDir, "apclog")
         file.write("xon " + unixConfig.hostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
         file.close()
     def performParallelAction(self, test, processInfo):

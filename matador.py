@@ -245,6 +245,30 @@ class ImportTest(optimization.ImportTest):
         else:
             self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
 
+class ImportTestCase(optimization.ImportTestCase):
+    def getOptions(self):
+        return "-s " + self.getSubplanName()
+
+class ImportTestSuite(optimization.ImportTestSuite):
+    def hasStaticLinkage(self, carmUsr):
+        resourceFile = os.path.join(carmUsr, "Resources", "CarmResources", "Customer.etab")
+        if not os.path.isfile(resourceFile):
+            return 0
+        for line in open(resourceFile).xreadlines():
+            if line.find("UseStaticLinking") != -1 and line.find("matador") != -1:
+                parts = plugins.commasplit(line.strip())
+                if parts[4].find("true") != -1:
+                    return 1
+        return 0
+    def getCarmtmpPath(self, carmtmp, version=""):
+        rootDir = "/carm/proj/matador/"
+        if version == "":
+            return os.path.join(rootDir, "master", carmtmp)
+        elif version == "10":
+            return os.path.join(rootDir, "carmen_10", "tmps_for_RD", "Matador", carmtmp)
+        elif version == "9":
+            return os.path.join(rootDir, "carmen_9.0_deliver", "tmps_for_Matador_9", carmtmp)
+
 class MigrateApcTest(plugins.Action):
     def __init__(self):
         self.ruleSetMap = {}

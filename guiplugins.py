@@ -207,7 +207,7 @@ class ImportTestCase(ImportTest):
             suite.app.setConfigDefault("use_standard_input", not self.appIsGUI())
             if self.appIsGUI():
                 self.switches["editsc"] = Switch("Change user abilities (edit GUI script)")
-            if suite.app.getConfigValue("use_standard_input"):
+            if suite.app.getConfigValue("use_standard_input") != "0":
                 self.switches["editin"] = Switch("Create standard input file", not self.appIsGUI())
             self.switches["editlog"] = Switch("Change system behaviour (edit log file)")
     def testType(self):
@@ -240,13 +240,17 @@ class ImportTestCase(ImportTest):
     def recordStandardResult(self, test):
         print "Running test", test, "to get standard behaviour..."
         progName = sys.argv[0]
-        stdout = os.popen("python " + progName + " -a " + test.app.name + " -o -t " + test.name)
+        commandLine = "python " + progName + " -a " + test.app.name + " -o -t " + test.name + " -ts " + self.test.name \
+                      + self.getStdResultOptions()
+        stdout = os.popen(commandLine)
         for line in stdout.readlines():
             sys.stdout.write("> " + line)
         if self.switches["editlog"].getValue():
             test.app.setConfigDefault("log_file", "output")
             logFile = test.makeFileName(test.app.getConfigValue("log_file"))
             self.viewFile(logFile, wait=1)
+    def getStdResultOptions(self):
+        return ""
     def writeOptionFile(self, suite, testDir):
         optionString = self.getOptions()
         print "Using option string :", optionString
@@ -277,21 +281,23 @@ class ImportTestSuite(ImportTest):
     def __init__(self, suite):
         ImportTest.__init__(self, suite)
         if self.canPerformOnTest():
-            self.switches["env"] = Switch("Add environment file")
+            self.addEnvironmentFileOptions()
     def testType(self):
         return "Suite"
     def createTestContents(self, suite, testDir):
         self.writeTestcasesFile(suite, testDir)
-        if self.switches["env"].getValue():
-            self.writeEnvironmentFile(suite, testDir)
+        self.writeEnvironmentFiles(suite, testDir)
     def writeTestcasesFile(self, suite, testDir):
         testCasesFile = os.path.join(testDir, "testsuite." + suite.app.name)        
         file = open(testCasesFile, "w")
         file.write("# Ordered list of tests in test suite. Add as appropriate" + os.linesep + os.linesep)
-    def writeEnvironmentFile(self, suite, testDir):
-        envFile = os.path.join(testDir, "environment")
-        file = open(envFile, "w")
-        file.write("# Dictionary of environment to variables to set in test suite" + os.linesep)
+    def addEnvironmentFileOptions(self):
+        self.switches["env"] = Switch("Add environment file")
+    def writeEnvironmentFiles(self, suite, testDir):
+        if self.switches["env"].getValue():
+            envFile = os.path.join(testDir, "environment")
+            file = open(envFile, "w")
+            file.write("# Dictionary of environment to variables to set in test suite" + os.linesep)
 
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:

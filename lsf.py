@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, time, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types, predict
+import os, time, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types, predict, guiplugins
 
 # Text only relevant to using the LSF configuration directly
 helpDescription = """
@@ -371,3 +371,6 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
         return jobs
 
 
+class ImportTestCase(guiplugins.ImportTestCase):
+    def getStdResultOptions(self):
+        return " -perf"

@@ -976,6 +976,52 @@ class ImportTest(plugins.Action):
     def testForImportTestCase(self, testInfo):
         return 0
 
+# Graphical import test
+class ImportTestCase(lsf.ImportTestCase):
+    def addOptionsFileOption(self):
+        self.options["sp"] = guiplugins.TextOption("Subplan name")
+    def getSubplanName(self):
+        return self.options["sp"].getValue()
+    def getOptions(self):
+        pass
+    # getOptions implemented in subclasses
+
+# Graphical import suite
+class ImportTestSuite(guiplugins.ImportTestSuite):
+    def addEnvironmentFileOptions(self):
+        self.options["usr"] = guiplugins.TextOption("CARMUSR")
+    def getCarmusr(self):
+        return self.options["usr"].getValue()
+    def hasStaticLinkage(self):
+        return 1
+    def openFile(self, fileName):
+        print "Writing file", os.path.basename(fileName)
+        return open(fileName, "w")
+    def writeLine(self, file, line):
+        file.write(line + os.linesep)
+        print line
+    def writeEnvironmentFiles(self, suite, testDir):
+        carmUsr = self.getCarmusr()
+        envFile = os.path.join(testDir, "environment")
+        file = self.openFile(envFile)
+        self.writeLine(file, "CARMUSR:" + carmUsr)
+        carmtmp = os.path.basename(carmUsr).replace("_user", "_tmp")
+        if self.hasStaticLinkage(carmUsr):
+            self.writeLine(file, "CARMTMP:$CARMSYS/" + carmtmp)
+            return
+
+        self.writeLine(file, "CARMTMP:" + self.getCarmtmpPath(carmtmp))
+        self.writeVersionFile(testDir, "10", carmtmp)
+        self.writeVersionFile(testDir, "9", carmtmp)
+    def writeVersionFile(self, testDir, version, carmtmp):
+        envFile = os.path.join(testDir, "environment" + "." + version)
+        file = self.openFile(envFile)
+        carmtmpLine = "CARMTMP:" + self.getCarmtmpPath(carmtmp, version)
+        self.writeLine(file, carmtmpLine)
+    def getCarmtmpPath(self, carmtmp, version=""):
+        pass
+    # getCarmtmpPath implemented by subclasses
+        
 class TraverseSubPlans(plugins.Action):
     def __init__(self, args = []):
         self.Command = string.join(args)

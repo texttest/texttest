@@ -336,10 +336,10 @@ class MakeResourceFiles(plugins.Action):
             for line in file.readlines():
                 if line.find("user") != -1:
                     cpuTime = line.strip().split()[-1]
-                    resourceDict["CPU time"] = "CPU time   : " + string.rjust(cpuTime, 9) + " sec."
+                    resourceDict["CPU time"] = "CPU time   : " + self.parseUnixTime(cpuTime) + " sec."
                 if line.find("real") != -1:
                     realTime = line.strip().split()[-1]
-                    resourceDict["Real time"] = "Real time  : " + string.rjust(realTime, 9) + " sec." + os.linesep
+                    resourceDict["Real time"] = "Real time  : " + self.parseUnixTime(realTime) + " sec." + os.linesep
             os.remove(tmpFile)
 
         # remove the command-file created before submitting the command
@@ -355,7 +355,13 @@ class MakeResourceFiles(plugins.Action):
             self.writePerformanceFile(test, resourceDict[textList[2]], resourceDict[textList[3][0]], resourceDict[textList[4]], test.makeFileName("performance", temporary=1))
         if self.checkMemory:
             self.writeMemoryFile(resourceDict[textList[0]], resourceDict[textList[1]], test.makeFileName("memory", temporary=1))
-#private
+    def parseUnixTime(self, timeVal):
+        if timeVal.find(":") == -1:
+            return string.rjust(timeVal, 9)
+
+        parts = timeVal.split(":")
+        floatVal = 60 * float(parts[0]) + float(parts[1])
+        return string.rjust(str(floatVal), 9)
     def makeResourceDict(self, tmpFile, textList):
         resourceDict = {}
         file = open(tmpFile)

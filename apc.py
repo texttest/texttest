@@ -276,7 +276,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         optimization.MakeProgressReport.__del__(self)
         if len(self.weightKPI) > 1:
             # The weighted KPI is prodsum(KPIx * Tx / Tmin) ^ (1 / sum(Tx/Tmin))
-            # Tx is the average of the 'total time' for a specific test case, ie
+            # Tx is the kpi time limit for a specific test case's kpi group.
+            # If no such time limit is set then the average total time of the testcase is used, ie
             # Tx = (curTotalTime + refTotalTime) / 2
             #
             sumKPI = 1.0
@@ -352,6 +353,10 @@ class MakeProgressReport(optimization.MakeProgressReport):
         self.sumCurTime += currentRun.timeToCost(worstCost)
         self.sumRefTime += referenceRun.timeToCost(worstCost)
         self.lastKPITime = (currentRun.getPerformance() + referenceRun.getPerformance()) / 2.0
+        if self.kpiGroupForTest.has_key(test.name):
+            groupName = self.kpiGroupForTest[test.name]
+            if self.groupTimeLimit.has_key(groupName):
+                self.lastKPITime = self.groupTimeLimit[groupName]
         return worstCost
     def _kpiCalculateWorstCost(self, test, referenceRun, currentRun):
         if self.kpiGroupForTest.has_key(test.name):

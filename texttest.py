@@ -174,6 +174,20 @@ class TestSuite(Test):
             testcase.performAction(action)
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
+    def reFilter(self, filters):
+        testCaseList = []
+        debugLog.debug("Refilter for " + self.name)
+        for test in self.testcases:
+            debugLog.debug("Refilter check of " + test.name + " for " + self.name)
+            if test.classId() == self.classId():
+                test.reFilter(filters)
+                testCaseList.append(test)
+            elif test.isAcceptedByAll(filters):
+                debugLog.debug("Refilter ok of " + test.name + " for " + self.name)
+                testCaseList.append(test)
+            else:
+                debugLog.debug("Refilter loose " + test.name + " for " + self.name)
+        self.testcases = testCaseList
 # private:
     def getTestCases(self, filters):
         testCaseList = []
@@ -585,7 +599,9 @@ class ApplicationRunner:
             app.printHelpText()
             self.valid = 0
         else:
-            self.testSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
+            tmpSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
+            tmpSuite.reFilter(self.filterList)
+            self.testSuite = tmpSuite
     def actionCount(self):
         return len(self.actionSequence)
     def performAction(self, actionNum):

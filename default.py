@@ -99,17 +99,25 @@ class Config(plugins.Configuration):
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):
         self.texts = filterText.split(",")
+        self.allTestCaseNames = []
     def containsText(self, test):
         for text in self.texts:
             if test.name.find(text) != -1:
-                return 1
+                if test.name == text or not text in self.allTestCaseNames:
+                    return 1
+                else:
+                    return 0
         return 0
     def equalsText(self, test):
         return test.name in self.texts
     
 class TestNameFilter(TextFilter):
     def acceptsTestCase(self, test):
-        return self.containsText(test)
+        if self.containsText(test):
+            if not test.name in self.allTestCaseNames:
+                self.allTestCaseNames.append(test.name)
+            return 1
+        return 0
     
 class FileFilter(TextFilter):
     def __init__(self, filterFile):

@@ -345,8 +345,8 @@ class OptimizationRun:
                 # Doesn't make sense to scale temporary files, as they probably aren't complete
                 if foundTmp:
                     scale = 0
-                else:
-                    self.logFile = logFinder.findSpecifiedFile(version, specFile)
+            else:
+                self.logFile = logFinder.findSpecifiedFile(version, specFile)
         self.diag.info("Reading data from " + self.logFile)
         self.penaltyFactor = 1.0
         allItems = definingItems + interestingItems

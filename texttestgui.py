@@ -33,6 +33,7 @@ class TextTestGUI:
         self.performanceColumn = 0
         self.itermap = seqdict()
         self.actionThread = None
+        self.topWindow = None
         self.rightWindowGUI = None
         self.contents = None
         self.workQueue = Queue()
@@ -43,7 +44,7 @@ class TextTestGUI:
             win.set_title("TextTest dynamic GUI (test runs)")
         else:
             win.set_title("TextTest static GUI (test management)")
-        scriptEngine.connect("quit", "delete_event", win, self.quit)
+        scriptEngine.connect("close window", "delete_event", win, self.exit)
         vbox = self.createWindowContents(testWins)
         win.add(vbox)
         win.show()
@@ -149,7 +150,7 @@ class TextTestGUI:
         return self.contents
     def createTestWindows(self):
         # Create some command buttons.
-        buttons = []
+        buttons = [("Quit", self.quit)]
         if self.dynamic:
             buttons.append(("Save All", self.saveAll))
         else:
@@ -198,7 +199,7 @@ class TextTestGUI:
         self.createIterMap()
         testWins = self.createTestWindows()
         self.createDefaultRightGUI()
-        topWindow = self.createTopWindow(testWins)
+        self.topWindow = self.createTopWindow(testWins)
         if self.dynamic:
             self.actionThread = ActionThread(actionRunner)
             self.actionThread.start()
@@ -259,12 +260,16 @@ class TextTestGUI:
         self.selection.get_tree_view().expand_all()
         scriptEngine.setSelection(self.selection, [ iter ])
         self.selection.get_tree_view().grab_focus()
-    def quit(self, *args):
+    def exit(self, *args):
         gtk.main_quit()
         sys.stdout.flush()
         self.killInteractiveProcesses()
         if self.actionThread:
             self.actionThread.terminate()
+    def quit(self, *args):
+        # Generate a window closedown, so that the quit button behaves the same as closing the window
+        self.topWindow.destroy()
+        self.exit()
     def killInteractiveProcesses(self):
         # Don't leak processes
         for process in guiplugins.InteractiveAction.processes:

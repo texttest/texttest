@@ -246,6 +246,9 @@ class StartStudio(plugins.Action):
 optimization.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
 optimization.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
 
+#
+# TODO: Check Sami's stuff in /users/sami/work/Matador/Doc/Progress
+#
 class MakeProgressReport(optimization.MakeProgressReport):
     def __init__(self, referenceVersion):
         optimization.MakeProgressReport.__init__(self, referenceVersion)

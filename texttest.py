@@ -468,14 +468,15 @@ class OptionFinder:
         dirName = self.directoryName()
         os.chdir(dirName)
         debugLog.info("Using test suite at " + dirName)
-        appList = self._findApps(dirName, 1)
+        raisedError, appList = self._findApps(dirName, 1)
         appList.sort()
         debugLog.info("Found applications : " + repr(appList))
-        if len(appList) == 0:
+        if len(appList) == 0 and not raisedError:
             print "Could not find any matching applications (files of the form config.<app>) under", dirName
         return appList
     def _findApps(self, dirName, recursive):
         appList = []
+        raisedError = 0
         selectedAppList = self.findSelectedAppNames()
         for f in os.listdir(dirName):
             pathname = os.path.join(dirName, f)
@@ -494,10 +495,13 @@ class OptionFinder:
                     raise sys.exc_type, sys.exc_value
                 except:
                     print "Could not use application", appName, "-", sys.exc_value
+                    raisedError = 1
             elif os.path.isdir(pathname) and recursive:
-                for app in self._findApps(pathname, 0):
+                subRaisedError, subApps = self._findApps(pathname, 0)
+                raisedError |= subRaisedError
+                for app in subApps:
                     appList.append(app)
-        return appList
+        return raisedError, appList
     def addApplications(self, appName, dirName, pathname, version):
         appList = []
         builtInOptions = "a:c:d:h:m:s:v:xp"

@@ -545,6 +545,12 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
             for jobLine in self.findRunningJobs(machine):
                 file.write(jobLine + os.linesep)
     def findRunningJobs(self, machine):
+        try:
+            return self._findRunningJobs(machine)
+        except IOError:
+            # If bjobs is interrupted, it shouldn't matter, try again
+            return self._findRunningJobs(machine)
+    def _findRunningJobs(self, machine):
         # On a multi-processor machine performance can be affected by jobs on other processors,
         # as for example a process can hog the memory bus. Allow subclasses to define how to
         # stop these "slowdown jobs" to avoid false performance failures. Even if they aren't defined

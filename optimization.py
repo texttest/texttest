@@ -322,7 +322,7 @@ class LogFileFinder:
         versionMod = ""
         if version:
             versionMod = "." + version
-        searchString = self.test.app.name + versionMod + self.test.getTestUser()
+        searchString = self.test.app.name + versionMod + self.test.app.getTestUser()
         for subDir in os.listdir(self.test.abspath):
             fullDir = os.path.join(self.test.abspath, subDir)
             if os.path.isdir(fullDir) and subDir.startswith(searchString):

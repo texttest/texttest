@@ -155,6 +155,7 @@ class TestCase(Test):
             self.options = os.path.expandvars(open(optionsFile).readline().strip())
         # List of directories where this test will write files. First is where it executes from
         self.writeDirs = []
+        self.writeDirs.append(os.path.join(app.writeDirectory, self.getRelPath()))
         # List of objects observing this test, to be notified when it changes state
         self.observers = []
     def __repr__(self):
@@ -169,7 +170,7 @@ class TestCase(Test):
         else:
             return self.abspath
     def callAction(self, action):
-        if len(self.writeDirs) > 0:
+        if os.path.isdir(self.writeDirs[0]):
             os.chdir(self.writeDirs[0])
         try:
             return action(self)
@@ -193,8 +194,6 @@ class TestCase(Test):
         return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
         return globalRunIdentifier
-    def getTestUser(self):
-        return tmpString()
     def isOutdated(self, filename):
         modTime = os.stat(filename)[stat.ST_MTIME]
         currTime = time.time()
@@ -209,10 +208,10 @@ class TestCase(Test):
         parent, current = os.path.split(startDir)
         return self.makePathName(fileName, parent)
     def makeBasicWriteDirectory(self):
-        writeDir = self.createDirs(os.path.join(self.app.writeDirectory, self.getRelPath()))
+        os.makedirs(self.writeDirs[0])
         for copyTestPath in self.app.getConfigList("copy_test_path"):
             fullPath = self.makePathName(copyTestPath, self.abspath)
-            target = os.path.join(writeDir, copyTestPath)
+            target = os.path.join(self.writeDirs[0], copyTestPath)
             if os.path.isfile(fullPath):
                 shutil.copy(fullPath, target)
             if os.path.isdir(fullPath):
@@ -412,6 +411,8 @@ class Application:
                 shutil.rmtree(os.path.join(rootDir, file))
     def getTmpIdentifier(self):
         return self.name + self.versionSuffix() + globalRunIdentifier
+    def getTestUser(self):
+        return tmpString()
     def hasREpattern(self, txt):
     	# return 1 if txt contains a regular expression meta character
 	return self.specialChars.search(txt) != None
@@ -419,6 +420,9 @@ class Application:
         # We can claim all environment files...
         if fileName.startswith("environment"):
             return 1
+        # And anything ending in cmp we don't want...
+        if fileName.endswith("cmp"):
+            return 0
         parts = fileName.split(".")
         if len(parts) == 1:
             return 0
@@ -499,6 +503,9 @@ class Application:
             newFileName = fileName + "cmp"
         else:
             newFileName = os.path.join(os.getcwd(), stem + "." + self.name + "origcmp")
+        # Don't recreate filtered files
+        if os.path.isfile(newFileName):
+            return newFileName
         
         oldFile = open(fileName)
         newFile = open(newFileName, "w")
@@ -560,6 +567,7 @@ class OptionFinder:
     def __init__(self):
         self.inputOptions = self.buildOptions()
         self._setUpLogging()
+        self.directoryName = self.findDirectoryName()
         debugLog.debug(repr(self.inputOptions))
     def _setUpLogging(self):
         global debugLog
@@ -604,7 +612,7 @@ class OptionFinder:
         else:
             return item[1:].strip()
     def findApps(self):
-        dirName = self.directoryName()
+        dirName = self.directoryName
         os.chdir(dirName)
         debugLog.info("Using test suite at " + dirName)
         raisedError, appList = self._findApps(dirName, 1)
@@ -714,13 +722,13 @@ class OptionFinder:
         if os.path.isfile(scriptFile):
             return os.path.join(os.getcwd(), scriptFile)
         else:
-            return os.path.join(self.directoryName(), scriptFile)
+            return os.path.join(self.directoryName, scriptFile)
     def _getDiagnosticFile(self):
         if os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
         else:
-            return os.path.join(self.directoryName(), "Diagnostics", "log4py.conf")
-    def directoryName(self):
+            return os.path.join(self.directoryName, "Diagnostics", "log4py.conf")
+    def findDirectoryName(self):
         if self.inputOptions.has_key("d"):
             return os.path.abspath(self.inputOptions["d"])
         elif os.environ.has_key("TEXTTEST_HOME"):

@@ -73,7 +73,10 @@ class Config(plugins.Configuration):
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
-        return MakeWriteDirectory();
+        if self.isReconnecting():
+            return plugins.Action()
+        else:
+            return MakeWriteDirectory();
     def tryGetTestRunner(self):
         if self.isReconnecting():
             return plugins.Action()
@@ -129,8 +132,7 @@ class Config(plugins.Configuration):
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
-        if len(test.writeDirs) < 1:
-            test.makeBasicWriteDirectory()
+        test.makeBasicWriteDirectory()
         os.chdir(test.writeDirs[0])
     def __repr__(self):
         return "Make write directory for"
@@ -305,76 +307,27 @@ class CountTest(plugins.Action):
         self.appCount[repr(app)] = 0
         
 class ReconnectTest(plugins.Action):
-    def __init__(self, fetchOption):
-        self.fetchDir = None
-        self.fetchUser = None
-        if len(fetchOption) > 0:
-            if fetchOption.find(":") != -1:
-                self.fetchDir, self.fetchUser = fetchOption.split(":")
-            else:
-                self.fetchDir = fetchOption
+    def __init__(self, fetchUser):
+        self.fetchUser = fetchUser
     def __repr__(self):
         return "Reconnect to"
-    def findTestDir(self, test):
-        configFile = "config." + test.app.name
-        testCaseDir = test.getRelPath()[1:]
-        parts = test.app.abspath.split(os.sep)
-        for ix in range(len(parts)):
-            if ix == 0:
-                findDir = self.fetchDir
-            else:
-                backIx = -1 * (ix + 1)
-                findDir = os.path.join(self.fetchDir, string.join(parts[backIx:], os.sep))
-            if os.path.isfile(os.path.join(findDir, configFile)):
-                return os.path.join(findDir, testCaseDir)
-        return None
-    def __call__(self, test):
-        translateUser = 0
-        if self.fetchDir == None or not os.path.isdir(self.fetchDir):
-            testDir = test.abspath
-        else:
-            testDir = self.findTestDir(test)
-        if testDir == None:
-            self.describe(test, "Failed!")
-            return
-        pattern = test.app.name + test.app.versionSuffix()
-        if self.fetchUser != None:
-            pattern += self.fetchUser
-        else:
-            pattern += test.getTestUser()
-        self.describe(test)
-        for subDir in os.listdir(testDir):
-            fullPath = os.path.join(testDir, subDir)
-            if os.path.isdir(fullPath) and subDir.startswith(pattern):
-                for file in os.listdir(fullPath):
-                    if not file.endswith("cmp"):
-                        fullFilePath = os.path.join(fullPath, file)
-                        if os.path.isfile(fullFilePath):
-                            shutil.copyfile(fullFilePath, os.path.join(os.getcwd(), file))
-                break
-    def setUpSuite(self, suite):
-        self.describe(suite)
-
-class CleanTmpFiles(plugins.Action):
-    def __init__(self):
-        self.numFiles = 0
-        self.regExps = []
-        self.regExps.append(re.compile("[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$"))
-        self.regExps.append(re.compile("[0-9][0-9]:[0-9][0-9]:[0-9][0-9]cmp$"))
-    def __del__(self):
-        if self.numFiles > 0:
-            print "Removed " + str(self.numFiles) + " file(s)"
-    def __repr__(self):
-        return "Cleaning tmp files"
-    def __call__(self, test):
-        curNumFiles = self.numFiles
-        for file in os.listdir(test.abspath):
-            for regExp in self.regExps:
-                if regExp.search(file):
-                    os.remove(file)
-                    self.numFiles += 1
-                    break
-        if self.numFiles > curNumFiles:
-            self.describe(test, " " + str(self.numFiles - curNumFiles) + " file(s)")
-    def setUpSuite(self, suite):
-        self.describe(suite)
+    def setUpApplication(self, app):
+        root, localDir = os.path.split(app.writeDirectory)
+        fetchDir = root
+        userId = app.getTestUser()
+        if self.fetchUser and self.hasUserDependentWriteDir(app, userId):
+            fetchDir = fetchDir.replace(userId, self.fetchUser)
+        userToFind = self.fetchUser
+        if not self.fetchUser:
+            userToFind = userId
+        patternToFind = app.name + app.versionSuffix() + userToFind
+        for subDir in os.listdir(fetchDir):
+            fullPath = os.path.join(fetchDir, subDir)
+            if os.path.isdir(fullPath) and subDir.startswith(patternToFind):
+                print "Reconnecting to test results in directory", fullPath
+                shutil.copytree(fullPath, app.writeDirectory)
+        if not os.path.isdir(app.writeDirectory):
+            raise plugins.TextTestError, "Could not find any runs matching " + patternToFind + " under " + fetchDir
+    def hasUserDependentWriteDir(self, app, userId):
+        origWriteDir = app.getConfigValue("write_tmp_files")
+        return origWriteDir.find(userId) != -1 or origWriteDir.find("~") != -1

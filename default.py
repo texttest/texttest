@@ -238,7 +238,7 @@ class CreateCatalogue(plugins.Action):
         fileName = test.makeFileName("catalogue", temporary=1)
         file = open(fileName, "w")
         for writeDir in test.writeDirs:
-            self.listDirectory(test.app, file, writeDir)
+            self.listDirectory(test.app, file, os.path.normpath(writeDir))
         file.close()
         if os.path.getsize(fileName) == 0:
             os.remove(fileName)
@@ -265,7 +265,7 @@ class CreateCatalogue(plugins.Action):
         return 1
     def getName(self, writeDir):
         currDir = os.getcwd()
-        if writeDir == currDir:
+        if os.path.samefile(writeDir, currDir):
             return "Test Directory"
         if writeDir.startswith(currDir):
             return "Test subdirectory " + writeDir.replace(currDir + os.sep, "")

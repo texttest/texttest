@@ -511,7 +511,7 @@ class ProcessProfilerResults(plugins.Action):
         return "Profiling"    
 
 class BuildCode(plugins.Action):
-    builtDirs = []
+    builtDirs = {}
     def __init__(self, target, remote = 1):
         self.target = target
         self.remote = remote
@@ -520,17 +520,20 @@ class BuildCode(plugins.Action):
         targetDir = app.getConfigValue("build_targets")
         if not targetDir.has_key(self.target):
             return
+        arch = getArchitecture(app)
+        if not self.builtDirs.has_key(arch):
+            self.builtDirs[arch] = []
         for relPath in targetDir[self.target]:
             absPath = app.makeAbsPath(relPath)
-            if absPath in self.builtDirs:
-                print "Already built under", absPath, "- skipping build"
+            if absPath in self.builtDirs[arch]:
+                print "Already built on", arch, "under", absPath, "- skipping build"
                 return
-            self.builtDirs.append(absPath)
+            self.builtDirs[arch].append(absPath)
             if os.path.isdir(absPath):
                 self.buildLocal(absPath, app)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
-        if getArchitecture(app) == "i386_linux" and self.remote:
+        if arch == "i386_linux" and self.remote:
             self.buildRemote("sparc", app) 
             self.buildRemote("parisc_2_0", app)
             self.buildRemote("powerpc", app)

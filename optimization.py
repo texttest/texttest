@@ -13,6 +13,8 @@ class OptimizationConfig(carmen.CarmenConfig):
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def getRuleBuilder(self, neededOnly):
+        if self.isReconnecting():
+            return plugins.Action()
         if self.isNightJob() or not neededOnly:
             return self.getCompileRules(None)
         else:
@@ -31,6 +33,8 @@ class ExtractSubPlanFile(plugins.Action):
     def __repr__(self):
         return "Extracting subplan file " + self.sourceName + " to " + self.targetName + " on"
     def __call__(self, test):
+        if self.config.isReconnecting():
+            return
         sourcePath = self.config.getSubPlanFileName(test, self.sourceName)
         targetFile = test.getTmpFileName(self.targetName, "w")
         if os.path.isfile(sourcePath):

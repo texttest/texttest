@@ -64,8 +64,12 @@ class LSFConfig(unixConfig.UNIXConfig):
         filters = unixConfig.UNIXConfig.getFilterList(self)
         self.addFilter(filters, "r", performance.TimeFilter)
         return filters
+    def useLSF(self):
+        if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l"):
+            return 0
+        return 1
     def getTestRunner(self):
-        if self.optionMap.has_key("l"):
+        if not self.useLSF():
             return default.Config.getTestRunner(self)
         else:
             return SubmitTest(self.findLSFQueue, self.optionValue("R"))
@@ -73,7 +77,7 @@ class LSFConfig(unixConfig.UNIXConfig):
     def findLSFQueue(self, test):
         return "normal"
     def getTestCollator(self):
-        if self.optionMap.has_key("l"):
+        if not self.useLSF():
             return default.Config.getTestCollator(self)
         else:
             return plugins.CompositeAction([ Wait(), MakeResourceFiles(self.checkPerformance(), self.checkMemory()) ])

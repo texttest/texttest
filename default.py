@@ -15,12 +15,16 @@ helpOptions = """
 -o         - run in overwrite mode. This means that the interactive dialogue is replaced by simply
              overwriting all previous results with new ones.
 
+-reconnect <fetchdir:user>
+            - Reconnect to already run tests, optionally takes a directory and user from which to
+              fetch temporary files.
+
 -t <text>  - only run tests whose names contain <text> as a substring
 
 -f <file>  - only run tests whose names appear in the file <file>
 """
 
-import os, plugins, respond, comparetest, string
+import os, re, shutil, plugins, respond, comparetest, string
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -39,8 +43,13 @@ class Config(plugins.Configuration):
         self.addFilter(filters, "t", TestNameFilter)
         self.addFilter(filters, "f", FileFilter)
         return filters
+    def isReconnecting(self):
+        return self.optionMap.has_key("reconnect")
     def getTestRunner(self):
-        return RunTest()
+        if self.isReconnecting():
+            return ReconnectTest(self.optionValue("reconnect"))
+        else:
+            return RunTest()
     def getTestEvaluator(self):
         subParts = [ self.getTestCollator(), self.getTestComparator(), self.getTestResponder() ]
         return plugins.CompositeAction(subParts)
@@ -118,5 +127,88 @@ class RunTest(plugins.Action):
             pass # Wait doesn't exist on Windows, but seems necessary on UNIX
     def getExecuteCommand(self, test):
         return test.getExecuteCommand()
+    def setUpSuite(self, suite):
+        self.describe(suite)
+
+class ReconnectTest(plugins.Action):
+    def __init__(self, fetchOption):
+        self.fetchDir = None
+        self.fetchUser = None
+        if len(fetchOption) > 0:
+            if fetchOption.find(":") != -1:
+                parts = fetchOption.split(":")
+                self.fetchDir = parts[0]
+                self.fetchUser = parts[1]
+            else:
+                self.fetchDir = fetchOption
+    def __repr__(self):
+        return "Reconnect to"
+    def findTestDir(self, test):
+        configFile = "config." + test.app.name
+        testCaseDir = test.abspath.replace(test.app.abspath + os.sep, "")
+        parts = test.app.abspath.split(os.sep)
+        for ix in range(len(parts)):
+            if ix == 0:
+                findDir = self.fetchDir
+            else:
+                backIx = -1 * (ix + 1)
+                findDir = os.path.join(self.fetchDir, string.join(parts[backIx:], os.sep))
+            if os.path.isfile(os.path.join(findDir, configFile)):
+                return os.path.join(findDir, testCaseDir)
+        return None
+    def newResult(self, test, file):
+        if file.find("." + test.app.name) == -1:
+            return 0
+        stem = file.split(".")[0]
+        pathStandardFile = test.makeFileName(stem)
+        if pathStandardFile.split(os.sep)[-1] != file:
+            return 0
+        if os.path.isfile(pathStandardFile):
+            return 0
+        return 1
+    def __call__(self, test):
+        translateUser = 0
+        okFlag = 1
+        if self.fetchDir == None or not os.path.isdir(self.fetchDir):
+            testDir = test.abspath
+        else:
+            testDir = self.findTestDir(test)
+        if testDir == None:
+            self.describe(test, "Failed!")
+            return
+        pattern = "." + test.app.name
+        if self.fetchUser != None:
+            pattern += self.fetchUser
+            translateUser = 1
+        else:
+            pattern += test.getTestUser()
+        rexp = re.compile(pattern + "[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$")
+        stemsFound = []
+        multiStems = []
+        for file in os.listdir(testDir):
+            if rexp.search(file, 1) or self.newResult(test, file):
+                srcFile = os.path.join(testDir, file)
+                stem = file.split(".")[0]
+                targetFile = stem + "." + test.app.name + test.getTmpExtension()
+                if stem in stemsFound:
+                    okFlag = 0
+                    if not stem in multiStems:
+                        multiStems.append(stem)
+                    try:
+                        os.remove(os.path.join(test.abspath, targetFile))
+                    except:
+                        pass
+                else:
+                    if translateUser == 1:
+                        targetFile = test.getTmpFileName(stem, "w")
+                    targetFile = os.path.join(test.abspath, targetFile)
+                    if srcFile != targetFile:
+                        shutil.copyfile(srcFile, targetFile)
+                stemsFound.append(stem)
+        if okFlag:
+            self.describe(test)
+        else:
+            self.describe(test, ", failed for multiple: " + string.join(multiStems, ",") + " files")
+
     def setUpSuite(self, suite):
         self.describe(suite)

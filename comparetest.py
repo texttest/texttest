@@ -148,7 +148,7 @@ class TestComparison:
         if comparison.newResult() or comparison.hasDifferences():
             return comparison
         if self.overwriteOnSuccess:
-            plugins.movefile(tmpFile, standardFile)
+            comparison.overwrite(1, test.app.getFullVersion(forSave=1))
         return None
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         return FileComparison(test, standardFile, tmpFile, makeNew)

@@ -520,6 +520,13 @@ class ExtractApcLogs(plugins.Action):
         # Extract from the apclog
         cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + test.makeFileName(saveName, temporary = 1)
         os.system(cmdLine)
+        # Extract mpatrol files, if they are present.
+        if os.path.isfile(os.path.join(apcTmpDir, "mpatrol.out")):
+            cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.out" + " > " + test.makeFileName("mpatrol_out", temporary = 1)
+            os.system(cmdLine)
+        if os.path.isfile(os.path.join(apcTmpDir, "mpatrol.log")):
+            cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.log" + " > " + test.makeFileName("mpatrol_log", temporary = 1)
+        os.system(cmdLine)
         # Remove dir
         plugins.rmtree(apcTmpDir)
         # Remove the error file (which is create because we are keeping the logfiles,
@@ -751,7 +758,12 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
     def buildOptions(self, path, ruleSet):
         subPlan = path
         statusFile = path + os.sep + "run_status"
-        ruleSetPath = "${CARMTMP}" + os.sep + os.path.join("crc", "rule_set", "APC", "PUTS_ARCH_HERE")
+        application = self.suite.app.name
+        if application == "cs":
+            application = "FANDANGO"
+        else:
+            application = "APC"
+        ruleSetPath = "${CARMTMP}" + os.sep + os.path.join("crc", "rule_set", application, "PUTS_ARCH_HERE")
         ruleSetFile = ruleSetPath + os.sep + ruleSet
         return subPlan + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
 

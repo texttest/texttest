@@ -690,7 +690,7 @@ class UpdatePerformance(plugins.Action):
             performanceFile = self.getPerformanceFile(test, version)
             if statusFile == None or performanceFile == None:
                 return
-            lastTime = self.getLastTime(statusFile)
+            lastTime = self.getLastTime(test, version, statusFile)
             runHost = self.getExecHost(statusFile)
             totPerf = int(performance.getPerformance(performanceFile))
             verText = " (master)"
@@ -716,10 +716,10 @@ class UpdatePerformance(plugins.Action):
     def getExecHost(self, file):
         hostLine = os.popen("grep achine " + file + " | tail -1").readline().strip()
         return hostLine.split(":")[1].strip()
-    def getLastTime(self, file):
-        optCalc = optimization.OptimizationValueCalculator( [ optimization.timeEntryName ], file)
-        times = optCalc.getValues(optimization.timeEntryName)
-        return int(times[-1] * 60.0)
+    def getLastTime(self, test, version, file):
+        optRun = optimization.OptimizationRun(test, version, [ optimization.timeEntryName ], [], 0)
+        times = optRun.solutions[-1][optimization.timeEntryName]
+        return int(times * 60.0)
     def getStatusFile(self, test, version):
         currentFile = test.makeFileName(self.statusFileName, version)
         if not os.path.isfile(currentFile):

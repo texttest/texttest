@@ -345,17 +345,6 @@ class LSFJob:
         return self.isSubmitted() and not self.hasFinished()
     def kill(self):
         os.system("bkill " + self.jobId + " > /dev/null 2>&1")
-    def getProcessId(self, app):
-        for line in os.popen("bjobs -l " + self.jobId).xreadlines():
-            pos = line.find("PIDs")
-            if pos != -1:
-                pids = line[pos + 6:].strip().split(' ')
-                if len(pids) >= 4:
-                    return pids[-1]
-                # Try to figure out the PID, without having to wait for LSF.
-                if len(pids) == 1:
-                    return self.getProcessIdWithoutLSF(pids[0], app)
-        return []
     
 class SubmitTest(plugins.Action):
     def __init__(self, queueFunction, resourceFunction, machineFunction, optionMap):

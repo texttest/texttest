@@ -22,7 +22,11 @@ helpOptions = """
             - Reconnect to already run tests, optionally takes a directory and user from which to
               fetch temporary files.
 
--t <text>  - only run tests whose names contain <text> as a substring
+-t <text>  - only run tests whose names contain <text> as a substring. Note that <text> may be a comma-separated
+             list
+
+-ts <text> - only run test suites whose full relative paths contain <text> as a substring. As above this may be
+             a comma-separated list.
 
 -f <file>  - only run tests whose names appear in the file <file>
 """
@@ -49,6 +53,7 @@ class Config(plugins.Configuration):
     def getFilterList(self):
         filters = []
         self.addFilter(filters, "t", TestNameFilter)
+        self.addFilter(filters, "ts", TestSuiteFilter)
         self.addFilter(filters, "f", FileFilter)
         return filters
     def isReconnecting(self):
@@ -159,7 +164,17 @@ class TestNameFilter(TextFilter):
                 self.allTestCaseNames.append(test.name)
             return 1
         return 0
-    
+
+class TestSuiteFilter(TextFilter):
+    def acceptsTestCase(self, test):
+        pathComponents = test.getRelPath().split(os.sep)
+        for path in pathComponents:
+            if len(path) and path != test.name:
+                for text in self.texts:
+                    if path.find(text) != -1:
+                        return 1
+        return 0
+
 class FileFilter(TextFilter):
     def __init__(self, filterFile):
         self.texts = map(string.strip, open(filterFile).readlines())

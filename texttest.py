@@ -258,7 +258,7 @@ class TestSuite(Test):
             testPath = os.path.join(self.abspath, testName)
             testSuite = TestSuite(testName, testPath, self.app, filters)
             if testSuite.isValid():
-                if not testSuite.rejected:
+                if not testSuite.rejected and testSuite.size() > 0:
                     testCaseList.append(testSuite)
             else:
                 testCase = TestCase(testName, testPath, self.app)

@@ -43,7 +43,7 @@ default.ExtractStandardPerformance     - update the standard performance files f
 """
 
 import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, knownbugs
-from glob import glob
+import glob
 from cPickle import Unpickler
 
 def getConfig(optionMap):
@@ -257,10 +257,45 @@ class CollateFiles(plugins.Action):
         self.diag = plugins.getDiagnostics("Collate Files")
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
+    def expandCollations(self, test, coll):
+	newColl = {}
+	# copy items specified without "*" in targetStem
+	self.diag.info("coll initial:", str(coll))
+        for targetStem, sourcePattern in coll.items():
+	    if not glob.has_magic(targetStem):
+	    	newColl[targetStem] = sourcePattern
+	# add files generated from items in targetStem containing "*"
+        for targetStem, sourcePattern in coll.items():
+	    if not glob.has_magic(targetStem):
+		continue
+
+	    # generate a list of filenames from previously saved files
+            targetPtn = test.makeFileName(targetStem)
+	    self.diag.info("targetPtn: " + targetPtn)
+	    fileList = map(os.path.basename,glob.glob(targetPtn))
+
+	    # generate a list of filenames for generated files
+            sourcePtn = test.makeFileName(sourcePattern, temporary=1)
+	    # restore suffix (makeFileName automatically adds application name)
+	    sourcePtn = os.path.splitext(sourcePtn)[0] + \
+				os.path.splitext(sourcePattern)[1]
+	    self.diag.info("sourcePtn: " + sourcePtn)
+	    fileList.extend(map(os.path.basename,glob.glob(sourcePtn)))
+	    fileList.sort()
+
+	    # add each file to newColl using suffix from sourcePtn
+	    for aFile in fileList:
+		self.diag.info("aFile: " + aFile)
+	    	plain = os.path.splitext(aFile)[0]
+	    	if not plain in newColl:
+		    ext = os.path.splitext(sourcePtn)[1]
+		    newColl[plain] = plain + ext
+	self.diag.info("coll final:", str(newColl))
+	return newColl
     def __call__(self, test):
         if test.state.isComplete():
             return
-
+	self.collations = self.expandCollations(test, self.collations)
         errorWrites = []
         for targetStem, sourcePattern in self.collations.items():
             targetFile = test.makeFileName(targetStem, temporary=1)
@@ -289,7 +324,7 @@ class CollateFiles(plugins.Action):
         for writeDir in test.writeDirs:
             self.diag.info("Looking for pattern " + sourcePattern + " in " + writeDir)
             pattern = os.path.join(writeDir, sourcePattern)
-            paths = glob(pattern)
+            paths = glob.glob(pattern)
             if len(paths):
                 return paths[0]
     def transformToText(self, path, test):

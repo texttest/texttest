@@ -81,7 +81,6 @@ class MakeComparisons(comparetest.MakeComparisons):
         if self.execHost != None:
             cmpFlag = self.execHost in test.app.getConfigList("performance_test_machine")
         if cmpFlag == 0:
-            print "Removing: ", tmpFile
             os.remove(tmpFile)
         return cmpFlag
     def makeTestComparison(self, test):

@@ -341,13 +341,15 @@ class MigrateApcTest(plugins.Action):
             mapToWrite[key] = value
 
 class PrintRuleValue(plugins.Action):
+    def __init__(self, args = []):
+        self.variable = args[0]
     def __repr__(self):
         return "Printing rule values for"
     def __call__(self, test):
         rulesFile = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", getOption(test.options, "-s"), "APC_FILES", "rules")
         for line in open(rulesFile).xreadlines():
-            if line.find("use_random_dfs_method TRUE") != -1:
-                print test.getIndent() + "RANDOM DFS in " + repr(test)   
+            if line.find(self.variable + " TRUE") != -1:
+                print test.getIndent() + self.variable + " in " + repr(test)   
     def setUpSuite(self, suite):
         self.describe(suite)
 

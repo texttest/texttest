@@ -752,7 +752,7 @@ class MultiEntryDictionary:
             for line in configFile.readlines():
                 if line[0] == '#' or not ':' in line:
                     continue
-                self.addLine(line[:-1])
+                self.addLine(line.strip())
         self.updateFor(filename, appName)
         for version in versions:
             self.updateFor(filename, version)

@@ -267,6 +267,7 @@ class OptionFinder:
         return inputOptions
     def findApps(self):
         dirName = self.directoryName()
+        os.chdir(dirName)
         debugPrint("Using test suite at " + dirName)
         return self._findApps(dirName, 1)
     def _findApps(self, dirName, recursive):
@@ -307,6 +308,8 @@ class OptionFinder:
     def directoryName(self):
         if self.inputOptions.has_key("d"):
             return os.path.abspath(self.inputOptions["d"])
+        elif os.environ.has_key("TEXTTEST_HOME"):
+            return os.environ["TEXTTEST_HOME"]
         else:
             return os.getcwd()
     def checkoutName(self):

@@ -408,7 +408,7 @@ class OptimizationRun:
     def _timeToCostNoPenalty(self, targetCost):
         lastCost = 0
         lastTime = 0
-        for solution in self.solutions:
+        for solution in self.solutions[1:]:
             if solution[costEntryName] < targetCost:
                 costGap = lastCost - solution[costEntryName]
                 percent = float(lastCost - targetCost) / costGap

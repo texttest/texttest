@@ -38,14 +38,47 @@ def getPerformance(fileName):
 def getTestPerformance(test):
     return getPerformance(test.makeFileName("performance")) / 60
 
+def getPerformanceHost(fileName):
+    try:
+        parts = open(fileName).readline().split()
+        if parts[-2] == "on":
+            return parts[-1]
+    except:
+        pass
+    return None
+
+class PerformanceTestComparison(comparetest.TestComparison):
+    def __init__(self, test, comparisonMaker):
+        comparetest.TestComparison.__init__(self, test)
+        self.comparisonMaker = comparisonMaker
+    def __repr__(self):
+        if self.comparisonMaker.execHost == None:
+            return comparetest.TestComparison.__repr__(self)
+        return "FAILED on " + self.comparisonMaker.execHost
+
 # Does the same as the basic test comparison apart from when comparing the performance file
 class MakeComparisons(comparetest.MakeComparisons):
+    def __init__(self):
+        self.execHost = None
     def createFileComparison(self, test, standardFile, tmpFile):
         stem, ext = os.path.splitext(standardFile)
         if (stem == "performance"):
             return PerformanceFileComparison(test, standardFile, tmpFile)
         else:
             return comparetest.FileComparison(test, standardFile, tmpFile)
+    def shouldCompare(self, file, test, tmpExt, dirPath):
+        if not comparetest.MakeComparisons.shouldCompare(self, file, test, tmpExt, dirPath):
+            return 0
+        stem, ext = os.path.splitext(file)
+        if stem != "performance":
+            return 1
+        self.execHost = getPerformanceHost(os.path.join(dirPath, file))
+        if self.execHost != None:
+            return self.execHost in test.app.getConfigList("performance_test_machine")
+        else:
+            return 0
+    def makeTestComparison(self, test):
+        return PerformanceTestComparison(test, self)
 
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile):

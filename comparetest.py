@@ -18,39 +18,50 @@ import os, filecmp, string, plugins
 
 testComparisonMap = {}
 
+class TestComparison:
+    def __init__(self, test):
+        self.test = test
+        self.comparisons = []
+        self.attemptedComparisons = []
+    def __repr__(self):
+        return "FAILED"
+
 class MakeComparisons(plugins.Action):
     def __repr__(self):
-        return "Comparing differences for" 
+        return "Comparing differences for"
     def __call__(self, test):
-        comparisons = []
-        attemptedComparisons = []
+        testComparison = self.makeTestComparison(test)
         for tmpExt, subDir in self.fileFinders(test):
-            self.makeComparisons(test, tmpExt, subDir, comparisons, attemptedComparisons)
+            self.makeComparisons(test, tmpExt, subDir, testComparison)
         postText = ""
-        if len(comparisons) > 0:
-            testComparisonMap[test] = comparisons
+        if len(testComparison.comparisons) > 0:
+            testComparisonMap[test] = testComparison
         else:
             postText += " - SUCCESS!"
-        postText +=  " (on " + string.join(attemptedComparisons, ",") + ")"
+        postText +=  " (on " + string.join(testComparison.attemptedComparisons, ",") + ")"
         self.describe(test, postText)
+    def makeTestComparison(self, test):
+        return TestComparison(test)
     def fileFinders(self, test):
         defaultFinder = test.app.name + test.getTmpExtension(), ""
         return [ defaultFinder ]
-    def makeComparisons(self, test, tmpExt, subDirectory, comparisons, attemptedComparisons):
+    def makeComparisons(self, test, tmpExt, subDirectory, testComparison):
         dirPath = os.path.join(test.abspath, subDirectory)
         fileList = os.listdir(dirPath)
         fileList.sort()
         for file in fileList:
-            if file.endswith(tmpExt):
+            if self.shouldCompare(file, test, tmpExt, dirPath):
                 stem, ext = os.path.splitext(file)
                 standardFile = os.path.basename(test.makeFileName(stem))
                 comparison = self.makeComparison(test, os.path.join(subDirectory, standardFile), os.path.join(subDirectory, file))
-                attemptedComparisons.append(standardFile)
+                testComparison.attemptedComparisons.append(standardFile)
                 if comparison != None:
-                    comparisons.append(comparison)
+                    testComparison.comparisons.append(comparison)
     def setUpSuite(self, suite):
         self.describe(suite)
 #private:
+    def shouldCompare(self, file, test, tmpExt, dirPath):
+        return file.endswith(tmpExt)
     def makeComparison(self, test, standardFile, tmpFile):
         comparison = self.createFileComparison(test, standardFile, tmpFile)
         if os.path.exists(standardFile):

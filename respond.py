@@ -20,9 +20,9 @@ class Responder(plugins.Action):
             self.handleCoreFile(test)
             os.remove("core")
         if comparetest.testComparisonMap.has_key(test):
-            comparisons = comparetest.testComparisonMap[test]
-            print test.getIndent() + repr(test), self, "differences in", self.comparisonsString(comparisons)
-            self.handleFailure(test, comparisons)
+            testComparison = comparetest.testComparisonMap[test]
+            print test.getIndent() + repr(test), repr(testComparison), ": differences in " + self.comparisonsString(testComparison.comparisons)
+            self.handleFailure(test, testComparison)
             del comparetest.testComparisonMap[test]
         else:
             self.handleSuccess(test)
@@ -31,15 +31,14 @@ class Responder(plugins.Action):
     def comparisonsString(self, comparisons):
         return string.join([repr(x) for x in comparisons], ",")
 
+
 # Uses the python ndiff library, which should work anywhere. Override display method to use other things
 class InteractiveResponder(Responder):
-    def __repr__(self):
-        return "FAILED :"
-    def handleFailure(self, test, comparisons):
-        performView = self.askUser(test, comparisons, 1)
+    def handleFailure(self, test, testComparison):
+        performView = self.askUser(test, testComparison.comparisons, 1)
         if performView:
-            self.displayComparisons(comparisons, sys.stdout, test.app)
-            self.askUser(test, comparisons, 0)
+            self.displayComparisons(testComparison.comparisons, sys.stdout, test.app)
+            self.askUser(test, testComparison.comparisons, 0)
     def displayComparisons(self, comparisons, displayStream, app):
         for comparison in comparisons:
             displayStream.write("------------------ Differences in " + repr(comparison) + " --------------------\n")
@@ -106,6 +105,6 @@ class OverwriteOnFailures(Responder):
         self.version = version
     def __repr__(self):
         return "- overwriting"
-    def handleFailure(self, test, comparisons):
-        for comparison in comparisons:
+    def handleFailure(self, test, testComparison):
+        for comparison in testComparison.comparisons:
             comparison.overwrite(self.version)

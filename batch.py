@@ -87,8 +87,6 @@ killedTests = []
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):
-    def __repr__(self):
-        return "Batch mode response to"
     def __init__(self, lineCount, sessionName):
         self.sessionName = sessionName
         self.failureDetail = {}
@@ -134,18 +132,18 @@ class BatchResponder(respond.Responder):
     def handleSuccess(self, test):
         category = self.findSuccessCategory(test)
         self.categories[category].addTest(test)
-    def handleFailure(self, test, comparisons):
-        category = self.findFailureCategory(test, comparisons)
+    def handleFailure(self, test, testComparison):
+        category = self.findFailureCategory(test, testComparison)
         self.categories[category].addTest(test)
-    def findFailureCategory(self, test, comparisons):
+    def findFailureCategory(self, test, testComparison):
         successCategory = self.findSuccessCategory(test)
         if successCategory != "success":
             return successCategory
         # Don't provide failure information on crashes and unfinished tests, it's confusing...
-        self.failureDetail[test] = comparisons
-        if len(comparisons) > 1:
+        self.failureDetail[test] = testComparison
+        if len(testComparison.comparisons) > 1:
             return "difference"
-        return comparisons[0].getType()
+        return testComparison.comparisons[0].getType()
     def findSuccessCategory(self, test):
         if test in killedTests:
             return "unfinished"
@@ -190,11 +188,11 @@ class BatchResponder(respond.Responder):
             mailFile.write(stackTrace)
     def writeFailureDetail(self, mailFile):
         mailFile.write(os.linesep + "Failure information for the tests that failed follows..." + os.linesep)
-        for test, comparisons in self.failureDetail.items():
+        for test, testComparison in self.failureDetail.items():
             mailFile.write("--------------------------------------------------------" + os.linesep)
-            mailFile.write("TEST FAILED -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
+            mailFile.write("TEST " + repr(testComparison) + " -> " + repr(test) + "(under " + test.getRelPath() + ")" + os.linesep)
             os.chdir(test.abspath)
-            self.responder.displayComparisons(comparisons, mailFile, self.mainSuite.app)
+            self.responder.displayComparisons(testComparison.comparisons, mailFile, self.mainSuite.app)
     def getCleanUpAction(self):
         return SendException(self) 
 

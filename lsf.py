@@ -217,10 +217,9 @@ class MakeResourceFiles(plugins.Action):
         return resourceDict
     def writePerformanceFile(self, test, cpuLine, executionLine, fileName):
         executionMachine = self.findExecutionMachine(executionLine)
-        if executionMachine in test.app.getConfigList("performance_test_machine"):
-            file = open(fileName, "w")
-            file.write(string.strip(cpuLine) + " on " + executionMachine + "\n")
-            file.close()
+        file = open(fileName, "w")
+        file.write(string.strip(cpuLine) + " on " + executionMachine + "\n")
+        file.close()
     def findExecutionMachine(self, line):
         start = string.find(line, "<")
         end = string.find(line, ">", start)

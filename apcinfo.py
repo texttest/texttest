@@ -1,4 +1,4 @@
-import plugins, os, re, string, math, exceptions, optimization, performance, time, texttest
+import plugins, os, re, string, math, exceptions, optimization, performance, time, texttest, copy
 
 try:
     import HTMLgen, barchart
@@ -245,6 +245,7 @@ class GenHTML(plugins.Action):
         self.hatedFcnsFile = self.htmlDir + os.sep + "hatedfcns.html"
         self.variationFile = self.htmlDir + os.sep + "variation.html"
         self.ruleFailureFile = self.htmlDir + os.sep + "rulefailures.html"
+        self.interParamsFile = self.htmlDir + os.sep + "deadheadparams.html"
         
     def setUpApplication(self, app):
         self.RCFile = app.abspath + os.sep + "apcinfo.rc"
@@ -258,6 +259,16 @@ class GenHTML(plugins.Action):
         self.interestingValues = ["Conn fixing time", "OC to DH time"]
         #self.tsValues = self.definingValues + self.interestingValues + ["Other time"]
         self.tsValues = [ "Network gen", "Generation", "Coordination", "DH post", "Conn fix", "OC->DH", "Other" ]
+        self.interestingParameters = [ "add_tight_deadheads_active_copies",
+                                       "add_tight_deadheads_other",
+                                       "add_all_passive_copies_of_active_flights",
+                                       "add_all_other_local_plan_deadheads",
+                                       "search_for_double_deadheads",
+                                       "optimize_deadhead_chains",
+                                       "use_ground_transport",
+                                       "use_long_haul_preprocess",
+                                       "search_oag_deadheads",
+                                       "allow_oag_deadheads"]
         self.timeSpentBC = BarChart(self.tsValues)
         
         # The global chart for relative times.
@@ -297,6 +308,15 @@ class GenHTML(plugins.Action):
         if os.path.isfile(ruleFailureIntroFileName):
             self.ruleFailureDoc.append_file(ruleFailureIntroFileName)
         self.ruleFailureDoc.append(self.ruleFailureChart)
+
+        # Table with interesting parameters
+        self.interParamsDoc = CarmenDocument(self.RCFile)
+        self.interParamsDoc.title = "Deadhead parameter settings"
+        self.interParamsTable = HTMLgen.Table()
+        self.interParamsTable.heading = copy.deepcopy(self.interestingParameters)
+        self.interParamsTable.heading.insert(0, "KPI group")
+        self.interParamsTable.body = []
+        self.interParamsDoc.append(HTMLgen.Small(self.interParamsTable))
         
         self.kpiGroupForTest = {}
         self.kpiGroups = []
@@ -356,6 +376,9 @@ class GenHTML(plugins.Action):
         # Write rule failure page
         self.ruleFailureDoc.write(self.ruleFailureFile)
 
+        # Write interesting parameters page
+        self.interParamsDoc.write(self.interParamsFile)
+
         # Write most hated page.
         hatedFcnsDoc = CarmenDocument(self.RCFile)
         hatedFcnsDoc.title = "The 10 most time consuming functions in APC"
@@ -392,6 +415,14 @@ class GenHTML(plugins.Action):
                 
                 ruleFailureAvg = suitePage["group"][groups]["rulecheckfailureavg"]/suitePage["group"][groups]["numtests"]
                 self.ruleFailureChart.datalist.load_tuple((linkToTest, 100*ruleFailureAvg))
+                # Insert interesting params into table.
+                row = [ linkToTest ]
+                for params in self.interestingParameters:
+                    if suitePage["group"][groups]["interestingParameters"].has_key(params):
+                        row.append(suitePage["group"][groups]["interestingParameters"][params])
+                    else:
+                        row.append("-")
+                self.interParamsTable.body.append(row)
             table = HTMLgen.Table()
             table.body = suitePage["group"][groups]["table"]
             table.heading = ["Test", "Cost", "Perf. (min)", "Mem (MB)", "Uncov", "Overcov", "Illegal", "Rule checks/failures", "Date"]
@@ -520,14 +551,18 @@ class GenHTML(plugins.Action):
 
 
         # Info from the 'rules' file
-        inter = { "apc_pac.num_col_gen_objective_components" : { 'val': None, 'text': "Cost components" },
-                  "apc_pac.num_col_gen_resource_components" : { 'val': None, 'text': "Resources components" }}
+        interestingParametersFound = {}
+        inter = { "num_col_gen_objective_components" : { 'val': None, 'text': "Cost components" },
+                  "num_col_gen_resource_components" : { 'val': None, 'text': "Resources components" }}
         ruleFile = os.path.join(subplanDir, "APC_FILES", "rules")
         if os.path.isfile(ruleFile):
             for line in open(ruleFile).xreadlines():
                 items = line.split()
-                if inter.has_key(items[0]):
-                    inter[items[0]]["val"] = items[1]
+                parameter = items[0].split(".")[-1]
+                if inter.has_key(parameter):
+                    inter[parameter]["val"] = items[1]
+                if self.interestingParameters.count(parameter) > 0:
+                    interestingParametersFound[parameter] = items[1]
 
             for item in inter.keys():
                 entry = inter[item]
@@ -537,6 +572,7 @@ class GenHTML(plugins.Action):
                     info.append(entry["text"] + ": 0 ")
 
         self.currentSuitePage["group"][group]["info"] = info
+        self.currentSuitePage["group"][group]["interestingParameters"] = interestingParametersFound
     
     def readKPIGroupFile(self, suite):
         self.kpiGroupForTest = {}
@@ -601,7 +637,7 @@ class GenHTML(plugins.Action):
             group = "common"
         # Create group if necessary.
         if not self.currentSuitePage["group"].has_key(group):
-            self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} , 'rulecheckfailureavg': 0 , 'numtests': 0}
+            self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} , 'rulecheckfailureavg': 0 , 'numtests': 0, 'interestingParameters': None}
             if not group == "common":
                 self.createGroupInfo(group, test)
 

@@ -62,3 +62,8 @@ class FleetSubPlanDirManager(optimization.SubPlanDirManager):
             else:
                 newFile.write(line)
         return binary
+    
+optimization.itemNamesInFile[optimization.costEntryName] = "Optimizer cost"
+# Reset matador values
+optimization.noIncreaseExceptMethods = {}
+optimization.noIncreaseExceptMethods[optimization.costEntryName] = []

@@ -28,11 +28,6 @@ apc.ImportTest             - Import new test cases and test users.
 
 apc.PrintAirport           - Prints the target AirportFile location for each user
 
-apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
-                             This is intended to be used on a single specified test and will terminate
-                             the testsuite after it starts Studio. It is a simple shortcut to set the
-                             correct CARMSYS etc. environment variables for the test and run Studio.
-
 apc.UpdateCvsIgnore        - Make the .cvsignore file in each test directory identical to 'cvsignore.master'
 
 apc.UpdatePerformance      - Update the performance file for tests with time from the status file if the
@@ -281,15 +276,6 @@ class FetchApcCore(plugins.Action):
             os.system("rsh " + machine + " '" + cmdLine + "'")
     def __repr__(self):
         return "Fetching core for"
-
-class StartStudio(plugins.Action):
-    def __call__(self, test):
-        print "CARMSYS:", os.environ["CARMSYS"]
-        print "CARMUSR:", os.environ["CARMUSR"]
-        print "CARMTMP:", os.environ["CARMTMP"]
-        commandLine = os.path.join(os.environ["CARMSYS"], "bin", "studio")
-        print os.popen(commandLine).readline()
-        sys.exit(0)
         
 optimization.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
 optimization.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"

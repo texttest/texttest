@@ -224,4 +224,10 @@ class ImportTest(optimization.ImportTest):
 
 optimization.itemNamesInFile[optimization.memoryEntryName] = "Memory"
 optimization.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
-    
+
+# Add here list of entries that should not increase, paired with the methods not to check
+optimization.noIncreaseExceptMethods[optimization.costEntryName] = [ "SolutionLegaliser", "initial" ]
+optimization.noIncreaseExceptMethods["crew with illegal rosters"] = []
+optimization.noIncreaseExceptMethods["broken hard trip constraints"] = [ "MaxRoster" ]
+optimization.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
+optimization.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]

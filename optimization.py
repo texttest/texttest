@@ -42,10 +42,15 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Do not scale times with the performance of the test
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
+                               
+optimization.StartStudio   - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
+                             This is intended to be used on a single specified test and will terminate
+                             the testsuite after it starts Studio. It is a simple shortcut to set the
+                             correct CARMSYS etc. environment variables for the test and run Studio.
 """
 
 
-import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re
+import carmen, os, sys, string, shutil, KPI, plugins, performance, math, re, predict
 
 class OptimizationConfig(carmen.CarmenConfig):
     def getOptionString(self):
@@ -206,7 +211,15 @@ class SubPlanDirManager:
                 os.rmdir(subDir)
             except:
                 os.system("rm -rf " + subDir);
-                
+
+class StartStudio(plugins.Action):
+    def __call__(self, test):
+        print "CARMSYS:", os.environ["CARMSYS"]
+        print "CARMUSR:", os.environ["CARMUSR"]
+        print "CARMTMP:", os.environ["CARMTMP"]
+        commandLine = os.path.join(os.environ["CARMSYS"], "bin", "studio")
+        print os.popen(commandLine).readline()
+        sys.exit(0)
 
 class RemoveTemporarySubplan(plugins.Action):
     def __init__(self, subplanManager):
@@ -220,11 +233,53 @@ class RemoveTemporarySubplan(plugins.Action):
 costEntryName = "cost of plan"
 timeEntryName = "cpu time"
 memoryEntryName = "memory"
+methodEntryName = "Running.*\.\.\."
 newSolutionMarker = "new solution"
 
-#Probably different for APC and matador
+#Probably different for APC and matador : static data for the text in the log file
 itemNamesInFile = {}
 
+# Static data for what data to check in CheckOptimizationRun, and what methods to avoid it with
+noIncreaseExceptMethods = {}
+class CheckOptimizationRun(predict.CheckLogFilePredictions):
+    def __repr__(self):
+        return "Checking optimization values for"
+    def __call__(self, test):
+        self.describe(test)
+        interestingValues = noIncreaseExceptMethods.keys()
+        # Note also that CSL parameter changes in rostering can cause the cost to go up
+        if test.name.find("CSL_param") != -1:
+            interestingValues.remove(costEntryName)
+        optRun = OptimizationRun(test, "", [], interestingValues + [ methodEntryName ])
+        for value in interestingValues:
+            oldValue, newValue = self.findIncrease(optRun, value)
+            if oldValue != None:
+                self.insertError(test, "Increase in " + value + " (from " + str(oldValue) + " to " + str(newValue) + ")")
+    def findIncrease(self, optRun, entry):
+        lastEntry = None
+        for solution in optRun.solutions:
+            if not solution.has_key(entry):
+                continue
+            currEntry = solution[entry]
+            if lastEntry and self.hasIncreased(entry, currEntry, lastEntry) and self.shouldCheckMethod(entry, solution):
+                return lastEntry, currEntry
+            lastEntry = currEntry
+        return None, None
+    def hasIncreased(self, entry, currEntry, lastEntry):
+        if currEntry <= lastEntry:
+            return 0
+        # For cost, allow a certain tolerance corresponding to CPLEX's tolerance
+        if entry != costEntryName:
+            return 1
+        percIncrease = float(currEntry - lastEntry) / float(lastEntry)
+        return percIncrease > 0.00001
+    def shouldCheckMethod(self, entry, solution):
+        currMethod = solution.get(methodEntryName, "")
+        for skipMethod in noIncreaseExceptMethods[entry]:
+            if currMethod.find(skipMethod) != -1:
+                return 0
+        return 1
+    
 class LogFileFinder:
     def __init__(self, test, tryTmpFile = 1):
         self.tryTmpFile = tryTmpFile
@@ -239,7 +294,7 @@ class LogFileFinder:
         if os.path.isfile(logFile):
             return logFile
         else:
-            raise EnvironmentError, "Could not find log file for Optimization Run in test", + repr(self.test)
+            raise EnvironmentError, "Could not find log file for Optimization Run in test" + repr(self.test)
     def findTempFile(self, test, version):
         fileInTest = self.findTempFileInTest(version, self.logStem)
         if fileInTest or self.logStem == "output":
@@ -269,9 +324,10 @@ class OptimizationRun:
         self.logFile = logFinder.findFile(version)
         self.diag.info("Reading data from " + self.logFile)
         self.penaltyFactor = 1.0
-        calculator = OptimizationValueCalculator(definingItems + interestingItems, self.logFile)
+        allItems = definingItems + interestingItems
+        calculator = OptimizationValueCalculator(allItems, self.logFile)
         self.solutions = calculator.getSolutions(definingItems)
-        if scale and self.solutions:
+        if scale and self.solutions and timeEntryName in allItems:
             self.scaleTimes()
         self.diag.debug("Solutions :" + repr(self.solutions))
     def scaleTimes(self):
@@ -298,7 +354,7 @@ class OptimizationRun:
                 maxMemory = memory
         return maxMemory
     def timeToCost(self, targetCost):
-        if len(self.solutions) < 2 or abs(self.solutions[-1][costEntryName]) < abs(targetCost):
+        if len(self.solutions) < 2 or self.solutions[-1][costEntryName] < targetCost:
             return self._timeToCostNoPenalty(targetCost)
         penalizedTime = self.getPerformance() * self.penaltyFactor
         return int(penalizedTime)
@@ -306,7 +362,7 @@ class OptimizationRun:
         lastCost = 0
         lastTime = 0
         for solution in self.solutions:
-            if abs(solution[costEntryName]) < abs(targetCost):
+            if solution[costEntryName] < targetCost:
                 costGap = lastCost - solution[costEntryName]
                 percent = float(lastCost - targetCost) / costGap
                 performance = lastTime + (solution[timeEntryName] - lastTime) * percent
@@ -319,7 +375,7 @@ class OptimizationRun:
         lastCost = 0
         lastTime = 0
         for solution in self.solutions:
-            if abs(solution[timeEntryName]) > abs(targetTime):
+            if solution[timeEntryName] > targetTime:
                 timeGap = lastTime - solution[timeEntryName]
                 percent = float(lastTime - targetTime) / timeGap
                 cost = lastCost + (solution[costEntryName] - lastCost) * percent
@@ -335,7 +391,7 @@ class OptimizationRun:
         lastCost = self.getCost(-1)
         for ix in range(len(self.solutions) - 2):
             solution = self.solutions[-1 * (ix + 2)]
-            diff = abs(solution[costEntryName] - lastCost)
+            diff = solution[costEntryName] - lastCost
             if (1.0 * diff / lastCost) * 100.0 > margin:
                 if ix == 0:
                     return -1
@@ -381,6 +437,8 @@ class OptimizationValueCalculator:
             return self.convertTime(line)
         elif item == memoryEntryName:
             return self.getMemory(line)
+        elif item == methodEntryName:
+            return self.getMethod(line)
         else: # Default assumes a numeric value as the last field of the line
             return self.getFinalNumeric(line)
     def getFinalNumeric(self, line):
@@ -391,6 +449,9 @@ class OptimizationValueCalculator:
         entries = timeEntry.split(":")
         timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip()) 
         return float(timeInSeconds) / 60.0
+    def getMethod(self, methodLine):
+        method = methodLine.replace("Running ", "")
+        return method.replace("...", "")
     def getTimeEntry(self, line):
         entries = line.split(" ")
         for index in range(len(entries)):
@@ -525,7 +586,7 @@ class MakeProgressReport(TestReport):
         refSol = referenceRun.getMeasuredSolution(refMargin)
         currCost = currentRun.getCost(currSol)
         refCost = referenceRun.getCost(refSol)
-        if abs(currCost) < abs(refCost):
+        if currCost < refCost:
             return refCost
         else:
             return currCost

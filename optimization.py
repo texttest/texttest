@@ -13,11 +13,10 @@ class OptimizationConfig(carmen.CarmenConfig):
         if batchSession == "nightjob" or batchSession == "wkendjob" or not neededOnly:
             return self.getCompileRules(None)
         else:
-            print "Filtered"
             localFilter = carmen.UpdatedLocalRulesetFilter(self.getRuleSetName, self.getLibraryFile())
-            return self.getCompileRules(filter)
-    def getCompileRules(self, filter):
-        return carmen.CompileRules(self.getRuleSetName, "-optimize", filter)
+            return self.getCompileRules(localFilter)
+    def getCompileRules(self, localFilter):
+        return carmen.CompileRules(self.getRuleSetName, "-optimize", localFilter)
     def getTestCollator(self):
         return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), ExtractSubPlanFile(self, "best_solution", "solution") ])
 

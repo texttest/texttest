@@ -89,8 +89,12 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions = []
         subActions.append(unixConfig.CollateFile("best_solution", "solution"))
         subActions.append(unixConfig.CollateFile("status", "status"))
-        subActions.append(unixConfig.CollateFile("run_status_script_error", "error"))        
-        subActions.append(FetchApcCore(self))
+        subActions.append(unixConfig.CollateFile("run_status_script_error", "error"))
+        # This one should be added, but we have to change the names, which will require some work.
+        #subActions.append(unixConfig.CollateFile("run_status_error", "errors"))
+        subActions.append(unixConfig.CollateFile("run_status_warning", "warnings"))
+        # Removed this functionality temporarily, since it has caused a lot of problems.
+        #subActions.append(FetchApcCore(self))
         subActions.append(baseCollator)
         subActions.append(RemoveLogs())
         localAction = plugins.CompositeAction(subActions)

@@ -144,18 +144,12 @@ class CarmenConfig(lsf.LSFConfig):
         else:
             return None
     def getRealRuleBuilder(self):
-        ruleRunner = None
-        if self.useLSF():
-            ruleRunner = lsf.SubmitTest(self.findLSFQueue, self.findLSFResource)
-        return [ self.getRuleBuildObject(ruleRunner), self.getRuleWaitingAction(), \
-                                         EvaluateRuleBuild(self.getRuleSetName) ]
+        ruleRunner = lsf.SubmitTest(self.findLSFQueue, self.findLSFResource)
+        return [ self.getRuleBuildObject(ruleRunner), UpdateRulesetBuildStatus(self.getRuleSetName, self.getRulesetBuildJobName) ]
+    def getRulesetBuildJobName(self, test):
+        return getRaveName(test) + "." + test.parent.name + "." + self.getRuleSetName(test)
     def getRuleBuildObject(self, ruleRunner):
-        return CompileRules(self.getRuleSetName, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
-    def getRuleWaitingAction(self):
-        if self.useLSF():
-            return lsf.UpdateLSFStatus(self.getRuleSetName, RULESET_NOT_BUILT)
-        else:
-            return None
+        return CompileRules(self.getRuleSetName, self.getRulesetBuildJobName, self.raveMode(), self.getRuleBuildFilter(), ruleRunner)
     def buildRules(self):
         if self.optionMap.has_key("skip") or self.isReconnecting():
             return 0
@@ -252,7 +246,7 @@ class CarmenConfig(lsf.LSFConfig):
         app.setConfigDefault("rave_name", None)
         # dictionary of lists
         app.setConfigDefault("build_targets", { "" : [] })
-    
+
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
 
@@ -308,10 +302,11 @@ class CleanupRules(plugins.Action):
             self.raveName = getRaveName(suite)
 
 class CompileRules(plugins.Action):
-    def __init__(self, getRuleSetName, modeString = "-optimize", filter = None, ruleRunner = None):
-        self.rulesCompiled = []
+    rulesCompiled = []
+    def __init__(self, getRuleSetName, getRulesetBuildJobName, modeString = "-optimize", filter = None, ruleRunner = None):
         self.raveName = None
         self.getRuleSetName = getRuleSetName
+        self.getRulesetBuildJobName = getRulesetBuildJobName
         self.modeString = modeString
         self.filter = filter
         self.ruleRunner = ruleRunner
@@ -326,14 +321,15 @@ class CompileRules(plugins.Action):
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
         if not ruleset.isValid():
             return
-        if ruleset.name in self.rulesCompiled:
+        jobName = self.getRulesetBuildJobName(test)
+        if jobName in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name + " already being compiled")
             test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + ruleset.name)
             return
         self.describe(test, " - ruleset " + ruleset.name)
         self.ensureCarmTmpDirExists()
         ruleset.backup()
-        self.rulesCompiled.append(ruleset.name)
+        self.rulesCompiled.append(jobName)
         retStatus = None
         if ruleset.precompiled:
             root, local = os.path.split(ruleset.targetFile)
@@ -375,61 +371,45 @@ class CompileRules(plugins.Action):
         self.diag.info("Compiling with command '" + commandLine + "'")
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
         test.changeState(RULESET_NOT_BUILT, "Compiling ruleset " + self.getRuleSetName(test))
-        if self.ruleRunner:
-            return self.ruleRunner.runCommand(test, fullCommand, self.getRuleSetName)
-        
-        returnValue = os.system(fullCommand)
-        if returnValue:
-            errContents = string.join(open(compTmp).readlines(),"")
-            if errContents.find("already being compiled by") != -1:
-                print test.getIndent() + "Waiting for other compilation to finish..."
-                time.sleep(30)
-                os.remove(compTmp)
-                self.performCompile(test, commandLine)
+        return self.ruleRunner.runCommand(test, fullCommand, self.getRulesetBuildJobName)
     def setUpSuite(self, suite):
         if self.filter and not self.filter.acceptsTestSuite(suite):
             self.raveName = None
             return
         self.describe(suite)
-        self.rulesCompiled = []
         if self.raveName == None:
             self.raveName = getRaveName(suite)
     def getFilter(self):
         return self.filter
 
-class EvaluateRuleBuild(plugins.Action):
-    def __init__(self, getRuleSetName):
+class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
+    def __init__(self, getRuleSetName, jobNameFunction):
+        lsf.UpdateLSFStatus.__init__(self, jobNameFunction)
         self.getRuleSetName = getRuleSetName
-        self.rulesCompiled = {}
     def __call__(self, test):
-        if test.state != RULESET_NOT_BUILT:
-            return
-        compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
-        if not os.path.isfile(compTmp):
-            return self.checkForPreviousFailure(test)
-        errContents = string.join(open(compTmp).readlines(),"")
+        if test.state == RULESET_NOT_BUILT:
+            return lsf.UpdateLSFStatus.__call__(self, test)
+    def processStatus(self, test, status, machine):
         ruleset = self.getRuleSetName(test)
-        # The first is C-compilation error, the second generation error...
-        # Would be better if there was something unambiguous to look for!
-        success = errContents.find("failed!") == -1 and errContents.find("ERROR:") == -1 and \
-                  errContents.find("Serious error") == -1 and errContents.find("Failed in an LSF library call") == -1
-        self.rulesCompiled[ruleset] = success
-        if success:
+        if status == "EXIT":
+            self.raiseFailure(test, ruleset)
+        elif status == "DONE":
             test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
         else:
-            self.raiseFailure(ruleset, errContents)
-    def raiseFailure(self, ruleset, errContents):
+            details = "Compiling ruleset " + ruleset
+            if machine != None:
+                details += " on " + machine
+            details += os.linesep + "Current LSF status = " + status + os.linesep
+            test.changeState(RULESET_NOT_BUILT, details)
+    def raiseFailure(self, test, ruleset):
+        compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
+        if not os.path.isfile(compTmp):
+            raise plugins.TextTestError, "Trying to use ruleset '" + ruleset + "' that failed to build."
+
+        errContents = string.join(open(compTmp).readlines(),"")
         errMsg = "Failed to build ruleset " + ruleset + os.linesep + errContents 
         print errMsg
         raise plugins.TextTestError, errMsg
-    def checkForPreviousFailure(self, test):
-        ruleset = self.getRuleSetName(test)
-        if not self.rulesCompiled.has_key(ruleset):
-            return self.WAIT | self.RETRY
-        if self.rulesCompiled[ruleset] == 0:
-            raise plugins.TextTestError, "Trying to use ruleset '" + ruleset + "' that failed to build."
-        else:
-            test.changeState(test.NOT_STARTED, "Ruleset " + ruleset + " succesfully compiled")
             
 class RuleSet:
     def __init__(self, ruleSetName, raveName, arch):

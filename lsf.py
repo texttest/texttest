@@ -153,10 +153,10 @@ class LSFConfig(unixConfig.UNIXConfig):
 
 class LSFJob:
     def __init__(self, test, jobNameFunction = None):
-        jobName = test.getRelPath()
+        jobName = repr(test.app) + test.app.versionSuffix() + test.getRelPath()
         if jobNameFunction:
             jobName = jobNameFunction(test)
-        self.name = test.getTmpExtension() + repr(test.app) + test.app.versionSuffix() + jobName
+        self.name = test.getTmpExtension() + jobName
         self.app = test.app
     def hasStarted(self):
         retstring = self.getFile("-r").readline()
@@ -327,23 +327,18 @@ class Wait(plugins.Action):
 
 
 class UpdateLSFStatus(plugins.Action):
-    def __init__(self, jobNameFunction = None, startState = None):
+    def __init__(self, jobNameFunction = None):
         self.jobNameFunction = jobNameFunction
         self.diag = plugins.getDiagnostics("LSF Status")
-        self.startState = startState
     def __repr__(self):
         return "Updating LSF status for"
     def __call__(self, test):
-        if self.startState and test.state != self.startState:
-            return
-        
         job = LSFJob(test, self.jobNameFunction)
         status, machine = job.getStatus()
         self.diag.info("Job " + job.name + " in state " + status + " for test " + test.name)
+        self.processStatus(test, status, machine)
         if status == "DONE" or status == "EXIT":
             return
-        if status != "PEND":
-            self.getRunningInformation(test, status, machine)
 
         global emergencyFinish
         if emergencyFinish:
@@ -352,14 +347,14 @@ class UpdateLSFStatus(plugins.Action):
             test.changeState(test.KILLED, "Killed by LSF emergency finish")
             return
         return self.WAIT | self.RETRY
-    def getRunningInformation(self, test, status, machine):
+    def processStatus(self, test, status, machine):
         pass
 
 class UpdateTestLSFStatus(UpdateLSFStatus):
     def __init__(self):
         UpdateLSFStatus.__init__(self)
         self.logFile = None
-    def getRunningInformation(self, test, status, machine):
+    def processStatus(self, test, status, machine):
         perc = self.calculatePercentage(test)
         details = ""
         if machine != None:
@@ -368,7 +363,10 @@ class UpdateTestLSFStatus(UpdateLSFStatus):
         details += "Current LSF status = " + status + os.linesep
         if perc > 0:
             details += "From log file reckoned to be " + str(perc) + "% complete."
-        test.changeState(test.RUNNING, details)
+        if status == "PEND":
+            test.changeState(test.NOT_STARTED, details)
+        else:
+            test.changeState(test.RUNNING, details)
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
     def calculatePercentage(self, test):

@@ -396,15 +396,19 @@ class CopyEnvironment(plugins.Action):
                 
                 oldcarmtmp = self.getCarmtmp(oldFile)
                 root, local = os.path.split(os.path.normpath(oldcarmtmp))
-                newcarmtmp = os.path.join("/carm/proj/matador/carmtmps/", self.getDirVersion(version), "i386_linux", local)
+                newcarmtmp = self.getNewCarmtmp(oldcarmtmp, version, "i386_linux", local)
                 self.replaceInFile(oldFile, oldcarmtmp, newcarmtmp)
                 for arch in archs:
                     targetFile = oldFile + "." + arch
-                    self.makeCarmtmpFile(targetFile, version, arch, local)
-    def makeCarmtmpFile(self, targetFile, version, arch, local):
+                    newcarmtmp = self.getNewCarmtmp(oldcarmtmp, version, arch, local)
+                    self.makeCarmtmpFile(targetFile, newcarmtmp)
+    def getNewCarmtmp(self, oldcarmtmp, version, arch, local):
+        basePath = "${CARMSYS}"
+        if oldcarmtmp.find("CARMSYS") == -1:
+            basePath = os.path.join("/carm/proj/matador/carmtmps/", self.getDirVersion(version))
+        return os.path.join(basePath, arch, local)
+    def makeCarmtmpFile(self, targetFile, carmtmp):
         file = open(targetFile, "w")
-        dirVersion = self.getDirVersion(version)
-        carmtmp = os.path.join("/carm/proj/matador/carmtmps/", dirVersion, arch, local)
         print carmtmp
         file.write("CARMTMP:" + carmtmp + os.linesep)
         file.close()

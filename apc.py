@@ -88,7 +88,7 @@ class ApcConfig(optimization.OptimizationConfig):
     def getLibraryFile(self, app):
         return os.path.join("data", "apc", carmen.getArchitecture(app), "libapc.a")
     def getRuleBuildObject(self, testRunner):
-        return ApcCompileRules(self.getRuleSetName, self.getLibraryFile, self.getRuleBuildFilter(), testRunner, \
+        return ApcCompileRules(self.getRuleSetName, self.getRulesetBuildJobName, self.getLibraryFile, self.getRuleBuildFilter(), testRunner, \
                                self.raveMode())
     def getSpecificTestRunner(self):
         subActions = [ self._getApcTestRunner() ]
@@ -301,9 +301,9 @@ class RunApcTestInDebugger(default.RunTest):
         self.describe(suite)
     
 class ApcCompileRules(carmen.CompileRules):
-    def __init__(self, getRuleSetName, getLibraryFile, sFilter = None, testRunner = None, \
+    def __init__(self, getRuleSetName, getRulesetBuildJobName, getLibraryFile, sFilter = None, testRunner = None, \
                  modeString = "-optimize"):
-        carmen.CompileRules.__init__(self, getRuleSetName, modeString, sFilter, testRunner)
+        carmen.CompileRules.__init__(self, getRuleSetName, getRulesetBuildJobName, modeString, sFilter, testRunner)
         self.getLibraryFile = getLibraryFile
         self.diag = plugins.getDiagnostics("ApcCompileRules")
     def compileRulesForTest(self, test):

@@ -93,8 +93,10 @@ class BatchCategory:
             mailFile.write(os.linesep)
 
 allBatchResponders = []
-categoryNames = [ "badPredict", "crash", "dead", "difference", "faster", "slower", "success", "unfinished" ]
-categoryDescriptions = [ "had internal errors", "CRASHED", "caused exception", "FAILED", "ran faster", "ran slower", "succeeded", "were unfinished" ]
+categoryNames = [ "badPredict", "crash", "dead", "difference", "faster", "slower",\
+                  "larger", "smaller", "success", "unfinished" ]
+categoryDescriptions = [ "had internal errors", "CRASHED", "caused exception", "FAILED", \
+                         "ran faster", "ran slower", "used more memory", "used less memory", "succeeded", "were unfinished" ]
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):

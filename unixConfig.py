@@ -36,12 +36,9 @@ class UNIXConfig(default.Config):
     def keepTmpFiles(self):
         return self.batchMode()
     def getTestCollator(self):
-        coreAction = CollateCore("core*", "stacktrace")
-        return plugins.CompositeAction([coreAction, default.Config.getTestCollator(self)])
+        return CollateUNIXFiles()
     def getPerformanceFileMaker(self):
         return MakePerformanceFile()
-    def getTestComparator(self):
-        return performance.MakeComparisons(self.optionMap.has_key("n"))
     def getTestRunner(self):
         return RunTest()
     def getTestResponder(self):
@@ -53,7 +50,7 @@ class UNIXConfig(default.Config):
         else:
             return respond.UNIXInteractiveResponder(diffLines)
     def printHelpDescription(self):
-        print helpDescription, predict.helpDescription, comparetest.helpDescription, respond.helpDescription
+        print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
     def printHelpScripts(self):
         print performance.helpScripts
     def printHelpOptions(self, builtInOptions):
@@ -102,18 +99,19 @@ def isCompressed(path):
         return 0
 
 # Deal with UNIX-compressed files as well as straight text
-class CollateFile(default.CollateFile):
+class CollateUNIXFiles(default.CollateFiles):
+    def __init__(self):
+        default.CollateFiles.__init__(self)
+        self.collations.append(("core*", "stacktrace"))
     def transformToText(self, path):
-        if not isCompressed(path):
-            return        
-        toUse = path + ".Z"
-        os.rename(path, toUse)
-        os.system("uncompress " + toUse)
-
-# Extract just the stack trace rather than the whole core
-class CollateCore(CollateFile):
-    def transformToText(self, path):
-        CollateFile.transformToText(self, path)
+        if isCompressed(path):
+            toUse = path + ".Z"
+            os.rename(path, toUse)
+            os.system("uncompress " + toUse)
+        if os.path.basename(path).startswith("stacktrace"):
+            # Extract just the stack trace rather than the whole core
+            self.interpretCoreFile(path)
+    def interpretCoreFile(self, path):
         if os.path.getsize(path) == 0:
             os.remove(path)
             file = open(path, "w")

@@ -145,9 +145,6 @@ class OptimizationConfig(carmen.CarmenConfig):
         return plugins.CompositeAction([ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ])
     def getSpecificTestRunner(self):
         return carmen.CarmenConfig.getTestRunner(self) 
-    def getTestCollator(self):
-        solutionCollator = unixConfig.CollateFile("best_solution", "solution")
-        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), solutionCollator ])
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)

@@ -37,7 +37,7 @@ default.CountTest          - produce a brief report on the number of tests in th
 default.ExtractMemory      - update the memory files from the standard log files
 """
 
-import os, re, shutil, plugins, respond, comparetest, string, predict
+import os, re, shutil, plugins, respond, performance, string, predict
 from glob import glob
 
 def getConfig(optionMap):
@@ -98,11 +98,11 @@ class Config(plugins.Configuration):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"))
         else:
-            return self.getTestCollator()
+            return plugins.CompositeAction([self.getTestCollator(), self.getPerformanceFileMaker(), self.getMemoryFileMaker()])
     def getCatalogueCreator(self):
         return CreateCatalogue()
     def getTestCollator(self):
-        return plugins.CompositeAction([self.getPerformanceFileMaker(), self.getMemoryFileMaker()])
+        return CollateFiles()
     def getMemoryFileMaker(self):
         return MakeMemoryFile()
     def getPerformanceFileMaker(self):
@@ -110,7 +110,7 @@ class Config(plugins.Configuration):
     def getTestPredictionChecker(self):
         return predict.CheckPredictions()
     def getTestComparator(self):
-        return comparetest.MakeComparisons(self.optionMap.has_key("n"))
+        return performance.MakeComparisons(self.optionMap.has_key("n"))
     def getTestResponder(self):
         if self.optionMap.has_key("o"):
             return respond.OverwriteOnFailures()
@@ -128,7 +128,7 @@ class Config(plugins.Configuration):
     def printHelpScripts(self):
         print helpScripts
     def printHelpDescription(self):
-        print helpDescription, predict.helpDescription, comparetest.helpDescription, respond.helpDescription
+        print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
     def printHelpOptions(self, builtInOptions):
         print helpOptions, builtInOptions
     def printHelpText(self, builtInOptions):
@@ -149,28 +149,38 @@ class MakeWriteDirectory(plugins.Action):
     def setUpApplication(self, app):
         app.makeWriteDirectory()
 
-class CollateFile(plugins.Action):
-    def __init__(self, sourcePattern, targetStem):
-        self.sourcePattern = sourcePattern
-        self.targetStem = targetStem
-	self.errText = "Expected file '" + sourcePattern + "' not created by test"
+class CollateFiles(plugins.Action):
+    def __init__(self):
+        self.collations = []
+    def setUpApplication(self, app):
+        for entry in app.getConfigList("collate_file"):
+            if entry.find("->") == -1:
+                print "WARNING: cannot collate file from entry '" + entry + "'"
+                print "Must be of the form '<source_pattern>-><target_name>'"
+                continue
+            sourcePattern, targetStem = entry.split("->")
+            self.collations.append((sourcePattern, targetStem))
     def __call__(self, test):
         if test.state > test.RUNNING:
             return
-        targetFile = test.makeFileName(self.targetStem, temporary=1)
-        fullpath = self.findPath(test)
-        if fullpath:
-            self.extract(fullpath, targetFile)
-            self.transformToText(targetFile)
-        elif os.path.isfile(test.makeFileName(self.targetStem)):
-            open(targetFile, "w").write(self.errText + os.linesep)
-    def findPath(self, test):
+
+        for sourcePattern, targetStem in self.collations:
+            targetFile = test.makeFileName(targetStem, temporary=1)
+            fullpath = self.findPath(test, sourcePattern)
+            if fullpath:
+                self.extract(fullpath, targetFile)
+                self.transformToText(targetFile)
+            elif os.path.isfile(test.makeFileName(targetStem)):
+                errText = self.getErrorText(sourcePattern)
+                open(targetFile, "w").write(errText + os.linesep)
+    def getErrorText(self, sourcePattern):
+        return "Expected file '" + sourcePattern + "' not created by test"
+    def findPath(self, test, sourcePattern):
         for writeDir in test.writeDirs:
-            pattern = os.path.join(writeDir, self.sourcePattern)
+            pattern = os.path.join(writeDir, sourcePattern)
             paths = glob(pattern)
             if len(paths):
                 return paths[0]
-        return None
     def transformToText(self, path):
         # By default assume it is text
         pass

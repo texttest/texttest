@@ -3,7 +3,7 @@ The Flamenco configuration is based on the Carmen configuration. It is set up to
 with the running architecture in the name of the binary given in the config file. It will also collect the
 file "sqlnet.log", and compare it as the test suite file sqlerr.<app>."""
 
-import carmen, os, plugins, default
+import carmen, os, plugins, unixConfig
 
 def getConfig(optionMap):
     return FlamencoConfig(optionMap)
@@ -35,8 +35,8 @@ class FlamencoConfig(carmen.CarmenConfig):
 	    return fullprog
 	debugLog.info( "NO RunTest script: set cmd to '" + fullprog + "'" )
 	return fullprog
-    def getTestCollator(self):
-        return plugins.CompositeAction([ carmen.CarmenConfig.getTestCollator(self), CreateCompareFiles() ])
+    def getFileCollator(self):
+        return CollateFiles()
     def printHelpDescription(self):
         print helpDescription
         carmen.CarmenConfig.printHelpDescription(self)
@@ -100,22 +100,20 @@ class FlamencoConfig(carmen.CarmenConfig):
 	    debugLog.info(nameslist + " not set")
 	return None
 
-class CollateFile(default.CollateFile):
-    def __init__(self, sourcePattern, targetStem,errText):
-	default.CollateFile.__init__(self, sourcePattern, targetStem)
-	if errText != "" :
-	    self.errText = errText
+class CollateFiles(unixConfig.CollateUNIXFiles):
+    def __init__(self):
+	unixConfig.CollateUNIXFiles.__init__(self)
+        self.collations.append(("sqlnet.log", "sqlerr"))
+    def setUpApplication(self, app):
+        unixConfig.CollateUNIXFiles.setUpApplication(self, app)
+        for stem in app.getConfigList("required_file"):
+            debugLog.info("collect output file " + stem)
+            self.collations.append((stem + "*", "resultfile_" + stem))
+    def getErrorText(self, sourcePattern):
+        if sourcePattern == "sqlnet.log":
+            return "NO ERROR"
+        else:
+            return unixConfig.CollateUNIXFiles.getErrorText(self, sourcePattern)
     def extract(self, sourcePath, targetFile):
         os.rename(sourcePath, targetFile)
 
-
-class CreateCompareFiles(plugins.Action):
-    def __call__(self, test):
-	CollateFile("sqlnet.log","sqlerr","NO ERROR")(test)
-        if test.app.configDir.has_key("required_file"):
-	    reqFiles = test.app.getConfigList("required_file")
-	    if not reqFiles:
-		return
-	    for stem in reqFiles:
-		debugLog.info("collect output file " + stem )
-		CollateFile(stem+"*", "resultfile_" + stem, "")(test)

@@ -17,6 +17,12 @@ is interpreted as a test failure.
 import os, filecmp, string, plugins
 
 class TestComparison:
+    scoreTable = {}
+    scoreTable["difference"] = 2
+    scoreTable["faster"] = 1
+    scoreTable["slower"] = 1
+    scoreTable["larger"] = 0
+    scoreTable["smaller"] = 0
     def __init__(self, test, overwriteOnSuccess):
         self.test = test
         self.overwriteOnSuccess = overwriteOnSuccess
@@ -43,12 +49,17 @@ class TestComparison:
                 return "crash"
             else:
                 return "badPredict"
-        if len(self.changedResults) > 1:
-            return "difference"
-        if len(self.changedResults) > 0:
-            return self.changedResults[0].getType()
+        worstType = None
+        for result in self.changedResults:
+            type = result.getType()
+            if not worstType or self.isWorseThan(type, worstType):
+                worstType = type
+        if worstType:
+            return worstType
         else:
             return self.newResults[0].getType()
+    def isWorseThan(self, type, worstType):
+        return self.scoreTable[type] > self.scoreTable[worstType]
     def getComparisons(self):
         return self.changedResults + self.newResults
     def _comparisonsString(self, comparisons):

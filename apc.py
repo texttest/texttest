@@ -111,16 +111,8 @@ class ApcConfig(optimization.OptimizationConfig):
             return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
         else:
             return RunApcTest()
-    def getTestCollator(self):
-        baseCollator = unixConfig.UNIXConfig.getTestCollator(self)
-        collateActions = []
-        collateActions.append(unixConfig.CollateFile("best_solution", "solution"))
-        collateActions.append(unixConfig.CollateFile("status", "status"))
-        collateActions.append(unixConfig.CollateFile("run_status_script_error", "error"))
-        # This one should be added, but we have to change the names, which will require some work.
-        #collateActions.append(unixConfig.CollateFile("run_status_error", "errors"))
-        collateActions.append(unixConfig.CollateFile("run_status_warning", "warnings"))
-        collateAction = plugins.CompositeAction(collateActions)
+    def getFileCollator(self):
+        baseCollator = optimization.OptimizationConfig.getFileCollator(self)
         subActions = []
         subActions.append(FetchApcCore(self))
         subActions.append(baseCollator)
@@ -129,11 +121,7 @@ class ApcConfig(optimization.OptimizationConfig):
             subActions.append(carmen.ProcessProfilerResults())
         if self.optionMap.has_key("extractlogs"):
             subActions.append(ExtractApcLogs(self.optionValue("extractlogs")))
-        localAction = plugins.CompositeAction(subActions)
-        if not self.useLSF():
-            return localAction
-        else:
-            return plugins.CompositeAction([ lsf.Wait(), self.updaterLSFStatus(), collateAction, localAction ])
+        return plugins.CompositeAction(subActions)
     def _getSubPlanDirName(self, test):
         statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
         dirs = statusFile.split(os.sep)[:-2]

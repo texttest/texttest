@@ -129,11 +129,14 @@ class LSFConfig(unixConfig.UNIXConfig):
                 resourceList.append(resource)
         return resourceList
     def getTestCollator(self):
-        baseCollator = unixConfig.UNIXConfig.getTestCollator(self)
+        return plugins.CompositeAction([ self.getWaitingAction(), self.getFileCollator() ])
+    def getFileCollator(self):
+        return unixConfig.UNIXConfig.getTestCollator(self)
+    def getWaitingAction(self):
         if not self.useLSF():
-            return baseCollator
+            return plugins.Action()
         else:
-            return plugins.CompositeAction([ Wait(), self.updaterLSFStatus(), baseCollator ])
+            return plugins.CompositeAction([ Wait(), self.updaterLSFStatus() ])
     def updaterLSFStatus(self):
         return UpdateLSFStatus()
     def isSlowdownJob(self, jobUser, jobName):

@@ -23,6 +23,14 @@ When differences in performance are reported, you are given the option to save a
 The default behaviour (if there are no other differences) is to save the average of the old result
 and the new result. In order to override this and save the exact result, append a '+' to the save
 option that you type. (so "s+" to save the standard version, "1+" to save the first offered version etc.)
+
+Note that memory measurement works in a similar way. Given a file containing the line
+Max Memory :    45.3 MB
+
+the entries "minimum_memory_for_test" and "memory_variation_%" are compared and can be saved in the ways described
+above. The default MemoryFileMaker will look for the application reporting on its own memory consumption,
+this has proved somewhat more stable than sampling approaches. This is controlled by the config file entry
+"string_before_memory", which indicates a unique string that appears in the log file before the memory number.
 """ + comparetest.helpDescription
 
 helpScripts = """performance.AddTestPerformance
@@ -35,14 +43,17 @@ helpScripts = """performance.AddTestPerformance
 # CPU time   :      30.31 sec. on heathlands
 # 
 
+# For memory the same is true, and the format is
+# Max Memory :       45 MB
+
 # Returns -1 as error value, if the file is the wrong format
 def getPerformance(fileName):
     try:
         line = open(fileName).readline()
-        start = line.find(":")
-        end = line.find("s", start)
-        fullName = line[start + 1:end - 1]
-        return float(string.strip(fullName))
+        pos = line.find(":")
+        if pos == -1:
+            return float(-1)
+        return float(line[pos + 1:].lstrip().split()[0])
     except:
         return float(-1)
 
@@ -67,13 +78,31 @@ class PerformanceTestComparison(comparetest.TestComparison):
             return "FAILED on " + self.execHost + " :"
         return comparetest.TestComparison.__repr__(self)
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
-        stem, ext = os.path.basename(standardFile).split(".", 1)
-        if (stem == "performance"):
-            return PerformanceFileComparison(test, standardFile, tmpFile, makeNew)
+        baseName = os.path.basename(standardFile)
+        if baseName.find(".") == -1:
+            return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile, makeNew)
+        
+        stem, ext = baseName.split(".", 1)
+        if stem == "performance" or stem == "memory":
+            descriptors = self.findDescriptors(stem)
+            return PerformanceFileComparison(test, standardFile, tmpFile, descriptors, makeNew)
         else:
             return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile, makeNew)
+    def findDescriptors(self, stem):
+        descriptors = {}
+        if stem == "memory":
+            descriptors["goodperf"] = "smaller"
+            descriptors["badperf"] = "larger"
+            descriptors["config"] = "memory"
+        elif stem == "performance":
+            descriptors["goodperf"] = "faster"
+            descriptors["badperf"] = "slower"
+            descriptors["config"] = "cputime"
+        return descriptors
     def shouldCompare(self, file, dir, app):
         if not comparetest.TestComparison.shouldCompare(self, file, dir, app):
+            return 0
+        if file.find(".") == -1:
             return 0
         stem, ext = file.split(".",1)
         if stem != "performance":
@@ -102,18 +131,22 @@ class MakeComparisons(comparetest.MakeComparisons):
         return PerformanceTestComparison(test, self.overwriteOnSuccess)
 
 class PerformanceFileComparison(comparetest.FileComparison):
-    def __init__(self, test, standardFile, tmpFile, makeNew):
+    def __init__(self, test, standardFile, tmpFile, descriptors, makeNew):
         comparetest.FileComparison.__init__(self, test, standardFile, tmpFile, makeNew)
+        self.diag = plugins.getDiagnostics("performance")
+        self.diag.info("Checking test " + test.name)
+        self.descriptors = descriptors
         if (os.path.exists(self.stdCmpFile)):
-            self.oldCPUtime = getPerformance(self.stdCmpFile)
-            self.newCPUtime = getPerformance(self.tmpCmpFile)
+            self.oldPerformance = getPerformance(self.stdCmpFile)
+            self.newPerformance = getPerformance(self.tmpCmpFile)
+            self.diag.info("Performance is " + str(self.oldPerformance) + " and " + str(self.newPerformance))
             self.percentageChange = self.calculatePercentageIncrease()
             # If we didn't understand the old performance, overwrite it
-            if (self.oldCPUtime < 0):
+            if (self.oldPerformance < 0):
                 os.remove(self.stdFile)
         else:
-            self.newCPUtime = getPerformance(self.tmpFile)
-            self.oldCPUtime = self.newCPUtime
+            self.newPerformance = getPerformance(self.tmpFile)
+            self.oldPerformance = self.newPerformance
             self.percentageChange = 0.0
     def __repr__(self):
         baseText = comparetest.FileComparison.__repr__(self)
@@ -121,16 +154,18 @@ class PerformanceFileComparison(comparetest.FileComparison):
             return baseText
         return baseText + "(" + self.getType() + ")"
     def getType(self):
-        if self.newCPUtime < self.oldCPUtime:
-            return "faster"
+        if self.newPerformance < self.oldPerformance:
+            return self.descriptors["goodperf"]
         else:
-            return "slower"
+            return self.descriptors["badperf"]
     def hasDifferences(self):
-        perfList = self.test.app.getConfigList("performance_test_machine")
-        if perfList == None or len(perfList) == 0 or perfList[0] == "none":
-            return 0
-        longEnough = self.newCPUtime > float(self.test.app.getConfigValue("minimum_cputime_for_test"))
-        varianceEnough = self.percentageChange > float(self.test.app.getConfigValue("cputime_variation_%"))
+        configDescriptor = self.descriptors["config"]
+        if configDescriptor == "cputime":
+            perfList = self.test.app.getConfigList("performance_test_machine")
+            if perfList == None or len(perfList) == 0 or perfList[0] == "none":
+                return 0
+        longEnough = self.newPerformance > float(self.test.app.getConfigValue("minimum_" + configDescriptor + "_for_test"))
+        varianceEnough = self.percentageChange > float(self.test.app.getConfigValue(configDescriptor + "_variation_%"))
         return longEnough and varianceEnough and not self.hasExternalExcuse()
     def hasExternalExcuse(self):
         if self.getType() != "slower":
@@ -140,16 +175,16 @@ class PerformanceFileComparison(comparetest.FileComparison):
                 return 1
         return 0
     def calculatePercentageIncrease(self):
-        largest = max(self.oldCPUtime, self.newCPUtime)
-        smallest = min(self.oldCPUtime, self.newCPUtime)
+        largest = max(self.oldPerformance, self.newPerformance)
+        smallest = min(self.oldPerformance, self.newPerformance)
         if smallest == 0.0:
             return 0.0
         return ((largest - smallest) / smallest) * 100
     def saveResults(self, destFile):
         # Here we save the average of the old and new performance, assuming fluctuation
-        avgPerformance = round((self.oldCPUtime + self.newCPUtime) / 2.0, 2)
+        avgPerformance = round((self.oldPerformance + self.newPerformance) / 2.0, 2)
         line = open(self.tmpFile).readlines()[0]
-        lineToWrite = line.replace(str(self.newCPUtime), str(avgPerformance))
+        lineToWrite = line.replace(str(self.newPerformance), str(avgPerformance))
         newFile = open(destFile, "w")
         newFile.write(lineToWrite)
         os.remove(self.tmpFile)

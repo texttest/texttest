@@ -596,8 +596,8 @@ class Application:
 class OptionFinder:
     def __init__(self):
         self.inputOptions = self.buildOptions()
-        self._setUpLogging()
         self.directoryName = self.findDirectoryName()
+        self._setUpLogging()
         debugLog.debug(repr(self.inputOptions))
     def _setUpLogging(self):
         global debugLog
@@ -957,8 +957,8 @@ class TextTest:
         else:
             return "%H%M%S"
     def ensureDisplaySet(self):
-        # DISPLAY variable must be set if we are to run the GUI
-        if not os.environ.has_key("DISPLAY"):
+        # DISPLAY variable must be set if we are to run the GUI on UNIX
+        if os.name == "posix" and not os.environ.has_key("DISPLAY"):
             for app in self.allApps:
                 try:
                     displayModule = app.getConfigValue("display_module")

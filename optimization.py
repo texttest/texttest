@@ -48,8 +48,8 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Plot against solution number instead of cpu time.
                              - nt
                                Do not use status file from the currently running test.
-                             - b
-                               Plots both the original and the currently running test. 
+                             - tu=user_name
+                               Looks for temporary files in /users/user_name/texttesttmp instead of default textttesttmp. 
                              - ns
                                Do not scale times with the performance of the test.
                              - nv
@@ -286,11 +286,12 @@ class CheckOptimizationRun(predict.CheckLogFilePredictions):
         return 1
     
 class LogFileFinder:
-    def __init__(self, test, tryTmpFile = 1):
+    def __init__(self, test, tryTmpFile = 1, searchInUser = None):
         self.tryTmpFile = tryTmpFile
         self.test = test
         self.logStem = test.app.getConfigValue("log_file")
         self.diag = plugins.getDiagnostics("Log File Finder")
+        self.searchInUser = searchInUser
     def findFile(self, version = None, specFile = ""):
         if len(specFile):
             return 0, self.findSpecifiedFile(version, specFile)
@@ -353,8 +354,13 @@ class LogFileFinder:
         versionMod = ""
         if version:
             versionMod = "." + version
-        searchString = app.name + versionMod + app.getTestUser()
         root, localDir = os.path.split(app.writeDirectory)
+        searchString = app.name + versionMod
+        if self.searchInUser:
+            searchString += self.searchInUser
+            root = "/users/" + self.searchInUser + "/texttesttmp/"
+        else:
+            searchString += app.getTestUser()
         for subDir in os.listdir(root):
             fullDir = os.path.join(root, subDir)
             if os.path.isdir(fullDir) and subDir.startswith(searchString):
@@ -1335,6 +1341,9 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         self.addSwitch(oldOptionGroup, "av", "Plot also average")
         self.addSwitch(oldOptionGroup, "oav", "Plot only average")
         self.addOption(oldOptionGroup, "title", "Title of the plot")
+        self.addOption(oldOptionGroup, "tu", "Search for temporary files in user")
+        self.addSwitch(oldOptionGroup, "nt", "Don't search for temporary files")
+        
         self.externalGraph = graph
         if graph:
             self.testGraph = graph
@@ -1354,8 +1363,10 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         return "Plotting"
     def __call__(self, test):
         logFileStem = test.app.getConfigValue("log_file")
-        if test.state.hasStarted() and not test.state.hasSucceeded():
-            logFileFinder = LogFileFinder(test, tryTmpFile = 1)
+        searchInUser = self.optionGroup.getOptionValue("tu")
+        noTmp = self.optionGroup.getSwitchValue("nt")
+        if not noTmp:
+            logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
             foundTmp, logFile = logFileFinder.findFile()
             if foundTmp:
                 self.writePlotFiles("this run", logFile, test)
@@ -1364,7 +1375,20 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             self.writePlotFiles("std result", stdFile, test)
         for version in plugins.commasplit(self.optionGroup.getOptionValue("v")):
             if version:
-                self.writePlotFiles(version, test.makeFileName(logFileStem, version), test)
+                if not noTmp:
+                    logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
+                    foundTmp, logFile = logFileFinder.findFile(version)
+                    if foundTmp:
+                        self.writePlotFiles(version + "run", logFile, test)
+                # Find the closest possible matching version. hack, should be done by texttest core.
+                possibleVersions = test.app._getVersionExtensions(version.split("."))
+                for ver in possibleVersions:
+                    logFile = test.makeFileName(logFileStem, version,temporary = 0, forComparison = 0) + ".apc." + ver
+                    if os.path.isfile(logFile):
+                        self.writePlotFiles(version, logFile, test)
+                        if not ver == version:
+                            print "Using log file with version", ver, "to print test", test.name, "version", version 
+                        break
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):

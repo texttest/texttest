@@ -303,7 +303,7 @@ class UpdateLSFStatus(plugins.Action):
     def calculatePercentage(self, test):
         stdFile = test.makeFileName(self.logFile)
         tmpFile = test.makeFileName(self.logFile, temporary=1)
-        if not os.path.isfile(tmpFile):
+        if not os.path.isfile(tmpFile) or not os.path.isfile(stdFile):
             return 0
         stdSize = os.path.getsize(stdFile)
         tmpSize = os.path.getsize(tmpFile)

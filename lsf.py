@@ -35,7 +35,9 @@ helpOptions = """
 -l         - run in local mode. This means that the framework will not use LSF, but will behave as
              if the default configuration was being used, and run on the local machine.
 
--r <mins>  - run only tests which are expected to complete in less than <mins> minutes.
+-r <limits>- run tests subject to the time limits (in minutes) represented by <limits>. If this is a single limit
+             it will be interpreted as a minimum. If it is two comma-separated values, these are interpreted as
+             <minimum>,<maximum>. Empty strings are treated as no limit.
 
 -R <resrc> - Use the LSF resource <resrc>. This is essentially forwarded to LSF's bsub command, so for a full
              list of its capabilities, consult the LSF manual. However, it is particularly useful to use this

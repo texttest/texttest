@@ -277,6 +277,7 @@ class SubmitTest(unixConfig.RunTest):
         self.diag.info("Building command file at " + cmdFile)
         f = open(cmdFile, "w")
         f.write("HOST=`hostname`; export HOST" + os.linesep)
+        curDir = test.getDirectory(temporary=1)
         if os.environ.has_key("LSF_ENVIRONMENT"):
             data = os.environ["LSF_ENVIRONMENT"]
             defs = data.split(";")
@@ -285,9 +286,12 @@ class SubmitTest(unixConfig.RunTest):
                 if len(parts) > 1:
                     var = parts[0]
                     value = parts[1]
+                    fullPathValue = os.path.join(curDir, value)
+                    if os.path.exists(fullPathValue):
+                        value = fullPathValue
                     if value != "dummy":
                         f.write(var + "=" + "\"" + value + "\"; export " + var + os.linesep)
-        f.write("cd " + test.getDirectory(temporary=1) + os.linesep)
+        f.write("cd " + curDir + os.linesep)
         f.write(testCommand + os.linesep)
         f.close()
         return cmdFile

@@ -570,6 +570,9 @@ class AttachProfiler(plugins.Action):
         job = lsf.LSFJob(test)
         status, executionMachine = job.getStatus()
         processId = job.getProcessId()
+        if not processId:
+            print "Failed to find process id; profiler not attached."
+            return
         self.describe(test, ", executing on " + executionMachine + ", pid " + str(processId))
         runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId + " >& gprof.output"
         os.spawnlp(os.P_NOWAIT, "rsh", "rsh", executionMachine, runLine)

@@ -31,31 +31,28 @@ class RenamePlans(plugins.Action):
             return
         # Local plan
         localPlan1 = os.getenv("TESTCASE_LP_1")
-        if localPlan1 == None:
-            return
-        localPlan2 = os.getenv("TESTCASE_LP_2")
-        localPlan3 = os.getenv("TESTCASE_LP_3")
-        localPlanDir = carmusrDir + "/LOCAL_PLAN/" + localPlan1 + "/" + localPlan2 + "/" + localPlan3
-        localPlan = localPlanDir + "/localplan"
-        if os.path.isfile(localPlan):
-            decompressAndRename(localPlan,"./localplan.rrl")
+        if localPlan1 != None:
+	    localPlan2 = os.getenv("TESTCASE_LP_2")
+	    localPlan3 = os.getenv("TESTCASE_LP_3")
+	    localPlanDir = carmusrDir + "/LOCAL_PLAN/" + localPlan1 + "/" + localPlan2 + "/" + localPlan3
+	    localPlan = localPlanDir + "/localplan"
+	    if os.path.isfile(localPlan):
+		decompressAndRename(localPlan,"./localplan.rrl")
         # Sub plan
         subPlanName = os.getenv("TESTCASE_SP")
-        if subPlanName == None:
-            return
-        subPlan = localPlanDir + "/" + subPlanName + "/subplan"
-        subPlanHeader = subPlan + "Header"
-        if os.path.isfile(subPlan):
-            decompressAndRename(subPlan,"./subplan.rrl")
-        if os.path.isfile(subPlanHeader):
-            decompressAndRename(subPlanHeader,"./subplanHeader.rrl")
+        if subPlanName != None:
+	    subPlan = localPlanDir + "/" + subPlanName + "/subplan"
+	    subPlanHeader = subPlan + "Header"
+	    if os.path.isfile(subPlan):
+		decompressAndRename(subPlan,"./subplan.rrl")
+	    if os.path.isfile(subPlanHeader):
+		decompressAndRename(subPlanHeader,"./subplanHeader.rrl")
         # Environment plan
         envPlanName = os.getenv("TESTCASE_EP")
-        if envPlanName == None:
-            return
-        envPlan = localPlanDir + "/" + envPlanName + "/subplan"
-        envPlanHeader = envPlan + "Header"
-        if os.path.isfile(envPlan):
-            decompressAndRename(envPlan,"./envplan.rrl")
-        if os.path.isfile(envPlanHeader):
-            decompressAndRename(envPlanHeader,"./envplanHeader.rrl")
+        if envPlanName != None:
+	    envPlan = localPlanDir + "/" + envPlanName + "/subplan"
+	    envPlanHeader = envPlan + "Header"
+	    if os.path.isfile(envPlan):
+		decompressAndRename(envPlan,"./envplan.rrl")
+	    if os.path.isfile(envPlanHeader):
+		decompressAndRename(envPlanHeader,"./envplanHeader.rrl")

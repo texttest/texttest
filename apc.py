@@ -601,9 +601,9 @@ class MakeProgressReport(optimization.MakeProgressReport):
 
         # Calculate the KPI for each KPI group.
         for groupName in self.finalCostsInGroup.keys():
-            referenceAverageRun = self.createAverageOptimizationRun(referenceAverages[groupName])
-            currentAverageRun = self.createAverageOptimizationRun(currentAverages[groupName])
-            self.doCompare(referenceAverageRun, currentAverageRun, app, groupName, userNameForKPIGroup[groupName], "KPI-group")
+            referenceAverageRun, referenceMinRun, referenceMaxRun = self.createOptimizationRuns(referenceAverages[groupName])
+            currentAverageRun, currentMinRun, currentMaxRun = self.createOptimizationRuns(currentAverages[groupName])
+            self.doCompare(referenceAverageRun, currentAverageRun, app, groupName, userNameForKPIGroup[groupName], "KPI-group", (referenceMinRun, referenceMaxRun,currentMinRun, currentMaxRun))
     
         print os.linesep
         if self.sumRefTime > 0:
@@ -634,6 +634,14 @@ class MakeProgressReport(optimization.MakeProgressReport):
                 self.prodKPI *= math.pow(kpi, 1.0 * kpiTime / sumkpiTime)
             wText = "Overall time weighted KPI with respect to version"
             print wText, self.referenceVersion, "=", self.percent(self.prodKPI)
+    def doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition = "test", minMaxRuns = None):
+        kpi = optimization.MakeProgressReport.doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition)
+
+        worstCost = self.calculateWorstCost(referenceRun, currentRun, app, groupName)
+        currTTWC = currentRun.timeToCost(worstCost)
+        refTTWC = referenceRun.timeToCost(worstCost)
+        
+        self.plotKPI(self.testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns)
 
     def getPerformance(self, test, currentVersion, referenceVersion):
         return 0.0, 0.0
@@ -761,30 +769,39 @@ class MakeProgressReport(optimization.MakeProgressReport):
         if averagerMap.has_key(groupName):
             averagers = averagerMap[groupName]
         else:
-            averagers = averagerMap[groupName] = optimization.Averager(), optimization.Averager()
+            averagers = averagerMap[groupName] = optimization.Averager(1), optimization.Averager(1)
         costAverager, memAverager = averagers
         costAverager.addGraph(costGraph)
         memAverager.addGraph(memoryGraph)
         
     # Creates an OptimizationRun from the averager values.
-    def createAverageOptimizationRun(self, averages):
+    def createOptimizationRuns(self, averages):
         costAverage, memAverage = averages
-        costAverageGraph = costAverage.getGraph()
-        memAverageGraph = memAverage.getGraph()
-
+        costAverageGraph = costAverage.getAverage()
+        memAverageGraph = memAverage.getAverage()
+        averRun = self.createOptimizationRun(costAverageGraph, memAverageGraph)
+        costMinGraph, costMaxGraph = costAverage.getMinMax()
+        memMinGraph, memMaxGraph = memAverage.getMinMax()
+        minRun = self.createOptimizationRun(costMinGraph, memMinGraph)
+        maxRun = self.createOptimizationRun(costMaxGraph, memMaxGraph)
+        return averRun, minRun, maxRun
+        
+    def createOptimizationRun(self, costGraph, memGraph):
         solution = []
-        timeVals = costAverageGraph.keys()
+        timeVals = costGraph.keys()
         timeVals.sort()
         for time in timeVals:
-            if not memAverageGraph.has_key(time):
+            if not memGraph.has_key(time):
                 print "Errror!"
             else:
                 map = {}
                 map[optimization.timeEntryName] = time
-                map[optimization.costEntryName] = costAverageGraph[time]
-                map[optimization.memoryEntryName] = memAverageGraph[time]
+                map[optimization.costEntryName] = costGraph[time]
+                map[optimization.memoryEntryName] = memGraph[time]
                 solution.append(map)
         return optimization.OptimizationRun("","","","", 0.0, solution)
+    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns):
+        pass
 
 # Produces graphical output for the progress report.
 class MakeProgressReportGraphical(MakeProgressReport):
@@ -792,7 +809,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
         MakeProgressReport.__init__(self, referenceVersion)
         self.matplotlibPresent = 0
         try:
-            from matplotlib.pylab import figure, axes, plot, show, title, legend, FuncFormatter, savefig
+            from matplotlib.pylab import figure, axes, plot, show, title, legend, FuncFormatter, savefig, fill
             self.figure = figure
             self.axes = axes
             self.plot = plot
@@ -801,6 +818,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
             self.legend = legend
             self.FuncFormatter = FuncFormatter
             self.savefig = savefig
+            self.fill = fill
             self.matplotlibPresent = 1
         except:
             print "The matplotlib package doesn't seem to be in PYTHONPATH." + os.linesep + "No graphical output will be avaliable."
@@ -809,7 +827,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
         if self.matplotlibPresent:
             # Finally show the matlab plots.
             self.show()
-    def plotRun(self, optRun, options):
+    def plotRun(self, optRun, options, linewidth = 0.5):
         xVals = []
         yVals = []
         solutionPrev = optRun.solutions[0]
@@ -821,7 +839,29 @@ class MakeProgressReportGraphical(MakeProgressReport):
             solutionPrev = solution
         xVals.append(solutionPrev[optimization.timeEntryName])
         yVals.append(solutionPrev[optimization.costEntryName])
-        self.plot(xVals, yVals, options)
+        self.plot(xVals, yVals, options, linewidth = linewidth)
+    def fillRuns(self, optRunMin, optRunMax, axes, options):
+        xVals = []
+        yVals = []
+        solutionPrev = optRunMin.solutions[0]
+        for solution in optRunMin.solutions[1:]:
+            xVals.append(solutionPrev[optimization.timeEntryName])
+            yVals.append(solutionPrev[optimization.costEntryName])
+            xVals.append(solution[optimization.timeEntryName])
+            yVals.append(solutionPrev[optimization.costEntryName])
+            solutionPrev = solution
+        xVals.append(solutionPrev[optimization.timeEntryName])
+        yVals.append(solutionPrev[optimization.costEntryName])
+        solutionPrev = optRunMax.solutions[-1]
+        tmpSol = optRunMax.solutions[1:]
+        tmpSol.reverse()
+        for solution in tmpSol:
+            xVals.append(solutionPrev[optimization.timeEntryName])
+            yVals.append(solutionPrev[optimization.costEntryName])
+            xVals.append(solutionPrev[optimization.timeEntryName])
+            yVals.append(solution[optimization.costEntryName])
+            solutionPrev = solution
+        axes.fill(xVals, yVals, '#dddddd' , linewidth = 0.5, edgecolor = options)
     def plotKPILimits(self, worstCost, currTTWC, refTTWC):
         self.plot([0,1.1*max(currTTWC,refTTWC)],[worstCost, worstCost],"r")
         self.plot([currTTWC,currTTWC], [worstCost*1.01,worstCost*0.99],"r")
@@ -830,7 +870,7 @@ class MakeProgressReportGraphical(MakeProgressReport):
         self.plotKPILimits(worstCost, currTTWC, refTTWC)
         ax.set_ylim( (lowestCost*0.999, lowestCost * 1.05) )
         self.legend([self.referenceVersion,self.currentVersion])
-    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi):
+    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns):
         if not self.matplotlibPresent:
             return
         self.figure(testCount, facecolor = 'w', figsize = (12,5))
@@ -845,8 +885,12 @@ class MakeProgressReportGraphical(MakeProgressReport):
         # Plot the average curves on the left axes.
         ax = self.axes([0.1, up ,width, height], axisbg = axesBG)
         ax.yaxis.set_major_formatter(majorFormatter)
-        self.plotRun(referenceRun, "b")
-        self.plotRun(currentRun, "g")
+        if minMaxRuns:
+            referenceMinRun, referenceMaxRun, currentMinRun, currentMaxRun = minMaxRuns
+            self.fillRuns(referenceMinRun, referenceMaxRun, ax, "b")
+            self.fillRuns(currentMinRun, currentMaxRun, ax, "g")
+        self.plotRun(referenceRun, "b", 1.5)
+        self.plotRun(currentRun, "g", 1.5)
         self.plotPost(ax, lowestCostInGroup, worstCost, currTTWC, refTTWC)
         self.title("User " + userName + ", KPI group " + groupName + ": " + str(kpi))
         # Plot the individual curves on the right axes.
@@ -912,8 +956,8 @@ class MakeProgressReportHTML(MakeProgressReportGraphical):
             self.summaryContainer.append((self.htmlHeading(2, "Worst KPI = " + self.percent(self.worstKpi))))
             self.indexDoc.append(self.htmlHR())
             self.indexDoc.write(os.path.join(self.dirForPlots, "index.html"))
-    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi):
-        MakeProgressReportGraphical.plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi)
+    def plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns):
+        MakeProgressReportGraphical.plotKPI(self, testCount, currentRun, referenceRun, worstCost, currTTWC, refTTWC, groupName, userName, kpi, minMaxRuns)
         if self.savePlots:
             self.savefig(os.path.join(self.dirForPlots, groupName))
             if self.writeHTML:

@@ -184,7 +184,7 @@ class TestComparison(plugins.TestState):
             if file == "framework_tmp":
                 continue
             fullPath = os.path.join(dir, file)
-            if os.path.isdir(file):
+            if os.path.isdir(fullPath):
                 self.makeComparisonsInDir(test, fullPath, makeNew)
             elif self.shouldCompare(file, dir, test.app):
                 self.diag.info("Decided we should compare " + file)

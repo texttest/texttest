@@ -338,10 +338,15 @@ class CollectFiles(plugins.Action):
             if filename.startswith(prefix):
                 fullname = os.path.join(app.abspath, filename)
                 file = open(fullname)
-                app.addConfigEntry("collection", file.readline().strip(), "batch_recipients")
+                recipient = file.readline().strip()
+                if recipient:
+                    app.addConfigEntry("collection", recipient, "batch_recipients")
                 catValues = plugins.commasplit(file.readline().strip())
-                for i in range(len(categoryNames)):
-                    totalValues[i] += int(catValues[i])
+                try:
+                    for i in range(len(categoryNames)):
+                        totalValues[i] += int(catValues[i])
+                except ValueError:
+                    print "WARNING : found truncated or old format batch report (" + filename + ") - could not parse result correctly"
                 fileBodies.append(file.read())
                 file.close()
                 try:

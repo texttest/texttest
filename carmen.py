@@ -399,7 +399,7 @@ class CompileRules(plugins.Action):
         jobName = self.jobNameCreator.getName(test)
         if jobName in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name + " already being compiled")
-            test.changeState(plugins.TestState("need_rulecompile", "Compiling ruleset " + ruleset.name))
+            test.changeState(NeedRuleCompilation("Compiling ruleset " + ruleset.name, thisTestCompiles=0))
             return
         self.describe(test, " - ruleset " + ruleset.name)
         ruleset.backup()
@@ -436,7 +436,7 @@ class CompileRules(plugins.Action):
         os.environ["PWD"] = test.abspath
         self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.environ["PWD"])
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
-        test.changeState(plugins.TestState("need_rulecompile", "Compiling ruleset " + self.getRuleSetName(test)))
+        test.changeState(NeedRuleCompilation("Compiling ruleset " + self.getRuleSetName(test), thisTestCompiles=1))
         return self.ruleRunner.runCommand(test, fullCommand, self.jobNameCreator.getName)
     def setUpSuite(self, suite):
         if self.filter and not self.filter.acceptsTestSuite(suite):
@@ -451,9 +451,15 @@ class CompileRules(plugins.Action):
     def getFilter(self):
         return self.filter
 
+class NeedRuleCompilation(plugins.TestState):
+    def __init__(self, details, thisTestCompiles):
+        plugins.TestState.__init__(self, "need_rulecompile", details)
+        self.thisTestCompiles = thisTestCompiles
+
 class RunningRuleCompilation(plugins.TestState):
-    def __init__(self, details):
+    def __init__(self, details, prevState):
         plugins.TestState.__init__(self, "running_rulecompile", details)
+        self.thisTestCompiles = prevState.thisTestCompiles
     def changeDescription(self):
         return "start ruleset compilation"
     def timeElapsedSince(self, oldState):
@@ -482,7 +488,7 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
         if status == "PEND":
             test.state.freeText = details
         else:
-            test.changeState(RunningRuleCompilation(details))
+            test.changeState(RunningRuleCompilation(details, test.state))
 
         if status == "EXIT":
             return self.raiseFailure(test, ruleset)
@@ -492,7 +498,7 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
     def raiseFailure(self, test, ruleset):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
         jobName = self.jobNameFunction(test)
-        if not os.path.isfile(compTmp):
+        if not test.state.thisTestCompiles:
             # Make sure first test is first one to report - less confusing...
             if jobName in self.ruleCompilations:
                 raise plugins.TextTestError, "Trying to use ruleset '" + ruleset + "' that failed to build."
@@ -502,6 +508,8 @@ class UpdateRulesetBuildStatus(lsf.UpdateLSFStatus):
         errContents = self.findErrorMessage(compTmp)
         self.raiseFailureWithError(ruleset, errContents)
     def findErrorMessage(self, compTmp):
+        if not os.path.isfile(compTmp):
+            return "Rave compiler did not run at all, possibly problems with execution machine"
         errContents = string.join(open(compTmp).readlines(),"")
         if errContents.find("Compiling... failed!") != -1:
             return "Rave compiler failed in C-compilation phase." + os.linesep + "See " + compTmp + " for details."

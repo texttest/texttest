@@ -746,7 +746,7 @@ class Application:
             fpath = os.path.join(rootDir, file)
             if not os.path.isdir(fpath):
                 continue
-            if fpath.find(currTmpString) != -1:
+            if file.startswith(currTmpString):
                 previousWriteDir = os.path.join(rootDir, file)
                 print "Removing previous write directory", previousWriteDir
                 shutil.rmtree(previousWriteDir)

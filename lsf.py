@@ -21,9 +21,8 @@ Because UNIX is assumed anyway, results are presented using "tkdiff" for the fil
 the "log_file" entry in the config file, and "diff" for everything else. These are more
 user friendly but less portable than the default "ndiff".
 
-It also generates performance checking and memory checking by using the LSF report file to
-extract this information. The reliability of memory checking is however uncertain, hence
-it is currently disabled by default. As well as the CPU time needed by performance.py, it will
+It also generates performance checking by using the LSF report file to
+extract this information. As well as the CPU time needed by performance.py, it will
 report the real time and any jobs which are currently running on the other processors of
 the execution machine, if it has others. These have been found to be capable of interfering
 with the performance of the job.

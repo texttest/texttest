@@ -106,6 +106,9 @@ class PerformanceFileComparison(comparetest.FileComparison):
         else:
             return "slower"
     def hasDifferences(self):
+        perfList = self.test.app.getConfigList("performance_test_machine")
+        if perfList == None or len(perfList) == 0 or perfList[0] == "none":
+            return 0
         longEnough = self.newCPUtime > float(self.test.app.getConfigValue("minimum_cputime_for_test"))
         varianceEnough = self.percentageChange > float(self.test.app.getConfigValue("cputime_variation_%"))
         return longEnough and varianceEnough

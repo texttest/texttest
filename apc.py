@@ -47,6 +47,12 @@ apc.UpdateCvsIgnore        - Make the .cvsignore file in each test directory ide
 
 apc.PrintAirport           - Prints the target AirportFile location for each user
 
+apc.UpdatePerformance      - Update the performance file for tests with time from the status file if the
+                             status file is from a run on a performance test machine.
+                             The following options are supported:
+                             - v=v1,v2
+                               Update for  multiple versions, ie 'v=,9' means master and version 9
+
 apc.StartStudio            - Start ${CARMSYS}/bin/studio with CARMUSR and CARMTMP set for specific test
                              This is intended to be used on a single specified test and will terminate
                              the testsuite after it starts Studio. It is a simple shortcut to set the
@@ -625,3 +631,60 @@ class PrintAirport(plugins.Action):
     def setUpApplication(self, app):
         pass
 
+class UpdatePerformance(plugins.Action):
+    def __init__(self, args = []):
+        self.updateVersions = [ "" ]
+        self.statusFileName = None
+        self.interpretOptions(args)
+    def __repr__(self):
+        return "Updating performance"
+    def __call__(self, test):
+        for version in self.updateVersions:
+            statusFile = self.getStatusFile(test, version)
+            performanceFile = self.getPerformanceFile(test, version)
+            if statusFile == None or performanceFile == None:
+                return
+            lastTime = self.getLastTime(statusFile)
+            runHost = self.getExecHost(statusFile)
+            totPerf = int(performance.getPerformance(performanceFile))
+            verText = " (master)"
+            if version != "":
+                verText = " (" + version + ")"
+            if not runHost in test.app.getConfigList("performance_test_machine"):
+                self.describe(test, verText + " no update for run on " + runHost)
+                return
+            if lastTime == totPerf:
+                self.describe(test, verText + " no need for update")
+                return
+            self.describe(test, verText + " perf:" + str(totPerf) + ", status: " + str(lastTime) + ", on " + runHost)
+            open(performanceFile,"w").write("CPU time   :      " + str(lastTime) + ".0 sec. on " + runHost + os.linesep)
+    def interpretOptions(self, args):
+        for ar in args:
+            arr = ar.split("=")
+            if arr[0]=="v":
+                self.updateVersions = arr[1].split(",")
+            elif not self.setOption(arr):
+                print "Unknown option " + arr[0]
+    def setOption(self, arr):
+        return 0
+    def getExecHost(self, file):
+        hostLine = os.popen("grep achine " + file + " | tail -1").readline().strip()
+        return hostLine.split(":")[1].strip()
+    def getLastTime(self, file):
+        optCalc = optimization.OptimizationValueCalculator( [ optimization.timeEntryName ], file)
+        times = optCalc.getValues(optimization.timeEntryName)
+        return int(times[-1] * 60.0)
+    def getStatusFile(self, test, version):
+        currentFile = test.makeFileName(self.statusFileName, version)
+        if not os.path.isfile(currentFile):
+            return None
+        return currentFile
+    def getPerformanceFile(self, test, version):
+        currentFile = test.makeFileName("performance", version)
+        if not os.path.isfile(currentFile):
+            return None
+        return currentFile
+    def setUpSuite(self, suite):
+        pass
+    def setUpApplication(self, app):
+        self.statusFileName = app.getConfigValue("log_file")

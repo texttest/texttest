@@ -153,7 +153,14 @@ class BackgroundProcess:
         except OSError:
             return 1
     def kill(self):
-        os.kill(self.processId, signal.SIGTERM)
+        self.killProcessAndChildren(str(self.processId))
+    def killProcessAndChildren(self, pid):
+        for line in os.popen("ps -efl | grep " + pid).xreadlines():
+            entries = line.split()
+            if entries[4] == pid:
+                print "Killing child process", entries[3]
+                self.killProcessAndChildren(entries[3])
+        os.kill(int(pid), signal.SIGKILL)
     def resetSignalHandlers(self):
         # Set all signal handlers to default. There is a python bug
         # that processes started from threads block all signals. This

@@ -175,8 +175,8 @@ class TextTestGUI:
         self.model.row_changed(self.model.get_path(iter), iter)
     def quit(self, *args):
         self.quitGUI = 1
-        self.actionThread.join()
         gtk.main_quit()
+        self.actionThread.join()
     def saveAll(self, *args):
         saveTestAction = self.testCaseGUI.getSaveTestAction()
         for test in self.allTests:

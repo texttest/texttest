@@ -150,7 +150,7 @@ class CarmenConfig(lsf.LSFConfig):
             return None
     def getRealRuleBuilder(self):
         if self.useLSF():
-            ruleRunner = lsf.SubmitTest(self.findLSFQueue, self.findLSFResource)
+            ruleRunner = lsf.SubmitTest(self.findRaveCompilationLSFQueue, self.findLSFResource)
         else:
             ruleRunner = default.RunTest()
         return [ self.getRuleBuildObject(ruleRunner), UpdateRulesetBuildStatus(self.getRuleSetName, self.getRulesetBuildJobName) ]
@@ -194,12 +194,15 @@ class CarmenConfig(lsf.LSFConfig):
     def findDefaultLSFQueue(self, test):
         arch = getArchitecture(test.app)
         return self.getQueuePerformancePrefix(test, arch) + self.getArchQueueName(arch) + self.getQueuePlatformSuffix(test.app, arch)
+    def findRaveCompilationLSFQueue(self, test):
+        arch = getArchitecture(test.app)
+        return self.getQueuePerformancePrefix(test, arch, rave = 1) + self.getArchQueueName(arch) + self.getQueuePlatformSuffix(test.app, arch)
     def getArchQueueName(self, arch):
         if arch == "sparc_64":
             return "sparc"
         else:
             return arch
-    def getQueuePerformancePrefix(self, test, arch):
+    def getQueuePerformancePrefix(self, test, arch, rave = 0):
         cpuTime = performance.getTestPerformance(test)
         usePrefix = ""
         if os.environ.has_key("LSF_QUEUE_PREFIX"):
@@ -207,7 +210,7 @@ class CarmenConfig(lsf.LSFConfig):
         # Currently no short queue for powerpc_aix4
         if arch == "powerpc" and "9" in test.app.versions:
             return ""
-        if usePrefix == "" and cpuTime < 10:
+        if usePrefix == "" and (cpuTime < 10 or rave):
             return "short_"
         elif arch == "powerpc" or arch == "parisc_2_0":
             return ""

@@ -296,6 +296,9 @@ class CheckCarmVariables(plugins.Action):
     def setUpSuite(self, suite):
         if isUserSuite(suite):
             self.ensureCarmTmpDirExists()
+    def __call__(self, test):
+        if isUserSuite(test):
+            self.ensureCarmTmpDirExists()
     def ensureCarmTmpDirExists(self):
         carmTmp = os.path.normpath(os.environ["CARMTMP"])
         if not os.path.isdir(carmTmp):

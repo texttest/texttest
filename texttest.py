@@ -370,6 +370,7 @@ class OptionFinder:
         return appList
     def _findApps(self, dirName, recursive):
         appList = []
+        selectedAppList = self.findSelectedAppNames()
         for f in os.listdir(dirName):
             pathname = os.path.join(dirName, f)
             if os.path.isfile(pathname):
@@ -377,7 +378,7 @@ class OptionFinder:
                 if len(components) > 2 or components[0] != "config":
                     continue
                 appName = components[1]
-                if self.inputOptions.has_key("a") and appName != self.inputOptions["a"]:
+                if len(selectedAppList) and not appName in selectedAppList:
                     continue
                 versionList = self.findVersionList()
                 try:
@@ -392,6 +393,11 @@ class OptionFinder:
     def findVersionList(self):
         if self.inputOptions.has_key("v"):
             return self.inputOptions["v"].split(",")
+        else:
+            return []
+    def findSelectedAppNames(self):
+        if self.inputOptions.has_key("a"):
+            return self.inputOptions["a"].split(",")
         else:
             return []
     def timesToRun(self):
@@ -508,6 +514,42 @@ class MultiEntryDictionary:
         else:
             return []
 
+class ApplicationRunner:
+    def __init__(self, app):
+        self.app = app
+        self.actionSequence = inputOptions.getActionSequence(app)
+        self.valid, self.filterList = app.getFilterList()
+        if inputOptions.helpMode():
+            app.printHelpText()
+            self.valid = 0
+        else:
+            self.testSuite = TestSuite(os.path.basename(app.abspath), app.abspath, app, self.filterList)
+    def actionCount(self):
+        return len(self.actionSequence)
+    def performAction(self, actionNum):
+        if actionNum < self.actionCount():
+            action = self.actionSequence[actionNum]
+            if action.getFilter() != None:
+                self._performActionWithFilter(action)
+            else:
+                self._performAction(self.testSuite, action)
+    def performCleanUp(self):
+        self.valid = 0 # Make sure no future runs are made
+        for action in self.actionSequence:
+            cleanUp = action.getCleanUpAction()
+            if cleanUp != None:
+                self._performAction(self.testSuite, cleanUp)        
+    def _performActionWithFilter(self, action):
+        newFilterList = self.filterList
+        newFilterList.append(action.getFilter())
+        debugPrint("Creating extra test suite from new filter " + repr(action.getFilter()))
+        debugPrint(os.getcwd())
+        actionTests = TestSuite(os.path.basename(self.app.abspath), self.app.abspath, self.app, newFilterList)
+        self._performAction(actionTests, action)
+    def _performAction(self, suite, action):
+        action.setUpApplication(suite.app)
+        suite.performAction(action)    
+
 def debugPrint(text):
     if inputOptions.debugMode():
         print text
@@ -540,64 +582,57 @@ class TextTest:
         else:
             return "%H%M%S"
     def run(self):
-        for run in range(inputOptions.timesToRun()):
-            for app in self.allApps:
-                try:
-                    self.runApp(app)
-                except:
-                    # Assumed to be a child thread, in any case exit silently
-                    if sys.exc_type == exceptions.SystemExit:
-                        return
-                    elif sys.exc_type == exceptions.KeyboardInterrupt:
-                        print "Terminated due to interruption"
-                        return
-                    else:
-                        print "Terminated tests of application", app, "due to exception:"
-                        printException()
-    def runApp(self, app):
-        actionSequence = inputOptions.getActionSequence(app)
-        acceptsApp, filterList = app.getFilterList()
-        if not acceptsApp:
-            return
-        if inputOptions.helpMode():
-            return app.printHelpText()
-        allTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, filterList)
         try:
-            self.performActionSequence(allTests, actionSequence, app, filterList)
-        except:
-            if sys.exc_type == exceptions.SystemExit:
+            self._run()
+        except SystemExit:# Assumed to be a child thread, in any case exit silently
+            pass
+        except KeyboardInterrupt:
+            print "Terminated due to interruption"
+    def _run(self):
+        applicationRunners = self.createAppRunners()
+        if len(applicationRunners) == 0:
+            return
+        maxActionCount = max(map(lambda x: x.actionCount(), applicationRunners))
+        # Run actions one at a time for each application. This should ensure a fair spread of machine time when this is limited
+        for run in range(inputOptions.timesToRun()):
+            for actionNum in range(maxActionCount):
+                self.performActionOnApps(applicationRunners, actionNum)
+    def createAppRunners(self):
+        applicationRunners = []
+        for app in self.allApps:
+            try:
+                appRunner = ApplicationRunner(app)
+                if appRunner.valid:
+                    print app.description()
+                    applicationRunners.append(appRunner)
+            except (SystemExit, KeyboardInterrupt):
                 raise sys.exc_type, sys.exc_value
-            else:
-                self.performCleanUp(allTests, actionSequence, app)
-    def performCleanUp(self, suite, actionSequence, app):    
-        print "Caught exception, cleaning up..."
-        for action in actionSequence:
-            cleanUp = action.getCleanUpAction()
-            if cleanUp != None:
-                self.performAction(suite, cleanUp)
-        # Keyboard interrupts should terminate everything, otherwise we should continue with other apps
-        if sys.exc_type == exceptions.KeyboardInterrupt:
+            except:
+                print "Not running tests of application", app, "due to exception in set-up:"
+                printException()
+        return applicationRunners
+    def performActionOnApps(self, applicationRunners, actionNum):
+        try:
+            for appRunner in applicationRunners:
+                if appRunner.valid:
+                    self.performAction(appRunner, actionNum)
+        except SystemExit:
+            # Assumed to be a child thread, in any case exit silently
             raise sys.exc_type, sys.exc_value
-        else:
-            print "Terminated tests of application", app, "due to exception:"
+        except KeyboardInterrupt:
+            print "Received kill signal, cleaning up all applications..."
+            for appRunner in applicationRunners:
+                appRunner.performCleanUp()
+            raise sys.exc_type, sys.exc_value
+    def performAction(self, appRunner, actionNum):
+        try:
+            appRunner.performAction(actionNum)
+        except (SystemExit, KeyboardInterrupt):
+            raise sys.exc_type, sys.exc_value
+        except:
+            print "Caught exception from application", appRunner.app, ", cleaning up and terminating its tests:"
             printException()
-    def performActionSequence(self, suite, actionSequence, app, filterList):
-        print app.description()
-        for action in actionSequence:
-            if action.getFilter() != None:
-                self.performActionWithFilter(app, action, action.getFilter(), filterList)
-            else:
-                self.performAction(suite, action)
-    def performActionWithFilter(self, app, action, newFilter, filterList):
-        newFilterList = filterList
-        newFilterList.append(newFilter)
-        debugPrint("Creating extra test suite from new filter " + repr(newFilter))
-        debugPrint(os.getcwd())
-        actionTests = TestSuite(os.path.basename(app.abspath), app.abspath, app, newFilterList)
-        self.performAction(actionTests, action)
-    def performAction(self, suite, action):
-        action.setUpApplication(suite.app)
-        suite.performAction(action)
+            appRunner.performCleanUp()
 
 if __name__ == "__main__":
     program = TextTest()

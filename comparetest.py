@@ -87,7 +87,7 @@ class TestComparison:
                 standardFile = os.path.basename(test.makeFileName(stem))
                 standardPath = os.path.join(subDirectory, standardFile)
                 comparison = self.makeComparison(test, standardPath, os.path.join(subDirectory, file))
-                self.addComparison(standardFile, comparison)
+                self.addComparison(standardPath, comparison)
     def shouldCompare(self, file, tmpExt, dirPath):
         return file.endswith(tmpExt)
     def makeComparison(self, test, standardFile, tmpFile):

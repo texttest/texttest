@@ -248,7 +248,7 @@ class TestCase(Test):
             debugLog.info("Input file now '" + self.inputFile + "'")
         return writeDir
     def cleanFiles(self, keeptmp):
-        if self.inputFile.find(globalRunIdentifier) != -1:
+        if self.inputFile.find(self.getTmpIdentifier()) != -1:
             os.remove(self.inputFile)
         # Don't be in the directory when it's removed...
         os.chdir(self.abspath)

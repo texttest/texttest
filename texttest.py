@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, string, getopt, types, time, re, plugins, exceptions
+import os, sys, string, getopt, types, time, re, plugins, exceptions, stat
 from stat import *
 
 helpIntro = """
@@ -112,11 +112,19 @@ class TestCase(Test):
     def getTmpFileName(self, text, mode):
         prefix = text + "." + self.app.name
         fileName = prefix + globalRunIdentifier
-        if mode == "w" and not inputOptions.parallelMode():
+        # When writing files, clean up equivalent files from previous runs, unless
+        # we are in parallel mode and the files are less than 2 days old
+        if mode == "w":
             for file in os.listdir(self.abspath):
                 if file.find(prefix) != -1 and file.find(self.getTestUser()) != -1:
-                    os.remove(file)
+                    if not inputOptions.parallelMode() or self.isOutdated(file):
+                        os.remove(file)
         return fileName
+    def isOutdated(self, filename):
+        modTime = os.stat(filename)[stat.ST_MTIME]
+        currTime = time.time()
+        threeDaysInSeconds = 60 * 60 * 24 * 3
+        return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
     def getInputFileName(self):

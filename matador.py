@@ -246,6 +246,8 @@ class TimeSummary(plugins.Action):
         self.useTmpStatus = 0
         self.suite = ""
         self.solutionDetail = 0
+        self.genTime = 1
+        self.optTime = 1
         # Must be last in the constructor
         self.interpretOptions(args)
     def __repr__(self):
@@ -257,6 +259,12 @@ class TimeSummary(plugins.Action):
                 self.timeVersions = arr[1].split(",")
             elif arr[0]=="sd":
                 self.solutionDetail = 1
+            elif arr[0]=="opt":
+                self.genTime = 0
+                self.optTime = 1
+            elif arr[0]=="gen":
+                self.optTime = 0
+                self.genTime = 1
             else:
                 print "Unknown option " + arr[0]
     def setUpSuite(self, suite):
@@ -294,10 +302,14 @@ class TimeSummary(plugins.Action):
                     hasTimes = 1
                     totalTime = int(solution[totTime] * 60) - lastTotTime
                     if totalTime > 0:
-                        sumGen += solution[genTime]
-                        sumOpt += solution[optTime]
                         sumTot += totalTime
-                        useFul = solution[genTime] + solution[optTime]
+                        useFul = 0
+                        if self.genTime:
+                            sumGen += solution[genTime]
+                            useFul = solution[genTime] + solution[optTime]
+                        if self.optTime:
+                            sumOpt += solution[optTime]
+                            useFul += solution[optTime]
                         usePercent.append(str(int(100.0* useFul / totalTime)))
                     else:
                         usePercent.append("--")

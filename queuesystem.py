@@ -142,7 +142,7 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         app.setConfigDefault("min_time_for_performance_force", -1)
         app.setConfigDefault("queue_system_module", "LSF")
         app.setConfigDefault("performance_test_resource", { "default" : [] })
-        app.setConfigDefault("parallel_environment_name", "make")
+        app.setConfigDefault("parallel_environment_name", "'*'")
 
 class SubmissionRules:
     def __init__(self, optionMap, test, nonTestProcess):

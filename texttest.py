@@ -368,7 +368,7 @@ class TestCase(Test):
     def _removeDir(self, writeDir):
         parent, local = os.path.split(writeDir)
         if local.find(self.app.getTmpIdentifier()) != -1:
-            debugLog.info("Removing write directory under", parent)
+            directoryLog.info("Removing write directory under " + parent)
             plugins.rmtree(writeDir)
         elif parent:
             self._removeDir(parent)
@@ -414,7 +414,7 @@ class TestCase(Test):
         return writeDir
     def createDirs(self, fullWriteDir):
         os.makedirs(fullWriteDir)    
-        debugLog.info("Created write directory " + fullWriteDir)
+        directoryLog.info("Created write directory " + fullWriteDir)
         self.writeDirs.append(fullWriteDir)
         return fullWriteDir
     def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
@@ -876,7 +876,7 @@ class Application:
         os.makedirs(self.writeDirectory)
         debugLog.info("Made root directory at " + self.writeDirectory)
     def removeWriteDirectory(self):
-        doRemove = self.cleanMode & plugins.Configuration.CLEAN_SELF
+        doRemove = self.cleanMode & plugins.Configuration.CLEAN_BASIC
         if doRemove and os.path.isdir(self.writeDirectory):
             # Don't be somewhere under the directory when it's removed
             os.chdir(self.abspath)
@@ -1007,8 +1007,9 @@ class OptionFinder(seqdict):
         else:
             self._disableDiags()
         # Module level debugging logger
-        global debugLog
+        global debugLog, directoryLog
         debugLog = plugins.getDiagnostics("texttest")
+        directoryLog = plugins.getDiagnostics("directories")
     def _disableDiags(self):
         rootLogger = log4py.Logger().get_root()        
         rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
@@ -1277,7 +1278,7 @@ class TestRunner:
         for action in self.appRunner.cleanupSequence:
             self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.test))
             self.test.callAction(action)
-        if self.test.app.cleanMode & plugins.Configuration.CLEAN_SELF:
+        if self.test.app.cleanMode & plugins.Configuration.CLEAN_NONBASIC:
             self.test.cleanNonBasicWriteDirectories()
     def findSuitesToChange(self, previousTestRunner):
         tearDownSuites = []

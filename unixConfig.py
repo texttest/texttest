@@ -31,7 +31,7 @@ class UNIXConfig(default.Config):
         return self.optionMap.has_key("b")
     def getCleanMode(self):
         defaultMode = default.Config.getCleanMode(self)
-        if self.batchMode() and defaultMode & self.CLEAN_SELF:
+        if self.batchMode() and defaultMode & self.CLEAN_BASIC:
             return self.CLEAN_PREVIOUS
         else:
             return defaultMode

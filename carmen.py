@@ -61,9 +61,6 @@ class CarmenConfig(lsf.LSFConfig):
         for group in groups:
             if group.name.startswith("How"):
                 group.addSwitch("lprof", "Run with LProf profiler")
-    def getLoginShell(self):
-        # All of carmen's login stuff is done in tcsh starter scripts...
-        return "/bin/tcsh"
     def getTestRunner(self):
         baseRunner = lsf.LSFConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):
@@ -144,6 +141,9 @@ class CarmenConfig(lsf.LSFConfig):
         app.setConfigDefault("default_architecture", "i386_linux")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10)
         app.setConfigDefault("maximum_cputime_for_chunking", 0.0)
+    def defaultLoginShell(self):
+        # All of carmen's login stuff is done in tcsh starter scripts...
+        return "/bin/tcsh"
     def getApplicationEnvironment(self, app):
         return lsf.LSFConfig.getApplicationEnvironment(self, app) + \
                [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]
@@ -201,6 +201,10 @@ class RunWithParallelAction(plugins.Action):
             return self.getProcessName(processId)
         else:
             return pslines[-1].split()[-1]
+    def setUpSuite(self, suite):
+        self.baseRunner.setUpSuite(suite)
+    def setUpApplication(self, app):
+        self.baseRunner.setUpApplication(app)
                 
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, processInfo):

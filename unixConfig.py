@@ -41,15 +41,14 @@ class UNIXConfig(default.Config):
     def getPerformanceFileMaker(self):
         return MakePerformanceFile()
     def getTestRunner(self):
-        return RunTest(self.getLoginShell())
-    def getLoginShell(self):
-        # Default, we know this exists everywhere
-        return "sh"
+        return RunTest()
     def getTestResponder(self):
         if self.batchMode():
             return batch.BatchResponder(self.optionValue("b"))
         else:
             return default.Config.getTestResponder(self)
+    def defaultLoginShell(self):
+        return "sh"
     def defaultTextDiffTool(self):
         return "diff"
     def defaultSeverities(self):
@@ -81,6 +80,7 @@ class UNIXConfig(default.Config):
         app.setConfigDefault("batch_use_collection", { "default" : "false" })
         # Sample to show that values are lists
         app.setConfigDefault("batch_version", { "default" : [] })
+        app.setConfigDefault("login_shell", self.defaultLoginShell())
         # Use batch session as a base version
         batchSession = self.optionValue("b")
         if batchSession:
@@ -99,10 +99,10 @@ class Pending(plugins.TestState):
         self.process.doFork()
 
 class RunTest(default.RunTest):
-    def __init__(self, loginShell):
+    def __init__(self):
         default.RunTest.__init__(self)
         self.process = None
-        self.loginShell = loginShell
+        self.loginShell = None
         self.collectStdErr = 1
         self.testDisplay = None
         self.realDisplay = os.getenv("DISPLAY")
@@ -156,6 +156,7 @@ class RunTest(default.RunTest):
     def setUpApplication(self, app):
         default.RunTest.setUpApplication(self, app)
         self.collectStdErr = app.getConfigValue("collect_standard_error")
+        self.loginShell = app.getConfigValue("login_shell")
         self.setUpVirtualDisplay(app)
     def setUpVirtualDisplay(self, app):
         finder = VirtualDisplayFinder(app)

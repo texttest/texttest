@@ -101,7 +101,7 @@ class LSFConfig(unixConfig.UNIXConfig):
         if not self.useLSF():
             return unixConfig.UNIXConfig._getActionSequence(self, makeDirs)
 
-        submitter = SubmitTest(self.getLoginShell(), self.findLSFQueue, self.findLSFResource, self.findLSFMachine, self.optionMap)
+        submitter = SubmitTest(self.findLSFQueue, self.findLSFResource, self.findLSFMachine, self.optionMap)
         actions = [ submitter, self.updaterLSFStatus(), default.SaveState() ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
@@ -110,7 +110,7 @@ class LSFConfig(unixConfig.UNIXConfig):
         return actions
     def getTestRunner(self):
         if self.optionMap.slaveRun():
-            return RunTestInSlave(self.getLoginShell())
+            return RunTestInSlave()
         else:
             return unixConfig.UNIXConfig.getTestRunner(self)
     def updaterLSFStatus(self):
@@ -348,8 +348,8 @@ class LSFJob:
         os.system("bkill " + self.jobId + " > /dev/null 2>&1")
     
 class SubmitTest(plugins.Action):
-    def __init__(self, loginShell, queueFunction, resourceFunction, machineFunction, optionMap):
-        self.loginShell = loginShell
+    def __init__(self, queueFunction, resourceFunction, machineFunction, optionMap):
+        self.loginShell = None
         self.queueFunction = queueFunction
         self.resourceFunction = resourceFunction
         self.machineFunction = machineFunction
@@ -436,6 +436,7 @@ class SubmitTest(plugins.Action):
         if os.environ.has_key("TEXTTEST_DIAGDIR"):
             self.origEnv["TEXTTEST_DIAGDIR"] = os.path.join(os.getenv("TEXTTEST_DIAGDIR"), "slave")
         self.runOptions = self.setRunOptions(app)
+        self.loginShell = app.getConfigValue("login_shell")
     
 class KillTest(plugins.Action):
     jobsKilled = []

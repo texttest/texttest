@@ -245,6 +245,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         optimization.MakeProgressReport.__init__(self, referenceVersion)
         self.refMargins = {}
         self.currentMargins = {}
+        self.groupQualityLimit = {}
+        self.groupTimeLimit = {}
         self.kpiGroupForTest = {}
         self.testInGroupList = []
         self.finalCostsInGroup = {}
@@ -302,8 +304,17 @@ class MakeProgressReport(optimization.MakeProgressReport):
         for line in groupFile.readlines():
             if line[0] == '#' or not ':' in line:
                 continue
-            groupName, testname = line.strip().split(":",1)
-            self.kpiGroupForTest[testname] = groupName
+            groupKey, groupValue = line.strip().split(":",1)
+            if groupKey.find("_") == -1:
+                testName = groupValue
+                groupName = groupKey
+                self.kpiGroupForTest[testName] = groupName
+            else:
+                groupName, groupParameter = groupKey.split("_", 1)
+                if groupParameter == "q":
+                    self.groupQualityLimit[groupName] = int(groupValue)
+                if groupParameter == "t":
+                    self.groupTimeLimit[groupName] = int(groupValue)
     def compare(self, test, referenceRun, currentRun):
         userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
         if not self.kpiGroupForTest.has_key(test.name):
@@ -317,12 +328,17 @@ class MakeProgressReport(optimization.MakeProgressReport):
             self.finalCostsInGroup[groupName] = []
         self.finalCostsInGroup[groupName].append(fcTuple)
     def getMargins(self, test):
-        if self.kpiGroupForTest.has_key(test.name):
-            refMargin = self.refMargins[self.kpiGroupForTest[test.name]]
-            currentMargin = self.currentMargins[self.kpiGroupForTest[test.name]]
-            return currentMargin, refMargin
-        else:
+        if not self.kpiGroupForTest.has_key(test.name):
             return optimization.MakeProgressReport.getMargins(self, test)
+        refMargin = self.refMargins[self.kpiGroupForTest[test.name]]
+        currentMargin = self.currentMargins[self.kpiGroupForTest[test.name]]
+        return currentMargin, refMargin
+    def calculateWorstCost(self, test, referenceRun, currentRun):
+        if self.kpiGroupForTest.has_key(test.name):
+            groupName = self.kpiGroupForTest[test.name]
+            if self.groupQualityLimit.has_key(groupName):
+                return self.groupQualityLimit[groupName]
+        return optimization.MakeProgressReport.calculateWorstCost(self, test)
     def computeKPI(self, currTTWC, refTTWC):
         kpi = optimization.MakeProgressReport.computeKPI(self, currTTWC, refTTWC)
         if kpi != "NaN%":
@@ -421,7 +437,7 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
                     sec = line.split(":")[1].split("s")[0]
                     return "CPU time   :     " + str(int(sec)) + ".0 sec. on onepusu"
 # Give some default that will not end it up in the short queue
-        return "CPU time   :      2500.0 sec. on heathlands"
+        return "CPU time   :      2500.0 sec. on onepusu"
         
 
 class ApcTestSuiteInformation(optimization.TestSuiteInformation):

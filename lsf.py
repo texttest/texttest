@@ -125,7 +125,7 @@ class LSFConfig(unixConfig.UNIXConfig):
             return baseCollator
         else:
             resourceAction = MakeResourceFiles(self.checkPerformance(), self.checkMemory(), self.isSlowdownJob)
-            return plugins.CompositeAction([ Wait(), resourceAction, baseCollator ])
+            return plugins.CompositeAction([ Wait(), UpdateLSFStatus(), resourceAction, baseCollator ])
     def getTestComparator(self):
         if self.optionMap.has_key("l"):
             return default.Config.getTestComparator(self)
@@ -148,17 +148,22 @@ class LSFJob:
         self.name = test.getTmpExtension() + repr(test.app) + test.app.versionSuffix() + test.getRelPath()
     def hasStarted(self):
         retstring = self.getFile("-r").readline()
-        return string.find(retstring, "not found") == -1
+        return retstring.find("not found") == -1
     def hasFinished(self):
         retstring = self.getFile().readline()
         return retstring.find("not found") != -1
     def kill(self):
         os.system("bkill -J " + self.name + " > /dev/null 2>&1")
-    def getExecutionMachine(self):
-        file = self.getFile("-w")
+    def getStatus(self):
+        file = self.getFile("-w -a")
         lastline = file.readlines()[-1]
-        fullName = self.getPreviousWord(lastline, self.name)
-        return fullName.split('.')[0]
+        data = lastline.strip().split()
+        status = data[2]
+        if status == "PEND":
+            return status, None
+        else:
+            execMachine = data[5].split('.')[0]
+            return status, execMachine
     def getProcessIds(self):
         for line in self.getFile("-l").xreadlines():
             pos = line.find("PIDs")
@@ -167,13 +172,6 @@ class LSFJob:
         return []
     def getFile(self, options = ""):
         return os.popen("bjobs -J " + self.name + " " + options + " 2>&1")
-    def getPreviousWord(self, line, field):
-        prevWord = ""
-        for word in line.split(' '):
-            if word == field:
-                return prevWord
-            prevWord = word
-        return ""
     
 class SubmitTest(plugins.Action):
     def __init__(self, queueFunction, resourceFunction):
@@ -183,6 +181,8 @@ class SubmitTest(plugins.Action):
     def __repr__(self):
         return "Submitting"
     def __call__(self, test):
+        if test.state == test.UNRUNNABLE:
+            return
         queueToUse = self.queueFunction(test)
         self.describe(test, " to LSF queue " + queueToUse)
         testCommand = self.getExecuteCommand(test)
@@ -234,8 +234,6 @@ class KillTest(plugins.Action):
             return
         self.describe(test, " in LSF")
         job.kill()
-    def setUpSuite(self, suite):
-        self.describe(suite)
         
 class Wait(plugins.Action):
     def __init__(self):
@@ -261,6 +259,19 @@ class Wait(plugins.Action):
     def checkCondition(self, job):
         return job.hasFinished()
 
+class UpdateLSFStatus(plugins.Action):
+    def __repr__(self):
+        return "Updating LSF status for"
+    def __call__(self, test):
+        job = LSFJob(test)
+        status, machine = job.getStatus()
+        if status == "DONE" or status == "EXIT":
+            return
+        if status != "PEND":
+            details = "Executing on " + machine + os.linesep + "Current LSF status = " + status
+            test.changeState(test.RUNNING, details)
+        return "wait"
+    
 class MakeResourceFiles(plugins.Action):
     def __init__(self, checkPerformance, checkMemory, isSlowdownJob):
         self.checkPerformance = checkPerformance
@@ -269,9 +280,6 @@ class MakeResourceFiles(plugins.Action):
     def __repr__(self):
         return "Making resource files for"
     def __call__(self, test):
-        job = LSFJob(test)
-        if not job.hasFinished():
-            return "wait"
         textList = [ "Max Memory", "Max Swap", "CPU time", [ "executed on host", "home directory" ], "Real time" ]
         tmpFile = test.getTmpFileName("report", "r")
         resourceDict = self.makeResourceDict(tmpFile, textList)

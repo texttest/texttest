@@ -112,7 +112,7 @@ class CollateFile(plugins.Action):
         else:
             self.dirFunctions = [ self.currDir ]
     def __call__(self, test):
-        if test.state != test.RUNNING:
+        if test.state > test.RUNNING:
             return
         targetFile = test.getTmpFileName(self.targetStem, "w")
         fullpath = self.findPath(test)
@@ -172,6 +172,8 @@ class RunTest(plugins.Action):
     def __repr__(self):
         return "Running"
     def __call__(self, test):
+        if test.state == test.UNRUNNABLE:
+            return
         self.describe(test)
         outfile = test.getTmpFileName("output", "w")
         stdin, stdout, stderr = os.popen3(self.getExecuteCommand(test) + " > " + outfile)

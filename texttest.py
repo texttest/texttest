@@ -51,7 +51,7 @@ class Test:
         self.app = app
         self.abspath = abspath
         self.paddedName = self.name
-        self.state = self.RUNNING 
+        self.state = self.NOT_STARTED 
         self.stateDetails = None
         self.previousEnv = {}
         self.environment = MultiEntryDictionary(os.path.join(self.abspath, "environment"), app.name, app.getVersionFileExtensions())

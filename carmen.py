@@ -274,7 +274,7 @@ class RunLProf(plugins.Action):
         return "Running LProf profiler on"
     def __call__(self, test):
         job = lsf.LSFJob(test)
-        executionMachine = job.getExecutionMachine()
+        status, executionMachine = job.getStatus()
         self.describe(test, ", executing on " + executionMachine)
         processId = job.getProcessIds()[self.whichProcessId]
         runLine = "cd " + os.getcwd() + "; /users/lennart/bin/gprofile " + processId

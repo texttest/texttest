@@ -48,6 +48,8 @@ class TextTestGUI:
             return "red"
         if test.state == test.SUCCEEDED:
             return "green"
+        if test.state == test.RUNNING:
+            return "yellow"
         return "white"
     def createWindowContents(self):
         self.contents = gtk.HBox(homogeneous=gtk.TRUE)
@@ -217,10 +219,12 @@ class TestCaseGUI:
     def getTestInfo(self, test):
         if test.state == test.UNRUNNABLE:
             return str(test.stateDetails).split(os.linesep)[0]
-        elif test.state == test.FAILED and test.stateDetails.failedPrediction:
-            return test.stateDetails.failedPrediction
-        else:
-            return ""
+        elif test.state == test.FAILED:
+            if test.stateDetails.failedPrediction:
+                return test.stateDetails.failedPrediction
+        elif test.state != test.SUCCEEDED and test.stateDetails:
+            return test.stateDetails
+        return ""
     def getWindow(self):
         return self.window
     def createTitle(self, test):

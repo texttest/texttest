@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/KPI.py,v 1.6 2003/09/11 10:11:59 henrike Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/KPI.py,v 1.7 2003/10/23 16:04:03 henrike Exp $
 #
 # Classes to calculate the KPI (Key Performance Indicator)
 #
@@ -259,12 +259,15 @@ class CurveKPI(KPI):
                        self.iBasics.statusFileGetFirstOccurrence(self.cStrNowStatusFile, regExpDate)]
         reDate = re.compile(r'^(?P<month>\d+).(?P<day>\d+).(?P<year>\d+).*$')
         for ixVersion in (0, 1):
-            mDate = reDate.match(listStrDates[ixVersion])
-            if mDate:
-                strYear = mDate.group('year')
-                if len(strYear) == 2:
-                    strYear = '20' + strYear
-                listStrDates[ixVersion] = '%s-%s-%s' %(strYear, mDate.group('month'), mDate.group('day'))
+            if listStrDates[ixVersion]:
+                mDate = reDate.match(listStrDates[ixVersion])
+                if mDate:
+                    strYear = mDate.group('year')
+                    if len(strYear) == 2:
+                        strYear = '20' + strYear
+                    listStrDates[ixVersion] = '%s-%s-%s' %(strYear, mDate.group('month'), mDate.group('day'))
+            else:
+                listStrDates[ixVersion] = '1986-01-01'
         return (listStrDates[0], listStrDates[1])
     def getTupFinalUncovered(self):
         return ('', '')

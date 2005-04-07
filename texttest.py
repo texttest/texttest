@@ -599,11 +599,13 @@ class ConfigurationWrapper:
         try:
             exec importCommand
         except:
-            errorString = "No module named " + moduleName
-            if sys.exc_type == exceptions.ImportError and str(sys.exc_value) == errorString:
-                self.raiseException(msg = "could not find config_module " + moduleName, useOrigException=0)
-            else:
-                self.raiseException(msg = "config_module " + moduleName + " contained errors and could not be imported") 
+            if sys.exc_type == exceptions.ImportError:
+                errorString = "No module named " + moduleName
+                if str(sys.exc_value) == errorString:
+                    self.raiseException(msg = "could not find config_module " + moduleName, useOrigException=0)
+                elif str(sys.exc_value) == "cannot import name getConfig":
+                    self.raiseException(msg = "module " + moduleName + " is not intended for use as a config_module", useOrigException=0)
+            self.raiseException(msg = "config_module " + moduleName + " contained errors and could not be imported") 
         self.target = getConfig(inputOptions)
     def raiseException(self, msg = None, req = None, useOrigException = 1):
         message = msg

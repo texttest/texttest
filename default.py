@@ -371,12 +371,9 @@ class CollateFiles(plugins.Action):
     
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):
-        self.texts = self.parse(filterText)
+        self.texts = plugins.commasplit(filterText)
         self.textTriggers = [ plugins.TextTrigger(text) for text in self.texts ]
         self.allTestCaseNames = []
-    def parse(self, filterText):
-        # Use UNIX paths in internal communications
-        return map(lambda x: x.replace("/", os.sep), plugins.commasplit(filterText))
     def containsText(self, test):
         return self.stringContainsText(test.name)
     def stringContainsText(self, searchString):

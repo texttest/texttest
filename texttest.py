@@ -156,8 +156,9 @@ class Test:
         for observer in self.observers:
             observer.notifyChange(self)
     def getRelPath(self):
-        relPath = self.abspath.replace(self.app.abspath, "")
-        if relPath.startswith(os.sep):
+        # We standardise communication around UNIX paths, it's all much easier that way
+        relPath = self.abspath.replace(self.app.abspath, "").replace(os.sep, "/")
+        if relPath.startswith("/"):
             return relPath[1:]
         return relPath
     def getDirectory(self, temporary, forComparison = 1):
@@ -193,7 +194,7 @@ class Test:
         relPath = self.getRelPath()
         if not len(relPath):
             return ""
-        dirCount = string.count(relPath, os.sep) + 1
+        dirCount = string.count(relPath, "/") + 1
         retstring = ""
         for i in range(dirCount):
             retstring = retstring + "  "

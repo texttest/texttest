@@ -25,9 +25,9 @@ from cPickle import Pickler
 class FakeSMTP:
     def connect(self, server):
         print "Connecting to fake SMTP server at", server
-    def sendmail(self, fromAddr, toAddr, contents):
+    def sendmail(self, fromAddr, toAddresses, contents):
         print "Sending mail from address", fromAddr
-        raise smtplib.SMTPServerDisconnected, "Could not send mail to " + toAddr + ": I'm only a fake server!"
+        raise smtplib.SMTPServerDisconnected, "Could not send mail to " + repr(toAddresses) + ": I'm only a fake server!"
     def quit(self):
         pass
 
@@ -249,7 +249,7 @@ class MailSender(plugins.Action):
     def sendMail(self, smtp, app, mailContents):
         smtpServer = app.getConfigValue("smtp_server")
         fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
-        toAddress = app.getCompositeConfigValue("batch_recipients", self.sessionName)
+        toAddresses = plugins.commasplit(app.getCompositeConfigValue("batch_recipients", self.sessionName))
         try:
             smtp.connect(smtpServer)
         except smtplib.SMTPException:
@@ -257,7 +257,7 @@ class MailSender(plugins.Action):
                              str(sys.exc_type) + ": " + str(sys.exc_value))
             return self.storeMail(app, mailContents)
         try:
-            smtp.sendmail(fromAddress, toAddress, mailContents)
+            smtp.sendmail(fromAddress, toAddresses, mailContents)
         except smtplib.SMTPException:
             sys.stdout.write("FAILED : Mail could not be sent\n" + \
                              str(sys.exc_type) + ": " + str(sys.exc_value))

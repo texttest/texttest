@@ -80,7 +80,7 @@ class Test:
             propFile = diagDict["properties_file"]
             if not self.properties.has_key(propFile):
                 self.properties.addEntry(propFile, {}, insert=1)
-            self.properties.addEntry(entryName, entry, sectionName = propFile, insert=1)
+            self.properties.addEntry(entryName, entry.replace(os.sep, "/"), sectionName = propFile, insert=1)
         else:
             self.environment[entryName] = entry        
     def expandEnvironmentReferences(self, referenceVars = []):

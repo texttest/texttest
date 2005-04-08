@@ -296,7 +296,7 @@ class WindowsProcessHandler:
         return os.system("pskill " + str(process) + " 2> nul")
 
 # Generally useful class to encapsulate a background process, of which TextTest creates
-# a few... seems it only works on UNIX right now.
+# a few...
 class BackgroundProcess:
     fakeProcesses = os.environ.has_key("TEXTTEST_NO_SPAWN")
     if os.name == "posix":

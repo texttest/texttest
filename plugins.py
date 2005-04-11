@@ -75,19 +75,31 @@ def addCategory(name, briefDesc, longDesc = ""):
 # the summary of batch mode
 class TestState:
     categoryDescriptions = seqdict()
-    def __init__(self, category, freeText = "", briefText = "", started = 0, completed = 0):
+    showExecHosts = 0
+    def __init__(self, category, freeText = "", briefText = "", started = 0, completed = 0, executionHosts = []):
         self.category = category
         self.freeText = freeText
         self.briefText = briefText
         self.started = started
         self.completed = completed
+        self.executionHosts = executionHosts
     def __str__(self):
         return self.freeText
     def __repr__(self):
         if not self.categoryDescriptions.has_key(self.category):
-            return self.category + " :"
+            return self.category + self.hostRepr()
         briefDescription, longDescription = self.categoryDescriptions[self.category]
-        return longDescription + " :"
+        return longDescription + self.hostRepr()
+    def hostString(self):
+        if len(self.executionHosts) == 0:
+            return "(no execution hosts given)"
+        else:
+            return "on " + string.join(self.executionHosts, ",")
+    def hostRepr(self):
+        if self.showExecHosts and len(self.executionHosts) > 0:
+            return " " + self.hostString() + " :"
+        else:
+            return " :"
     def notifyInMainThread(self):
         # Hook to tell the state we're in the main thread, as some things can only be done there
         pass

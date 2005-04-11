@@ -25,16 +25,8 @@ class UNIXConfig(default.Config):
         return "sh"
     def defaultTextDiffTool(self):
         return "diff"
-    def defaultSeverities(self):
-        severities = default.Config.defaultSeverities(self)
-        severities["errors"] = 1
-        severities["performance"] = 2
-        return severities
     def printHelpDescription(self):
         print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
-    def printHelpScripts(self):
-        print performance.helpScripts
-        default.Config.printHelpScripts(self)
     def setApplicationDefaults(self, app):
         default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("virtual_display_machine", [])
@@ -275,10 +267,6 @@ class MakePerformanceFile(default.PerformanceFileCreator):
     def __repr__(self):
         return "Making performance file for"
     def makePerformanceFiles(self, test, temp):
-        # Ugly hack to work around lack of proper test states
-        executionMachines = self.machineInfoFinder.findExecutionMachines(test)
-        test.execHost = string.join(executionMachines, ",")
-        
         # Check that all of the execution machines are also performance machines
         if not self.allMachinesTestPerformance(test, "cputime"):
             return
@@ -289,7 +277,7 @@ class MakePerformanceFile(default.PerformanceFileCreator):
             return
         
         fileToWrite = test.makeFileName("performance", temporary=1)
-        self.writeFile(test, cpuTime, realTime, executionMachines, fileToWrite)
+        self.writeFile(test, cpuTime, realTime, fileToWrite)
     def readTimes(self, test):
         # Read the UNIX performance file, allowing us to discount system time.
         tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
@@ -318,14 +306,14 @@ class MakePerformanceFile(default.PerformanceFileCreator):
 
         parts = timeVal.split(":")
         return 60 * float(parts[0]) + float(parts[1])
-    def writeFile(self, test, cpuTime, realTime, executionMachines, fileName):
+    def writeFile(self, test, cpuTime, realTime, fileName):
         file = open(fileName, "w")
-        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. on " + test.execHost + "\n"
+        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. " + test.state.hostString() + "\n"
         file.write(cpuLine)
         realLine = "Real time  : " + self.timeString(realTime) + " sec.\n"
         file.write(realLine)
-        self.writeMachineInformation(file, executionMachines)
-    def writeMachineInformation(self, file, executionMachines):
+        self.writeMachineInformation(file, test)
+    def writeMachineInformation(self, file, test):
         # A space for subclasses to write whatever they think is relevant about
         # the machine environment right now.
         pass

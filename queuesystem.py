@@ -79,6 +79,8 @@ class RunTestInSlave(unixConfig.RunTest):
         self.describe(test)
         self.diag.info("Running test with command '" + command + "'")
         os.system(command)
+        # No process remains...
+        self.changeToRunningState(test, None)
     def setUpVirtualDisplay(self, app):
         # Assume the master sets DISPLAY for us
         pass
@@ -115,6 +117,9 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
             return RunTestInSlave()
         else:
             return unixConfig.UNIXConfig.getTestRunner(self)
+    def showExecHostsInFailures(self):
+        # Always show execution hosts, many different ones are used
+        return 1
     def getSubmissionRules(self, test, nonTestProcess):
         return SubmissionRules(self.optionMap, test, nonTestProcess)
     def statusUpdater(self):
@@ -502,7 +507,7 @@ class UpdateTestStatus(UpdateStatus):
             else:
                 return self.handleFileWaiting(test, machineStr)
         else:
-            runState = plugins.TestState("running", freeText=details, briefText=summary, started=1)
+            runState = default.Running(machines, freeText=details, briefText=summary)
             test.changeState(runState)
     def handleFileWaiting(self, test, machineStr):
         if not self.testsWaitingForFiles.has_key(test):
@@ -550,12 +555,10 @@ class UpdateTestStatus(UpdateStatus):
 class MachineInfoFinder(default.MachineInfoFinder):
     def __init__(self):
         self.queueMachineInfo = None        
-    def findExecutionMachines(self, test):
+    def updateExecutionHosts(self, test):
         machines = self.queueMachineInfo.findAllMachinesForJob()
         if len(machines):
-            return machines
-
-        return default.MachineInfoFinder.findExecutionMachines(self, test)
+            test.state.executionHosts = machines
     def findPerformanceMachines(self, app, fileStem):
         perfMachines = []
         resources = app.getCompositeConfigValue("performance_test_resource", fileStem)
@@ -581,9 +584,9 @@ class MakePerformanceFile(unixConfig.MakePerformanceFile):
     def __init__(self, machineInfoFinder, isSlowdownJob):
         unixConfig.MakePerformanceFile.__init__(self, machineInfoFinder)
         self.isSlowdownJob = isSlowdownJob
-    def writeMachineInformation(self, file, executionMachines):
+    def writeMachineInformation(self, file, test):
         # Try and write some information about what's happening on the machine
-        for machine in executionMachines:
+        for machine in test.state.executionHosts:
             for jobLine in self.findRunningJobs(machine):
                 file.write(jobLine + "\n")
     def findRunningJobs(self, machine):

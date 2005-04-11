@@ -85,15 +85,6 @@ def getTestMemory(test, version = None):
     return getPerformance(test.makeFileName("memory", version))
 
 class PerformanceTestComparison(comparetest.TestComparison):
-    def __init__(self, previousInfo, execHost, appAbs):
-        comparetest.TestComparison.__init__(self, previousInfo, execHost, appAbs)
-        self.execHost = execHost
-    def __repr__(self):
-        basicDesc = comparetest.TestComparison.__repr__(self)
-        if self.execHost != None and len(basicDesc) > 0:
-            return basicDesc.replace(":", "on " + self.execHost + " :")
-        else:
-            return basicDesc
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         baseName = os.path.basename(standardFile)
         if baseName.find(".") == -1:
@@ -148,6 +139,8 @@ class PerformanceFileComparison(comparetest.FileComparison):
             return baseText
         return baseText + "(" + self.getType() + ")"
     def getType(self):
+        if self.newResult():
+            return comparetest.FileComparison.getType(self)
         if self.newPerformance < self.oldPerformance:
             return self.descriptors["goodperf"]
         else:

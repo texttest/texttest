@@ -178,6 +178,8 @@ class Config(plugins.Configuration):
         return predict.CheckPredictions()
     def getFailureExplainer(self):
         return CheckForBugs()
+    def showExecHostsInFailures(self):
+        return self.batchMode()
     def getTestComparator(self):
         comparetest.MakeComparisons.testComparisonClass = performance.PerformanceTestComparison
         return comparetest.MakeComparisons()
@@ -200,6 +202,7 @@ class Config(plugins.Configuration):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
     def printHelpScripts(self):
+        print performance.helpScripts
         print helpScripts, predict.helpScripts
     def printHelpDescription(self):
         print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
@@ -222,7 +225,9 @@ class Config(plugins.Configuration):
         return None
     def defaultSeverities(self):
         severities = {}
+        severities["errors"] = 1
         severities["output"] = 1
+        severities["performance"] = 2
         severities["usecase"] = 2
         severities["catalogue"] = 2
         return severities
@@ -266,7 +271,9 @@ class Config(plugins.Configuration):
         batchSession = self.optionValue("b")
         if batchSession:
             app.addConfigEntry("base_version", batchSession)
-        
+        if not plugins.TestState.showExecHosts:
+            plugins.TestState.showExecHosts = self.showExecHostsInFailures()
+
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeBasicWriteDirectory()
@@ -451,9 +458,19 @@ class Pending(plugins.TestState):
     def notifyInMainThread(self):
         self.process.doFork()
 
+class Running(plugins.TestState):
+    def __init__(self, execMachines, bkgProcess = None, freeText = "", briefText = ""):
+        plugins.TestState.__init__(self, "running", freeText, briefText, started=1, executionHosts = execMachines)
+        self.bkgProcess = bkgProcess
+    def processCompleted(self):
+        return self.bkgProcess.hasTerminated()
+    def killProcess(self):
+        if self.bkgProcess and self.bkgProcess.processId:
+            print "Killing running test (process id", str(self.bkgProcess.processId) + ")"
+            self.bkgProcess.kill()
+
 class RunTest(plugins.Action):
     def __init__(self):
-        self.process = None
         self.collectStdErr = 1
         self.diag = plugins.getDiagnostics("run test")
     def __repr__(self):
@@ -463,26 +480,25 @@ class RunTest(plugins.Action):
             return
         # Change to the directory so any incidental files can be found easily
         os.chdir(test.writeDirs[0])
-        retValue = self.runTest(test)
-        # Change state after we've started running!
-        self.changeState(test)
-        return retValue
-    def changeState(self, test):
-        test.changeState(plugins.TestState("running", "Running on " + hostname(), started = 1))
+        return self.runTest(test)
+    def changeToRunningState(self, test, process):
+        execMachines = [ hostname() ]
+        newState = Running(execMachines, process, "Running on " + hostname())
+        test.changeState(newState)
     def runTest(self, test):
-        if self.process:
-            # See if the running process is finished
-            if self.process.hasTerminated():
-                self.process = None
+        if test.state.hasStarted():
+            if test.state.processCompleted():
                 return
             else:
                 return self.RETRY
 
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
-        self.process = plugins.BackgroundProcess(testCommand, testRun=1)
-        test.changeState(Pending(self.process))
-        self.process.waitForStart()
+        process = plugins.BackgroundProcess(testCommand, testRun=1)
+        # Working around Python bug
+        test.changeState(Pending(process))
+        process.waitForStart()
+        self.changeToRunningState(test, process)
         return self.RETRY
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand() + " < " + self.getInputFile(test)
@@ -504,7 +520,7 @@ class RunTest(plugins.Action):
         else:
             return "nul"
     def getCleanUpAction(self):
-        return KillTest(self)
+        return KillTest()
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
@@ -512,13 +528,9 @@ class RunTest(plugins.Action):
         self.collectStdErr = app.getConfigValue("collect_standard_error")
 
 class KillTest(plugins.Action):
-    def __init__(self, testRunner):
-        self.runner = testRunner
-    def setUpApplication(self, app):
-        process = self.runner.process
-        if process and process.processId:
-            print "Killing running test (process id", str(process.processId) + ")"
-            process.kill()        
+    def __call__(self, test):
+        if test.state.hasStarted() and not test.state.isComplete():
+            test.state.killProcess()
 
 class CreateCatalogue(plugins.Action):
     def __init__(self):
@@ -707,8 +719,8 @@ class ReconnectTest(plugins.Action):
 class MachineInfoFinder:
     def findPerformanceMachines(self, app, fileStem):
         return app.getCompositeConfigValue("performance_test_machine", fileStem)
-    def findExecutionMachines(self, test):
-        return [ hostname() ]
+    def updateExecutionHosts(self, test):
+        pass
     def setUpApplication(self, app):
         pass
 
@@ -719,12 +731,11 @@ class PerformanceFileCreator(plugins.Action):
     def setUpApplication(self, app):
         self.machineInfoFinder.setUpApplication(app)
     def allMachinesTestPerformance(self, test, fileStem):
-        executionMachines = self.machineInfoFinder.findExecutionMachines(test)
         performanceMachines = self.machineInfoFinder.findPerformanceMachines(test.app, fileStem)
         self.diag.info("Found performance machines as " + repr(performanceMachines))
         if "any" in performanceMachines:
             return 1
-        for host in executionMachines:
+        for host in test.state.executionHosts:
             realHost = host
             # Format support e.g. 2*apple for multi-processor machines
             if host[1] == "*":
@@ -737,6 +748,8 @@ class PerformanceFileCreator(plugins.Action):
         if test.state.isComplete():
             return
 
+        # Get hold of any extra execution hosts that might have appeared by now...
+        self.machineInfoFinder.updateExecutionHosts(test)
         return self.makePerformanceFiles(test, temp)
 
 

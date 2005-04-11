@@ -39,7 +39,7 @@ class CheckLogFilePredictions(plugins.Action):
                 return None
         return logFile
     def insertError(self, test, errType, briefError, error):
-        test.changeState(FailedPrediction(errType, briefText=briefError, freeText=error, started=1))
+        test.changeState(FailedPrediction(errType, briefText=briefError, freeText=error, started=1, executionHosts=test.state.executionHosts))
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")   
 

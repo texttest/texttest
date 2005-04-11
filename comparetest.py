@@ -79,9 +79,8 @@ plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
 
 class TestComparison(plugins.TestState):
-    def __init__(self, previousInfo, execHost, appAbs):
-        plugins.TestState.__init__(self, "failure", "", started=1, completed=1)
-        self.execHost = execHost
+    def __init__(self, previousInfo, appAbs):
+        plugins.TestState.__init__(self, "failure", "", started=1, completed=1, executionHosts=previousInfo.executionHosts)
         self.allResults = []
         self.changedResults = []
         self.newResults = []
@@ -92,14 +91,12 @@ class TestComparison(plugins.TestState):
         self.diag = plugins.getDiagnostics("TestComparison")
         # Cache this only so it gets output when we pickle, so we can re-interpret if needed...
         self.appAbsPath = appAbs
-    def __repr__(self):
+    def __repr__(self):    
         if self.failedPrediction:
             briefDescription, longDescription = self.categoryDescriptions[self.category]
-            return longDescription + " (" + self.failedPrediction.briefText + ") :"
-        elif len(self.changedResults) > 0:
+            return longDescription + " (" + self.failedPrediction.briefText + ")" + self.hostRepr()
+        elif len(self.changedResults) > 0 or len(self.newResults) > 0:
             return plugins.TestState.__repr__(self)
-        elif len(self.newResults) > 0:
-            return ":"
         else:
             return ""
     def updateAbsPath(self, newAbsPath):
@@ -280,16 +277,11 @@ class MakeComparisons(plugins.Action):
         self.textDiffTool = None
     def __repr__(self):
         return "Comparing differences for"
-    def execHost(self, test):
-        try:
-            return test.execHost
-        except AttributeError:
-            return None
     def __call__(self, test):
         # Don't compare already completed tests if they have errors
         if test.state.isComplete() and not test.state.hasResults():
             return
-        testComparison = self.testComparisonClass(test.state, self.execHost(test), test.app.abspath)
+        testComparison = self.testComparisonClass(test.state, test.app.abspath)
         testComparison.makeComparisons(test)
         self.categorise(testComparison)
         self.describe(test, testComparison.getPostText())
@@ -298,11 +290,7 @@ class MakeComparisons(plugins.Action):
         self.describe(suite)
     def categorise(self, state):
         if not state.hasResults():
-            errMsg = "No output files at all produced, presuming problems running test" 
-            if state.execHost:
-                raise plugins.TextTestError, errMsg + " on " + state.execHost
-            else:
-                raise plugins.TextTestError, errMsg
+            raise plugins.TextTestError, "No output files at all produced, presuming problems running test " + state.hostString() 
         if state.failedPrediction:
             # Keep the category we had before
             state.freeText += "\n\n" + self.getFreeTextInfo(state)

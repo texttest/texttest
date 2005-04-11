@@ -299,6 +299,8 @@ class RunApcTestInDebugger(default.RunTest):
         # Check for personal .gdbinit.
         if os.path.isfile(os.path.join(os.environ["HOME"], ".gdbinit")):
             print "Warning: You have a personal .gdbinit. This may create unexpected behaviour."
+        # Change to running state, without an associated process
+        self.changeToRunningState(test, None)
         # Source the CONFIG file to get the environment correct and run gdb with the script.
         configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
         os.system(". " + configFile + "; " + executeCommand)

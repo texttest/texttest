@@ -32,8 +32,12 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                The y-axis has the y-range range. Default is the whole data set. Example: 2e7:3e7
                              - p=an absolute file name
                                Produces a postscript file instead of displaying the graph.
+                             - pr=printer name
+                               Produces postscript output and sends it to the printer specified.
                              - pc
                                The postscript file will be in color.
+                             - pa3
+                               The postscript will be in A3 format and landscape.
                              - i=item,item,...
                                Which item to plot from the status file. Note that whitespaces are replaced
                                by underscores. Default is TOTAL cost. Example: i=overcover_cost.
@@ -1281,9 +1285,9 @@ class _PlotTest(plugins.Action):
 class GraphPlot(plugins.Action):
     def setUpApplication(self, app):
         if commonPlotter.plotForTest:
-            xrange, yrange, targetFile, colour, onlyAverage, title = commonPlotter.plotForTest.getPlotOptions()
+            xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, title = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
-            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, colour, onlyAverage, commonPlotter.plotAveragers, title, wait=1)
+            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, title, wait=1)
     
 class TestGraph:
     def __init__(self):
@@ -1327,7 +1331,7 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, writeDir, xrange, yrange, targetFile, colour, onlyAverage, plotAveragers, title = None, wait=0):
+    def plot(self, writeDir, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotAveragers, title = None, wait=0):
         if len(self.plotLines) == 0:
             return
 
@@ -1335,6 +1339,7 @@ class TestGraph:
         gnuplotFileName = os.path.join(writeDir, "gnuplot.input")
         outputFileName = os.path.join(writeDir, "gnuplot.output")
         gnuplotFile = open(gnuplotFileName, "w")
+        absTargetFile = None
         if targetFile:
             # The abspath is to get the testing working, I don't like the abspath...
             absTargetFile = os.path.abspath(os.path.expanduser(targetFile))
@@ -1345,6 +1350,17 @@ class TestGraph:
             if colour:
                 gnuplotFile.write(" color")
             gnuplotFile.write(os.linesep)
+        if printer:
+            absTargetFile = os.path.join(writeDir, "texttest.ps")
+            gnuplotFile.write("set terminal postscript")
+            if printA3:
+                gnuplotFile.write(" landscape")
+            if colour:
+                gnuplotFile.write(" color")
+            gnuplotFile.write(os.linesep)
+            if printA3:
+                gnuplotFile.write("set size 1.45,1.45" + os.linesep)
+                gnuplotFile.write("set origin 0,-0.43" + os.linesep)
 
         gnuplotFile.write("set ylabel '" + self.getAxisLabel("y") + "'" + os.linesep)
         gnuplotFile.write("set xlabel '" + self.getAxisLabel("x") + "'" + os.linesep)
@@ -1370,11 +1386,13 @@ class TestGraph:
         commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName
         # This is ugly! It's only to be able to test it (we must avoid getting windows popping up where gnuplot
         # produces a window, but must call it for real when we generate a file...).
-        if targetFile:
+        if absTargetFile:
             os.system(commandLine)
             tmppf = open(outputFileName).read()
             if len(tmppf) > 0:
                 open(absTargetFile, "w").write(tmppf)
+            if printer:
+                os.system("lpr -o PageSize=A3 -P" + printer + " " + absTargetFile)
         else:
             process = plugins.BackgroundProcess(commandLine)
             if wait:
@@ -1414,9 +1432,11 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         self.addOption(oldOptionGroup, "yr", "Vertical range")
         self.addOption(oldOptionGroup, "ts", "Time scale to use", "minutes")
         self.addOption(oldOptionGroup, "p", "Absolute file to print to")
+        self.addOption(oldOptionGroup, "pr", "Printer to print to")
         self.addOption(oldOptionGroup, "i", "Log file item to plot", costEntryName)
         self.addOption(oldOptionGroup, "v", "Extra versions to plot")
         self.addSwitch(oldOptionGroup, "pc", "Print in colour")
+        self.addSwitch(oldOptionGroup, "pa3", "Print in colour")
         self.addSwitch(oldOptionGroup, "s", "Plot against solution number rather than time")
         self.addSwitch(oldOptionGroup, "av", "Plot also average")
         self.addSwitch(oldOptionGroup, "oav", "Plot only average")
@@ -1472,17 +1492,19 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):
-        xrange, yrange, fileName, writeColour , onlyAverage, title= self.getPlotOptions()
-        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, writeColour, onlyAverage, title, None)
+        xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title = self.getPlotOptions()
+        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title, None)
         self.testGraph = TestGraph()
     def getPlotOptions(self):
         xrange = self.optionGroup.getOptionValue("r")
         yrange = self.optionGroup.getOptionValue("yr")
         fileName = self.optionGroup.getOptionValue("p")
         writeColour = self.optionGroup.getSwitchValue("pc")
+        printA3 = self.optionGroup.getSwitchValue("pa3")
         onlyAverage = self.optionGroup.getSwitchValue("oav")
         title = self.optionGroup.getOptionValue("title")
-        return xrange, yrange, fileName, writeColour, onlyAverage, title
+        printer = self.optionGroup.getOptionValue("pr")
+        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title
     def writePlotFiles(self, lineName, logFile, test):
         plotItems = self.getItemsToPlot()
         optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)

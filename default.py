@@ -235,7 +235,7 @@ class Config(plugins.Configuration):
         if os.name == "posix":
             return "diff"
         else:
-            return "ndiff.py -q"
+            return "ndiff"
     def defaultSeverities(self):
         severities = {}
         severities["errors"] = 1

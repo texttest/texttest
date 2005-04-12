@@ -69,7 +69,7 @@ comparetest.RemoveObsoleteVersions
                              output.app.3, when only a warning is written.
 """ 
 
-import os, filecmp, string, plugins, time
+import os, filecmp, string, sys, plugins, time
 from ndict import seqdict
 from predict import FailedPrediction
 from shutil import copyfile
@@ -335,10 +335,18 @@ class MakeComparisons(plugins.Action):
             return line
         truncatedLine = line[:self.maxLineWidth]
         return truncatedLine + "\n" + self.getWrappedLine(line[self.maxLineWidth:])
+    def findTextDiffTool(self, app):
+        configVal = app.getConfigValue("text_diff_program")
+        if configVal != "ndiff":
+            return configVal
+        for dir in sys.path:
+            fullPath = os.path.join(dir, "ndiff.py")
+            if os.path.isfile(fullPath):
+                return sys.executable + " " + fullPath + " -q"
     def setUpApplication(self, app):
         self.lineCount = app.getConfigValue("lines_of_text_difference")
         self.maxLineWidth = app.getConfigValue("max_width_text_difference")
-        self.textDiffTool = app.getConfigValue("text_diff_program")
+        self.textDiffTool = self.findTextDiffTool(app)
 
 class FileComparison:
     def __init__(self, test, standardFile, tmpFile, makeNew = 0):

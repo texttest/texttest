@@ -67,7 +67,7 @@ apc.CVSBranchTests         - This script is useful when two versions of a test s
 
 """
 
-import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixConfig, guiplugins, exceptions, time
+import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time
 from time import sleep
 from ndict import seqdict
 
@@ -451,7 +451,7 @@ def getTestMachine(test):
         diag.info("Test was run locally on " + machine)
     return machine
 
-class FetchApcCore(unixConfig.CollateUNIXFiles):
+class FetchApcCore(unixonly.CollateFiles):
     def isApcLogFileKept(self, errorFileName):
         for line in open(errorFileName).xreadlines():
             if line.find("*** Keeping the logfiles in") != -1:
@@ -1154,7 +1154,7 @@ class ImportTestCase(optimization.ImportTestCase):
     # copied from TestCaseInformation...
     def getRuleSetName(self, absSubPlanDir):
         problemPath = os.path.join(absSubPlanDir,"problems")
-        if not unixConfig.isCompressed(problemPath):
+        if not unixonly.isCompressed(problemPath):
             problemLines = open(problemPath).xreadlines()
         else:
             tmpName = os.tmpnam()

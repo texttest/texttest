@@ -45,7 +45,7 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
                             making the changes it has shown, and writing an options.<app> file.
 """
 
-import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixConfig, sys, guiplugins
+import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
@@ -314,7 +314,7 @@ class MigrateApcTest(plugins.Action):
         response = sys.stdin.readline().strip()
     def commitChange(self, oldDir, newDir, fileName):
         oldPath = os.path.join(oldDir, fileName)
-        if unixConfig.isCompressed(oldPath):
+        if unixonly.isCompressed(oldPath):
             os.remove(fileName)
         newFile = fileName + "." + self.app.name
         shutil.copyfile(newFile, os.path.join(newDir, fileName))
@@ -331,7 +331,7 @@ class MigrateApcTest(plugins.Action):
                 return line.replace(module, self.app.fullName.lower())
         return line
     def getPath(self, absPath):
-        if unixConfig.isCompressed(absPath):
+        if unixonly.isCompressed(absPath):
             localName = os.path.basename(absPath) + ".Z"
             shutil.copyfile(absPath, localName)
             os.system("uncompress " + localName)

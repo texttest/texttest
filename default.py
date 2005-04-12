@@ -139,7 +139,13 @@ class Config(plugins.Configuration):
         else:
             return self.getTestRunner()
     def getTestRunner(self):
-        return RunTest()
+        if os.name == "posix":
+            # Use Xvfb to suppress GUIs, cmd files to prevent shell-quote problems,
+            # UNIX time to collect system performance info.
+            from unixonly import RunTest as UNIXRunTest
+            return UNIXRunTest()
+        else:
+            return RunTest()
     def isReconnectingFast(self):
         return self.isReconnecting() and not self.optionMap.has_key("reconnfull")
     def getTestEvaluator(self):
@@ -167,11 +173,16 @@ class Config(plugins.Configuration):
         else:
             return CreateCatalogue()
     def getTestCollator(self):
-        return CollateFiles()
+        if os.name == "posix":
+            # Handle UNIX compression and collect core files
+            from unixonly import CollateFiles as UNIXCollateFiles
+            return UNIXCollateFiles(self.optionMap.has_key("keeptmp"))
+        else:
+            return CollateFiles()
     def getPerformanceExtractor(self):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def getPerformanceFileMaker(self):
-        return None
+        return MakePerformanceFile(self.getMachineInfoFinder())
     def getMachineInfoFinder(self):
         return MachineInfoFinder()
     def getTestPredictionChecker(self):
@@ -217,12 +228,14 @@ class Config(plugins.Configuration):
         print "Python scripts: (as given to -s <module>.<class> [args])"
         print "--------------------------------------------------------"
         self.printHelpScripts()
+    def defaultLoginShell(self):
+        # For UNIX
+        return "sh"
     def defaultTextDiffTool(self):
-        for dir in sys.path:
-            fullPath = os.path.join(dir, "ndiff.py")
-            if os.path.isfile(fullPath):
-                return sys.executable + " " + fullPath + " -q"
-        return None
+        if os.name == "posix":
+            return "diff"
+        else:
+            return "ndiff.py -q"
     def defaultSeverities(self):
         severities = {}
         severities["errors"] = 1
@@ -235,6 +248,7 @@ class Config(plugins.Configuration):
         if os.name == "posix":
             return os.environ["USER"] + "@localhost"
         else:
+            # There is nothing sensible you can put here on Windows
             return "non_existent_mail_address"
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output")
@@ -249,6 +263,9 @@ class Config(plugins.Configuration):
         app.setConfigDefault("create_catalogues", "false")
         app.setConfigDefault("internal_error_text", [])
         app.setConfigDefault("internal_compulsory_text", [])
+        # Performance values
+        app.setConfigDefault("cputime_include_system_time", 0)
+        app.setConfigDefault("cputime_slowdown_variation_%", 30)
         app.setConfigDefault("performance_logfile", { "default" : [] })
         app.setConfigDefault("performance_logfile_extractor", {})
         app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] })
@@ -273,6 +290,9 @@ class Config(plugins.Configuration):
             app.addConfigEntry("base_version", batchSession)
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.showExecHostsInFailures()
+        if os.name == "posix":
+            app.setConfigDefault("virtual_display_machine", [])
+            app.setConfigDefault("login_shell", self.defaultLoginShell())
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
@@ -751,6 +771,85 @@ class PerformanceFileCreator(plugins.Action):
         # Get hold of any extra execution hosts that might have appeared by now...
         self.machineInfoFinder.updateExecutionHosts(test)
         return self.makePerformanceFiles(test, temp)
+
+class UNIXPerformanceInfoFinder:
+    def __init__(self, diag):
+        self.diag = diag
+        self.includeSystemTime = 0
+    def findTimesUsedBy(self, test):
+        # Read the UNIX performance file, allowing us to discount system time.
+        tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
+        self.diag.info("Reading performance file " + tmpFile)
+        if not os.path.isfile(tmpFile):
+            return None, None
+            
+        file = open(tmpFile)
+        cpuTime = None
+        realTime = None
+        for line in file.readlines():
+            self.diag.info("Parsing line " + line.strip())
+            if line.startswith("user"):
+                cpuTime = self.parseUnixTime(line)
+            if self.includeSystemTime and line.startswith("sys"):
+                cpuTime = cpuTime + self.parseUnixTime(line)
+            if line.startswith("real"):
+                realTime = self.parseUnixTime(line)
+        return cpuTime, realTime
+    def parseUnixTime(self, line):
+        timeVal = line.strip().split()[-1]
+        if timeVal.find(":") == -1:
+            return float(timeVal)
+
+        parts = timeVal.split(":")
+        return 60 * float(parts[0]) + float(parts[1])
+    def setUpApplication(self, app):
+        self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
+
+class WindowsPerformanceInfoFinder:
+    def findTimesUsedBy(self, test):
+        # On Windows, these are collected by the process polling
+        return test.state.getProcessCpuTime(), None
+
+# Class for making a performance file directly from system-collected information,
+# rather than parsing reported entries in a log file
+class MakePerformanceFile(PerformanceFileCreator):
+    def __init__(self, machineInfoFinder):
+        PerformanceFileCreator.__init__(self, machineInfoFinder)
+        if os.name == "posix":
+            self.systemPerfInfoFinder = UNIXPerformanceInfoFinder(self.diag)
+        else:
+            self.systemPerfInfoFinder = WindowsPerformanceInfoFinder()
+    def setUpApplication(self, app):
+        PerformanceFileCreator.setUpApplication(self, app)
+        self.systemPerfInfoFinder.setUpApplication(app)
+    def __repr__(self):
+        return "Making performance file for"
+    def makePerformanceFiles(self, test, temp):
+        # Check that all of the execution machines are also performance machines
+        if not self.allMachinesTestPerformance(test, "cputime"):
+            return
+        cpuTime, realTime = self.systemPerfInfoFinder.findTimesUsedBy(test)
+        # There was still an error (jobs killed in emergency), so don't write performance files
+        if cpuTime == None:
+            print "Not writing performance file for", test
+            return
+        
+        fileToWrite = test.makeFileName("performance", temporary=1)
+        self.writeFile(test, cpuTime, realTime, fileToWrite)
+    def timeString(self, timeVal):
+        return str(round(float(timeVal), 1)).rjust(9)
+    def writeFile(self, test, cpuTime, realTime, fileName):
+        file = open(fileName, "w")
+        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. " + test.state.hostString() + "\n"
+        file.write(cpuLine)
+        if realTime is not None:
+            realLine = "Real time  : " + self.timeString(realTime) + " sec.\n"
+            file.write(realLine)
+        self.writeMachineInformation(file, test)
+    def writeMachineInformation(self, file, test):
+        # A space for subclasses to write whatever they think is relevant about
+        # the machine environment right now.
+        pass
 
 
 # Relies on the config entry performance_logfile_extractor, so looks in the log file for anything reported

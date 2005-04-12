@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, string, signal, sys, default, unixConfig, performance, respond, batch, plugins, types, predict, guiplugins
+import os, string, signal, sys, default, unixonly, performance, respond, batch, plugins, types, predict, guiplugins
 from Queue import Queue, Empty
 from threading import Thread
 from time import sleep
@@ -73,7 +73,7 @@ def queueSystemName(app):
 signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
 # Use a non-monitoring runTest, but the rest from unix
-class RunTestInSlave(unixConfig.RunTest):
+class RunTestInSlave(unixonly.RunTest):
     def runTest(self, test):
         command = self.getExecuteCommand(test)
         self.describe(test)
@@ -85,9 +85,9 @@ class RunTestInSlave(unixConfig.RunTest):
         # Assume the master sets DISPLAY for us
         pass
         
-class QueueSystemConfig(unixConfig.UNIXConfig):
+class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
-        unixConfig.UNIXConfig.addToOptionGroups(self, app, groups)
+        default.Config.addToOptionGroups(self, app, groups)
         queueSystem = queueSystemName(app)
         queueSystemGroup = app.createOptionGroup(queueSystem)
         queueSystemGroup.addSwitch("l", "Run tests locally", nameForOff="Submit tests to " + queueSystem)
@@ -101,9 +101,9 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         return 1
     def _getActionSequence(self, makeDirs):
         if self.optionMap.slaveRun():
-            return unixConfig.UNIXConfig._getActionSequence(self, 0)
+            return default.Config._getActionSequence(self, 0)
         if not self.useQueueSystem():
-            return unixConfig.UNIXConfig._getActionSequence(self, makeDirs)
+            return default.Config._getActionSequence(self, makeDirs)
 
         submitter = SubmitTest(self.getSubmissionRules, self.optionMap)
         actions = [ submitter, self.statusUpdater(), default.SaveState() ]
@@ -116,7 +116,7 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         if self.optionMap.slaveRun():
             return RunTestInSlave()
         else:
-            return unixConfig.UNIXConfig.getTestRunner(self)
+            return default.Config.getTestRunner(self)
     def showExecHostsInFailures(self):
         # Always show execution hosts, many different ones are used
         return 1
@@ -128,12 +128,12 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         if self.optionMap.slaveRun():
             return MakePerformanceFile(self.getMachineInfoFinder(), self.isSlowdownJob)
         else:
-            return unixConfig.UNIXConfig.getPerformanceFileMaker(self)
+            return default.Config.getPerformanceFileMaker(self)
     def getMachineInfoFinder(self):
         if self.optionMap.slaveRun():
             return MachineInfoFinder()
         else:
-            return unixConfig.UNIXConfig.getMachineInfoFinder(self)
+            return default.Config.getMachineInfoFinder(self)
     def isSlowdownJob(self, jobUser, jobName):
         return 0
     def printHelpDescription(self):
@@ -142,7 +142,7 @@ class QueueSystemConfig(unixConfig.UNIXConfig):
         print helpOptions + batchInfo
         default.Config.printHelpOptions(self, builtInOptions)
     def setApplicationDefaults(self, app):
-        unixConfig.UNIXConfig.setApplicationDefaults(self, app)
+        default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("default_queue", "texttest_default")
         app.setConfigDefault("min_time_for_performance_force", -1)
         app.setConfigDefault("queue_system_module", "LSF")
@@ -413,7 +413,7 @@ class SubmitTest(plugins.Action):
         self.describe(suite)
     def setUpApplication(self, app):
         app.checkBinaryExists()
-        finder = unixConfig.VirtualDisplayFinder(app)
+        finder = unixonly.VirtualDisplayFinder(app)
         display = finder.getDisplay()
         if display:
             self.origEnv["DISPLAY"] = display
@@ -580,9 +580,9 @@ class MachineInfoFinder(default.MachineInfoFinder):
         exec command
         self.queueMachineInfo = _MachineInfo()
 
-class MakePerformanceFile(unixConfig.MakePerformanceFile):
+class MakePerformanceFile(default.MakePerformanceFile):
     def __init__(self, machineInfoFinder, isSlowdownJob):
-        unixConfig.MakePerformanceFile.__init__(self, machineInfoFinder)
+        default.MakePerformanceFile.__init__(self, machineInfoFinder)
         self.isSlowdownJob = isSlowdownJob
     def writeMachineInformation(self, file, test):
         # Try and write some information about what's happening on the machine

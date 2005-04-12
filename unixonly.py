@@ -1,39 +1,6 @@
 #!/usr/local/bin/python
 
-# Text only relevant to using the LSF configuration directly
-helpDescription = """
-The UNIX configuration is designed to run on a UNIX system. It will collect and process core files
-produced by the application, will make use of UNIX 'time' to performance-test the application (if
-enabled) and will also use UNIX diff for textual differences by default.
-
-The default behaviour is to run all tests locally.
-"""
-
 import default, respond, performance, predict, os, shutil, plugins, string, time
-
-def getConfig(optionMap):
-    return UNIXConfig(optionMap)
-
-class UNIXConfig(default.Config):
-    def getTestCollator(self):
-        return CollateUNIXFiles(self.optionMap.has_key("keeptmp"))
-    def getPerformanceFileMaker(self):
-        return MakePerformanceFile(self.getMachineInfoFinder())
-    def getTestRunner(self):
-        return RunTest()
-    def defaultLoginShell(self):
-        return "sh"
-    def defaultTextDiffTool(self):
-        return "diff"
-    def printHelpDescription(self):
-        print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
-    def setApplicationDefaults(self, app):
-        default.Config.setApplicationDefaults(self, app)
-        app.setConfigDefault("virtual_display_machine", [])
-        app.setConfigDefault("login_shell", self.defaultLoginShell())
-        # Performance values
-        app.setConfigDefault("cputime_include_system_time", 0)
-        app.setConfigDefault("cputime_slowdown_variation_%", 30)
                 
 class RunTest(default.RunTest):
     def __init__(self):
@@ -52,7 +19,6 @@ class RunTest(default.RunTest):
         testCommand = default.RunTest.getExecuteCommand(self, test)
 
         # put the command in a file to avoid quoting problems,
-        # also fix env.variables that remote login doesn't reset
         cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
         self.buildCommandFile(test, cmdFile, testCommand)
         unixPerfFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
@@ -166,7 +132,7 @@ def isCompressed(path):
         return 0
 
 # Deal with UNIX-compressed files as well as straight text
-class CollateUNIXFiles(default.CollateFiles):
+class CollateFiles(default.CollateFiles):
     def __init__(self, keepCoreFiles):
         default.CollateFiles.__init__(self)
         self.collations["stacktrace"] = "core*"
@@ -257,64 +223,3 @@ class CollateUNIXFiles(default.CollateFiles):
         else:
             plugins.movefile(sourcePath, targetFile)
 
-class MakePerformanceFile(default.PerformanceFileCreator):
-    def __init__(self, machineInfoFinder):
-        default.PerformanceFileCreator.__init__(self, machineInfoFinder)
-        self.includeSystemTime = 0
-    def setUpApplication(self, app):
-        default.PerformanceFileCreator.setUpApplication(self, app)
-        self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
-    def __repr__(self):
-        return "Making performance file for"
-    def makePerformanceFiles(self, test, temp):
-        # Check that all of the execution machines are also performance machines
-        if not self.allMachinesTestPerformance(test, "cputime"):
-            return
-        cpuTime, realTime = self.readTimes(test)
-        # There was still an error (jobs killed in emergency), so don't write performance files
-        if cpuTime == None:
-            print "Not writing performance file for", test
-            return
-        
-        fileToWrite = test.makeFileName("performance", temporary=1)
-        self.writeFile(test, cpuTime, realTime, fileToWrite)
-    def readTimes(self, test):
-        # Read the UNIX performance file, allowing us to discount system time.
-        tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
-        self.diag.info("Reading performance file " + tmpFile)
-        if not os.path.isfile(tmpFile):
-            return None, None
-            
-        file = open(tmpFile)
-        cpuTime = None
-        realTime = None
-        for line in file.readlines():
-            self.diag.info("Parsing line " + line.strip())
-            if line.startswith("user"):
-                cpuTime = self.parseUnixTime(line)
-            if self.includeSystemTime and line.startswith("sys"):
-                cpuTime = cpuTime + self.parseUnixTime(line)
-            if line.startswith("real"):
-                realTime = self.parseUnixTime(line)
-        return cpuTime, realTime
-    def timeString(self, timeVal):
-        return str(round(float(timeVal), 1)).rjust(9)
-    def parseUnixTime(self, line):
-        timeVal = line.strip().split()[-1]
-        if timeVal.find(":") == -1:
-            return float(timeVal)
-
-        parts = timeVal.split(":")
-        return 60 * float(parts[0]) + float(parts[1])
-    def writeFile(self, test, cpuTime, realTime, fileName):
-        file = open(fileName, "w")
-        cpuLine = "CPU time   : " + self.timeString(cpuTime) + " sec. " + test.state.hostString() + "\n"
-        file.write(cpuLine)
-        realLine = "Real time  : " + self.timeString(realTime) + " sec.\n"
-        file.write(realLine)
-        self.writeMachineInformation(file, test)
-    def writeMachineInformation(self, file, test):
-        # A space for subclasses to write whatever they think is relevant about
-        # the machine environment right now.
-        pass
-    

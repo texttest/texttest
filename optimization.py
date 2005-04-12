@@ -98,7 +98,7 @@ optimization.TraverseSubPlans
 """
 
 
-import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixConfig, guiplugins, copy
+import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy
 from ndict import seqdict
 
 itemNamesConfigKey = "_itemnames_map"
@@ -940,7 +940,7 @@ class TestCaseInformation(TestInformation):
         return ", Test: '" + self.name + "'"
     def getRuleSetName(self, absSubPlanDir):
         problemPath = os.path.join(absSubPlanDir,"problems")
-        if not unixConfig.isCompressed(problemPath):
+        if not unixonly.isCompressed(problemPath):
             problemLines = open(problemPath).xreadlines()
         else:
             tmpName = os.tmpnam()

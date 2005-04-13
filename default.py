@@ -489,7 +489,28 @@ class Running(plugins.TestState):
             print "Killing running test (process id", str(self.bkgProcess.processId) + ")"
             self.bkgProcess.kill()
 
+# Poll CPU time values as well
+class WindowsRunning(Running):
+    def __init__(self, execMachines, bkgProcess = None, freeText = "", briefText = ""):
+        Running.__init__(self, execMachines, bkgProcess, freeText, briefText)
+        self.latestCpu = 0.0
+        self.cpuDelta = 0.0
+    def processCompleted(self):
+        newCpu = self.bkgProcess.getCpuTime()
+        if newCpu is None:
+            return 1
+        self.cpuDelta = newCpu - self.latestCpu
+        self.latestCpu = newCpu
+        return 0
+    def getProcessCpuTime(self):
+        # Assume it finished linearly halfway between the last poll and now...
+        return self.latestCpu + (self.cpuDelta / 2.0)
+
 class RunTest(plugins.Action):
+    if os.name == "posix":
+        runningClass = Running
+    else:
+        runningClass = WindowsRunning
     def __init__(self):
         self.collectStdErr = 1
         self.diag = plugins.getDiagnostics("run test")
@@ -503,7 +524,7 @@ class RunTest(plugins.Action):
         return self.runTest(test)
     def changeToRunningState(self, test, process):
         execMachines = [ hostname() ]
-        newState = Running(execMachines, process, "Running on " + hostname())
+        newState = self.runningClass(execMachines, process, "Running on " + hostname())
         test.changeState(newState)
     def runTest(self, test):
         if test.state.hasStarted():
@@ -809,6 +830,8 @@ class WindowsPerformanceInfoFinder:
     def findTimesUsedBy(self, test):
         # On Windows, these are collected by the process polling
         return test.state.getProcessCpuTime(), None
+    def setUpApplication(self, app):
+        pass
 
 # Class for making a performance file directly from system-collected information,
 # rather than parsing reported entries in a log file

@@ -256,7 +256,9 @@ class UNIXProcessHandler:
             return 1
     def kill(self, process, killSignal):
         return os.kill(process, killSignal)
-
+    def getCpuTime(self, processId):
+        # Not supported, mainly here for Windows
+        return None
 
 class WindowsProcessHandler:
     def __init__(self):
@@ -298,14 +300,28 @@ class WindowsProcessHandler:
             return int(words[0][:-1], 16)
         except ValueError:
             return
-    def hasTerminated(self, processId):
+    def getPsWords(self, processId):
         stdout = os.popen("pslist " + str(processId))
         for line in stdout.readlines():
-            if line.find("was not found") != -1:
-                return 1
-        return 0
+            words = line.split()
+            if len(words) < 2:
+                continue
+            if words[1] == str(processId):
+                return words
+        return words
+    def hasTerminated(self, processId):
+        words = self.getPsWords(processId)
+        return words[2] == "was"
+    def getCpuTime(self, processId):
+        words = self.getPsWords(processId)
+        cpuEntry = words[6]
+        try:
+            hours, mins, seconds = cpuEntry.split(":")
+            return 3600 * float(hours) + 60 * float(mins) + float(seconds)
+        except ValueError:
+            return None
     def kill(self, process, killSignal):
-        return os.system("pskill " + str(process) + " 2> nul")
+        return os.system("pskill " + str(process) + " > nul 2> nul")
 
 # Generally useful class to encapsulate a background process, of which TextTest creates
 # a few...
@@ -364,6 +380,8 @@ class BackgroundProcess:
             self.tryKillProcess(processes[-1])
         else:
             print "All child processes under", self.processId, "terminated, could not kill"
+    def getCpuTime(self):
+        return self.processHandler.getCpuTime(self.processId)
     def tryKillProcess(self, process):
         if self.tryKillProcessWithSignal(process, signal.SIGINT):
             return

@@ -1297,6 +1297,7 @@ class TestGraph:
         self.yLabel = ""
         self.pointTypeCounter = 1
         self.lineTypeCounter = 2
+        self.undesiredLineTypes = []
         self.users = []
         self.apps = []
     def addLine(self, plotLine):
@@ -1327,6 +1328,8 @@ class TestGraph:
                 plotLine.lineType = str(self.lineTypeCounter)
                 self.lineTypes[plotLine.name] = plotLine.lineType
                 self.lineTypeCounter += 1
+                while self.undesiredLineTypes.count(self.lineTypeCounter) > 0:
+                    self.lineTypeCounter += 1
             else:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
@@ -1348,7 +1351,7 @@ class TestGraph:
                 return
             gnuplotFile.write("set terminal postscript")
             if colour:
-                gnuplotFile.write(" color")
+                gnuplotFile.write(" color solid")
             gnuplotFile.write(os.linesep)
         if printer:
             absTargetFile = os.path.join(writeDir, "texttest.ps")
@@ -1356,11 +1359,13 @@ class TestGraph:
             if printA3:
                 gnuplotFile.write(" landscape")
             if colour:
-                gnuplotFile.write(" color")
+                gnuplotFile.write(" color solid")
             gnuplotFile.write(os.linesep)
             if printA3:
                 gnuplotFile.write("set size 1.45,1.45" + os.linesep)
                 gnuplotFile.write("set origin 0,-0.43" + os.linesep)
+        if targetFile or printer:
+            self.undesiredLineTypes = [5, 6]
 
         gnuplotFile.write("set ylabel '" + self.getAxisLabel("y") + "'" + os.linesep)
         gnuplotFile.write("set xlabel '" + self.getAxisLabel("x") + "'" + os.linesep)

@@ -1441,7 +1441,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         self.addOption(oldOptionGroup, "i", "Log file item to plot", costEntryName)
         self.addOption(oldOptionGroup, "v", "Extra versions to plot")
         self.addSwitch(oldOptionGroup, "pc", "Print in colour")
-        self.addSwitch(oldOptionGroup, "pa3", "Print in colour")
+        self.addSwitch(oldOptionGroup, "pa3", "Print in A3")
         self.addSwitch(oldOptionGroup, "s", "Plot against solution number rather than time")
         self.addSwitch(oldOptionGroup, "av", "Plot also average")
         self.addSwitch(oldOptionGroup, "oav", "Plot only average")

@@ -147,9 +147,12 @@ class MachineInfo:
         return [ machineOrGroup ]
     def findResourceMachines(self, resource):
         machines = []
-        for line in os.popen("qhost -l '" + resource + "'"):
-           if not line.startswith("HOSTNAME") and not line.startswith("-----") and not line.startswith("global"):
-                machines.append(line.split()[0].split(".")[0])
+        # Hacked workaround for problems with SGE, bug 1513 in their bug system
+        # Should really use qhost but that seems flaky
+        for line in os.popen("qselect -l '" + resource + "'"):
+            machineName = line.split("@")[-1].split(".")[0]
+            if not machineName in machines:
+                machines.append(machineName)
         return machines
     def findRunningJobs(self, machine):
         jobs = []

@@ -524,6 +524,7 @@ class RunTest(plugins.Action):
         return self.runTest(test)
     def changeToRunningState(self, test, process):
         execMachines = [ hostname() ]
+        self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
         newState = self.runningClass(execMachines, process, "Running on " + hostname())
         test.changeState(newState)
     def runTest(self, test):
@@ -791,6 +792,7 @@ class PerformanceFileCreator(plugins.Action):
 
         # Get hold of any extra execution hosts that might have appeared by now...
         self.machineInfoFinder.updateExecutionHosts(test)
+        self.diag.info("After execution host update in state " + repr(test.state))
         return self.makePerformanceFiles(test, temp)
 
 class UNIXPerformanceInfoFinder:

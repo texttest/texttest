@@ -199,6 +199,7 @@ class RunWithParallelAction(plugins.Action):
             return
         processId = os.fork()
         if processId == 0:
+            # Note, this is a child process, so any state changes made by baseRunner will not be reflected...
             self.baseRunner(test)
             os._exit(0)
         else:
@@ -208,6 +209,8 @@ class RunWithParallelAction(plugins.Action):
             except plugins.TextTestError:
                 self.handleNoTimeAvailable(test)
             os.waitpid(processId, 0)
+            # Make the state change that would presumably be made by the baseRunner...
+            self.baseRunner.changeToRunningState(test, None)
     def findProcessInfo(self, firstpid, test):
         while 1:
             processInfo = self._findProcessInfo(firstpid, test)

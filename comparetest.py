@@ -95,10 +95,8 @@ class TestComparison(plugins.TestState):
         if self.failedPrediction:
             briefDescription, longDescription = self.categoryDescriptions[self.category]
             return longDescription + " (" + self.failedPrediction.briefText + ")" + self.hostRepr()
-        elif len(self.changedResults) > 0 or len(self.newResults) > 0:
-            return plugins.TestState.__repr__(self)
         else:
-            return ""
+            return plugins.TestState.__repr__(self)
     def updateAbsPath(self, newAbsPath):
         self.diag = plugins.getDiagnostics("TestComparison")
         self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
@@ -293,7 +291,7 @@ class MakeComparisons(plugins.Action):
             raise plugins.TextTestError, "No output files at all produced, presuming problems running test " + state.hostString() 
         if state.failedPrediction:
             # Keep the category we had before
-            state.freeText += "\n\n" + self.getFreeTextInfo(state)
+            state.freeText += self.getFreeTextInfo(state)
             return
         worstResult = state.getMostSevereFileComparison()
         if not worstResult:

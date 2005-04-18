@@ -261,15 +261,10 @@ class UNIXProcessHandler:
         return None
 
 class WindowsProcessHandler:
-    def __init__(self):
-        for dir in os.environ["PATH"].split(";"):
-            fullPath = os.path.join(dir, "cmd.exe")
-            if os.path.isfile(fullPath):
-                self.cmdStarter = fullPath
     def spawnProcess(self, commandLine):
         # Start the process in a subshell so redirection works correctly
-        args = [self.cmdStarter, "/C", commandLine ]
-        processHandle = os.spawnv(os.P_NOWAIT, self.cmdStarter, args)
+        args = [os.environ["COMSPEC"], "/C", commandLine ]
+        processHandle = os.spawnv(os.P_NOWAIT, args[0], args)
         # As we start a shell, we have a handle on the shell itself, not
         # on the process running in it. Unlike UNIX, killing the shell is not enough!
         cmdProcId = self.findProcessId(processHandle)

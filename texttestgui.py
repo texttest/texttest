@@ -782,7 +782,13 @@ class TestCaseGUI(RightWindowGUI):
     def getTestInfo(self, test):
         if not test:
             return ""
-        return str(test.state.freeText)
+        info = ""
+        if test.state.isComplete():
+            info = "Test " + repr(test.state) + "\n"
+        if len(test.state.freeText) > 0:
+            return info + str(test.state.freeText)
+        else:
+            return info.replace(" :", "")
     def performInteractiveAction(self, action):
         self.test.callAction(action)
     

@@ -365,8 +365,9 @@ class FileComparison:
         self.differenceId = self._hasDifferences(app)
         self.severity = 99
         failureSeverityDict = app.getConfigValue("failure_severity")
-        if failureSeverityDict.has_key(self.stem):
-            self.severity = failureSeverityDict[self.stem]
+        for key in failureSeverityDict.keys():
+            if fnmatch(self.stem, key):
+                self.severity = failureSeverityDict[key]
     def __repr__(self):
         return os.path.basename(self.stdFile).split('.')[0]
     def checkExternalExcuses(self, app):

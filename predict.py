@@ -38,7 +38,7 @@ class CheckLogFilePredictions(plugins.Action):
             if not os.path.isfile(logFile):
                 return None
         return logFile
-    def insertError(self, test, errType, briefError, error):
+    def insertError(self, test, errType, briefError, error=""):
         test.changeState(FailedPrediction(errType, briefText=briefError, freeText=error, started=1, executionHosts=test.state.executionHosts))
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")   
@@ -83,7 +83,7 @@ class CheckPredictions(CheckLogFilePredictions):
         errorsFound += self.extractErrorsFrom(test, "errors", compsNotFound)
         errorsFound += len(compsNotFound)
         for comp in compsNotFound:
-            self.insertError(test, "badPredict", "missing '" + comp + "'", "ERROR : Compulsory message missing (" + comp + ")")
+            self.insertError(test, "badPredict", "missing '" + comp + "'")
         return errorsFound
     def extractErrorsFrom(self, test, fileStem, compsNotFound):
         errorsFound = 0
@@ -94,7 +94,7 @@ class CheckPredictions(CheckLogFilePredictions):
             for error in self.internalErrorList:
                 if line.find(error) != -1:
                     errorsFound += 1
-                    self.insertError(test, "badPredict", error, "Internal ERROR (" + error + ")")
+                    self.insertError(test, "badPredict", error)
             for comp in compsNotFound:
                 if line.find(comp) != -1:
                     compsNotFound.remove(comp)

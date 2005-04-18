@@ -115,7 +115,7 @@ class Config(plugins.Configuration):
         
         if self.optionMap.slaveRun():
             return self.CLEAN_NONBASIC # only clean extra directories that we create...
-        if self.batchMode():
+        if self.batchMode() and not self.isReconnecting():
             return self.CLEAN_PREVIOUS
         
         return self.CLEAN_NONBASIC | self.CLEAN_BASIC

@@ -362,10 +362,14 @@ class MailSender(plugins.Action):
         return versions
         
 class CollectFiles(plugins.Action):
-    def __init__(self, userName=""):
+    def __init__(self, args=[""]):
         self.mailSender = MailSender("collection")
         self.diag = plugins.getDiagnostics("batch collect")
-        self.userName = userName
+        self.userName = args[0]
+        if self.userName:
+            print "Collecting batch files created by user", self.userName + "..."
+        else:
+            print "Collecting batch files locally..."
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()

@@ -1,5 +1,6 @@
 
 import plugins, os, sys, shutil, string
+from glob import glob
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
@@ -350,20 +351,49 @@ class SelectTests(InteractiveAction):
         return "Select"
     def getScriptTitle(self):
         return "Select indicated tests"
-    def performOn(self, app, selTests):
+    def getFilterList(self):
+        self.app.configObject.updateOptions(self.optionGroup)
+        return self.app.configObject.getFilterList()
+    def getSelectedTests(self, rootTestSuites):
+        selectedTests = []
+        filters = self.getFilterList()
+        for suite in rootTestSuites:
+            for filter in filters:
+                if not filter.acceptsApplication(suite.app):
+                    continue
+                
+            newTests = self.getTestsFromSuite(suite, filters)
+            guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
+            selectedTests += newTests
+        return selectedTests
+    def getTestsFromSuite(self, suite, filters):
+        if not suite.isAcceptedByAll(filters):
+            return []
+        try:
+            tests = []
+            for subSuite in self.findTestCaseList(suite):
+                tests += self.getTestsFromSuite(subSuite, filters)
+            return tests
+        except AttributeError:
+            return [ suite ]
+    def findTestCaseList(self, suite):
+        testcases = suite.testcases
+        testCaseFiles = glob(os.path.join(suite.abspath, "testsuite.*"))
+        if len(testCaseFiles) < 2:
+            return testcases
+        
         version = self.optionGroup.getOptionValue("vs")
-        appToUse = app
-        fullVersion = app.getFullVersion()
-        if fullVersion.find(version) == -1:
-            if len(fullVersion) > 0:
-                version += "." + fullVersion
-            appToUse = app.createCopy(version)
-        appToUse.configObject.updateOptions(self.optionGroup)
-        valid, testSuite = appToUse.createTestSuite()
-        for test in testSuite.testCaseList():
-            test.app = app
-        guilog.info("Created test suite of size " + str(testSuite.size()))
-        return testSuite
+        fullVersion = suite.app.getFullVersion()
+        if len(fullVersion) > 0 and len(version) > 0:
+            version += "." + fullVersion
+
+        versionFile = suite.makeFileName("testsuite", version)
+        newTestNames = suite.getTestNames(versionFile)
+        newTestList = []
+        for testCase in testcases:
+            if testCase.name in newTestNames:
+                newTestList.append(testCase)
+        return newTestList
 
 class ResetGroups(InteractiveAction):
     def getTitle(self):

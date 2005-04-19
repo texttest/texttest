@@ -564,7 +564,7 @@ class ApplicationGUI(RightWindowGUI):
         for test, iter in itermap.items():
             if not self.itermap.has_key(test.app):
                 self.itermap[test.app] = {}
-            self.itermap[test.app][test.abspath] = iter
+            self.itermap[test.app][test] = iter
     def addFilesToModel(self):
         confiter = self.model.insert_before(None, None)
         self.model.set_value(confiter, 0, "Configuration Files")
@@ -578,29 +578,31 @@ class ApplicationGUI(RightWindowGUI):
             fullPath = os.path.join(self.app.abspath, file)
             self.addFileToModel(confiter, fullPath, None, colour)
     def performInteractiveAction(self, action):
-        newSuite = action.performOn(self.app, self.getSelectedTests())
-        if newSuite:
-            iterlist = self.getSelectedIters(newSuite)
-            for extraApp in self.app.extras:
-                extraSuite = action.performOn(extraApp, self.getSelectedTests())
-                iterlist += self.getSelectedIters(extraSuite)
-            self.selection.unselect_all()
-            for iter in iterlist:
-                self.selection.select_iter(iter)
-            self.selection.get_tree_view().grab_focus()
-            guilog.info("Marking " + str(len(self.getSelectedTests())) + " tests as selected")
-    def getSelectedIters(self, suite):
-        iters = []
-        try:
-            for test in suite.testcases:
-                iters += self.getSelectedIters(test)
-            return iters
-        except AttributeError:
-            iterMapApp = self.itermap[suite.app]
-            if iterMapApp.has_key(suite.abspath):
-                return [ iterMapApp[suite.abspath] ]
-            else:
-                return []
+        if isinstance(action, guiplugins.SelectTests):
+            self.selectTests(action)
+        else:
+            action.performOn(self.app, self.getSelectedTests())
+    def selectTests(self, action):
+        selectedTests = action.getSelectedTests(self.getRootSuites())
+        self.selection.unselect_all()
+        for test in selectedTests:
+            iter = self.itermap[test.app][test]
+            self.selection.select_iter(iter)
+        self.selection.get_tree_view().grab_focus()
+        guilog.info("Marking " + str(len(self.getSelectedTests())) + " tests as selected")
+    def getRootSuites(self):
+        suites = [ self.getRootSuite(self.app) ]
+        for extraApp in self.app.extras:
+            suites.append(self.getRootSuite(extraApp))
+        return suites
+    def getRootSuite(self, app):
+        sampleTest = self.itermap[app].keys()[0]
+        return self.getRoot(sampleTest)
+    def getRoot(self, test):
+        if test.parent:
+            return self.getRoot(test.parent)
+        else:
+            return test
     def getSelectedTests(self):
         tests = []
         self.selection.selected_foreach(self.addSelTest, tests)

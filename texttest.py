@@ -121,8 +121,9 @@ class Test:
         nonVersionName = os.path.join(root, stem)
         versions = self.app.getVersionFileExtensions()
         debugLog.info("Versions available : " + repr(versions))
-        if refVersion != None:
-            versions = [ refVersion ]
+        if refVersion:
+            refApp = self.app.createCopy(refVersion)
+            versions = refApp.getVersionFileExtensions()
         if len(versions) == 0:
             return nonVersionName
         
@@ -546,14 +547,18 @@ class TestSuite(Test):
         for testcase in self.testcases:
             size += testcase.size()
         return size
+    def getTestNames(self, fileName):
+        testNames = []
+        for testline in open(fileName).xreadlines():
+            testName = testline.strip()
+            if len(testName) > 0 and testName[0] != '#':
+                testNames.append(testName)
+        return testNames
 # private:
     def getTestCases(self, filters, fileName, allVersions):
         testCaseList = []
         allowEmpty = 1
-        for testline in open(fileName).xreadlines():
-            testName = testline.strip()
-            if len(testName) == 0  or testName[0] == '#':
-                continue
+        for testName in self.getTestNames(fileName):
             if allVersions and self.alreadyContains(self.testcases, testName):
                 continue
             if self.alreadyContains(testCaseList, testName):

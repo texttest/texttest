@@ -751,7 +751,10 @@ class ReconnectTest(plugins.Action):
             patternToFind = app.name + "." + versionSuffix + userToFind
         else:
             patternToFind = app.name + userToFind
-        for subDir in os.listdir(fetchDir):
+        fileList = os.listdir(fetchDir)
+        fileList.sort()
+        fileList.reverse()
+        for subDir in fileList:
             fullPath = os.path.join(fetchDir, subDir)
             if os.path.isdir(fullPath) and subDir.startswith(patternToFind):
                 return fullPath

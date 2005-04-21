@@ -539,6 +539,7 @@ class LineFilter:
         self.linesToRemove = 1
         self.autoRemove = 0
         self.wordNumber = None
+        self.removeWordsAfter = 0                                         
         for syntaxString in self.syntaxStrings:
             linePoint = self.trigger.find(syntaxString)
             if linePoint != -1:
@@ -554,7 +555,12 @@ class LineFilter:
     def readSyntax(self, syntaxString, beforeText, afterText):
         if syntaxString == "{WORD ":
             self.trigger = beforeText
-            self.wordNumber = int(afterText[:-1])
+            wordText = afterText[:-1]
+            if wordText.endswith("+"):
+                self.removeWordsAfter = 1
+                self.wordNumber = int(wordText[:-1])
+            else:
+                self.wordNumber = int(wordText)
             # Somewhat non-intuitive to count from 0...
             if self.wordNumber > 0:
                 self.wordNumber -= 1
@@ -601,7 +607,10 @@ class LineFilter:
             realNumber = self.findRealWordNumber(words)
             self.diag.info("Real number was " + str(realNumber))
             if realNumber < len(words):
-                del words[realNumber]
+                if self.removeWordsAfter:
+                    words = words[:realNumber]
+                else:
+                    del words[realNumber]
             return string.join(words).rstrip() + "\n"
         else:
             return None

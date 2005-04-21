@@ -756,7 +756,7 @@ class ReconnectTest(plugins.Action):
         fileList.reverse()
         for subDir in fileList:
             fullPath = os.path.join(fetchDir, subDir)
-            if os.path.isdir(fullPath) and subDir.startswith(patternToFind):
+            if os.path.isdir(fullPath) and subDir.startswith(patternToFind) and not plugins.samefile(fullPath, app.writeDirectory):
                 return fullPath
     def setUpSuite(self, suite):
         self.describe(suite)

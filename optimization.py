@@ -988,10 +988,13 @@ class TestCaseInformation(TestInformation):
                 if fullPath.find(testName) != -1:
                     possibleDirs.append(fullPath)
             else:
-                subdirs = os.listdir(fullPath)
-                for subdir in subdirs:
-                    if os.path.isdir(os.path.join(fullPath, subdir)):
-                        dirs.append(os.path.join(name,subdir))
+                try:
+                    subdirs = os.listdir(fullPath)
+                    for subdir in subdirs:
+                        if os.path.isdir(os.path.join(fullPath, subdir)):
+                            dirs.append(os.path.join(name,subdir))
+                except OSError:
+                    continue
         return possibleDirs
     def suiteDescription(self):
         return repr(self.suite.app) + " " + self.suite.classId() + " " + self.suite.name

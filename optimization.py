@@ -1501,7 +1501,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             self.plotGraph()
     def plotGraph(self):
         xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title = self.getPlotOptions()
-        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title, None)
+        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, {}, title, None)
         self.testGraph = TestGraph()
     def getPlotOptions(self):
         xrange = self.optionGroup.getOptionValue("r")

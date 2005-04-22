@@ -1488,15 +1488,10 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
                     foundTmp, logFile = logFileFinder.findFile(version)
                     if foundTmp:
                         self.writePlotFiles(version + "run", logFile, test)
-                # Find the closest possible matching version. hack, should be done by texttest core.
-                possibleVersions = test.app._getVersionExtensions(version.split("."))
-                for ver in possibleVersions:
-                    logFile = test.makeFileName(logFileStem, version,temporary = 0, forComparison = 0) + ".apc." + ver
-                    if os.path.isfile(logFile):
-                        self.writePlotFiles(version, logFile, test)
-                        if not ver == version:
-                            print "Using log file with version", ver, "to print test", test.name, "version", version 
-                        break
+                logFile = test.makeFileName(logFileStem, version)
+                self.writePlotFiles(version, logFile, test)
+                if not logFile.endswith(version):
+                    print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version 
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):

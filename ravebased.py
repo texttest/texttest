@@ -55,8 +55,17 @@ def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
 class UserFilter(default.TextFilter):
+    def isUserSuite(self, suite):
+        # Don't use the generic one because we can't guarantee environment has been read yet...
+        envFiles = [ os.path.join(suite.abspath, "environment"), suite.makeFileName("environment") ]
+        for file in envFiles:
+            if os.path.isfile(file):
+                for line in open(file).xreadlines():
+                    if line.startswith("CARMUSR:"):
+                        return 1
+        return 0
     def acceptsTestSuite(self, suite):
-        if isUserSuite(suite):
+        if self.isUserSuite(suite):
             return self.containsText(suite)
         else:
             return 1

@@ -526,22 +526,6 @@ class TestSuite(Test):
     def expandChildEnvironmentReferences(self, referenceVars):
         for case in self.testcases:
             case.expandEnvironmentReferences(referenceVars)
-    def reFilter(self, filters):
-        testCaseList = []
-        debugLog.debug("Refilter for " + self.name)
-        for test in self.testcases:
-            debugLog.debug("Refilter check of " + test.name + " for " + self.name)
-            if test.size() == 0 or not test.isAcceptedByAll(filters):
-                debugLog.debug("Refilter loose " + test.name + " for " + self.name)
-                continue
-            if test.classId() == self.classId():
-                test.reFilter(filters)
-                if test.size() > 0:
-                    testCaseList.append(test)
-            else:
-                debugLog.debug("Refilter ok of " + test.name + " for " + self.name)
-                testCaseList.append(test)
-        self.testcases = testCaseList
     def size(self):
         size = 0
         for testcase in self.testcases:
@@ -896,7 +880,6 @@ class Application:
             if not filter.acceptsApplication(self):
                 success = 0
         suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters, allVersions=allVersions)
-        suite.reFilter(filters)
         suite.expandEnvironmentReferences()
         return success, suite
     def description(self):

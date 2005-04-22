@@ -400,14 +400,12 @@ class TextFilter(plugins.Filter):
     def __init__(self, filterText):
         self.texts = plugins.commasplit(filterText)
         self.textTriggers = [ plugins.TextTrigger(text) for text in self.texts ]
-        self.allTestCaseNames = []
     def containsText(self, test):
         return self.stringContainsText(test.name)
     def stringContainsText(self, searchString):
         for trigger in self.textTriggers:
             if trigger.matches(searchString):
-                if searchString == trigger.text or not trigger.text in self.allTestCaseNames:
-                    return 1
+                return 1
         return 0
     def equalsText(self, test):
         return test.name in self.texts
@@ -423,11 +421,7 @@ class TestPathFilter(TextFilter):
     
 class TestNameFilter(TextFilter):
     def acceptsTestCase(self, test):
-        if self.containsText(test):
-            if not test.name in self.allTestCaseNames:
-                self.allTestCaseNames.append(test.name)
-            return 1
-        return 0
+        return self.containsText(test)
 
 class TestSuiteFilter(TextFilter):
     def acceptsTestCase(self, test):

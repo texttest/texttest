@@ -377,12 +377,14 @@ class SubmitTest(plugins.Action):
     def runCommand(self, test, command, jobNameFunction = None, copyEnv = 1):
         submissionRules = self.submitRuleFunction(test, jobNameFunction)
         self.describe(test, jobNameFunction, submissionRules)
-        
-        if not QueueSystemServer.instance:
-            QueueSystemServer.instance = QueueSystemServer(self.origEnv)
+
+        self.tryStartServer()
         self.diag.info("Submitting job : " + command)
         QueueSystemServer.instance.submitJob(test, jobNameFunction, submissionRules, command, copyEnv)
         return self.WAIT
+    def tryStartServer(self):
+        if not QueueSystemServer.instance:
+            QueueSystemServer.instance = QueueSystemServer(self.origEnv)
     def setRunOptions(self, app):
         runOptions = []
         runGroup = self.findRunGroup(app)
@@ -413,13 +415,15 @@ class SubmitTest(plugins.Action):
         self.describe(suite)
     def setUpApplication(self, app):
         app.checkBinaryExists()
+        if os.environ.has_key("TEXTTEST_DIAGDIR"):
+            self.origEnv["TEXTTEST_DIAGDIR"] = os.path.join(os.getenv("TEXTTEST_DIAGDIR"), "slave")
         finder = unixonly.VirtualDisplayFinder(app)
         display = finder.getDisplay()
         if display:
             self.origEnv["DISPLAY"] = display
             print "Tests will run with DISPLAY variable set to", display
-        if os.environ.has_key("TEXTTEST_DIAGDIR"):
-            self.origEnv["TEXTTEST_DIAGDIR"] = os.path.join(os.getenv("TEXTTEST_DIAGDIR"), "slave")
+            # If we are running with a virtual display, make sure the server knows that...
+            self.tryStartServer()
         self.runOptions = self.setRunOptions(app)
         self.loginShell = app.getConfigValue("login_shell")
         

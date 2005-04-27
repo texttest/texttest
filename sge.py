@@ -19,7 +19,7 @@ class QueueSystem:
         resource = self.getResourceArg(submissionRules)
         if len(resource):
             qsubArgs += " -l " + resource
-        qsubArgs += " -w e -m n -b y -V -o /dev/null -e /dev/null"
+        qsubArgs += " -w e -m n -cwd -b y -V -o /dev/null -e /dev/null"
         return "qsub " + qsubArgs
     def findSubmitError(self, stderr):
         errLines = stderr.readlines()

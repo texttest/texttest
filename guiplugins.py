@@ -28,10 +28,8 @@ class InteractiveAction(plugins.Action):
         return 1
     def getScriptTitle(self):
         return self.getTitle()
-    def startExternalProgram(self, commandLine, shellTitle = None, shellOptions = "", exitHandler=None, exitHandlerArgs=()):
-        if shellTitle:
-            commandLine = "xterm " + shellOptions + " -bg white -T '" + shellTitle + "' -e " + commandLine
-        process = plugins.BackgroundProcess(commandLine, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+    def startExternalProgram(self, commandLine, shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
+        process = plugins.BackgroundProcess(commandLine, shellTitle=shellTitle, holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         self.processes.append(process)
         return process
     def viewFile(self, fileName, wait = 0, refresh=0):
@@ -231,17 +229,14 @@ class RecordTest(InteractiveAction):
         os.chdir(test.writeDirs[0])
         recordCommand = test.getExecuteCommand()
         shellTitle = None
-        shellOptions = ""
         if test.getConfigValue("use_standard_input"):
             shellTitle = description
         else:
             logFile = os.path.join(test.app.writeDirectory, "record_run.log")
             errFile = os.path.join(test.app.writeDirectory, "record_errors.log")
             recordCommand +=  " > " + logFile + " 2> " + errFile
-        shellOptions = ""
-        if self.optionGroup.getSwitchValue("hold"):
-            shellOptions = "-hold"
-        process = self.startExternalProgram(recordCommand, shellTitle, shellOptions)
+        holdShell = self.optionGroup.getSwitchValue("hold")
+        process = self.startExternalProgram(recordCommand, shellTitle, holdShell)
         process.waitForTermination()
         test.tearDownEnvironment(parents=1)
         test.app.removeWriteDirectory()

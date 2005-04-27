@@ -240,13 +240,21 @@ class TextTrigger:
             return line.find(self.text) != -1
 
 class UNIXProcessHandler:
-    def spawnProcess(self, commandLine):
+    def spawnProcess(self, commandLine, shellTitle, holdShell):
+        if shellTitle:
+            commandLine = "xterm" + self.getShellOptions(holdShell) + " -bg white -T '" + shellTitle + "' -e " + commandLine
+
         processId = os.fork()   
         if processId == 0:
             os.system(commandLine)
             os._exit(0)
         else:
             return processId
+    def getShellOptions(self, holdShell):
+        if holdShell:
+            return " -hold"
+        else:
+            return ""
     def hasTerminated(self, processId):
         # Works on child processes only. Do not use while killing...
         try:
@@ -261,9 +269,9 @@ class UNIXProcessHandler:
         return None
 
 class WindowsProcessHandler:
-    def spawnProcess(self, commandLine):
+    def spawnProcess(self, commandLine, shellTitle, holdShell):
         # Start the process in a subshell so redirection works correctly
-        args = [os.environ["COMSPEC"], "/C", commandLine ]
+        args = [os.environ["COMSPEC"], self.getShellOptions(holdShell), commandLine ]
         processHandle = os.spawnv(os.P_NOWAIT, args[0], args)
         # As we start a shell, we have a handle on the shell itself, not
         # on the process running in it. Unlike UNIX, killing the shell is not enough!
@@ -272,6 +280,11 @@ class WindowsProcessHandler:
             return subProcId
         # If no subprocesses can be found, just kill the shell
         return cmdProcId
+    def getShellOptions(self, holdShell):
+        if holdShell:
+            return "/K"
+        else:
+            return "/C"
     def findProcessId(self, processHandle):
         childProcesses = self.findChildProcesses(str(os.getpid()))
         for subProcId, subProcHandle in childProcesses:
@@ -326,9 +339,11 @@ class BackgroundProcess:
         processHandler = UNIXProcessHandler()
     else:
         processHandler = WindowsProcessHandler()
-    def __init__(self, commandLine, testRun=0, exitHandler=None, exitHandlerArgs=()):
+    def __init__(self, commandLine, testRun=0, exitHandler=None, exitHandlerArgs=(), shellTitle=None, holdShell=0):
         self.commandLine = commandLine
         self.processId = None
+        self.shellTitle = shellTitle
+        self.holdShell = holdShell
         self.exitHandler = exitHandler
         self.exitHandlerArgs = exitHandlerArgs
         if not testRun:
@@ -341,7 +356,7 @@ class BackgroundProcess:
     def __repr__(self):
         return self.commandLine.split()[0].lstrip()
     def doFork(self):
-        self.processId = self.processHandler.spawnProcess(self.commandLine)
+        self.processId = self.processHandler.spawnProcess(self.commandLine, self.shellTitle, self.holdShell)
     def waitForStart(self):
         while self.processId == None:
             time.sleep(0.1)

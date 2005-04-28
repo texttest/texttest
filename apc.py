@@ -203,8 +203,11 @@ def verifyLogFileDir(arch):
     if os.path.isdir(carmTmp):
         logFileDir = carmTmp + "/logfiles"
         if not os.path.isdir(logFileDir):
-            os.makedirs(logFileDir)
-
+            try:
+                os.makedirs(logFileDir)
+            except OSError:
+                return
+                
 class CheckFilesForApc(plugins.Action):
     def __call__(self, test):
         verifyAirportFile(carmen.getArchitecture(test.app))

@@ -248,9 +248,14 @@ class RecordTest(InteractiveAction):
                               "\n" + "These will appear shortly. You do not need to submit the test manually."
         test.notifyChanged()
         ttOptions = self.getRunOptions(test)
-        commandLine = self.getTextTestName() + " " + ttOptions + " > /dev/null 2>&1"
+        commandLine = self.getTextTestName() + " " + ttOptions + self.nullRedirect()
         guilog.info("Starting replay TextTest with options : " + ttOptions)
         process = self.startExternalProgram(commandLine, exitHandler=self.setTestReady, exitHandlerArgs=(test,))
+    def nullRedirect(self):
+        if os.name == "posix":  
+            return " > /dev/null 2>&1"
+        else:
+            return " > nul 2> nul"
     def setTestReady(self, test):
         test.state.freeText = "Recorded use case and collected all standard files"
         test.notifyChanged()

@@ -42,7 +42,7 @@ default.CountTest          - produce a brief report on the number of tests in th
 default.ExtractStandardPerformance     - update the standard performance files from the standard log files
 """
 
-import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, batch
+import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, batch, re
 import glob
 from threading import currentThread
 from knownbugs import CheckForBugs
@@ -886,9 +886,11 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         self.entryFinders = app.getConfigValue("performance_logfile_extractor")
         self.entryFiles = app.getConfigValue("performance_logfile")
         self.logFileStem = app.getConfigValue("log_file")
+        self.diag.info("Found the following entry finders:" + str(self.entryFinders))
     def makePerformanceFiles(self, test, temp):
         for fileStem, entryFinder in self.entryFinders.items():
             if not self.allMachinesTestPerformance(test, fileStem):
+                self.diag.info("Not extracting performance file for " + fileStem + ": not on performance machines")
                 continue
             values = []
             for logFileStem in self.findLogFileStems(fileStem):
@@ -926,9 +928,11 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         return "Total " + string.capitalize(fileStem) + "  :      " + str(roundedSum) + " seconds"
     def findValues(self, logFile, entryFinder):
         values = []
+        self.diag.info("Scanning log file for entry finder: " + entryFinder)
         for line in open(logFile).xreadlines():
             value = self.getValue(line, entryFinder)
             if value:
+                self.diag.info(" found corresponding value: " + str(value))
                 values.append(value)
         return values
     def getValue(self, line, entryFinder):
@@ -943,7 +947,16 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
                 memNumber = float(memNumber / 1024.0)
             return memNumber
         except:
-            return None
+            # try parsing the memString as a hh:mm:ss time string
+            timePattern = re.compile(r'(?P<hours>\d\d)\:(?P<minutes>\d\d)\:(?P<seconds>\d\d)')
+            match = timePattern.match(memString)
+            if match:
+                hours = float(match.group('hours'))
+                minutes = float(match.group('minutes'))
+                seconds = float(match.group('seconds'))
+                return hours*60*60 + minutes*60 + seconds
+            else:
+                return None
 
 # A standalone action, we add description and generate the main file instead...
 class ExtractStandardPerformance(ExtractPerformanceFiles):

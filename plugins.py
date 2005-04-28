@@ -255,6 +255,11 @@ class UNIXProcessHandler:
             return " -hold"
         else:
             return ""
+    def waitForTermination(self, processId):
+        try:
+            os.waitpid(processId, 0)
+        except OSError:
+            pass
     def hasTerminated(self, processId):
         # Works on child processes only. Do not use while killing...
         try:
@@ -320,6 +325,9 @@ class WindowsProcessHandler:
     def hasTerminated(self, processId):
         words = self.getPsWords(processId)
         return words[2] == "was"
+    def waitForTermination(self, processId):
+        while not self.hasTerminated(processId):
+            time.sleep(0.1)
     def getCpuTime(self, processId):
         words = self.getPsWords(processId)
         cpuEntry = words[6]
@@ -379,10 +387,7 @@ class BackgroundProcess:
         if self.processId == None:
             return
         for process in findAllProcesses(self.processId):
-            try:
-                os.waitpid(process, 0)
-            except OSError:
-                pass
+            self.processHandler.waitForTermination(process)
     def kill(self):
         processes = findAllProcesses(self.processId)
         # Just kill the deepest child process, that seems to work best...

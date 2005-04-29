@@ -760,7 +760,7 @@ class Application:
             self.setConfigDefault("follow_program", "tail -f")
         elif os.name == "dos" or os.name == "nt":
             self.setConfigDefault("view_program", "notepad")
-            self.setConfigDefault("follow_program", None)
+            self.setConfigDefault("follow_program", "baretail")
     def getGuiColourDictionary(self):
         dict = {}
         dict["success"] = "green"

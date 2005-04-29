@@ -152,6 +152,10 @@ def abspath(relpath):
     else:
         return os.path.abspath(relpath)
 
+# Useful utility...
+def localtime():
+    return time.strftime("%d%b%H:%M:%S", time.localtime())
+
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
     return map(string.strip, input.split(","))

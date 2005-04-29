@@ -1574,7 +1574,7 @@ class TextTest:
         if self.inputOptions.slaveRun():
             globalRunIdentifier = self.inputOptions["slave"]
         else:
-            globalRunIdentifier = tmpString() + time.strftime(self.timeFormat(), time.localtime())
+            globalRunIdentifier = tmpString() + plugins.localtime()
     def disableScriptEngine(self):
         if os.environ.has_key("USECASE_RECORD_STDIN"):
             del os.environ["USECASE_RECORD_STDIN"]
@@ -1646,9 +1646,6 @@ class TextTest:
             app.extras.append(extraApp)
             appList.append(extraApp)
         return appList
-    def timeFormat(self):
-        # Needs to work in files - Windows doesn't like : in file names
-        return "%d%b%H:%M:%S"
     def createActionRunner(self):
         actionRunner = ActionRunner()
         uniqueNameFinder = UniqueNameFinder()

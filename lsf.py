@@ -32,6 +32,8 @@ class QueueSystem:
             if line.find("exit code 140") != -1:
                 return "real"
         return ""
+    def exitedWithError(self, job):
+        return job.status == "EXIT"
     def killJob(self, jobId):
         os.system("bkill " + jobId + " > /dev/null 2>&1")
     def getJobId(self, line):

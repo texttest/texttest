@@ -264,12 +264,14 @@ class QueueSystemServer:
     def runQueueThread(self):
         while 1:
             # Submit at most 5 jobs, then do an update
+            self.diag.info("Creating jobs at " + plugins.localtime())
             try:
                 for i in range(5):
                     self.createJobFromQueue()
             except Empty:
                 pass
 
+            self.diag.info("Updating jobs at " + plugins.localtime())
             self.updateJobs()
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             sleep(0.1)
@@ -466,7 +468,7 @@ class UpdateStatus(plugins.Action):
         # Take a copy of the job status as it can be updated during this time by the queue thread
         jobStatus = copy(job.status)
         self.diag.info("Job " + job.jobId + " in state " + jobStatus + " for test " + test.name)
-        exitStatus = self.processStatus(test, jobStatus, job.machines)
+        exitStatus = self.processStatus(test, jobStatus, job)
         if jobStatus == "DONE" or jobStatus == "EXIT":
             return exitStatus
 
@@ -480,7 +482,7 @@ class UpdateStatus(plugins.Action):
             QueueSystemServer.instance.killJob(test, self.jobNameFunction)
             return
         return self.WAIT | self.RETRY
-    def processStatus(self, test, status, machines):
+    def processStatus(self, test, status, job):
         pass
     def getCleanUpAction(self):
         return KillTest(self.jobNameFunction)
@@ -492,12 +494,12 @@ class UpdateTestStatus(UpdateStatus):
         UpdateStatus.__init__(self)
         self.logFile = None
         self.testsWaitingForFiles = {}
-    def processStatus(self, test, status, machines):
+    def processStatus(self, test, status, job):
         details = ""
         summary = status
         machineStr = ""
-        if len(machines):
-            machineStr = string.join(machines, ',')
+        if len(job.machines):
+            machineStr = string.join(job.machines, ',')
             details += "Executing on " + machineStr + "\n"
             summary += " (" + machineStr + ")"
         details += "Current " + queueSystemName(test.app) + " status = " + status + "\n"
@@ -511,7 +513,7 @@ class UpdateTestStatus(UpdateStatus):
             else:
                 return self.handleFileWaiting(test, machineStr)
         else:
-            runState = default.Running(machines, freeText=details, briefText=summary)
+            runState = default.Running(job.machines, freeText=details, briefText=summary)
             test.changeState(runState)
     def handleFileWaiting(self, test, machineStr):
         if not self.testsWaitingForFiles.has_key(test):

@@ -1,6 +1,7 @@
 
 import os, string, signal
-from plugins import getDiagnostics
+from plugins import getDiagnostics, localtime
+from time import sleep
 
 class QueueSystem:
     def __init__(self, envString):
@@ -64,7 +65,7 @@ class QueueSystem:
             return "PEND"
         elif sgeStat.startswith("q"):
             if states == "z":
-                return self.completedState(jobId)
+                return "DONE"
             else:
                 return "PEND"
         elif sgeStat.startswith("s") or sgeStat.startswith("S") or sgeStat.startswith("T"):
@@ -73,15 +74,15 @@ class QueueSystem:
             return "USUSP"
         else:
             return sgeStat
-    def completedState(self, jobId):
-        exitStatus = self.exitStatus(jobId)
+    def exitedWithError(self, job):
+        exitStatus = self.exitStatus(job.jobId)
         if exitStatus is None:
-            return "RUN"
-        if exitStatus == 0:
-            return "DONE"
-        else:
-            return "EXIT"
+            sleep(0.5)
+            return self.exitedWithError(job)
+
+        return exitStatus > 0
     def exitStatus(self, jobId):
+        self.diag.info("qacct -j " + jobId + " at " + localtime())
         stdin, stdout, stderr = os.popen3("qacct -j " + jobId)
         errMsg = stderr.readlines()
         lines = stdout.readlines()
@@ -97,6 +98,7 @@ class QueueSystem:
         self._updateJobs("z")
     def _updateJobs(self, states):
         commandLine = self.envString + "qstat -s " + states + " -u " + os.environ["USER"]
+        self.diag.info("At " + localtime() + " : qstat -s " + states)
         stdin, stdout, stderr = os.popen3(commandLine)
         self.parseQstatOutput(stdout, states)
         self.parseQstatErrors(stderr)

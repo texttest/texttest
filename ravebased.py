@@ -384,11 +384,11 @@ class UpdateRulesetBuildStatus(queuesystem.UpdateStatus):
             self.ruleCompilations.append(jobName)
             ruleset = self.getRuleSetName(test)
             self.raiseFailureWithError(ruleset, str(test.state))
-    def processStatus(self, test, status, machines):
+    def processStatus(self, test, status, job):
         ruleset = self.getRuleSetName(test)
         details = "Compiling ruleset " + ruleset
-        machineStr = string.join(machines, ",")
-        if len(machines):
+        machineStr = string.join(job.machines, ",")
+        if len(job.machines):
             details += " on " + machineStr
         details += os.linesep + "Current LSF status = " + status + os.linesep
         if status == "PEND":
@@ -396,9 +396,13 @@ class UpdateRulesetBuildStatus(queuesystem.UpdateStatus):
         else:
             test.changeState(RunningRuleCompilation(details, test.state))
 
-        if status == "EXIT":
+        if status != "EXIT" and status != "DONE":
+            return
+
+        queueSystem = queuesystem.QueueSystemServer.instance.getQueueSystem(test)
+        if queueSystem.exitedWithError(job):
             return self.raiseFailure(test, ruleset, machineStr)
-        elif status == "DONE":
+        else:
             self.ruleCompilations.append(self.jobNameFunction(test))
             test.changeState(plugins.TestState("not_started", "Ruleset " + ruleset + " succesfully compiled"))
     def raiseFailure(self, test, ruleset, machineStr):

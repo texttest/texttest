@@ -928,28 +928,33 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         return "Total " + string.capitalize(fileStem) + "  :      " + str(roundedSum) + " seconds"
     def findValues(self, logFile, entryFinder):
         values = []
-        self.diag.info("Scanning log file for entry finder: " + entryFinder)
+        self.diag.info("Scanning log file for entry: " + entryFinder)
         for line in open(logFile).xreadlines():
             value = self.getValue(line, entryFinder)
             if value:
-                self.diag.info(" found corresponding value: " + str(value))
+                self.diag.info(" found value: " + str(value))
                 values.append(value)
         return values
     def getValue(self, line, entryFinder):
-        pos = line.find(entryFinder)
-        if pos == -1:
+        # locates the first whitespace after an occurrence of entryFinder in line,
+        # and scans the rest of the string after that whitespace
+        pattern = '.*' + entryFinder + r'\S*\s(?P<restofline>.*)'
+        regExp = re.compile(pattern)        
+        match = regExp.match(line)
+        if not match:
             return None
-        endOfString = pos + len(entryFinder)
-        memString = line[endOfString:].lstrip()
+        restOfLine = match.group('restofline')
+        self.diag.info(" entry found, extracting value from: " + restOfLine)
         try:
-            memNumber = float(memString.split()[0])
-            if memString.lower().find("kb") != -1:
-                memNumber = float(memNumber / 1024.0)
-            return memNumber
+            number = float(restOfLine.split()[0])
+            if restOfLine.lower().find("kb") != -1:
+                number = float(number / 1024.0)
+            return number
         except:
-            # try parsing the memString as a hh:mm:ss time string
-            timePattern = re.compile(r'(?P<hours>\d\d)\:(?P<minutes>\d\d)\:(?P<seconds>\d\d)')
-            match = timePattern.match(memString)
+            # try parsing the memString as a h*:mm:ss time string
+            # * - any number of figures are allowed for the hour part
+            timeRegExp = re.compile(r'(?P<hours>\d+)\:(?P<minutes>\d\d)\:(?P<seconds>\d\d)')
+            match = timeRegExp.match(restOfLine.split()[0])
             if match:
                 hours = float(match.group('hours'))
                 minutes = float(match.group('minutes'))

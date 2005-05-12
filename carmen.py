@@ -263,6 +263,8 @@ class RunLprof(RunWithParallelAction):
         os.system(runLine)
     def handleNoTimeAvailable(self, test):
         raise plugins.TextTestError, "Lprof information not collected, test did not run long enough to connect to it"
+    def changeToRunningState(self, test, process):
+        return self.baseRunner.changeToRunningState(test, process)
     
 class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):

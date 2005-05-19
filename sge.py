@@ -75,12 +75,16 @@ class QueueSystem:
         else:
             return sgeStat
     def exitedWithError(self, job):
-        exitStatus = self.exitStatus(job.jobId)
-        if exitStatus is None:
-            sleep(0.5)
-            return self.exitedWithError(job)
-
-        return exitStatus > 0
+        trials = 10
+        sleepTime = 0.5
+        while trials > 0:
+            exitStatus = self.exitStatus(job.jobId)
+            if not exitStatus is None:
+                return exitStatus > 0
+            sleep(sleepTime)
+            if sleepTime < 5:
+                sleepTime *= 2
+        return 1
     def exitStatus(self, jobId):
         self.diag.info("qacct -j " + jobId + " at " + localtime())
         stdin, stdout, stderr = os.popen3("qacct -j " + jobId)

@@ -1,6 +1,7 @@
 
 import plugins, os, sys, shutil, string
 from glob import glob
+global scriptEngine
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
@@ -32,20 +33,19 @@ class InteractiveAction(plugins.Action):
         process = plugins.BackgroundProcess(commandLine, shellTitle=shellTitle, holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         self.processes.append(process)
         return process
-    def viewFile(self, fileName, wait = 0, refresh=0):
+    def viewFile(self, fileName, refresh=0):
         viewProgram = self.test.getConfigValue("view_program")
+        if not plugins.canExecute(viewProgram):
+            raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
+                  "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
         baseName = os.path.basename(fileName)
         guilog.info("Viewing file " + baseName + " using '" + viewProgram + "', refresh set to " + str(refresh))
         exitHandler = None
         if refresh:
             exitHandler = self.test.filesChanged
-        commandLine = viewProgram + " " + fileName
-        if viewProgram.endswith("emacs"):
-            # Emacs dumps junk on standard error - this is annoying!
-            commandLine += " 2> /dev/null"
+        commandLine = viewProgram + " " + fileName + plugins.nullRedirect()
         process = self.startExternalProgram(commandLine, exitHandler=exitHandler)
-        if wait:
-            process.waitForTermination()
+        scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getTextTestName(self):
         return "python " + sys.argv[0]
     def describe(self, testObj, postText = ""):
@@ -136,8 +136,12 @@ class ViewFile(InteractiveAction):
         baseName = os.path.basename(fileName)
         title = self.test.name + " (" + baseName + ")"
         followProgram = self.test.app.getConfigValue("follow_program")
+        if not plugins.canExecute(followProgram.split()[0]):
+            raise plugins.TextTestError, "Cannot find file-following program '" + followProgram + \
+                  "'\nPlease install it somewhere on your PATH or point the follow_program setting at a different tool"
         guilog.info("Following file " + title + " using '" + followProgram + "'")
-        self.startExternalProgram(followProgram + " " + fileName, shellTitle=title)
+        process = self.startExternalProgram(followProgram + " " + fileName, shellTitle=title)
+        scriptEngine.monitorProcess("follows progress of test files", process)
     def view(self, comparison, fileName):
         if self.optionGroup.getSwitchValue("f"):
             return self.followFile(fileName)
@@ -158,10 +162,14 @@ class ViewFile(InteractiveAction):
         return self.optionGroup.getSwitchValue("rdt")
     def takeDiff(self, comparison):
         diffProgram = self.test.app.getConfigValue("diff_program")
+        if not plugins.canExecute(diffProgram):
+            raise plugins.TextTestError, "Cannot find graphical difference program '" + diffProgram + \
+                  "'\nPlease install it somewhere on your PATH or point the diff_program setting at a different tool"
         stdFile = self.stdFile(comparison)
         tmpFile = self.tmpFile(comparison)
         guilog.info("Comparing file " + os.path.basename(tmpFile) + " with previous version using '" + diffProgram + "'")
-        self.startExternalProgram("tkdiff " + stdFile + " " + tmpFile)
+        process = self.startExternalProgram(diffProgram + " " + stdFile + " " + tmpFile)
+        scriptEngine.monitorProcess("shows graphical differences in test files", process)
 
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveAction):
@@ -218,6 +226,7 @@ class RecordTest(InteractiveAction):
     def __init__(self, test, oldOptionGroup):
         InteractiveAction.__init__(self, test, oldOptionGroup, "Recording")
         self.addSwitch(oldOptionGroup, "hold", "Hold record shell after recording")
+        self.recordMode = self.test.getConfigValue("use_case_record_mode")
     def __call__(self, test):
         description = "Running " + test.app.fullName + " in order to capture user actions..."
         guilog.info(description)
@@ -229,33 +238,32 @@ class RecordTest(InteractiveAction):
         os.chdir(test.writeDirs[0])
         recordCommand = test.getExecuteCommand()
         shellTitle = None
-        if test.getConfigValue("use_standard_input"):
+        if self.recordMode == "console":
             shellTitle = description
         else:
             logFile = os.path.join(test.app.writeDirectory, "record_run.log")
             errFile = os.path.join(test.app.writeDirectory, "record_errors.log")
             recordCommand +=  " > " + logFile + " 2> " + errFile
         holdShell = self.optionGroup.getSwitchValue("hold")
-        process = self.startExternalProgram(recordCommand, shellTitle, holdShell)
-        process.waitForTermination()
+        process = self.startExternalProgram(recordCommand, shellTitle, holdShell, \
+                                            exitHandler=self.setTestRecorded, exitHandlerArgs=(test,))
         test.tearDownEnvironment(parents=1)
+        test.setReplayEnvironment()
+        scriptEngine.monitorProcess("records use cases", process, [ test.inputFile, test.useCaseFile ])
+    def canPerformOnTest(self):
+        return self.recordMode != "disabled"
+    def setTestRecorded(self, test):
         test.app.removeWriteDirectory()
-        if not os.path.isfile(test.useCaseFile):
-            if not plugins.BackgroundProcess.fakeProcesses: # do not make this check when running self tests
-                raise plugins.TextTestError, "Recording did not produce a usecase file"
+        if not os.path.isfile(test.useCaseFile) and not os.path.isfile(test.inputFile):
+            raise plugins.TextTestError, "Recording did not produce any results (no usecase or input file)"
 
         test.state.freeText = "Recorded use case - now attempting to replay in the background to collect standard files" + \
                               "\n" + "These will appear shortly. You do not need to submit the test manually."
         test.notifyChanged()
         ttOptions = self.getRunOptions(test)
-        commandLine = self.getTextTestName() + " " + ttOptions + self.nullRedirect()
+        commandLine = self.getTextTestName() + " " + ttOptions + plugins.nullRedirect()
         guilog.info("Starting replay TextTest with options : " + ttOptions)
         process = self.startExternalProgram(commandLine, exitHandler=self.setTestReady, exitHandlerArgs=(test,))
-    def nullRedirect(self):
-        if os.name == "posix":  
-            return " > /dev/null 2>&1"
-        else:
-            return " > nul 2> nul"
     def setTestReady(self, test):
         test.state.freeText = "Recorded use case and collected all standard files"
         test.notifyChanged()
@@ -432,9 +440,26 @@ class RunTests(InteractiveAction):
         logFile = os.path.join(app.writeDirectory, "dynamic_run.log")
         errFile = os.path.join(app.writeDirectory, "dynamic_errors.log")
         commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
-        print "Starting dynamic TextTest with options :", ttOptions
+        recScript = os.getenv("USECASE_RECORD_SCRIPT")
+        if recScript:
+            os.environ["USECASE_RECORD_SCRIPT"] = self.getDynamic(recScript)
+        repScript = os.getenv("USECASE_REPLAY_SCRIPT")
+        if repScript:
+            # Dynamic GUI might not record anything (it might fail) - don't try to replay files that
+            # aren't there...
+            dynRepScript = self.getDynamic(repScript)
+            if os.path.isfile(dynRepScript):
+                os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
         self.startExternalProgram(commandLine, exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,))
+        if recScript:
+            os.environ["USECASE_RECORD_SCRIPT"] = recScript
+        if repScript:
+            os.environ["USECASE_REPLAY_SCRIPT"] = repScript
+    def getDynamic(self, script):
+        dir, file = os.path.split(script)
+        return os.path.join(dir, "dynamic_" + file)
     def checkTestRun(self, errFile):
+        scriptEngine.applicationEvent("dynamic GUI to be closed")
         if os.path.isfile(errFile):
             errText = open(errFile).read()
             if len(errText):
@@ -556,6 +581,9 @@ class InteractiveActionHandler:
 interactiveActionHandler = InteractiveActionHandler()
 guilog = None
 
-def setUpGuiLog():
+def setUpGuiLog(dynamic):
     global guilog
-    guilog = plugins.getDiagnostics("GUI behaviour")
+    if dynamic:
+        guilog = plugins.getDiagnostics("dynamic GUI behaviour")
+    else:
+        guilog = plugins.getDiagnostics("static GUI behaviour")

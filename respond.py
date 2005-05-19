@@ -51,21 +51,23 @@ class InteractiveResponder(Responder):
     def handleFailure(self, test):
         performView = self.askUser(test, allowView=1)
         if performView:
-            outputText = test.state.freeText
-            sys.stdout.write(outputText)
-            logFileComparison, list = test.state.findComparison(self.logFile)
-            if logFileComparison:
-                tool = self.graphicalDiffTool
-                cmdLine = tool + " " + logFileComparison.stdCmpFile + " " +\
-                          logFileComparison.tmpCmpFile
-                if logFileComparison.newResult():
-                    tool = self.graphicalViewTool
-                    cmdLine = tool + " " + logFileComparison.tmpCmpFile
-                if tool:
-                    print "<See also " + tool + " window for details of " + self.logFile + ">"
-                    plugins.BackgroundProcess(cmdLine)
-            self.askUser(test, allowView=0)
-    def askUser(self, test, allowView):      
+            process = self.viewTest(test)
+            self.askUser(test, allowView=0, process=process)
+    def viewTest(self, test):
+        outputText = test.state.freeText
+        sys.stdout.write(outputText)
+        logFileComparison, list = test.state.findComparison(self.logFile)
+        if logFileComparison:
+            tool = self.graphicalDiffTool
+            cmdLine = tool + " " + logFileComparison.stdCmpFile + " " +\
+                      logFileComparison.tmpCmpFile + plugins.nullRedirect()
+            if logFileComparison.newResult():
+                tool = self.graphicalViewTool
+                cmdLine = tool + " " + logFileComparison.tmpCmpFile + plugins.nullRedirect()
+            if tool:
+                print "<See also " + tool + " window for details of " + self.logFile + ">"
+                return plugins.BackgroundProcess(cmdLine)
+    def askUser(self, test, allowView, process=None):      
         versions = test.app.getVersionFileExtensions(forSave=1)
         options = ""
         for i in range(len(versions)):
@@ -85,6 +87,8 @@ class InteractiveResponder(Responder):
                 versionOption = str(i + 1)
                 if response.startswith(versionOption):
                     self.save(test, versions[i], exactSave)
+        if process:
+            process.killAll()
         return 0
     
 class OverwriteOnFailures(Responder):

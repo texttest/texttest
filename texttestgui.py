@@ -37,10 +37,11 @@ class ActionThread(Thread):
 
 class TextTestGUI:
     def __init__(self, dynamic, startTime):
-        guiplugins.setUpGuiLog()
+        guiplugins.setUpGuiLog(dynamic)
         global guilog, scriptEngine
         from guiplugins import guilog
         scriptEngine = ScriptEngine(guilog)
+        guiplugins.scriptEngine = scriptEngine
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.dynamic = dynamic
@@ -257,6 +258,9 @@ class TextTestGUI:
         time.sleep(0.1)
         return gtk.TRUE
     def testChanged(self, test, state, byAction):
+        # May have already closed down, don't crash if so
+        if not self.selection.get_tree_view():
+            return
         if test.classId() == "test-case":
             # Working around python bug 853411: main thread must do all forking
             state.notifyInMainThread()
@@ -312,9 +316,9 @@ class TextTestGUI:
     def exit(self, *args):
         gtk.main_quit()
         sys.stdout.flush()
-        self.killInteractiveProcesses()
         if self.actionThread:
             self.actionThread.terminate()
+        self.killInteractiveProcesses()
     def quit(self, *args):
         # Generate a window closedown, so that the quit button behaves the same as closing the window
         self.topWindow.destroy()
@@ -324,7 +328,7 @@ class TextTestGUI:
         for process in guiplugins.InteractiveAction.processes:
             if not process.hasTerminated():
                 guilog.info("Killing '" + repr(process) + "' interactive process")
-                process.kill()
+                process.killAll()
     def saveAll(self, *args):
         saveActionFromWindow = self.rightWindowGUI.getSaveTestAction()
         windowVersion = None
@@ -466,7 +470,10 @@ class RightWindowGUI:
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
         comparison = self.model.get_value(iter, 3)
-        self.fileViewAction.view(comparison, fileName)
+        try:
+            self.fileViewAction.view(comparison, fileName)
+        except plugins.TextTestError, e:
+            showError(str(e))
     def addButton(self, method, buttonbox, label, scriptTitle, option):
         button = gtk.Button()
         button.set_label(label)

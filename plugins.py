@@ -156,6 +156,21 @@ def abspath(relpath):
 def localtime():
     return time.strftime("%d%b%H:%M:%S", time.localtime())
 
+def nullRedirect():
+    if os.name == "posix":  
+        return " > /dev/null 2>&1"
+    else:
+        return " > nul 2> nul"
+
+def canExecute(program):
+    if os.name == "posix":
+        return os.system("which " + program + " > /dev/null 2>&1") == 0
+    for dir in os.environ["PATH"].split(";"):
+        fullPath = os.path.join(dir, program + ".exe")
+        if os.path.isfile(fullPath):
+            return 1
+    return 0        
+
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
     return map(string.strip, input.split(","))
@@ -259,18 +274,30 @@ class UNIXProcessHandler:
             return " -hold"
         else:
             return ""
-    def waitForTermination(self, processId):
-        try:
-            os.waitpid(processId, 0)
-        except OSError:
-            pass
     def hasTerminated(self, processId):
-        # Works on child processes only. Do not use while killing...
-        try:
-            procId, status = os.waitpid(processId, os.WNOHANG)
-            return procId > 0 or status > 0
-        except OSError:
-            return 1
+        lines = os.popen("ps -p " + str(processId) + " 2> /dev/null").readlines()
+        return len(lines) < 2 or lines[-1].strip().endswith("<defunct>")
+    def findChildProcesses(self, pid):
+        processes = []
+        stdin, stdout, stderr = os.popen3("ps -efl | grep " + str(pid))
+        errMsg = stderr.read()
+        outLines = stdout.readlines()
+        if len(errMsg) > 0 and len(outLines) == 0:
+            return self.findChildProcesses(pid)
+
+        for line in outLines:
+            entries = line.split()
+            if entries[4] == str(pid):
+                childPid = int(entries[3])
+                processes.append(childPid)
+                processes += self.findChildProcesses(childPid)
+        return processes
+    def findProcessName(self, pid):
+        pslines = os.popen("ps -l -p " + str(pid) + " 2> /dev/null").readlines()
+        if len(pslines) == 0:
+            return self.findProcessName(pid)
+        else:
+            return pslines[-1].split()[-1]
     def kill(self, process, killSignal):
         return os.kill(process, killSignal)
     def getCpuTime(self, processId):
@@ -311,6 +338,9 @@ class WindowsProcessHandler:
                 idStart = processInfo.find("(")
                 subprocesses.append((processInfo[idStart + 1:-1], self.getHandleId(words)))
         return subprocesses
+    def findProcessName(self, processId):
+        words = self.getPsWords(processId)
+        return words[0]
     def getHandleId(self, words):
         try:
             # Drop trailing colon
@@ -329,9 +359,6 @@ class WindowsProcessHandler:
     def hasTerminated(self, processId):
         words = self.getPsWords(processId)
         return words[2] == "was"
-    def waitForTermination(self, processId):
-        while not self.hasTerminated(processId):
-            time.sleep(0.1)
     def getCpuTime(self, processId):
         words = self.getPsWords(processId)
         cpuEntry = words[6]
@@ -343,28 +370,72 @@ class WindowsProcessHandler:
     def kill(self, process, killSignal):
         return os.system("pskill " + str(process) + " > nul 2> nul")
 
-# Generally useful class to encapsulate a background process, of which TextTest creates
-# a few...
-class BackgroundProcess:
-    fakeProcesses = os.environ.has_key("TEXTTEST_NO_SPAWN")
+class Process:
     if os.name == "posix":
         processHandler = UNIXProcessHandler()
     else:
         processHandler = WindowsProcessHandler()
+    def __init__(self, processId):
+        self.processId = processId
+    def __repr__(self):
+        return self.getName()
+    def hasTerminated(self):
+        for process in self.findAllProcesses():
+            if not self.processHandler.hasTerminated(process.processId):
+                return 0
+        return 1
+    def findAllProcesses(self):
+        return [ self ] + self.findChildProcesses()
+    def findChildProcesses(self):
+        ids = self.processHandler.findChildProcesses(self.processId)
+        return [ Process(id) for id in ids ]
+    def getName(self):
+        return self.processHandler.findProcessName(self.processId)
+    def waitForTermination(self):
+        while not self.hasTerminated():
+            time.sleep(0.1)
+    def checkTermination(self):
+        return self.hasTerminated()
+    def killAll(self):
+        processes = self.findAllProcesses()
+        # Start with the deepest child process...
+        processes.reverse()
+        for index in range(len(processes)):
+            verbose = index == 0
+            processes[index].kill(verbose)
+    def getCpuTime(self):
+        return self.processHandler.getCpuTime(self.processId)
+    def kill(self, verbose=1):
+        if self.tryKill(signal.SIGINT, verbose):
+            return
+        if self.tryKill(signal.SIGTERM, verbose):
+            return
+        self.tryKill(signal.SIGKILL, verbose)
+    def tryKill(self, killSignal, verbose=0):
+        if verbose:
+            print "Killed process", self.processId, "with signal", killSignal
+        try:
+            self.processHandler.kill(self.processId, killSignal)
+        except OSError:
+            pass
+        for i in range(10):
+            time.sleep(0.1)
+            if self.processHandler.hasTerminated(self.processId):
+                return 1
+        return 0
+
+# Generally useful class to encapsulate a background process, of which TextTest creates
+# a few...
+class BackgroundProcess(Process):
     def __init__(self, commandLine, testRun=0, exitHandler=None, exitHandlerArgs=(), shellTitle=None, holdShell=0):
+        Process.__init__(self, None)
         self.commandLine = commandLine
-        self.processId = None
         self.shellTitle = shellTitle
         self.holdShell = holdShell
         self.exitHandler = exitHandler
         self.exitHandlerArgs = exitHandlerArgs
         if not testRun:
-            if not self.fakeProcesses:
-                self.doFork()
-            else:
-                # When running self tests, we don't have time to start external programs and stop them
-                # again, so we provide an environment variable to fake them all
-                print "Faking start of external progam: '" + commandLine + "'"
+            self.doFork()
     def __repr__(self):
         return self.commandLine.split()[0].lstrip()
     def doFork(self):
@@ -378,71 +449,15 @@ class BackgroundProcess:
         if self.exitHandler:
             self.exitHandler(*self.exitHandlerArgs)
         return 1
+    def waitForTermination(self):
+        if self.processId != None:
+            Process.waitForTermination(self)
     def hasTerminated(self):
         if self.processId == None:
             return 1
-        if not self.processHandler.hasTerminated(self.processId):
-            return 0
-        for process in findAllProcesses(self.processId):
-            if process != self.processId and not self.processHandler.hasTerminated(process):
-                return 0
-        return 1
-    def waitForTermination(self):
-        if self.processId == None:
-            return
-        for process in findAllProcesses(self.processId):
-            self.processHandler.waitForTermination(process)
-    def kill(self):
-        processes = findAllProcesses(self.processId)
-        # Just kill the deepest child process, that seems to work best...
-        if len(processes) > 0:
-            self.tryKillProcess(processes[-1])
         else:
-            print "All child processes under", self.processId, "terminated, could not kill"
-    def getCpuTime(self):
-        return self.processHandler.getCpuTime(self.processId)
-    def tryKillProcess(self, process):
-        if self.tryKillProcessWithSignal(process, signal.SIGINT):
-            return
-        if self.tryKillProcessWithSignal(process, signal.SIGTERM):
-            return
-        self.tryKillProcessWithSignal(process, signal.SIGKILL)
-    def tryKillProcessWithSignal(self, process, killSignal):
-        try:
-            self.processHandler.kill(process, killSignal)
-            print "Killed process", process, "with signal", killSignal
-        except OSError:
-            print "Process", process, "already terminated, could not kill with signal", killSignal
-            pass
-        for i in range(10):
-            time.sleep(0.1)
-            if self._hasTerminatedNotChild(process):
-                return 1
-        return 0
-    def _hasTerminatedNotChild(self, processId):
-        lines = os.popen("ps -p " + str(processId)).readlines()
-        return len(lines) < 2
-
-
-# Find child processes. Note that this concept doesn't really exist on Windows, so we just return the process
-def findAllProcesses(pid):
-    if os.name != "posix":
-        return [ pid ]
-    processes = []
-    stdin, stdout, stderr = os.popen3("ps -efl | grep " + str(pid))
-    errMsg = stderr.read()
-    outLines = stdout.readlines()
-    if len(errMsg) > 0 and len(outLines) == 0:
-        return findAllProcesses(pid)
+            return Process.hasTerminated(self)
     
-    for line in outLines:
-        entries = line.split()
-        if entries[3] == str(pid) and line.find("<defunct>") == -1:
-            processes.insert(0, pid)
-        if entries[4] == str(pid):
-            processes += findAllProcesses(int(entries[3]))
-    return processes
-
 class Option:    
     def __init__(self, name, value):
         self.name = name

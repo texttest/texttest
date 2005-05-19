@@ -230,7 +230,7 @@ class MailSender(plugins.Action):
         file.close()
     def getSmtp(self):
         # Mock out sending of mail...
-        if plugins.BackgroundProcess.fakeProcesses:
+        if os.environ.has_key("TEXTTEST_FAKE_SEND_MAIL"):
             return FakeSMTP()
         else:
             return smtplib.SMTP()

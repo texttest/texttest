@@ -251,6 +251,11 @@ class TestCase(Test):
         self.setRecord(self.makeFileName("usecase", temporary=1))
     def setRecordEnvironment(self):
         self.setRecord(self.useCaseFile, self.inputFile)
+        self.disableReplay()
+    def disableReplay(self):
+        if not self.useJavaRecorder():
+            if self.environment.has_key("USECASE_REPLAY_SCRIPT"):
+                del self.environment["USECASE_REPLAY_SCRIPT"]
     def addJusecaseProperty(self, name, value):
         self.properties.addEntry(name, value, sectionName="jusecase", insert=1)
     def setReplay(self, replayScript, replaySpeed):

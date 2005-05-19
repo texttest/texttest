@@ -261,6 +261,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("run_dependent_text", { "" : [] })
         app.setConfigDefault("unordered_text", { "" : [] })
         app.setConfigDefault("create_catalogues", "false")
+        app.setConfigDefault("catalogue_process_string", "")
         app.setConfigDefault("internal_error_text", [])
         app.setConfigDefault("internal_compulsory_text", [])
         # Performance values
@@ -271,7 +272,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] })
         app.setConfigDefault("performance_variation_%", { "default" : 10 })
         app.setConfigDefault("performance_test_minimum", { "default" : 0 })
-        app.setConfigDefault("use_standard_input", 1)
+        app.setConfigDefault("use_case_record_mode", "disabled")
         app.setConfigDefault("collect_standard_output", 1)
         app.setConfigDefault("collect_standard_error", 1)
         app.addConfigEntry("pending", "white", "test_colours")
@@ -481,7 +482,7 @@ class Running(plugins.TestState):
     def killProcess(self):
         if self.bkgProcess and self.bkgProcess.processId:
             print "Killing running test (process id", str(self.bkgProcess.processId) + ")"
-            self.bkgProcess.kill()
+            self.bkgProcess.killAll()
 
 # Poll CPU time values as well
 class WindowsRunning(Running):
@@ -584,17 +585,24 @@ class CreateCatalogue(plugins.Action):
         oldFiles = self.catalogues[test]
         newFiles = self.findAllFiles(test)
         filesLost, filesGained = self.findDifferences(oldFiles, newFiles, test.writeDirs)
+        processesGained = self.findProcessesGained(test)
         if len(filesLost) == 0 and len(filesGained) == 0:
             return
         
         fileName = test.makeFileName("catalogue", temporary=1)
         file = open(fileName, "w")
-        file.write("The following new files were created:" + "\n")
+        file.write("The following new files were created:\n")
         self.writeFileStructure(file, filesGained)
         if len(filesLost) > 0:
-            file.write("\n" + "The following existing files were deleted:" + "\n")
+            file.write("\nThe following existing files were deleted:\n")
             self.writeFileStructure(file, filesLost)
+        if len(processesGained) > 0:
+            file.write("\nThe following processes were created:\n")
+            self.writeProcesses(file, processesGained) 
         file.close()
+    def writeProcesses(self, file, processesGained):
+        for process in processesGained:
+            file.write("- " + process + "\n")
     def writeFileStructure(self, file, fileNames):
         prevParts = []
         tabSize = 4
@@ -612,21 +620,38 @@ class CreateCatalogue(plugins.Action):
                 else:
                     file.write("-" * tabSize)
             prevParts = parts
+    def findProcessesGained(self, test):
+        searchString = test.getConfigValue("catalogue_process_string")
+        if len(searchString) == 0:
+            return []
+        processes = []
+        logFile = test.makeFileName(test.getConfigValue("log_file"), temporary=1)
+        for line in open(logFile).xreadlines():
+            if line.startswith(searchString):
+                parts = line.strip().split(" : ")
+                processId = int(parts[-1])
+                process = plugins.Process(processId)
+                self.diag.info("Found process ID " + str(processId))
+                if not process.hasTerminated():
+                    process.killAll()
+                    processes.append(parts[1])
+        return processes
     def findAllFiles(self, test):
         fileList = []
         for writeDir in test.writeDirs:
             if os.path.isdir(writeDir):
                 fileList += self.listDirectory(test.app, writeDir, firstLevel = 1)
-        self.diag.info("Found all files present as follows : " + "\n" + repr(fileList))
+        self.diag.info("Found all files present as follows : \n" + repr(fileList))
         return fileList
     def listDirectory(self, app, writeDir, firstLevel = 0):
         subDirs = []
         files = []
         availFiles = os.listdir(writeDir)
         availFiles.sort()
+        frameworkDirs = [ "framework_tmp", "file_edits", "Diagnostics" ]
         for writeFile in availFiles:
             # Don't list special directories or the framework's own temporary files
-            if writeFile == "CVS" or (firstLevel and writeFile == "framework_tmp"):
+            if writeFile == "CVS" or (firstLevel and writeFile in frameworkDirs):
                 continue
             fullPath = os.path.join(writeDir, writeFile)
             if os.path.isdir(fullPath):

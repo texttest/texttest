@@ -100,6 +100,7 @@ optimization.TraverseSubPlans
 
 import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy
 from ndict import seqdict
+from time import sleep
 
 itemNamesConfigKey = "_itemnames_map"
 noIncreasMethodsConfigKey = "_noincrease_methods_map"
@@ -1290,7 +1291,9 @@ class GraphPlot(plugins.Action):
         if commonPlotter.plotForTest:
             xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, title = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
-            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, title, wait=1)
+            plotProcess = commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, title)
+            if plotProcess:
+                print "Created process : gnuplot window :", plotProcess.processId
     
 class TestGraph:
     def __init__(self):
@@ -1303,6 +1306,8 @@ class TestGraph:
         self.undesiredLineTypes = []
         self.users = []
         self.apps = []
+        self.gnuplotFile = None
+        self.diag = plugins.getDiagnostics("Test Graph")
     def addLine(self, plotLine):
         self.plotLines.append(plotLine)
         test = plotLine.test
@@ -1337,49 +1342,39 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, writeDir, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotAveragers, title = None, wait=0):
+    def plot(self, writeDir, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotAveragers, title = None):
         if len(self.plotLines) == 0:
             return
 
         os.chdir(writeDir)
-        gnuplotFileName = os.path.join(writeDir, "gnuplot.input")
-        outputFileName = os.path.join(writeDir, "gnuplot.output")
-        gnuplotFile = open(gnuplotFileName, "w")
+        self.gnuplotFile, outputFile = os.popen2("gnuplot -persist -background white")
         absTargetFile = None
+        
         if targetFile:
-            # The abspath is to get the testing working, I don't like the abspath...
-            absTargetFile = os.path.abspath(os.path.expanduser(targetFile))
+            absTargetFile = os.path.expanduser(targetFile)
+            # Mainly for testing...
             if not os.path.isabs(absTargetFile):
-                print "An absolute path must be given.", absTargetFile
-                return
-            gnuplotFile.write("set terminal postscript")
-            if colour:
-                gnuplotFile.write(" color solid")
-            gnuplotFile.write(os.linesep)
+                absTargetFile = os.path.join(writeDir, absTargetFile)
+            self.writePlot(self.terminalLine(colour))
         if printer:
             absTargetFile = os.path.join(writeDir, "texttest.ps")
-            gnuplotFile.write("set terminal postscript")
+            self.writePlot(self.terminalLine(colour, printA3))
             if printA3:
-                gnuplotFile.write(" landscape")
-            if colour:
-                gnuplotFile.write(" color solid")
-            gnuplotFile.write(os.linesep)
-            if printA3:
-                gnuplotFile.write("set size 1.45,1.45" + os.linesep)
-                gnuplotFile.write("set origin 0,-0.43" + os.linesep)
+                self.writePlot("set size 1.45,1.45")
+                self.writePlot("set origin 0,-0.43")
         if targetFile or printer:
             self.undesiredLineTypes = [5, 6]
 
-        gnuplotFile.write("set ylabel '" + self.getAxisLabel("y") + "'" + os.linesep)
-        gnuplotFile.write("set xlabel '" + self.getAxisLabel("x") + "'" + os.linesep)
-        gnuplotFile.write("set time" + os.linesep)
-        gnuplotFile.write("set title \"" + self.makeTitle(title) + "\"" + os.linesep)
-        gnuplotFile.write("set xtics border nomirror norotate" + os.linesep)
-        gnuplotFile.write("set ytics border nomirror norotate" + os.linesep)
-        gnuplotFile.write("set border 3" + os.linesep)
-        gnuplotFile.write("set xrange [" + xrange +"];" + os.linesep)
+        self.writePlot("set ylabel '" + self.getAxisLabel("y") + "'")
+        self.writePlot("set xlabel '" + self.getAxisLabel("x") + "'")
+        self.writePlot("set time")
+        self.writePlot("set title \"" + self.makeTitle(title) + "\"")
+        self.writePlot("set xtics border nomirror norotate")
+        self.writePlot("set ytics border nomirror norotate")
+        self.writePlot("set border 3")
+        self.writePlot("set xrange [" + xrange +"];")
         if yrange:
-            gnuplotFile.write("set yrange [" + yrange +"];" + os.linesep)
+            self.writePlot("set yrange [" + yrange +"];")
         plotArguments = self.getPlotArguments()
         if plotAveragers:
             avgArguments = [ plotAveragers[plotAverager].plotArgument() for plotAverager in plotAveragers ]
@@ -1388,23 +1383,37 @@ class TestGraph:
             else:
                 plotArguments += avgArguments
         relPlotArgs = [ arg.replace(writeDir, ".") for arg in plotArguments ]
-        gnuplotFile.write("plot " + string.join(relPlotArgs, ", ") + os.linesep)
-        gnuplotFile.write("quit" + os.linesep)
-        gnuplotFile.close()
-        commandLine = "gnuplot -persist -background white < " + gnuplotFileName + " > " + outputFileName
-        # This is ugly! It's only to be able to test it (we must avoid getting windows popping up where gnuplot
-        # produces a window, but must call it for real when we generate a file...).
-        if absTargetFile:
-            os.system(commandLine)
-            tmppf = open(outputFileName).read()
+        self.writePlot("plot " + string.join(relPlotArgs, ", "))
+        if not absTargetFile:
+            self.gnuplotFile.flush()
+            gnuplotProcess = self.findGnuplotProcess()
+            self.gnuplotFile.close()
+            return gnuplotProcess
+        else:
+            self.gnuplotFile.close()
+            tmppf = outputFile.read()
             if len(tmppf) > 0:
                 open(absTargetFile, "w").write(tmppf)
             if printer:
                 os.system("lpr -o PageSize=A3 -P" + printer + " " + absTargetFile)
-        else:
-            process = plugins.BackgroundProcess(commandLine)
-            if wait:
-                process.waitForTermination()
+    def terminalLine(self, colour, printA3=0):
+        line = "set terminal postscript"
+        if printA3:
+            line += " landscape"
+        if colour:
+            line += " color solid"
+        return line
+    def writePlot(self, line):
+        self.gnuplotFile.write(line + os.linesep)
+        self.diag.info(line + os.linesep)
+    def findGnuplotProcess(self):
+        thisProc = plugins.Process(os.getpid())
+        while 1:
+            for childProc in thisProc.findChildProcesses():
+                name = childProc.getName()
+                if name.startswith("gnuplot_x11"):
+                    return childProc
+            sleep(0.1)
     def getAxisLabel(self, axis):
         label = None
         for plotLine in self.plotLines:
@@ -1496,7 +1505,10 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             self.plotGraph()
     def plotGraph(self):
         xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title = self.getPlotOptions()
-        self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, {}, title, None)
+        plotProcess = self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, {}, title)
+        if plotProcess:
+            self.processes.append(plotProcess)
+            guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
         self.testGraph = TestGraph()
     def getPlotOptions(self):
         xrange = self.optionGroup.getOptionValue("r")
@@ -1542,9 +1554,11 @@ class StartStudio(guiplugins.InteractiveAction):
         lPos = fullSubPlanPath.find("LOCAL_PLAN/")
         subPlan = fullSubPlanPath[lPos + 11:]
         localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
-        studioCommand = "studio -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'"
+        studioCommand = "studio -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
+                        "\",0)'" + plugins.nullRedirect() 
         commandLine = os.path.join(os.environ["CARMSYS"], "bin", studioCommand)
-        self.startExternalProgram(commandLine)
+        process = self.startExternalProgram(commandLine)
+        guiplugins.scriptEngine.monitorProcess("runs studio", process)
         test.tearDownEnvironment(parents=1)
 
 guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUI, StartStudio ]

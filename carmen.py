@@ -148,11 +148,6 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def isExecutable(self, process, parentProcess, test):
         binaryName = os.path.basename(test.getConfigValue("binary"))
         return binaryName.startswith(parentProcess) and process.find(".") == -1 and process.find("arch") == -1 and process.find("crsutil") == -1 and process.find("CMD") == -1
-    def binaryRunning(self, processNameDict):
-        for name in processNameDict.values():
-            if self.binaryName.startswith(name):
-                return 1
-        return 0
     def getTestCollator(self):
         if self.optionMap.has_key("lprof"):
             return [ self.getFileCollator(), ProcessProfilerResults() ]
@@ -189,7 +184,12 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     
 class RunWithParallelAction(plugins.Action):
     def __init__(self, baseRunner, isExecutable):
-        self.baseRunner = baseRunner
+        self.parallelActions = [ self ]
+        if isinstance(baseRunner, RunWithParallelAction):
+            self.parallelActions.append(baseRunner)
+            self.baseRunner = baseRunner.baseRunner
+        else:
+            self.baseRunner = baseRunner
         self.isExecutable = isExecutable
         self.diag = plugins.getDiagnostics("Parallel Action")
     def __repr__(self):
@@ -199,53 +199,44 @@ class RunWithParallelAction(plugins.Action):
             return
         processId = os.fork()
         if processId == 0:
-            # Note, this is a child process, so any state changes made by baseRunner will not be reflected...
+            # Note, this is a child process, so any state changes made by baseRunner will not be reflected, and anything written will not get printed...
             self.baseRunner(test)
             os._exit(0)
         else:
             try:
-                processInfo = self.findProcessInfo(processId, test)
-                self.performParallelAction(test, processInfo)
+                execProcess, parentProcess = self.findProcessInfo(processId, test)
+                for parallelAction in self.parallelActions:
+                    parallelAction.performParallelAction(test, execProcess, parentProcess)
             except plugins.TextTestError:
-                self.handleNoTimeAvailable(test)
+                for parallelAction in self.parallelActions:
+                    parallelAction.handleNoTimeAvailable(test)
             os.waitpid(processId, 0)
             # Make the state change that would presumably be made by the baseRunner...
             self.baseRunner.changeToRunningState(test, None)
     def findProcessInfo(self, firstpid, test):
         while 1:
-            processInfo = self._findProcessInfo(firstpid, test)
-            if processInfo:
-                return processInfo
+            execProcess, parentProcess = self._findProcessInfo(plugins.Process(firstpid), test)
+            if execProcess:
+                return execProcess, parentProcess
             else:
                 time.sleep(0.1)
-    def _findProcessInfo(self, firstpid, test):
-        self.diag.info("Looking for info from process " + str(firstpid))
-        # Look for the binary process, or a child of it, that is a pure executable not a script
-        allProcesses = plugins.findAllProcesses(firstpid)
-        if len(allProcesses) == 0:
+    def _findProcessInfo(self, process, test):
+        self.diag.info(" Looking for info from process " + repr(process))
+        if process.hasTerminated():
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
-        if len(allProcesses) == 1:
-            return
+        # Look for the binary process, or a child of it, that is a pure executable not a script
+        childProcesses = process.findChildProcesses()
+        if len(childProcesses) == 0:
+            return None, None
         
-        processNameDict = self.getProcessNames(allProcesses)
-        executableProcessName = processNameDict.values()[-1]
-        parentProcessName = processNameDict.values()[-2]
+        executableProcessName = childProcesses[-1].getName()
+        parentProcessName = childProcesses[-2].getName()
         if self.isExecutable(executableProcessName, parentProcessName, test):
             self.diag.info("Chose process as executable : " + executableProcessName)
-            return processNameDict.items()[-2:]
+            return childProcesses[-1], childProcesses[-2]
         else:
-            self.diag.info("Rejected process as executable : " + executableProcessName + " in " + repr(processNameDict))
-    def getProcessNames(self, allProcesses):
-        dict = seqdict()
-        for processId in allProcesses:
-            dict[str(processId)] = self.getProcessName(processId)
-        return dict
-    def getProcessName(self, processId):
-        pslines = os.popen("ps -l -p " + str(processId)).readlines()
-        if len(pslines) == 0:
-            return self.getProcessName(processId)
-        else:
-            return pslines[-1].split()[-1]
+            self.diag.info("Rejected process as executable : " + executableProcessName)
+            return None, None
     def setUpSuite(self, suite):
         self.baseRunner.setUpSuite(suite)
     def setUpApplication(self, app):
@@ -255,16 +246,13 @@ class RunWithParallelAction(plugins.Action):
         pass
                 
 class RunLprof(RunWithParallelAction):
-    def performParallelAction(self, test, processInfo):
-        processId, processName = processInfo[-1]
-        self.describe(test, ", profiling process '" + processName + "'")
+    def performParallelAction(self, test, execProcess, parentProcess):
+        self.describe(test, ", profiling process '" + execProcess.getName() + "'")
         os.chdir(test.writeDirs[0])
-        runLine = "/users/lennart/bin/gprofile " + processId + " >& gprof.output"
+        runLine = "/users/lennart/bin/gprofile " + str(execProcess.processId) + " >& gprof.output"
         os.system(runLine)
     def handleNoTimeAvailable(self, test):
         raise plugins.TextTestError, "Lprof information not collected, test did not run long enough to connect to it"
-    def changeToRunningState(self, test, process):
-        return self.baseRunner.changeToRunningState(test, process)
     
 class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):

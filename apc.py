@@ -222,7 +222,8 @@ class ViewApcLog(guiplugins.InteractiveAction):
             file = open(viewLogScript)
             command = file.readlines()[0].strip()
             file.close()
-            self.startExternalProgram(command)
+            process = self.startExternalProgram(command)
+            guiplugins.scriptEngine.monitorProcess("views the APC log", process)
         else:
             raise plugins.TextTestError, "APC log file not yet available"
     def getTitle(self):
@@ -514,13 +515,11 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         logFileName = os.path.join(apcTmpDir, "apclog")
         file.write("xon " + default.hostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
         file.close()
-    def performParallelAction(self, test, processInfo):
-        processId, processName = processInfo[0]
-        runProcessId, runProcessName = processInfo[-1]
-        apcTmpDir = self.getApcLogDir(test, processId)
-        self.diag.info("APC log directory is " + apcTmpDir + " based on process " + processName)
+    def performParallelAction(self, test, execProcess, parentProcess):
+        apcTmpDir = self.getApcLogDir(test, str(parentProcess.processId))
+        self.diag.info("APC log directory is " + apcTmpDir + " based on process " + parentProcess.getName())
         if not os.path.isdir(apcTmpDir):
-            raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + runProcessName
+            raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + execProcess.getName()
         self.makeLinks(test, apcTmpDir)
         test.writeDirs.append(apcTmpDir)
         self.describe(test)

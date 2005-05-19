@@ -84,6 +84,8 @@ class QueueSystem:
             sleep(sleepTime)
             if sleepTime < 5:
                 sleepTime *= 2
+            trials -= 1
+        # BIG WARNING GOES HERE: SGE lost this job
         return 1
     def exitStatus(self, jobId):
         self.diag.info("qacct -j " + jobId + " at " + localtime())

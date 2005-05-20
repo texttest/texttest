@@ -178,17 +178,16 @@ class Test:
         # Note this has no effect on the real environment, but can be useful for internal environment
         # variables. It would be really nice if Python had a proper "unsetenv" function...
         debugLog.debug("Restoring environment for " + self.name + " to " + repr(self.previousEnv))
+        for var in self.previousEnv.keys():
+            os.environ[var] = self.previousEnv[var]
         for var in self.environment.keys():
-            if os.environ.has_key(var):
-                if self.previousEnv.has_key(var):
-                    os.environ[var] = self.previousEnv[var]
-                else:
-                    debugLog.debug("Removed variable " + var)
-                    # Set to empty string as a fake-remove. Some versions of
-                    # python do not have os.unsetenv and hence del only has an internal
-                    # effect. It's better to leave an empty value than to leak the set value
-                    os.environ[var] = ""
-                    del os.environ[var]
+            if not self.previousEnv.has_key(var):
+                debugLog.debug("Removed variable " + var)
+                # Set to empty string as a fake-remove. Some versions of
+                # python do not have os.unsetenv and hence del only has an internal
+                # effect. It's better to leave an empty value than to leak the set value
+                os.environ[var] = ""
+                del os.environ[var]
         if parents and self.parent:
             self.parent.tearDownEnvironment(1)
     def getIndent(self):
@@ -256,6 +255,9 @@ class TestCase(Test):
         if not self.useJavaRecorder():
             if self.environment.has_key("USECASE_REPLAY_SCRIPT"):
                 del self.environment["USECASE_REPLAY_SCRIPT"]
+            if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
+                self.previousEnv["USECASE_REPLAY_SCRIPT"] = os.environ["USECASE_REPLAY_SCRIPT"]
+                del os.environ["USECASE_REPLAY_SCRIPT"]
     def addJusecaseProperty(self, name, value):
         self.properties.addEntry(name, value, sectionName="jusecase", insert=1)
     def setReplay(self, replayScript, replaySpeed):
@@ -386,7 +388,7 @@ class TestCase(Test):
             debugLog.info("Writing " + propFileName + " for " + var + " : " + repr(value))
             file = open(propFileName, "w")
             for subVar, subValue in value.items():
-                file.write(subVar + "=" + subValue + "\n")            
+                file.write(subVar + " = " + subValue + "\n")            
     def cleanNonBasicWriteDirectories(self):
         if len(self.writeDirs) > 0:
             for writeDir in self.writeDirs[1:]:

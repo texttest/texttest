@@ -72,6 +72,10 @@ def queueSystemName(app):
 
 signal.signal(signal.SIGUSR2, tenMinutesToGo)
 
+# Exception to throw if job got lost, typical SGE SNAFU behaviour
+class QueueSystemLostJob(RuntimeError):
+    pass
+
 # Use a non-monitoring runTest, but the rest from unix
 class RunTestInSlave(unixonly.RunTest):
     def runTest(self, test):

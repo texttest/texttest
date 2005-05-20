@@ -8,6 +8,7 @@ class QueueSystem:
         self.activeJobs = {}
         self.envString = envString
         self.diag = getDiagnostics("Queue System Thread")
+        self.jobExitStatusCache = {}
     def getSubmitCommand(self, jobName, submissionRules):
         # Sungrid doesn't like : or / in job names
         qsubArgs = "-N " + jobName.replace(":", "").replace("/", ".")
@@ -75,6 +76,10 @@ class QueueSystem:
         else:
             return sgeStat
     def exitedWithError(self, job):
+        if self.jobExitStatusCache.has_key(job.jobId):
+            status = self.jobExitStatusCache[job.jobId]
+            if status is None:
+                raise queuesystem.QueueSystemLostJob, "SGE already lost job:" + job.jobId
         trials = 10
         sleepTime = 0.5
         while trials > 0:
@@ -85,9 +90,11 @@ class QueueSystem:
             if sleepTime < 5:
                 sleepTime *= 2
             trials -= 1
-        # BIG WARNING GOES HERE: SGE lost this job
-        return 1
+        self.jobExitStatusCache[jobId] = None
+        raise queuesystem.QueueSystemLostJob, "SGE lost job:" + job.jobId
     def exitStatus(self, jobId):
+        if self.jobExitStatusCache.has_key(jobId):
+            return self.jobExitStatusCache[jobId]
         self.diag.info("qacct -j " + jobId + " at " + localtime())
         stdin, stdout, stderr = os.popen3("qacct -j " + jobId)
         errMsg = stderr.readlines()
@@ -95,10 +102,13 @@ class QueueSystem:
         if len(errMsg):
             # assume this is because the job hasn't propagated yet, wait a bit
             return None
+        exitStatus = 1
         for line in lines:
             if line.startswith("exit_status"):
-                return int(line.strip().split()[-1])
-        return 1
+                exitStatus = int(line.strip().split()[-1])
+                break
+        self.jobExitStatusCache[jobId] = exitStatus
+        return exitStatus
     def updateJobs(self):
         self._updateJobs("prs")
         self._updateJobs("z")

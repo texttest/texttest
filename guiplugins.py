@@ -33,6 +33,28 @@ class InteractiveAction(plugins.Action):
         process = plugins.BackgroundProcess(commandLine, shellTitle=shellTitle, holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         self.processes.append(process)
         return process
+    def startExtProgramNewUsecase(self, commandLine, usecase, exitHandler, exitHandlerArgs): 
+        recScript = os.getenv("USECASE_RECORD_SCRIPT")
+        if recScript:
+            os.environ["USECASE_RECORD_SCRIPT"] = self.getNewUsecase(recScript, usecase)
+        repScript = os.getenv("USECASE_REPLAY_SCRIPT")
+        if repScript:
+            # Dynamic GUI might not record anything (it might fail) - don't try to replay files that
+            # aren't there...
+            dynRepScript = self.getNewUsecase(repScript, usecase)
+            if os.path.isfile(dynRepScript):
+                os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
+            else:
+                del os.environ["USECASE_REPLAY_SCRIPT"]
+        self.startExternalProgram(commandLine, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        if recScript:
+            os.environ["USECASE_RECORD_SCRIPT"] = recScript
+        if repScript:
+            os.environ["USECASE_REPLAY_SCRIPT"] = repScript
+    def getNewUsecase(self, script, usecase):
+        dir, file = os.path.split(script)
+        return os.path.join(dir, usecase + "_" + file)
+
     def viewFile(self, fileName, refresh=0):
         viewProgram = self.test.getConfigValue("view_program")
         if not plugins.canExecute(viewProgram):
@@ -245,6 +267,8 @@ class RecordTest(InteractiveAction):
             errFile = os.path.join(test.app.writeDirectory, "record_errors.log")
             recordCommand +=  " > " + logFile + " 2> " + errFile
         holdShell = self.optionGroup.getSwitchValue("hold")
+        guilog.info("Recorder settings: record " + repr(os.getenv("USECASE_RECORD_SCRIPT") is not None) +\
+                    " replay " + repr(os.getenv("USECASE_REPLAY_SCRIPT") is not None))
         process = self.startExternalProgram(recordCommand, shellTitle, holdShell, \
                                             exitHandler=self.setTestRecorded, exitHandlerArgs=(test,))
         test.tearDownEnvironment(parents=1)
@@ -253,7 +277,6 @@ class RecordTest(InteractiveAction):
     def canPerformOnTest(self):
         return self.recordMode != "disabled"
     def setTestRecorded(self, test):
-        test.app.removeWriteDirectory()
         if not os.path.isfile(test.useCaseFile) and not os.path.isfile(test.inputFile):
             raise plugins.TextTestError, "Recording did not produce any results (no usecase or input file)"
 
@@ -261,14 +284,18 @@ class RecordTest(InteractiveAction):
                               "\n" + "These will appear shortly. You do not need to submit the test manually."
         test.notifyChanged()
         ttOptions = self.getRunOptions(test)
-        commandLine = self.getTextTestName() + " " + ttOptions + plugins.nullRedirect()
-        guilog.info("Starting replay TextTest with options : " + ttOptions)
-        process = self.startExternalProgram(commandLine, exitHandler=self.setTestReady, exitHandlerArgs=(test,))
+        commandLine = self.getTextTestName() + " " + ttOptions
+        logFile = os.path.join(test.app.writeDirectory, "replaylog")
+        errFile = os.path.join(test.app.writeDirectory, "replayerrs")
+        commandLine +=  " > " + logFile + " 2> " + errFile
+        process = self.startExtProgramNewUsecase(commandLine, usecase="replay", exitHandler=self.setTestReady, exitHandlerArgs=(test,))
     def setTestReady(self, test):
+        test.app.removeWriteDirectory()
+        scriptEngine.applicationEvent("replay texttest to complete")
         test.state.freeText = "Recorded use case and collected all standard files"
         test.notifyChanged()
     def getRunOptions(self, test):
-        basicOptions = "-t " + self.test.name + " -a " + self.test.app.name# + " -ts " + self.test.parent.name
+        basicOptions = "-tp " + self.test.getRelPath() + " -a " + self.test.app.name
         logFile = test.makeFileName(test.getConfigValue("log_file"))
         if os.path.isfile(logFile):
             return "-g " + basicOptions
@@ -440,24 +467,7 @@ class RunTests(InteractiveAction):
         logFile = os.path.join(app.writeDirectory, "dynamic_run.log")
         errFile = os.path.join(app.writeDirectory, "dynamic_errors.log")
         commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
-        recScript = os.getenv("USECASE_RECORD_SCRIPT")
-        if recScript:
-            os.environ["USECASE_RECORD_SCRIPT"] = self.getDynamic(recScript)
-        repScript = os.getenv("USECASE_REPLAY_SCRIPT")
-        if repScript:
-            # Dynamic GUI might not record anything (it might fail) - don't try to replay files that
-            # aren't there...
-            dynRepScript = self.getDynamic(repScript)
-            if os.path.isfile(dynRepScript):
-                os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
-        self.startExternalProgram(commandLine, exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,))
-        if recScript:
-            os.environ["USECASE_RECORD_SCRIPT"] = recScript
-        if repScript:
-            os.environ["USECASE_REPLAY_SCRIPT"] = repScript
-    def getDynamic(self, script):
-        dir, file = os.path.split(script)
-        return os.path.join(dir, "dynamic_" + file)
+        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,))
     def checkTestRun(self, errFile):
         scriptEngine.applicationEvent("dynamic GUI to be closed")
         if os.path.isfile(errFile):
@@ -487,7 +497,7 @@ class EnableDiagnostics(InteractiveAction):
     def __repr__(self):
         return "Diagnostics"
     def getTitle(self):
-        return "Diagnostics"
+        return "New Diagnostics"
     def getScriptTitle(self):
         return "Enable Diagnostics"
     def matchesMode(self, dynamic):

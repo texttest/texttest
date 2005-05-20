@@ -1347,7 +1347,8 @@ class TestGraph:
             return
 
         os.chdir(writeDir)
-        self.gnuplotFile, outputFile = os.popen2("gnuplot -persist -background white")
+        errsFile = os.path.join(writeDir, "gnuplot.errors")
+        self.gnuplotFile, outputFile = os.popen2("gnuplot -persist -background white 2> " + errsFile)
         absTargetFile = None
         
         if targetFile:

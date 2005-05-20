@@ -1,6 +1,7 @@
 
 import os, string, signal
 from plugins import getDiagnostics, localtime
+from queuesystem import QueueSystemLostJob
 from time import sleep
 
 class QueueSystem:
@@ -90,8 +91,8 @@ class QueueSystem:
             if sleepTime < 5:
                 sleepTime *= 2
             trials -= 1
-        self.jobExitStatusCache[jobId] = None
-        raise queuesystem.QueueSystemLostJob, "SGE lost job:" + job.jobId
+        self.jobExitStatusCache[job.jobId] = None
+        raise QueueSystemLostJob, "SGE lost job:" + job.jobId
     def exitStatus(self, jobId):
         if self.jobExitStatusCache.has_key(jobId):
             return self.jobExitStatusCache[jobId]

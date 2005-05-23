@@ -626,6 +626,8 @@ class CreateCatalogue(plugins.Action):
             return []
         processes = []
         logFile = test.makeFileName(test.getConfigValue("log_file"), temporary=1)
+        if not os.path.isfile(logFile):
+            return []
         for line in open(logFile).xreadlines():
             if line.startswith(searchString):
                 parts = line.strip().split(" : ")

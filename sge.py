@@ -32,6 +32,8 @@ class QueueSystem:
             return ""
     def findExceededLimit(self, jobId):
         exitStatus = self.exitStatus(jobId)
+        if exitStatus is None:
+            return ""
         terminatingSignal = exitStatus & 0x7f
         if terminatingSignal == signal.SIGXCPU:
             return "cpu"

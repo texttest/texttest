@@ -277,6 +277,8 @@ class UNIXProcessHandler:
     def hasTerminated(self, processId):
         lines = os.popen("ps -p " + str(processId) + " 2> /dev/null").readlines()
         return len(lines) < 2 or lines[-1].strip().endswith("<defunct>")
+    def waitForChild(self, processId):
+        return os.waitpid(processId, 0)
     def findChildProcesses(self, pid):
         processes = []
         stdin, stdout, stderr = os.popen3("ps -efl | grep " + str(pid))
@@ -326,6 +328,9 @@ class WindowsProcessHandler:
         for subProcId, subProcHandle in childProcesses:
             if subProcHandle == processHandle:
                 return subProcId
+    def waitForChild(self, processId):
+        # No child processes in this sense: fork not supported on windows
+        pass
     def findChildProcesses(self, processId):
         subprocesses = []
         stdout = os.popen("handle -a -p " + processId)
@@ -446,6 +451,8 @@ class BackgroundProcess(Process):
     def checkTermination(self):
         if not self.hasTerminated():
             return 0
+        # Avoid defunct processes, this is a fork on UNIX
+        self.processHandler.waitForChild(self.processId)
         if self.exitHandler:
             self.exitHandler(*self.exitHandlerArgs)
         return 1

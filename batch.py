@@ -246,14 +246,6 @@ class MailSender(plugins.Action):
             self.sendMail(smtp, app, mailContents)
             smtp.quit()
         sys.stdout.write("\n")
-    def breakLine(self, line, maxLen):
-        # returns line with '\n' inserted every maxLen position
-        formatted = []
-        while len(line) > maxLen:
-            formatted.append(line[0:maxLen])
-            line = line[maxLen:]
-        formatted.append(line)
-        return '\n'.join(formatted)
     def sendMail(self, smtp, app, mailContents):
         smtpServer = app.getConfigValue("smtp_server")
         fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
@@ -265,10 +257,7 @@ class MailSender(plugins.Action):
                              str(sys.exc_type) + ": " + str(sys.exc_value))
             return self.storeMail(app, mailContents)
         try:
-            # makes sure the message doesn't contain lines longer than 500 characters
-            lines = [self.breakLine(line, 500) for line in mailContents.splitlines(True)]
-            formattedMailContents = ''.join(lines)
-            smtp.sendmail(fromAddress, toAddresses, formattedMailContents)
+            smtp.sendmail(fromAddress, toAddresses, mailContents)
         except smtplib.SMTPException:
             sys.stdout.write("FAILED : Mail could not be sent\n" + \
                              str(sys.exc_type) + ": " + str(sys.exc_value))

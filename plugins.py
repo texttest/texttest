@@ -1,5 +1,5 @@
 
-import os, log4py, string, signal, shutil, time, re, stat, threading, Queue
+import os, log4py, string, signal, shutil, time, re, stat
 from types import FileType
 from ndict import seqdict
 
@@ -258,150 +258,43 @@ class TextTrigger:
         else:
             return line.find(self.text) != -1
 
-def unixFindChildrenByPs(pid):
-    processes = []
-    stdin, stdout, stderr = os.popen3("ps -efl | grep " + str(pid))
-    errMsg = stderr.read()
-    outLines = stdout.readlines()
-    stdin.close()
-    stdout.close()
-    stderr.close()
-    if len(errMsg) > 0 and len(outLines) == 0:
-        return unixFindChildrenByPs(pid)
-
-    for line in outLines:
-        entries = line.split()
-        if entries[4] == str(pid):
-            childPid = int(entries[3])
-            processes.append(childPid)
-            processes += unixFindChildrenByPs(childPid)
-    return processes
-
-class UNIXProcessMonitor:
-    def __init__(self):
-        self.pidLock = threading.RLock()
-        self.runningChildProcesses = {}
-        self.terminatedChildProcesses = {}
-        self.terminateSignal = threading.Condition()
-    def monitorPid(self, pid):
-        terminated = 0
-        while not terminated:
-            time.sleep(5)
-            childPids = unixFindChildrenByPs(pid)
-            self.pidLock.acquire()
-            cmd, oldPids = self.runningChildProcesses[pid]
-            self.runningChildProcesses[pid] = cmd, childPids
-            self.pidLock.release()
-            termPid, status = os.waitpid(pid, os.WNOHANG)
-            if termPid == pid:
-                terminated = 1
-        self.terminateSignal.acquire()
-        self.pidLock.acquire()
-        if self.runningChildProcesses.has_key(pid):
-            cmd, childPids = self.runningChildProcesses[pid]
-            del self.runningChildProcesses[pid]
-        else:
-            cmd = "<unknown>"
-            childPids = []
-        self.terminatedChildProcesses[pid] = status, cmd, childPids
-        self.pidLock.release()
-        self.terminateSignal.notify()
-        self.terminateSignal.release()
-    def isChild(self, pid):
-        self.pidLock.acquire()
-        isChild = self.runningChildProcesses.has_key(pid)
-        if not isChild:
-            isChild = self.terminatedChildProcesses.has_key(pid)
-        self.pidLock.release()
-        return isChild
-    def hasChildren(self):
-        self.pidLock.acquire()
-        hasChildren = len(self.runningChildProcesses) > 0
-        self.pidLock.release()
-        return hasChildren
-    def hasTerminated(self, processId):
-        terminated = 0
-        self.pidLock.acquire()
-        if self.terminatedChildProcesses.has_key(processId):
-            terminated = 1
-            status, cmd, childPids = self.terminatedChildProcesses[processId]
-        self.pidLock.release()
-        return terminated
-    def getCommand(self, processId):
-        cmd = "<unknown>"
-        self.pidLock.acquire()
-        if self.runningChildProcesses.has_key(processId):
-            cmd, childPids = self.runningChildProcesses[processId]
-        elif self.terminatedChildProcesses.has_key(processId):
-            status, cmd, childPids = self.terminatedChildProcesses[processId]
-        self.pidLock.release()
-        return cmd
-    def waitForChild(self, pid):
-        self.terminateSignal.acquire()
-        while not self.hasTerminated(pid):
-            self.terminateSignal.wait()
-        self.terminateSignal.release()
-        self.pidLock.acquire()
-        status, cmd, childPids = self.terminatedChildProcesses[pid]
-        self.pidLock.release()
-        return pid, status
-    def findChildProcesses(self, pid):
-        self.pidLock.acquire()
-        if self.runningChildProcesses.has_key(pid):
-            cmd, childPids = self.runningChildProcesses[pid]
-        elif self.terminatedChildProcesses.has_key(pid):
-            status, cmd, childPids = self.terminatedChildProcesses[pid]
-        else:
-            childPids = []
-        self.pidLock.release()
-        return childPids
+class UNIXProcessHandler:
     def spawnProcess(self, commandLine, shellTitle, holdShell):
         if shellTitle:
             commandLine = "xterm" + self.getShellOptions(holdShell) + " -bg white -T '" + shellTitle + "' -e " + commandLine
+
         processId = os.fork()   
         if processId == 0:
             os.system(commandLine)
             os._exit(0)
         else:
-            self.pidLock.acquire()
-            self.runningChildProcesses[processId] = commandLine, []
-            self.pidLock.release()
-            monitorThread = threading.Thread(target=self.monitorPid, args=[processId])
-            monitorThread.setDaemon(1)
-            monitorThread.start()
             return processId
-
-unixProcessMonitor = 0
-
-class UNIXProcessHandler:
-    def getMonitor(self):
-        global unixProcessMonitor
-        if unixProcessMonitor == 0:
-            unixProcessMonitor = UNIXProcessMonitor()
-        return unixProcessMonitor
-    def spawnProcess(self, commandLine, shellTitle, holdShell):
-        return self.getMonitor().spawnProcess(commandLine, shellTitle, holdShell)
     def getShellOptions(self, holdShell):
         if holdShell:
             return " -hold"
         else:
             return ""
     def hasTerminated(self, processId):
-        if self.getMonitor().isChild(processId):
-            return self.getMonitor().hasTerminated(processId)
         lines = os.popen("ps -p " + str(processId) + " 2> /dev/null").readlines()
         return len(lines) < 2 or lines[-1].strip().endswith("<defunct>")
     def waitForChild(self, processId):
-        if self.getMonitor().isChild(processId):
-            return self.getMonitor().waitForChild(processId)
         return os.waitpid(processId, 0)
     def findChildProcesses(self, pid):
-        if self.getMonitor().isChild(pid):
-            return self.getMonitor().findChildProcesses(pid)
-        return unixFindChildrenByPs(pid)
+        processes = []
+        stdin, stdout, stderr = os.popen3("ps -efl | grep " + str(pid))
+        errMsg = stderr.read()
+        outLines = stdout.readlines()
+        if len(errMsg) > 0 and len(outLines) == 0:
+            return self.findChildProcesses(pid)
+
+        for line in outLines:
+            entries = line.split()
+            if entries[4] == str(pid):
+                childPid = int(entries[3])
+                processes.append(childPid)
+                processes += self.findChildProcesses(childPid)
+        return processes
     def findProcessName(self, pid):
-        if self.getMonitor().isChild(pid):
-            return getMonitor().getCommand(pid)
         pslines = os.popen("ps -l -p " + str(pid) + " 2> /dev/null").readlines()
         if len(pslines) == 0:
             return self.findProcessName(pid)

@@ -478,10 +478,11 @@ class UpdateStatus(plugins.Action):
 
         global emergencyFinish
         if emergencyFinish:
+            postText = "(Emergency finish of job " + str(job.jobId) + ")" 
             if self.jobNameFunction:
-                print test.getIndent() + "Killing", self.jobNameFunction(test), "(Emergency finish)"
+                print test.getIndent() + "Killing", self.jobNameFunction(test), postText
             else:
-                print test.getIndent() + "Killing", repr(test), "(Emergency finish)"
+                print test.getIndent() + "Killing", repr(test), postText
                 test.changeState(plugins.TestState("killed", completed=1))
             QueueSystemServer.instance.killJob(test, self.jobNameFunction)
             return

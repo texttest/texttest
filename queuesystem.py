@@ -278,7 +278,7 @@ class QueueSystemServer:
             self.diag.info("Updating jobs at " + plugins.localtime())
             self.updateJobs()
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
-            sleep(0.1)
+            sleep(3)
     def getEnvironmentString(self, envDict):
         envStr = "env -i "
         for key, value in envDict.items():

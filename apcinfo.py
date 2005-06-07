@@ -1,9 +1,10 @@
-import plugins, os, re, string, math, exceptions, optimization, performance, time, texttest, copy
+import plugins, os, re, string, math, exceptions, optimization, performance, time, copy
+from testmodel import BadConfigError
 
 try:
     import HTMLgen, barchart
 except:
-    raise texttest.BadConfigError, "Python modules HTMLgen and/or barchart not found. Try adding /users/johani/pythonpackages/HTMLgen to your PYTHONPATH."
+    raise BadConfigError, "Python modules HTMLgen and/or barchart not found. Try adding /users/johani/pythonpackages/HTMLgen to your PYTHONPATH."
 
 
 class CarmenDocument(HTMLgen.SeriesDocument):

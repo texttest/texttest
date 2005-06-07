@@ -1,5 +1,5 @@
 
-import os, log4py, string, signal, shutil, time, re, stat
+import os, sys, log4py, string, signal, shutil, time, re, stat
 from types import FileType
 from ndict import seqdict
 
@@ -215,6 +215,18 @@ def rmtree(dir, attempts=5):
             print "Write directory still in use, waiting 1 second to remove..."
             time.sleep(1)
     print "Something still using write directory", dir, ": leaving it"
+
+def printException():
+    sys.stderr.write("Description of exception thrown :" + "\n")
+    type, value, traceback = sys.exc_info()
+    sys.excepthook(type, value, traceback)
+    
+# Need somewhat different formats on Windows/UNIX
+def tmpString():
+    if os.environ.has_key("USER"):
+        return os.getenv("USER")
+    else:
+        return "tmp"
 
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):

@@ -1291,9 +1291,7 @@ class GraphPlot(plugins.Action):
         if commonPlotter.plotForTest:
             xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, title = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
-            plotProcess = commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, title)
-            if plotProcess:
-                print "Created process : gnuplot window :", plotProcess.processId
+            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, title)
     
 class TestGraph:
     def __init__(self):
@@ -1389,6 +1387,7 @@ class TestGraph:
             self.gnuplotFile.flush()
             gnuplotProcess = self.findGnuplotProcess()
             self.gnuplotFile.close()
+            print "Created process : gnuplot window :", gnuplotProcess.processId
             return gnuplotProcess
         else:
             self.gnuplotFile.close()
@@ -1508,7 +1507,9 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title = self.getPlotOptions()
         plotProcess = self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, {}, title)
         if plotProcess:
-            self.processes.append(plotProcess)
+            # Should really monitor this and close it when GUI closes,
+            # but it isn't a child process so this means ps and load on the machine
+            #self.processes.append(plotProcess)
             guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
         self.testGraph = TestGraph()
     def getPlotOptions(self):

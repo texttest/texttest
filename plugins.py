@@ -274,11 +274,19 @@ class UNIXProcessHandler:
             return " -hold"
         else:
             return ""
-    def hasTerminated(self, processId):
-        lines = os.popen("ps -p " + str(processId) + " 2> /dev/null").readlines()
-        return len(lines) < 2 or lines[-1].strip().endswith("<defunct>")
-    def waitForChild(self, processId):
-        return os.waitpid(processId, 0)
+    def hasTerminated(self, processId, childProcess=0):
+        if childProcess:
+            # This is much more efficient for forked children than calling ps...
+            # Also, it doesn't leave defunct processes. Naturally, it doesn't work on other
+            # processes...
+            try:
+                procId, status = os.waitpid(processId, os.WNOHANG)
+                return procId > 0 or status > 0
+            except OSError:
+                return 1
+        else:
+            lines = os.popen("ps -p " + str(processId) + " 2> /dev/null").readlines()
+            return len(lines) < 2 or lines[-1].strip().endswith("<defunct>")
     def findChildProcesses(self, pid):
         processes = []
         stdin, stdout, stderr = os.popen3("ps -efl | grep " + str(pid))
@@ -328,9 +336,6 @@ class WindowsProcessHandler:
         for subProcId, subProcHandle in childProcesses:
             if subProcHandle == processHandle:
                 return subProcId
-    def waitForChild(self, processId):
-        # No child processes in this sense: fork not supported on windows
-        pass
     def findChildProcesses(self, processId):
         subprocesses = []
         stdout = os.popen("handle -a -p " + processId)
@@ -361,7 +366,7 @@ class WindowsProcessHandler:
             if words[1] == str(processId):
                 return words
         return words
-    def hasTerminated(self, processId):
+    def hasTerminated(self, processId, childProcess=0):
         words = self.getPsWords(processId)
         return words[2] == "was"
     def getCpuTime(self, processId):
@@ -451,8 +456,6 @@ class BackgroundProcess(Process):
     def checkTermination(self):
         if not self.hasTerminated():
             return 0
-        # Avoid defunct processes, this is a fork on UNIX
-        self.processHandler.waitForChild(self.processId)
         if self.exitHandler:
             self.exitHandler(*self.exitHandlerArgs)
         return 1
@@ -462,8 +465,7 @@ class BackgroundProcess(Process):
     def hasTerminated(self):
         if self.processId == None:
             return 1
-        else:
-            return Process.hasTerminated(self)
+        return self.processHandler.hasTerminated(self.processId, childProcess=1)
     
 class Option:    
     def __init__(self, name, value):

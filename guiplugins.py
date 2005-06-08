@@ -190,7 +190,7 @@ class ViewFile(InteractiveAction):
         stdFile = self.stdFile(comparison)
         tmpFile = self.tmpFile(comparison)
         guilog.info("Comparing file " + os.path.basename(tmpFile) + " with previous version using '" + diffProgram + "'")
-        process = self.startExternalProgram(diffProgram + " " + stdFile + " " + tmpFile)
+        process = self.startExternalProgram(diffProgram + " " + stdFile + " " + tmpFile + plugins.nullRedirect())
         scriptEngine.monitorProcess("shows graphical differences in test files", process)
 
 # And a generic import test. Note acts on test suites

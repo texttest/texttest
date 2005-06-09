@@ -6,6 +6,12 @@ from ndict import seqdict
 from copy import copy
 from cPickle import Pickler, Unpickler, UnpicklingError
 
+helpIntro = """
+Note: the purpose of this help is primarily to document the configuration you currently have,
+though also to provide a full list of options supported by both your framework and your configuration.
+A user guide (UserGuide.html) is available to document the framework itself.
+"""            
+
 builtInOptions = """
 -a <app>   - run only the application with extension <app>
 

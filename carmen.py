@@ -41,7 +41,7 @@ def getConfig(optionMap):
     return CarmenConfig(optionMap)
 
 architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris", "ia64_hpux" ]
-majorReleases = [ "8", "9", "10", "11" ]
+majorReleases = [ "8", "9", "10", "11", "12" ]
 
 def getArchitecture(app):
     for version in app.versions:

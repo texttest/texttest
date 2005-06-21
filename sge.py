@@ -98,10 +98,7 @@ class QueueSystem:
     def exitStatus(self, jobId):
         if self.jobExitStatusCache.has_key(jobId):
             return self.jobExitStatusCache[jobId]
-        self.diag.info("qacct -j " + jobId + " at " + localtime())
-        stdin, stdout, stderr = os.popen3("qacct -j " + jobId)
-        errMsg = stderr.readlines()
-        lines = stdout.readlines()
+        errMsg, lines = self.getAccounting(jobId)
         if len(errMsg):
             # assume this is because the job hasn't propagated yet, wait a bit
             return None
@@ -112,6 +109,37 @@ class QueueSystem:
                 break
         self.jobExitStatusCache[jobId] = exitStatus
         return exitStatus
+    def getAccounting(self, jobId):
+        errMsg, lines, found = self.getAccountingInfo(jobId, "")
+        logNum = 0
+        while found == 0:
+            fileName = self.findAccountingFile(logNum)
+            if fileName == "":
+                found = 1
+            else:
+                errMsg, lines, found = self.getAccountingInfo(jobId, fileName)
+            logNum = logNum + 1
+        return errMsg, lines
+    def findAccountingFile(self, logNum):
+        if os.environ.has_key("SGE_ROOT") and os.environ.has_key("SGE_CELL"):
+            findPattern = os.path.join(os.environ["SGE_ROOT"], os.environ["SGE_CELL"])
+            acctFile = os.path.join("common", "accounting." + str(logNum))
+            if os.path.isfile(acctFile):
+                return acctFile
+        return ""
+    def getAccountingInfo(self, jobId, file):
+        if file != "":
+            cmdLine = "qacct -f " + file + " -j " + jobId
+        else:
+            cmdLine = "qacct -j " + jobId
+        self.diag.info(cmdLine + " at " + localtime())
+        stdin, stdout, stderr = os.popen3(cmdLine)
+        errMsg = stderr.readlines()
+        lines = stdout.readlines()
+        if len(errMsg) > 0 and errMsg[0].find("error: job id " + jobId + " not found") != -1:
+            return errMsg, lines, 0
+        else:
+            return errMsg, lines, 1
     def updateJobs(self):
         self._updateJobs("prs")
         self._updateJobs("z")

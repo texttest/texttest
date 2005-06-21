@@ -300,19 +300,16 @@ class UNIXProcessHandler:
             lines = os.popen("ps -p " + str(processId) + " 2> /dev/null").readlines()
             return len(lines) < 2 or lines[-1].strip().endswith("<defunct>")
     def findChildProcesses(self, pid):
+        outLines = os.popen("ps -efl").readlines()
+        return self.findChildProcessesInLines(pid, outLines)
+    def findChildProcessesInLines(self, pid, outLines):
         processes = []
-        stdin, stdout, stderr = os.popen3("ps -efl | grep " + str(pid))
-        errMsg = stderr.read()
-        outLines = stdout.readlines()
-        if len(errMsg) > 0 and len(outLines) == 0:
-            return self.findChildProcesses(pid)
-
         for line in outLines:
             entries = line.split()
-            if entries[4] == str(pid):
+            if len(entries) > 4 and entries[4] == str(pid):
                 childPid = int(entries[3])
                 processes.append(childPid)
-                processes += self.findChildProcesses(childPid)
+                processes += self.findChildProcessesInLines(childPid, outLines)
         return processes
     def findProcessName(self, pid):
         pslines = os.popen("ps -l -p " + str(pid) + " 2> /dev/null").readlines()

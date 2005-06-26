@@ -1,5 +1,6 @@
 
 import plugins, os, sys, shutil, string
+from testmodel import TestCase
 from glob import glob
 global scriptEngine
 
@@ -460,14 +461,17 @@ class RunTests(InteractiveAction):
     def getScriptTitle(self):
         return "Run selected tests"
     def performOn(self, app, selTests):
-        if len(selTests) == 0:
+        selTestCases = filter(self.isTestCase, selTests)
+        if len(selTestCases) == 0:
             raise plugins.TextTestError, "No tests selected - cannot run!"
-        ttOptions = string.join(self.getTextTestOptions(app, selTests))
+        ttOptions = string.join(self.getTextTestOptions(app, selTestCases))
         app.makeWriteDirectory()
         logFile = os.path.join(app.writeDirectory, "dynamic_run.log")
         errFile = os.path.join(app.writeDirectory, "dynamic_errors.log")
         commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
         self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,))
+    def isTestCase(self, test):
+        return isinstance(test, TestCase)
     def checkTestRun(self, errFile):
         scriptEngine.applicationEvent("dynamic GUI to be closed")
         if os.path.isfile(errFile):

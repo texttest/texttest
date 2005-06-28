@@ -459,7 +459,8 @@ class FetchApcCore(unixonly.CollateFiles):
     def isApcLogFileKept(self, errorFileName):
         for line in open(errorFileName).xreadlines():
             if line.find("*** Keeping the logfiles in") != -1:
-                return "Yes"
+                return 1
+        return None
     def extractCoreFor(self, test):
         subplanDir = test.writeDirs[1]
         scriptErrorsFileName = os.path.join(subplanDir, "run_status_script_error")
@@ -568,11 +569,14 @@ class ExtractApcLogs(plugins.Action):
         #    os.system(cmdLine) 
         # Remove dir
         plugins.rmtree(apcTmpDir)
-        # Remove the error file (which is create because we are keeping the logfiles,
-        # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***")
-        errFile = test.makeFileName("script_errors", temporary=1)
-        if os.path.isfile(errFile):
-            os.remove(errFile)
+        # When apc_debug is present, we want to remove the error file
+        # (which is create because we are keeping the logfiles,
+        # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***"),
+        # otherwise the test is flagged failed.
+        if os.path.isfile(os.path.join(apcTmpDir, "apc_debug")):
+            errFile = test.makeFileName("script_errors", temporary=1)
+            if os.path.isfile(errFile):
+                os.remove(errFile)
     def __repr__(self):
         return "Extracting APC logfile for"
         

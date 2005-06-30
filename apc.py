@@ -554,8 +554,12 @@ class ExtractApcLogs(plugins.Action):
 
         self.describe(test)
         # Extract from the apclog
-        cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + test.makeFileName(saveName, temporary = 1)
+        extractToFile = test.makeFileName(saveName, temporary = 1)
+        cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + extractToFile
         os.system(cmdLine)
+        # We sometimes have problems with an empty file extracted.
+        if os.stat(extractToFile)[stat.ST_SIZE] == 0:
+            os.remove(extractToFile)
         # Extract mpatrol files, if they are present.
         if os.path.isfile(os.path.join(apcTmpDir, "mpatrol.out")):
             cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.out" + " > " + test.makeFileName("mpatrol_out", temporary = 1)

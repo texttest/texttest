@@ -300,13 +300,18 @@ class RecordTest(InteractiveAction):
             errFile = os.path.join(test.app.writeDirectory, "record_errors.log")
             recordCommand +=  " > " + logFile + " 2> " + errFile
         holdShell = self.optionGroup.getSwitchValue("hold")
-        guilog.info("Recorder settings: record " + repr(os.getenv("USECASE_RECORD_SCRIPT") is not None) +\
-                    " replay " + repr(os.getenv("USECASE_REPLAY_SCRIPT") is not None))
+        guilog.info("Recorder settings: record " + self.switchOutput("USECASE_RECORD_SCRIPT") +\
+                    " replay " + self.switchOutput("USECASE_REPLAY_SCRIPT"))
         process = self.startExternalProgram(recordCommand, shellTitle, holdShell, \
                                             exitHandler=self.setTestRecorded, exitHandlerArgs=(test,))
         test.tearDownEnvironment(parents=1)
         test.setReplayEnvironment()
         scriptEngine.monitorProcess("records use cases", process, [ test.inputFile, test.useCaseFile ])
+    def switchOutput(self, envVar):
+        if os.getenv(envVar) is not None:
+            return "on"
+        else:
+            return "off"
     def canPerformOnTest(self):
         return self.recordMode != "disabled"
     def setTestRecorded(self, test):

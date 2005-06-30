@@ -566,9 +566,8 @@ class ExtractApcLogs(plugins.Action):
         # Extract scprob prototype...
         #if os.path.isfile(os.path.join(apcTmpDir, "APC_rot.scprob")):
         #    cmdLine = "cd " + apcTmpDir + "; " + "cat  APC_rot.scprob" + " > " + test.makeFileName(" APC_rot.scprob", temporary = 1)
-        #    os.system(cmdLine) 
-        # Remove dir
-        plugins.rmtree(apcTmpDir)
+        #    os.system(cmdLine)
+        
         # When apc_debug is present, we want to remove the error file
         # (which is create because we are keeping the logfiles,
         # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***"),
@@ -577,6 +576,8 @@ class ExtractApcLogs(plugins.Action):
             errFile = test.makeFileName("script_errors", temporary=1)
             if os.path.isfile(errFile):
                 os.remove(errFile)
+        # Remove dir
+        plugins.rmtree(apcTmpDir)
     def __repr__(self):
         return "Extracting APC logfile for"
         

@@ -60,10 +60,6 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                No line type grouping for different versions of the test.
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
-                             - oem
-                               Only plot exact matching versions, i.e., if v=,new2 and no logfile version new2
-                               exist nothing is plotted, compared to the default behaviour where the closest
-                               matching version is plotted.
                              - sg
                                Plot all tests chosen on the same graph, rather than one window per test
                              - title=graphtitle
@@ -1464,7 +1460,6 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         self.addOption(oldOptionGroup, "title", "Title of the plot")
         self.addOption(oldOptionGroup, "tu", "Search for temporary files in user")
         self.addSwitch(oldOptionGroup, "nt", "Don't search for temporary files")
-        self.addSwitch(oldOptionGroup, "oem", "Only plot exact matching versions")
         
         self.externalGraph = graph
         if graph:
@@ -1480,25 +1475,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         text = self.optionGroup.getOptionValue("i")
         if text == "apctimes":
             text = "DH_post_processing,Generation_time,Coordination_time,Conn_fixing_time,Optimization_time,Network_generation_time"
-        itemList = plugins.commasplit(text.replace("-", " "))
-        items = []
-        itemScaleFactor = {}
-        for item in itemList:
-            thisItem = []
-            itemAltenatives = item.split(":")
-            for itemAlt in itemAltenatives:
-                if not itemAlt.find("*") == -1:
-                    itemSplit = itemAlt.split("*")
-                    try:
-                        thisItem.append(itemSplit[1])
-                        itemScaleFactor[itemSplit[1]] = float(itemSplit[0])
-                    except:
-                        print "No numerical factor specified."
-                else:
-                    thisItem.append(itemAlt)
-                    itemScaleFactor[itemAlt] = 1.0
-            items.append(thisItem)
-        return items, itemScaleFactor
+        return plugins.commasplit(text.replace("_", " "))
     def __repr__(self):
         return "Plotting"
     def __call__(self, test):
@@ -1521,14 +1498,9 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
                     if foundTmp:
                         self.writePlotFiles(version + "run", logFile, test)
                 logFile = test.makeFileName(logFileStem, version)
+                self.writePlotFiles(version, logFile, test)
                 if not logFile.endswith(version):
-                    if not self.optionGroup.getSwitchValue("oem"):
-                        self.writePlotFiles(version, logFile, test)
-                        print "Using log file", os.path.basename(logFile), "to plot test", test.name, "version", version
-                    else:
-                        print "Not plotting test", test.name, "version", version
-                else:
-                    self.writePlotFiles(version, logFile, test)
+                    print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version 
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):
@@ -1551,25 +1523,19 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         printer = self.optionGroup.getOptionValue("pr")
         return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title
     def writePlotFiles(self, lineName, logFile, test):
-        plotItems, scaleFactors = self.getItemsToPlot()
-        itemsToExtract = []
-        for itemAlts in plotItems:
-            for item in itemAlts:
-                itemsToExtract.append(item)
-        optRun = OptimizationRun(test.app, [ timeEntryName ], itemsToExtract, logFile)
+        plotItems = self.getItemsToPlot()
+        optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
         if len(optRun.solutions) == 0:
             return
 
-        for itemAlts in plotItems:
-            # Use the first item alternative as holder for the group. 
-            item = itemAlts[0] 
+        for item in plotItems:
             averager = None
             if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
                 if not self.plotAveragers.has_key(lineName+item):
                     averager = self.plotAveragers[lineName+item] = PlotAverager(self.test.app.writeDirectory)
                 else:
                     averager = self.plotAveragers[lineName+item]
-            plotLine = PlotLine(test, lineName, itemAlts, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), averager, scaleFactors)
+            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), averager)
             self.testGraph.addLine(plotLine)
 
 class StartStudio(guiplugins.InteractiveAction):
@@ -1600,12 +1566,11 @@ class StartStudio(guiplugins.InteractiveAction):
 guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUI, StartStudio ]
 
 class PlotLine:
-    def __init__(self, test, lineName, itemAlts, optRun, plotAgainstSolution, plotTimeScale, averager, scaleFactors):
+    def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale, averager):
         self.test = test
         self.name = lineName
         self.lineType = None
         self.pointType = None
-        item = itemAlts[0]
         if item != costEntryName:
             self.name += "." + item
         self.axisLabels = {}
@@ -1626,7 +1591,7 @@ class PlotLine:
                 self.axisLabels["x"] = "CPU time (min)"
         self.axisLabels["y"] = item
         self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
-        graph = self.writeFile(optRun, itemAlts, plotAgainstSolution, timeScaleFactor, scaleFactors)
+        graph = self.writeFile(optRun, item, plotAgainstSolution, timeScaleFactor)
         if averager:
             averager.addGraph(graph)
             if not averager.plotLineRepresentant:
@@ -1638,7 +1603,7 @@ class PlotLine:
             return "plot-" + lineName.replace(" ", "-")
         else:
             return "plot-" + lineName.replace(" ", "-") + "-" + item.replace(" ", "-")
-    def writeFile(self, optRun, itemAlternatives, plotAgainstSolution, timeScaleFactor, scaleFactors):
+    def writeFile(self, optRun, item, plotAgainstSolution, timeScaleFactor):
         dir, localName = os.path.split(self.plotFileName)
         if not os.path.isdir(dir):
             os.makedirs(dir)
@@ -1646,17 +1611,14 @@ class PlotLine:
         graph = {}
         cnt = 0
         for solution in optRun.solutions:
-            for itemAlt in itemAlternatives:
-                if solution.has_key(itemAlt):
-                    scaleFactor = scaleFactors[itemAlt]
-                    if plotAgainstSolution:
-                        plotFile.write(str(scaleFactor * solution[itemAlt]) + os.linesep)
-                        graph[cnt] = scaleFactor * solution[itemAlt]
-                        cnt = cnt + 1
-                    else:
-                        plotFile.write(str(solution[timeEntryName]/timeScaleFactor) + "  " + str(scaleFactor * solution[itemAlt]) + os.linesep)
-                        graph[solution[timeEntryName]/timeScaleFactor] = scaleFactor * solution[itemAlt]
-                    continue
+            if solution.has_key(item):
+                if plotAgainstSolution:
+                    plotFile.write(str(solution[item]) + os.linesep)
+                    graph[cnt] = solution[item]
+                    cnt = cnt + 1
+                else:
+                    plotFile.write(str(solution[timeEntryName]/timeScaleFactor) + "  " + str(solution[item]) + os.linesep)
+                    graph[solution[timeEntryName]/timeScaleFactor] = solution[item]
         return graph           
     def getPlotArguments(self, multipleApps, multipleUsers, multipleLines, multipleTests):
         return "'" + self.plotFileName + "' " + self.getPlotName(multipleApps, multipleUsers, multipleTests) + self.getStyle(multipleLines)

@@ -916,7 +916,6 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         self.diag.info("Found the following entry finders:" + str(self.entryFinders))
     def makePerformanceFiles(self, test, temp):
         for fileStem, entryFinder in self.entryFinders.items():
-            print "makePerformance files", fileStem,entryFinder
             if not self.allMachinesTestPerformance(test, fileStem):
                 self.diag.info("Not extracting performance file for " + fileStem + ": not on performance machines")
                 continue
@@ -942,8 +941,6 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         # Round to accuracy 0.01
         if fileStem.find("mem") != -1:
             return self.makeMemoryLine(values, fileStem)
-        elif fileStem.find("iterspersec") != -1:
-            return self.makeIterLine(values, fileStem)
         else:
             return self.makeTimeLine(values, fileStem)
     def makeMemoryLine(self, values, fileStem):
@@ -956,8 +953,6 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
             sum += value
         roundedSum = float(int(10*sum))/10
         return "Total " + string.capitalize(fileStem) + "  :      " + str(roundedSum) + " seconds"
-    def makeIterLine(self, values, fileStem):
-        return "Iterations per second: " + str(int(values[0]))
     def findValues(self, logFile, entryFinder):
         values = []
         self.diag.info("Scanning log file for entry: " + entryFinder)

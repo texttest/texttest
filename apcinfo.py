@@ -122,7 +122,7 @@ class AnalyzeLProfData:
                                      "CGSUB::feasible",
                                      "apc_setup"]
         self.raveFunctions = ["CRCExecuteAllRules",
-#                              "CRCComputeValue",
+                              "CRCComputeValue",
                               "CRCComputeValueArgs",
                               "CRCSetRotation",
                               "CRCModifyRotation",
@@ -610,7 +610,6 @@ class GenHTML(plugins.Action):
             return
         # Top list for this suite.
         self.suitePageName = suite.name + ".html"
-        self.currentSuiteName = suite.name
         self.ilist.append(HTMLgen.Href(self.suitePageName, HTMLgen.Text(suite.name)))
         self.currentList = HTMLgen.List(style="compact")
         self.ilist.append(self.currentList)
@@ -673,7 +672,7 @@ class GenHTML(plugins.Action):
         else:
             print "Warning, no solution in OptimizationRun!"
 
-        self.extractProfiling(self.currentSuiteName, test, group)
+        self.extractProfiling(test, group)
         
         # Table
         testPerformance = performance.getTestPerformance(test)
@@ -688,9 +687,8 @@ class GenHTML(plugins.Action):
         self.currentSuitePage["group"][group]["numtests"] += 1
         self.totalCPUtime += testPerformance
         
-    def extractProfiling(self, suiteName, test, group):
-        #lprofFile = test.makeFileName("lprof", temporary = 0)
-        lprofFile = self.profilesDir + "/" + suiteName + "__" + test.name + "_lprof.apc"
+    def extractProfiling(self, test, group):
+        lprofFile = test.makeFileName("lprof", temporary = 0)
         if os.path.isfile(lprofFile):
             if not self.currentSuitePage["group"][group]["profiling"]:
                 data = self.currentSuitePage["group"][group]["profiling"] = { 'fcns': {}, 'count': 0 , 'tests': [] , 'ravebc': self.raveBC.createBC("RAVE") }

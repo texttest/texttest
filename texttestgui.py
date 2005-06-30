@@ -222,7 +222,7 @@ class TextTestGUI:
             self.actionThread.start()
             gtk.idle_add(self.pickUpChange)
         else:
-            gtk.idle_add(self.monitorBackgroundProcesses)
+            gtk.idle_add(self.pickUpProcess)
         # Run the Gtk+ main loop.
         gtk.main()
     def createDefaultRightGUI(self):
@@ -243,17 +243,14 @@ class TextTestGUI:
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
             return gtk.TRUE
-    def monitorBackgroundProcesses(self):
-        termProcesses = []
-        for process in guiplugins.InteractiveAction.processes:
+    def pickUpProcess(self):
+        process = guiplugins.processTerminationMonitor.getTerminatedProcess()
+        if process:
             try:
-                if process.checkTermination():
-                    termProcesses.append(process)
+                process.runExitHandler()
             except plugins.TextTestError, e:
                 showError(str(e))
-                termProcesses.append(process)
-        for process in termProcesses:
-            guiplugins.InteractiveAction.processes.remove(process)
+        
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
         return gtk.TRUE
@@ -318,17 +315,11 @@ class TextTestGUI:
         sys.stdout.flush()
         if self.actionThread:
             self.actionThread.terminate()
-        self.killInteractiveProcesses()
+        guiplugins.processTerminationMonitor.killAll()
     def quit(self, *args):
         # Generate a window closedown, so that the quit button behaves the same as closing the window
         self.topWindow.destroy()
         self.exit()
-    def killInteractiveProcesses(self):
-        # Don't leak processes
-        for process in guiplugins.InteractiveAction.processes:
-            if not process.hasTerminated():
-                guilog.info("Killing '" + repr(process) + "' interactive process")
-                process.killAll()
     def saveAll(self, *args):
         saveActionFromWindow = self.rightWindowGUI.getSaveTestAction()
         windowVersion = None

@@ -1,12 +1,44 @@
 
 import plugins, os, sys, shutil, string
 from testmodel import TestCase
+from threading import Thread
 from glob import glob
+from Queue import Queue, Empty
 global scriptEngine
+global processTerminationMonitor
+
+# The purpose of this class is to provide a means to monitor externally
+# started process, so that (a) code can be called when they exit, and (b)
+# they can be terminated when TextTest is terminated.
+class ProcessTerminationMonitor:
+    def __init__(self):
+        self.processes = []
+        self.termQueue = Queue()
+    def addMonitoring(self, process):
+        self.processes.append(process)
+        newThread = Thread(target=self.monitor, args=(process,))
+        newThread.start()
+    def monitor(self, process):
+        process.waitForTermination()
+        self.termQueue.put(process)
+    def getTerminatedProcess(self):
+        try:
+            process = self.termQueue.get_nowait()
+            self.processes.remove(process)
+            return process
+        except Empty:
+            return None
+    def killAll(self):
+        # Don't leak processes
+        for process in self.processes:
+            if not process.hasTerminated():
+                guilog.info("Killing '" + repr(process) + "' interactive process")
+                process.killAll()
+
+processTerminationMonitor = ProcessTerminationMonitor()
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveAction(plugins.Action):
-    processes = []    
     def __init__(self, test, oldOptionGroup, optionName = ""):
         self.test = test
         self.optionGroup = plugins.OptionGroup(optionName, test.getConfigValue("gui_entry_overrides"), test.getConfigValue("gui_entry_options"))
@@ -32,7 +64,7 @@ class InteractiveAction(plugins.Action):
         return self.getTitle()
     def startExternalProgram(self, commandLine, shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
         process = plugins.BackgroundProcess(commandLine, shellTitle=shellTitle, holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
-        self.processes.append(process)
+        processTerminationMonitor.addMonitoring(process)
         return process
     def startExtProgramNewUsecase(self, commandLine, usecase, exitHandler, exitHandlerArgs): 
         recScript = os.getenv("USECASE_RECORD_SCRIPT")

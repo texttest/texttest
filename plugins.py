@@ -280,7 +280,7 @@ class UNIXProcessHandler:
             os.system(commandLine)
             os._exit(0)
         else:
-            return processId
+            return processId, processId
     def getShellOptions(self, holdShell):
         if holdShell:
             return " -hold"
@@ -324,17 +324,25 @@ class UNIXProcessHandler:
         return None
 
 class WindowsProcessHandler:
+    def __init__(self):
+        self.processManagement = 1
+        stdout = os.popen("handle none").read()
+        if stdout.find("administrator") != -1:
+            print "Cannot determine process IDs: possibly lack of administrator rights for 'handle'"
+            self.processManagement = 0
     def spawnProcess(self, commandLine, shellTitle, holdShell):
         # Start the process in a subshell so redirection works correctly
         args = [os.environ["COMSPEC"], self.getShellOptions(holdShell), commandLine ]
         processHandle = os.spawnv(os.P_NOWAIT, args[0], args)
+        if not self.processManagement:
+            return None, processHandle
         # As we start a shell, we have a handle on the shell itself, not
         # on the process running in it. Unlike UNIX, killing the shell is not enough!
         cmdProcId = self.findProcessId(processHandle)
         for subProcId, subProcHandle in self.findChildProcesses(cmdProcId):
-            return subProcId
+            return subProcId, processHandle
         # If no subprocesses can be found, just kill the shell
-        return cmdProcId
+        return cmdProcId, processHandle
     def getShellOptions(self, holdShell):
         if holdShell:
             return "/K"
@@ -413,8 +421,8 @@ class Process:
     def waitForTermination(self):
         while not self.hasTerminated():
             time.sleep(0.1)
-    def checkTermination(self):
-        return self.hasTerminated()
+    def runExitHandler(self):
+        pass
     def killAll(self):
         processes = self.findAllProcesses()
         # Start with the deepest child process...
@@ -453,24 +461,22 @@ class BackgroundProcess(Process):
         self.holdShell = holdShell
         self.exitHandler = exitHandler
         self.exitHandlerArgs = exitHandlerArgs
+        self.processHandle = None
         if not testRun:
             self.doFork()
     def __repr__(self):
         return self.commandLine.split()[0].lstrip()
     def doFork(self):
-        self.processId = self.processHandler.spawnProcess(self.commandLine, self.shellTitle, self.holdShell)
+        self.processId, self.processHandle = self.processHandler.spawnProcess(self.commandLine, self.shellTitle, self.holdShell)
     def waitForStart(self):
         while self.processId == None:
             time.sleep(0.1)
-    def checkTermination(self):
-        if not self.hasTerminated():
-            return 0
+    def runExitHandler(self):
         if self.exitHandler:
             self.exitHandler(*self.exitHandlerArgs)
-        return 1
     def waitForTermination(self):
-        if self.processId != None:
-            Process.waitForTermination(self)
+        if self.processHandle != None:
+            os.waitpid(self.processHandle, 0)
     def hasTerminated(self):
         if self.processId == None:
             return 1

@@ -531,6 +531,10 @@ class RunTest(plugins.Action):
 
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
+        if os.name == "nt" and plugins.BackgroundProcess.processHandler.processManagement == 0:
+            self.changeToRunningState(test, None)
+            os.system(testCommand)
+            return
         process = plugins.BackgroundProcess(testCommand, testRun=1)
         # Working around Python bug
         test.changeState(Pending(process))

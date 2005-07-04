@@ -290,7 +290,7 @@ class TextTest:
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
         if not os.environ.has_key("USECASE_HOME"):
             os.environ["USECASE_HOME"] = os.path.join(self.inputOptions.directoryName, "usecases")
-        if self.inputOptions.useGUI():
+        if len(self.allApps) > 0 and self.inputOptions.useGUI():
             try:
                 from texttestgui import TextTestGUI
                 self.gui = TextTestGUI(not self.inputOptions.useStaticGUI(), self.inputOptions.startTime)

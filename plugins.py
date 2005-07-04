@@ -339,7 +339,7 @@ class WindowsProcessHandler:
         # As we start a shell, we have a handle on the shell itself, not
         # on the process running in it. Unlike UNIX, killing the shell is not enough!
         cmdProcId = self.findProcessId(processHandle)
-        for subProcId, subProcHandle in self.findChildProcesses(cmdProcId):
+        for subProcId, subProcHandle in self.findChildProcessesWithHandles(cmdProcId):
             return subProcId, processHandle
         # If no subprocesses can be found, just kill the shell
         return cmdProcId, processHandle
@@ -349,11 +349,13 @@ class WindowsProcessHandler:
         else:
             return "/C"
     def findProcessId(self, processHandle):
-        childProcesses = self.findChildProcesses(str(os.getpid()))
+        childProcesses = self.findChildProcessesWithHandles(str(os.getpid()))
         for subProcId, subProcHandle in childProcesses:
             if subProcHandle == processHandle:
                 return subProcId
     def findChildProcesses(self, processId):
+        return [ pid for pid, handle in self.findChildProcessesWithHandles(processId) ]
+    def findChildProcessesWithHandles(self, processId):
         subprocesses = []
         stdout = os.popen("handle -a -p " + processId)
         for line in stdout.readlines():
@@ -385,7 +387,11 @@ class WindowsProcessHandler:
         return words
     def hasTerminated(self, processId, childProcess=0):
         words = self.getPsWords(processId)
-        return words[2] == "was"
+        if len(words) > 2:
+            return words[2] == "was"
+        else:
+            sys.stderr.write("Unexpected output from pslist for " + str(processId) + ": \n" + repr(words) + "\n")
+            return 1
     def getCpuTime(self, processId):
         words = self.getPsWords(processId)
         cpuEntry = words[6]

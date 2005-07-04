@@ -525,8 +525,10 @@ class RunTest(plugins.Action):
     def runTest(self, test):
         if test.state.hasStarted():
             if test.state.processCompleted():
+                self.diag.info("Process completed.")
                 return
             else:
+                self.diag.info("Process not complete yet, retrying...")
                 return self.RETRY
 
         testCommand = self.getExecuteCommand(test)

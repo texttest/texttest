@@ -339,6 +339,9 @@ class WindowsProcessHandler:
         # As we start a shell, we have a handle on the shell itself, not
         # on the process running in it. Unlike UNIX, killing the shell is not enough!
         cmdProcId = self.findProcessId(processHandle)
+        if not cmdProcId:
+            # The process may have already exited by this point, don't crash if so!
+            return None, processHandle
         for subProcId, subProcHandle in self.findChildProcessesWithHandles(cmdProcId):
             return subProcId, processHandle
         # If no subprocesses can be found, just kill the shell

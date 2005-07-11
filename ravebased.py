@@ -532,6 +532,8 @@ class BuildCode(plugins.Action):
             self.buildRemote("sparc", app)
             if not "9" in app.versions and not "10" in app.versions:
                 self.buildRemote("sparc_64", app)
+                if not "11" in app.versions:
+                    self.buildRemote("x86_64_linux", app)
             self.buildRemote("parisc_2_0", app)
             self.buildRemote("powerpc", app)
     def getPathAndTargets(self, optValue):
@@ -544,6 +546,7 @@ class BuildCode(plugins.Action):
         return (relPath, makeTargets)
     def getMachine(self, app, arch):
         version9 = "9" in app.versions
+        version12 = "12" in app.versions
         if arch == "i386_linux":
             if version9:
                 return "xanxere"
@@ -562,9 +565,14 @@ class BuildCode(plugins.Action):
                 return "tororo"
         if arch == "ia64_hpux":
             return "wakeman"
+        if arch == "x86_64_linux":
+            if version12:
+                return "woodville"
+            else:
+                return "brockville"
     def getRemoteCommandLine(self, arch, absPath, makeCommand):
         commandLine = "cd " + absPath + "; " + makeCommand
-        if arch == "sparc_64":
+        if arch == "sparc_64" or arch == "x86_64_linux":
             commandLine = "setenv BITMODE 64; " + commandLine
         return commandLine
     def buildLocal(self, absPath, app, makeTargets):

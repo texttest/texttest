@@ -92,7 +92,10 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
         arch = getArchitecture(self.test.app)
-        resources.append("carmarch=\"*" + arch + "*\"")
+        if arch == "x86_64_linux" and "12" in self.test.app.versions:
+            resources.append("carmarch=\"*linux*\"")
+        else:
+            resources.append("carmarch=\"*" + arch + "*\"")
         return resources
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]

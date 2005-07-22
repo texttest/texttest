@@ -93,7 +93,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         resources = CarmenSubmissionRules.findResourceList(self)
         arch = getArchitecture(self.test.app)
         if arch == "x86_64_linux" and "12" in self.test.app.versions:
-            resources.append("carmarch=\"*linux*\"")
+            resources.append("carmarch=\"*i386_linux*\"")
         else:
             resources.append("carmarch=\"*" + arch + "*\"")
         return resources

@@ -758,6 +758,7 @@ class Application:
         self.setConfigDefault("test_colours", self.getGuiColourDictionary())
         self.setConfigDefault("file_colours", self.getGuiColourDictionary())
         self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ])
+        self.setConfigDefault("test_list_files_directory", [])
         self.setConfigDefault("gui_entry_overrides", {})
         self.setConfigDefault("gui_entry_options", { "" : [] })
         self.setConfigDefault("use_case_recorder", "")
@@ -787,6 +788,19 @@ class Application:
             self.setConfigDefault("interpreter", "python")
         else:
             self.setConfigDefault("interpreter", "")
+        debugLog.info("Adding items to tests_listed_in_file")
+        for directory in self.getConfigValue("test_list_files_directory"):
+            if os.path.isabs(directory):
+                fullPath = directory
+            else:
+                fullPath = os.path.join(self.inputOptions.findDirectoryName(), directory)
+            debugLog.info(" looking for files in " + fullPath)
+            if os.path.exists(fullPath):
+                filenames = os.listdir(fullPath)
+                filenames.sort()
+                for filename in filenames:
+                    debugLog.info("  found file: " + filename)
+                    self.addConfigEntry('tests_listed_in_file', os.path.join(directory,filename), 'gui_entry_options')            
     def createOptionGroup(self, name):
         defaultDict = self.getConfigValue("gui_entry_overrides")
         optionDict = self.getConfigValue("gui_entry_options")

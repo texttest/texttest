@@ -799,6 +799,8 @@ class Application:
                 filenames = os.listdir(fullPath)
                 filenames.sort()
                 for filename in filenames:
+                    if not os.path.isfile(filename):
+                        continue
                     debugLog.info("  found file: " + filename)
                     self.addConfigEntry('tests_listed_in_file', os.path.join(directory,filename), 'gui_entry_options')            
     def createOptionGroup(self, name):

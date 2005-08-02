@@ -3,6 +3,7 @@
 # GUI for TextTest written with PyGTK
 
 import guiplugins, plugins, comparetest, gtk, gobject, os, string, time, sys
+from gobject import idle_add
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer
 from Queue import Queue, Empty
@@ -14,9 +15,9 @@ def destroyDialog(dialog, *args):
 def showError(message):
     guilog.info("ERROR : " + message)
     dialog = gtk.Dialog("TextTest Message", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
-    dialog.set_modal(gtk.TRUE)
+    dialog.set_modal(True)
     label = gtk.Label(message)
-    dialog.vbox.pack_start(label, expand=gtk.TRUE, fill=gtk.TRUE)
+    dialog.vbox.pack_start(label, expand=True, fill=True)
     label.show()
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show()
@@ -65,8 +66,8 @@ class TextTestGUI:
         shortcutBar = scriptEngine.createShortcutBar()
         if shortcutBar:
             vbox = gtk.VBox()
-            vbox.pack_start(mainWindow, expand=gtk.TRUE, fill=gtk.TRUE)
-            vbox.pack_start(shortcutBar, expand=gtk.FALSE, fill=gtk.FALSE)
+            vbox.pack_start(mainWindow, expand=True, fill=True)
+            vbox.pack_start(shortcutBar, expand=False, fill=False)
             shortcutBar.show()
             vbox.show()
             self.topWindow.add(vbox)
@@ -152,10 +153,10 @@ class TextTestGUI:
             self.model.set_value(iter, 4, details)
             self.model.set_value(iter, 5, colour2)
     def createWindowContents(self, testWins):
-        self.contents = gtk.HBox(homogeneous=gtk.TRUE)
+        self.contents = gtk.HBox(homogeneous=True)
         testCaseWin = self.rightWindowGUI.getWindow()
-        self.contents.pack_start(testWins, expand=gtk.TRUE, fill=gtk.TRUE)
-        self.contents.pack_start(testCaseWin, expand=gtk.TRUE, fill=gtk.TRUE)
+        self.contents.pack_start(testWins, expand=True, fill=True)
+        self.contents.pack_start(testCaseWin, expand=True, fill=True)
         self.contents.show()
         return self.contents
     def createTestWindows(self):
@@ -170,16 +171,16 @@ class TextTestGUI:
 
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
-        vbox.pack_start(buttonbox, expand=gtk.FALSE, fill=gtk.FALSE)
-        vbox.pack_start(window, expand=gtk.TRUE, fill=gtk.TRUE)
+        vbox.pack_start(buttonbox, expand=False, fill=False)
+        vbox.pack_start(window, expand=True, fill=True)
         vbox.show()
         return vbox
     def createDisplayWindows(self):
         hbox = gtk.HBox()
         treeWin = self.createTreeWindow()
         detailWin = self.createDetailWindow()
-        hbox.pack_start(treeWin, expand=gtk.TRUE, fill=gtk.TRUE)
-        hbox.pack_start(detailWin, expand=gtk.TRUE, fill=gtk.TRUE)
+        hbox.pack_start(treeWin, expand=True, fill=True)
+        hbox.pack_start(detailWin, expand=True, fill=True)
         hbox.show()
         return hbox
     def createTreeWindow(self):
@@ -210,7 +211,7 @@ class TextTestGUI:
         return scrolled
     def expandSuite(self, view, iter, path, *args):
         # Make sure expanding expands everything, better than just one level as default...
-        view.expand_row(path, open_all=gtk.TRUE)
+        view.expand_row(path, open_all=True)
     def takeControl(self, actionRunner):
         # We've got everything and are ready to go
         self.createIterMap()
@@ -220,9 +221,9 @@ class TextTestGUI:
         if self.dynamic:
             self.actionThread = ActionThread(actionRunner)
             self.actionThread.start()
-            gtk.idle_add(self.pickUpChange)
+            idle_add(self.pickUpChange)
         else:
-            gtk.idle_add(self.pickUpProcess)
+            idle_add(self.pickUpProcess)
         # Run the Gtk+ main loop.
         gtk.main()
     def createDefaultRightGUI(self):
@@ -233,16 +234,16 @@ class TextTestGUI:
             test, state = self.workQueue.get_nowait()
             if test:
                 self.testChanged(test, state, byAction = 1)
-            return gtk.TRUE
+            return True
         except Empty:
             # Maybe it's empty because the action thread has terminated
             if not self.actionThread.isAlive():
                 self.actionThread.join()
                 scriptEngine.applicationEvent("completion of test actions")
-                return gtk.FALSE
+                return False
             # We must sleep for a bit, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
-            return gtk.TRUE
+            return True
     def pickUpProcess(self):
         process = guiplugins.processTerminationMonitor.getTerminatedProcess()
         if process:
@@ -253,7 +254,7 @@ class TextTestGUI:
         
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
-        return gtk.TRUE
+        return True
     def testChanged(self, test, state, byAction):
         # May have already closed down, don't crash if so
         if not self.selection.get_tree_view():
@@ -367,7 +368,7 @@ class TextTestGUI:
                 cmpAction(test)
             self.rightWindowGUI = TestCaseGUI(test, self.dynamic)
         if self.contents:
-            self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=gtk.TRUE, fill=gtk.TRUE)
+            self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=True, fill=True)
             self.contents.show()
     def makeButtons(self, list):
         buttonbox = gtk.HBox()
@@ -376,7 +377,7 @@ class TextTestGUI:
             button.set_label(label)
             scriptEngine.connect(label, "clicked", button, func)
             button.show()
-            buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
+            buttonbox.pack_start(button, expand=False, fill=False)
         buttonbox.show()
         return buttonbox
 
@@ -451,15 +452,18 @@ class RightWindowGUI:
         fileWin = gtk.ScrolledWindow()
         fileWin.add(view)
         vbox = gtk.VBox()
-        vbox.pack_start(buttons, expand=gtk.FALSE, fill=gtk.FALSE)
-        vbox.pack_start(fileWin, expand=gtk.TRUE, fill=gtk.TRUE)
-        vbox.pack_start(notebook, expand=gtk.TRUE, fill=gtk.TRUE)
+        vbox.pack_start(buttons, expand=False, fill=False)
+        vbox.pack_start(fileWin, expand=True, fill=True)
+        vbox.pack_start(notebook, expand=True, fill=True)
         fileWin.show()
         vbox.show()    
         return vbox
     def displayDifferences(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
+        if not fileName:
+            # Don't crash on double clicking the header lines...
+            return
         comparison = self.model.get_value(iter, 3)
         try:
             self.fileViewAction.view(comparison, fileName)
@@ -470,7 +474,7 @@ class RightWindowGUI:
         button.set_label(label)
         scriptEngine.connect(scriptTitle, "clicked", button, method, None, option)
         button.show()
-        buttonbox.pack_start(button, expand=gtk.FALSE, fill=gtk.FALSE)
+        buttonbox.pack_start(button, expand=False, fill=False)
     def diagnoseOption(self, option):
         value = option.getValue()
         text = "Creating entry for option '" + option.name + "'"
@@ -492,27 +496,27 @@ class RightWindowGUI:
         vbox = gtk.VBox()
         for option in optionGroup.options.values():
             hbox = self.createOptionBox(option)
-            vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
+            vbox.pack_start(hbox, expand=False, fill=False)
         for switch in optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
-            vbox.pack_start(hbox, expand=gtk.FALSE, fill=gtk.FALSE)
+            vbox.pack_start(hbox, expand=False, fill=False)
         vbox.show()    
         return vbox
     def createOptionBox(self, option):
         hbox = gtk.HBox()
         self.diagnoseOption(option)
         label = gtk.Label(option.name + "  ")
-        hbox.pack_start(label, expand=gtk.FALSE, fill=gtk.TRUE)
+        hbox.pack_start(label, expand=False, fill=True)
         if len(option.possibleValues) > 1:
             combobox = gtk.Combo()
             entry = combobox.entry
             combobox.set_popdown_strings(option.possibleValues)
-            hbox.pack_start(combobox, expand=gtk.TRUE, fill=gtk.TRUE)
+            hbox.pack_start(combobox, expand=True, fill=True)
             combobox.show()
         else:
             entry = gtk.Entry()
             entry.show()
-            hbox.pack_start(entry, expand=gtk.TRUE, fill=gtk.TRUE)
+            hbox.pack_start(entry, expand=True, fill=True)
         entry.set_text(option.getValue())
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
         option.setMethods(entry.get_text, entry.set_text)
@@ -525,16 +529,16 @@ class RightWindowGUI:
             radioButton1 = gtk.RadioButton(None, switch.name)
             radioButton2 = gtk.RadioButton(radioButton1, switch.nameForOff)
             if switch.getValue():
-                radioButton1.set_active(gtk.TRUE)
+                radioButton1.set_active(True)
             else:
-                radioButton2.set_active(gtk.TRUE)
+                radioButton2.set_active(True)
             scriptEngine.registerToggleButton(radioButton1, "choose " + switch.name)
             scriptEngine.registerToggleButton(radioButton2, "choose " + switch.nameForOff)
             switch.setMethods(radioButton1.get_active, radioButton1.set_active)
             switch.resetMethod = radioButton2.set_active
             hbox = gtk.HBox()
-            hbox.pack_start(radioButton1, expand=gtk.TRUE, fill=gtk.TRUE)
-            hbox.pack_start(radioButton2, expand=gtk.TRUE, fill=gtk.TRUE)
+            hbox.pack_start(radioButton1, expand=True, fill=True)
+            hbox.pack_start(radioButton2, expand=True, fill=True)
             radioButton1.show()
             radioButton2.show()
             hbox.show()
@@ -542,7 +546,7 @@ class RightWindowGUI:
         else:
             checkButton = gtk.CheckButton(switch.name)
             if switch.getValue():
-                checkButton.set_active(gtk.TRUE)
+                checkButton.set_active(True)
             scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
             switch.setMethods(checkButton.get_active, checkButton.set_active)
             checkButton.show()

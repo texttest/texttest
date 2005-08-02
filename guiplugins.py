@@ -478,6 +478,7 @@ class ResetGroups(InteractiveAction):
             group.reset()
     
 class RunTests(InteractiveAction):
+    runNumber = 1
     def __init__(self, app, oldOptionGroup):
         self.app = app
         self.test = app
@@ -503,8 +504,9 @@ class RunTests(InteractiveAction):
             raise plugins.TextTestError, "No tests selected - cannot run!"
         ttOptions = string.join(self.getTextTestOptions(app, selTestCases))
         app.makeWriteDirectory()
-        logFile = os.path.join(app.writeDirectory, "dynamic_run.log")
-        errFile = os.path.join(app.writeDirectory, "dynamic_errors.log")
+        logFile = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber) + ".log")
+        errFile = os.path.join(app.writeDirectory, "dynamic_errors" + str(self.runNumber) + ".log")
+        self.runNumber += 1
         commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
         self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,))
     def isTestCase(self, test):

@@ -799,9 +799,9 @@ class Application:
                 filenames = os.listdir(fullPath)
                 filenames.sort()
                 for filename in filenames:
-                    if not os.path.isfile(filename):
+                    if not os.path.isfile(os.path.join(fullPath, filename)):
                         continue
-                    debugLog.info("  found file: " + filename)
+                    debugLog.info("  found file: " + filename)                    
                     self.addConfigEntry('tests_listed_in_file', os.path.join(directory,filename), 'gui_entry_options')            
     def createOptionGroup(self, name):
         defaultDict = self.getConfigValue("gui_entry_overrides")

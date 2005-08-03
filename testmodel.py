@@ -801,8 +801,9 @@ class Application:
                 for filename in filenames:
                     if not os.path.isfile(os.path.join(fullPath, filename)):
                         continue
-                    debugLog.info("  found file: " + filename)                    
-                    self.addConfigEntry('tests_listed_in_file', os.path.join(directory,filename), 'gui_entry_options')            
+                    debugLog.info("  found file: " + filename)
+                    fullFilePath = os.path.normpath(os.path.join(directory, filename))
+                    self.addConfigEntry('tests_listed_in_file', fullFilePath, 'gui_entry_options')
     def createOptionGroup(self, name):
         defaultDict = self.getConfigValue("gui_entry_overrides")
         optionDict = self.getConfigValue("gui_entry_options")

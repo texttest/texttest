@@ -255,6 +255,8 @@ class ImportTest(InteractiveAction):
         if len(testName) == 0:
             raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + "\n" + \
                   "Fill in the 'Adding " + self.testType() + "' tab below."
+        if testName.find(" ") != -1:
+            raise plugins.TextTestError, "The new " + self.testType() + " name is not permitted to contain spaces, please specify another"
         guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + repr(suite))
         testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)

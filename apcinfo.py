@@ -449,14 +449,15 @@ class GenHTML(plugins.Action):
                     self.raveBC.createBarChartMeans(data["ravebc"], groups, self.chartRaveglob, name + ".html" + "#" + groups)
                 page.append(data["ravebc"])
                 page.append(HTMLgen.Paragraph())
-                self.findProfilingGraph(name, data["tests"])
                 page.append("Used tests for profiling results: ")
                 page.append(self.findProfilingGraph(name, data["tests"]))
                 self.profilingGroups.append(HTMLgen.Href(name + ".html" + "#" + groups, HTMLgen.Text(groups)))
 
     def findProfilingGraph(self, suite, tests):
-        filesInProfileDir = os.listdir(self.profilesDir)
         profTests = HTMLgen.Container()
+        if not os.path.isdir(self.profilesDir):
+            return profTests
+        filesInProfileDir = os.listdir(self.profilesDir)
         for test in tests:
             foundProfile = 0
             lookForFileStartingWith = suite + "__" + test + "_t5_prof.ps"

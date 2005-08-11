@@ -229,7 +229,7 @@ class RunWithParallelAction(plugins.Action):
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
         # Look for the binary process, or a child of it, that is a pure executable not a script
         childProcesses = process.findChildProcesses()
-        if len(childProcesses) == 0:
+        if len(childProcesses) < 2:
             return None, None
         
         executableProcessName = childProcesses[-1].getName()

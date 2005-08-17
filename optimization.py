@@ -187,6 +187,7 @@ class OptimizationConfig(ravebased.Config):
         ravebased.Config.setApplicationDefaults(self, app)
         app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile)
         app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods)
+        app.setConfigDefault("cvs_log_for_files", "")
         app.setConfigDefault("kpi_cost_margin", 0.0)
         app.addConfigEntry("definition_file_stems", "raveparameters")
 
@@ -1641,3 +1642,41 @@ class PlotLine:
             style = " with linespoints "
         return style
     
+class CVSLogInGUI(guiplugins.InteractiveAction):
+    def __call__(self, test):
+        logFileStem = test.app.getConfigValue("log_file")
+        files = [ logFileStem ]
+        files += test.app.getConfigValue("cvs_log_for_files").split(",")
+        cvsInfo = ""
+        for file in files:
+            fullName = test.makeFileName(file)
+            cvsInfo += self.getCVSInfo(fullName)
+        raise  plugins.TextTestError, "CVS Logs" + os.linesep + os.linesep + cvsInfo
+    def getTitle(self):
+        return "CVS"
+    def getCVSInfo(self, file):
+        if not os.path.isfile(file):
+            return ""
+        info = os.path.basename(file) + ":" + os.linesep
+        cvsCommand = "cvs log -N -rHEAD " + file
+        stdin, stdouterr = os.popen4(cvsCommand)
+        cvsLines = stdouterr.readlines()
+        if len(cvsLines) > 0:
+            addLine = None
+            for line in cvsLines:
+                isMinusLine = None
+                if line.startswith("-----------------"):
+                    addLine = 1
+                    isMinusLine = 1
+                if line.startswith("================="):
+                    addLine = None
+                if line.find("nothing known about") != -1:
+                    info += "Not CVS controlled"
+                    break
+                if addLine and not isMinusLine:
+                    info += line
+            info += os.linesep
+        return info
+        
+
+guiplugins.interactiveActionHandler.testClasses += [ CVSLogInGUI ]

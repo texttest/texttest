@@ -1472,7 +1472,10 @@ class CleanSubplans(plugins.Action):
                     continue
                 cleanedPlansTest += 1
                 usedMem += int(os.popen("du -s " + subplanName).readlines()[0].split("\t")[0])
-                shutil.rmtree(subplanName)
+                try:
+                    shutil.rmtree(subplanName)
+                except OSError:
+                    print "Failed to remove subplan", subplanName
         self.describe(test, " (" + str(cleanedPlansTest) + ", " +  str(usedMem/1024) + "M)")
         self.cleanedPlans += cleanedPlansTest
         self.totalMem += usedMem

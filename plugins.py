@@ -147,7 +147,7 @@ def getDiagnostics(diagName):
 
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):
-    if os.name == "posix":
+    if os.environ.has_key("PWD"):
         return os.path.join(os.environ["PWD"], relpath)
     else:
         return os.path.abspath(relpath)

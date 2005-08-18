@@ -686,6 +686,7 @@ class Application:
             self.versions = []
         self.inputOptions = inputOptions
         self.configDir = MultiEntryDictionary()
+        self.configDocs = {}
         self.setConfigDefaults()
         extensions = self.getVersionFileExtensions(baseVersion=0)
         self.configDir.readValuesFromFile(configFile, name, extensions, insert=0)
@@ -739,36 +740,39 @@ class Application:
         else:
             return os.path.join(self.abspath, ".texttest")
     def setConfigDefaults(self):
-        self.setConfigDefault("binary", None)
-        self.setConfigDefault("config_module", "default")
-        self.setConfigDefault("full_name", string.upper(self.name))
-        self.setConfigDefault("checkout_location", ".")
-        self.setConfigDefault("default_checkout", "")
-        self.setConfigDefault("extra_version", [])
-        self.setConfigDefault("base_version", [])
-        self.setConfigDefault("unsaveable_version", [])
-        self.setConfigDefault("diagnostics", {})
-        self.setConfigDefault("copy_test_path", [])
-        self.setConfigDefault("link_test_path", [])
-        self.setConfigDefault("slow_motion_replay_speed", 0)
+        self.setConfigDefault("binary", "", "Full path to the System Under Test")
+        self.setConfigDefault("config_module", "default", "Configuration module to use")
+        self.setConfigDefault("full_name", string.upper(self.name), "Expanded name to use for application")
+        self.setConfigDefault("checkout_location", ".", "Absolute path to look for checkouts under")
+        self.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
+        self.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
+        self.setConfigDefault("base_version", [], "Versions to inherit settings from")
+        self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
+        self.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
+        self.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
+        self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
+        self.setConfigDefault("slow_motion_replay_speed", 0, "How long in seconds to wait between each GUI action")
         # External viewing tools
         # Do this here rather than from the GUI: if applications can be run with the GUI
         # anywhere it needs to be set up
-        self.setConfigDefault("add_shortcut_bar", 1)
-        self.setConfigDefault("test_colours", self.getGuiColourDictionary())
-        self.setConfigDefault("file_colours", self.getGuiColourDictionary())
-        self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ])
-        self.setConfigDefault("test_list_files_directory", [])
-        self.setConfigDefault("gui_entry_overrides", {})
-        self.setConfigDefault("gui_entry_options", { "" : [] })
-        self.setConfigDefault("use_case_recorder", "")
-        self.setConfigDefault("diff_program", "tkdiff")
+        self.setConfigDefault("add_shortcut_bar", 1, "Whether or not TextTest's shortcut bar will appear")
+        self.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
+        self.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
+        self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ], \
+                              "files to be shown as definition files by the static GUI")
+        self.setConfigDefault("test_list_files_directory", [], "Directories to search for test-filter files")
+        self.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
+        self.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
+        self.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
+        self.setConfigDefault("diff_program", "tkdiff", "External program to use for graphical file comparison")
+        viewDoc = "External program to use for viewing and editing text files"
+        follDoc = "External program to use for following progress of a file"
         if os.name == "posix":
-            self.setConfigDefault("view_program", "xemacs")
-            self.setConfigDefault("follow_program", "tail -f")
+            self.setConfigDefault("view_program", "xemacs", viewDoc)
+            self.setConfigDefault("follow_program", "tail -f", follDoc)
         elif os.name == "dos" or os.name == "nt":
-            self.setConfigDefault("view_program", "notepad")
-            self.setConfigDefault("follow_program", "baretail")
+            self.setConfigDefault("view_program", "notepad", viewDoc)
+            self.setConfigDefault("follow_program", "baretail", follDoc)
     def getGuiColourDictionary(self):
         dict = {}
         dict["success"] = "green"
@@ -780,14 +784,14 @@ class Application:
         return dict
     def setDependentConfigDefaults(self):
         binary = self.getConfigValue("binary")
-        if not binary:
-            raise BadConfigError, "config file entry 'binary' not defined"
         # Set values which default to other values
-        self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module"))
+        self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module"),
+                              "Module to search for InteractiveActions for the GUI")
+        interDoc = "Program to use as interpreter for the SUT"
         if binary.endswith(".py"):
-            self.setConfigDefault("interpreter", "python")
+            self.setConfigDefault("interpreter", "python", interDoc)
         else:
-            self.setConfigDefault("interpreter", "")
+            self.setConfigDefault("interpreter", "", interDoc)
         debugLog.info("Adding items to tests_listed_in_file")
         for directory in self.getConfigValue("test_list_files_directory"):
             if os.path.isabs(directory):
@@ -835,7 +839,7 @@ class Application:
             return 0
     def addToOptionGroup(self, group):
         if group.name.startswith("Select"):
-            group.addOption("vs", "Version to select", self.getFullVersion())
+            group.addOption("vs", "Tests for version", self.getFullVersion())
         elif group.name.startswith("What"):
             group.addOption("c", "Use checkout")
             group.addOption("v", "Run this version", self.getFullVersion())
@@ -851,17 +855,13 @@ class Application:
             group.addSwitch("x", "Write TextTest diagnostics")
         elif group.name.startswith("Invisible"):
             # Options that don't make sense with the GUI should be invisible there...
-            group.addOption("a", "Applications containing")
+            group.addOption("a", "Run Applications whose name contains")
             group.addOption("s", "Run this script")
-            group.addOption("d", "Run tests at")
-            group.addOption("tmp", "Write test-tmp files at")
-            group.addOption("delay", "Between replayed actions, delay this long")
-            group.addOption("record", "Record user actions to this script")
-            group.addOption("replay", "Replay user actions from this script")
-            group.addOption("recinp", "Record standard input to this script")
+            group.addOption("d", "Run as if TEXTTEST_HOME was")
+            group.addOption("tmp", "Private: write test-tmp files at")
             group.addOption("slave", "Private: used to submit slave runs remotely")
-            group.addOption("help", "Print help text")
-            group.addSwitch("g", "use GUI", 1)
+            group.addSwitch("help", "Print configuration help text on stdout")
+            group.addSwitch("g", "use dynamic GUI", 1)
             group.addSwitch("gx", "use static GUI")
     def findOptionGroup(self, option, optionGroups):
         for optionGroup in optionGroups:
@@ -1038,8 +1038,10 @@ class Application:
             return dict["default"]
     def addConfigEntry(self, key, value, sectionName = ""):
         self.configDir.addEntry(key, value, sectionName)
-    def setConfigDefault(self, key, value):
+    def setConfigDefault(self, key, value, docString = ""):
         self.configDir[key] = value
+        if len(docString) > 0:
+            self.configDocs[key] = docString
     def makeCheckout(self, checkoutOverride):
         if checkoutOverride:
             checkout = checkoutOverride
@@ -1054,6 +1056,8 @@ class Application:
         return self.configObject.getExecuteCommand(binary, test)
     def checkBinaryExists(self):
         binary = self.getConfigValue("binary")
+        if not binary:
+            raise plugins.TextTestError, "config file entry 'binary' not defined"
         if not os.path.isfile(binary):
             raise plugins.TextTestError, binary + " has not been built."
     def getEnvironment(self):

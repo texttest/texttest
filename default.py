@@ -245,46 +245,47 @@ class Config(plugins.Configuration):
         severities["catalogue"] = 2
         return severities
     def getDefaultMailAddress(self):
-        if os.name == "posix":
-            return os.environ["USER"] + "@localhost"
-        else:
-            # There is nothing sensible you can put here on Windows
-            return "non_existent_mail_address"
+        user = os.getenv("USER", "$USER")
+        return user + "@localhost"
     def setApplicationDefaults(self, app):
-        app.setConfigDefault("log_file", "output")
-        app.setConfigDefault("failure_severity", self.defaultSeverities())
-        app.setConfigDefault("text_diff_program", self.defaultTextDiffTool())
-        app.setConfigDefault("lines_of_text_difference", 30)
-        app.setConfigDefault("max_width_text_difference", 500)
-        app.setConfigDefault("home_operating_system", "any")
-        app.setConfigDefault("collate_file", {})
-        app.setConfigDefault("run_dependent_text", { "" : [] })
-        app.setConfigDefault("unordered_text", { "" : [] })
-        app.setConfigDefault("create_catalogues", "false")
-        app.setConfigDefault("catalogue_process_string", "")
-        app.setConfigDefault("internal_error_text", [])
-        app.setConfigDefault("internal_compulsory_text", [])
+        app.setConfigDefault("log_file", "output", "Result file to search, by default")
+        app.setConfigDefault("failure_severity", self.defaultSeverities(), \
+                             "Mapping of result files to how serious diffs in them are")
+        app.setConfigDefault("text_diff_program", self.defaultTextDiffTool(), \
+                             "External program to use for textual comparison of files")
+        app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
+        app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
+        app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
+        app.setConfigDefault("collate_file", {}, "Mapping of result file names to paths to collect them from")
+        app.setConfigDefault("run_dependent_text", { "" : [] }, "Mapping of patterns to remove from result files")
+        app.setConfigDefault("unordered_text", { "" : [] }, "Mapping of patterns to extract and sort from result files")
+        app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
+        app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")
+        app.setConfigDefault("internal_error_text", [], "List of text to be considered as an internal error, if present")
+        app.setConfigDefault("internal_compulsory_text", [], "List of text to be considered as an internal error, if not present")
         # Performance values
-        app.setConfigDefault("cputime_include_system_time", 0)
-        app.setConfigDefault("cputime_slowdown_variation_%", 30)
-        app.setConfigDefault("performance_logfile", { "default" : [] })
-        app.setConfigDefault("performance_logfile_extractor", {})
-        app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] })
-        app.setConfigDefault("performance_variation_%", { "default" : 10 })
-        app.setConfigDefault("performance_test_minimum", { "default" : 0 })
-        app.setConfigDefault("use_case_record_mode", "disabled")
-        app.setConfigDefault("collect_standard_output", 1)
-        app.setConfigDefault("collect_standard_error", 1)
+        app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
+        app.setConfigDefault("cputime_slowdown_variation_%", 30, "CPU time tolerance allowed when interference detected")
+        app.setConfigDefault("performance_logfile", { "default" : [] }, "Which result file to collect performance data from")
+        app.setConfigDefault("performance_logfile_extractor", {}, "What string to look for when collecting performance data")
+        app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \
+                             "List of machines where performance can be collected")
+        app.setConfigDefault("performance_variation_%", { "default" : 10 }, "How much variation in performance is allowed")
+        app.setConfigDefault("performance_test_minimum", { "default" : 0 }, \
+                             "Minimum time/memory to be consumed before data is collected")
+        app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
+        app.setConfigDefault("collect_standard_output", 1, "Is standard output of the SUT collected by default")
+        app.setConfigDefault("collect_standard_error", 1, "Is standard error of the SUT collected by default")
         app.addConfigEntry("pending", "white", "test_colours")
         app.addConfigEntry("definition_file_stems", "knownbugs")
         # Batch values. Maps from session name to values
-        app.setConfigDefault("smtp_server", "localhost")
-        app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() })
-        app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() })
-        app.setConfigDefault("batch_timelimit", { "default" : None })
-        app.setConfigDefault("batch_use_collection", { "default" : "false" })
+        app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
+        app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
+        app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
+        app.setConfigDefault("batch_timelimit", { "default" : None }, "Maximum length of test to include in batch mode runs")
+        app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         # Sample to show that values are lists
-        app.setConfigDefault("batch_version", { "default" : [] })
+        app.setConfigDefault("batch_version", { "default" : [] }, "Which versions are allowed as batch mode runs")
         # Use batch session as a base version
         batchSession = self.optionValue("b")
         if batchSession:
@@ -292,8 +293,10 @@ class Config(plugins.Configuration):
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.showExecHostsInFailures()
         if os.name == "posix":
-            app.setConfigDefault("virtual_display_machine", [])
-            app.setConfigDefault("login_shell", self.defaultLoginShell())
+            app.setConfigDefault("virtual_display_machine", [], \
+                                 "(UNIX) List of machines to run virtual display server (Xvfb) on")
+            app.setConfigDefault("login_shell", self.defaultLoginShell(), \
+                                 "(UNIX) Which shell to use when starting processes")
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
@@ -1010,3 +1013,49 @@ class ExtractStandardPerformance(ExtractPerformanceFiles):
         return 1
     def setUpSuite(self, suite):
         self.describe(suite)
+
+class DocumentOptions(plugins.Action):
+    def setUpApplication(self, app):
+        keys = []
+        for group in app.optionGroups:
+            keys += group.options.keys()
+            keys += group.switches.keys()
+        keys.sort()
+        for key in keys:
+            self.displayKey(key, app.optionGroups)
+    def displayKey(self, key, groups):
+        for group in groups:
+            if group.options.has_key(key):
+                keyOutput, docOutput = self.optionOutput(key, group, group.options[key].name)
+                self.display(keyOutput, self.groupOutput(group), docOutput)
+            if group.switches.has_key(key):    
+                self.display("-" + key, self.groupOutput(group), group.switches[key].name)
+    def display(self, keyOutput, groupOutput, docOutput):
+        if not docOutput.startswith("Private"):
+            print keyOutput + ";" + groupOutput + ";" + docOutput
+    def groupOutput(self, group):
+        if group.name == "Invisible":
+            return "N/A"
+        else:
+            return group.name
+    def optionOutput(self, key, group, docs):
+        keyOutput = "-" + key + " <value>"
+        if docs.find("<") != -1:
+            keyOutput = self.filledOptionOutput(key, docs)
+        else:
+            docs += " <value>"
+        if group.name.startswith("Select"):
+            return keyOutput, "Select " + docs.lower()
+        else:
+            return keyOutput, docs
+    def filledOptionOutput(self, key, docs):
+        start = docs.find("<")
+        end = docs.find(">", start)
+        filledPart = docs[start:end + 1]
+        return "-" + key + " " + filledPart
+
+class DocumentConfig(plugins.Action):
+    def setUpApplication(self, app):
+        for key, value in app.configDir.items():
+            print key + "|" + str(value) + "|" + app.configDocs[key]
+

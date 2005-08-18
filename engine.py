@@ -280,6 +280,8 @@ class UniqueNameFinder:
 
 class TextTest:
     def __init__(self):
+        if os.environ.has_key("FAKE_OS"):
+            os.name = os.environ["FAKE_OS"]
         self.inputOptions = testmodel.OptionFinder()
         self.diag = plugins.getDiagnostics("Find Applications")
         if self.inputOptions.slaveRun():
@@ -391,7 +393,7 @@ class TextTest:
                 empty = testSuite.size() == 0
                 if self.gui and (not empty or not self.gui.dynamic):
                     self.gui.addSuite(testSuite)
-                if not empty:
+                if not empty or self.inputOptions.has_key("s"):
                     allEmpty = 0
                     actionSequence = self.inputOptions.getActionSequence(app)
                     actionRunner.addTestActions(testSuite, actionSequence)

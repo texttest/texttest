@@ -1,11 +1,10 @@
-import plugins, os, re, string, math, exceptions, optimization, performance, time, copy
+import plugins, os, re, string, math, exceptions, optimization, performance, time, copy, apc
 from testmodel import BadConfigError
 
 try:
     import HTMLgen, barchart
 except:
     raise BadConfigError, "Python modules HTMLgen and/or barchart not found. Try adding /users/johani/pythonpackages/HTMLgen to your PYTHONPATH."
-
 
 class CarmenDocument(HTMLgen.SeriesDocument):
     def header(self):
@@ -577,34 +576,8 @@ class GenHTML(plugins.Action):
         self.currentSuitePage["group"][group]["interestingParameters"] = interestingParametersFound
     
     def readKPIGroupFile(self, suite):
-        self.kpiGroupForTest = {}
-        self.kpiGroups = []
+        self.kpiGroupForTest,self.kpiGroups= apc.readKPIGroupFileCommon(suite)
         self.kpiGroupsList = {}
-        kpiGroups = suite.makeFileName("kpi_groups")
-        if not os.path.isfile(kpiGroups):
-            return
-        groupFile = open(kpiGroups)
-        groupName = None
-        for line in groupFile.readlines():
-            if line[0] == '#' or not ':' in line:
-                continue
-            groupKey, groupValue = line.strip().split(":",1)
-            if groupKey.find("_") == -1:
-                if groupName:
-                    groupKey = groupName
-                testName = groupValue
-                self.kpiGroupForTest[testName] = groupKey
-                try:
-                    ind = self.kpiGroups.index(groupKey)
-                except ValueError:
-                    self.kpiGroups.append(groupKey)
-            else:
-                gk = groupKey.split("_")
-                kpigroup = gk[0]
-                item = gk[1]
-                if item == "name":
-                    groupName = groupValue
-                
                 
     def setUpSuite(self, suite):
         if suite.name == "picador":

@@ -71,6 +71,36 @@ import default, ravebased, carmen, queuesystem, performance, os, sys, stat, stri
 from time import sleep
 from ndict import seqdict
 
+def readKPIGroupFileCommon(suite):
+    kpiGroupForTest = {}
+    kpiGroups = []
+    kpiGroupsFileName = suite.makeFileName("kpi_groups")
+    if not os.path.isfile(kpiGroupsFileName):
+        return {},[]
+    groupFile = open(kpiGroupsFileName)
+    groupName = None
+    for line in groupFile.readlines():
+        if line[0] == '#' or not ':' in line:
+            continue
+        groupKey, groupValue = line.strip().split(":",1)
+        if groupKey.find("_") == -1:
+            if groupName:
+                groupKey = groupName
+            testName = groupValue
+            kpiGroupForTest[testName] = groupKey
+            try:
+                ind = kpiGroups.index(groupKey)
+            except ValueError:
+                kpiGroups.append(groupKey)
+        else:
+            gk = groupKey.split("_")
+            kpigroup = gk[0]
+            item = gk[1]
+            if item == "name":
+                groupName = groupValue
+    groupFile.close()
+    return kpiGroupForTest,kpiGroups
+
 def getConfig(optionMap):
     return ApcConfig(optionMap)
 
@@ -1481,3 +1511,65 @@ class CleanSubplans(plugins.Action):
         self.totalMem += usedMem
     def setUpSuite(self, suite):
         self.describe(suite)
+
+
+class SaveBestSolution(guiplugins.InteractiveAction):
+    def __call__(self, test):
+        import shutil
+        # If we have the possibility to save, we know that the current solution is best
+        testdir = self.test.parent.getDirectory(1)
+        bestStatusFile = os.path.join(testdir, self.hostCaseName, "best_known_status");
+        currentStatusFile = self.test.makeFileName("status", temporary=1)
+        shutil.copyfile(currentStatusFile, bestStatusFile)
+
+        bestSolFile = os.path.join(testdir, self.hostCaseName, "best_known_solution");
+        currentSolFile = self.test.makeFileName("solution", temporary=1)
+        shutil.copyfile(currentSolFile, bestSolFile)
+        
+    def getTitle(self):
+        return "Save best"
+
+    def solutionIsBetter(self):
+        parentDir = self.test.parent.getDirectory(1)
+        bestStatusFile = os.path.join(parentDir, self.hostCaseName, "best_known_status");
+        statusFile = self.test.makeFileName("status", temporary=1)
+        if not os.path.isfile(statusFile):
+            return 0
+        solutionFile = self.test.makeFileName("solution", temporary=1)
+        if not os.path.isfile(solutionFile):
+            return 0
+        # read solutions
+        items = ['uncovered legs', 'illegal pairings', 'overcovers', 'cost of plan', 'cpu time']
+        itemNames = {'memory': 'Time:.*memory', 'cost of plan': 'TOTAL cost', 'new solution': 'apc_status Solution', 'illegal pairings':'illegal trips', 'uncovered legs':'uncovered legs\.', 'overcovers':'overcovers'}
+        calc = optimization.OptimizationValueCalculator(items, statusFile, itemNames, []);
+        sol=calc.getSolutions(items)
+        if len(sol) == 0 :
+            return 0
+        if not os.path.isfile(bestStatusFile):
+            return 1
+        calcBestKnown = optimization.OptimizationValueCalculator(items, bestStatusFile, itemNames, []);
+        solBest=calcBestKnown.getSolutions(items)
+        #Check the 4 first items
+        for i in range(4):
+            if sol[-1][items[i]] < solBest[-1][items[i]]:
+                return 1
+            if sol[-1][items[i]] > solBest[-1][items[i]]:
+                return 0
+        #all equal
+        return 0
+        
+    def canPerformOnTest(self):
+        self.kpiGroupForTest, self.kpiGroups = readKPIGroupFileCommon(self.test.parent)
+        if not self.kpiGroupForTest.has_key(self.test.name):
+            self.hostCaseName = self.test.name
+        else:
+            self.hostCaseName = self.findFirstInKPIGroup()
+        return self.solutionIsBetter()
+
+    def findFirstInKPIGroup(self):
+        gp=self.kpiGroupForTest[self.test.name]
+        tests = filter(lambda x:self.kpiGroupForTest[x] == gp, self.kpiGroupForTest.keys())
+        tests.sort()
+        return tests[0]
+
+guiplugins.interactiveActionHandler.testClasses.append(SaveBestSolution)

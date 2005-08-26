@@ -108,15 +108,21 @@ def pad(str, padSize):
     return str.ljust(padSize)
         
 class PredictionStatistics(plugins.Action):
-    def __init__(self, args):
-        arg, val = args[0].split("=")
-        versions = val.split(",")
+    def __init__(self, args=[]):
+        versions = self.getVersions(args)
         self.referenceChecker = CheckPredictions(versions[0])
         self.currentChecker = None
         if len(versions) > 1:
             self.currentChecker = CheckPredictions(versions[1])
+    def getVersions(self, args):
+        if len(args) == 0:
+            return [""]
+        arg, val = args[0].split("=")
+        return val.split(",")
     def setUpSuite(self, suite):
         self.suiteName = suite.name + "\n   "
+    def scriptDoc(self):
+        return "Displays statistics about application internal errors present in the test suite"
     def __call__(self, test):
         refErrors = self.referenceChecker.collectErrors(test)
         currErrors = 0

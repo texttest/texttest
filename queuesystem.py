@@ -70,7 +70,10 @@ def tenMinutesToGo(signal, stackFrame):
 def queueSystemName(app):
     return app.getConfigValue("queue_system_module")
 
-signal.signal(signal.SIGUSR2, tenMinutesToGo)
+try:
+    signal.signal(signal.SIGUSR2, tenMinutesToGo)
+except AttributeError:
+    print "WARNING: operating system does not have SIGUSR2 - queuesystem module may not work too well..."
 
 # Exception to throw if job got lost, typical SGE SNAFU behaviour
 class QueueSystemLostJob(RuntimeError):
@@ -147,11 +150,11 @@ class QueueSystemConfig(default.Config):
         default.Config.printHelpOptions(self, builtInOptions)
     def setApplicationDefaults(self, app):
         default.Config.setApplicationDefaults(self, app)
-        app.setConfigDefault("default_queue", "texttest_default")
-        app.setConfigDefault("min_time_for_performance_force", -1)
-        app.setConfigDefault("queue_system_module", "SGE")
-        app.setConfigDefault("performance_test_resource", { "default" : [] })
-        app.setConfigDefault("parallel_environment_name", "'*'")
+        app.setConfigDefault("default_queue", "texttest_default", "Which queue to submit tests to by default")
+        app.setConfigDefault("min_time_for_performance_force", -1, "Minimum CPU time for test to always run on performance machines")
+        app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
+        app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
+        app.setConfigDefault("parallel_environment_name", "'*'", "(SGE) Which SGE parallel environment to use when SUT is parallel")
 
 class SubmissionRules:
     def __init__(self, optionMap, test, nonTestProcess):

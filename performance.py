@@ -232,6 +232,8 @@ class ShowMemoryUsage(plugins.Action):
         self.numberTests = 0
     def __repr__(self):
         return "Memory usage for"
+    def scriptDoc(self):
+        return "Prints a report on memory usage per test (looks in \"memory\" files)"
     def __call__(self, test):
         testMemory = getTestMemory(test)
         self.describe(test, ": " + str(testMemory) + " MB")
@@ -244,6 +246,8 @@ def percentDiff(perf1, perf2):
 
 class PerformanceStatistics(plugins.Action):
     def __init__(self, args = []):
+        self.referenceVersion = ""
+        self.currentVersion = None
         self.interpretOptions(args)
         self.limit = 0
     def interpretOptions(self, args):
@@ -262,15 +266,20 @@ class PerformanceStatistics(plugins.Action):
                     self.limit = 0
             else:
                 print "Unknown option " + arr[0]
+    def scriptDoc(self):
+        return "Prints a report on CPU time usage per test. Can compare versions"
     def setUpSuite(self, suite):
         self.suiteName = suite.name + "\n" + "   "
     def __call__(self, test):
         refPerf = getTestPerformance(test, self.referenceVersion)
-        currPerf = getTestPerformance(test, self.currentVersion)
-        pDiff = percentDiff(currPerf, refPerf)
-        if self.limit == 0 or pDiff > self.limit:
-            print self.suiteName + test.name.ljust(30) + "\t", self.minsec(refPerf), self.minsec(currPerf), "\t" + str(pDiff) + "%"
-            self.suiteName = "   "
+        if self.currentVersion is not None:
+            currPerf = getTestPerformance(test, self.currentVersion)
+            pDiff = percentDiff(currPerf, refPerf)
+            if self.limit == 0 or pDiff > self.limit:
+                print self.suiteName + test.name.ljust(30) + "\t", self.minsec(refPerf), self.minsec(currPerf), "\t" + str(pDiff) + "%"
+                self.suiteName = "   "
+        else:
+            print self.suiteName + test.name.ljust(30) + "\t", self.minsec(refPerf)
     def minsec(self, minFloat):
         intMin = int(minFloat)
         secPart = minFloat - intMin

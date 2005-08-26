@@ -79,7 +79,7 @@ class Config(plugins.Configuration):
             elif group.name.startswith("Invisible"):
                 # Only relevant without the GUI
                 group.addSwitch("o", "Overwrite all failures")
-                group.addOption("tp", "Tests with exact path") # use for internal communication
+                group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addSwitch("n", "Create new results files (overwrite everything)")
             elif group.name.startswith("Side"):
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
@@ -702,6 +702,8 @@ class CountTest(plugins.Action):
     def __del__(self):
         for app, count in self.appCount.items():
             print "Application", app, "has", count, "tests"
+    def scriptDoc(self):
+        return "report on the number of tests selected, by application"
     def __repr__(self):
         return "Counting"
     def __call__(self, test):
@@ -1005,6 +1007,8 @@ class ExtractStandardPerformance(ExtractPerformanceFiles):
         ExtractPerformanceFiles.__init__(self, MachineInfoFinder())
     def __repr__(self):
         return "Extracting standard performance for"
+    def scriptDoc(self):
+        return "update the standard performance files from the standard log files"
     def __call__(self, test):
         self.describe(test)
         ExtractPerformanceFiles.__call__(self, test, temp=0)
@@ -1032,10 +1036,12 @@ class DocumentOptions(plugins.Action):
                 self.display("-" + key, self.groupOutput(group), group.switches[key].name)
     def display(self, keyOutput, groupOutput, docOutput):
         if not docOutput.startswith("Private"):
-            print keyOutput + ";" + groupOutput + ";" + docOutput
+            print keyOutput + ";" + groupOutput + ";" + docOutput.replace("SGE", "SGE/LSF")
     def groupOutput(self, group):
         if group.name == "Invisible":
             return "N/A"
+        elif group.name == "SGE":
+            return "SGE/LSF"
         else:
             return group.name
     def optionOutput(self, key, group, docs):
@@ -1059,3 +1065,23 @@ class DocumentConfig(plugins.Action):
         for key, value in app.configDir.items():
             print key + "|" + str(value) + "|" + app.configDocs[key]
 
+class DocumentScripts(plugins.Action):
+    def setUpApplication(self, app):
+        modNames = [ "batch", "comparetest", "default", "performance", "predict" ]
+        for modName in modNames:
+            importCommand = "import " + modName
+            exec importCommand
+            command = "names = dir(" + modName + ")"
+            exec command
+            for name in names:
+                scriptName = modName + "." + name
+                constructCommand = "obj = " + scriptName + "()"
+                try:
+                    exec constructCommand
+                except TypeError:
+                    continue
+                try:
+                    docString = obj.scriptDoc()
+                    print scriptName + "|" + docString
+                except AttributeError:
+                    pass

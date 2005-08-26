@@ -659,6 +659,8 @@ class RemoveObsoleteVersions(plugins.Action):
         for file in self.filesToRemove:
             os.system("cvs rm -f " + file)
         self.filesToRemove = []
+    def scriptDoc(self):
+        return "Removes (from CVS) all files with version IDs that are equivalent to a non-versioned file"
     def cmpFile(self, test, file):
         basename = os.path.basename(file)
         return test.makeFileName(basename + "cmp", temporary=1, forComparison=0)

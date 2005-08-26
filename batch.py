@@ -370,6 +370,8 @@ class CollectFiles(plugins.Action):
             print "Collecting batch files created by user", self.userName + "..."
         else:
             print "Collecting batch files locally..."
+    def scriptDoc(self):
+        return "Collect and send all batch reports that have been written to intermediate files"
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()

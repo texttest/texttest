@@ -1292,7 +1292,10 @@ class GraphPlot(plugins.Action):
         if commonPlotter.plotForTest:
             xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, title = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
-            commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, title)
+            try:
+                commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, title)
+            except plugins.TextTestError, e:
+                print e
     
 class TestGraph:
     def __init__(self):
@@ -1388,7 +1391,10 @@ class TestGraph:
             self.gnuplotFile.flush()
             gnuplotProcess = self.findGnuplotProcess()
             self.gnuplotFile.close()
-            print "Created process : gnuplot window :", gnuplotProcess.processId
+            if gnuplotProcess:
+                print "Created process : gnuplot window :", gnuplotProcess.processId
+            else:
+                raise plugins.TextTestError, "Failed to create gnuplot process - errors from gnuplot:\n" + open(errsFile).read() 
             return gnuplotProcess
         else:
             self.gnuplotFile.close()
@@ -1409,7 +1415,7 @@ class TestGraph:
         self.diag.info(line + os.linesep)
     def findGnuplotProcess(self):
         thisProc = plugins.Process(os.getpid())
-        while 1:
+        for attempt in range(10):
             for childProc in thisProc.findChildProcesses():
                 name = childProc.getName()
                 if name.startswith("gnuplot_x11"):

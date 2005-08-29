@@ -56,14 +56,20 @@ def getMajorReleaseId(app):
     return "master"
 
 class CarmenSubmissionRules(queuesystem.SubmissionRules):
+    def __init__(self, optionMap, test, nonTestProcess):
+        queuesystem.SubmissionRules.__init__(self, optionMap, test, nonTestProcess)
+        # Must cache all environment variables, they may not be preserved in queue system thread...
+        self.envPerfCategory = ""
+        if not nonTestProcess and os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
+            self.envPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
     # Return "short", "medium" or "long"
     def getPerformanceCategory(self):
         # RAVE compilations
         if self.nonTestProcess:
             return "short"
         # Hard-coded, useful at boundaries
-        if not self.nonTestProcess and os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
-            return os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
+        if self.envPerfCategory:
+            return self.envPerfCategory
         cpuTime = performance.getTestPerformance(self.test)
         if cpuTime < self.test.getConfigValue("maximum_cputime_for_short_queue"):
             return "short"
@@ -100,7 +106,6 @@ class SgeSubmissionRules(CarmenSubmissionRules):
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]
     def getSubmitSuffix(self, name):
-        resourceList = self.findConcreteResources()
         return name + " queue " + self.findQueueResource() + ", requesting " + string.join(self.findConcreteResources(), ",")
 
 class LsfSubmissionRules(CarmenSubmissionRules):

@@ -10,10 +10,12 @@ plugins.addCategory("bug", "known bugs", "had known bugs")
 class KnownBug(FailedPrediction):
     def __init__(self, bugDesc):
         self.bugStatus = "UNREPORTED"
+        self.diag = plugins.getDiagnostics("known bugs")
         fullBugText = bugDesc
         briefBugText = "unreported bug"
         if self.isNumber(bugDesc):
             fullBugText = os.popen(self.getBugcli() + " -b " + bugDesc).read()
+            self.diag.info("Found bug with text " + fullBugText)
             self.bugStatus = self.findStatus(fullBugText)
             briefBugText = "bug " + bugDesc + " (" + self.bugStatus + ")"
         FailedPrediction.__init__(self, self.findCategory(), briefText=briefBugText, freeText=fullBugText, completed = 1)

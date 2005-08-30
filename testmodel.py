@@ -966,7 +966,10 @@ class Application:
             if file.startswith(currTmpString):
                 previousWriteDir = os.path.join(rootDir, file)
                 print "Removing previous write directory", previousWriteDir
-                shutil.rmtree(previousWriteDir)
+                try:
+                    shutil.rmtree(previousWriteDir)
+                except OSError:
+                    print "Unable to remove previous write directory", previousWriteDir
     def getTmpIdentifier(self):
         return self.name + self.versionSuffix() + globalRunIdentifier
     def ownsFile(self, fileName, unknown = 1):

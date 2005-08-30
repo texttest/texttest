@@ -361,9 +361,9 @@ class CollateFiles(plugins.Action):
     def __call__(self, test):
         if test.state.isComplete():
             return
-	self.collations = self.expandCollations(test, self.collations)
+	testCollations = self.expandCollations(test, self.collations)
         errorWrites = []
-        for targetStem, sourcePattern in self.collations.items():
+        for targetStem, sourcePattern in testCollations.items():
             targetFile = test.makeFileName(targetStem, temporary=1)
             fullpath = self.findPath(test, sourcePattern)
             if fullpath:

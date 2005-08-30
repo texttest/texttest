@@ -143,6 +143,8 @@ class Config(carmen.CarmenConfig):
                 return [ self.getRuleCleanup(), realBuilder ]
         else:
             return None
+    def getRuleSetName(self, test):
+        raise plugins.TextTestError, "Cannot determine ruleset name, need to provide derived configuration to use rule compilation"
     def getRealRuleBuilder(self):
         jobNameCreator = RulesetJobBuildNameCreator(self.getRuleSetName)
         if self.useQueueSystem():
@@ -288,7 +290,11 @@ class CompileRules(plugins.Action):
         return "Compiling rules for"
     def __call__(self, test):
         if self.raveName and (not self.filter or self.filter.acceptsTestCase(test)):
-            return self.compileRulesForTest(test)
+            try:
+                return self.compileRulesForTest(test)
+            except plugins.TextTestError, e:
+                print e
+                return 
         else:
             self.diag.info("Rejecting ruleset compile for " + test.name)
     def compileRulesForTest(self, test):

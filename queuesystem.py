@@ -504,7 +504,10 @@ class UpdateTestStatus(UpdateStatus):
         self.testsWaitingForFiles = {}
     def processStatus(self, test, status, job):
         details = ""
+        jobDone = status == "DONE" or status == "EXIT"
         summary = status
+        if jobDone:
+            summary = "RUN"
         machineStr = ""
         if len(job.machines):
             machineStr = string.join(job.machines, ',')
@@ -515,14 +518,15 @@ class UpdateTestStatus(UpdateStatus):
         if status == "PEND":
             pendState = plugins.TestState("pending", freeText=details, briefText=summary)
             test.changeState(pendState)
-        elif status == "DONE" or status == "EXIT":
-            if test.loadState():
-                self.describe(test, self.getPostText(test))
-            else:
-                return self.handleFileWaiting(test, machineStr)
         else:
-            runState = default.Running(job.machines, freeText=details, briefText=summary)
-            test.changeState(runState)
+            if not jobDone or not test.state.hasStarted():
+                runState = default.Running(job.machines, freeText=details, briefText=summary)
+                test.changeState(runState)
+            if jobDone:
+                if test.loadState():
+                    self.describe(test, self.getPostText(test))
+                else:
+                    return self.handleFileWaiting(test, machineStr)
     def handleFileWaiting(self, test, machineStr):
         if not self.testsWaitingForFiles.has_key(test):
             self.testsWaitingForFiles[test] = 0

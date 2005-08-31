@@ -290,18 +290,20 @@ class CompileRules(plugins.Action):
         return "Compiling rules for"
     def __call__(self, test):
         if self.raveName and (not self.filter or self.filter.acceptsTestCase(test)):
-            try:
-                return self.compileRulesForTest(test)
-            except plugins.TextTestError, e:
-                print e
-                return 
+            return self.compileRulesForTest(test)
         else:
             self.diag.info("Rejecting ruleset compile for " + test.name)
     def compileRulesForTest(self, test):
         arch = carmen.getArchitecture(test.app)
-        ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
-        if not ruleset.isValid():
+        try:
+            ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
+        except plugins.TextTestError, e:
+            # assume problems here are due to compilation itself not being setup, ignore
+            print e
             return
+        
+        if not ruleset.isValid():
+            raise plugins.TextTestError, "Could not compile ruleset '" + ruleset.name + "' : rule source file does not exist"
         jobName = self.jobNameCreator.getName(test)
         if jobName in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name + " already being compiled")

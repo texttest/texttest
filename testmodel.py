@@ -403,6 +403,7 @@ class TestCase(Test):
     def collatePaths(self, configListName, collateMethod):
         for copyTestPath in self.app.getConfigValue(configListName):
             fullPath = self.makePathName(copyTestPath, self.abspath)
+            debugLog.info("Path for linking/copying at " + fullPath)
             target = os.path.join(self.writeDirs[0], copyTestPath)
             dir, localName = os.path.split(target)
             if not os.path.isdir(dir):

@@ -26,8 +26,8 @@ class TestRunner:
             raise sys.exc_type, sys.exc_info
         except:
             print "WARNING : caught exception while running", self.test, "changing state to UNRUNNABLE :"
-            plugins.printException()
-            self.failTest(str(sys.exc_type) + ": " + str(sys.exc_value))
+            exceptionText = plugins.printException()
+            self.failTest(exceptionText)
     def failTest(self, excString):
         self.test.changeState(plugins.TestState("unrunnable", briefText="UNRUNNABLE", freeText=excString, completed=1))
     def performActions(self, previousTestRunner, runToCompletion):

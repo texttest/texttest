@@ -2,6 +2,7 @@
 import os, sys, log4py, string, signal, shutil, time, re, stat
 from types import FileType
 from ndict import seqdict
+from traceback import format_exception
 
 # Generic configuration class
 class Configuration:
@@ -217,9 +218,11 @@ def rmtree(dir, attempts=5):
     print "Something still using write directory", dir, ": leaving it"
 
 def printException():
-    sys.stderr.write("Description of exception thrown :" + "\n")
+    sys.stderr.write("Description of exception thrown :\n")
     type, value, traceback = sys.exc_info()
-    sys.excepthook(type, value, traceback)
+    exceptionString = string.join(format_exception(type, value, traceback), "")
+    sys.stderr.write(exceptionString)
+    return exceptionString
     
 # Need somewhat different formats on Windows/UNIX
 def tmpString():

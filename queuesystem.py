@@ -545,7 +545,9 @@ class UpdateTestStatus(UpdateStatus):
             errStr = open(slaveErrFile).read()
             if errStr:
                 raise plugins.TextTestError, "Slave exited on " + machineStr + " : " + "\n" + errStr
-        raise plugins.TextTestError, "No results produced on " + machineStr + ", presuming problems running test there"
+        job = QueueSystemServer.instance.findJob(test, self.jobNameFunction)
+        raise plugins.TextTestError, "No results produced on " + machineStr + \
+              ", presuming problems running test there. Job ID was " + str(job.jobId)
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
     def getPostText(self, test):

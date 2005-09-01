@@ -34,14 +34,14 @@ class QueueSystem:
         exitStatus = self.exitStatus(jobId)
         if exitStatus is None:
             return ""
-        terminatingSignal = exitStatus & 0x7f
-        cpuSignals = [ signal.SIGXCPU, 24, 30, 33 ]
-        realSignals = [ signal.SIGUSR1, 10, 16 ]
-        if terminatingSignal in cpuSignals:
-            return "cpu"
-        if terminatingSignal in realSignals:
-            return "real"
-        if terminatingSignal > 0:
+        if exitStatus > 128:
+            terminatingSignal = exitStatus - 128
+            cpuSignals = [ signal.SIGXCPU, 24, 30, 33 ]
+            realSignals = [ signal.SIGUSR1, 10, 16 ]
+            if terminatingSignal in cpuSignals:
+                return "cpu"
+            if terminatingSignal in realSignals:
+                return "real"
             return "killed with signal " + str(terminatingSignal)
         return ""
     def killJob(self, jobId):

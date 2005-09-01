@@ -35,9 +35,11 @@ class QueueSystem:
         if exitStatus is None:
             return ""
         terminatingSignal = exitStatus & 0x7f
-        if terminatingSignal == signal.SIGXCPU:
+        cpuSignals = [ signal.SIGXCPU, 24, 30, 33 ]
+        realSignals = [ signal.SIGUSR1, 10, 16 ]
+        if terminatingSignal in cpuSignals:
             return "cpu"
-        if terminatingSignal == signal.SIGUSR1:
+        if terminatingSignal in realSignals:
             return "real"
         return ""
     def killJob(self, jobId):

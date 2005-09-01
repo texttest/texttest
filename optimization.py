@@ -189,6 +189,8 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods)
         app.setConfigDefault("cvs_log_for_files", "")
         app.setConfigDefault("kpi_cost_margin", 0.0)
+        app.setConfigDefault("testoverview_repository", "")
+        app.setConfigDefault("testoverview_pages", "")
         app.addConfigEntry("definition_file_stems", "raveparameters")
 
 class MakeTmpSubPlan(plugins.Action):

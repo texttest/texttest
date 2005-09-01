@@ -263,7 +263,7 @@ class QueueSystemServer:
             return "Test hit " + name + "'s total run time limit, and was killed." + "\n" + \
                    "Maybe it was hanging or maybe it needs to be run in another queue."
         else:
-            return "Test exceeded limit " + exceededLimit
+            return "Test " + exceededLimit
     def killJob(self, test, jobNameFunction):
         job = self.findJob(test, jobNameFunction)
         queueSystem = self.getQueueSystem(test)

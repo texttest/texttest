@@ -41,6 +41,8 @@ class QueueSystem:
             return "cpu"
         if terminatingSignal in realSignals:
             return "real"
+        if terminatingSignal > 0:
+            return "killed with signal " + str(terminatingSignal)
         return ""
     def killJob(self, jobId):
         os.system("qdel " + jobId + " > /dev/null 2>&1")

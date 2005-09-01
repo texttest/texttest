@@ -303,7 +303,10 @@ class CompileRules(plugins.Action):
             return
         
         if not ruleset.isValid():
-            raise plugins.TextTestError, "Could not compile ruleset '" + ruleset.name + "' : rule source file does not exist"
+            if os.environ.has_key("ALLOW_INVALID_RULESETS"):
+                return
+            else:
+                raise plugins.TextTestError, "Could not compile ruleset '" + ruleset.name + "' : rule source file does not exist"
         jobName = self.jobNameCreator.getName(test)
         if jobName in self.rulesCompiled:
             self.describe(test, " - ruleset " + ruleset.name + " already being compiled")

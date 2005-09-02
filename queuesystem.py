@@ -62,7 +62,7 @@ def getConfig(optionMap):
 emergencyFinish = 0
 
 def tenMinutesToGo(signal, stackFrame):
-    print "Received signal for termination in 10 minutes, killing all remaining jobs"
+    print "Received SIGUSR2 signal for termination, killing all remaining tests..."
     sys.stdout.flush() # Try not to lose log file information...
     global emergencyFinish
     emergencyFinish = 1
@@ -371,18 +371,13 @@ class SubmitTest(plugins.Action):
         testCommand = self.getExecuteCommand(test)
         return self.runCommand(test, testCommand, None, copyEnv=0)
     def getExecuteCommand(self, test):
+        # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
+        # it comes to noticing extra shells
         tmpDir, local = os.path.split(test.app.writeDirectory)
-        slaveLog = test.makeFileName("slavelog", temporary=1, forComparison=0)
-        slaveErrs = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
-        commandLine = "python " + sys.argv[0] + " -d " + test.app.abspath + " -a " + test.app.name + test.app.versionSuffix() \
+        commandLine = "exec python " + sys.argv[0] + " -d " + test.app.abspath + " -a " + test.app.name + test.app.versionSuffix() \
                       + " -c " + test.app.checkout + " -tp " + test.getRelPath() + " -slave " + test.getTmpExtension() \
-                      + " -tmp " + tmpDir + " " + self.runOptions + " > " + slaveLog
-        # C-shell based shells have different syntax here...
-        if self.loginShell.find("csh") != -1:
-            commandLine = "( " + commandLine + " ) >& " + slaveErrs
-        else:
-            commandLine += " 2> " + slaveErrs
-        return self.loginShell + " -c \"" + commandLine + "\""
+                      + " -tmp " + tmpDir + " " + self.runOptions
+        return "exec " + self.loginShell + " -c \"" + commandLine + "\""
     def runCommand(self, test, command, jobNameFunction = None, copyEnv = 1):
         submissionRules = self.submitRuleFunction(test, jobNameFunction)
         self.describe(test, jobNameFunction, submissionRules)
@@ -543,7 +538,7 @@ class UpdateTestStatus(UpdateStatus):
         slaveErrFile = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
         if os.path.isfile(slaveErrFile):
             errStr = open(slaveErrFile).read()
-            if errStr:
+            if errStr and errStr.find("Traceback") != -1:
                 raise plugins.TextTestError, "Slave exited on " + machineStr + " : " + "\n" + errStr
         job = QueueSystemServer.instance.findJob(test, self.jobNameFunction)
         raise plugins.TextTestError, "No results produced on " + machineStr + \

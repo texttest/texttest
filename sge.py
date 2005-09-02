@@ -22,7 +22,7 @@ class QueueSystem:
         resource = self.getResourceArg(submissionRules)
         if len(resource):
             qsubArgs += " -l " + resource
-        qsubArgs += " -w e -m n -cwd -b y -V -o /dev/null -e /dev/null"
+        qsubArgs += " -w e -notify -m n -cwd -b y -V -o framework_tmp/slavelog -e framework_tmp/slaveerrs"
         return "qsub " + qsubArgs
     def findSubmitError(self, stderr):
         errLines = stderr.readlines()
@@ -164,8 +164,6 @@ class QueueSystem:
                 continue
             job = self.activeJobs[jobId]
             status = self.getStatus(words[4], states, jobId)
-            if job.status == "PEND" and status == "PEND" and words[4] == "t" and len(words) >= 6:
-                self.setJobHost(job, words[7])
             if job.status == "PEND" and status != "PEND" and len(words) >= 6:
                 self.setJobHost(job, words[7])
             job.status = status
@@ -211,7 +209,7 @@ class MachineInfo:
         jobs = []
         fieldInfo = 0
         user = ""
-        for line in os.popen("qstat -r -s r -l hostname ='" + machine + "'").xreadlines():
+        for line in os.popen("qstat -r -s r -l hostname='" + machine + "'").xreadlines():
             if line.startswith("job") or line.startswith("----"):
                 fieldInfo = 1
                 continue

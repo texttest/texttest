@@ -418,7 +418,7 @@ class UpdateRulesetBuildStatus(queuesystem.UpdateStatus):
                 self.ruleCompilations.append(self.jobNameFunction(test))
                 test.changeState(plugins.TestState("not_started", "Ruleset " + ruleset + " succesfully compiled"))
         except queuesystem.QueueSystemLostJob:
-            self.raiseFailureWithError(ruleset, "Queue system lost the job")
+            self.raiseFailureWithError(ruleset, "Queue system lost the job : id " + str(job.jobId))
             
     def raiseFailure(self, test, ruleset, machineStr):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)

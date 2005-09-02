@@ -86,7 +86,7 @@ class QueueSystem:
         if self.jobExitStatusCache.has_key(job.jobId):
             status = self.jobExitStatusCache[job.jobId]
             if status is None:
-                raise queuesystem.QueueSystemLostJob, "SGE already lost job:" + job.jobId
+                raise QueueSystemLostJob, "SGE already lost job:" + job.jobId
         trials = 10
         sleepTime = 0.5
         while trials > 0:

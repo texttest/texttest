@@ -134,7 +134,7 @@ class GenererateTestStatus(plugins.Action):
     def getTestIdentifier(self, dir):
         return string.join(dir.split(os.sep)[len(self.testStateRepository.split(os.sep)) + 2:])
     def generateTable(self, majorVersion, version, loggedTests, tagsFound):
-        tagsFound.sort() # Should really sort on date instead of alphabetic order.
+        tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
         
         t = HTMLgen.TableLite(border=2, cellpadding=4, cellspacing=1,width="100%")
         t.append(self.generateTableHead(majorVersion, version, tagsFound))
@@ -270,3 +270,5 @@ class GenererateTestStatus(plugins.Action):
             return name
         else:
             return os.path.join(self.pageDir, name)
+    def getTagTimeInSeconds(self, tag):
+        return time.mktime(time.strptime(tag, "%d%b%Y"))

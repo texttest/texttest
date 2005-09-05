@@ -540,7 +540,10 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
     def makeLinks(self, test, apcTmpDir):
         sourceName = os.path.join(test.writeDirs[1], "run_status_head")
         targetName = os.path.join(test.writeDirs[0], "run_status_head")
-        os.symlink(sourceName, targetName)
+        try:
+            os.symlink(sourceName, targetName)
+        except OSError:
+            print "Failed to create run_status_head link"
         viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
         file = open(viewLogScript, "w")
         logFileName = os.path.join(apcTmpDir, "apclog")

@@ -218,6 +218,29 @@ class SubmissionRules:
         # If we haven't got a log_file yet, we should do this so we collect performance reliably
         logFile = self.test.makeFileName(self.test.getConfigValue("log_file"))
         return not os.path.isfile(logFile)
+
+class PollThread(Thread):
+    def __init__(self, polledAction):
+        Thread.__init__(self)
+        self.polledAction = polledAction
+        self.setDaemon(1)
+        self.diag = plugins.getDiagnostics("Polling")
+    def run(self):
+        totalTime = self.totalTime()
+        while 1:
+            self.polledAction()
+            newTotalTime = self.totalTime()
+            sleepTime = (newTotalTime - totalTime) * 10
+            if sleepTime == 0.0:
+                sleepTime = 0.1
+            self.diag.info("Sleeping for " + str(sleepTime) + " seconds")
+            # We must sleep for a bit, or we use the whole CPU (busy-wait)
+            sleep(sleepTime)
+            totalTime = newTotalTime
+    def totalTime(self):
+        userTime, sysTime, childUserTime, childSysTime, realTime = os.times()
+        self.diag.info("Times: " + str(userTime) + " " + str(sysTime) + " " + str(childUserTime) + str(childSysTime))
+        return userTime + sysTime + childUserTime + childSysTime
     
 class QueueSystemServer:
     instance = None
@@ -226,11 +249,14 @@ class QueueSystemServer:
         self.submissionQueue = Queue()
         self.allJobs = {}
         self.queueSystems = {}
-        self.diag = plugins.getDiagnostics("Queue System Thread")
+        self.submitDiag = plugins.getDiagnostics("Queue System Submit Thread")
+        self.updateDiag = plugins.getDiagnostics("Queue System Thread")
         QueueSystemServer.instance = self
-        self.queueThread = Thread(target=self.runQueueThread)
-        self.queueThread.setDaemon(1)
-        self.queueThread.start()
+        self.submitThread = Thread(target=self.runSubmitThread)
+        self.submitThread.setDaemon(1)
+        self.submitThread.start()
+        self.updateThread = PollThread(self.updateJobs)
+        self.updateThread.start()        
     def getJobName(self, test, jobNameFunction):
         jobName = repr(test.app).replace(" ", "_") + test.app.versionSuffix() + test.getRelPath()
         if jobNameFunction:
@@ -256,44 +282,35 @@ class QueueSystemServer:
         job = self.findJob(test, jobNameFunction)
         queueSystem = self.getQueueSystem(test)
         return queueSystem.killJob(job.jobId)
-    def runQueueThread(self):
+    def runSubmitThread(self):
+        # only update if there is nothing to submit...
         while 1:
-            # Submit at most 5 jobs, then do an update
-            self.diag.info("Creating jobs at " + plugins.localtime())
-            try:
-                for i in range(5):
-                    self.createJobFromQueue()
-            except Empty:
-                pass
-
-            self.diag.info("Updating jobs at " + plugins.localtime())
-            self.updateJobs()
-            # We must sleep for a bit, or we use the whole CPU (busy-wait)
-            sleep(3)
+            self.submitDiag.info("Creating job at " + plugins.localtime())
+            self.createJobFromQueue()
     def getEnvironmentString(self, envDict):
         envStr = "env -i "
         for key, value in envDict.items():
             envStr += "'" + key + "=" + value + "' "
         return envStr
     def createJobFromQueue(self):
-        jobName, submissionRules, command, envCopy = self.submissionQueue.get_nowait()
+        jobName, submissionRules, command, envCopy = self.submissionQueue.get()
         queueSystem = self.getQueueSystem(submissionRules.test)
         envString = self.envString
         if envCopy:
             envString = self.getEnvironmentString(envCopy)
         submitCommand = queueSystem.getSubmitCommand(jobName, submissionRules)
         fullCommand = envString + submitCommand + " '" + command + "'"
-        self.diag.info("Creating job " + jobName + " with command : " + fullCommand)
+        self.submitDiag.info("Creating job " + jobName + " with command : " + fullCommand)
         # Change directory to the appropriate test dir
         os.chdir(submissionRules.test.writeDirs[0])
         stdin, stdout, stderr = os.popen3(fullCommand)
         errorMessage = queueSystem.findSubmitError(stderr)
         if errorMessage:
             self.allJobs[jobName] = QueueSystemJob("submit_failed", errorMessage)
-            self.diag.info("Job not created : " + errorMessage)
+            self.submitDiag.info("Job not created : " + errorMessage)
         else:
             jobId = queueSystem.findJobId(stdout)
-            self.diag.info("Job created with id " + jobId)
+            self.submitDiag.info("Job created with id " + jobId)
             job = QueueSystemJob(jobId)
             queueSystem.activeJobs[jobId] = job
             self.allJobs[jobName] = job
@@ -313,6 +330,7 @@ class QueueSystemServer:
                 return errorMessage
         return ""
     def updateJobs(self):
+        self.updateDiag.info("Updating jobs at " + plugins.localtime())
         for system in self.queueSystems.values():
             if len(system.activeJobs):
                 system.updateJobs()

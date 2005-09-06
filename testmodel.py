@@ -239,6 +239,11 @@ class TestCase(Test):
             self.properties.addEntry("jusecase", {}, insert=1)
         if os.path.isfile(self.useCaseFile):
             self.setReplayEnvironment()
+        # For self testing
+        slaveUseCase = self.makeFileName("slave_usecase")
+        if os.path.isfile(slaveUseCase):
+            self.environment["SLAVE_USECASE_REPLAY_SCRIPT"] = slaveUseCase
+            self.environment["SLAVE_USECASE_RECORD_SCRIPT"] = self.makeFileName("slave_usecase", temporary=1)
     def useJavaRecorder(self):
         return self.app.getConfigValue("use_case_recorder") == "jusecase"
     # Here we assume the application uses either PyUseCase or JUseCase
@@ -970,7 +975,8 @@ class Application:
                 try:
                     shutil.rmtree(previousWriteDir)
                 except OSError:
-                    print "Unable to remove previous write directory", previousWriteDir
+                    print "Unable to remove previous write directory", previousWriteDir, ":"
+                    plugins.printException()
     def getTmpIdentifier(self):
         return self.name + self.versionSuffix() + globalRunIdentifier
     def ownsFile(self, fileName, unknown = 1):

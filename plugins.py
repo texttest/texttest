@@ -1,5 +1,22 @@
 
-import os, sys, log4py, string, signal, shutil, time, re, stat
+import signal, sys
+
+emergencySignal = 0
+# imperative to install signal handlers as soon as possible...
+def handleEmergencySignal(signal, stackFrame):
+    print "Received signal for termination, killing all remaining tests..."
+    sys.stdout.flush() # Try not to lose log file information...
+    global emergencySignal
+    emergencySignal = signal
+
+try:
+    signal.signal(signal.SIGUSR1, handleEmergencySignal)
+    signal.signal(signal.SIGUSR2, handleEmergencySignal)
+    signal.signal(signal.SIGXCPU, handleEmergencySignal)
+except AttributeError:
+    pass
+
+import os, log4py, string, shutil, time, re, stat
 from types import FileType
 from ndict import seqdict
 from traceback import format_exception
@@ -154,8 +171,8 @@ def abspath(relpath):
         return os.path.abspath(relpath)
 
 # Useful utility...
-def localtime():
-    return time.strftime("%d%b%H:%M:%S", time.localtime())
+def localtime(format="%d%b%H:%M:%S"):
+    return time.strftime(format, time.localtime())
 
 def nullRedirect():
     if os.name == "posix":  

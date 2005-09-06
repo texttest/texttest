@@ -25,17 +25,12 @@ class QueueSystem:
             if errorMessage and errorMessage.find("still trying") == -1:
                 return errorMessage
         return ""
-    def findExceededLimit(self, jobId):
-        for line in os.popen("bjobs -a -l " + jobId).readlines():
-            if line.find("signal 24") != -1:
-                return "cpu"
-            if line.find("exit code 140") != -1:
-                return "real"
-        return ""
+    def getJobFailureInfo(self, jobId):
+        return os.popen("bjobs -a -l " + jobId).read()
     def exitedWithError(self, job):
         return job.status == "EXIT"
     def killJob(self, jobId):
-        os.system("bkill " + jobId + " > /dev/null 2>&1")
+        os.system("bkill -s USR2 " + jobId + " > /dev/null 2>&1")
     def getJobId(self, line):
         word = line.split()[1]
         return word[1:-1]

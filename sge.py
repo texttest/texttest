@@ -30,20 +30,8 @@ class QueueSystem:
             return errLines[0].strip()
         else:
             return ""
-    def findExceededLimit(self, jobId):
-        exitStatus = self.exitStatus(jobId)
-        if exitStatus is None:
-            return ""
-        if exitStatus > 128:
-            terminatingSignal = exitStatus - 128
-            cpuSignals = [ signal.SIGXCPU, 24, 30, 33 ]
-            realSignals = [ signal.SIGUSR1, 10, 16 ]
-            if terminatingSignal in cpuSignals:
-                return "cpu"
-            if terminatingSignal in realSignals:
-                return "real"
-            return "killed with signal " + str(terminatingSignal)
-        return ""
+    def getJobFailureInfo(self, jobId):
+        return string.join(self.getAccounting(jobId))
     def killJob(self, jobId):
         os.system("qdel " + jobId + " > /dev/null 2>&1")
     def getJobId(self, line):
@@ -83,30 +71,18 @@ class QueueSystem:
         else:
             return sgeStat
     def exitedWithError(self, job):
-        if self.jobExitStatusCache.has_key(job.jobId):
-            status = self.jobExitStatusCache[job.jobId]
-            if status is None:
-                raise QueueSystemLostJob, "SGE already lost job:" + job.jobId
-        trials = 10
-        sleepTime = 0.5
-        while trials > 0:
-            exitStatus = self.exitStatus(job.jobId)
-            if not exitStatus is None:
-                return exitStatus > 0
-            sleep(sleepTime)
-            if sleepTime < 5:
-                sleepTime *= 2
-            trials -= 1
-        self.jobExitStatusCache[job.jobId] = None
-        raise QueueSystemLostJob, "SGE lost job:" + job.jobId
+        return self.exitStatus(job.jobId) > 0
     def exitStatus(self, jobId):
         if self.jobExitStatusCache.has_key(jobId):
-            return self.jobExitStatusCache[jobId]
-        errMsg, lines = self.getAccounting(jobId)
-        if len(errMsg):
-            # assume this is because the job hasn't propagated yet, wait a bit
-            return None
-        exitStatus = 1
+            status = self.jobExitStatusCache[jobId]
+            if status is None:
+                raise QueueSystemLostJob, "SGE already lost job:" + jobId
+        try:
+            lines = self.getAccounting(jobId)
+        except QueueSystemLostJob:
+            self.jobExitStatusCache[jobId] = None
+            raise
+        exitStatus = None
         for line in lines:
             if line.startswith("exit_status"):
                 exitStatus = int(line.strip().split()[-1])
@@ -114,6 +90,20 @@ class QueueSystem:
         self.jobExitStatusCache[jobId] = exitStatus
         return exitStatus
     def getAccounting(self, jobId):
+        trials = 10
+        sleepTime = 0.5
+        while trials > 0:
+            errMsg, lines = self.tryGetAccounting(jobId)
+            if len(errMsg) == 0:
+                return lines
+            # assume errMsg is because the job hasn't propagated yet, wait a bit
+            sleep(sleepTime)
+            if sleepTime < 5:
+                sleepTime *= 2
+            trials -= 1
+        # SGE has lost the job
+        raise QueueSystemLostJob, "SGE lost job:" + jobId
+    def tryGetAccounting(self, jobId):
         errMsg, lines, found = self.getAccountingInfo(jobId, "")
         logNum = 0
         while found == 0:

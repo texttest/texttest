@@ -59,21 +59,8 @@ helpOptions = """
 def getConfig(optionMap):
     return QueueSystemConfig(optionMap)
 
-emergencyFinish = 0
-
-def tenMinutesToGo(signal, stackFrame):
-    print "Received SIGUSR2 signal for termination, killing all remaining tests..."
-    sys.stdout.flush() # Try not to lose log file information...
-    global emergencyFinish
-    emergencyFinish = 1
-
 def queueSystemName(app):
     return app.getConfigValue("queue_system_module")
-
-try:
-    signal.signal(signal.SIGUSR2, tenMinutesToGo)
-except AttributeError:
-    print "WARNING: operating system does not have SIGUSR2 - queuesystem module may not work too well..."
 
 # Exception to throw if job got lost, typical SGE SNAFU behaviour
 class QueueSystemLostJob(RuntimeError):
@@ -85,9 +72,21 @@ class RunTestInSlave(unixonly.RunTest):
         command = self.getExecuteCommand(test)
         self.describe(test)
         self.diag.info("Running test with command '" + command + "'")
-        os.system(command)
-        # No process remains...
         self.changeToRunningState(test, None)
+        os.system(command)
+        if plugins.emergencySignal:
+            briefText, freeText = self.getKillText(plugins.emergencySignal)
+            test.changeState(plugins.TestState("killed", completed=1, briefText=briefText, freeText=freeText))
+    def getKillText(self, sig):
+        if sig == signal.SIGUSR1:
+            return "RUNLIMIT", "Test exceeded queue system's maximum wallclock time allowed"
+        elif sig == signal.SIGXCPU:
+            return "CPULIMIT", "Test exceeded queue system's maximum cpu time allowed"
+        elif sig == signal.SIGUSR2:
+            timeStr = plugins.localtime("%H:%M")
+            return "killed at " + timeStr, "Test killed explicitly at " + timeStr
+        else:
+            return "signal " + str(sig), "Terminated by signal " + str(sig)
     def setUpVirtualDisplay(self, app):
         # Assume the master sets DISPLAY for us
         pass
@@ -249,21 +248,10 @@ class QueueSystemServer:
             return self.allJobs[jobName]
         else:
             return QueueSystemJob()
-    def findJobLimitMessage(self, test, jobNameFunction):
+    def getJobFailureInfo(self, test, jobNameFunction):
         job = self.findJob(test, jobNameFunction)
         queueSystem = self.getQueueSystem(test)
-        exceededLimit = queueSystem.findExceededLimit(job.jobId)
-        if not exceededLimit:
-            return ""
-        name = queueSystemName(test)
-        if exceededLimit == "cpu":
-            return "Test hit " + name + "'s CPU time limit, and was killed." + "\n" + \
-                   "Maybe it went into an infinite loop or maybe it needs to be run in another queue."
-        elif exceededLimit == "real":
-            return "Test hit " + name + "'s total run time limit, and was killed." + "\n" + \
-                   "Maybe it was hanging or maybe it needs to be run in another queue."
-        else:
-            return "Test " + exceededLimit
+        return queueSystem.getJobFailureInfo(job.jobId)
     def killJob(self, test, jobNameFunction):
         job = self.findJob(test, jobNameFunction)
         queueSystem = self.getQueueSystem(test)
@@ -360,14 +348,13 @@ class SubmitTest(plugins.Action):
     def __repr__(self):
         return "Submitting"
     def __call__(self, test):
-        if test.state.isComplete():
-            return
-        
-        global emergencyFinish
-        if emergencyFinish:
+        if plugins.emergencySignal:
             raise plugins.TextTestError, "Preprocessing not complete by " + \
                   queueSystemName(test.app) + " termination time"
 
+        if test.state.isComplete():
+            return
+        
         testCommand = self.getExecuteCommand(test)
         return self.runCommand(test, testCommand, None, copyEnv=0)
     def getExecuteCommand(self, test):
@@ -402,6 +389,14 @@ class SubmitTest(plugins.Action):
         if self.optionMap.has_key("keeptmp"):
             runOptions.append("-keeptmp")
         return string.join(runOptions)
+    def setUpDisplay(self, app):
+        finder = unixonly.VirtualDisplayFinder(app)
+        display = finder.getDisplay()
+        if display:
+            self.origEnv["DISPLAY"] = display
+            print "Tests will run with DISPLAY variable set to", display
+            # If we are running with a virtual display, make sure the server knows that...
+            self.tryStartServer()
     def findRunGroup(self, app):
         for group in app.optionGroups:
             if group.name.startswith("How"):
@@ -421,15 +416,23 @@ class SubmitTest(plugins.Action):
         app.checkBinaryExists()
         if os.environ.has_key("TEXTTEST_DIAGDIR"):
             self.origEnv["TEXTTEST_DIAGDIR"] = os.path.join(os.getenv("TEXTTEST_DIAGDIR"), "slave")
-        finder = unixonly.VirtualDisplayFinder(app)
-        display = finder.getDisplay()
-        if display:
-            self.origEnv["DISPLAY"] = display
-            print "Tests will run with DISPLAY variable set to", display
-            # If we are running with a virtual display, make sure the server knows that...
-            self.tryStartServer()
+        self.setUpDisplay(app)
+        self.setUpScriptEngine()
         self.runOptions = self.setRunOptions(app)
         self.loginShell = app.getConfigValue("login_shell")
+    def setUpScriptEngine(self):
+        # For self-testing: make sure the slave doesn't read the master use cases.
+        # If it reads anything, it should read its own. Check for "SLAVE_" versions of the variables,
+        # set them to the real values
+        variables = [ "USECASE_RECORD_STDIN", "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]
+        for var in variables:
+            self.setUpUseCase(var)
+    def setUpUseCase(self, var):
+        slaveVar = "SLAVE_" + var
+        if os.environ.has_key(slaveVar):
+            self.origEnv[var] = os.environ[slaveVar]
+        elif os.environ.has_key(var):
+            del self.origEnv[var]    
         
 class KillTest(plugins.Action):
     jobsKilled = []
@@ -438,7 +441,7 @@ class KillTest(plugins.Action):
         # Don't double-kill jobs, it can cause problems and indeterminism
     def __repr__(self):
         return "Cancelling"
-    def __call__(self, test):
+    def __call__(self, test, postText=""):
         if test.state.isComplete() or not QueueSystemServer.instance:
             return
         job = QueueSystemServer.instance.findJob(test, self.jobNameFunction)
@@ -446,20 +449,19 @@ class KillTest(plugins.Action):
             return
         name = queueSystemName(test.app)
         if self.jobNameFunction:
-            print test.getIndent() + repr(self), self.jobNameFunction(test), "in " + name
+            print test.getIndent() + repr(self), self.jobNameFunction(test), "in " + name + postText
         else:
-            self.describe(test, " in " + name)
+            self.describe(test, " in " + name + postText)
         self.jobsKilled.append(job.jobId)
         QueueSystemServer.instance.killJob(test, self.jobNameFunction)
         
-plugins.addCategory("killed", "unfinished", "were unfinished")
+plugins.addCategory("killed", "killed", "were killed by the queue system")
 
 class UpdateStatus(plugins.Action):
     def __init__(self, jobNameFunction = None):
         self.jobNameFunction = jobNameFunction
         self.diag = plugins.getDiagnostics("Queue Status")
-    def __repr__(self):
-        return "Killing"
+        self.killer = KillTest(self.jobNameFunction)
     def __call__(self, test):
         if test.state.isComplete():
             return
@@ -474,21 +476,14 @@ class UpdateStatus(plugins.Action):
         if jobStatus == "DONE" or jobStatus == "EXIT":
             return exitStatus
 
-        global emergencyFinish
-        if emergencyFinish:
-            postText = "(Emergency finish of job " + str(job.jobId) + ")" 
-            if self.jobNameFunction:
-                print test.getIndent() + "Killing", self.jobNameFunction(test), postText
-            else:
-                print test.getIndent() + "Killing", repr(test), postText
-                test.changeState(plugins.TestState("killed", completed=1))
-            QueueSystemServer.instance.killJob(test, self.jobNameFunction)
-            return
+        if plugins.emergencySignal:
+            postText = " (Emergency finish of job " + str(job.jobId) + ")" 
+            self.killer(test, postText)
         return self.WAIT | self.RETRY
     def processStatus(self, test, status, job):
         pass
     def getCleanUpAction(self):
-        return KillTest(self.jobNameFunction)
+        return self.killer
 
 class UpdateTestStatus(UpdateStatus):
     def __repr__(self):
@@ -526,23 +521,24 @@ class UpdateTestStatus(UpdateStatus):
         if not self.testsWaitingForFiles.has_key(test):
             self.testsWaitingForFiles[test] = 0
         if self.testsWaitingForFiles[test] > 10:
-            return self.slaveFailed(test, machineStr)
+            failReason, fullText = self.getSlaveFailure(test)
+            failReason += " on " + machineStr
+            fullText = failReason + "\n" + fullText
+            return test.changeState(plugins.TestState("unrunnable", briefText=failReason, \
+                                                      freeText=fullText, completed=1))
 
         self.testsWaitingForFiles[test] += 1
         self.describe(test, " : results not yet available, file system wait time " + str(self.testsWaitingForFiles[test]))
         return self.WAIT | self.RETRY
-    def slaveFailed(self, test, machineStr):
-        limitMessage = QueueSystemServer.instance.findJobLimitMessage(test, self.jobNameFunction)
-        if limitMessage:
-            raise plugins.TextTestError, limitMessage + "\n"
+    def getSlaveFailure(self, test):
         slaveErrFile = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
         if os.path.isfile(slaveErrFile):
             errStr = open(slaveErrFile).read()
             if errStr and errStr.find("Traceback") != -1:
-                raise plugins.TextTestError, "Slave exited on " + machineStr + " : " + "\n" + errStr
-        job = QueueSystemServer.instance.findJob(test, self.jobNameFunction)
-        raise plugins.TextTestError, "No results produced on " + machineStr + \
-              ", presuming problems running test there. Job ID was " + str(job.jobId)
+                return "Slave exited", errStr
+        name = queueSystemName(test.app)
+        return name + "/system error", "Full accounting info from " + name + " follows:\n" + \
+               QueueSystemServer.instance.getJobFailureInfo(test, self.jobNameFunction)
     def setUpApplication(self, app):
         self.logFile = app.getConfigValue("log_file")
     def getPostText(self, test):

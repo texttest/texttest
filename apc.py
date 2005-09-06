@@ -182,8 +182,8 @@ class ApcConfig(optimization.OptimizationConfig):
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
-    def printHelpOptions(self, builtInOptions):
-        optimization.OptimizationConfig.printHelpOptions(self, builtInOptions)
+    def printHelpOptions(self):
+        optimization.OptimizationConfig.printHelpOptions(self)
         print helpOptions
     def printHelpScripts(self):
         optimization.OptimizationConfig.printHelpScripts(self)

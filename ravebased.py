@@ -186,8 +186,8 @@ class Config(carmen.CarmenConfig):
         # Detect TextTest APC jobs and XPRESS tests
         parts = jobName.split(os.sep)
         return parts[0].find("APC") != -1 or parts[0].find("MpsSolver") != -1
-    def printHelpOptions(self, builtInOptions):
-        carmen.CarmenConfig.printHelpOptions(self, builtInOptions)
+    def printHelpOptions(self):
+        carmen.CarmenConfig.printHelpOptions(self)
         print helpOptions
     def printHelpScripts(self):
         carmen.CarmenConfig.printHelpScripts(self)

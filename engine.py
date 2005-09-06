@@ -404,7 +404,7 @@ class TextTest:
                     print testmodel.helpIntro
                     print "TextTest didn't find any valid test applications - you probably need to tell it where to find them."
                     print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
-                    print "If this makes no sense, read the user guide..."
+                    print "If this makes no sense, read the online documentation..."
                 return
             self._run()
         except KeyboardInterrupt:

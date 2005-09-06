@@ -6,56 +6,6 @@ from threading import Thread
 from time import sleep
 from copy import copy, deepcopy
 
-# Text only relevant to using the parallel configuration directly
-helpDescription = """
-The queue system configuration is designed to run on a UNIX system with some queuing/load balancing
-software installed. This enables tests to be run in parallel on multiple machines across a network.
-
-This is a generic configuration for all such software. The products LSF from Platform Computing,
-and Sun Grid Engine are supported via the corresponding modules.
-"""
-
-# Text for use by derived configurations as well
-queueGeneral = """
-When all tests have been submitted to the queueing system, the configuration will
-then wait for each test, and provide comparison when each has finished.
-
-It also generates performance checking in a similar way to the unix module. As well as
-the CPU time needed by performance.py, it will report the real time and any jobs which
-are currently running on the other processors of the execution machine, if it has others.
-These have been found to be capable of interfering with the performance of the job.
-
-The environment variables QUEUE_SYSTEM_RESOURCE and QUEUE_SYSTEM_PROCESSES can be used to
-turn on queue system functionality for particular parts of the test suite. The first will
-always ensure that a queue system resource is specified
-(equivalent to -R command line in LSF or -l in SGE), while the second will ensure that
-the queueing system makes a request for that number of processes. A single number is a
-precise limit, while min,max can specify a range.
-"""
-
-batchInfo = """
-             Note that it can be useful to send the whole TextTest run to the queue system in batch mode, using LSF's termination
-             time feature. If this is done, LSF will send TextTest a signal 10 minutes before the termination time,
-             which allows TextTest to kill all remaining jobs and report them as unfinished in its report."""
-
-helpOptions = """
--l         - run in local mode. This means that the framework will not use the queue system, but
-             will behave as if the default configuration was being used, and run on the local machine.
-
--q <queue> - run in named queue
-
--r <limits>- run tests subject to the time limits (in minutes) represented by <limits>. If this is a single limit
-             it will be interpreted as a minimum. If it is two comma-separated values, these are interpreted as
-             <minimum>,<maximum>. Empty strings are treated as no limit.
-
--R <resrc> - Use the queue system resource <resrc>. This is essentially forwarded to LSF's bsub command or SGE's qsub command, so for a full
-             list of its capabilities, consult the queue system manual. In LSF, it is particularly useful to use this
-             to force a test to go to certain machines, using -R "hname == <hostname>", or to avoid similar machines
-             using -R "hname != <hostname>"
-
--perf      - Force execution on the performance test machines. These are the machines listed in the config file list entry "performance_test_machine".
-""" + batch.helpOptions             
-
 def getConfig(optionMap):
     return QueueSystemConfig(optionMap)
 
@@ -143,10 +93,8 @@ class QueueSystemConfig(default.Config):
     def isSlowdownJob(self, jobUser, jobName):
         return 0
     def printHelpDescription(self):
-        print helpDescription, queueGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription 
-    def printHelpOptions(self, builtInOptions):
-        print helpOptions + batchInfo
-        default.Config.printHelpOptions(self, builtInOptions)
+        print """The queuesystem configuration is a published configuration, 
+               documented online at http://www.texttest.org/TextTest/docs/queuesystem"""
     def setApplicationDefaults(self, app):
         default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("default_queue", "texttest_default", "Which queue to submit tests to by default")
@@ -283,7 +231,6 @@ class QueueSystemServer:
         queueSystem = self.getQueueSystem(test)
         return queueSystem.killJob(job.jobId)
     def runSubmitThread(self):
-        # only update if there is nothing to submit...
         while 1:
             self.submitDiag.info("Creating job at " + plugins.localtime())
             self.createJobFromQueue()

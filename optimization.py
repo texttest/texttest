@@ -177,8 +177,8 @@ class OptimizationConfig(ravebased.Config):
     def printHelpDescription(self):
         print helpDescription
         ravebased.Config.printHelpDescription(self)
-    def printHelpOptions(self, builtInOptions):
-        ravebased.Config.printHelpOptions(self, builtInOptions)
+    def printHelpOptions(self):
+        ravebased.Config.printHelpOptions(self)
         print helpOptions
     def printHelpScripts(self):
         ravebased.Config.printHelpScripts(self)

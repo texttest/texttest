@@ -2,58 +2,6 @@
 
 import os, comparetest, string, plugins
 
-helpDescription = """
-Performance analysis makes use of files containing a single line, which
-looks like:
-CPU time :     30.31 sec. on apple
-where "apple" is some host name.
-
-Instead of the default file comparison described below, these files are evaluated
-as follows. First, the execution machine (apple) is looked for in the config file
-list entry called "performance_test_machine". If our execution machine is not in
-this list, performance information is disregarded. If it is in this list, the number
-of seconds is extracted. If this is then less than the config file entry
-"minimum_cputime_for_test", performance information is also disregarded. If the
-test ran on a performance test machine and it ran for long enough for performance
-checking to be worthwhile, the deviation from the standard performance in percentage
-is checked. If it is greater than the config file entry "cputime_variation_%", failure
-is reported.
-
-When differences in performance are reported, you are given the option to save as described below.
-The default behaviour (if there are no other differences) is to save the average of the old result
-and the new result. In order to override this and save the exact result, append a '+' to the save
-option that you type. (so "s+" to save the standard version, "1+" to save the first offered version etc.)
-
-Note that memory measurement works in a similar way. Given a file containing the line
-Max Memory :    45.3 MB
-
-the entries "minimum_memory_for_test" and "memory_variation_%" are compared and can be saved in the ways described
-above. The default MemoryFileMaker will look for the application reporting on its own memory consumption,
-this has proved somewhat more stable than sampling approaches. This is controlled by the config file entry
-"string_before_memory", which indicates a unique string that appears in the log file before the memory number.
-""" + comparetest.helpDescription
-
-helpScripts = """performance.AddTestPerformance
-                           - Adds up the CPU time performance as specified by the test's
-                             performance file for the selected tests.
-performance.ShowMemoryUsage
-                           - Displays the memory usage as specified by the test's memory file.
-performance.PerformanceStatistics
-                           - Displays 
-                             Currently supports these options:
-                             - v
-                               version1[,version2]
-                             - l
-                               Print only tests with difference larger than limit
-performance.MemoryStatistics
-                           - Displays 
-                             Currently supports these options:
-                             - v
-                               version1[,version2]
-                             - l
-                               Print only tests with difference larger than limit
-""" + comparetest.helpScripts
-
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing
 # CPU time   :      30.31 sec. on heathlands

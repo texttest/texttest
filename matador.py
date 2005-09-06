@@ -2,12 +2,6 @@ helpDescription = """
 The Matador configuration is based on the Rave-based configuration. It will compile all static rulesets in the test
 suite before running any tests, if the library file "matador.o" has changed since the static ruleset was last built.""" 
 
-helpOptions = """-diag      - Run with diagnostics on. This will set the environment variables DIAGNOSTICS_IN and DIAGNOSTICS_OUT to
-             both point at the subdirectory ./Diagnostics in the test case. It will also disable performance checking,
-             as producing lots of text tends to slow down the program, and will tell the comparator to also
-             compare the diagnostics found in the ./Diagnostics subdirectory.
-"""
-
 helpScripts = """matador.ImportTest         - Import new test cases and test users.
                              The general principle is to add entries to the "testsuite.<app>" file and then
                              run this action, typcally 'texttest -a <app> -s matador.ImportTest'. The action
@@ -122,9 +116,6 @@ class MatadorConfig(optimization.OptimizationConfig):
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
-    def printHelpOptions(self, builtInOptions):
-        optimization.OptimizationConfig.printHelpOptions(self, builtInOptions)
-        print helpOptions
     def printHelpScripts(self):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts

@@ -1,22 +1,5 @@
 #!/usr/local/bin/python
 
-helpOptions = """
--b <bname> - run in batch mode, using batch session name <bname>. This will replace the interactive
-             dialogue with an email report, which is sent to $USER if the session name <bname> is
-             not recognised by the config file.
-
-             There is also a possibility to define batch sessions in the config file. The following
-             entries are understood:
-             <bname>_timelimit,  if present, will run only tests up to that limit
-             <bname>_recipients, if present, ensures that mail is sent to those addresses instead of $USER.
-             If set to "none", it ensures that that batch session will ignore that application.
-             <bname>_version, these entries form a list and ensure that only the versions listed are accepted.
-             If the list is empty, all versions are allowed.
-             <bname>_use_collection, if equal to "true", send the batch report to an intermediate file where it
-             can be collected and amalgamated with others using the script batch.CollectFiles. This avoids too
-             many emails being sent by batch mode if many independent things are tested.
-"""
-
 import os, performance, plugins, respond, sys, string, time, types, smtplib
 from ndict import seqdict
 from cPickle import Pickler

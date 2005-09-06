@@ -7,39 +7,10 @@ from copy import copy
 from cPickle import Pickler, Unpickler, UnpicklingError
 
 helpIntro = """
-Note: the purpose of this help is primarily to document the configuration you currently have,
-though also to provide a full list of options supported by both your framework and your configuration.
-A user guide (UserGuide.html) is available to document the framework itself.
+Note: the purpose of this help is primarily to document derived configurations and how they differ from the
+defaults. To find information on the configurations provided with texttest, consult the documentation at
+http://www.texttest.org/TextTest/docs
 """            
-
-builtInOptions = """
--a <app>   - run only the application with extension <app>
-
--v <vers>  - use <vers> as the version name(s). Versions separated by "." characters will be aggregated.
-             Versions separated by "," characters will be run one after another. See the User Guide for
-             a fuller explanation of what a "version" means.
-
--c <chkt>  - use <chkt> as the checkout instead of the "default_checkout" entry (see User Guide)
-
--d <root>  - use <root> as the root directory instead of the value of TEXTTEST_HOME,
-             or the current working directory, which are used otherwise.
-
--g         - run with GUI instead of text interface. Will only work if PyGTK is installed.
-
--gx        - run static GUI, which won't run tests unless instructed. Useful for creating new tests
-             and viewing the test suite.
-
--s <scrpt> - instead of the normal actions performed by the configuration, use the script <scpt>. If this contains
-             a ".", an attempt will be made to understand it as the Python class <module>.<classname>. If this fails,
-             it will be interpreted as an external script.
-
--help      - Do not run anything. Instead, generate useful text, such as this.
-
--x         - Enable log4py diagnostics for the framework. This will use a diagnostic directory from the environment
-             variable TEXTTEST_DIAGNOSTICS, if defined, or the directory <root>/Diagnostics/ if not. It will read
-             the log4py configuration file present in that directory and write all diagnostic files there as well.
-             More details can be had from the log4py documentation.
-"""
 
 # Base class for TestCase and TestSuite
 class Test:
@@ -660,9 +631,9 @@ class ConfigurationWrapper:
         elif action != None:
             actionSequence.append(action)
             debugLog.info("Adding to action sequence : " + str(action))
-    def printHelpText(self, builtInOptions):
+    def printHelpText(self):
         try:
-            return self.target.printHelpText(builtInOptions)
+            return self.target.printHelpText()
         except:
             self.raiseException(req = "help text")
     def getApplicationEnvironment(self, app):
@@ -1014,7 +985,7 @@ class Application:
         for x in range(length):
             header += "-"
         print header
-        self.configObject.printHelpText(builtInOptions)
+        self.configObject.printHelpText()
     def getConfigValue(self, key):
         value = self.configDir[key]
         if type(value) == types.StringType:

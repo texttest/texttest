@@ -1,19 +1,30 @@
 #!/usr/local/bin/python
 
 helpDescription = """
-The Carmen configuration is based on the LSF configuration. Its default operation is therefore to
-submit all jobs to LSF, rather than run them locally.
+The Carmen configuration is based on the queuesystem configuration
+(see http://www.texttest.org/TextTest/docs/queuesystem). Its default operation is therefore to
+submit all jobs to the queuesystem (SGE unless you request LSF), rather than run them locally.
 
-Execution architectures are now determined by versions, not by which architecture TextTest is run on as before.
-If any version is specified which is the name of a Carmen architecture, that architecture will be used.
-Otherwise the entry "default_architecture" is read from the config file and used. "supported_architecture" is now
-deprecated.
+Execution architectures are determined by versions. If any version is specified which is the name of a Carmen architecture,
+that architecture will be used. Otherwise the entry "default_architecture" is read from the config file and used. This
+architecture will be provided as a request for the SGE resource 'carmarch'.
 
-It determines the queue as follows: if a test takes less than 10 minutes, it will be submitted
-to short_<arch>, where <arch> is the architecture as determined above. If it takes
-more than 2 hours, it will go to idle_<arch>. If neither of these, or if the specified queue
-does not exist, it will be submitted to the queue <arch>. If however the environment LSF_QUEUE_PREFIX is set
-then that <prefix>_<arch> will be used if arch is i386_linux or sparc.
+It determines the SGE queue to submit to as follows: if a test takes less than 10 minutes, it will be submitted
+to the short queue. If it takes more than 2 hours, it will go to the idle queue. If neither of these, or if the specified queue
+does not exist, it will be submitted to the 'normal' queue. You can override this behaviour by setting the environment variable
+"QUEUE_SYSTEM_PERF_CATEGORY" to "short", "medium" or "long", as appropriate, when the time taken by the test will not
+be considered.
+
+The Carmen nightjob will run TextTest on all versions and on all architectures. It will do so with the batch
+session name "nightjob" on Monday to Thursday nights, and "wkendjob" on Friday night.
+If you do not want this, you should therefore restrict or disable these session names in your config file, as
+described in the documentation for batch mode.
+
+Note that, because the Carmen configuration infers architectures from versions, you can also
+enable and disable architectures using the config file entry "batch_version" (see the online documentation for batch mode.)
+
+Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
+at 8am on Monday morning. This can cause some tests to be reported as "killed" in your batch report.
 """
 
 helpOptions = """
@@ -21,18 +32,6 @@ helpOptions = """
              data in the test directory, in a file called lprof.<app>. It is proposed to automatically generate
              the graphical information also
 """
-
-batchInfo = """
-             Note that, because the Carmen configuration converts infers architectures from versions, you can also
-             enable and disable architectures using <bname>_version.
-
-             The Carmen nightjob will run TextTest on all versions and on all architectures. It will do so with the batch
-             session name "nightjob" on Monday to Thursday nights, and "wkendjob" on Friday night.
-             If you do not want this, you should therefore restrict or disable these session names in your config file, as
-             indicated above.
-
-             Note also that the "nightjob" sessions are killed at 8am each morning, while the "wkendjob" sessions are killed
-             at 8am on Monday morning. This can cause some tests to be reported as "unfinished" in your batch report."""
 
 import queuesystem, default, performance, os, string, shutil, plugins, respond, predict, time
 from ndict import seqdict
@@ -171,13 +170,10 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob"
-    def printHelpOptions(self, builtInOptions):
-        print queuesystem.helpOptions + batchInfo
-        default.Config.printHelpOptions(self, builtInOptions)
-        print "(Carmen-specific options...)"
+    def printHelpOptions(self):
         print helpOptions
     def printHelpDescription(self):
-        print helpDescription, queuesystem.queueGeneral, predict.helpDescription, performance.helpDescription, respond.helpDescription
+        print helpDescription
     def setApplicationDefaults(self, app):
         queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux")

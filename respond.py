@@ -1,14 +1,5 @@
 #!/usr/local/bin/python
 
-helpDescription = """
-The interactive response presented on failure should be fairly self-explanatory. Essentially you
-get the choice to view the details (with the chosen tool, as described above), save or continue.
-"Continue" does nothing and leaves all files in place. Save will just overwrite the standard results
-with the new ones. If you are running with a version (-v), then you also get the choice to save
-the results for that version. This will create or override results files of the form <root>.<app>.<version>,
-instead of files of the form <root>.<app>
-"""
-
 import comparetest, sys, string, os, plugins
 from usecase import ScriptEngine
     

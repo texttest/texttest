@@ -1,47 +1,5 @@
 #!/usr/local/bin/python
 
-helpDescription = """
-The default configuration is the simplest and most portable. It is intended to run on
-any architecture. Therefore, differences in results are displayed using Python's ndiff
-module, the most portable differencing tool I can find, anyway.
-
-Its default behaviour is to run all tests on the local machine.
-"""
-
-helpOptions = """
--o         - run in overwrite mode. This means that the interactive dialogue is replaced by simply
-             overwriting all previous results with new ones.
-
--n         - run in new-file mode. Tests that succeed will still overwrite the standard file, rather than
-             leaving it, as is the default behaviour.
-
--reconnect <user>
-            - Reconnect to already run tests, optionally takes a user from which to
-              fetch temporary files. If not provided, will look for calling user.
-
--reconnfull - Only has an effect with reconnect. Essentially, recompute all filtering rather than trusting the run
-              you are reconnecting to.
-
--keeptmp   - Keep any temporary directories where test(s) write files. Note that once you run the test again the old
-             temporary dirs will be removed.       
-
--t <text>   - only run tests whose names contain <text> as a substring. Note that <text> may be a comma-separated
-              list
-
--ts <text>  - only run test suites whose full relative paths contain <text> as a substring. As above this may be
-              a comma-separated list.
-
--f <file>   - only run tests whose names appear in the file <file>
--grep <tx>  - only run tests whose log file (according to the config file entry "log_file") contains <tx>. Note that
-              this can also be a comma-separated list
-"""
-
-helpScripts = """
-default.CountTest          - produce a brief report on the number of tests in the chosen selection, by application
-
-default.ExtractStandardPerformance     - update the standard performance files from the standard log files
-"""
-
 import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, batch, re
 import glob
 from threading import currentThread
@@ -213,19 +171,17 @@ class Config(plugins.Configuration):
         if self.optionMap.has_key(optionName):
             list.append(filterObj(self.optionMap[optionName]))
     def printHelpScripts(self):
-        print performance.helpScripts
-        print helpScripts, predict.helpScripts
+        pass
     def printHelpDescription(self):
-        print helpDescription, predict.helpDescription, performance.helpDescription, respond.helpDescription
-    def printHelpOptions(self, builtInOptions):
-        print batch.helpOptions
-        print helpOptions, builtInOptions
-    def printHelpText(self, builtInOptions):
+        print "The default configuration is a published configuration. Consult the online documentation."
+    def printHelpOptions(self):
+        pass
+    def printHelpText(self):
         self.printHelpDescription()
-        print "Command line options supported :"
-        print "--------------------------------"
-        self.printHelpOptions(builtInOptions)
-        print "Python scripts: (as given to -s <module>.<class> [args])"
+        print "\nAdditional Command line options supported :"
+        print "-------------------------------------------"
+        self.printHelpOptions()
+        print "\nPython scripts: (as given to -s <module>.<class> [args])"
         print "--------------------------------------------------------"
         self.printHelpScripts()
     def defaultLoginShell(self):

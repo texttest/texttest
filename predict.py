@@ -1,21 +1,5 @@
 #!/usr/local/bin/python
 
-helpDescription = """
-It is possible to specify predictively how an application behaves. In general this works by reading
-the config file list "internal_error_text" and searching the resulting log file for it. If this text
-is found, the test will fail even if it would otherwise have succeeded, and a message explaining which
-internal error caused the fail is printed. Conversely, you can specify the list "internal_compulsory_text" which
-does the same thing if the text is not found. predict.CheckPredictions can also be run as a standalone action to
-check the standard test results for internal errors.
-"""
-
-helpScripts = """predict.PredictionStatistics
-                           - Displays statistics about application internal errors present in the test suite
-                             Currently supports these options:
-                             - v
-                               version1[,version2]
-"""
-
 import os, filecmp, string, plugins, copy
 
 plugins.addCategory("badPredict", "internal errors", "had internal errors")

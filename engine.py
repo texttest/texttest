@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, testmodel, plugins
+import plugins, os, sys, testmodel
 from time import sleep
 from usecase import ScriptEngine
 
@@ -284,9 +284,6 @@ class TextTest:
             os.name = os.environ["FAKE_OS"]
         self.inputOptions = testmodel.OptionFinder()
         self.diag = plugins.getDiagnostics("Find Applications")
-        if self.inputOptions.slaveRun():
-            # Having the script engine active in the slave isn't a good idea... 
-            self.disableScriptEngine()
         self.allApps = self.findApps()
         self.gui = None
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
@@ -302,13 +299,6 @@ class TextTest:
         if not self.gui:
             logger = plugins.getDiagnostics("Use-case log")
             self.scriptEngine = ScriptEngine(logger)
-    def disableScriptEngine(self):
-        if os.environ.has_key("USECASE_RECORD_STDIN"):
-            del os.environ["USECASE_RECORD_STDIN"]
-        if os.environ.has_key("USECASE_RECORD_SCRIPT"):
-            del os.environ["USECASE_RECORD_SCRIPT"]
-        if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
-            del os.environ["USECASE_REPLAY_SCRIPT"]
     def findApps(self):
         dirName = self.inputOptions.directoryName
         self.diag.info("Using test suite at " + dirName)

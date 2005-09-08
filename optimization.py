@@ -1565,9 +1565,11 @@ class StartStudio(guiplugins.InteractiveAction):
         lPos = fullSubPlanPath.find("LOCAL_PLAN/")
         subPlan = fullSubPlanPath[lPos + 11:]
         localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
-        studioCommand = "studio -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
+        studio = os.path.join(os.environ["CARMSYS"], "bin", "studio")
+        if not os.path.isfile(studio):
+            raise plugins.TextTestError, "Cannot start studio, no file at " + studio
+        commandLine = studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
                         "\",0)'" + plugins.nullRedirect() 
-        commandLine = os.path.join(os.environ["CARMSYS"], "bin", studioCommand)
         process = self.startExternalProgram(commandLine)
         guiplugins.scriptEngine.monitorProcess("runs studio", process)
         test.tearDownEnvironment(parents=1)

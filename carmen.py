@@ -214,9 +214,15 @@ class RunWithParallelAction(plugins.Action):
             except plugins.TextTestError:
                 for parallelAction in self.parallelActions:
                     parallelAction.handleNoTimeAvailable(test)
-            os.waitpid(processId, 0)
             # Make the state change that would presumably be made by the baseRunner...
             self.baseRunner.changeToRunningState(test, None)
+            try:
+                os.waitpid(processId, 0)
+            except OSError:
+                # Assume interrupted system call, which isn't a problem, basically.
+                pass
+            # More potential state changes (killed state)
+            self.baseRunner.updateStateAfterRun(test)
     def findProcessInfo(self, firstpid, test):
         while 1:
             execProcess, parentProcess = self._findProcessInfo(plugins.Process(firstpid), test)

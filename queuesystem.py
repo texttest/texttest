@@ -24,6 +24,8 @@ class RunTestInSlave(unixonly.RunTest):
         self.diag.info("Running test with command '" + command + "'")
         self.changeToRunningState(test, None)
         os.system(command)
+        self.updateStateAfterRun(test)
+    def updateStateAfterRun(self, test):
         if plugins.emergencySignal:
             briefText, freeText = self.getKillText(plugins.emergencySignal)
             test.changeState(plugins.TestState("killed", completed=1, briefText=briefText, freeText=freeText))

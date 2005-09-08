@@ -481,6 +481,9 @@ class RunTest(plugins.Action):
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
         newState = self.runningClass(execMachines, process, "Running on " + hostname())
         test.changeState(newState)
+    def updateStateAfterRun(self, test):
+        # space to add extra states after running
+        pass
     def runTest(self, test):
         if test.state.hasStarted():
             if test.state.processCompleted():

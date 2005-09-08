@@ -58,7 +58,7 @@ class TextTestGUI:
         if self.dynamic:
             win.set_title("TextTest dynamic GUI (tests started at " + startTime + ")")
         else:
-            win.set_title("TextTest static GUI (test management)")
+            win.set_title("TextTest static GUI : management of tests")
         scriptEngine.connect("close window", "delete_event", win, self.exit)
         return win
     def fillTopWindow(self, testWins):
@@ -223,9 +223,25 @@ class TextTestGUI:
             self.actionThread.start()
             idle_add(self.pickUpChange)
         else:
+            self.expandTitle()
             idle_add(self.pickUpProcess)
+        guilog.info("Top Window title set to " + self.topWindow.get_title())
         # Run the Gtk+ main loop.
         gtk.main()
+    def findAllAppNames(self):
+        apps = []
+        iter = self.model.get_iter_root()
+        while iter:
+            test = self.model.get_value(iter, 2)
+            if test.classId() == "test-app":
+                name = test.getConfigValue("full_name")
+                if not name in apps:
+                    apps.append(name)
+            iter = self.model.iter_next(iter)
+        return apps
+    def expandTitle(self):
+        allApps = self.findAllAppNames()
+        self.topWindow.set_title(self.topWindow.get_title() + " for " + string.join(allApps, ","))
     def createDefaultRightGUI(self):
         iter = self.model.get_iter_root()
         self.viewTestAtIter(iter)

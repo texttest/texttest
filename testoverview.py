@@ -95,15 +95,13 @@ class GenererateTestStatus(plugins.Action):
                 os.mkdir(self.pageDir)
             except:
                 raise plugins.TextTestError, "Failed to create application page directory" + self.pageDir
-        
+            
         for majorVersion in self.majorVersions:
-            pageOverview = HTMLgen.SimpleDocument()
-            pageOverview.append(HTMLgen.Heading(1, "Test results for ", repr(app), align = 'center'))
-            minorVersionContainer = HTMLgen.Container()
-            pageOverview.append(minorVersionContainer)
+            self.pagesOverview = {}
             foundMinorVersions = HTMLgen.Container()
             details = TestDetails()
             self.pagesDetails = {}
+            usedSelectors = {}
             for minorVersion in self.minorVersions:
                 version = majorVersion + "." + minorVersion
                 loggedTests = {}
@@ -114,16 +112,28 @@ class GenererateTestStatus(plugins.Action):
                     for entries in os.listdir(baseDir):
                         self.traverseDirectories(categoryHandler, loggedTests, tagsFound, os.path.join(baseDir, entries))
                 if len(loggedTests.keys()) > 0:
-                    testTable = TestTable()
-                    table = testTable.generate(categoryHandler, majorVersion, version, loggedTests, tagsFound)
-                    pageOverview.append(HTMLgen.Name(version))
-                    pageOverview.append(table)
+                    tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
+                    selectors = [ SelectorLast6Days(tagsFound), SelectorAll(tagsFound), SelectorWeekend(tagsFound) ]
+                    for sel in selectors:
+                        selTags = sel.getSelectedTags()
+                        if not usedSelectors.has_key(repr(sel)):
+                            usedSelectors[repr(sel)] = sel.getFileNameExtension()
+                        testTable = TestTable()
+                        table = testTable.generate(categoryHandler, majorVersion, version, loggedTests, selTags)
+                        self.addOverviewPages(sel.getFileNameExtension(), version, table)
                     det = details.generate(categoryHandler, version, tagsFound)
                     self.addDetailPages(app, det)
                     foundMinorVersions.append(HTMLgen.Href("#" + version, minorVersion))
-            minorVersionContainer.append(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + majorVersion + "-"),
-                                                                              foundMinorVersions), align = 'center'))
-            self.writePages(app, majorVersion, pageOverview)
+            selContainer = HTMLgen.Container()
+            for sel in usedSelectors.keys():
+                selContainer.append(HTMLgen.Href(self.getOverviewPageName(majorVersion, usedSelectors[sel]), sel))
+            for sel in self.pagesOverview.keys():
+                self.pagesOverview[sel].prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
+                self.pagesOverview[sel].prepend(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + majorVersion + "-"),
+                                                                          foundMinorVersions), align = 'center'))
+                self.pagesOverview[sel].prepend(HTMLgen.Heading(1, "Test results for ", repr(app), align = 'center'))
+            
+            self.writePages(app, majorVersion)
     def traverseDirectories(self, categoryHandler, loggedTests, tagsFound, dir):
         for entries in os.listdir(dir):
             if os.path.isdir(os.path.join(dir, entries)):
@@ -146,24 +156,32 @@ class GenererateTestStatus(plugins.Action):
                     print "unpickling error"
             else:
                 print "Unknown file", entries
+    def addOverviewPages(self, item, version, table):
+        if not self.pagesOverview.has_key(item):
+            self.pagesOverview[item] = HTMLgen.SimpleDocument()
+        self.pagesOverview[item].append(HTMLgen.Name(version))
+        self.pagesOverview[item].append(table)
     def addDetailPages(self, app, details):
         for tag in details.keys():
             if not self.pagesDetails.has_key(tag):
                 self.pagesDetails[tag] = HTMLgen.SimpleDocument()
                 self.pagesDetails[tag].append(HTMLgen.Heading(1, tag + " - detailed test results for application ", app.name, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
-    def writePages(self, app, majorVersion, pageOverview):
-        pageOverview.write(os.path.join(self.pageDir, "test_" + majorVersion + ".html"))
+    def writePages(self, app, majorVersion):
+        for sel in self.pagesOverview.keys():
+            self.pagesOverview[sel].write(os.path.join(self.pageDir, self.getOverviewPageName(majorVersion, sel)))
         for tag in self.pagesDetails.keys():
             page = self.pagesDetails[tag]
             page.write(os.path.join(self.pageDir, getDetailPageName(majorVersion, tag)))
     def getTestIdentifier(self, dir):
         return string.join(dir.split(os.sep)[len(self.testStateRepository.split(os.sep)) + 2:])
+    def getTagTimeInSeconds(self, tag):
+        return time.mktime(time.strptime(tag, "%d%b%Y"))
+    def getOverviewPageName(self, majorVersion, sel):
+        return "test_" + majorVersion + sel + ".html"
 
 class TestTable:
     def generate(self, categoryHandler, majorVersion, version, loggedTests, tagsFound):
-        tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
-        
         t = HTMLgen.TableLite(border=2, cellpadding=4, cellspacing=1,width="100%")
         t.append(self.generateTableHead(majorVersion, version, tagsFound))
 
@@ -223,8 +241,6 @@ class TestTable:
         return HTMLgen.Container(cap, heading)
     def getPercent(self, detail):
         return int(detail.split("%")[0]) # Bad: Hard coded interpretation of texttest print-out.
-    def getTagTimeInSeconds(self, tag):
-        return time.mktime(time.strptime(tag, "%d%b%Y"))
 
 class TestDetails:
     def generate(self, categoryHandler, version, tags):
@@ -293,3 +309,41 @@ def getCategoryDescription(state, cat):
     return shortDescr, longDescr
 def getDetailPageName(majorVersion, tag):
     return "test_" + majorVersion + "_" + tag + ".html"
+
+
+class Selector:
+    def __init__(self, tags):
+        self.selectedTags = tags
+    def getSelectedTags(self):
+        return self.selectedTags
+    def getFileNameExtension(self):
+        return ""
+    def __repr__(self):
+        return "default"
+
+class SelectorLast6Days(Selector):
+    def __init__(self, tags):
+        if len(tags) > 6:
+            self.selectedTags = tags[-6:]
+        else:
+            self.selectedTags = tags
+    def __repr__(self):
+        return "Last six days"
+
+class SelectorAll(Selector):
+    def getFileNameExtension(self):
+        return "_all"
+    def __repr__(self):
+        return "All"
+    
+class SelectorWeekend(Selector):
+    def __init__(self, tags):
+        self.selectedTags = []
+        for tag in tags:
+            year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(tag, "%d%b%Y")
+            if wday == 4:
+                self.selectedTags.append(tag)
+    def getFileNameExtension(self):
+        return "_weekend"
+    def __repr__(self):
+        return "Weekend"

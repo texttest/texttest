@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, string, signal, sys, default, unixonly, performance, respond, batch, plugins, types, predict, guiplugins
+import os, string, sys, default, unixonly, performance, respond, batch, plugins, types, predict, guiplugins
 from Queue import Queue, Empty
 from threading import Thread
 from time import sleep
@@ -24,21 +24,6 @@ class RunTestInSlave(unixonly.RunTest):
         self.diag.info("Running test with command '" + command + "'")
         self.changeToRunningState(test, None)
         os.system(command)
-        self.updateStateAfterRun(test)
-    def updateStateAfterRun(self, test):
-        if plugins.emergencySignal:
-            briefText, freeText = self.getKillText(plugins.emergencySignal)
-            test.changeState(plugins.TestState("killed", completed=1, briefText=briefText, freeText=freeText))
-    def getKillText(self, sig):
-        if sig == signal.SIGUSR1:
-            return "RUNLIMIT", "Test exceeded queue system's maximum wallclock time allowed"
-        elif sig == signal.SIGXCPU:
-            return "CPULIMIT", "Test exceeded queue system's maximum cpu time allowed"
-        elif sig == signal.SIGUSR2:
-            timeStr = plugins.localtime("%H:%M")
-            return "killed at " + timeStr, "Test killed explicitly at " + timeStr
-        else:
-            return "signal " + str(sig), "Terminated by signal " + str(sig)
     def setUpVirtualDisplay(self, app):
         # Assume the master sets DISPLAY for us
         pass
@@ -422,8 +407,6 @@ class KillTest(plugins.Action):
         self.jobsKilled.append(job.jobId)
         QueueSystemServer.instance.killJob(test, self.jobNameFunction)
         
-plugins.addCategory("killed", "killed", "were killed by the queue system")
-
 class UpdateStatus(plugins.Action):
     def __init__(self, jobNameFunction = None):
         self.jobNameFunction = jobNameFunction

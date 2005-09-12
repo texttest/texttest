@@ -15,6 +15,7 @@ class FakeSMTP:
         pass
 
 class BatchFilter(plugins.Filter):
+    option = "b"
     def __init__(self, batchSession):
         self.batchSession = batchSession
         self.performanceFilter = None

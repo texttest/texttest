@@ -50,15 +50,14 @@ class Config(plugins.Configuration):
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
+    def getFilterClasses(self):
+        return [ TestNameFilter, TestPathFilter, TestSuiteFilter, FileFilter, \
+                 GrepFilter, batch.BatchFilter, performance.TimeFilter ]
     def getFilterList(self):
         filters = []
-        self.addFilter(filters, "t", TestNameFilter)
-        self.addFilter(filters, "tp", TestPathFilter)
-        self.addFilter(filters, "ts", TestSuiteFilter)
-        self.addFilter(filters, "f", FileFilter)
-        self.addFilter(filters, "grep", GrepFilter)
-        self.addFilter(filters, "b", batch.BatchFilter)
-        self.addFilter(filters, "r", performance.TimeFilter)
+        for filterClass in self.getFilterClasses():
+            if self.optionMap.has_key(filterClass.option):
+                filters.append(filterClass(self.optionMap[filterClass.option]))
         return filters
     def batchMode(self):
         return self.optionMap.has_key("b")
@@ -167,9 +166,6 @@ class Config(plugins.Configuration):
             return self.optionMap[option]
         else:
             return ""
-    def addFilter(self, list, optionName, filterObj):
-        if self.optionMap.has_key(optionName):
-            list.append(filterObj(self.optionMap[optionName]))
     def printHelpScripts(self):
         pass
     def printHelpDescription(self):
@@ -371,6 +367,7 @@ class TextFilter(plugins.Filter):
         return test.name in self.texts
 
 class TestPathFilter(TextFilter):
+    option = "tp"
     def acceptsTestCase(self, test):
         return test.getRelPath() in self.texts
     def acceptsTestSuite(self, suite):
@@ -380,10 +377,12 @@ class TestPathFilter(TextFilter):
         return 0
     
 class TestNameFilter(TextFilter):
+    option = "t"
     def acceptsTestCase(self, test):
         return self.containsText(test)
 
 class TestSuiteFilter(TextFilter):
+    option = "ts"
     def acceptsTestCase(self, test):
         pathComponents = test.getRelPath().split(os.sep)
         for path in pathComponents:
@@ -394,6 +393,7 @@ class TestSuiteFilter(TextFilter):
         return 0
 
 class GrepFilter(TextFilter):
+    option = "grep"
     def __init__(self, filterText):
         TextFilter.__init__(self, filterText)
         self.logFileStem = None
@@ -408,6 +408,7 @@ class GrepFilter(TextFilter):
         return 1
 
 class FileFilter(TextFilter):
+    option = "f"
     def __init__(self, filterFile):
         self.filename = filterFile
         self.texts = [] 

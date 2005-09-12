@@ -55,6 +55,7 @@ def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
 class UserFilter(default.TextFilter):
+    option = "u"
     def isUserSuite(self, suite):
         # Don't use the generic one because we can't guarantee environment has been read yet...
         envFiles = [ os.path.join(suite.abspath, "environment"), suite.makeFileName("environment") ]
@@ -110,10 +111,8 @@ class Config(carmen.CarmenConfig):
             elif group.name.startswith("Side"):
                 group.addOption("build", "Build application target")
                 group.addOption("buildl", "Build application target locally")        
-    def getFilterList(self):
-        filters = carmen.CarmenConfig.getFilterList(self)
-        self.addFilter(filters, "u", UserFilter)
-        return filters
+    def getFilterClasses(self):
+        return carmen.CarmenConfig.getFilterClasses(self) + [ UserFilter ]
     def getActionSequence(self):
         if self.optionMap.slaveRun():
             return carmen.CarmenConfig.getActionSequence(self)

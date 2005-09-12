@@ -138,6 +138,7 @@ class PerformanceFileComparison(comparetest.FileComparison):
             pass
 
 class TimeFilter(plugins.Filter):
+    option = "r"
     def __init__(self, timeLimit):
         self.minTime = 0.0
         self.maxTime = None

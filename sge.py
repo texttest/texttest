@@ -31,7 +31,10 @@ class QueueSystem:
         else:
             return ""
     def getJobFailureInfo(self, jobId):
-        return string.join(self.getAccounting(jobId))
+        try:
+            return string.join(self.getAccounting(jobId))
+        except QueueSystemLostJob, e:
+            return str(e)
     def killJob(self, jobId):
         os.system("qdel " + jobId + " > /dev/null 2>&1")
     def getJobId(self, line):

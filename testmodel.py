@@ -515,18 +515,11 @@ class TestSuite(Test):
         for testcase in self.testcases:
             size += testcase.size()
         return size
-    def getTestNames(self, fileName):
-        testNames = []
-        for testline in open(fileName).xreadlines():
-            testName = testline.strip()
-            if len(testName) > 0 and testName[0] != '#':
-                testNames.append(testName)
-        return testNames
 # private:
     def getTestCases(self, filters, fileName, allVersions):
         testCaseList = []
         allowEmpty = 1
-        for testName in self.getTestNames(fileName):
+        for testName in plugins.readList(fileName):
             if allVersions and self.alreadyContains(self.testcases, testName):
                 continue
             if self.alreadyContains(testCaseList, testName):
@@ -594,9 +587,9 @@ class ConfigurationWrapper:
                 self.target.optionMap[key] = option.getValue()
             elif self.target.optionMap.has_key(key):
                 del self.target.optionMap[key]
-    def getFilterList(self):
+    def getFilterList(self, app):
         try:
-            return self.target.getFilterList()
+            return self.target.getFilterList(app)
         except:
             self.raiseException(req = "filter list")
     def getCleanMode(self):
@@ -874,7 +867,7 @@ class Application:
         return "." + fullVersion
     def createTestSuite(self, filters = None, allVersions = 0):
         if not filters:
-            filters = self.configObject.getFilterList()
+            filters = self.configObject.getFilterList(self)
 
         success = 1
         for filter in filters:
@@ -1196,10 +1189,8 @@ class MultiEntryDictionary(seqdict):
     def readValuesFromFile(self, filename, appName = "", versions = [], insert=1, errorOnUnknown=0):
         self.currDict = self
         debugLog.info("Reading values from file " + os.path.basename(filename))
-        if os.path.isfile(filename):
-            configFile = open(filename)
-            for line in configFile.xreadlines():
-                self.parseConfigLine(line.strip(), insert, errorOnUnknown)
+        for line in plugins.readList(filename):
+            self.parseConfigLine(line, insert, errorOnUnknown)
         # Versions are in order of most specific first. We want to update with least specific first.
         versions.reverse()
         self.updateFor(filename, appName, insert, errorOnUnknown)
@@ -1209,8 +1200,6 @@ class MultiEntryDictionary(seqdict):
         # Must reset it for addConfigEntry, so that doesn't go wrong
         self.currDict = self
     def parseConfigLine(self, line, insert, errorOnUnknown):
-        if line.startswith("#") or len(line) == 0:
-            return
         if line.startswith("[") and line.endswith("]"):
             self.currDict = self.changeSectionMarker(line[1:-1], errorOnUnknown)
         elif line.find(":") != -1:

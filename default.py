@@ -51,14 +51,23 @@ class Config(plugins.Configuration):
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
     def getFilterClasses(self):
-        return [ TestNameFilter, TestPathFilter, TestSuiteFilter, FileFilter, \
+        return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  GrepFilter, batch.BatchFilter, performance.TimeFilter ]
-    def getFilterList(self):
+    def getFilterList(self, app):
         filters = []
         for filterClass in self.getFilterClasses():
             if self.optionMap.has_key(filterClass.option):
                 filters.append(filterClass(self.optionMap[filterClass.option]))
+        if self.optionMap.has_key("f"):
+            filters += self.getFiltersFromFile(app, self.optionMap["f"])
         return filters
+    def getFiltersFromFile(self, app, filename):
+        fullPath = app.makePathName(filename)
+        if not fullPath:
+            print "File", self.filename, "not found for application", app
+            return []
+        lines = plugins.readList(fullPath)
+        return [ TestNameFilter(string.join(lines, ",")) ]
     def batchMode(self):
         return self.optionMap.has_key("b")
     def getCleanMode(self):
@@ -405,21 +414,6 @@ class GrepFilter(TextFilter):
         return 0
     def acceptsApplication(self, app):
         self.logFileStem = app.getConfigValue("log_file")
-        return 1
-
-class FileFilter(TextFilter):
-    option = "f"
-    def __init__(self, filterFile):
-        self.filename = filterFile
-        self.texts = [] 
-    def acceptsTestCase(self, test):
-        return self.equalsText(test)
-    def acceptsApplication(self, app):
-        fullPath = app.makePathName(self.filename)
-        if not fullPath:
-            print "File", self.filename, "not found for application", app
-            return 0
-        self.texts = map(string.strip, open(fullPath).readlines())
         return 1
 
 # Workaround for python bug 853411: tell main thread to start the process

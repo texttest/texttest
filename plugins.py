@@ -33,7 +33,7 @@ class Configuration:
         pass
     def getActionSequence(self):
         return []
-    def getFilterList(self):
+    def getFilterList(self, app):
         return []
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options
@@ -233,6 +233,16 @@ def rmtree(dir, attempts=5):
             print "Write directory still in use, waiting 1 second to remove..."
             time.sleep(1)
     print "Something still using write directory", dir, ": leaving it"
+
+def readList(filename):
+    if not os.path.isfile(filename):
+        return []
+    items = []
+    for longline in open(filename).readlines():
+        line = longline.strip()
+        if len(line) > 0 and not line.startswith("#"):
+            items.append(line)
+    return items
 
 def printException():
     sys.stderr.write("Description of exception thrown :\n")

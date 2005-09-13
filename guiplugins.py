@@ -428,7 +428,7 @@ class SelectTests(InteractiveAction):
         return "Select indicated tests"
     def getFilterList(self):
         self.app.configObject.updateOptions(self.optionGroup)
-        return self.app.configObject.getFilterList()
+        return self.app.configObject.getFilterList(self.app)
     def getSelectedTests(self, rootTestSuites):
         selectedTests = []
         filters = self.getFilterList()
@@ -463,7 +463,7 @@ class SelectTests(InteractiveAction):
             version += "." + fullVersion
 
         versionFile = suite.makeFileName("testsuite", version)
-        newTestNames = suite.getTestNames(versionFile)
+        newTestNames = plugins.readList(versionFile)
         newTestList = []
         for testCase in testcases:
             if testCase.name in newTestNames:

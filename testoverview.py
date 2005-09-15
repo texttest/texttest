@@ -197,7 +197,7 @@ class TestTable:
                     type, detail = state.getTypeBreakdown()
                     category = state.category # Strange but correct..... (getTypeBreakdown gives "wrong" category)
                     fgcol, bgcol = self.getColors(category, detail)
-                    if category == "success" or category == "killed":
+                    if category == "success":
                         cellContaint =  HTMLgen.Font(repr(state) + detail, color = fgcol)
                     else:
                         cellContaint = HTMLgen.Href(getDetailPageName(majorVersion, tag) + "#" + version + test,
@@ -209,7 +209,7 @@ class TestTable:
             body = HTMLgen.TR()
             body = body + row
             table.append(body)
-        table = categoryHandler.generateSummaries(tagsFound) + table
+        table = categoryHandler.generateSummaries(majorVersion, version, tagsFound) + table
         t.append(table)
         t.append(HTMLgen.BR())
         return t
@@ -255,6 +255,7 @@ class TestDetails:
                 shortDescr, longDescr = getCategoryDescription(state, cat)
                 fullDescription = self.getFullDescription(categories[cat], version)
                 if fullDescription:
+                    container.append(HTMLgen.Name(version + longDescr))
                     container.append(HTMLgen.Heading(3, "Detailed information for the tests that " + longDescr + ":"))
                     container.append(fullDescription)
         return detailsContainers
@@ -284,12 +285,25 @@ class CategoryHandler:
         if not self.testsInCategory[tag].has_key(state.category):
             self.testsInCategory[tag][state.category] = []
         self.testsInCategory[tag][state.category].append((test, state))
-    def generateSummaries(self, tags):
+    def generateSummaries(self, majorVersion, version, tags):
         row = [ HTMLgen.TD("Summary", bgcolor = HTMLcolors.GRAY1) ]
         for tag in tags:
-            summary = self.generateSummary(self.testsInCategory[tag])
+            summary = self.generateSummaryHTML(tag, majorVersion, version, self.testsInCategory[tag])
             row.append(HTMLgen.TD(summary, bgcolor = HTMLcolors.GRAY1))
         return HTMLgen.TR() + row
+    def generateSummaryHTML(self, tag, majorVersion, version, categories):
+        summary = HTMLgen.Container()
+        numTests = 0
+        for cat in categories.keys():
+            test, state = categories[cat][0]
+            shortDescr, longDescr = getCategoryDescription(state, cat)
+            if cat == "success":
+                summary.append(HTMLgen.Text("%d %s" % (len(categories[cat]), shortDescr)))
+            else:
+                summary.append(HTMLgen.Href(getDetailPageName(majorVersion, tag) + "#" + version + longDescr,
+                                            HTMLgen.Text("%d %s" % (len(categories[cat]), shortDescr))))
+            numTests += len(categories[cat])
+        return HTMLgen.Container(HTMLgen.Text("%d tests: " % numTests), summary)
     def generateSummary(self, categories):
         summary = ""
         numTests = 0

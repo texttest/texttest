@@ -54,10 +54,7 @@ class Config(plugins.Configuration):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  GrepFilter, batch.BatchFilter, performance.TimeFilter ]
     def getFilterList(self, app):
-        filters = []
-        for filterClass in self.getFilterClasses():
-            if self.optionMap.has_key(filterClass.option):
-                filters.append(filterClass(self.optionMap[filterClass.option]))
+        filters = self.getFiltersFromMap(self.optionMap)
         if self.optionMap.has_key("f"):
             filters += self.getFiltersFromFile(app, self.optionMap["f"])
         return filters
@@ -66,8 +63,15 @@ class Config(plugins.Configuration):
         if not fullPath:
             print "File", self.filename, "not found for application", app
             return []
-        lines = plugins.readList(fullPath)
-        return [ TestNameFilter(string.join(lines, ",")) ]
+        fileData = string.join(plugins.readList(fullPath), ",")
+        optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
+        return self.getFiltersFromMap(optionFinder)
+    def getFiltersFromMap(self, optionMap):
+        filters = []
+        for filterClass in self.getFilterClasses():
+            if optionMap.has_key(filterClass.option):
+                filters.append(filterClass(optionMap[filterClass.option]))
+        return filters
     def batchMode(self):
         return self.optionMap.has_key("b")
     def getCleanMode(self):

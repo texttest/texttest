@@ -262,6 +262,30 @@ def tmpString():
 class TextTestError(RuntimeError):
     pass
 
+# Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
+class OptionFinder(seqdict):
+    def __init__(self, args, defaultKey="default"):
+        seqdict.__init__(self)
+        self.buildOptions(args, defaultKey)
+    def buildOptions(self, args, defaultKey):
+        optionKey = None                                                                                         
+        for item in args:    
+            if item[0] == "-":                         
+                optionKey = self.stripMinuses(item)
+                self[optionKey] = ""
+            elif optionKey:
+                if len(self[optionKey]):
+                    self[optionKey] += " "
+                self[optionKey] += item.strip()
+            else:
+                self[defaultKey] = item
+    def stripMinuses(self, item):
+        if item[1] == "-":
+            return item[2:].strip()
+        else:
+            return item[1:].strip()
+    
+
 # Action for wrapping an executable that isn't Python, or can't be imported in the usual way
 class NonPythonAction(Action):
     def __init__(self, actionText):

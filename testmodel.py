@@ -1035,11 +1035,10 @@ class Application:
         env = [ ("TEXTTEST_CHECKOUT", self.checkout) ]
         return env + self.configObject.getApplicationEnvironment(self)
             
-class OptionFinder(seqdict):
+class OptionFinder(plugins.OptionFinder):
     def __init__(self):
-        seqdict.__init__(self)
+        plugins.OptionFinder.__init__(self, sys.argv[1:])
         self.startTime = plugins.localtime()
-        self.buildOptions()
         self.directoryName = os.path.normpath(self.findDirectoryName())
         self._setUpLogging()
         self.setRunId()
@@ -1084,22 +1083,6 @@ class OptionFinder(seqdict):
     def _disableDiags(self):
         rootLogger = log4py.Logger().get_root()        
         rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
-    # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
-    def buildOptions(self):                                                                                                              
-        optionKey = None                                                                                                                 
-        for item in sys.argv[1:]:                      
-            if item[0] == "-":                         
-                optionKey = self.stripMinuses(item)
-                self[optionKey] = ""
-            elif optionKey:
-                if len(self[optionKey]):
-                    self[optionKey] += " "
-                self[optionKey] += item.strip()
-    def stripMinuses(self, item):
-        if item[1] == "-":
-            return item[2:].strip()
-        else:
-            return item[1:].strip()
     def findVersionList(self):
         if self.has_key("v"):
             return plugins.commasplit(self["v"])

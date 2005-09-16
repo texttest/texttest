@@ -6,6 +6,8 @@ from threading import Thread
 from time import sleep
 from copy import copy, deepcopy
 
+plugins.addCategory("abandoned", "abandoned", "were abandoned")
+
 def getConfig(optionMap):
     return QueueSystemConfig(optionMap)
 
@@ -412,6 +414,7 @@ class UpdateStatus(plugins.Action):
         self.jobNameFunction = jobNameFunction
         self.diag = plugins.getDiagnostics("Queue Status")
         self.killer = KillTest(self.jobNameFunction)
+        self.jobsWaitingForKill = {}
     def __call__(self, test):
         if test.state.isComplete():
             return
@@ -427,8 +430,28 @@ class UpdateStatus(plugins.Action):
             return exitStatus
 
         if plugins.emergencySignal:
-            postText = " (Emergency finish of job " + str(job.jobId) + ")" 
-            self.killer(test, postText)
+            return self.tryKillJob(test, str(job.jobId))
+            
+        return self.WAIT | self.RETRY
+    def tryKillJob(self, test, jobId):
+        if self.jobsWaitingForKill.has_key(jobId):
+            return self.handleJobWaiting(test, jobId)
+
+        postText = " (Emergency finish of job " + jobId + ")" 
+        self.killer(test, postText)
+        self.jobsWaitingForKill[jobId] = 0
+        return self.WAIT | self.RETRY
+    def handleJobWaiting(self, test, jobId):
+        if self.jobsWaitingForKill[jobId] > 600:
+            freeText = "Could not delete job " + jobId + " in queuesystem: have abandoned it"
+            return test.changeState(plugins.TestState("abandoned", briefText="job deletion failed", \
+                                                      freeText=freeText, completed=1))
+
+        self.jobsWaitingForKill[jobId] += 1
+        attempt = self.jobsWaitingForKill[jobId]
+        if attempt % 10 == 0:
+            print test.getIndent() + "Emergency finish in progress for " + repr(test) + \
+                  ", queue system wait time " + str(attempt)
         return self.WAIT | self.RETRY
     def processStatus(self, test, status, job):
         pass

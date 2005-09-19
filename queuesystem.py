@@ -547,7 +547,7 @@ class MachineInfoFinder(default.MachineInfoFinder):
         perfMachines = []
         resources = app.getCompositeConfigValue("performance_test_resource", fileStem)
         for resource in resources:
-            perfMachines += self.queueMachineInfo.findResourceMachines(resource)
+            perfMachines += self.findResourceMachines(resource)
 
         rawPerfMachines = default.MachineInfoFinder.findPerformanceMachines(self, app, fileStem)
         for machine in rawPerfMachines:
@@ -557,6 +557,12 @@ class MachineInfoFinder(default.MachineInfoFinder):
             return rawPerfMachines
         else:
             return perfMachines
+    def findResourceMachines(self, resource):
+        try:
+            return self.queueMachineInfo.findResourceMachines(resource)
+        except IOError:
+            # If we're interrupted here, the test has already finished, so try again
+            return self.findResourceMachines(resource)
     def setUpApplication(self, app):
         default.MachineInfoFinder.setUpApplication(self, app)
         moduleName = queueSystemName(app).lower()

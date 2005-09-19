@@ -907,6 +907,8 @@ def ensureDirectoryExists(path):
     h, t = os.path.split(path)
     ensureDirectoryExists(h)
     if len(t) > 0:
-        os.mkdir(path)
-
+        try:
+            os.mkdir(path)
+        except OSError, detail:
+            print "ensureDirectoryExists failed due to " + str(detail)
 

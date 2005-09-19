@@ -20,15 +20,22 @@ class QueueSystemLostJob(RuntimeError):
 
 # Use a non-monitoring runTest, but the rest from unix
 class RunTestInSlave(unixonly.RunTest):
-    def runTest(self, test):
+    def runTest(self, test, inChild=0):
         command = self.getExecuteCommand(test)
         self.describe(test)
         self.diag.info("Running test with command '" + command + "'")
-        self.changeToRunningState(test, None)
+        if not inChild:
+            self.changeToRunningState(test, None)
         os.system(command)
     def setUpVirtualDisplay(self, app):
         # Assume the master sets DISPLAY for us
         pass
+    def changeToRunningState(self, test, process):
+        unixonly.RunTest.changeToRunningState(self, test, process)
+        runFile = test.makeFileName("testrunstate", temporary=1, forComparison=0)
+        file = open(runFile, "w")
+        file.write(test.state.freeText)
+        file.close()
         
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
@@ -481,15 +488,20 @@ class UpdateTestStatus(UpdateStatus):
         if status == "PEND":
             pendState = plugins.TestState("pending", freeText=details, briefText=summary)
             test.changeState(pendState)
-        else:
-            if not jobDone or not test.state.hasStarted():
-                runState = default.Running(job.machines, freeText=details, briefText=summary)
-                test.changeState(runState)
-            if jobDone:
-                if test.loadState():
-                    self.describe(test, self.getPostText(test))
-                else:
-                    return self.handleFileWaiting(test, machineStr)
+            return
+        
+        runFile = test.makeFileName("testrunstate", temporary=1, forComparison=0)
+        testStarted = os.path.isfile(runFile)
+        if not testStarted and not jobDone:
+            return self.WAIT | self.RETRY
+        if not jobDone or not test.state.hasStarted():
+            runState = default.Running(job.machines, freeText=details, briefText=summary)
+            test.changeState(runState)
+        if jobDone:
+            if test.loadState():
+                self.describe(test, self.getPostText(test))
+            else:
+                return self.handleFileWaiting(test, machineStr)
     def handleFileWaiting(self, test, machineStr):
         if not self.testsWaitingForFiles.has_key(test):
             self.testsWaitingForFiles[test] = 0

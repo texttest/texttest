@@ -8,10 +8,10 @@ class RunTest(default.RunTest):
         self.loginShell = None
         self.testDisplay = None
         self.realDisplay = os.getenv("DISPLAY")
-    def __call__(self, test):
+    def __call__(self, test, inChild=0):
         if self.testDisplay:
             os.environ["DISPLAY"] = self.testDisplay
-        retValue = default.RunTest.__call__(self, test)
+        retValue = default.RunTest.__call__(self, test, inChild)
         if self.testDisplay and self.realDisplay:
             os.environ["DISPLAY"] = self.realDisplay
         return retValue

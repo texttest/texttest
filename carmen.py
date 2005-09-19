@@ -204,11 +204,13 @@ class RunWithParallelAction(plugins.Action):
         processId = os.fork()
         if processId == 0:
             # Note, this is a child process, so any state changes made by baseRunner will not be reflected, and anything written will not get printed...
-            self.baseRunner(test)
+            self.baseRunner(test, inChild=1)
             os._exit(0)
         else:
             try:
                 execProcess, parentProcess = self.findProcessInfo(processId, test)
+                # Make the state change that would presumably be made by the baseRunner...
+                self.baseRunner.changeToRunningState(test, None)
                 for parallelAction in self.parallelActions:
                     parallelAction.performParallelAction(test, execProcess, parentProcess)
             except plugins.TextTestError:
@@ -217,8 +219,6 @@ class RunWithParallelAction(plugins.Action):
             except IOError:
                 # interrupted system call in I/O is no problem
                 pass
-            # Make the state change that would presumably be made by the baseRunner...
-            self.baseRunner.changeToRunningState(test, None)
             try:
                 os.waitpid(processId, 0)
             except OSError:

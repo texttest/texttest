@@ -469,12 +469,12 @@ class RunTest(plugins.Action):
         self.diag = plugins.getDiagnostics("run test")
     def __repr__(self):
         return "Running"
-    def __call__(self, test):
+    def __call__(self, test, inChild=0):
         if test.state.isComplete():
             return
         # Change to the directory so any incidental files can be found easily
         os.chdir(test.writeDirs[0])
-        return self.runTest(test)
+        return self.runTest(test, inChild)
     def changeToRunningState(self, test, process):
         execMachines = [ hostname() ]
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
@@ -483,7 +483,7 @@ class RunTest(plugins.Action):
     def updateStateAfterRun(self, test):
         # space to add extra states after running
         pass
-    def runTest(self, test):
+    def runTest(self, test, inChild=0):
         if test.state.hasStarted():
             if test.state.processCompleted():
                 self.diag.info("Process completed.")
@@ -502,7 +502,8 @@ class RunTest(plugins.Action):
         # Working around Python bug
         test.changeState(Pending(process))
         process.waitForStart()
-        self.changeToRunningState(test, process)
+        if not inChild:
+            self.changeToRunningState(test, process)
         return self.RETRY
     def getExecuteCommand(self, test):
         testCommand = test.getExecuteCommand() + " < " + self.getInputFile(test)

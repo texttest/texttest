@@ -114,7 +114,7 @@ class Config(carmen.CarmenConfig):
     def getFilterClasses(self):
         return carmen.CarmenConfig.getFilterClasses(self) + [ UserFilter ]
     def getActionSequence(self):
-        if self.optionMap.slaveRun():
+        if self.slaveRun():
             return carmen.CarmenConfig.getActionSequence(self)
         
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner

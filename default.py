@@ -68,15 +68,7 @@ class Config(plugins.Configuration):
     def getCleanMode(self):
         if self.isReconnectingFast():
             return self.CLEAN_NONE
-        if self.optionMap.has_key("keeptmp"):
-            if self.optionMap.slaveRun():
-                return self.CLEAN_NONE
-            else:
-                return self.CLEAN_PREVIOUS
-        
-        if self.optionMap.slaveRun():
-            return self.CLEAN_NONBASIC # only clean extra directories that we create...
-        if self.batchMode() and not self.isReconnecting():
+        if self.optionMap.has_key("keeptmp") or (self.batchMode() and not self.isReconnecting()):
             return self.CLEAN_PREVIOUS
         
         return self.CLEAN_NONBASIC | self.CLEAN_BASIC
@@ -114,9 +106,11 @@ class Config(plugins.Configuration):
         if not self.isReconnectingFast():
             actions += [ self.getTestPredictionChecker(), self.getTestComparator(),
                          self.getFailureExplainer(), SaveState() ]
-        if not self.optionMap.useGUI() and not self.optionMap.slaveRun():
+        if self.useTextResponder():
             actions.append(self.getTestResponder())
         return actions
+    def useTextResponder(self):
+        return not self.optionMap.useGUI()
     def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull"))

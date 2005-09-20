@@ -292,7 +292,7 @@ class TextTest:
         if len(self.allApps) > 0 and self.inputOptions.useGUI():
             try:
                 from texttestgui import TextTestGUI
-                self.gui = TextTestGUI(not self.inputOptions.useStaticGUI(), self.inputOptions.startTime)
+                self.gui = TextTestGUI(not self.inputOptions.useStaticGUI())
             except:
                 print "Cannot use GUI: caught exception:"
                 plugins.printException()
@@ -349,8 +349,6 @@ class TextTest:
         appList = []
         app = self.createApplication(appName, dirName, pathname, version)
         appList.append(app)
-        if self.inputOptions.slaveRun():
-            return appList
         extraVersions = app.getConfigValue("extra_version")
         for appVersion in app.versions:
             if appVersion in extraVersions:

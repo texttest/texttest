@@ -338,7 +338,7 @@ class TestCase(Test):
     def getExecuteCommand(self):
         return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
-        return globalRunIdentifier
+        return self.app.configObject.getRunIdentifier()
     def isOutdated(self, filename):
         modTime = plugins.modifiedTime(filename)
         currTime = time()
@@ -597,6 +597,11 @@ class ConfigurationWrapper:
             return self.target.setApplicationDefaults(app)
         except:
             self.raiseException(req = "set defaults")
+    def getRunIdentifier(self):
+        try:
+            return self.target.getRunIdentifier()
+        except:
+            self.raiseException(req = "run id")
     def addToOptionGroups(self, app, groups):
         try:
             return self.target.addToOptionGroups(app, groups)
@@ -824,7 +829,6 @@ class Application:
             group.addOption("s", "Run this script")
             group.addOption("d", "Run as if TEXTTEST_HOME was")
             group.addOption("tmp", "Private: write test-tmp files at")
-            group.addOption("slave", "Private: used to submit slave runs remotely")
             group.addSwitch("help", "Print configuration help text on stdout")
             group.addSwitch("g", "use dynamic GUI", 1)
             group.addSwitch("gx", "use static GUI")
@@ -933,7 +937,7 @@ class Application:
                     print "Unable to remove previous write directory", previousWriteDir, ":"
                     plugins.printException()
     def getTmpIdentifier(self):
-        return self.name + self.versionSuffix() + globalRunIdentifier
+        return self.name + self.versionSuffix() + self.configObject.getRunIdentifier()
     def ownsFile(self, fileName, unknown = 1):
         # Environment file may or may not be owned. Return whatever we're told to return for unknown
         if fileName == "environment":
@@ -1029,17 +1033,9 @@ class Application:
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):
         plugins.OptionFinder.__init__(self, sys.argv[1:])
-        self.startTime = plugins.localtime()
         self.directoryName = os.path.normpath(self.findDirectoryName())
         self._setUpLogging()
-        self.setRunId()
         debugLog.debug(repr(self))
-    def setRunId(self):
-        global globalRunIdentifier
-        if self.slaveRun():
-            globalRunIdentifier = self["slave"]
-        else:
-            globalRunIdentifier = plugins.tmpString() + self.startTime
     def _setUpLogging(self):
         global debugLog
         # Don't use the default locations, particularly current directory causes trouble
@@ -1105,8 +1101,6 @@ class OptionFinder(plugins.OptionFinder):
         return self.has_key("g") or self.useStaticGUI()
     def useStaticGUI(self):
         return self.has_key("gx")
-    def slaveRun(self):
-        return self.has_key("slave")
     def _getDiagnosticFile(self):
         if not os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             os.environ["TEXTTEST_DIAGNOSTICS"] = os.path.join(self.directoryName, "Diagnostics")

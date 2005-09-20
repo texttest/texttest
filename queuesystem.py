@@ -47,12 +47,35 @@ class QueueSystemConfig(default.Config):
         queueSystemGroup.addOption("R", "Request " + queueSystem + " resource")
         queueSystemGroup.addOption("q", "Request " + queueSystem + " queue")
         groups.insert(3, queueSystemGroup)
+        for group in groups:
+            if group.name.startswith("Invisible"):
+                group.addOption("slave", "Private: used to submit slave runs remotely")
     def useQueueSystem(self):
         if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l"):
             return 0
         return 1
+    def slaveRun(self):
+        return self.optionMap.has_key("slave")
+    def getRunIdentifier(self):
+        if self.slaveRun():
+            return self.optionMap["slave"]
+        else:
+            return default.Config.getRunIdentifier(self)
+    def useTextResponder(self):
+        if self.slaveRun():
+            return 0
+        else:
+            return default.Config.useTextResponder(self)
+    def getCleanMode(self):
+        if self.slaveRun():
+            if self.optionMap.has_key("keeptmp"):
+                return self.CLEAN_NONE
+            else:
+                return self.CLEAN_NONBASIC
+        else:
+            return default.Config.getCleanMode(self)
     def _getActionSequence(self, makeDirs):
-        if self.optionMap.slaveRun():
+        if self.slaveRun():
             return default.Config._getActionSequence(self, 0)
         if not self.useQueueSystem():
             return default.Config._getActionSequence(self, makeDirs)
@@ -65,7 +88,7 @@ class QueueSystemConfig(default.Config):
             actions.append(self.getTestResponder())
         return actions
     def getTestRunner(self):
-        if self.optionMap.slaveRun():
+        if self.slaveRun():
             return RunTestInSlave()
         else:
             return default.Config.getTestRunner(self)
@@ -77,12 +100,12 @@ class QueueSystemConfig(default.Config):
     def statusUpdater(self):
         return UpdateTestStatus()
     def getPerformanceFileMaker(self):
-        if self.optionMap.slaveRun():
+        if self.slaveRun():
             return MakePerformanceFile(self.getMachineInfoFinder(), self.isSlowdownJob)
         else:
             return default.Config.getPerformanceFileMaker(self)
     def getMachineInfoFinder(self):
-        if self.optionMap.slaveRun():
+        if self.slaveRun():
             return MachineInfoFinder()
         else:
             return default.Config.getMachineInfoFinder(self)
@@ -98,6 +121,9 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "'*'", "(SGE) Which SGE parallel environment to use when SUT is parallel")
+        if self.slaveRun():
+            # Shouldn't run extra versions in slaves (!)
+            app.addConfigEntry("extra_version", "{CLEAR LIST}")
 
 class SubmissionRules:
     def __init__(self, optionMap, test, nonTestProcess):

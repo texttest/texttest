@@ -21,6 +21,19 @@ from types import FileType
 from ndict import seqdict
 from traceback import format_exception
 
+# Useful utility...
+def localtime(format="%d%b%H:%M:%S"):
+    return time.strftime(format, time.localtime())
+
+globalStartTime = localtime()
+
+# Need somewhat different formats on Windows/UNIX
+def tmpString():
+    if os.environ.has_key("USER"):
+        return os.getenv("USER")
+    else:
+        return "tmp"
+
 # Generic configuration class
 class Configuration:
     CLEAN_NONE = 0
@@ -41,6 +54,9 @@ class Configuration:
         return []
     def getCleanMode(self):
         return self.CLEAN_BASIC | self.CLEAN_NONBASIC
+    def getRunIdentifier(self):
+        global globalStartTime
+        return tmpString() + globalStartTime
     def printHelpText(self):
         pass
     def extraReadFiles(self, test):
@@ -170,10 +186,6 @@ def abspath(relpath):
     else:
         return os.path.abspath(relpath)
 
-# Useful utility...
-def localtime(format="%d%b%H:%M:%S"):
-    return time.strftime(format, time.localtime())
-
 def nullRedirect():
     if os.name == "posix":  
         return " > /dev/null 2>&1"
@@ -282,13 +294,6 @@ def printException():
     sys.stderr.write(exceptionString)
     return exceptionString
     
-# Need somewhat different formats on Windows/UNIX
-def tmpString():
-    if os.environ.has_key("USER"):
-        return os.getenv("USER")
-    else:
-        return "tmp"
-
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):
     pass

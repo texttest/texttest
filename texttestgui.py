@@ -37,7 +37,7 @@ class ActionThread(Thread):
         self.join()
 
 class TextTestGUI:
-    def __init__(self, dynamic, startTime):
+    def __init__(self, dynamic):
         guiplugins.setUpGuiLog(dynamic)
         global guilog, scriptEngine
         from guiplugins import guilog
@@ -48,15 +48,15 @@ class TextTestGUI:
         self.dynamic = dynamic
         self.itermap = seqdict()
         self.actionThread = None
-        self.topWindow = self.createTopWindow(startTime)
+        self.topWindow = self.createTopWindow()
         self.rightWindowGUI = None
         self.contents = None
         self.workQueue = Queue()
-    def createTopWindow(self, startTime):
+    def createTopWindow(self):
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
         if self.dynamic:
-            win.set_title("TextTest dynamic GUI (tests started at " + startTime + ")")
+            win.set_title("TextTest dynamic GUI (tests started at " + plugins.globalStartTime + ")")
         else:
             win.set_title("TextTest static GUI : management of tests")
         scriptEngine.connect("close window", "delete_event", win, self.exit)

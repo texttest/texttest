@@ -149,7 +149,7 @@ class ApcConfig(optimization.OptimizationConfig):
             return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
         else:
             baseRunner = optimization.OptimizationConfig.getSpecificTestRunner(self)
-            if self.optionMap.slaveRun():
+            if self.slaveRun():
                 return MarkApcLogDir(baseRunner, self.isExecutable, self.optionMap.has_key("extractlogs"))
             else:
                 return baseRunner
@@ -163,7 +163,7 @@ class ApcConfig(optimization.OptimizationConfig):
         subActions = []
         subActions.append(FetchApcCore(self.optionMap.has_key("keeptmp")))
         subActions.append(RemoveLogs())
-        if self.optionMap.slaveRun():
+        if self.slaveRun():
             useExtractLogs = self.optionValue("extractlogs")
             if useExtractLogs == "":
                 useExtractLogs = "all"

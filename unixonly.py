@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 
 import default, respond, performance, predict, os, shutil, plugins, string, time
+from socket import gethostname
                 
 class RunTest(default.RunTest):
     def __init__(self):
@@ -75,7 +76,7 @@ class VirtualDisplayFinder:
         pidStr = line.split()[3]
         os.system(self.getSysCommand(server, "kill -9 " + pidStr))
     def getSysCommand(self, server, command, background=1):
-        if server == default.hostname():
+        if server == gethostname():
             if background:
                 return command + " >& /dev/null &"
             else:

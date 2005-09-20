@@ -210,7 +210,7 @@ class TestCase(Test):
             self.properties.addEntry("jusecase", {}, insert=1)
         if os.path.isfile(self.useCaseFile):
             self.setReplayEnvironment()
-        # For self testing
+        # For self testing. Should really be more general...
         slaveUseCase = self.makeFileName("slave_usecase")
         if os.path.isfile(slaveUseCase):
             self.environment["SLAVE_USECASE_REPLAY_SCRIPT"] = slaveUseCase

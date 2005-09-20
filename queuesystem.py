@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, string, sys, default, unixonly, performance, respond, batch, plugins, types, predict, guiplugins
+import os, string, sys, default, unixonly, performance, plugins
 from Queue import Queue, Empty
 from threading import Thread
 from time import sleep
@@ -48,7 +48,7 @@ class QueueSystemConfig(default.Config):
         queueSystemGroup.addOption("q", "Request " + queueSystem + " queue")
         groups.insert(3, queueSystemGroup)
     def useQueueSystem(self):
-        if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l") or self.optionMap.has_key("rundebug"):
+        if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l"):
             return 0
         return 1
     def _getActionSequence(self, makeDirs):

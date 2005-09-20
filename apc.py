@@ -68,6 +68,7 @@ apc.CVSBranchTests         - This script is useful when two versions of a test s
 """
 
 import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time
+from socket import gethostname
 from time import sleep
 from ndict import seqdict
 
@@ -127,6 +128,10 @@ class ApcConfig(optimization.OptimizationConfig):
             listKPIs = [KPI.cSimplePairingOptTimeKPI]
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         return optimization.OptimizationConfig.getActionSequence(self)
+    def useQueueSystem(self):
+        if self.optionMap.has_key("rundebug"):
+            return 0
+        return optimization.OptimizationConfig.useQueueSystem(self)
     def getProgressReportBuilder(self):
         if self.optionMap.has_key("prrepgraphical"):
             return MakeProgressReportGraphical(self.optionValue("prrep"))
@@ -479,7 +484,7 @@ def getTestMachine(test):
         machine = job.machines[0]
         diag.info("Test was run using LSF on " + machine)
     else:
-        machine = default.hostname()
+        machine = gethostname()
         diag.info("Test was run locally on " + machine)
     return machine
 
@@ -545,7 +550,7 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
         file = open(viewLogScript, "w")
         logFileName = os.path.join(apcTmpDir, "apclog")
-        file.write("xon " + default.hostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
+        file.write("xon " + gethostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
         file.close()
     def performParallelAction(self, test, execProcess, parentProcess):
         apcTmpDir = self.getApcLogDir(test, str(parentProcess.processId))

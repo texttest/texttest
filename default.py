@@ -5,19 +5,10 @@ import glob
 from threading import currentThread
 from knownbugs import CheckForBugs
 from cPickle import Unpickler
+from socket import gethostname
 
 def getConfig(optionMap):
     return Config(optionMap)
-
-def hostname():
-    if os.environ.has_key("HOST"):
-        return os.environ["HOST"]
-    elif os.environ.has_key("HOSTNAME"):
-        return os.environ["HOSTNAME"]
-    elif os.environ.has_key("COMPUTERNAME"):
-        return os.environ["COMPUTERNAME"]
-    else:
-        raise plugins.TextTestError, "No hostname could be found for local machine!!!"
 
 class Config(plugins.Configuration):
     def addToOptionGroups(self, app, groups):
@@ -476,9 +467,9 @@ class RunTest(plugins.Action):
         os.chdir(test.writeDirs[0])
         return self.runTest(test, inChild)
     def changeToRunningState(self, test, process):
-        execMachines = [ hostname() ]
+        execMachines = [ gethostname() ]
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
-        newState = self.runningClass(execMachines, process, "Running on " + hostname())
+        newState = self.runningClass(execMachines, process, "Running on " + gethostname())
         test.changeState(newState)
     def updateStateAfterRun(self, test):
         # space to add extra states after running

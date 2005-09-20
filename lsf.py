@@ -18,7 +18,8 @@ class QueueSystem:
         machines = submissionRules.findMachineList()
         if len(machines):
             bsubArgs += " -m '" + string.join(machines, " ") + "'"
-        bsubArgs += " -u nobody -o framework_tmp/slavelog -e framework_tmp/slaveerrs"
+        outputFile, errorsFile = submissionRules.getJobFiles()
+        bsubArgs += " -u nobody -o " + outputFile + " -e " + errorsFile
         return "bsub " + bsubArgs
     def findSubmitError(self, stderr):
         for errorMessage in stderr.readlines():

@@ -225,6 +225,10 @@ def rmtree(dir, attempts=5):
     if not os.path.isdir(dir):
         print "Write directory", dir, "externally removed"
         return
+    # Don't be somewhere under the directory when it's removed
+    if os.getcwd().startswith(dir):
+        root, local = os.path.split(dir)
+        os.chdir(root)
     for i in range(attempts):
         try:
             shutil.rmtree(dir)
@@ -243,6 +247,33 @@ def readList(filename):
         if len(line) > 0 and not line.startswith("#"):
             items.append(line)
     return items
+
+def chdir(dir):
+    ensureDirectoryExists(dir)
+    os.chdir(dir)
+
+def openForWrite(path):
+    ensureDirExistsForFile(path)
+    return open(path, "w")
+
+# Make sure the dir exists
+def ensureDirExistsForFile(path):
+    dir, localName = os.path.split(path)
+    ensureDirectoryExists(dir)
+
+def ensureDirectoryExists(path):
+    if os.path.isdir(path):
+        return
+    try:
+        os.makedirs(path)
+    except OSError, detail:
+        if os.path.isdir(path):
+            return
+        detailStr = str(detail)
+        if detailStr.find("Interrupted system call") != -1:
+            return ensureDirectoryExists(path)
+        else:
+            raise
 
 def printException():
     sys.stderr.write("Description of exception thrown :\n")

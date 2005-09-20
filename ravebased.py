@@ -340,8 +340,6 @@ class CompileRules(plugins.Action):
             return self.modeString
     def performCompile(self, test, commandLine):
         compTmp = test.makeFileName("ravecompile", temporary=1, forComparison=0)
-        # Hack to work around crc_compile bug which fails if ":" in directory
-        os.chdir(test.abspath)
         # Hack to work around AMD automounter which creates weird temporary path
         os.environ["PWD"] = test.abspath
         self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.environ["PWD"])
@@ -898,17 +896,3 @@ class ConfigEtableParser:
         if tok == "":
             return None
         return tok
-
-def ensureDirectoryExists(path):
-    if len(path) == 0:
-        return
-    if os.path.isdir(path):
-        return
-    h, t = os.path.split(path)
-    ensureDirectoryExists(h)
-    if len(t) > 0:
-        try:
-            os.makedirs(path)
-        except OSError, detail:
-            print "ensureDirectoryExists failed due to " + str(detail)
-

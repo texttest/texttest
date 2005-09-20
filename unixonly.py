@@ -31,7 +31,7 @@ class RunTest(default.RunTest):
         else:
             return default.RunTest.getStdErrRedirect(self, command, file)        
     def buildCommandFile(self, test, cmdFile, testCommand):
-        f = open(cmdFile, "w")
+        f = plugins.openForWrite(cmdFile)
         f.write(testCommand + "\n")
         f.close()
         return cmdFile

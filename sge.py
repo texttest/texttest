@@ -22,7 +22,8 @@ class QueueSystem:
         resource = self.getResourceArg(submissionRules)
         if len(resource):
             qsubArgs += " -l " + resource
-        qsubArgs += " -w e -notify -m n -cwd -b y -V -o framework_tmp/slavelog -e framework_tmp/slaveerrs"
+        outputFile, errorsFile = submissionRules.getJobFiles()
+        qsubArgs += " -w e -notify -m n -cwd -b y -V -o " + outputFile + " -e " + errorsFile
         return "qsub " + qsubArgs
     def findSubmitError(self, stderr):
         errLines = stderr.readlines()
@@ -58,7 +59,9 @@ class QueueSystem:
         # S(uspended),  T(hreshold),  w(aiting) or h(old).
         # However, both pending and completed jobs seem to have state 'qw'
         self.diag.info("Got status = " + sgeStat)
-        if sgeStat.startswith("r") or sgeStat.startswith("d"):
+        if sgeStat.startswith("E"):
+            return "ERROR"
+        elif sgeStat.startswith("r") or sgeStat.startswith("d"):
             return "RUN"
         elif sgeStat.startswith("t") or sgeStat.startswith("w"):
             return "PEND"
@@ -157,11 +160,22 @@ class QueueSystem:
                 continue
             job = self.activeJobs[jobId]
             status = self.getStatus(words[4], states, jobId)
+            if status == "ERROR":
+                job.errorMessage = self.getJobError(job.jobId)
+                return
             if job.status == "PEND" and status != "PEND" and len(words) >= 6:
                 self.setJobHost(job, words[7])
             job.status = status
             if status == "EXIT" or status == "DONE":
                 del self.activeJobs[jobId]
+    def getJobError(self, jobId):
+        self.killJob(jobId)
+        jobError = "Job ended in state 'Eqw'"
+        del self.activeJobs[jobId]
+        for line in self.getAccounting(jobId):
+            if line.startswith("failed"):
+                return jobError + " - SGE message '" + line.strip() + "'"
+        return jobError + " - no SGE message could be found"
     def setJobHost(self, job, queueName):
         parts = queueName.split('@')
         if len(parts) > 1:

@@ -219,7 +219,7 @@ def verifyAirportFile(arch):
             apCompile = os.path.join(os.environ["CARMSYS"], "bin", arch, "apcomp")
             if os.path.isfile(apCompile):
                 print "Missing AirportFile detected, building:", airportFile
-                ravebased.ensureDirectoryExists(os.path.dirname(airportFile))
+                plugins.ensureDirExistsForFile(airportFile)
                 # We need to source the CONFIG file in order to get some
                 # important environment variables set, i.e. PRODUCT and BRANCH.
                 configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
@@ -386,7 +386,7 @@ class ApcCompileRules(ravebased.CompileRules):
         if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
             return
         apcExecutable = ruleset.targetFile
-        ravebased.ensureDirectoryExists(os.path.dirname(apcExecutable))
+        plugins.ensureDirExistsForFile(apcExecutable)
         ruleLib = self.getRuleLib(ruleset.name)
         if self.isNewer(apcExecutable, self.apcLib):
             self.diag.info("APC binary is newer than libapc.a, returning.")
@@ -396,8 +396,6 @@ class ApcCompileRules(ravebased.CompileRules):
         self.rulesCompiled.append(ruleset.name)
         if not os.path.isfile(ruleLib):
             compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-            # Hack for crc_compile.
-            os.chdir(test.abspath)
             self.diag.debug("Building rule set library using the command " + self.ruleCompileCommand(ruleset.sourceFile, test))
             returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile, test))
             if returnValue:

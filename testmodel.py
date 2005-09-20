@@ -327,14 +327,11 @@ class TestCase(Test):
         return 1
     def saveState(self):
         stateFile = self.getStateFile()
-        # Ensure directory exists, it may not
-        dir, local = os.path.split(stateFile)
-        if not os.path.isdir(dir):
-            os.makedirs(dir)
         if os.path.isfile(stateFile):
             # Don't overwrite previous saved state
             return
-        file = open(stateFile, "w")
+
+        file = plugins.openForWrite(stateFile)
         pickler = Pickler(file)
         pickler.dump(self.state)
         file.close()
@@ -351,13 +348,13 @@ class TestCase(Test):
         return filter.acceptsTestCase(self)
     def makeBasicWriteDirectory(self):
         fullPathToMake = os.path.join(self.writeDirs[0], "framework_tmp")
-        os.makedirs(fullPathToMake)
+        plugins.ensureDirectoryExists(fullPathToMake)
     def prepareBasicWriteDirectory(self):
-        if self.app.useDiagnostics:
-            os.mkdir(os.path.join(self.writeDirs[0], "Diagnostics"))
         self.collatePaths("copy_test_path", self.copyTestPath)
         self.collatePaths("link_test_path", self.linkTestPath)
         self.createPropertiesFiles()
+        if self.app.useDiagnostics:
+            plugins.ensureDirectoryExists(os.path.join(self.writeDirs[0], "Diagnostics"))
     def createPropertiesFiles(self):
         for var, value in self.properties.items():
             propFileName = os.path.join(self.writeDirs[0], var + ".properties")
@@ -381,9 +378,7 @@ class TestCase(Test):
             fullPath = self.makePathName(copyTestPath, self.abspath)
             debugLog.info("Path for linking/copying at " + fullPath)
             target = os.path.join(self.writeDirs[0], copyTestPath)
-            dir, localName = os.path.split(target)
-            if not os.path.isdir(dir):
-                os.makedirs(dir)
+            plugins.ensureDirExistsForFile(target)
             collateMethod(fullPath, target)
     def copyTestPath(self, fullPath, target):
         if os.path.isfile(fullPath):
@@ -418,7 +413,7 @@ class TestCase(Test):
         self.createDirs(fullWriteDir)    
         return writeDir
     def createDirs(self, fullWriteDir):
-        os.makedirs(fullWriteDir)    
+        os.makedirs(fullWriteDir)
         directoryLog.info("Created write directory " + fullWriteDir)
         self.writeDirs.append(fullWriteDir)
         return fullWriteDir
@@ -849,8 +844,6 @@ class Application:
         root = os.path.expanduser(os.environ["TEXTTEST_TMP"])
         global globalTmpDirectory
         globalTmpDirectory = plugins.abspath(root)
-        if not os.path.isdir(globalTmpDirectory):
-            os.makedirs(globalTmpDirectory)
         localName = self.getTmpIdentifier().replace(":", "")
         if inputOptions.useStaticGUI():
             localName = "static_gui." + localName
@@ -912,17 +905,15 @@ class Application:
         fullList += fromRemaining
         return fullList
     def makeWriteDirectory(self):
-        if (os.path.isdir(self.writeDirectory)):
+        if os.path.isdir(self.writeDirectory):
             return
         root, tmpId = os.path.split(self.writeDirectory)
         self.tryCleanPreviousWriteDirs(root)
-        os.makedirs(self.writeDirectory)
+        plugins.ensureDirectoryExists(self.writeDirectory)
         debugLog.info("Made root directory at " + self.writeDirectory)
     def removeWriteDirectory(self):
         doRemove = self.cleanMode & plugins.Configuration.CLEAN_BASIC
         if doRemove and os.path.isdir(self.writeDirectory):
-            # Don't be somewhere under the directory when it's removed
-            os.chdir(self.abspath)
             plugins.rmtree(self.writeDirectory)
     def tryCleanPreviousWriteDirs(self, rootDir, nameBase = ""):
         doRemove = self.cleanMode & plugins.Configuration.CLEAN_PREVIOUS
@@ -1059,12 +1050,7 @@ class OptionFinder(plugins.OptionFinder):
                 if not os.environ.has_key("TEXTTEST_DIAGDIR"):
                     os.environ["TEXTTEST_DIAGDIR"] = os.path.dirname(diagFile)
                 writeDir = os.getenv("TEXTTEST_DIAGDIR")
-                if not os.path.isdir(writeDir):
-                    try:
-                        os.makedirs(writeDir)
-                    except OSError:
-                        # Not a reason not to work if we can't do this for some reason
-                        pass
+                plugins.ensureDirectoryExists(writeDir)
                 print "TextTest will write diagnostics in", writeDir, "based on file at", diagFile
                 for file in os.listdir(writeDir):
                     if file.endswith(".diag"):

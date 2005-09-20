@@ -149,6 +149,8 @@ class SubmissionRules:
             return []
 
         return performanceMachines
+    def getJobFiles(self):
+        return "framework_tmp/slavelog", "framework_tmp/slaveerrs"
     def forceOnPerformanceMachines(self):
         if self.nonTestProcess:
             return 0

@@ -377,7 +377,7 @@ class TestCase(Test):
         for copyTestPath in self.app.getConfigValue(configListName):
             fullPath = self.makePathName(copyTestPath, self.abspath)
             debugLog.info("Path for linking/copying at " + fullPath)
-            target = os.path.join(self.writeDirs[0], copyTestPath)
+            target = os.path.join(self.writeDirs[0], os.path.basename(copyTestPath))
             plugins.ensureDirExistsForFile(target)
             collateMethod(fullPath, target)
     def copyTestPath(self, fullPath, target):

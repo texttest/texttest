@@ -349,6 +349,8 @@ class TextTest:
         appList = []
         app = self.createApplication(appName, dirName, pathname, version)
         appList.append(app)
+        if not app.configObject.useExtraVersions():
+            return appList
         extraVersions = app.getConfigValue("extra_version")
         for appVersion in app.versions:
             if appVersion in extraVersions:

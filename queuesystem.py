@@ -66,6 +66,8 @@ class QueueSystemConfig(default.Config):
             return 0
         else:
             return default.Config.useTextResponder(self)
+    def useExtraVersions(self):
+        return not self.slaveRun()
     def getCleanMode(self):
         if self.slaveRun():
             if self.optionMap.has_key("keeptmp"):
@@ -121,9 +123,6 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "'*'", "(SGE) Which SGE parallel environment to use when SUT is parallel")
-        if self.slaveRun():
-            # Shouldn't run extra versions in slaves (!)
-            app.addConfigEntry("extra_version", "{CLEAR LIST}")
 
 class SubmissionRules:
     def __init__(self, optionMap, test, nonTestProcess):

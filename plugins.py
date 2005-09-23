@@ -57,6 +57,8 @@ class Configuration:
     def getRunIdentifier(self):
         global globalStartTime
         return tmpString() + globalStartTime
+    def useExtraVersions(self):
+        return 1
     def printHelpText(self):
         pass
     def extraReadFiles(self, test):

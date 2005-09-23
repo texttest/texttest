@@ -602,6 +602,11 @@ class ConfigurationWrapper:
             return self.target.getRunIdentifier()
         except:
             self.raiseException(req = "run id")
+    def useExtraVersions(self):
+        try:
+            return self.target.useExtraVersions()
+        except:
+            self.raiseException(req = "extra versions")
     def addToOptionGroups(self, app, groups):
         try:
             return self.target.addToOptionGroups(app, groups)

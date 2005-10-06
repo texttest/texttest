@@ -230,7 +230,8 @@ class Config(carmen.CarmenConfig):
         app.setConfigDefault("build_targets", { "" : [] })
         app.addConfigEntry("need_rulecompile", "white", "test_colours")
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
-
+        app.addConfigEntry("ruleset_compiled", "white", "test_colours")
+        
 def getRaveName(test):
     return test.app.getConfigValue("rave_name")
 
@@ -448,11 +449,12 @@ class SynchroniseState(plugins.Action):
             return 0
         if testCompiling.state.category == "running_rulecompile" and test.state.category == "need_rulecompile":
             test.changeState(RunningRuleCompilation(test.state, testCompiling.state), notify=1)
-        elif testCompiling.state.category == "ruleset_compiled":
-            test.changeState(testCompiling.state, notify=1)
-        elif testCompiling.state.isComplete():
+        elif testCompiling.state.category == "unrunnable":
             errMsg = "Trying to use ruleset '" + test.state.rulesetName + "' that failed to build."
             test.changeState(RuleBuildFailed("Ruleset build failed (repeat)", errMsg), notify=1)
+        elif testCompiling.state.category == "ruleset_compiled" or testCompiling.state.hasStarted():
+            test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + \
+                                               test.state.rulesetName + " succesfully compiled"), notify=1)
         return 1
 
 class WaitForRuleCompile(queuesystem.WaitForCompletion):

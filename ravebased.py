@@ -452,7 +452,7 @@ class SynchroniseState(plugins.Action):
         elif testCompiling.state.category == "unrunnable":
             errMsg = "Trying to use ruleset '" + test.state.rulesetName + "' that failed to build."
             test.changeState(RuleBuildFailed("Ruleset build failed (repeat)", errMsg), notify=1)
-        elif testCompiling.state.category == "ruleset_compiled" or testCompiling.state.hasStarted():
+        elif not testCompiling.state.category.endswith("_rulecompile"):
             test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + \
                                                test.state.rulesetName + " succesfully compiled"), notify=1)
         return 1

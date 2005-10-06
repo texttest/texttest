@@ -279,17 +279,21 @@ class TextTestGUI:
             # Working around python bug 853411: main thread must do all forking
             state.notifyInMainThread()
             self.redrawTest(test, state)
-            if byAction:
+            if byAction and state.category != "not_started":
                 test.stateChangeEvent(state)
         else:
             self.redrawSuite(test)
         if self.rightWindowGUI and self.rightWindowGUI.object == test:
             self.recreateTestView(test)
     def notifyChange(self, test):
-        if currentThread() == self.actionThread:
-            self.workQueue.put((test, test.state))
-        else:
+        # GUI thread is the main thread, everything else should go to the work queue. Return
+        # whether we've notified another thread
+        if currentThread().getName() == "MainThread":
             self.testChanged(test, test.state, byAction = 0)
+        else:
+            self.workQueue.put((test, test.state))
+        # We'll deal with any application events in the GUI thread
+        return 1
     # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test, state):
         iter = self.itermap[test]
@@ -382,6 +386,7 @@ class TextTestGUI:
                 guilog.info("Recalculating result info for test: result file changed since created")
                 cmpAction = comparetest.MakeComparisons()
                 cmpAction(test)
+                test.notifyChanged()
             self.rightWindowGUI = TestCaseGUI(test, self.dynamic)
         if self.contents:
             self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=True, fill=True)
@@ -800,15 +805,9 @@ class TestCaseGUI(RightWindowGUI):
         textViewWindow.show()
         return textViewWindow
     def getTestInfo(self, test):
-        if not test:
+        if not test or test.classId() != "test-case":
             return ""
-        info = ""
-        if test.state.isComplete():
-            info = "Test " + repr(test.state) + "\n"
-        if len(test.state.freeText) > 0:
-            return info + str(test.state.freeText)
-        else:
-            return info.replace(" :", "")
+        return test.app.configObject.getTextualInfo(test)
     def performInteractiveAction(self, action):
         self.test.callAction(action)
     

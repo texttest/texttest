@@ -35,12 +35,14 @@ class Config(plugins.Configuration):
     def getActionSequence(self):
         return self._getActionSequence(makeDirs=1)
     def _getActionSequence(self, makeDirs):
-        catalogueCreator = self.getCatalogueCreator()
-        actions = [ self.getWriteDirectoryPreparer(), catalogueCreator, \
-                    self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
+        actions = [ self.getTestProcessor(), self.getTestPostProcessor() ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
+    def getTestProcessor(self):
+        catalogueCreator = self.getCatalogueCreator()
+        return [ self.getWriteDirectoryPreparer(), catalogueCreator, \
+                 self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def getFilterClasses(self):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  GrepFilter, batch.BatchFilter, performance.TimeFilter ]
@@ -65,10 +67,12 @@ class Config(plugins.Configuration):
         return filters
     def batchMode(self):
         return self.optionMap.has_key("b")
+    def keepTemporaryDirectories(self):
+        return self.optionMap.has_key("keeptmp") or (self.batchMode() and not self.isReconnecting())
     def getCleanMode(self):
         if self.isReconnectingFast():
             return self.CLEAN_NONE
-        if self.optionMap.has_key("keeptmp") or (self.batchMode() and not self.isReconnecting()):
+        if self.keepTemporaryDirectories():
             return self.CLEAN_PREVIOUS
         
         return self.CLEAN_NONBASIC | self.CLEAN_BASIC
@@ -105,7 +109,12 @@ class Config(plugins.Configuration):
         actions = [ self.getFileExtractor() ]
         if not self.isReconnectingFast():
             actions += [ self.getTestPredictionChecker(), self.getTestComparator(),
-                         self.getFailureExplainer(), SaveState() ]
+                         self.getFailureExplainer(), NotifyChanges() ]
+        return actions
+    def getTestPostProcessor(self):
+        actions = []
+        if self.keepTemporaryDirectories():
+            actions.append(SaveState())
         if self.useTextResponder():
             actions.append(self.getTestResponder())
         return actions
@@ -164,6 +173,35 @@ class Config(plugins.Configuration):
             return self.optionMap[option]
         else:
             return ""
+            info = ""
+    # For display in the GUI
+    def getTextualInfo(self, test):
+        info = ""
+        if test.state.isComplete():
+            info = "Test " + repr(test.state) + "\n"
+            if len(test.state.freeText) == 0:
+                info = info.replace(" :", "")
+        info += str(test.state.freeText)
+        if not test.state.isComplete():
+            info += self.progressText(test)
+        return info
+    def progressText(self, test):
+        perc = self.calculatePercentage(test)
+        if perc > 0:
+            return "\nFrom log file reckoned to be " + str(perc) + "% complete."
+        else:
+            return ""
+    def calculatePercentage(self, test):
+        logFileStem = test.getConfigValue("log_file")
+        stdFile = test.makeFileName(logFileStem)
+        tmpFile = test.makeFileName(logFileStem, temporary=1)
+        if not os.path.isfile(tmpFile) or not os.path.isfile(stdFile):
+            return 0
+        stdSize = os.path.getsize(stdFile)
+        tmpSize = os.path.getsize(tmpFile)
+        if stdSize == 0:
+            return 0
+        return (tmpSize * 100) / stdSize 
     def printHelpScripts(self):
         pass
     def printHelpDescription(self):
@@ -247,6 +285,10 @@ class Config(plugins.Configuration):
                                  "(UNIX) List of machines to run virtual display server (Xvfb) on")
             app.setConfigDefault("login_shell", self.defaultLoginShell(), \
                                  "(UNIX) Which shell to use when starting processes")
+
+class NotifyChanges(plugins.Action):
+    def __call__(self, test):
+        test.notifyChanged()
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
@@ -460,11 +502,18 @@ class RunTest(plugins.Action):
         # Change to the directory so any incidental files can be found easily
         os.chdir(test.writeDirs[0])
         return self.runTest(test, inChild)
+    def getExecutionMachines(self, test):
+        return [ gethostname() ]
     def changeToRunningState(self, test, process):
-        execMachines = [ gethostname() ]
+        execMachines = self.getExecutionMachines(test)
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
-        newState = self.runningClass(execMachines, process, "Running on " + gethostname())
-        test.changeState(newState)
+        briefText = self.getBriefText(execMachines)
+        freeText = "Running on " + string.join(execMachines, ",")
+        newState = self.runningClass(execMachines, process, briefText=briefText, freeText=freeText)
+        test.changeState(newState, notify=1)
+    def getBriefText(self, execMachines):
+        # Default to not bothering to print the machine name: all is local anyway
+        return ""
     def updateStateAfterRun(self, test):
         # space to add extra states after running
         pass
@@ -485,7 +534,7 @@ class RunTest(plugins.Action):
             return
         process = plugins.BackgroundProcess(testCommand, testRun=1)
         # Working around Python bug
-        test.changeState(Pending(process))
+        test.changeState(Pending(process), notify=1)
         process.waitForStart()
         if not inChild:
             self.changeToRunningState(test, process)
@@ -674,14 +723,14 @@ class ReconnectTest(plugins.Action):
         self.loadStoredState(test)
     def performReconnection(self, test):
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
-        if not self.canReconnectTo(reconnLocation):
-            raise plugins.TextTestError, "No test results found to reconnect to"
 
         if self.fullRecalculate:
             self.copyFiles(reconnLocation, test)
         else:
             test.writeDirs[0] = reconnLocation
     def copyFiles(self, reconnLocation, test):
+        if not self.canReconnectTo(reconnLocation):
+            return
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
             if os.path.isfile(fullPath):
@@ -690,16 +739,19 @@ class ReconnectTest(plugins.Action):
         if os.path.isfile(testStateFile):
             shutil.copyfile(testStateFile, test.getStateFile())
     def loadStoredState(self, test):
-        loaded = test.loadState(self.fullRecalculate)
-        if loaded:
-            # State will refer to TEXTTEST_HOME in the original (which we may not have now,
-            # and certainly don't want to save), try to fix this...
-            test.state.updateAbsPath(test.app.abspath)
-            self.describe(test, " (state " + test.state.category + ")")
+        storedState = test.getStoredState()
+        if self.fullRecalculate:
+            # Only pick up errors here, recalculate the rest. Don't notify until
+            # we're done with recalculation
+            if not storedState.hasResults():
+                test.changeState(storedState)
         else:
-            if not self.fullRecalculate:
-                raise plugins.TextTestError, "No teststate file found, cannot do fast reconnect. Maybe try full recalculation to see what happened"
-            self.describe(test)
+            test.changeState(storedState, notify=1)
+
+        # State will refer to TEXTTEST_HOME in the original (which we may not have now,
+        # and certainly don't want to save), try to fix this...
+        test.state.updateAbsPath(test.app.abspath)
+        self.describe(test, " (state " + test.state.category + ")")
     def canReconnectTo(self, dir):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0
@@ -740,8 +792,6 @@ class ReconnectTest(plugins.Action):
 class MachineInfoFinder:
     def findPerformanceMachines(self, app, fileStem):
         return app.getCompositeConfigValue("performance_test_machine", fileStem)
-    def updateExecutionHosts(self, test):
-        pass
     def setUpApplication(self, app):
         pass
 
@@ -766,13 +816,8 @@ class PerformanceFileCreator(plugins.Action):
                 return 0
         return 1
     def __call__(self, test, temp=1):
-        if test.state.isComplete():
-            return
-
-        # Get hold of any extra execution hosts that might have appeared by now...
-        self.machineInfoFinder.updateExecutionHosts(test)
-        self.diag.info("After execution host update in state " + repr(test.state))
-        return self.makePerformanceFiles(test, temp)
+        if not test.state.isComplete():
+            return self.makePerformanceFiles(test, temp)
 
 class UNIXPerformanceInfoFinder:
     def __init__(self, diag):
@@ -1029,3 +1074,39 @@ class DocumentScripts(plugins.Action):
                     print scriptName + "|" + docString
                 except AttributeError:
                     pass
+
+class ReplaceText(plugins.Action):
+    def __init__(self, args):
+        argDict = self.parseArguments(args)
+        self.oldText = argDict["old"]
+        self.newText = argDict["new"]
+        self.logFile = None
+        self.textDiffTool = None
+    def __repr__(self):
+        return "Replacing " + self.oldText + " with " + self.newText + " for"
+    def parseArguments(self, args):
+        currKey = ""
+        dict = {}
+        for arg in args:
+            if arg.find("=") != -1:
+                currKey, val = arg.split("=")
+                dict[currKey] = val
+            else:
+                dict[currKey] += " " + arg
+        return dict
+    def __call__(self, test):
+        self.describe(test)
+        sys.stdout.flush()
+        logFile = test.makeFileName(self.logFile)
+        newLogFile = test.makeFileName("new_" + self.logFile)
+        writeFile = open(newLogFile, "w")
+        for line in open(logFile).xreadlines():
+            writeFile.write(line.replace(self.oldText, self.newText))
+        writeFile.close()
+        os.system(self.textDiffTool + " " + logFile + " " + newLogFile)
+        os.rename(newLogFile, logFile)
+    def setUpSuite(self, suite):
+        self.describe(suite)
+    def setUpApplication(self, app):
+        self.logFile = app.getConfigValue("log_file")
+        self.textDiffTool = plugins.findDiffTool(app.getConfigValue("text_diff_program"))

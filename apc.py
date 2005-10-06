@@ -139,9 +139,8 @@ class ApcConfig(optimization.OptimizationConfig):
             return MakeProgressReportHTML(self.optionValue("prrep"), self.optionValue("prrephtml"))
         else:
             return MakeProgressReport(self.optionValue("prrep"))
-    def getRuleBuildObject(self, testRunner, jobNameCreator):
-        return ApcCompileRules(self.getRuleSetName, jobNameCreator, self.getRuleBuildFilter(), testRunner, \
-                               self.raveMode(), self.optionValue("rulecomp"))
+    def getRuleBuildObject(self):
+        return ApcCompileRules(self.getRuleSetName, self.raveMode(), self.optionValue("rulecomp"))
     def getSpecificTestRunner(self):
         return [ CheckFilesForApc(), self._getApcTestRunner() ]
     def _getApcTestRunner(self):
@@ -182,8 +181,21 @@ class ApcConfig(optimization.OptimizationConfig):
                 if option.find("crc" + os.sep + "rule_set") != -1:
                     return option.split(os.sep)[-1]
         return None
-    def statusUpdater(self):
-        return ApcUpdateStatus()
+    def getTextualInfo(self, test):
+        basicInfo = optimization.OptimizationConfig.getTextualInfo(self, test)
+        if test.state.hasStarted() and not test.state.isComplete():
+            return basicInfo + "\n" + self.getRunStatusInfo(test)
+        return basicInfo
+    def getRunStatusInfo(self, test):
+        subplanDir = test.writeDirs[-1]
+        runStatusHeadFile = os.path.join(subplanDir, "run_status_head")
+        if os.path.isfile(runStatusHeadFile):
+            try:
+                return open(runStatusHeadFile).read()
+            except (OSError,IOError):
+                return "Error opening/reading " + runStatusHeadFile                 
+        else:
+            return "Run status file is not avaliable yet."
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -368,9 +380,8 @@ class RunApcTestInDebugger(default.RunTest):
         self.describe(suite)
     
 class ApcCompileRules(ravebased.CompileRules):
-    def __init__(self, getRuleSetName, jobNameCreator, sFilter = None, testRunner = None, \
-                 modeString = "-optimize", ruleCompFlags = None):
-        ravebased.CompileRules.__init__(self, getRuleSetName, jobNameCreator, modeString, sFilter, testRunner)
+    def __init__(self, getRuleSetName, modeString = "-optimize", ruleCompFlags = None):
+        ravebased.CompileRules.__init__(self, getRuleSetName, modeString)
         self.ruleCompFlags = ruleCompFlags
         self.diag = plugins.getDiagnostics("ApcCompileRules")
     def compileRulesForTest(self, test):
@@ -451,19 +462,6 @@ class ApcCompileRules(ravebased.CompileRules):
             return 0
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
-
-class ApcUpdateStatus(queuesystem.UpdateTestStatus):
-    def getExtraRunData(self, test):
-         subplanDir = test.writeDirs[-1]
-         runStatusHeadFile = os.path.join(subplanDir, "run_status_head")
-         if os.path.isfile(runStatusHeadFile):
-             try:
-                 runStatusHead = open(runStatusHeadFile).read()
-                 return runStatusHead
-             except (OSError,IOError):
-                 return "Error opening/reading " + runStatusHeadFile                 
-         else:
-             return "Run status file is not avaliable yet."
                           
 class RemoveLogs(plugins.Action):
     def __call__(self, test):
@@ -475,18 +473,6 @@ class RemoveLogs(plugins.Action):
             os.remove(filePath)
     def __repr__(self):
         return "Remove logs"
-
-def getTestMachine(test):
-    diag = plugins.getDiagnostics("getTestMachineAndApcLogDir")
-    # Find which machine the job was run on.
-    if test.app.configObject.target.useLSF():
-        job = lsf.LSFServer.instance.findJob(test)
-        machine = job.machines[0]
-        diag.info("Test was run using LSF on " + machine)
-    else:
-        machine = gethostname()
-        diag.info("Test was run locally on " + machine)
-    return machine
 
 class FetchApcCore(unixonly.CollateFiles):
     def isApcLogFileKept(self, errorFileName):

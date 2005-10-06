@@ -50,7 +50,7 @@ class CheckPredictions(CheckLogFilePredictions):
         return "unknown " + crashType
     def collectErrors(self, test):
         if plugins.emergencySignal:
-            briefText, freeText = self.getKillText(plugins.emergencySignal)
+            briefText, freeText = self.getKillText()
             self.insertError(test, "killed", briefText, freeText + "\n")
             return 1
         # Hard-coded prediction: check test didn't crash
@@ -74,16 +74,9 @@ class CheckPredictions(CheckLogFilePredictions):
         for comp in compsNotFound:
             self.insertError(test, "badPredict", "missing '" + comp + "'")
         return errorsFound
-    def getKillText(self, sig):
-        if sig == signal.SIGUSR1:
-            return "RUNLIMIT", "Test exceeded maximum wallclock time allowed"
-        elif sig == signal.SIGXCPU:
-            return "CPULIMIT", "Test exceeded maximum cpu time allowed"
-        elif sig == signal.SIGUSR2:
-            timeStr = plugins.localtime("%H:%M")
-            return "killed at " + timeStr, "Test killed explicitly at " + timeStr
-        else:
-            return "signal " + str(sig), "Terminated by signal " + str(sig)
+    def getKillText(self):
+        brief, full = plugins.getSignalText()
+        return brief, "Test " + full
     def extractErrorsFrom(self, test, fileStem, compsNotFound):
         errorsFound = 0
         logFile = self.getLogFile(test, fileStem)

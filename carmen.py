@@ -55,20 +55,17 @@ def getMajorReleaseId(app):
     return "master"
 
 class CarmenSubmissionRules(queuesystem.SubmissionRules):
-    def __init__(self, optionMap, test, nonTestProcess):
-        queuesystem.SubmissionRules.__init__(self, optionMap, test, nonTestProcess)
+    def __init__(self, optionMap, test):
+        queuesystem.SubmissionRules.__init__(self, optionMap, test)
         # Must cache all environment variables, they may not be preserved in queue system thread...
-        self.envPerfCategory = ""
-        if not nonTestProcess and os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
-            self.envPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
+        self.presetPerfCategory = ""
+        if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
+            self.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
     # Return "short", "medium" or "long"
     def getPerformanceCategory(self):
-        # RAVE compilations
-        if self.nonTestProcess:
-            return "short"
-        # Hard-coded, useful at boundaries
-        if self.envPerfCategory:
-            return self.envPerfCategory
+        # Hard-coded, useful at boundaries and for rave compilations
+        if self.presetPerfCategory:
+            return self.presetPerfCategory
         cpuTime = performance.getTestPerformance(self.test)
         if cpuTime < self.test.getConfigValue("maximum_cputime_for_short_queue"):
             return "short"
@@ -105,12 +102,12 @@ class SgeSubmissionRules(CarmenSubmissionRules):
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]
     def getSubmitSuffix(self, name):
-        return name + " queue " + self.findQueueResource() + ", requesting " + string.join(self.findConcreteResources(), ",")
+        return " to " + name + " queue " + self.findQueueResource() + ", requesting " + string.join(self.findConcreteResources(), ",")
 
 class LsfSubmissionRules(CarmenSubmissionRules):
     def findDefaultQueue(self):
         arch = getArchitecture(self.test.app)
-        if arch == "i386_linux" and not self.nonTestProcess:
+        if arch == "i386_linux" and not self.presetPerfCategory:
             cpuTime = performance.getTestPerformance(self.test)
             chunkLimit = float(self.test.app.getConfigValue("maximum_cputime_for_chunking"))
             if cpuTime > 0 and cpuTime < chunkLimit:
@@ -162,11 +159,11 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return self.getFileCollator()
     def getFileCollator(self):
         return queuesystem.QueueSystemConfig.getTestCollator(self)
-    def getSubmissionRules(self, test, nonTestProcess):
+    def getSubmissionRules(self, test):
         if queuesystem.queueSystemName(test.app) == "LSF":
-            return LsfSubmissionRules(self.optionMap, test, nonTestProcess)
+            return LsfSubmissionRules(self.optionMap, test)
         else:
-            return SgeSubmissionRules(self.optionMap, test, nonTestProcess)
+            return SgeSubmissionRules(self.optionMap, test)
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob"

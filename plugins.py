@@ -27,6 +27,18 @@ def localtime(format="%d%b%H:%M:%S"):
 
 globalStartTime = localtime()
 
+# utility for emergency signals, give a brief and a longer description of what they mean
+def getSignalText():
+    if emergencySignal == signal.SIGUSR1:
+        return "RUNLIMIT", "exceeded maximum wallclock time allowed"
+    elif emergencySignal == signal.SIGXCPU:
+        return "CPULIMIT", "exceeded maximum cpu time allowed"
+    elif emergencySignal == signal.SIGUSR2:
+        timeStr = localtime("%H:%M")
+        return "killed at " + timeStr, "killed explicitly at " + timeStr
+    else:
+        return "signal " + str(emergencySignal), "terminated by signal " + str(emergencySignal)
+
 # Need somewhat different formats on Windows/UNIX
 def tmpString():
     if os.environ.has_key("USER"):
@@ -63,6 +75,8 @@ class Configuration:
         pass
     def extraReadFiles(self, test):
         return {}
+    def getTextualInfo(self, test):
+        return ""
     def setApplicationDefaults(self, app):
         pass
     
@@ -142,10 +156,6 @@ class TestState:
     def needsRecalculation(self):
         # Is some aspect of the state out of date
         return 0
-    def displayDataChange(self, oldState):
-        return self.category != oldState.category or self.briefText != oldState.briefText
-    def timeElapsedSince(self, oldState):
-        return (self.isComplete() != oldState.isComplete()) or (self.hasStarted() != oldState.hasStarted())
     # Used by text interface to print states
     def getDifferenceSummary(self, actionDesc):
         if self.freeText:
@@ -210,6 +220,14 @@ def commasplit(input):
 # Another useful thing that saves an import and remembering weird stuff
 def modifiedTime(filename):
     return os.stat(filename)[stat.ST_MTIME]
+
+def findDiffTool(name):
+    if name != "ndiff":
+        return name
+    for dir in sys.path:
+        fullPath = os.path.join(dir, "ndiff.py")
+        if os.path.isfile(fullPath):
+            return sys.executable + " " + fullPath + " -q"
 
 # Another useful utility, for moving files around and copying where not possible
 def movefile(sourcePath, targetFile):
@@ -284,8 +302,17 @@ def ensureDirectoryExists(path):
         if os.path.isdir(path):
             return
         detailStr = str(detail)
-        if detailStr.find("Interrupted system call") != -1:
+        if detailStr.find("Interrupted system call") != -1 or detailStr.find("File exists") != -1:
             return ensureDirectoryExists(path)
+        else:
+            raise
+
+def retryOnInterrupt(function, *args):
+    try:
+        return function(*args)
+    except IOError, detail:
+        if str(detail).find("Interrupted system call") != -1:
+            return retryOnInterrupt(function, *args)
         else:
             raise
 
@@ -295,6 +322,25 @@ def printException():
     exceptionString = string.join(format_exception(type, value, traceback), "")
     sys.stderr.write(exceptionString)
     return exceptionString
+
+class PreviewGenerator:
+    def __init__(self, maxWidth, maxLength):
+        self.maxWidth = maxWidth
+        self.maxLength = maxLength
+    def getPreview(self, file):
+        linesWritten = 0
+        fullText = ""
+        for line in file.xreadlines():
+            if linesWritten < self.maxLength:
+                fullText += self.getWrappedLine(line)
+                linesWritten += 1
+        file.close()
+        return fullText
+    def getWrappedLine(self, line):
+        if len(line) <= self.maxWidth:
+            return line
+        truncatedLine = line[:self.maxWidth]
+        return truncatedLine + "\n" + self.getWrappedLine(line[self.maxWidth:])
     
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):
@@ -323,7 +369,6 @@ class OptionFinder(seqdict):
         else:
             return item[1:].strip()
     
-
 # Action for wrapping an executable that isn't Python, or can't be imported in the usual way
 class NonPythonAction(Action):
     def __init__(self, actionText):

@@ -203,6 +203,8 @@ class MakeTmpSubPlan(plugins.Action):
     def tearDownSuite(self, suite):
         self.unreadRaveParameters()
     def __call__(self, test):
+        if test.state.isComplete():
+            return
         dirName = self.subplanFunction(test)
         if not os.path.isdir(dirName):
             raise plugins.TextTestError, "Cannot run test, subplan directory at " + dirName + " does not exist"

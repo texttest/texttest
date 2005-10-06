@@ -1,12 +1,10 @@
 
 import os, string
 
+# Used by the master to submit, monitor and delete jobs...
 class QueueSystem:
-    def __init__(self, envString):
-        self.activeJobs = {}
-        self.envString = envString
-    def getSubmitCommand(self, jobName, submissionRules):
-        bsubArgs = "-J " + jobName
+    def getSubmitCommand(self, submissionRules):
+        bsubArgs = "-J " + submissionRules.getJobName()
         if submissionRules.processesNeeded != "1":
             bsubArgs += " -n " + submissionRules.processesNeeded
         queue = submissionRules.findQueue()
@@ -28,8 +26,6 @@ class QueueSystem:
         return ""
     def getJobFailureInfo(self, jobId):
         return os.popen("bjobs -a -l " + jobId).read()
-    def exitedWithError(self, job):
-        return job.status == "EXIT"
     def killJob(self, jobId):
         os.system("bkill -s USR2 " + jobId + " > /dev/null 2>&1")
     def getJobId(self, line):
@@ -72,68 +68,8 @@ class QueueSystem:
             return res.replace("=", "==")
         else:
             return res
-    def updateJobs(self):
-        commandLine = self.envString + "bjobs -a -w " + string.join(self.activeJobs.keys())
-        stdin, stdout, stderr = os.popen3(commandLine)
-        self.parseBjobsOutput(stdout)
-        self.parseBjobsErrors(stderr)
-    def parseBjobsOutput(self, stdout):
-        for line in stdout.xreadlines():
-            if line.startswith("JOBID"):
-                continue
-            words = line.strip().split()
-            jobId = words[0]
-            job = self.activeJobs[jobId]
-            status = words[2]
-            if job.status == "PEND" and status != "PEND" and len(words) >= 6:
-                fullMachines = words[5].split(':')
-                job.machines = map(lambda x: x.split('.')[0], fullMachines)
-            if status == "EXIT":
-                if self._requeueTest(words):
-                    job.machines = []
-                    status = "PEND"
-            job.status = status
-            if status == "EXIT" or status == "DONE":
-                del self.activeJobs[jobId]
-    def parseBjobsErrors(self, stderr):
-        # Assume anything we can't find any more has completed OK
-        for errorMessage in stderr.readlines():
-            if not errorMessage or errorMessage.find("still trying") != -1:
-                continue
-            jobId = self.getJobId(errorMessage)
-            if not self.activeJobs.has_key(jobId):
-                print "ERROR: unexpected output from bjobs :", errorMessage.strip()
-                continue
-            
-            job = self.activeJobs[jobId]
-            job.status = "DONE"
-            del self.activeJobs[jobId]
-    def _requeueTest(self, jobInfoList): # REQUEUE if last two log message bhist lines contains REQUEUE_PEND and Exited
-        jobId = jobInfoList[0]
-        std = os.popen("bhist -l " + jobId + " 2>&1")
-        requeueLine = ""
-        exitLine = ""
-        for line in std.xreadlines():
-            colonParts = line.split(":")
-            if len(colonParts) < 4:
-                continue
-            logMsg = colonParts[3]
-            if len(logMsg.strip()) == 0:
-                continue
-            if logMsg.find("REQUEUE_PEND") != -1:
-                requeueLine = colonParts[3]
-                exitLine = ""
-                continue
-            if len(requeueLine) > 0 and logMsg.find("Exited") != -1:
-                exitLine = logMsg
-                continue
-            if logMsg.find("Starting"):
-                requeueLine = ""
-                exitLine = ""
-        if len(requeueLine) > 0:
-            return 1
-        return 0
 
+# Used by the slave for getting performance info
 class MachineInfo:
     def findActualMachines(self, machineOrGroup):
         machines = []
@@ -155,7 +91,8 @@ class MachineInfo:
             jobName = fields[6]
             jobs.append((user, jobName))
         return jobs
-    # Need to get all hosts for parallel
-    def findAllMachinesForJob(self):
-        hosts = os.environ["LSB_HOSTS"].split(":")
-        return [ host.split(".")[0] for host in hosts ] 
+    
+# Need to get all hosts for parallel
+def getExecutionMachines():
+    hosts = os.environ["LSB_HOSTS"].split(":")
+    return [ host.split(".")[0] for host in hosts ] 

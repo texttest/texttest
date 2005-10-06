@@ -1,17 +1,13 @@
 
 import os, string, signal
 from plugins import getDiagnostics, localtime
-from queuesystem import QueueSystemLostJob
 from time import sleep
 
+# Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem:
-    def __init__(self, envString):
-        self.activeJobs = {}
-        self.envString = envString
-        self.diag = getDiagnostics("Queue System Thread")
-        self.jobExitStatusCache = {}
-    def getSubmitCommand(self, jobName, submissionRules):
+    def getSubmitCommand(self, submissionRules):
         # Sungrid doesn't like : or / in job names
+        jobName = submissionRules.getJobName()
         qsubArgs = "-N " + jobName.replace(":", "").replace("/", ".")
         if submissionRules.processesNeeded != "1":
             qsubArgs += " -pe " + submissionRules.getParallelEnvironment() + " " + \
@@ -25,17 +21,18 @@ class QueueSystem:
         outputFile, errorsFile = submissionRules.getJobFiles()
         qsubArgs += " -w e -notify -m n -cwd -b y -V -o " + outputFile + " -e " + errorsFile
         return "qsub " + qsubArgs
+    def getResourceArg(self, submissionRules):
+        resourceList = submissionRules.findResourceList()
+        machines = submissionRules.findMachineList()
+        if len(machines):
+            resourceList.append("hostname='" + string.join(machines, "|") + "'")
+        return string.join(resourceList, ",")
     def findSubmitError(self, stderr):
         errLines = stderr.readlines()
         if len(errLines):
             return errLines[0].strip()
         else:
             return ""
-    def getJobFailureInfo(self, jobId):
-        try:
-            return string.join(self.getAccounting(jobId))
-        except QueueSystemLostJob, e:
-            return str(e)
     def killJob(self, jobId):
         os.system("qdel " + jobId + " > /dev/null 2>&1")
     def getJobId(self, line):
@@ -47,68 +44,19 @@ class QueueSystem:
             else:
                 print "Unexpected output from qsub :", line.strip()
         return ""
-    def getResourceArg(self, submissionRules):
-        resourceList = submissionRules.findResourceList()
-        machines = submissionRules.findMachineList()
-        if len(machines):
-            resourceList.append("hostname='" + string.join(machines, "|") + "'")
-        return string.join(resourceList, ",")
-    def getStatus(self, sgeStat, states, jobId):
-        # Use LSF status names for now as queuesystem.py expects them. man qstat gives
-        # states as d(eletion), t(ransfering), r(unning), R(estarted), s(uspended),
-        # S(uspended),  T(hreshold),  w(aiting) or h(old).
-        # However, both pending and completed jobs seem to have state 'qw'
-        self.diag.info("Got status = " + sgeStat)
-        if sgeStat.startswith("E"):
-            return "ERROR"
-        elif sgeStat.startswith("r") or sgeStat.startswith("d"):
-            return "RUN"
-        elif sgeStat.startswith("t") or sgeStat.startswith("w"):
-            return "PEND"
-        elif sgeStat.startswith("q"):
-            if states == "z":
-                return "DONE"
-            else:
-                return "PEND"
-        elif sgeStat.startswith("s") or sgeStat.startswith("S") or sgeStat.startswith("T"):
-            return "SSUSP"
-        elif sgeStat.startswith("h"):
-            return "USUSP"
-        else:
-            return sgeStat
-    def exitedWithError(self, job):
-        return self.exitStatus(job.jobId) > 0
-    def exitStatus(self, jobId):
-        if self.jobExitStatusCache.has_key(jobId):
-            status = self.jobExitStatusCache[jobId]
-            if status is None:
-                raise QueueSystemLostJob, "SGE already lost job:" + jobId
-        try:
-            lines = self.getAccounting(jobId)
-        except QueueSystemLostJob:
-            self.jobExitStatusCache[jobId] = None
-            raise
-        exitStatus = None
-        for line in lines:
-            if line.startswith("exit_status"):
-                exitStatus = int(line.strip().split()[-1])
-                break
-        self.jobExitStatusCache[jobId] = exitStatus
-        return exitStatus
-    def getAccounting(self, jobId):
+    def getJobFailureInfo(self, jobId):
         trials = 10
         sleepTime = 0.5
         while trials > 0:
             errMsg, lines = self.tryGetAccounting(jobId)
             if len(errMsg) == 0:
-                return lines
+                return string.join(lines)
             # assume errMsg is because the job hasn't propagated yet, wait a bit
             sleep(sleepTime)
             if sleepTime < 5:
                 sleepTime *= 2
             trials -= 1
-        # SGE has lost the job
-        raise QueueSystemLostJob, "SGE lost job:" + jobId
+        return "SGE lost job:" + jobId
     def tryGetAccounting(self, jobId):
         errMsg, lines, found = self.getAccountingInfo(jobId, "")
         logNum = 0
@@ -132,7 +80,6 @@ class QueueSystem:
             cmdLine = "qacct -f " + file + " -j " + jobId
         else:
             cmdLine = "qacct -j " + jobId
-        self.diag.info(cmdLine + " at " + localtime())
         stdin, stdout, stderr = os.popen3(cmdLine)
         errMsg = stderr.readlines()
         lines = stdout.readlines()
@@ -140,64 +87,8 @@ class QueueSystem:
             return errMsg, lines, 0
         else:
             return errMsg, lines, 1
-    def updateJobs(self):
-        self._updateJobs("prs")
-        self._updateJobs("z")
-    def _updateJobs(self, states):
-        commandLine = self.envString + "qstat -s " + states + " -u " + os.environ["USER"]
-        self.diag.info("At " + localtime() + " : qstat -s " + states)
-        stdin, stdout, stderr = os.popen3(commandLine)
-        self.parseQstatOutput(stdout, states)
-        self.parseQstatErrors(stderr)
-    def parseQstatOutput(self, stdout, states):
-        for line in stdout.xreadlines():
-            line = line.strip()
-            if line.startswith("job") or line.startswith("----") or line == "":
-                continue
-            words = line.split()
-            jobId = words[0]
-            if not self.activeJobs.has_key(jobId):
-                continue
-            job = self.activeJobs[jobId]
-            status = self.getStatus(words[4], states, jobId)
-            if status == "ERROR":
-                job.errorMessage = self.getJobError(job.jobId)
-                return
-            if job.status == "PEND" and status != "PEND" and len(words) >= 6:
-                self.setJobHost(job, words[7])
-            job.status = status
-            if status == "EXIT" or status == "DONE":
-                del self.activeJobs[jobId]
-    def getJobError(self, jobId):
-        self.killJob(jobId)
-        jobError = "Job ended in state 'Eqw'"
-        del self.activeJobs[jobId]
-        for line in self.getAccounting(jobId):
-            if line.startswith("failed"):
-                return jobError + " - SGE message '" + line.strip() + "'"
-        return jobError + " - no SGE message could be found"
-    def setJobHost(self, job, queueName):
-        parts = queueName.split('@')
-        if len(parts) > 1:
-            fullMachine = parts[-1]
-            job.machines = [ fullMachine.split('.')[0] ]
-        else:
-            if len(job.machines) < 1:
-                job.machines = [ "UNKNOWN" ]
-    def parseQstatErrors(self, stderr):
-        # Assume anything we can't find any more has completed OK
-        for errorMessage in stderr.readlines():
-            if not errorMessage:
-                continue
-            jobId = self.getJobId(errorMessage)
-            if not self.activeJobs.has_key(jobId):
-                print "ERROR: unexpected output from qstat :", errorMessage.strip()
-                continue
-            
-            job = self.activeJobs[jobId]
-            job.status = "DONE"
-            del self.activeJobs[jobId]
-    
+
+# Used by slave for producing performance data
 class MachineInfo:
     def findActualMachines(self, machineOrGroup):
         # In LSF this unpacks host groups, taking advantage of the fact that they are
@@ -228,19 +119,22 @@ class MachineInfo:
                 jobName = line.split(":")[-1].strip()
                 jobs.append((user, jobName))
         return jobs
-    def findAllMachinesForJob(self):
-        if not os.environ.has_key("PE_HOSTFILE"):
-            return []
-        hostlines = open(os.environ["PE_HOSTFILE"]).readlines()
-        hostlist = []
-        for line in hostlines:
-            parts = line.strip().split()
-            if len(parts) < 2:
-                continue
-            host = parts[0].split(".")[0]
-            counter = int(parts[1])
-            while counter > 0:
-                hostlist.append(host)
-                counter = counter - 1
-        return hostlist
+
+# Used by slave to find all execution machines    
+def getExecutionMachines():
+    if not os.environ.has_key("PE_HOSTFILE"):
+        from socket import gethostname
+        return [ gethostname() ]
+    hostlines = open(os.environ["PE_HOSTFILE"]).readlines()
+    hostlist = []
+    for line in hostlines:
+        parts = line.strip().split()
+        if len(parts) < 2:
+            continue
+        host = parts[0].split(".")[0]
+        counter = int(parts[1])
+        while counter > 0:
+            hostlist.append(host)
+            counter = counter - 1
+    return hostlist
 

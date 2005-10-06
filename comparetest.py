@@ -219,12 +219,12 @@ class MakeComparisons(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
     def categorise(self, state):
-        if not state.hasResults():
-            raise plugins.TextTestError, "No output files at all produced, presuming problems running test " + state.hostString() 
         if state.failedPrediction:
             # Keep the category we had before
             state.freeText += self.getFreeTextInfo(state)
             return
+        if not state.hasResults():
+            raise plugins.TextTestError, "No output files at all produced, presuming problems running test " + state.hostString() 
         worstResult = state.getMostSevereFileComparison()
         if not worstResult:
             state.category = "success"
@@ -246,36 +246,18 @@ class MakeComparisons(plugins.Action):
         return "------------------ " + titleText + " --------------------"
     def fileComparisonBody(self, comparison):
         if comparison.newResult():
-            return self.getPreview(open(comparison.tmpFile))
+            return self.previewGenerator.getPreview(open(comparison.tmpFile))
         
         cmdLine = self.textDiffTool + " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
         stdout = os.popen(cmdLine)
-        return self.getPreview(stdout)
-    def getPreview(self, file):
-        linesWritten = 0
-        fullText = ""
-        for line in file.xreadlines():
-            if linesWritten < self.lineCount:
-                fullText += self.getWrappedLine(line)
-                linesWritten += 1
-        file.close()
-        return fullText
-    def getWrappedLine(self, line):
-        if len(line) <= self.maxLineWidth:
-            return line
-        truncatedLine = line[:self.maxLineWidth]
-        return truncatedLine + "\n" + self.getWrappedLine(line[self.maxLineWidth:])
+        return self.previewGenerator.getPreview(stdout)
     def findTextDiffTool(self, app):
         configVal = app.getConfigValue("text_diff_program")
-        if configVal != "ndiff":
-            return configVal
-        for dir in sys.path:
-            fullPath = os.path.join(dir, "ndiff.py")
-            if os.path.isfile(fullPath):
-                return sys.executable + " " + fullPath + " -q"
+        return plugins.findDiffTool(configVal)
     def setUpApplication(self, app):
-        self.lineCount = app.getConfigValue("lines_of_text_difference")
-        self.maxLineWidth = app.getConfigValue("max_width_text_difference")
+        maxLength = app.getConfigValue("lines_of_text_difference")
+        maxWidth = app.getConfigValue("max_width_text_difference")
+        self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = self.findTextDiffTool(app)
 
 class FileComparison:

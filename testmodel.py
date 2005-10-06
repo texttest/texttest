@@ -125,8 +125,13 @@ class Test:
         readFiles[""] = localFiles
         return readFiles + self.app.configObject.extraReadFiles(self)
     def notifyChanged(self):
+        debugLog.info("Change notified, test " + self.name + " in state " + self.state.category)
+        # If other threads process this change, leave it to them to send the state change event
+        otherThreads = 0
         for observer in self.observers:
-            observer.notifyChange(self)
+            otherThreads |= observer.notifyChange(self)
+        if not otherThreads and self.state.category != "not_started":
+            self.stateChangeEvent(self.state)
     def getRelPath(self):
         # We standardise communication around UNIX paths, it's all much easier that way
         relPath = self.abspath.replace(self.app.abspath, "").replace(os.sep, "/")
@@ -205,6 +210,9 @@ class TestCase(Test):
             outVarName = diagDict["write_directory_variable"]
             self.addDiagVariable(diagDict, outVarName, basicWriteDir)
         self.setUseCaseEnvironment()
+        # Always include the working directory of the test in PATH, to pick up linked
+        # executables. Allow for expansion of references...
+        self.environment["PATH"] = self.writeDirs[0] + os.pathsep + "$PATH"
     def setUseCaseEnvironment(self):
         if self.useJavaRecorder():
             self.properties.addEntry("jusecase", {}, insert=1)
@@ -288,43 +296,37 @@ class TestCase(Test):
     def filesChanged(self):
         self._setOptions()
         self.notifyChanged()
-    def changeState(self, state):
-        oldState = self.state
+    def changeState(self, state, notify=0):
         self.state = state
-        # Notify GUI of all category changes
-        if state.displayDataChange(oldState):
+        if notify:
             self.notifyChanged()
-        # Check that the state change involved moving on in time, not just re-classifying
-        # Tests changing state are reckoned to be significant enough to wait for...
-        if state.timeElapsedSince(oldState):
-            self.stateChangeEvent(state)
     def stateChangeEvent(self, state):
         eventName = "test " + self.uniqueName + " to " + state.changeDescription()
         category = self.uniqueName
-        # Files abound here, we wait a little for them to clear up
-        try:
-            ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=1)
-        except UseCaseScriptError:
-            # This will be raised if we're in a subthread, i.e. if the GUI is running
-            # Rely on the GUI to report the same event
-            pass
+        ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=1)
+        debugLog.info("Sent application event " + eventName)
     def getStateFile(self):
         return self.makeFileName("teststate", temporary=1, forComparison=0)
-    def loadState(self, retrieveErrorsOnly = 0):
+    def getFileToLoad(self):
         stateFile = self.getStateFile()
         if not os.path.isfile(stateFile):
-            return 0
+            return None
         
-        file = open(stateFile)
+        return open(stateFile)
+    def getStoredState(self):
+        file = self.getFileToLoad()
+        return self.getNewState(file)
+    def loadState(self, file):
+        state = self.getNewState(file)
+        self.changeState(state, notify=1)
+    def getNewState(self, file):
+        if not file:
+            return plugins.TestState("unrunnable", briefText="no results", freeText="No file found to load results from", completed=1)
         try:
             unpickler = Unpickler(file)
-            state = unpickler.load()
+            return unpickler.load()
         except UnpicklingError:
-            return 0
-        if retrieveErrorsOnly and state.hasResults():
-            return 0
-        self.changeState(state)
-        return 1
+            return plugins.TestState("unrunnable", briefText="read error", freeText="Failed to read results file", completed=1)
     def saveState(self):
         stateFile = self.getStateFile()
         if os.path.isfile(stateFile):
@@ -644,6 +646,11 @@ class ConfigurationWrapper:
             return self.target.extraReadFiles(test)
         except:
             self.raiseException(req = "extra read files")
+    def getTextualInfo(self, test):
+        try:
+            return self.target.getTextualInfo(test)
+        except:
+            self.raiseException(req = "textual info")
     def getExecuteCommand(self, test, binary):
         try:
             return self.target.getExecuteCommand(test, binary)
@@ -1067,6 +1074,7 @@ class OptionFinder(plugins.OptionFinder):
         global debugLog, directoryLog
         debugLog = plugins.getDiagnostics("texttest")
         directoryLog = plugins.getDiagnostics("directories")
+        debugLog.info("Replaying from " + repr(os.getenv("USECASE_REPLAY_SCRIPT")))
     def _disableDiags(self):
         rootLogger = log4py.Logger().get_root()        
         rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)

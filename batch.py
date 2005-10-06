@@ -50,32 +50,43 @@ class BatchCategory(plugins.Filter):
             self.briefDescription, self.longDescription = state.categoryDescriptions[self.name]
         else:
             self.briefDescription, self.longDescription = self.name, self.name
-        self.allTests = []
-        self.testLines = {}
+        self.tests = {}
+        self.testSuites = []
     def addTest(self, test):
+        self.tests[test.getRelPath()] = test
+    def getTestLine(self, test):
         overall, postText = test.state.getTypeBreakdown()
         if postText == self.name.upper():
             # Don't double report here
             postText = ""
         elif len(postText) > 0:
             postText = " : " + postText
-        self.testLines[test.getRelPath()] = test.getIndent() + "- " + repr(test) + postText + "\n"
-        self.allTests.append(test)
+        return test.getIndent() + "- " + repr(test) + postText + "\n"
+    def size(self):
+        return len(self.tests)
     def acceptsTestCase(self, test):
-        return self.testLines.has_key(test.getRelPath())
+        return self.tests.has_key(test.getRelPath())
     def describeBrief(self, app):
-        if len(self.allTests) > 0:
+        if self.size() > 0:
             valid, suite = app.createTestSuite([ self ])
+            self.testSuites.append(suite)
             return "The following tests " + self.longDescription + " : \n" + \
                    self.getTestLines(suite) + "\n"
     def getTestLines(self, test):
         if test.classId() == "test-case":
-            return self.testLines[test.getRelPath()]
+            realTest = self.tests[test.getRelPath()]
+            return self.getTestLine(realTest)
         else:
             lines = test.getIndent() + "In " + repr(test) + ":\n"
             for subtest in test.testcases:
                 lines += self.getTestLines(subtest)
             return lines
+    def getAllTests(self):
+        allTests = []
+        for suite in self.testSuites:
+            for test in suite.testCaseList():
+                allTests.append(self.tests[test.getRelPath()])
+        return allTests
     def describeFull(self):
         fullDescriptionString = self.getFullDescription()
         if fullDescriptionString:
@@ -84,7 +95,7 @@ class BatchCategory(plugins.Filter):
             return ""
     def getFullDescription(self):
         fullText = ""
-        for test in self.allTests:
+        for test in self.getAllTests():
             freeText = test.state.freeText
             if freeText:
                 fullText += "--------------------------------------------------------" + "\n"
@@ -137,7 +148,7 @@ class BatchResponder(respond.Responder):
     def totalTests(self, categoryList):
         count = 0
         for category in categoryList:
-            count += len(category.allTests)
+            count += category.size()
         return count
     def getFailuresBrief(self):
         contents = ""
@@ -319,7 +330,7 @@ class MailSender(plugins.Action):
         total = 0
         for resp in appResponders:
             if resp.categories.has_key(categoryName):
-                total += len(resp.categories[categoryName].allTests)
+                total += resp.categories[categoryName].size()
         return total
     def getBriefDescription(self, categoryName, appResponders):
         for resp in appResponders:

@@ -42,11 +42,19 @@ class AddSlaveSocket(plugins.Action):
         self.serverAddress = (host, int(port))
     def __call__(self, test):
         test.observers.append(self)
+    def connect(self, sendSocket):
+        for attempt in range(5):
+            try:
+                sendSocket.connect(self.serverAddress)
+                return
+            except socket.error:
+                sleep(1)
+        sendSocket.connect(self.serverAddress)
     def notifyChange(self, test):
         testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
         pickleData = dumps(test.state)
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sendSocket.connect(self.serverAddress)
+        self.connect(sendSocket)
         sendSocket.sendall(testData + os.linesep + pickleData)
         sendSocket.close()
         # No other threads to be notified here...

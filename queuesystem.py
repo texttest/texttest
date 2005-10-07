@@ -332,6 +332,10 @@ class SubmitTest(plugins.Action):
     def __call__(self, test):
         if not self.shouldSubmit(test):
             return
+
+        if plugins.emergencySignal:
+            raise plugins.TextTestError, "Termination time already reached when trying to submit to " + \
+                  queueSystemName(test.app)
         
         self.tryStartServer()
         command = self.getExecuteCommand(test)

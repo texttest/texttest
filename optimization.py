@@ -60,6 +60,8 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                No line type grouping for different versions of the test.
                              - v=v1,v2
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
+                               Moreover, you may supply a time scale factor for the different versions
+                               using the syntax v1:scale1,v2:scale2.
                              - sg
                                Plot all tests chosen on the same graph, rather than one window per test
                              - title=graphtitle
@@ -1497,19 +1499,27 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
             foundTmp, logFile = logFileFinder.findFile()
             if foundTmp:
-                self.writePlotFiles("this run", logFile, test)
+                self.writePlotFiles("this run", logFile, test, None)
         stdFile = test.makeFileName(logFileStem)
         if os.path.isfile(stdFile):
-            self.writePlotFiles("std result", stdFile, test)
-        for version in plugins.commasplit(self.optionGroup.getOptionValue("v")):
+            self.writePlotFiles("std result", stdFile, test, None)
+        for versionItem in plugins.commasplit(self.optionGroup.getOptionValue("v")):
+            if versionItem.find(":") == -1:
+                versionName = version = versionItem
+                scaling = None
+            else:
+                tmp = versionItem.split(":")
+                version = tmp[0]
+                scaling = float(tmp[1])
+                versionName = version + " scaling " + str(scaling)
             if version:
                 if not noTmp:
                     logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
                     foundTmp, logFile = logFileFinder.findFile(version)
                     if foundTmp:
-                        self.writePlotFiles(version + "run", logFile, test)
+                        self.writePlotFiles(versionName + "run", logFile, test, scaling)
                 logFile = test.makeFileName(logFileStem, version)
-                self.writePlotFiles(version, logFile, test)
+                self.writePlotFiles(versionName, logFile, test, scaling)
                 if not logFile.endswith(version):
                     print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version 
         if not self.externalGraph:
@@ -1533,7 +1543,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         title = self.optionGroup.getOptionValue("title")
         printer = self.optionGroup.getOptionValue("pr")
         return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title
-    def writePlotFiles(self, lineName, logFile, test):
+    def writePlotFiles(self, lineName, logFile, test, scaling):
         plotItems = self.getItemsToPlot()
         optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
         if len(optRun.solutions) == 0:
@@ -1546,7 +1556,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
                     averager = self.plotAveragers[lineName+item] = PlotAverager(self.test.app.writeDirectory)
                 else:
                     averager = self.plotAveragers[lineName+item]
-            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), averager)
+            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), scaling, averager)
             self.testGraph.addLine(plotLine)
 
 class StartStudio(guiplugins.InteractiveAction):
@@ -1579,7 +1589,7 @@ class StartStudio(guiplugins.InteractiveAction):
 guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUI, StartStudio ]
 
 class PlotLine:
-    def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale, averager):
+    def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale, scaling, averager):
         self.test = test
         self.name = lineName
         self.lineType = None
@@ -1587,21 +1597,23 @@ class PlotLine:
         if item != costEntryName:
             self.name += "." + item
         self.axisLabels = {}
-        timeScaleFactor = 0
+        timeScaleFactor = 0.0
         if plotAgainstSolution:
             self.axisLabels["x"] = "Solution number"
         else:
             if plotTimeScale == "hours":
-                timeScaleFactor = 60
+                timeScaleFactor = 1.0/60.0
                 self.axisLabels["x"] = "CPU time (hours)"
             elif plotTimeScale == "days":
-                timeScaleFactor = 60*24
+                timeScaleFactor = 1.0/(60.0*24.0)
                 self.axisLabels["x"] = "CPU time (days)"
             else:
                 if not plotTimeScale == "minutes":
                     print "Unknown time scale unit", plotTimeScale, ", using minutes."
-                timeScaleFactor = 1
+                timeScaleFactor = 1.0
                 self.axisLabels["x"] = "CPU time (min)"
+        if scaling:
+            timeScaleFactor *= scaling
         self.axisLabels["y"] = item
         self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
         graph = self.writeFile(optRun, item, plotAgainstSolution, timeScaleFactor)
@@ -1630,8 +1642,8 @@ class PlotLine:
                     graph[cnt] = solution[item]
                     cnt = cnt + 1
                 else:
-                    plotFile.write(str(solution[timeEntryName]/timeScaleFactor) + "  " + str(solution[item]) + os.linesep)
-                    graph[solution[timeEntryName]/timeScaleFactor] = solution[item]
+                    plotFile.write(str(solution[timeEntryName]*timeScaleFactor) + "  " + str(solution[item]) + os.linesep)
+                    graph[solution[timeEntryName]*timeScaleFactor] = solution[item]
         return graph           
     def getPlotArguments(self, multipleApps, multipleUsers, multipleLines, multipleTests):
         return "'" + self.plotFileName + "' " + self.getPlotName(multipleApps, multipleUsers, multipleTests) + self.getStyle(multipleLines)

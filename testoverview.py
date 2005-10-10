@@ -154,6 +154,9 @@ class GenererateTestStatus(plugins.Action):
                     categoryHandler.registerInCategory(tag, key, state)
                 except UnpicklingError:
                     print "unpickling error"
+                except EOFError:
+                    print "EOFError in ",file
+                    print "Ignoring this file"
             else:
                 print "Unknown file", entries
     def addOverviewPages(self, item, version, table):

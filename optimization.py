@@ -62,6 +62,9 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
                                Moreover, you may supply a time scale factor for the different versions
                                using the syntax v1:scale1,v2:scale2.
+                             - oem
+                               Plot only exactly matching version, rather than plotting the closest
+                               matching version if no exact match exists.
                              - sg
                                Plot all tests chosen on the same graph, rather than one window per test
                              - title=graphtitle
@@ -1465,6 +1468,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         self.addOption(oldOptionGroup, "pr", "Printer to print to")
         self.addOption(oldOptionGroup, "i", "Log file item to plot", costEntryName)
         self.addOption(oldOptionGroup, "v", "Extra versions to plot")
+        self.addSwitch(oldOptionGroup, "oem", "Only plot exactly matching versions")
         self.addSwitch(oldOptionGroup, "pc", "Print in colour")
         self.addSwitch(oldOptionGroup, "pa3", "Print in A3")
         self.addSwitch(oldOptionGroup, "s", "Plot against solution number rather than time")
@@ -1494,6 +1498,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
     def __call__(self, test):
         logFileStem = test.app.getConfigValue("log_file")
         searchInUser = self.optionGroup.getOptionValue("tu")
+        onlyExactMatch = self.optionGroup.getSwitchValue("oem")
         noTmp = self.optionGroup.getSwitchValue("nt")
         if not noTmp:
             logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
@@ -1519,9 +1524,11 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
                     if foundTmp:
                         self.writePlotFiles(versionName + "run", logFile, test, scaling)
                 logFile = test.makeFileName(logFileStem, version)
-                self.writePlotFiles(versionName, logFile, test, scaling)
-                if not logFile.endswith(version):
-                    print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version 
+                isExactMatch = logFile.endswith(version)
+                if not onlyExactMatch and not isExactMatch:
+                    print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
+                if not (onlyExactMatch and not isExactMatch):
+                    self.writePlotFiles(versionName, logFile, test, scaling)
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):

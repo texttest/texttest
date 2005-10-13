@@ -482,9 +482,15 @@ class TestSuite(Test):
         localFiles = filter(self.isVersionTestSuiteFile, allFiles)
         return map(lambda file: os.path.join(self.abspath, file), localFiles)
     def isVersionTestSuiteFile(self, file):
-        if not file.startswith("testsuite") or file == os.path.basename(self.testCaseFile):
+        if file == os.path.basename(self.testCaseFile):
+            return 0
+        root = "testsuite." + self.app.name
+        if not file.startswith(root):
             return 0
         if file.find(self.app.getFullVersion()) == -1:
+            return 0
+        # Must contain appname followed by .: the root can never be a version
+        if file.find(self.app.name + ".") == -1:
             return 0
         # Don't do this for extra versions, they appear anyway...
         for extraApp in self.app.extras:

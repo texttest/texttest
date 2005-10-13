@@ -120,7 +120,7 @@ class GenererateTestStatus(plugins.Action):
                             usedSelectors[repr(sel)] = sel.getFileNameExtension()
                         testTable = TestTable()
                         table = testTable.generate(categoryHandler, majorVersion, version, loggedTests, selTags)
-                        self.addOverviewPages(sel.getFileNameExtension(), version, table)
+                        self.addOverviewPages(sel.getFileNameExtension(), version, table, app)
                     det = details.generate(categoryHandler, version, tagsFound)
                     self.addDetailPages(app, det)
                     foundMinorVersions.append(HTMLgen.Href("#" + version, minorVersion))
@@ -159,9 +159,9 @@ class GenererateTestStatus(plugins.Action):
                     print "Ignoring this file"
             else:
                 print "Unknown file", entries
-    def addOverviewPages(self, item, version, table):
+    def addOverviewPages(self, item, version, table, app):
         if not self.pagesOverview.has_key(item):
-            self.pagesOverview[item] = HTMLgen.SimpleDocument()
+            self.pagesOverview[item] = HTMLgen.SimpleDocument(title="Test results for " + repr(app))
         self.pagesOverview[item].append(HTMLgen.Name(version))
         self.pagesOverview[item].append(table)
     def addDetailPages(self, app, details):

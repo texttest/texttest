@@ -430,7 +430,7 @@ class CompileRules(plugins.Action):
         
         maxLength = test.getConfigValue("lines_of_text_difference")
         maxWidth = test.getConfigValue("max_width_text_difference")
-        previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
+        previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
         errContents = previewGenerator.getPreview(open(compTmp))
         return "Ruleset build failed", "Failed to build ruleset " + ruleset + os.linesep + errContents 
     def setUpSuite(self, suite):

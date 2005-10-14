@@ -324,18 +324,24 @@ def printException():
     return exceptionString
 
 class PreviewGenerator:
-    def __init__(self, maxWidth, maxLength):
+    def __init__(self, maxWidth, maxLength, startEndRatio=1):
         self.maxWidth = maxWidth
-        self.maxLength = maxLength
-    def getPreview(self, file):
-        linesWritten = 0
-        fullText = ""
-        for line in file.xreadlines():
-            if linesWritten < self.maxLength:
-                fullText += self.getWrappedLine(line)
-                linesWritten += 1
+        self.cutFromStart = int(maxLength * startEndRatio)
+        self.cutFromEnd = maxLength - self.cutFromStart
+    def getCutLines(self, file):
+        lines = file.readlines()
         file.close()
-        return fullText
+        if len(lines) < self.cutFromEnd + self.cutFromStart:
+            return lines
+        
+        cutLines = lines[:self.cutFromStart]
+        if self.cutFromEnd > 0:
+            cutLines.append("... extra data truncated by TextTest ...\n")
+            cutLines += lines[-self.cutFromEnd:]    
+        return cutLines
+    def getPreview(self, file):
+        lines = map(self.getWrappedLine, self.getCutLines(file))
+        return string.join(lines, "")
     def getWrappedLine(self, line):
         if len(line) <= self.maxWidth:
             return line

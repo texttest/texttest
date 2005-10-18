@@ -551,6 +551,7 @@ class TestSuite(Test):
                 return self.newTest(testSuite)
     def newTest(self, test):
         self.testcases.append(test)
+        self.expandEnvironmentReferences()
         self.notifyChanged()
         return test
     def alreadyContains(self, testCaseList, testName):

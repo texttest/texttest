@@ -17,7 +17,8 @@ class Config(plugins.Configuration):
                 group.addOption("t", "Test names containing")
                 group.addOption("f", "Tests listed in file")
                 group.addOption("ts", "Suite names containing")
-                group.addOption("grep", "Log files containing")
+                group.addOption("grep", "Result files containing")
+                group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
                 group.addOption("r", "Execution time <min, max>")
             elif group.name.startswith("What"):
                 group.addOption("reconnect", "Reconnect to previous run")
@@ -43,11 +44,21 @@ class Config(plugins.Configuration):
         catalogueCreator = self.getCatalogueCreator()
         return [ self.getWriteDirectoryPreparer(), catalogueCreator, \
                  self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
+    def getPossibleResultFiles(self, app):
+        files = []
+        if app.getConfigValue("collect_standard_output"):
+            files.append("output")
+        if app.getConfigValue("collect_standard_error"):
+            files.append("errors")
+        if app.getConfigValue("create_catalogues") == "true":
+            files.append("catalogue")
+        files += app.getConfigValue("collate_file").keys()
+        return files
     def getFilterClasses(self):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
-                 GrepFilter, batch.BatchFilter, performance.TimeFilter ]
+                 batch.BatchFilter, performance.TimeFilter ]
     def getFilterList(self, app):
-        filters = self.getFiltersFromMap(self.optionMap)
+        filters = self.getFiltersFromMap(self.optionMap, app)
         if self.optionMap.has_key("f"):
             filters += self.getFiltersFromFile(app, self.optionMap["f"])
         return filters
@@ -58,13 +69,20 @@ class Config(plugins.Configuration):
             return []
         fileData = string.join(plugins.readList(fullPath), ",")
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
-        return self.getFiltersFromMap(optionFinder)
-    def getFiltersFromMap(self, optionMap):
+        return self.getFiltersFromMap(optionFinder, app)
+    def getFiltersFromMap(self, optionMap, app):
         filters = []
         for filterClass in self.getFilterClasses():
             if optionMap.has_key(filterClass.option):
                 filters.append(filterClass(optionMap[filterClass.option]))
+        if optionMap.has_key("grep"):
+            filters.append(GrepFilter(optionMap["grep"], self.getGrepFile(optionMap, app)))
         return filters
+    def getGrepFile(self, optionMap, app):
+        if optionMap.has_key("grepfile"):
+            return optionMap["grepfile"]
+        else:
+            return app.getConfigValue("log_file")
     def batchMode(self):
         return self.optionMap.has_key("b")
     def keepTemporaryDirectories(self):
@@ -433,19 +451,17 @@ class TestSuiteFilter(TextFilter):
         return 0
 
 class GrepFilter(TextFilter):
-    option = "grep"
-    def __init__(self, filterText):
+    def __init__(self, filterText, fileStem):
         TextFilter.__init__(self, filterText)
-        self.logFileStem = None
+        self.fileStem = fileStem
     def acceptsTestCase(self, test):
-        logFile = test.makeFileName(self.logFileStem)
+        logFile = test.makeFileName(self.fileStem)
+        if not os.path.isfile(logFile):
+            return 0
         for line in open(logFile).xreadlines():
             if self.stringContainsText(line):
                 return 1
         return 0
-    def acceptsApplication(self, app):
-        self.logFileStem = app.getConfigValue("log_file")
-        return 1
 
 # Workaround for python bug 853411: tell main thread to start the process
 # if we aren't it...

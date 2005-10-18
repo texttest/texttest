@@ -30,6 +30,8 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                The x-axis has the range range. Default is the whole data set. Example: 60:
                              - yr=range
                                The y-axis has the y-range range. Default is the whole data set. Example: 2e7:3e7
+                             - per
+                               Plots percentage relative to the minimal cost.
                              - p=an absolute file name
                                Produces a postscript file instead of displaying the graph.
                              - pr=printer name
@@ -1271,7 +1273,7 @@ class PlotAverager(Averager):
         self.plotLineRepresentant = None
         self.tmpFileDirectory = tmpFileDirectory
     
-    def plotArgument(self):
+    def plotArgument(self, min):
         global plotAveragerCount
         plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))
         plotAveragerCount += 1
@@ -1279,7 +1281,11 @@ class PlotAverager(Averager):
         xValues = self.average.keys()
         xValues.sort()
         for xVal in xValues:
-            plotFile.write(str(xVal) + " " + str(self.average[xVal]/self.numberOfGraphs) + os.linesep)
+            if min:
+                y = 100.0*float(self.average[xVal])/float(self.numberOfGraphs*min)-100.0
+            else:
+                y = self.average[xVal]/self.numberOfGraphs
+            plotFile.write(str(xVal) + " " + str(y) + os.linesep)
         plotFile.close()
         return "'" + plotFileName + "' " + " title \"" + self.plotLineRepresentant.name + "\" with lines lt " + self.plotLineRepresentant.lineType + " lw 2"
 
@@ -1299,10 +1305,10 @@ class _PlotTest(plugins.Action):
 class GraphPlot(plugins.Action):
     def setUpApplication(self, app):
         if commonPlotter.plotForTest:
-            xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, title = commonPlotter.plotForTest.getPlotOptions()
+            xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title = commonPlotter.plotForTest.getPlotOptions()
             commonPlotter.plotForTest = None
             try:
-                commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, title)
+                commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, plotPercentage, title)
             except plugins.TextTestError, e:
                 print e
     
@@ -1319,6 +1325,12 @@ class TestGraph:
         self.apps = []
         self.gnuplotFile = None
         self.diag = plugins.getDiagnostics("Test Graph")
+    def findMinOverPlotLines(self):
+        min = self.plotLines[0].min
+        for plotLine in self.plotLines[1:]:
+            if plotLine.min < min:
+                min = plotLine.min
+        return min
     def addLine(self, plotLine):
         self.plotLines.append(plotLine)
         test = plotLine.test
@@ -1335,7 +1347,7 @@ class TestGraph:
             plotLine.pointType = self.pointTypes[test.name]
         # Fill in the map for later deduction
         self.lineTypes[plotLine.name] = 0
-    def getPlotArguments(self):
+    def writeLinesAndGetPlotArguments(self, min):
         multipleApps = len(self.apps) > 1
         multipleLines = (len(self.plotLines) > 1)
         multipleUsers = len(self.users) > 1
@@ -1343,6 +1355,7 @@ class TestGraph:
         multipleLineTypes = len(self.lineTypes) > 1
         plotArguments = []
         for plotLine in self.plotLines:
+            plotLine.writeFile(min)
             if not multipleTests or not multipleLineTypes or self.lineTypes[plotLine.name] == 0:
                 plotLine.lineType = str(self.lineTypeCounter)
                 self.lineTypes[plotLine.name] = plotLine.lineType
@@ -1353,10 +1366,16 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, writeDir, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotAveragers, title = None):
+    def plot(self, writeDir, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotAveragers, plotPercentage,
+             title = None):
         if len(self.plotLines) == 0:
             return
 
+        # Make sure that the writeDir is there, seems important in the static GUI.
+        # Before, this was done as a side effect when writing the PlotLines.
+        if not os.path.isdir(writeDir):
+            os.makedirs(writeDir)
+            
         os.chdir(writeDir)
         errsFile = os.path.join(writeDir, "gnuplot.errors")
         self.gnuplotFile, outputFile = os.popen2("gnuplot -persist -background white 2> " + errsFile)
@@ -1387,9 +1406,15 @@ class TestGraph:
         self.writePlot("set xrange [" + xrange +"];")
         if yrange:
             self.writePlot("set yrange [" + yrange +"];")
-        plotArguments = self.getPlotArguments()
+        min = None
+        if plotPercentage:
+            min = self.findMinOverPlotLines()
+            #self.writePlot("set label \"%\" at screen 0.03,0.5 rotate")
+            #self.writePlot("set label \"Percentage above " + str(min) + "\" at screen 0.97,0.02 right")
+            self.writePlot("set ylabel \"" + self.getAxisLabel("y") + "\\n% above " + str(min) + "\"")
+        plotArguments = self.writeLinesAndGetPlotArguments(min)
         if plotAveragers:
-            avgArguments = [ plotAveragers[plotAverager].plotArgument() for plotAverager in plotAveragers ]
+            avgArguments = [ plotAveragers[plotAverager].plotArgument(min) for plotAverager in plotAveragers ]
             if onlyAverage:
                 plotArguments = avgArguments
             else:
@@ -1468,6 +1493,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         self.addOption(oldOptionGroup, "pr", "Printer to print to")
         self.addOption(oldOptionGroup, "i", "Log file item to plot", costEntryName)
         self.addOption(oldOptionGroup, "v", "Extra versions to plot")
+        self.addSwitch(oldOptionGroup, "per", "Plot percentage")
         self.addSwitch(oldOptionGroup, "oem", "Only plot exactly matching versions")
         self.addSwitch(oldOptionGroup, "pc", "Print in colour")
         self.addSwitch(oldOptionGroup, "pa3", "Print in A3")
@@ -1532,8 +1558,8 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         if not self.externalGraph:
             self.plotGraph()
     def plotGraph(self):
-        xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title = self.getPlotOptions()
-        plotProcess = self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, {}, title)
+        xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title = self.getPlotOptions()
+        plotProcess = self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, {}, plotPercentage, title)
         if plotProcess:
             # Should really monitor this and close it when GUI closes,
             # but it isn't a child process so this means ps and load on the machine
@@ -1549,7 +1575,8 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         onlyAverage = self.optionGroup.getSwitchValue("oav")
         title = self.optionGroup.getOptionValue("title")
         printer = self.optionGroup.getOptionValue("pr")
-        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, title
+        plotPercentage = self.optionGroup.getSwitchValue("per")
+        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title
     def writePlotFiles(self, lineName, logFile, test, scaling):
         plotItems = self.getItemsToPlot()
         optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
@@ -1623,9 +1650,9 @@ class PlotLine:
             timeScaleFactor *= scaling
         self.axisLabels["y"] = item
         self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
-        graph = self.writeFile(optRun, item, plotAgainstSolution, timeScaleFactor)
+        self.createGraph(optRun, item, plotAgainstSolution, timeScaleFactor)
         if averager:
-            averager.addGraph(graph)
+            averager.addGraph(self.graph)
             if not averager.plotLineRepresentant:
                 averager.plotLineRepresentant = self
     def getAxisLabel(self, axis):
@@ -1635,23 +1662,33 @@ class PlotLine:
             return "plot-" + lineName.replace(" ", "-")
         else:
             return "plot-" + lineName.replace(" ", "-") + "-" + item.replace(" ", "-")
-    def writeFile(self, optRun, item, plotAgainstSolution, timeScaleFactor):
+    def createGraph(self, optRun, item, plotAgainstSolution, timeScaleFactor):
+        self.graph = {}
+        self.min = None
+        cnt = 0
+        for solution in optRun.solutions:
+            if solution.has_key(item):
+                if cnt > 0 and (self.min == None or self.min > solution[item]):
+                    self.min = solution[item]
+                if plotAgainstSolution:
+                    self.graph[cnt] = solution[item]
+                else:
+                    self.graph[solution[timeEntryName]*timeScaleFactor] = solution[item]
+            cnt = cnt + 1
+    def writeFile(self, min):
         dir, localName = os.path.split(self.plotFileName)
         if not os.path.isdir(dir):
             os.makedirs(dir)
         plotFile = open(self.plotFileName, "w")
-        graph = {}
-        cnt = 0
-        for solution in optRun.solutions:
-            if solution.has_key(item):
-                if plotAgainstSolution:
-                    plotFile.write(str(solution[item]) + os.linesep)
-                    graph[cnt] = solution[item]
-                    cnt = cnt + 1
-                else:
-                    plotFile.write(str(solution[timeEntryName]*timeScaleFactor) + "  " + str(solution[item]) + os.linesep)
-                    graph[solution[timeEntryName]*timeScaleFactor] = solution[item]
-        return graph           
+        xx = self.graph.keys()
+        xx.sort()
+        for x in xx:
+            if min:
+                y = 100.0*float(self.graph[x])/float(min)-100.0
+            else:
+                y = self.graph[x]
+            plotFile.write(str(x) + "  " + str(y) + os.linesep)
+        plotFile.close()
     def getPlotArguments(self, multipleApps, multipleUsers, multipleLines, multipleTests):
         return "'" + self.plotFileName + "' " + self.getPlotName(multipleApps, multipleUsers, multipleTests) + self.getStyle(multipleLines)
     def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):

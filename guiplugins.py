@@ -411,7 +411,18 @@ class ImportTestSuite(ImportTest):
             file = open(envFile, "w")
             file.write("# Dictionary of environment to variables to set in test suite" + "\n")
 
-class SelectTests(InteractiveAction):
+class InteractiveAppAction(InteractiveAction):
+    def canPerformOnTest(self):
+        return 1
+    def getSelectionOption(self, selTests):
+        selTestPaths = []
+        for test in selTests:
+            relPath = test.getRelPath()
+            if not relPath in selTestPaths:
+                selTestPaths.append(relPath)
+        return "-tp " + string.join(selTestPaths, ",")
+    
+class SelectTests(InteractiveAppAction):
     def __init__(self, app, oldOptionGroup):
         self.app = app
         self.test = app
@@ -420,8 +431,6 @@ class SelectTests(InteractiveAction):
                 self.optionGroup = group
     def __repr__(self):
         return "Selecting"
-    def canPerformOnTest(self):
-        return 1
     def getTitle(self):
         return "Select"
     def getScriptTitle(self):
@@ -470,7 +479,7 @@ class SelectTests(InteractiveAction):
                 newTestList.append(testCase)
         return newTestList
 
-class ResetGroups(InteractiveAction):
+class ResetGroups(InteractiveAppAction):
     def getTitle(self):
         return "Reset"
     def getScriptTitle(self):
@@ -478,8 +487,46 @@ class ResetGroups(InteractiveAction):
     def performOn(self, app, selTests):
         for group in app.optionGroups:
             group.reset()
+
+class SaveSelection(InteractiveAppAction):
+    def __init__(self, app, oldOptionGroup):
+        self.app = app
+        InteractiveAction.__init__(self, app, oldOptionGroup, "Saving")
+        self.addOption(oldOptionGroup, "name", "Name to give selection")
+        self.addSwitch(oldOptionGroup, "tests", "Store actual tests selected", 1)
+        for group in app.optionGroups:
+            if group.name.startswith("Select"):
+                self.selectionGroup = group
+    def __repr__(self):
+        return "Saving"
+    def getTitle(self):
+        return "Save Selection"
+    def getScriptTitle(self):
+        return "Save Selection"
+    def getFileName(self, app):
+        localName = self.optionGroup.getOptionValue("name")
+        if not localName:
+            raise plugins.TextTestError, "Must provide a file name to save, fill in the 'Saving' tab"
+        dir = os.path.join(app.abspath, app.getConfigValue("test_list_files_directory")[0])
+        plugins.ensureDirectoryExists(dir)
+        return os.path.join(dir, localName)
+    def getTextToSave(self, app, selTests):
+        if len(selTests) == 0:
+            raise plugins.TextTestError, "No tests are selected, cannot save selection!"
+        actualTests = self.optionGroup.getSwitchValue("tests")
+        if actualTests:
+            return self.getSelectionOption(selTests)
+        else:
+            commandLines = self.selectionGroup.getCommandLines()
+            return string.join(commandLines)
+    def performOn(self, app, selTests):
+        fileName = self.getFileName(app)
+        toWrite = self.getTextToSave(app, selTests)
+        file = open(fileName, "w")
+        file.write(toWrite + "\n")
+        file.close()
     
-class RunTests(InteractiveAction):
+class RunTests(InteractiveAppAction):
     runNumber = 1
     def __init__(self, app, oldOptionGroup):
         self.app = app
@@ -494,8 +541,6 @@ class RunTests(InteractiveAction):
         return self.optionGroups
     def __repr__(self):
         return "Running"
-    def canPerformOnTest(self):
-        return 1
     def getTitle(self):
         return "Run Tests"
     def getScriptTitle(self):
@@ -524,12 +569,7 @@ class RunTests(InteractiveAction):
         ttOptions += self.invisibleGroup.getCommandLines()
         for group in self.optionGroups:
             ttOptions += group.getCommandLines()
-        selTestPaths = []
-        for test in selTests:
-            relPath = test.getRelPath()
-            if not relPath in selTestPaths:
-                selTestPaths.append(relPath)
-        ttOptions.append("-tp " + string.join(selTestPaths, ","))
+        ttOptions.append(self.getSelectionOption(selTests))
         return ttOptions
 
 class EnableDiagnostics(InteractiveAction):
@@ -592,7 +632,7 @@ class InteractiveActionHandler:
     def __init__(self):
         self.testClasses =  [ SaveTest, RecordTest, EnableDiagnostics, CopyTest ]
         self.suiteClasses = [ ImportTestCase, ImportTestSuite ]
-        self.appClasses = [ SelectTests, RunTests, ResetGroups ]
+        self.appClasses = [ SelectTests, RunTests, ResetGroups, SaveSelection ]
         self.optionGroupMap = {}
     def getInstance(self, test, className):
         instance = self.makeInstance(className, test)

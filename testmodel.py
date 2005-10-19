@@ -55,8 +55,10 @@ class Test:
         else:
             self.environment[entryName] = entry        
     def expandEnvironmentReferences(self, referenceVars = []):
+        debugLog.info("Expanding suite " + self.name)
         self._expandEnvironmentReferences(referenceVars)
         self.tearDownEnvironment()
+        debugLog.info("End Expanding " + self.name)
     def _expandEnvironmentReferences(self, referenceVars):
         childReferenceVars = copy(referenceVars)
         for var, value in self.environment.items():
@@ -273,9 +275,11 @@ class TestCase(Test):
     def testCaseList(self):
         return [ self ]
     def expandEnvironmentReferences(self, referenceVars = []):
+        debugLog.info("Expanding " + self.name)
         self._expandEnvironmentReferences(referenceVars)
         self.options = os.path.expandvars(self.options)
         self.tearDownEnvironment()
+        debugLog.info("End expanding " + self.name)
     def _setOptions(self):
         optionsFile = self.makeFileName("options")
         self.options = ""
@@ -749,7 +753,7 @@ class Application:
         self.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
         self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ], \
                               "files to be shown as definition files by the static GUI")
-        self.setConfigDefault("test_list_files_directory", [], "Directories to search for test-filter files")
+        self.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
         self.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
         self.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
         self.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
@@ -781,22 +785,6 @@ class Application:
             self.setConfigDefault("interpreter", "python", interDoc)
         else:
             self.setConfigDefault("interpreter", "", interDoc)
-        debugLog.info("Adding items to tests_listed_in_file")
-        for directory in self.getConfigValue("test_list_files_directory"):
-            if os.path.isabs(directory):
-                fullPath = directory
-            else:
-                fullPath = os.path.join(self.inputOptions.findDirectoryName(), directory)
-            debugLog.info(" looking for files in " + fullPath)
-            if os.path.exists(fullPath):
-                filenames = os.listdir(fullPath)
-                filenames.sort()
-                for filename in filenames:
-                    if not os.path.isfile(os.path.join(fullPath, filename)):
-                        continue
-                    debugLog.info("  found file: " + filename)
-                    fullFilePath = os.path.normpath(os.path.join(directory, filename))
-                    self.addConfigEntry('tests_listed_in_file', fullFilePath, 'gui_entry_options')
     def createOptionGroup(self, name):
         defaultDict = self.getConfigValue("gui_entry_overrides")
         optionDict = self.getConfigValue("gui_entry_options")
@@ -969,19 +957,7 @@ class Application:
             return 1
         elif parts[0] == "environment":
             return unknown
-        return 0
-    def makePathName(self, name):
-        if os.path.isabs(name):
-            return name
-        localName = os.path.join(self.abspath, name)
-        if os.path.exists(localName):
-            return localName
-        homeDir, baseName = os.path.split(self.abspath)
-        homeName = os.path.join(homeDir, name)
-        if os.path.exists(homeName):
-            return homeName
-        # Return the name even though it doesn't exist, then it can be used
-        return name
+        return 0    
     def getActionSequence(self):
         return self.configObject.getActionSequence()
     def printHelpText(self):
@@ -1032,8 +1008,14 @@ class Application:
             checkout = checkoutOverride
         else:
             checkout = self.getConfigValue("default_checkout")
+        if os.path.isabs(checkout):
+            return checkout
         checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
-        return self.makePathName(os.path.join(checkoutLocation, checkout))
+        checkout = os.path.join(checkoutLocation, checkout)
+        if os.path.isabs(checkout):
+            return checkout
+        # Assume relative checkouts are relative to the root directory...
+        return os.path.join(self.abspath, checkout)
     def getExecuteCommand(self, test):
         binary = self.getConfigValue("binary")
         if self.configDir.has_key("interpreter"):

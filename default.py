@@ -15,7 +15,7 @@ class Config(plugins.Configuration):
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing")
-                group.addOption("f", "Tests listed in file")
+                group.addOption("f", "Tests listed in file", possibleValues=self.getPossibleFilterFiles(app))
                 group.addOption("ts", "Suite names containing")
                 group.addOption("grep", "Result files containing")
                 group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
@@ -54,6 +54,22 @@ class Config(plugins.Configuration):
             files.append("catalogue")
         files += app.getConfigValue("collate_file").keys()
         return files
+    def getPossibleFilterFiles(self, app):
+        filterFiles = []
+        for directory in app.getConfigValue("test_list_files_directory"):
+            fullPath = os.path.join(app.abspath, directory)
+            if os.path.exists(fullPath):
+                filenames = os.listdir(fullPath)
+                filenames.sort()
+                for filename in filenames:
+                    if os.path.isfile(os.path.join(fullPath, filename)):
+                        filterFiles.append(filename)
+        return filterFiles
+    def makeFilterFileName(self, app, filename):
+        for directory in app.getConfigValue("test_list_files_directory"):
+            fullPath = os.path.join(app.abspath, directory, filename)
+            if os.path.isfile(fullPath):
+                return fullPath
     def getFilterClasses(self):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  batch.BatchFilter, performance.TimeFilter ]
@@ -63,9 +79,9 @@ class Config(plugins.Configuration):
             filters += self.getFiltersFromFile(app, self.optionMap["f"])
         return filters
     def getFiltersFromFile(self, app, filename):
-        fullPath = app.makePathName(filename)
+        fullPath = self.makeFilterFileName(app, filename)
         if not fullPath:
-            print "File", self.filename, "not found for application", app
+            print "File", filename, "not found for application", app
             return []
         fileData = string.join(plugins.readList(fullPath), ",")
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
@@ -131,6 +147,8 @@ class Config(plugins.Configuration):
         return actions
     def getTestPostProcessor(self):
         actions = []
+##        if not self.isReconnecting():
+##            actions.append(CollectFailureData())
         if self.keepTemporaryDirectories():
             actions.append(SaveState())
         if self.useTextResponder():
@@ -327,6 +345,33 @@ class SaveState(plugins.Action):
     def __call__(self, test):
         test.saveState()
 
+class CollectFailureData(plugins.Action):
+    def __init__(self):
+        self.hardFailures = []
+        self.softFailures = []
+    def __call__(self, test):
+        category, details = test.state.getTypeBreakdown()
+        if category != "success":
+            self.hardFailures.append(test.getRelPath())
+        elif len(details) > 0:
+            self.softFailures.append(test.getRelPath())
+    def getCleanUpAction(self):
+        return CreateSelectionFiles(self)
+
+class CreateSelectionFiles(plugins.Action):
+    def __init__(self, collector):
+        self.collector = collector
+    def setUpApplication(self, app):
+        self.writeList(app, "hard_failures", self.collector.hardFailures)
+        self.writeList(app, "soft_failures", self.collector.softFailures)
+    def writeList(self, app, fileName, list):
+        if len(list) == 0:
+            return
+        fullPath = os.path.join(app.writeDirectory, fileName)
+        file = open(fullPath, "w")
+        file.write("-tp " + string.join(list, ",") + "\n")
+        file.close()
+    
 class CollateFiles(plugins.Action):
     def __init__(self):
         self.collations = {}
@@ -356,16 +401,17 @@ class CollateFiles(plugins.Action):
 	    sourcePtn = os.path.splitext(sourcePtn)[0] + \
 				os.path.splitext(sourcePattern)[1]
 	    self.diag.info("sourcePtn: " + sourcePtn)
-	    fileList.extend(map(os.path.basename,glob.glob(sourcePtn)))
+            for file in glob.glob(sourcePtn):
+                fileList.append(file.replace(test.writeDirs[0] + os.sep, ""))
 	    fileList.sort()
 
 	    # add each file to newColl using suffix from sourcePtn
 	    for aFile in fileList:
 		self.diag.info("aFile: " + aFile)
-	    	plain = os.path.splitext(aFile)[0]
-	    	if not plain in newColl:
+	    	newTarget = os.path.splitext(os.path.basename(aFile))[0]
+	    	if not newTarget in newColl:
 		    ext = os.path.splitext(sourcePtn)[1]
-		    newColl[plain] = plain + ext
+		    newColl[newTarget] = os.path.splitext(aFile)[0] + ext
 	self.diag.info("coll final:", str(newColl))
 	return newColl
     def __call__(self, test):

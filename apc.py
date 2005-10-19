@@ -1201,10 +1201,14 @@ class ImportTestCase(optimization.ImportTestCase):
         return ""
     def writeResultsFiles(self, suite, testDir):
         subPlanDir = self.getSubplanPath(suite, self.getSubplanName())
-        statusPath = os.path.join(testDir, "status." + suite.app.name)
-        if not os.path.isfile(statusPath):
-            shutil.copyfile(os.path.join(subPlanDir, "status"), statusPath)
-        perf = self.getPerformance(statusPath)
+        collationFiles = suite.app.getConfigValue("collate_file")
+        for file in collationFiles.keys():
+            origFile = os.path.join(subPlanDir, collationFiles[file])
+            if os.path.isfile(origFile):
+                newFile = os.path.join(testDir, file + "." + suite.app.name)
+                if not os.path.isfile(newFile):
+                    shutil.copyfile(origFile, newFile)
+        perf = self.getPerformance(os.path.join(testDir, "status." + suite.app.name))
         perfFile = self.getWriteFile("performance", suite, testDir)
         perfFile.write("CPU time   :     " + str(int(perf)) + ".0 sec. on tiptonville" + os.linesep)
         perfFile.close()

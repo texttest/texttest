@@ -658,6 +658,13 @@ class TextOption(Option):
     def __init__(self, name, value, possibleValues):
         Option.__init__(self, name, value)
         self.possibleValues = possibleValues
+        self.possValUpdateMethod = None
+    def setPossibleValuesUpdateMethod(self, method):
+        self.possValUpdateMethod = method
+        method(self.possibleValues)
+    def addPossibleValue(self, value):
+        self.possibleValues.append(value)
+        self.possValUpdateMethod(self.possibleValues)
 
 class Switch(Option):
     def __init__(self, name, value, nameForOff):

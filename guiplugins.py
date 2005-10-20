@@ -525,6 +525,8 @@ class SaveSelection(InteractiveAppAction):
         file = open(fileName, "w")
         file.write(toWrite + "\n")
         file.close()
+        filterFileOption = self.selectionGroup.options["f"]
+        filterFileOption.addPossibleValue(os.path.basename(fileName))
     
 class RunTests(InteractiveAppAction):
     runNumber = 1

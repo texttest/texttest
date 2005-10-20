@@ -531,7 +531,7 @@ class RightWindowGUI:
         if len(option.possibleValues) > 1:
             combobox = gtk.Combo()
             entry = combobox.entry
-            combobox.set_popdown_strings(option.possibleValues)
+            option.setPossibleValuesUpdateMethod(combobox.set_popdown_strings)
             hbox.pack_start(combobox, expand=True, fill=True)
             combobox.show()
         else:

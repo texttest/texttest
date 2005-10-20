@@ -65,7 +65,8 @@ class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, standardFile, tmpFile, descriptors, makeNew):
         self.descriptors = descriptors
         self.diag = plugins.getDiagnostics("performance")
-        self.diag.info("Checking test " + test.name)
+        self.processCount = len(test.state.executionHosts)
+        self.diag.info("Checking test " + test.name + " process count " + str(self.processCount))
         comparetest.FileComparison.__init__(self, test, standardFile, tmpFile, makeNew)
     def _cacheValues(self, app):
         if (os.path.exists(self.stdCmpFile)):
@@ -103,10 +104,12 @@ class PerformanceFileComparison(comparetest.FileComparison):
             return self.getSummary()
         else:
             return ""
+    def getConfigSetting(self, app, configDescriptor, configName):
+        return self.processCount * float(app.getCompositeConfigValue(configName, configDescriptor))
     def _hasDifferences(self, app):
         configDescriptor = self.descriptors["config"]
-        longEnough = self.newPerformance > float(app.getCompositeConfigValue("performance_test_minimum", configDescriptor))
-        varianceEnough = self.percentageChange > float(app.getCompositeConfigValue("performance_variation_%", configDescriptor))
+        longEnough = self.newPerformance > self.getConfigSetting(app, configDescriptor, "performance_test_minimum")
+        varianceEnough = self.percentageChange > self.getConfigSetting(app, configDescriptor, "performance_variation_%")
         return longEnough and varianceEnough
     def checkExternalExcuses(self, app):
         if self.getType() != "slower":

@@ -804,9 +804,15 @@ class ReconnectTest(plugins.Action):
         storedState = test.getStoredState()
         if self.fullRecalculate:
             # Only pick up errors here, recalculate the rest. Don't notify until
-            # we're done with recalculation
+            # we're done with recalculation.
             if not storedState.hasResults():
                 test.changeState(storedState)
+            else:
+                # Also pick up execution machines (if we can), we can't get them otherwise... don't crash if they fail
+                try:
+                    test.state.executionHosts = storedState.executionHosts
+                except AttributeError:
+                    pass
         else:
             test.changeState(storedState, notify=1)
 

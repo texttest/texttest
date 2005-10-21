@@ -367,12 +367,8 @@ class LogFileFinder:
             print "Could not find subplan name in output file " + fileInTest + os.linesep
             return None, None
     def findTempFileInTest(self, version, stem, thisRun = 1):
+        # Construct a search string.
         app = self.test.app
-        if thisRun:
-            fromThisRun = self.test.makeFileName(stem, version, temporary=1)
-            self.diag.info("Looked for " + fromThisRun)
-            if os.path.isfile(fromThisRun):
-                return fromThisRun, app.writeDirectory
         if not version:
             version = string.join(self.test.app.versions, ".")
         versionMod = ""
@@ -381,6 +377,12 @@ class LogFileFinder:
         searchString = app.name + versionMod
         userId, root = app.getPreviousWriteDirInfo(self.searchInUser)
         searchString += userId
+        
+        if thisRun:
+            fromThisRun = self.test.makeFileName(stem, version, temporary=1)
+            self.diag.info("Looked for " + fromThisRun)
+            if os.path.isfile(fromThisRun) and fromThisRun.find(searchString) != -1:
+                return fromThisRun, app.writeDirectory
         for subDir in os.listdir(root):
             fullDir = os.path.join(root, subDir)
             if os.path.isdir(fullDir) and subDir.startswith(searchString):

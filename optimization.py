@@ -1294,23 +1294,24 @@ class PlotAverager(Averager):
 class _PlotTest(plugins.Action):
     def __init__(self, args = []):
         self.testGraph = TestGraph()
-        self.args = args
-        self.plotForTest = None
-        self.plotAveragers = {}
+        # Create the options and read the command line arguments.
+        self.testGraph.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
+        for name, expl, value in self.testGraph.options:
+            self.testGraph.optionGroup.addOption(name, expl, value)
+        for name, expl in self.testGraph.switches:
+            self.testGraph.optionGroup.addSwitch(name, expl)
+        self.testGraph.optionGroup.readCommandLineArguments(args)
     def __call__(self, test):
-        self.plotForTest = PlotTestInGUI(test, graph=self.testGraph, plotAveragers=self.plotAveragers)
-        self.plotForTest.optionGroup.readCommandLineArguments(self.args)
-        self.plotForTest(test)
+        self.testGraph.createPlotLinesForTest(test)
     
 class GraphPlot(plugins.Action):
     def setUpApplication(self, app):
-        if commonPlotter.plotForTest:
-            xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title = commonPlotter.plotForTest.getPlotOptions()
-            commonPlotter.plotForTest = None
+        if commonPlotter.testGraph:
             try:
-                commonPlotter.testGraph.plot(app.writeDirectory, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, commonPlotter.plotAveragers, plotPercentage, title)
+                commonPlotter.testGraph.plot(app.writeDirectory)
             except plugins.TextTestError, e:
                 print e
+        commonPlotter.testGraph = None
     
 class TestGraph:
     def __init__(self):
@@ -1324,6 +1325,26 @@ class TestGraph:
         self.users = []
         self.apps = []
         self.gnuplotFile = None
+        self.plotAveragers = {}
+        # This is the options and switches that are common
+        # both for the GUI and command line.
+        self.options = [ ("r", "Horizontal range", "0:"),
+                         ("yr", "Vertical range", ""),
+                         ("ts", "Time scale to use", "minutes"),
+                         ("p", "Absolute file to print to", ""),
+                         ("pr", "Printer to print to", ""),
+                         ("i", "Log file item to plot", costEntryName),
+                         ("v", "Extra versions to plot", ""),
+                         ("title", "Title of the plot", ""),
+                         ("tu", "Search for temporary files in user", "") ]
+        self.switches = [ ("per", "Plot percentage"),
+                          ("oem", "Only plot exactly matching versions"),
+                          ("pc", "Print in colour"),
+                          ("pa3", "Print in A3"),
+                          ("s", "Plot against solution number rather than time"),
+                          ("av", "Plot also average"),
+                          ("oav", "Plot only average"),
+                          ("nt", "Don't search for temporary files") ]
         self.diag = plugins.getDiagnostics("Test Graph")
     def findMinOverPlotLines(self):
         min = self.plotLines[0].min
@@ -1366,8 +1387,8 @@ class TestGraph:
                 plotLine.lineType = self.lineTypes[plotLine.name]
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
-    def plot(self, writeDir, xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotAveragers, plotPercentage,
-             title = None):
+    def plot(self, writeDir):
+        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title = self.getPlotOptions()
         if len(self.plotLines) == 0:
             return
 
@@ -1413,8 +1434,8 @@ class TestGraph:
             #self.writePlot("set label \"Percentage above " + str(min) + "\" at screen 0.97,0.02 right")
             self.writePlot("set ylabel \"" + self.getAxisLabel("y") + "\\n% above " + str(min) + "\"")
         plotArguments = self.writeLinesAndGetPlotArguments(min)
-        if plotAveragers:
-            avgArguments = [ plotAveragers[plotAverager].plotArgument(min) for plotAverager in plotAveragers ]
+        if self.plotAveragers:
+            avgArguments = [ self.plotAveragers[plotAverager].plotArgument(min) for plotAverager in self.plotAveragers ]
             if onlyAverage:
                 plotArguments = avgArguments
             else:
@@ -1481,47 +1502,40 @@ class TestGraph:
         if len(self.pointTypes) == 1:
             title += ": Test " + firstTestName
         return title
+    def getPlotOptions(self):
+        xrange = self.optionGroup.getOptionValue("r")
+        yrange = self.optionGroup.getOptionValue("yr")
+        fileName = self.optionGroup.getOptionValue("p")
+        writeColour = self.optionGroup.getSwitchValue("pc")
+        printA3 = self.optionGroup.getSwitchValue("pa3")
+        onlyAverage = self.optionGroup.getSwitchValue("oav")
+        title = self.optionGroup.getOptionValue("title")
+        printer = self.optionGroup.getOptionValue("pr")
+        plotPercentage = self.optionGroup.getSwitchValue("per")
+        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title
 
-# Same as above, but from GUI. Refactor!
-class PlotTestInGUI(guiplugins.InteractiveAction):
-    def __init__(self, test, oldOptionGroup = None, graph = None, plotAveragers = None):
-        guiplugins.InteractiveAction.__init__(self, test, oldOptionGroup, "Graph")
-        self.addOption(oldOptionGroup, "r", "Horizontal range", "0:")
-        self.addOption(oldOptionGroup, "yr", "Vertical range")
-        self.addOption(oldOptionGroup, "ts", "Time scale to use", "minutes")
-        self.addOption(oldOptionGroup, "p", "Absolute file to print to")
-        self.addOption(oldOptionGroup, "pr", "Printer to print to")
-        self.addOption(oldOptionGroup, "i", "Log file item to plot", costEntryName)
-        self.addOption(oldOptionGroup, "v", "Extra versions to plot")
-        self.addSwitch(oldOptionGroup, "per", "Plot percentage")
-        self.addSwitch(oldOptionGroup, "oem", "Only plot exactly matching versions")
-        self.addSwitch(oldOptionGroup, "pc", "Print in colour")
-        self.addSwitch(oldOptionGroup, "pa3", "Print in A3")
-        self.addSwitch(oldOptionGroup, "s", "Plot against solution number rather than time")
-        self.addSwitch(oldOptionGroup, "av", "Plot also average")
-        self.addSwitch(oldOptionGroup, "oav", "Plot only average")
-        self.addOption(oldOptionGroup, "title", "Title of the plot")
-        self.addOption(oldOptionGroup, "tu", "Search for temporary files in user")
-        self.addSwitch(oldOptionGroup, "nt", "Don't search for temporary files")
+    # The routines below are the ones creating all the PlotLine instances for ONE test.
+    def createPlotLines(self, lineName, logFile, test, scaling):
+        # Find out what to plot.
+        plotItemsText = self.optionGroup.getOptionValue("i")
+        if plotItemsText == "apctimes":
+            plotItemsText = "DH_post_processing,Generation_time,Coordination_time,Conn_fixing_time,Optimization_time,Network_generation_time"
+        plotItems = plugins.commasplit(plotItemsText.replace("_", " "))
         
-        self.externalGraph = graph
-        if graph:
-            self.testGraph = graph
-        else:
-            self.testGraph = TestGraph()
-        self.plotAveragers = plotAveragers
-    def __repr__(self):
-        return "Plotting Graph"
-    def getTitle(self):
-        return "Plot Graph"
-    def getItemsToPlot(self):
-        text = self.optionGroup.getOptionValue("i")
-        if text == "apctimes":
-            text = "DH_post_processing,Generation_time,Coordination_time,Conn_fixing_time,Optimization_time,Network_generation_time"
-        return plugins.commasplit(text.replace("_", " "))
-    def __repr__(self):
-        return "Plotting"
-    def __call__(self, test):
+        optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
+        if len(optRun.solutions) == 0:
+            return
+
+        for item in plotItems:
+            averager = None
+            if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
+                if not self.plotAveragers.has_key(lineName+item):
+                    averager = self.plotAveragers[lineName+item] = PlotAverager(test.app.writeDirectory)
+                else:
+                    averager = self.plotAveragers[lineName+item]
+            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), scaling, averager)
+            self.addLine(plotLine)
+    def createPlotLinesForTest(self, test):
         logFileStem = test.app.getConfigValue("log_file")
         searchInUser = self.optionGroup.getOptionValue("tu")
         onlyExactMatch = self.optionGroup.getSwitchValue("oem")
@@ -1530,10 +1544,10 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
             foundTmp, logFile = logFileFinder.findFile()
             if foundTmp:
-                self.writePlotFiles("this run", logFile, test, None)
+                self.createPlotLines("this run", logFile, test, None)
         stdFile = test.makeFileName(logFileStem)
         if os.path.isfile(stdFile):
-            self.writePlotFiles("std result", stdFile, test, None)
+            self.createPlotLines("std result", stdFile, test, None)
         for versionItem in plugins.commasplit(self.optionGroup.getOptionValue("v")):
             if versionItem.find(":") == -1:
                 versionName = version = versionItem
@@ -1548,50 +1562,46 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
                     logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
                     foundTmp, logFile = logFileFinder.findFile(version)
                     if foundTmp:
-                        self.writePlotFiles(versionName + "run", logFile, test, scaling)
+                        self.createPlotLines(versionName + "run", logFile, test, scaling)
                 logFile = test.makeFileName(logFileStem, version)
                 isExactMatch = logFile.endswith(version)
                 if not onlyExactMatch and not isExactMatch:
                     print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
                 if not (onlyExactMatch and not isExactMatch):
-                    self.writePlotFiles(versionName, logFile, test, scaling)
-        if not self.externalGraph:
-            self.plotGraph()
-    def plotGraph(self):
-        xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title = self.getPlotOptions()
-        plotProcess = self.testGraph.plot(self.test.app.writeDirectory, xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, {}, plotPercentage, title)
+                    self.createPlotLines(versionName, logFile, test, scaling)
+
+# This is the action responsible for plotting from the GUI.
+class PlotTestInGUI(guiplugins.InteractiveAction):
+    def __init__(self, test, oldOptionGroup = None):
+        guiplugins.InteractiveAction.__init__(self, test, oldOptionGroup, "Graph")
+        self.createGUITestGraph(oldOptionGroup)
+    def createGUITestGraph(self, oldOptionGroup = []):
+        self.testGraph = TestGraph()
+        
+        self.testGraph.optionGroup = self.optionGroup
+        for name, expl, value in self.testGraph.options:
+            self.addOption(oldOptionGroup, name, expl, value)
+        for name, expl in self.testGraph.switches:
+            self.addSwitch(oldOptionGroup, name, expl)
+    def __repr__(self):
+        return "Plotting Graph"
+    def getTitle(self):
+        return "Plot Graph"
+    def __repr__(self):
+        return "Plotting"
+    def __call__(self, test):
+        self.testGraph.createPlotLinesForTest(test)
+        self.plotGraph(test.app.writeDirectory)  
+    def plotGraph(self, writeDirectory):
+        plotProcess = self.testGraph.plot(writeDirectory)
         if plotProcess:
             # Should really monitor this and close it when GUI closes,
             # but it isn't a child process so this means ps and load on the machine
             #self.processes.append(plotProcess)
             guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
+        # The TestGraph is "used", create a new one so that the user can do another plot.
         self.testGraph = TestGraph()
-    def getPlotOptions(self):
-        xrange = self.optionGroup.getOptionValue("r")
-        yrange = self.optionGroup.getOptionValue("yr")
-        fileName = self.optionGroup.getOptionValue("p")
-        writeColour = self.optionGroup.getSwitchValue("pc")
-        printA3 = self.optionGroup.getSwitchValue("pa3")
-        onlyAverage = self.optionGroup.getSwitchValue("oav")
-        title = self.optionGroup.getOptionValue("title")
-        printer = self.optionGroup.getOptionValue("pr")
-        plotPercentage = self.optionGroup.getSwitchValue("per")
-        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title
-    def writePlotFiles(self, lineName, logFile, test, scaling):
-        plotItems = self.getItemsToPlot()
-        optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
-        if len(optRun.solutions) == 0:
-            return
-
-        for item in plotItems:
-            averager = None
-            if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
-                if not self.plotAveragers.has_key(lineName+item):
-                    averager = self.plotAveragers[lineName+item] = PlotAverager(self.test.app.writeDirectory)
-                else:
-                    averager = self.plotAveragers[lineName+item]
-            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), scaling, averager)
-            self.testGraph.addLine(plotLine)
+        self.testGraph.optionGroup = self.optionGroup
 
 class StartStudio(guiplugins.InteractiveAction):
     def __repr__(self):
@@ -1620,7 +1630,7 @@ class StartStudio(guiplugins.InteractiveAction):
         guiplugins.scriptEngine.monitorProcess("runs studio", process)
         test.tearDownEnvironment(parents=1)
 
-guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUI, StartStudio ]
+guiplugins.interactiveActionHandler.testClasses += [ StartStudio ]
 
 class PlotLine:
     def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale, scaling, averager):

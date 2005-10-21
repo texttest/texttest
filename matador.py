@@ -550,3 +550,5 @@ class CleanSubplans(plugins.Action):
         self.cleanedPlans += cleanedPlansTest
     def setUpSuite(self, suite):
         self.describe(suite)
+
+guiplugins.interactiveActionHandler.testClasses.append(optimization.PlotTestInGUI)

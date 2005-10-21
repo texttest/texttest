@@ -67,7 +67,7 @@ apc.CVSBranchTests         - This script is useful when two versions of a test s
 
 """
 
-import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time
+import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel
 from socket import gethostname
 from time import sleep
 from ndict import seqdict
@@ -275,8 +275,6 @@ class ViewApcLog(guiplugins.InteractiveAction):
             raise plugins.TextTestError, "APC log file not yet available"
     def getTitle(self):
         return "View APC Log"
-
-guiplugins.interactiveActionHandler.testClasses.append(ViewApcLog)
 
 #
 # Runs the test in gdb and displays the log file. 
@@ -1568,4 +1566,27 @@ class SaveBestSolution(guiplugins.InteractiveAction):
         tests.sort()
         return tests[0]
 
-guiplugins.interactiveActionHandler.testClasses.append(SaveBestSolution)
+# Specialization of plotting in the GUI for APC
+class PlotTestInGUIAPC(optimization.PlotTestInGUI):
+    def __init__(self, test, oldOptionGroup = None):
+        optimization.PlotTestInGUI.__init__(self, test, oldOptionGroup)
+        self.addSwitch(oldOptionGroup, "kpi", "Plot kpi group")
+    def __call__(self, test):
+        self.testGraph.createPlotLinesForTest(test)
+        # Plot KPI group
+        if self.optionGroup.getSwitchValue("kpi"):
+            oldTestDir = test.getDirectory(None)
+            path, originalTestName = os.path.split(oldTestDir)
+            kpiGroupForTest, kpiGroups = readKPIGroupFileCommon(self.test.parent)
+            if kpiGroupForTest.has_key(originalTestName):
+                testInGroup = kpiGroupForTest[originalTestName]
+                for kpiTest in kpiGroupForTest.keys():
+                    if testInGroup == kpiGroupForTest[kpiTest] and  kpiTest != originalTestName:
+                        testPath = os.path.join(path, kpiTest)
+                        newTest = testmodel.TestCase(kpiTest, testPath, self.test.app, [], self.test.parent)
+                        self.testGraph.createPlotLinesForTest(newTest)
+            else:
+                print "Test", test.name, "is not in an KPI group."
+        self.plotGraph(test.app.writeDirectory)  
+
+guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUIAPC, ViewApcLog, SaveBestSolution ] 

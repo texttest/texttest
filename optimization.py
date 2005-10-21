@@ -1152,8 +1152,12 @@ class TraverseSubPlans(plugins.Action):
         switches = {}
         return switches
 
+# Start of "PlotTest" functionality.
+# Classes for using gnuplot to plot test curves of tests
 #
-#
+
+# The actions PlotTest, _PlotTest and GraphPlot are used for command line plotting.
+
 commonPlotter = 0
 commonPlotCount = 0
 
@@ -1184,113 +1188,6 @@ class PlotTest(plugins.Action):
     def getCleanUpAction(self):
         return GraphPlot()
 
-class Averager:
-    def __init__(self, minmax = 0):
-        self.average = {}
-        self.numberOfGraphs = 0
-        self.minmax = 0
-        if  minmax:
-            self.minmax = 1
-            self.min = {}
-            self.max = {}
-
-    def addGraph(self, graph):
-        self.numberOfGraphs += 1
-        if not self.average:
-            self.average = copy.deepcopy(graph)
-            if self.minmax:
-                self.min = copy.deepcopy(graph)
-                self.max = copy.deepcopy(graph)
-            return
-        graphXValues = graph.keys()
-        graphXValues.sort()
-        averageXValues = self.average.keys()
-        averageXValues.sort()
-        mergedVals = self.mergeVals(averageXValues, graphXValues)
-        extendedGraph = self.extendGraph(graph, mergedVals)
-        extendedAverage = self.extendGraph(self.average, mergedVals)
-        if self.minmax:
-            extendedMin = self.extendGraph(self.min, mergedVals)
-            extendedMax = self.extendGraph(self.max, mergedVals)
-        for xval in extendedAverage.keys():
-            extendedAverage[xval] += extendedGraph[xval]
-            if self.minmax:
-                extendedMin[xval] = min(extendedMin[xval], extendedGraph[xval])
-                extendedMax[xval] = max(extendedMax[xval], extendedGraph[xval])
-        self.average = extendedAverage
-        if self.minmax:
-            self.min = extendedMin
-            self.max = extendedMax
-
-    def mergeVals(self, values1, values2):
-        merged = values1
-        merged.extend(values2)
-        merged.sort()
-        mergedVals = [ merged[0] ]
-        prev = merged[0]
-        for val in merged[1:]:
-            if not val == prev:
-                mergedVals.append(val)
-                prev = val
-        return mergedVals
-
-    def extendGraph(self, graph, xvalues):
-        currentxvalues = graph.keys()
-        currentxvalues.sort()
-        extendedGraph = graph
-        for xval in xvalues:
-            if not graph.has_key(xval):
-                extendedGraph[xval] = graph[self.findClosestEarlierVal(xval, currentxvalues)]
-        return graph
-
-    def findClosestEarlierVal(self, xval, xvalues):
-        # If there is no earlier value.
-        if xval < xvalues[0]:
-            return xvalues[0]
-        if xval > xvalues[-1]:
-            return xvalues[-1]
-        pos = 0
-        while xvalues[pos] < xval:
-            pos += 1
-        return xvalues[pos-1]
-
-    def getAverage(self):
-        graph = {}
-        xValues = self.average.keys()
-        xValues.sort()
-        for xVal in xValues:
-            graph[xVal] = self.average[xVal]/self.numberOfGraphs
-        return graph
-    
-    def getMinMax(self):
-        return self.min, self.max
-
-plotAveragerCount = 0
-
-class PlotAverager(Averager):
-    def __init__(self, tmpFileDirectory = None):
-        Averager.__init__(self)
-        self.plotLineRepresentant = None
-        self.tmpFileDirectory = tmpFileDirectory
-    
-    def plotArgument(self, min):
-        global plotAveragerCount
-        plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))
-        plotAveragerCount += 1
-        plotFile = open(plotFileName, "w")
-        xValues = self.average.keys()
-        xValues.sort()
-        for xVal in xValues:
-            if min:
-                y = 100.0*float(self.average[xVal])/float(self.numberOfGraphs*min)-100.0
-            else:
-                y = self.average[xVal]/self.numberOfGraphs
-            plotFile.write(str(xVal) + " " + str(y) + os.linesep)
-        plotFile.close()
-        return "'" + plotFileName + "' " + " title \"" + self.plotLineRepresentant.name + "\" with lines lt " + self.plotLineRepresentant.lineType + " lw 2"
-
-# Class for using gnuplot to plot test curves of tests
-#
 class _PlotTest(plugins.Action):
     def __init__(self, args = []):
         self.testGraph = TestGraph()
@@ -1312,7 +1209,41 @@ class GraphPlot(plugins.Action):
             except plugins.TextTestError, e:
                 print e
         commonPlotter.testGraph = None
-    
+
+# This is the action responsible for plotting from the GUI.
+class PlotTestInGUI(guiplugins.InteractiveAction):
+    def __init__(self, test, oldOptionGroup = None):
+        guiplugins.InteractiveAction.__init__(self, test, oldOptionGroup, "Graph")
+        self.createGUITestGraph(oldOptionGroup)
+    def createGUITestGraph(self, oldOptionGroup = []):
+        self.testGraph = TestGraph()
+        
+        self.testGraph.optionGroup = self.optionGroup
+        for name, expl, value in self.testGraph.options:
+            self.addOption(oldOptionGroup, name, expl, value)
+        for name, expl in self.testGraph.switches:
+            self.addSwitch(oldOptionGroup, name, expl)
+    def __repr__(self):
+        return "Plotting Graph"
+    def getTitle(self):
+        return "Plot Graph"
+    def __repr__(self):
+        return "Plotting"
+    def __call__(self, test):
+        self.testGraph.createPlotLinesForTest(test)
+        self.plotGraph(test.app.writeDirectory)  
+    def plotGraph(self, writeDirectory):
+        plotProcess = self.testGraph.plot(writeDirectory)
+        if plotProcess:
+            # Should really monitor this and close it when GUI closes,
+            # but it isn't a child process so this means ps and load on the machine
+            #self.processes.append(plotProcess)
+            guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
+        # The TestGraph is "used", create a new one so that the user can do another plot.
+        self.testGraph = TestGraph()
+        self.testGraph.optionGroup = self.optionGroup
+
+# TestGraph is the "real stuff", the PlotLine instances are created here and gnuplot is invoked here.
 class TestGraph:
     def __init__(self):
         self.plotLines = []
@@ -1570,68 +1501,7 @@ class TestGraph:
                 if not (onlyExactMatch and not isExactMatch):
                     self.createPlotLines(versionName, logFile, test, scaling)
 
-# This is the action responsible for plotting from the GUI.
-class PlotTestInGUI(guiplugins.InteractiveAction):
-    def __init__(self, test, oldOptionGroup = None):
-        guiplugins.InteractiveAction.__init__(self, test, oldOptionGroup, "Graph")
-        self.createGUITestGraph(oldOptionGroup)
-    def createGUITestGraph(self, oldOptionGroup = []):
-        self.testGraph = TestGraph()
-        
-        self.testGraph.optionGroup = self.optionGroup
-        for name, expl, value in self.testGraph.options:
-            self.addOption(oldOptionGroup, name, expl, value)
-        for name, expl in self.testGraph.switches:
-            self.addSwitch(oldOptionGroup, name, expl)
-    def __repr__(self):
-        return "Plotting Graph"
-    def getTitle(self):
-        return "Plot Graph"
-    def __repr__(self):
-        return "Plotting"
-    def __call__(self, test):
-        self.testGraph.createPlotLinesForTest(test)
-        self.plotGraph(test.app.writeDirectory)  
-    def plotGraph(self, writeDirectory):
-        plotProcess = self.testGraph.plot(writeDirectory)
-        if plotProcess:
-            # Should really monitor this and close it when GUI closes,
-            # but it isn't a child process so this means ps and load on the machine
-            #self.processes.append(plotProcess)
-            guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
-        # The TestGraph is "used", create a new one so that the user can do another plot.
-        self.testGraph = TestGraph()
-        self.testGraph.optionGroup = self.optionGroup
-
-class StartStudio(guiplugins.InteractiveAction):
-    def __repr__(self):
-        return "Studio"
-    def getTitle(self):
-        return "Studio"
-    def getScriptTitle(self):
-        return "Start Studio"
-    def matchesMode(self, dynamic):
-        return not dynamic
-    def __call__(self, test):
-        test.setUpEnvironment(parents=1)
-        print "CARMSYS:", os.environ["CARMSYS"]
-        print "CARMUSR:", os.environ["CARMUSR"]
-        print "CARMTMP:", os.environ["CARMTMP"]
-        fullSubPlanPath = test.app.configObject.target._getSubPlanDirName(test)
-        lPos = fullSubPlanPath.find("LOCAL_PLAN/")
-        subPlan = fullSubPlanPath[lPos + 11:]
-        localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
-        studio = os.path.join(os.environ["CARMSYS"], "bin", "studio")
-        if not os.path.isfile(studio):
-            raise plugins.TextTestError, "Cannot start studio, no file at " + studio
-        commandLine = studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
-                        "\",0)'" + plugins.nullRedirect() 
-        process = self.startExternalProgram(commandLine)
-        guiplugins.scriptEngine.monitorProcess("runs studio", process)
-        test.tearDownEnvironment(parents=1)
-
-guiplugins.interactiveActionHandler.testClasses += [ StartStudio ]
-
+# Class representing ONE curve in plot.
 class PlotLine:
     def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale, scaling, averager):
         self.test = test
@@ -1719,7 +1589,144 @@ class PlotLine:
         else:
             style = " with linespoints "
         return style
+
+# Create averages of several graphs.
+class Averager:
+    def __init__(self, minmax = 0):
+        self.average = {}
+        self.numberOfGraphs = 0
+        self.minmax = 0
+        if  minmax:
+            self.minmax = 1
+            self.min = {}
+            self.max = {}
+
+    def addGraph(self, graph):
+        self.numberOfGraphs += 1
+        if not self.average:
+            self.average = copy.deepcopy(graph)
+            if self.minmax:
+                self.min = copy.deepcopy(graph)
+                self.max = copy.deepcopy(graph)
+            return
+        graphXValues = graph.keys()
+        graphXValues.sort()
+        averageXValues = self.average.keys()
+        averageXValues.sort()
+        mergedVals = self.mergeVals(averageXValues, graphXValues)
+        extendedGraph = self.extendGraph(graph, mergedVals)
+        extendedAverage = self.extendGraph(self.average, mergedVals)
+        if self.minmax:
+            extendedMin = self.extendGraph(self.min, mergedVals)
+            extendedMax = self.extendGraph(self.max, mergedVals)
+        for xval in extendedAverage.keys():
+            extendedAverage[xval] += extendedGraph[xval]
+            if self.minmax:
+                extendedMin[xval] = min(extendedMin[xval], extendedGraph[xval])
+                extendedMax[xval] = max(extendedMax[xval], extendedGraph[xval])
+        self.average = extendedAverage
+        if self.minmax:
+            self.min = extendedMin
+            self.max = extendedMax
+
+    def mergeVals(self, values1, values2):
+        merged = values1
+        merged.extend(values2)
+        merged.sort()
+        mergedVals = [ merged[0] ]
+        prev = merged[0]
+        for val in merged[1:]:
+            if not val == prev:
+                mergedVals.append(val)
+                prev = val
+        return mergedVals
+
+    def extendGraph(self, graph, xvalues):
+        currentxvalues = graph.keys()
+        currentxvalues.sort()
+        extendedGraph = graph
+        for xval in xvalues:
+            if not graph.has_key(xval):
+                extendedGraph[xval] = graph[self.findClosestEarlierVal(xval, currentxvalues)]
+        return graph
+
+    def findClosestEarlierVal(self, xval, xvalues):
+        # If there is no earlier value.
+        if xval < xvalues[0]:
+            return xvalues[0]
+        if xval > xvalues[-1]:
+            return xvalues[-1]
+        pos = 0
+        while xvalues[pos] < xval:
+            pos += 1
+        return xvalues[pos-1]
+
+    def getAverage(self):
+        graph = {}
+        xValues = self.average.keys()
+        xValues.sort()
+        for xVal in xValues:
+            graph[xVal] = self.average[xVal]/self.numberOfGraphs
+        return graph
     
+    def getMinMax(self):
+        return self.min, self.max
+
+plotAveragerCount = 0
+
+class PlotAverager(Averager):
+    def __init__(self, tmpFileDirectory = None):
+        Averager.__init__(self)
+        self.plotLineRepresentant = None
+        self.tmpFileDirectory = tmpFileDirectory
+    
+    def plotArgument(self, min):
+        global plotAveragerCount
+        plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))
+        plotAveragerCount += 1
+        plotFile = open(plotFileName, "w")
+        xValues = self.average.keys()
+        xValues.sort()
+        for xVal in xValues:
+            if min:
+                y = 100.0*float(self.average[xVal])/float(self.numberOfGraphs*min)-100.0
+            else:
+                y = self.average[xVal]/self.numberOfGraphs
+            plotFile.write(str(xVal) + " " + str(y) + os.linesep)
+        plotFile.close()
+        return "'" + plotFileName + "' " + " title \"" + self.plotLineRepresentant.name + "\" with lines lt " + self.plotLineRepresentant.lineType + " lw 2"
+
+# End of "PlotTest" functionality.
+
+class StartStudio(guiplugins.InteractiveAction):
+    def __repr__(self):
+        return "Studio"
+    def getTitle(self):
+        return "Studio"
+    def getScriptTitle(self):
+        return "Start Studio"
+    def matchesMode(self, dynamic):
+        return not dynamic
+    def __call__(self, test):
+        test.setUpEnvironment(parents=1)
+        print "CARMSYS:", os.environ["CARMSYS"]
+        print "CARMUSR:", os.environ["CARMUSR"]
+        print "CARMTMP:", os.environ["CARMTMP"]
+        fullSubPlanPath = test.app.configObject.target._getSubPlanDirName(test)
+        lPos = fullSubPlanPath.find("LOCAL_PLAN/")
+        subPlan = fullSubPlanPath[lPos + 11:]
+        localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
+        studio = os.path.join(os.environ["CARMSYS"], "bin", "studio")
+        if not os.path.isfile(studio):
+            raise plugins.TextTestError, "Cannot start studio, no file at " + studio
+        commandLine = studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
+                        "\",0)'" + plugins.nullRedirect() 
+        process = self.startExternalProgram(commandLine)
+        guiplugins.scriptEngine.monitorProcess("runs studio", process)
+        test.tearDownEnvironment(parents=1)
+
+guiplugins.interactiveActionHandler.testClasses += [ StartStudio ]
+
 class CVSLogInGUI(guiplugins.InteractiveAction):
     def __call__(self, test):
         logFileStem = test.app.getConfigValue("log_file")

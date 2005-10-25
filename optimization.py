@@ -1605,18 +1605,20 @@ class Averager:
 
     def addGraph(self, graph):
         self.numberOfGraphs += 1
+        # We will modify graph.
+        graphCopy = copy.deepcopy(graph)
         if not self.average:
-            self.average = copy.deepcopy(graph)
+            self.average = graphCopy
             if self.minmax:
-                self.min = copy.deepcopy(graph)
-                self.max = copy.deepcopy(graph)
+                self.min = graphCopy
+                self.max = graphCopy
             return
-        graphXValues = graph.keys()
+        graphXValues = graphCopy.keys()
         graphXValues.sort()
         averageXValues = self.average.keys()
         averageXValues.sort()
         mergedVals = self.mergeVals(averageXValues, graphXValues)
-        extendedGraph = self.extendGraph(graph, mergedVals)
+        extendedGraph = self.extendGraph(graphCopy, mergedVals)
         extendedAverage = self.extendGraph(self.average, mergedVals)
         if self.minmax:
             extendedMin = self.extendGraph(self.min, mergedVals)

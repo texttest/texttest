@@ -1133,7 +1133,12 @@ class OptionFinder(plugins.OptionFinder):
         try:
             exec importCommand
         except:
-            return self.getNonPython()
+            if os.path.isfile(self["s"]):
+                return self.getNonPython()
+            else:
+                sys.stderr.write("Import failed, looked at " + repr(sys.path) + "\n")
+                plugins.printException()
+                raise BadConfigError, "Could not import script " + pclass + " from module " + module
 
         # Assume if we succeed in importing then a python module is intended.
         try:

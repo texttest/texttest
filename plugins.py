@@ -340,7 +340,8 @@ class PreviewGenerator:
             cutLines += lines[-self.cutFromEnd:]    
         return cutLines
     def getPreview(self, file):
-        lines = map(self.getWrappedLine, self.getCutLines(file))
+        cutLines = retryOnInterrupt(self.getCutLines, file)
+        lines = map(self.getWrappedLine, cutLines)
         return string.join(lines, "")
     def getWrappedLine(self, line):
         if len(line) <= self.maxWidth:

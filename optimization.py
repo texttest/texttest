@@ -256,7 +256,10 @@ class MakeTmpSubPlan(plugins.Action):
                                 file.write(override)
                     file.write(line)
             else:
-                os.symlink(fromPath, toPath)
+                try:
+                    os.symlink(fromPath, toPath)
+                except OSError:
+                    print "Failed to create symlink " + toPath
     def readRaveParameters(self, fileName):
         if not os.path.isfile(fileName):
             self.raveParameters.append([])

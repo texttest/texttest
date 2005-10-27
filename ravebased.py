@@ -173,7 +173,7 @@ class Config(carmen.CarmenConfig):
         filterer = FilterRuleBuilds(self.getRuleSetName, self.getRuleBuildFilter())
         if self.useQueueSystem():
             # If building rulesets remotely, don't distribute them further...
-            os.environ["_AUTOTEST__NO_LSF_"] = "1"
+            os.environ["_AUTOTEST__LOCAL_COMPILE_"] = "1"
             submitter = SubmitRuleCompilations(self.getRaveSubmissionRules, self.optionMap)
             waiter = WaitForRuleCompile(self.getRuleSetName)
             return [ filterer, submitter, waiter ]

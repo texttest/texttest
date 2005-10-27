@@ -132,6 +132,8 @@ class Config(carmen.CarmenConfig):
                 group.addOption("raveslave", "Private: used for submitting slaves to compile rulesets")
     def getFilterClasses(self):
         return carmen.CarmenConfig.getFilterClasses(self) + [ UserFilter ]
+    def useExtraVersions(self):
+        return carmen.CarmenConfig.useExtraVersions(self) and not self.raveSlave()
     def getActionSequence(self):
         if self.slaveRun():
             return carmen.CarmenConfig.getActionSequence(self)
@@ -479,7 +481,7 @@ class WaitForRuleCompile(queuesystem.WaitForCompletion):
         else:
             return "ok"
     def jobStarted(self, test):
-        return test.state.category == "running_rulecompile"
+        return test.state.category != "need_rulecompile"
     
 class NeedRuleCompilation(plugins.TestState):
     def __init__(self, rulesetName, testCompiling = None):

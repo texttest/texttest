@@ -384,7 +384,7 @@ class LogFileFinder:
         if thisRun:
             fromThisRun = self.test.makeFileName(stem, version, temporary=1)
             self.diag.info("Looked for " + fromThisRun)
-            if os.path.isfile(fromThisRun) and fromThisRun.find(searchString) != -1:
+            if os.path.isfile(fromThisRun): # Temp removed, doesn't work for matador. and fromThisRun.find(searchString) != -1:
                 return fromThisRun, app.writeDirectory
         for subDir in os.listdir(root):
             fullDir = os.path.join(root, subDir)
@@ -1611,10 +1611,10 @@ class Averager:
         # We will modify graph.
         graphCopy = copy.deepcopy(graph)
         if not self.average:
-            self.average = graphCopy
+            self.average = copy.deepcopy(graphCopy)
             if self.minmax:
-                self.min = graphCopy
-                self.max = graphCopy
+                self.min = copy.deepcopy(graphCopy)
+                self.max = copy.deepcopy(graphCopy)
             return
         graphXValues = graphCopy.keys()
         graphXValues.sort()

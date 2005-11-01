@@ -61,6 +61,10 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
         self.presetPerfCategory = ""
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
             self.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
+        self.archToUse = getArchitecture(self.test.app)
+        if self.archToUse == "x86_64_linux" and "12" in self.test.app.versions:
+            # circumvent the resources, we can run fine on this much larger group of machines
+            self.archToUse = "i386_linux"
     # Return "short", "medium" or "long"
     def getPerformanceCategory(self):
         # Hard-coded, useful at boundaries and for rave compilations
@@ -93,11 +97,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
     def findConcreteResources(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
-        arch = getArchitecture(self.test.app)
-        if arch == "x86_64_linux" and "12" in self.test.app.versions:
-            resources.append("carmarch=\"*i386_linux*\"")
-        else:
-            resources.append("carmarch=\"*" + arch + "*\"")
+        resources.append("carmarch=\"*" + self.archToUse + "*\"")
         return resources
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]
@@ -106,33 +106,32 @@ class SgeSubmissionRules(CarmenSubmissionRules):
 
 class LsfSubmissionRules(CarmenSubmissionRules):
     def findDefaultQueue(self):
-        arch = getArchitecture(self.test.app)
-        if arch == "i386_linux" and not self.presetPerfCategory:
+        if self.archToUse == "i386_linux" and not self.presetPerfCategory:
             cpuTime = performance.getTestPerformance(self.test)
             chunkLimit = float(self.test.app.getConfigValue("maximum_cputime_for_chunking"))
             if cpuTime > 0 and cpuTime < chunkLimit:
                 return "short_rd_testing_chunked"
-        return self.getQueuePerformancePrefix(arch) + self.getArchQueueName(arch) +\
-               self.getQueuePlatformSuffix(arch)
-    def getArchQueueName(self, arch):
-        if arch == "sparc_64":
+        return self.getQueuePerformancePrefix() + self.getArchQueueName() +\
+               self.getQueuePlatformSuffix()
+    def getArchQueueName(self):
+        if self.archToUse == "sparc_64":
             return "sparc"
         else:
-            return arch
-    def getQueuePerformancePrefix(self, arch):
+            return self.archToUse
+    def getQueuePerformancePrefix(self):
         category = self.getPerformanceCategory()
         if category == "short":
             return "short_"
-        elif category == "medium" or (arch == "powerpc" or arch == "parisc_2_0"):
+        elif category == "medium" or (self.archToUse == "powerpc" or self.archToUse == "parisc_2_0"):
             return ""
         else:
             return "idle_"
-    def getQueuePlatformSuffix(self, arch):
-        if arch == "i386_linux":
+    def getQueuePlatformSuffix(self):
+        if self.archToUse == "i386_linux":
             return "_RHEL"
-        elif arch == "sparc" or arch == "sparc_64":
+        elif self.archToUse == "sparc" or self.archToUse == "sparc_64":
             return "_sol8"
-        elif arch == "powerpc":
+        elif self.archToUse == "powerpc":
             return "_aix5"
         return ""
 

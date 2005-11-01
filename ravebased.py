@@ -84,6 +84,8 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         # Ignore all command line options, but take account of environment etc...
         self.normalSubmissionRules.optionMap = {}
         self.normalSubmissionRules.presetPerfCategory = "short"
+        # Must always use the correct architecture, remove run hacks
+        self.normalSubmissionRules.archToUse = carmen.getArchitecture(self.test.app)
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY_RAVE"):
             self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):
@@ -104,8 +106,11 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         return basicName
     def findQueue(self):
         return self.normalSubmissionRules.findDefaultQueue()
+    def getMajorReleaseResource(self):
+        majorRelease = carmen.getMajorReleaseId(self.test.app)
+        return "carmbuild" + majorRelease.replace("carmen_", "") + "=1"
     def findResourceList(self):
-        return self.normalSubmissionRules.findResourceList()
+        return self.normalSubmissionRules.findResourceList() + [ self.getMajorReleaseResource() ]
     def getSubmitSuffix(self, name):
         return " (" + self.getRuleSetName(self.test) + " ruleset)" + self.normalSubmissionRules.getSubmitSuffix(name)
     def forceOnPerformanceMachines(self):

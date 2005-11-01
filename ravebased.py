@@ -84,6 +84,10 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         # Ignore all command line options, but take account of environment etc...
         self.normalSubmissionRules.optionMap = {}
         self.normalSubmissionRules.presetPerfCategory = "short"
+        if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY_RAVE"):
+            self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
+        if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):
+            self.normalSubmissionRules.envResource = os.environ["QUEUE_SYSTEM_RESOURCE_RAVE"]
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName

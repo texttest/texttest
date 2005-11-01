@@ -105,20 +105,14 @@ class BatchCategory(plugins.Filter):
                     fullText += "\n"
         return fullText
 
-allBatchResponders = []
-
-# Works only on UNIX
-class BatchResponder(respond.Responder):
-    def __init__(self, sessionName):
-        respond.Responder.__init__(self, 0)
-        self.sessionName = sessionName
+class BatchApplicationData:
+    def __init__(self, suite):
+        self.suite = suite
         self.categories = {}
         self.errorCategories = []
         self.failureCategories = []
         self.successCategories = []
-        self.mainSuite = None
-        allBatchResponders.append(self)
-    def handleAll(self, test):
+    def storeCategory(self, test):
         category = test.state.category
         if not self.categories.has_key(category):
             batchCategory = BatchCategory(test.state)
@@ -130,11 +124,6 @@ class BatchResponder(respond.Responder):
                 self.failureCategories.append(batchCategory)
             self.categories[category] = batchCategory
         self.categories[category].addTest(test)
-    def useGraphicalComparison(self, comparison):
-        return 0
-    def setUpSuite(self, suite):
-        if self.mainSuite == None:
-            self.mainSuite = suite
     def failureCount(self):
         return self.totalTests(self.failCategories())
     def successCount(self):
@@ -153,62 +142,70 @@ class BatchResponder(respond.Responder):
     def getFailuresBrief(self):
         contents = ""
         for category in self.failCategories():
-            contents += category.describeBrief(self.mainSuite.app)
+            contents += category.describeBrief(self.suite.app)
         return contents
     def getSuccessBrief(self):
         contents = ""
         for category in self.successCategories:
-            contents += category.describeBrief(self.mainSuite.app)
+            contents += category.describeBrief(self.suite.app)
         return contents
     def getDetails(self):
         contents = ""
         for category in self.allCategories():
             contents += category.describeFull()
         return contents
-    def getCleanUpAction(self):
-        return MailSender(self.sessionName)
+
+# Works only on UNIX
+class BatchResponder(respond.Responder):
+    def __init__(self, optionMap):
+        self.sessionName = optionMap["b"]
+        self.batchAppData = seqdict()
+        self.allApps = seqdict()
+    def notifyComplete(self, test):
+        self.describeFailures(test)
+        self.batchAppData[test.app].storeCategory(test)
+    def addSuite(self, suite):
+        app = suite.app
+        self.batchAppData[app] = BatchApplicationData(suite)
+        if not self.allApps.has_key(app.name):
+            self.allApps[app.name] = [ app ]
+        else:
+            self.allApps[app.name].append(app)
+    def notifyAllComplete(self):
+        mailSender = MailSender(self.sessionName)
+        for appList in self.allApps.values():
+            batchDataList = map(lambda x: self.batchAppData[x], appList)
+            mailSender.send(batchDataList)
 
 sectionHeaders = [ "Summary of all Unsuccessful tests", "Details of all Unsuccessful tests", "Summary of all Successful tests" ]
 
-class MailSender(plugins.Action):
+class MailSender:
     def __init__(self, sessionName):
         self.sessionName = sessionName
         self.diag = plugins.getDiagnostics("Mail Sender")
-    def getResponders(self, app):
-        appResponders = []
-        for responder in allBatchResponders:
-            if responder.mainSuite:
-                self.diag.info("Responder for " + responder.mainSuite.app.name + " has " + str(responder.testCount()) + " tests.")
-            else:
-                self.diag.info("Responder with main suite " + str(responder.mainSuite))
-            if responder.mainSuite and responder.mainSuite.app.name == app.name and responder.testCount() > 0:
-                appResponders.append(responder)
-        return appResponders
-    def setUpApplication(self, app):
-        appResponders = self.getResponders(app)
-        if len(appResponders) == 0:
+    def send(self, batchDataList):
+        if len(batchDataList) == 0:
             self.diag.info("No responders for " + repr(app))
             return
-        mailTitle = self.getMailTitle(app, appResponders)
-        mailContents = self.createMailHeaderSection(mailTitle, app, appResponders)
-        if len(appResponders) > 1:
-            for resp in appResponders:
-                mailContents += self.getMailTitle(app, [ resp ]) + "\n"
+        app = batchDataList[0].suite.app
+        mailTitle = self.getMailTitle(app, batchDataList)
+        mailContents = self.createMailHeaderSection(mailTitle, app, batchDataList)
+        if len(batchDataList) > 1:
+            for batchData in batchDataList:
+                mailContents += self.getMailTitle(app, [ batchData ]) + "\n"
             mailContents += "\n"
-        if not self.isAllSuccess(appResponders):
-            mailContents += self.performForAll(app, appResponders, BatchResponder.getFailuresBrief, sectionHeaders[0])
-            mailContents += self.performForAll(app, appResponders, BatchResponder.getDetails, sectionHeaders[1])
-        if not self.isAllFailure(appResponders):
-            mailContents += self.performForAll(app, appResponders, BatchResponder.getSuccessBrief, sectionHeaders[2])
-        for responder in appResponders:
-            allBatchResponders.remove(responder)
+        if not self.isAllSuccess(batchDataList):
+            mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getFailuresBrief, sectionHeaders[0])
+            mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getDetails, sectionHeaders[1])
+        if not self.isAllFailure(batchDataList):
+            mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getSuccessBrief, sectionHeaders[2])
         self.sendOrStoreMail(app, mailContents)
-    def performForAll(self, app, appResponders, method, headline):
+    def performForAll(self, app, batchDataList, method, headline):
         contents = headline + " follows...\n" + \
                    "---------------------------------------------------------------------------------" + "\n"
-        for resp in appResponders:
-            if len(appResponders) > 1:
-                if headline.find("Details") != -1 and not resp is appResponders[0]:
+        for resp in batchDataList:
+            if len(batchDataList) > 1:
+                if headline.find("Details") != -1 and not resp is batchDataList[0]:
                     contents += "---------------------------------------------------------------------------------" + "\n"
                 contents += self.getMailTitle(app, [ resp ]) + "\n\n"
             contents += method(resp) + "\n"
@@ -266,12 +263,12 @@ class MailSender(plugins.Action):
             if not os.path.isfile(attempt):
                 return attempt
     
-    def createMailHeaderSection(self, title, app, appResponders):
+    def createMailHeaderSection(self, title, app, batchDataList):
         toAddress = app.getCompositeConfigValue("batch_recipients", self.sessionName)
         # blank line needed to separate headers from body
         if self.useCollection(app):
             return toAddress + "\n" + \
-                   self.getMachineTitle(app, appResponders) + "\n" + \
+                   self.getMachineTitle(app, batchDataList) + "\n" + \
                    title + "\n\n" # blank line separating headers from body
         else:
             fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
@@ -279,61 +276,61 @@ class MailSender(plugins.Action):
                    "Subject: " + title + "\n\n"
     def useCollection(self, app):
         return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
-    def getMailHeader(self, app, appResponders):
+    def getMailHeader(self, app, batchDataList):
         title = time.strftime("%y%m%d") + " " + repr(app)
-        versions = self.findCommonVersions(app, appResponders)
+        versions = self.findCommonVersions(app, batchDataList)
         return title + self.getVersionString(versions) + " : "
-    def getCategoryNames(self, appResponders):
+    def getCategoryNames(self, batchDataList):
         names = []
-        for resp in appResponders:
+        for resp in batchDataList:
             for cat in resp.errorCategories:
                 if not cat.name in names:
                     names.append(cat.name)
-        for resp in appResponders:
+        for resp in batchDataList:
             for cat in resp.failureCategories:
                 if not cat.name in names:
                     names.append(cat.name)
-        for resp in appResponders:
+        for resp in batchDataList:
             for cat in resp.successCategories:
                 if not cat.name in names:
                     names.append(cat.name)
         return names
-    def isAllSuccess(self, appResponders):
-        return self.getTotalString(appResponders, BatchResponder.failureCount) == "0"
-    def isAllFailure(self, appResponders):
-        return self.getTotalString(appResponders, BatchResponder.successCount) == "0"
-    def getMailTitle(self, app, appResponders):
-        title = self.getMailHeader(app, appResponders)
-        title += self.getTotalString(appResponders, BatchResponder.testCount) + " tests"
-        if self.isAllSuccess(appResponders):
+    def isAllSuccess(self, batchDataList):
+        return self.getTotalString(batchDataList, BatchApplicationData.failureCount) == "0"
+    def isAllFailure(self, batchDataList):
+        return self.getTotalString(batchDataList, BatchApplicationData.successCount) == "0"
+    def getMailTitle(self, app, batchDataList):
+        title = self.getMailHeader(app, batchDataList)
+        title += self.getTotalString(batchDataList, BatchApplicationData.testCount) + " tests"
+        if self.isAllSuccess(batchDataList):
             return title + ", all successful"
         title += " :"
-        for categoryName in self.getCategoryNames(appResponders):
-            totalInCategory = self.getCategoryCount(categoryName, appResponders)
-            briefDesc = self.getBriefDescription(categoryName, appResponders) 
+        for categoryName in self.getCategoryNames(batchDataList):
+            totalInCategory = self.getCategoryCount(categoryName, batchDataList)
+            briefDesc = self.getBriefDescription(categoryName, batchDataList) 
             title += self.briefText(totalInCategory, briefDesc)
         # Lose trailing comma
         return title[:-1]
-    def getMachineTitle(self, app, appResponders):
+    def getMachineTitle(self, app, batchDataList):
         values = []
-        for categoryName in self.getCategoryNames(appResponders):
-            countStr = str(self.getCategoryCount(categoryName, appResponders))
-            briefDesc = self.getBriefDescription(categoryName, appResponders)
+        for categoryName in self.getCategoryNames(batchDataList):
+            countStr = str(self.getCategoryCount(categoryName, batchDataList))
+            briefDesc = self.getBriefDescription(categoryName, batchDataList)
             values.append(briefDesc + "=" + countStr)
         return string.join(values, ',')
-    def getTotalString(self, appResponders, method):
+    def getTotalString(self, batchDataList, method):
         total = 0
-        for resp in appResponders:
+        for resp in batchDataList:
             total += method(resp)
         return str(total)
-    def getCategoryCount(self, categoryName, appResponders):
+    def getCategoryCount(self, categoryName, batchDataList):
         total = 0
-        for resp in appResponders:
+        for resp in batchDataList:
             if resp.categories.has_key(categoryName):
                 total += resp.categories[categoryName].size()
         return total
-    def getBriefDescription(self, categoryName, appResponders):
-        for resp in appResponders:
+    def getBriefDescription(self, categoryName, batchDataList):
+        for resp in batchDataList:
             if resp.categories.has_key(categoryName):
                 return resp.categories[categoryName].briefDescription
     def getVersionString(self, versions):
@@ -346,13 +343,13 @@ class MailSender(plugins.Action):
             return ""
         else:
             return " " + str(count) + " " + description + ","
-    def findCommonVersions(self, app, appResponders):
-        if len(appResponders) == 0:
+    def findCommonVersions(self, app, batchDataList):
+        if len(batchDataList) == 0:
             return app.versions
-        versions = appResponders[0].mainSuite.app.versions
-        for resp in appResponders[1:]:
+        versions = batchDataList[0].suite.app.versions
+        for batchData in batchDataList[1:]:
             for version in versions:
-                if not version in resp.mainSuite.app.versions:
+                if not version in batchData.suite.app.versions:
                     versions.remove(version)
         return versions
         

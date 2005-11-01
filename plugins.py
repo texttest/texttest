@@ -20,6 +20,7 @@ import os, log4py, string, shutil, time, re, stat
 from types import FileType
 from ndict import seqdict
 from traceback import format_exception
+from threading import currentThread
 
 # Useful utility...
 def localtime(format="%d%b%H:%M:%S"):
@@ -58,6 +59,8 @@ class Configuration:
         pass
     def getActionSequence(self):
         return []
+    def getResponderClasses(self):
+        return []
     def getFilterList(self, app):
         return []
     def getExecuteCommand(self, binary, test):
@@ -66,9 +69,9 @@ class Configuration:
         return []
     def getCleanMode(self):
         return self.CLEAN_BASIC | self.CLEAN_NONBASIC
-    def getRunIdentifier(self):
+    def getRunIdentifier(self, prefix=""):
         global globalStartTime
-        return tmpString() + globalStartTime
+        return prefix + tmpString() + globalStartTime
     def useExtraVersions(self):
         return 1
     def printHelpText(self):
@@ -126,13 +129,15 @@ def addCategory(name, briefDesc, longDesc = ""):
 class TestState:
     categoryDescriptions = seqdict()
     showExecHosts = 0
-    def __init__(self, category, freeText = "", briefText = "", started = 0, completed = 0, executionHosts = []):
+    def __init__(self, category, freeText = "", briefText = "", started = 0, completed = 0,\
+                 executionHosts = [], lifecycleChange = ""):
         self.category = category
         self.freeText = freeText
         self.briefText = briefText
         self.started = started
         self.completed = completed
         self.executionHosts = executionHosts
+        self.lifecycleChange = lifecycleChange
     def __str__(self):
         return self.freeText
     def __repr__(self):
@@ -157,7 +162,7 @@ class TestState:
         # Is some aspect of the state out of date
         return 0
     # Used by text interface to print states
-    def getDifferenceSummary(self, actionDesc):
+    def getDifferenceSummary(self):
         if self.freeText:
             return "not compared:  " + self.freeText
         else:
@@ -179,12 +184,6 @@ class TestState:
         return self.hasFailed() and self.hasResults()
     def updateAbsPath(self, newAbsPath):
         pass
-    def changeDescription(self):
-        if self.isComplete():
-            return "complete"
-        elif self.hasStarted():
-            return "start"
-        return "become " + self.category
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
@@ -279,6 +278,9 @@ def readList(filename):
         if len(line) > 0 and not line.startswith("#"):
             items.append(line)
     return items
+
+def inMainThread():
+    return currentThread().getName() == "MainThread"
 
 def chdir(dir):
     ensureDirectoryExists(dir)

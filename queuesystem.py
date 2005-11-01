@@ -7,6 +7,7 @@ from threading import Thread
 from time import sleep
 from copy import copy, deepcopy
 from cPickle import dumps
+from respond import Responder
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
@@ -36,12 +37,11 @@ class RunTestInSlave(unixonly.RunTest):
     def getBriefText(self, execMachines):
         return "RUN (" + string.join(execMachines, ",") + ")"
     
-class AddSlaveSocket(plugins.Action):
-    def __init__(self, servAddr):
+class SocketResponder(Responder):
+    def __init__(self, optionMap):
+        servAddr = optionMap["servaddr"]
         host, port = servAddr.split(":")
         self.serverAddress = (host, int(port))
-    def __call__(self, test):
-        test.observers.append(self)
     def connect(self, sendSocket):
         for attempt in range(5):
             try:
@@ -50,15 +50,13 @@ class AddSlaveSocket(plugins.Action):
             except socket.error:
                 sleep(1)
         sendSocket.connect(self.serverAddress)
-    def notifyChange(self, test):
+    def notifyLifecycleChange(self, test, changeDesc):
         testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
         pickleData = dumps(test.state)
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect(sendSocket)
         sendSocket.sendall(testData + os.linesep + pickleData)
         sendSocket.close()
-        # No other threads to be notified here...
-        return 0
     
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
@@ -80,11 +78,11 @@ class QueueSystemConfig(default.Config):
         return 1
     def slaveRun(self):
         return self.optionMap.has_key("slave")
-    def getRunIdentifier(self):
+    def getRunIdentifier(self, prefix):
         if self.slaveRun():
-            return self.optionMap["slave"]
+            return prefix + self.optionMap["slave"]
         else:
-            return default.Config.getRunIdentifier(self)
+            return default.Config.getRunIdentifier(self, prefix)
     def useTextResponder(self):
         if self.slaveRun():
             return 0
@@ -102,18 +100,16 @@ class QueueSystemConfig(default.Config):
             return default.Config.getCleanMode(self)
     def getTestProcessor(self):
         baseProcessor = default.Config.getTestProcessor(self)
-        if not self.useQueueSystem():
+        if not self.useQueueSystem() or self.slaveRun():
             return baseProcessor
-        if self.slaveRun():
-            return [ AddSlaveSocket(self.optionMap["servaddr"]) ] + baseProcessor
 
         submitter = SubmitTest(self.getSubmissionRules, self.optionMap)
         return [ submitter, WaitForCompletion() ]
-    def getTestPostProcessor(self):
+    def getResponderClasses(self):
         if self.slaveRun():
-            return None
+            return [ SocketResponder ]
         else:
-            return default.Config.getTestPostProcessor(self)
+            return default.Config.getResponderClasses(self)
     def getTestRunner(self):
         if self.slaveRun():
             return RunTestInSlave()
@@ -346,10 +342,11 @@ class SubmitTest(plugins.Action):
         self.diag.info("Submitting job : " + command)
         QueueSystemServer.instance.submitJob(test, submissionRules, command, self.slaveEnv)
         return self.WAIT
-    def setPending(self, test):
+    def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)
-        pendState = plugins.TestState("pending", freeText=freeText, briefText="PEND")
-        test.changeState(pendState, notify=1)
+        return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
+    def setPending(self, test):
+        test.changeState(self.getPendingState(test))
     def getExecuteCommand(self, test):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
@@ -450,7 +447,7 @@ class WaitForCompletion(plugins.Action):
             freeText = "Could not delete " + repr(test) + " in queuesystem: have abandoned it"
             newState = plugins.TestState("abandoned", briefText="job deletion failed", \
                                                       freeText=freeText, completed=1)
-            return test.changeState(newState, notify=1)
+            return test.changeState(newState)
 
         self.testsWaitingForKill[test] += 1
         attempt = self.testsWaitingForKill[test]

@@ -6,8 +6,8 @@ import guiplugins, plugins, comparetest, gtk, gobject, os, string, time, sys
 from gobject import idle_add
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer
-from Queue import Queue, Empty
 from ndict import seqdict
+from respond import ThreadedResponder
 
 def destroyDialog(dialog, *args):
     dialog.destroy()
@@ -22,36 +22,29 @@ def showError(message):
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show()
 
-
-class ActionThread(Thread):
-    def __init__(self, actionRunner):
-        Thread.__init__(self)
-        self.actionRunner = actionRunner
-    def run(self):
-        try:
-            self.actionRunner.run()
-        except KeyboardInterrupt:
-            print "Terminated before tests complete: cleaning up..." 
-    def terminate(self):
-        self.actionRunner.interrupt()
-        self.join()
-
-class TextTestGUI:
-    def __init__(self, dynamic):
-        guiplugins.setUpGuiLog(dynamic)
-        global guilog, scriptEngine
-        from guiplugins import guilog
-        scriptEngine = ScriptEngine(guilog)
-        guiplugins.scriptEngine = scriptEngine
+class TextTestGUI(ThreadedResponder):
+    def __init__(self, optionMap):
+        self.dynamic = not optionMap.has_key("gx")
+        ThreadedResponder.__init__(self, optionMap)
+        scriptEngine = self.scriptEngine
+        guiplugins.scriptEngine = self.scriptEngine
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
-        self.dynamic = dynamic
         self.itermap = seqdict()
-        self.actionThread = None
         self.topWindow = self.createTopWindow()
         self.rightWindowGUI = None
+        self.actionThread = None
         self.contents = None
-        self.workQueue = Queue()
+    def setUpScriptEngine(self):
+        guiplugins.setUpGuiLog(self.dynamic)
+        global guilog, scriptEngine
+        from guiplugins import guilog
+        scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
+        self.scriptEngine = scriptEngine
+    def needsTestRuns(self):
+        return self.dynamic
+    def readAllVersions(self):
+        return not self.dynamic
     def createTopWindow(self):
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -94,8 +87,6 @@ class TextTestGUI:
         childIter = self.model.iter_children(iter)
         if test.classId() != "test-app":
             self.itermap[test] = iter.copy()
-            if newTest:
-                test.observers.append(self)
         if childIter:
             self.createSubIterMap(childIter, newTest)
         nextIter = self.model.iter_next(iter)
@@ -110,11 +101,13 @@ class TextTestGUI:
         self.model.set_value(iter, 2, app)
         self.model.set_value(iter, 3, nodeName)
     def addSuite(self, suite):
-        if suite.app.getConfigValue("add_shortcut_bar"):
+        app = suite.app
+        if app.getConfigValue("add_shortcut_bar"):
             scriptEngine.enableShortcuts = 1
         if not self.dynamic:
-            self.addApplication(suite.app)
-        self.addSuiteWithParent(suite, None)
+            self.addApplication(app)
+        if not self.dynamic or suite.size() > 0:
+            self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
         iter = self.model.insert_before(parent, None)
         nodeName = suite.name
@@ -212,22 +205,25 @@ class TextTestGUI:
     def expandSuite(self, view, iter, path, *args):
         # Make sure expanding expands everything, better than just one level as default...
         view.expand_row(path, open_all=True)
-    def takeControl(self, actionRunner):
-        # We've got everything and are ready to go
+    def setUpGui(self):
         self.createIterMap()
         testWins = self.createTestWindows()
         self.createDefaultRightGUI()
         self.fillTopWindow(testWins)
-        if self.dynamic:
-            self.actionThread = ActionThread(actionRunner)
-            self.actionThread.start()
-            idle_add(self.pickUpChange)
-        else:
-            self.expandTitle()
-            idle_add(self.pickUpProcess)
+    def runMain(self):
         guilog.info("Top Window title set to " + self.topWindow.get_title())
         # Run the Gtk+ main loop.
         gtk.main()
+    def runWithActionThread(self, actionThread):
+        self.actionThread = actionThread
+        self.setUpGui()
+        idle_add(self.pickUpChange)
+        self.runMain()
+    def runAlone(self):
+        self.setUpGui()
+        self.expandTitle()
+        idle_add(self.pickUpProcess)
+        self.runMain()
     def findAllAppNames(self):
         apps = []
         iter = self.model.get_iter_root()
@@ -246,20 +242,10 @@ class TextTestGUI:
         iter = self.model.get_iter_root()
         self.viewTestAtIter(iter)
     def pickUpChange(self):
-        try:
-            test, state = self.workQueue.get_nowait()
-            if test:
-                self.testChanged(test, state, byAction = 1)
-            return True
-        except Empty:
-            # Maybe it's empty because the action thread has terminated
-            if not self.actionThread.isAlive():
-                self.actionThread.join()
-                scriptEngine.applicationEvent("completion of test actions")
-                return False
-            # We must sleep for a bit, or we use the whole CPU (busy-wait)
-            time.sleep(0.1)
-            return True
+        response = self.processChangesMainThread()
+        # We must sleep for a bit, or we use the whole CPU (busy-wait)
+        time.sleep(0.1)
+        return response
     def pickUpProcess(self):
         process = guiplugins.processTerminationMonitor.getTerminatedProcess()
         if process:
@@ -271,29 +257,21 @@ class TextTestGUI:
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
         return True
-    def testChanged(self, test, state, byAction):
+    def notifyChangeMainThread(self, test, state):
         # May have already closed down, don't crash if so
         if not self.selection.get_tree_view():
             return
         if test.classId() == "test-case":
             # Working around python bug 853411: main thread must do all forking
-            state.notifyInMainThread()
-            self.redrawTest(test, state)
-            if byAction and state.category != "not_started":
-                test.stateChangeEvent(state)
+            if state:
+                state.notifyInMainThread()
+                self.redrawTest(test, state)
+            else:
+                self.redrawTest(test, test.state)
         else:
             self.redrawSuite(test)
         if self.rightWindowGUI and self.rightWindowGUI.object == test:
             self.recreateTestView(test)
-    def notifyChange(self, test):
-        # GUI thread is the main thread, everything else should go to the work queue. Return
-        # whether we've notified another thread
-        if currentThread().getName() == "MainThread":
-            self.testChanged(test, test.state, byAction = 0)
-        else:
-            self.workQueue.put((test, test.state))
-        # We'll deal with any application events in the GUI thread
-        return 1
     # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test, state):
         iter = self.itermap[test]
@@ -315,7 +293,6 @@ class TextTestGUI:
     def addNewTestToModel(self, suite, newTest, suiteIter):
         iter = self.addSuiteWithParent(newTest, suiteIter)
         self.itermap[newTest] = iter.copy()
-        newTest.observers.append(self)
         guilog.info("Viewing new test " + newTest.name)
         self.recreateTestView(newTest)
         self.markAndExpand(iter)
@@ -386,7 +363,6 @@ class TextTestGUI:
                 guilog.info("Recalculating result info for test: result file changed since created")
                 cmpAction = comparetest.MakeComparisons()
                 cmpAction(test)
-                test.notifyChanged()
             self.rightWindowGUI = TestCaseGUI(test, self.dynamic)
         if self.contents:
             self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=True, fill=True)

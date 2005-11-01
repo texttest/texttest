@@ -143,13 +143,17 @@ class Config(carmen.CarmenConfig):
         return carmen.CarmenConfig.getFilterClasses(self) + [ UserFilter ]
     def useExtraVersions(self):
         return carmen.CarmenConfig.useExtraVersions(self) and not self.raveSlave()
+    def getResponderClasses(self):
+        if self.raveSlave():
+            return [ queuesystem.SocketResponder ]
+        else:
+            return carmen.CarmenConfig.getResponderClasses(self)
     def getActionSequence(self):
         if self.slaveRun():
             return carmen.CarmenConfig.getActionSequence(self)
 
         if self.raveSlave():
-            return [ queuesystem.AddSlaveSocket(self.optionMap["servaddr"]), \
-                     SetBuildRequired(self.getRuleSetName), self.getRuleBuildObject() ]
+            return [ SetBuildRequired(self.getRuleSetName), self.getRuleBuildObject() ]
         
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
         return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleActions() ] + \
@@ -242,6 +246,7 @@ class Config(carmen.CarmenConfig):
         # dictionary of lists
         app.setConfigDefault("build_targets", { "" : [] })
         app.addConfigEntry("need_rulecompile", "white", "test_colours")
+        app.addConfigEntry("pend_rulecompile", "white", "test_colours")
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
         app.addConfigEntry("ruleset_compiled", "white", "test_colours")
         
@@ -386,12 +391,16 @@ class SubmitRuleCompilations(queuesystem.SubmitTest):
     def __repr__(self):
         return "Submitting Rule Builds for"
     def shouldSubmit(self, test):
-        submit = test.state.category == "need_rulecompile" and test.state.testCompiling == None
-        if not submit:
-            test.notifyChanged()
-        return submit
-    def setPending(self, test):
-        test.notifyChanged()    
+        if test.state.category != "need_rulecompile":
+            return 0
+
+        if test.state.testCompiling:
+            self.setPending(test)
+            return 0
+        else:
+            return 1
+    def getPendingState(self, test):
+        return PendingRuleCompilation(test.state)
 
 class CompileRules(plugins.Action):
     def __init__(self, getRuleSetName, modeString = "-optimize"):
@@ -428,13 +437,13 @@ class CompileRules(plugins.Action):
         compTmp = mktemp()
         self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.getcwd())
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
-        test.changeState(RunningRuleCompilation(test.state), notify=1)
+        test.changeState(RunningRuleCompilation(test.state))
         retStatus = os.system(fullCommand)
         if retStatus:
             briefText, fullText = self.getErrorMessage(test, ruleset, compTmp)
-            test.changeState(RuleBuildFailed(briefText, fullText), notify=1)
+            test.changeState(RuleBuildFailed(briefText, fullText))
         else:
-            test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + ruleset + " succesfully compiled"), notify=1)
+            test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + ruleset + " succesfully compiled"))
         os.remove(compTmp)
     def getErrorMessage(self, test, ruleset, compTmp):
         if plugins.emergencySignal:
@@ -460,14 +469,14 @@ class SynchroniseState(plugins.Action):
         testCompiling = self.getCompilingTest(test)
         if not testCompiling:
             return 0
-        if testCompiling.state.category == "running_rulecompile" and test.state.category == "need_rulecompile":
-            test.changeState(RunningRuleCompilation(test.state, testCompiling.state), notify=1)
+        if testCompiling.state.category == "running_rulecompile" and test.state.category == "pend_rulecompile":
+            test.changeState(RunningRuleCompilation(test.state, testCompiling.state))
         elif testCompiling.state.category == "unrunnable":
             errMsg = "Trying to use ruleset '" + test.state.rulesetName + "' that failed to build."
-            test.changeState(RuleBuildFailed("Ruleset build failed (repeat)", errMsg), notify=1)
+            test.changeState(RuleBuildFailed("Ruleset build failed (repeat)", errMsg))
         elif not testCompiling.state.category.endswith("_rulecompile"):
             test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + \
-                                               test.state.rulesetName + " succesfully compiled"), notify=1)
+                                               test.state.rulesetName + " succesfully compiled"))
         return 1
 
 class WaitForRuleCompile(queuesystem.WaitForCompletion):
@@ -490,15 +499,21 @@ class WaitForRuleCompile(queuesystem.WaitForCompletion):
         else:
             return "ok"
     def jobStarted(self, test):
-        return test.state.category != "need_rulecompile"
+        return test.state.category != "need_rulecompile" and test.state.category != "pend_rulecompile"
     
 class NeedRuleCompilation(plugins.TestState):
     def __init__(self, rulesetName, testCompiling = None):
         self.rulesetName = rulesetName
         self.testCompiling = testCompiling
+        plugins.TestState.__init__(self, "need_rulecompile")
+        
+class PendingRuleCompilation(plugins.TestState):
+    def __init__(self, prevState):
+        self.rulesetName = prevState.rulesetName
+        self.testCompiling = prevState.testCompiling
         briefText = "RULES PEND"
         freeText = "Build pending for ruleset '" + self.rulesetName + "'"
-        plugins.TestState.__init__(self, "need_rulecompile", briefText=briefText, freeText=freeText)
+        plugins.TestState.__init__(self, "pend_rulecompile", briefText=briefText, freeText=freeText)
 
 class RunningRuleCompilation(plugins.TestState):
     def __init__(self, prevState, compilingState = None):
@@ -510,9 +525,9 @@ class RunningRuleCompilation(plugins.TestState):
         else:
             briefText = "RULES (" + gethostname() + ")"
             freeText = "Compiling ruleset " + self.rulesetName + " on " + gethostname()
-        plugins.TestState.__init__(self, "running_rulecompile", briefText=briefText, freeText=freeText)
-    def changeDescription(self):
-        return "start ruleset compilation"
+        lifecycleChange = "start ruleset compilation"
+        plugins.TestState.__init__(self, "running_rulecompile", briefText=briefText, \
+                                   freeText=freeText, lifecycleChange=lifecycleChange)
 
 class RuleBuildFailed(plugins.TestState):
     def __init__(self, briefText, freeText):

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import plugins, os, sys, testmodel
+from threading import Thread
 from time import sleep
 from usecase import ScriptEngine
 
@@ -47,6 +48,7 @@ class TestRunner:
                 self.actionSequence.pop(0)
             if tryOthersNow:
                 return 0
+        self.test.notifyCompleted()
         return 1
     def returnString(self, completed, tryOthersNow):
         retString = " - "
@@ -144,7 +146,6 @@ class ApplicationRunner:
         return cleanupSequence
     def performCleanup(self):
         self.setUpApplications(self.cleanupSequence)
-        self.testSuite.app.removeWriteDirectory()
     def setUpApplications(self, sequence):
         self.testSuite.setUpEnvironment()
         for action in sequence:
@@ -206,6 +207,8 @@ class ActionRunner:
             self.allTests.append(testRunner)
     def hasTests(self):
         return len(self.allTests) > 0
+    def hasActions(self):
+        return len(self.appRunners) > 0
     def runCleanup(self):
         for testRunner in self.allTests:
             self.diag.info("Running cleanup actions for test " + testRunner.test.getRelPath())
@@ -225,6 +228,8 @@ class ActionRunner:
                 self.diag.info("Incomplete - putting to back of queue")
                 self.testQueue.append(self.currentTestRunner)
             self.previousTestRunner = self.currentTestRunner
+        for responder in testmodel.Test.observers:
+            responder.notifyAllComplete()
     def interrupt(self):
         self.interrupted = 1
         if self.currentTestRunner:
@@ -278,6 +283,8 @@ class UniqueNameFinder:
         self.name2test[name] = test
         test.uniqueName = name
 
+        
+
 class TextTest:
     def __init__(self):
         if os.environ.has_key("FAKE_OS"):
@@ -285,20 +292,9 @@ class TextTest:
         self.inputOptions = testmodel.OptionFinder()
         self.diag = plugins.getDiagnostics("Find Applications")
         self.allApps = self.findApps()
-        self.gui = None
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
         if not os.environ.has_key("USECASE_HOME"):
             os.environ["USECASE_HOME"] = os.path.join(self.inputOptions.directoryName, "usecases")
-        if len(self.allApps) > 0 and self.inputOptions.useGUI():
-            try:
-                from texttestgui import TextTestGUI
-                self.gui = TextTestGUI(not self.inputOptions.useStaticGUI())
-            except:
-                print "Cannot use GUI: caught exception:"
-                plugins.printException()
-        if not self.gui:
-            logger = plugins.getDiagnostics("Use-case log")
-            self.scriptEngine = ScriptEngine(logger)
     def findApps(self):
         dirName = self.inputOptions.directoryName
         self.diag.info("Using test suite at " + dirName)
@@ -363,37 +359,52 @@ class TextTest:
             app.extras.append(extraApp)
             appList.append(extraApp)
         return appList
-    def createActionRunner(self):
-        actionRunner = ActionRunner()
+    def readAllVersions(self):
+        for responder in self.allResponders:
+            if responder.readAllVersions():
+                return 1
+        return 0
+    def createResponders(self):
+        responderClasses = []
+        for app in self.allApps:
+            for respClass in app.configObject.getResponderClasses():
+                if not respClass in responderClasses:
+                    responderClasses.append(respClass)
+        # Make sure we send application events when tests change state
+        responderClasses.append(testmodel.ApplicationEventResponder)
+        self.allResponders = map(lambda x : x(self.inputOptions), responderClasses)
+        testmodel.Test.observers = self.allResponders
+    def createTestSuites(self):
         uniqueNameFinder = UniqueNameFinder()
         appSuites = []
+        allVersions = self.readAllVersions()
         for app in self.allApps:
             try:
-                allVersions = self.gui and not self.gui.dynamic
                 valid, testSuite = app.createTestSuite(allVersions=allVersions)
-                if valid:
-                    appSuites.append((app, testSuite))
-                    uniqueNameFinder.addSuite(testSuite)
             except testmodel.BadConfigError:
                 print "Error creating test suite for application", app, "-", sys.exc_value
-
-        allEmpty = 1
+            if not valid:
+                continue
+            
+            appSuites.append((app, testSuite))
+            uniqueNameFinder.addSuite(testSuite)
+            print "Using", app.description() + ", checkout", app.checkout
+        return appSuites
+    def destroyTestSuites(self, appSuites):
+        for app, testSuite in appSuites:
+            app.removeWriteDirectory()
+    def setUpResponders(self, appSuites):
+        for responder in self.allResponders:
+            for app, testSuite in appSuites:
+                responder.addSuite(testSuite)
+    def createActionRunner(self, appSuites):
+        actionRunner = ActionRunner()
         for app, testSuite in appSuites:
             try:
-                empty = testSuite.size() == 0
-                if self.gui and (not empty or not self.gui.dynamic):
-                    self.gui.addSuite(testSuite)
-                if not empty or self.inputOptions.has_key("s"):
-                    allEmpty = 0
-                    actionSequence = self.inputOptions.getActionSequence(app)
-                    actionRunner.addTestActions(testSuite, actionSequence)
-                    print "Using", app.description() + ", checkout", app.checkout
+                actionSequence = self.inputOptions.getActionSequence(app)
+                actionRunner.addTestActions(testSuite, actionSequence)
             except testmodel.BadConfigError:
                 sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + "\n")
-        if allEmpty and len(appSuites) > 0:
-            sys.stderr.write("No tests matched the selected applications/versions. The following were tried: \n")
-            for app, testSuite in appSuites:
-                sys.stderr.write(app.description() + "\n")
         return actionRunner
     def run(self):
         try:
@@ -409,15 +420,55 @@ class TextTest:
             self._run()
         except KeyboardInterrupt:
             print "Terminated due to interruption"
+    def findOwnThreadResponder(self):
+        for responder in self.allResponders:
+            if responder.needsOwnThread():
+                return responder
     def _run(self):
-        actionRunner = self.createActionRunner()
-        # Allow no tests for static GUI
-        if not actionRunner.hasTests() and (not self.gui or self.gui.dynamic):
-            return
+        self.createResponders()
+        appSuites = self.createTestSuites()
+        self.setUpResponders(appSuites)
         try:
-            if self.gui:
-                self.gui.takeControl(actionRunner)
+            # pick out any responder that is designed to hang around executing
+            # some sort of loop in its own thread... generally GUIs of some sort
+            ownThreadResponder = self.findOwnThreadResponder()
+            if not ownThreadResponder or ownThreadResponder.needsTestRuns():
+                self.runWithTests(ownThreadResponder, appSuites)
+            else:
+                ownThreadResponder.runAlone()
+        finally:
+            self.destroyTestSuites(appSuites)
+    def runWithTests(self, ownThreadResponder, appSuites):                
+        actionRunner = self.createActionRunner(appSuites)
+        if not actionRunner.hasActions():
+            return # assume error already printed
+        if not actionRunner.hasTests():
+            return self.writeNoTestsError(appSuites)
+        try:
+            if ownThreadResponder:
+                actionThread = ActionThread(actionRunner)
+                actionThread.start()
+                ownThreadResponder.runWithActionThread(actionThread)
             else:
                 actionRunner.run()
         finally:
             actionRunner.runCleanup()
+    def writeNoTestsError(self, appSuites):
+        if len(appSuites) > 0:
+            sys.stderr.write("No tests matched the selected applications/versions. The following were tried: \n")
+            for app, testSuite in appSuites:
+                sys.stderr.write(app.description() + "\n")
+
+
+class ActionThread(Thread):
+    def __init__(self, actionRunner):
+        Thread.__init__(self)
+        self.actionRunner = actionRunner
+    def run(self):
+        try:
+            self.actionRunner.run()
+        except KeyboardInterrupt:
+            print "Terminated before tests complete: cleaning up..." 
+    def terminate(self):
+        self.actionRunner.interrupt()
+        self.join()

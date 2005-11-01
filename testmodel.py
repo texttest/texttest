@@ -5,6 +5,7 @@ from usecase import ScriptEngine, UseCaseScriptError
 from ndict import seqdict
 from copy import copy
 from cPickle import Pickler, Unpickler, UnpicklingError
+from respond import Responder
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -14,6 +15,8 @@ http://www.texttest.org/TextTest/docs
 
 # Base class for TestCase and TestSuite
 class Test:
+    # List of objects observing all tests, for reacting to state changes
+    observers = []    
     def __init__(self, name, abspath, app, parent = None):
         self.name = name
         # There is nothing to stop several tests having the same name. Maintain another name known to be unique
@@ -26,8 +29,6 @@ class Test:
         self.state = plugins.TestState("not_started")
         self.paddedName = self.name
         self.previousEnv = {}
-        # List of objects observing this test, to be notified when it changes state
-        self.observers = []
         self.environment = MultiEntryDictionary()
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
@@ -126,14 +127,18 @@ class Test:
         readFiles = seqdict()
         readFiles[""] = localFiles
         return readFiles + self.app.configObject.extraReadFiles(self)
-    def notifyChanged(self):
-        debugLog.info("Change notified, test " + self.name + " in state " + self.state.category)
-        # If other threads process this change, leave it to them to send the state change event
-        otherThreads = 0
+    def notifyCompleted(self):
         for observer in self.observers:
-            otherThreads |= observer.notifyChange(self)
-        if not otherThreads and self.state.category != "not_started":
-            self.stateChangeEvent(self.state)
+            observer.notifyLifecycleChange(self, "complete")
+            observer.notifyComplete(self)
+    def notifyChanged(self, state=None):
+        for observer in self.observers:
+            if observer.notifyChange(self, state):
+                # threaded observers can transfer the change to another thread for later propagation
+                return
+        if state and state.lifecycleChange:
+            for observer in self.observers:
+                observer.notifyLifecycleChange(self, state.lifecycleChange)
     def getRelPath(self):
         # We standardise communication around UNIX paths, it's all much easier that way
         relPath = self.abspath.replace(self.app.abspath, "").replace(os.sep, "/")
@@ -300,15 +305,10 @@ class TestCase(Test):
     def filesChanged(self):
         self._setOptions()
         self.notifyChanged()
-    def changeState(self, state, notify=0):
+    def changeState(self, state):
         self.state = state
-        if notify:
-            self.notifyChanged()
-    def stateChangeEvent(self, state):
-        eventName = "test " + self.uniqueName + " to " + state.changeDescription()
-        category = self.uniqueName
-        ScriptEngine.instance.applicationEvent(eventName, category, timeDelay=1)
-        debugLog.info("Sent application event " + eventName)
+        debugLog.info("Change notified, test " + self.name + " in state " + state.category)
+        self.notifyChanged(state)
     def getStateFile(self):
         return self.makeFileName("teststate", temporary=1, forComparison=0)
     def getFileToLoad(self):
@@ -322,7 +322,7 @@ class TestCase(Test):
         return self.getNewState(file)
     def loadState(self, file):
         state = self.getNewState(file)
-        self.changeState(state, notify=1)
+        self.changeState(state)
     def getNewState(self, file):
         if not file:
             return plugins.TestState("unrunnable", briefText="no results", freeText="No file found to load results from", completed=1)
@@ -610,9 +610,9 @@ class ConfigurationWrapper:
             return self.target.setApplicationDefaults(app)
         except:
             self.raiseException(req = "set defaults")
-    def getRunIdentifier(self):
+    def getRunIdentifier(self, prefix=""):
         try:
-            return self.target.getRunIdentifier()
+            return self.target.getRunIdentifier(prefix)
         except:
             self.raiseException(req = "run id")
     def useExtraVersions(self):
@@ -635,6 +635,11 @@ class ConfigurationWrapper:
         for action in actionSequenceFromConfig:
             self.addActionToList(action, actionSequence)
         return actionSequence
+    def getResponderClasses(self):
+        try:
+            return self.target.getResponderClasses()
+        except:
+            self.raiseException(req = "responder classes")
     def addActionToList(self, action, actionSequence):
         if type(action) == types.ListType:
             for subAction in action:
@@ -837,8 +842,6 @@ class Application:
             group.addOption("d", "Run as if TEXTTEST_HOME was")
             group.addOption("tmp", "Private: write test-tmp files at")
             group.addSwitch("help", "Print configuration help text on stdout")
-            group.addSwitch("g", "use dynamic GUI", 1)
-            group.addSwitch("gx", "use static GUI")
     def findOptionGroup(self, option, optionGroups):
         for optionGroup in optionGroups:
             if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):
@@ -856,8 +859,6 @@ class Application:
         global globalTmpDirectory
         globalTmpDirectory = plugins.abspath(root)
         localName = self.getTmpIdentifier().replace(":", "")
-        if inputOptions.useStaticGUI():
-            localName = "static_gui." + localName
         return os.path.join(globalTmpDirectory, localName)
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
@@ -944,7 +945,7 @@ class Application:
                     print "Unable to remove previous write directory", previousWriteDir, ":"
                     plugins.printException()
     def getTmpIdentifier(self):
-        return self.name + self.versionSuffix() + self.configObject.getRunIdentifier()
+        return self.configObject.getRunIdentifier(self.name + self.versionSuffix())
     def ownsFile(self, fileName, unknown = 1):
         # Environment file may or may not be owned. Return whatever we're told to return for unknown
         if fileName == "environment":
@@ -1099,10 +1100,6 @@ class OptionFinder(plugins.OptionFinder):
             return ""
     def helpMode(self):
         return self.has_key("help")
-    def useGUI(self):
-        return self.has_key("g") or self.useStaticGUI()
-    def useStaticGUI(self):
-        return self.has_key("gx")
     def _getDiagnosticFile(self):
         if not os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             os.environ["TEXTTEST_DIAGNOSTICS"] = os.path.join(self.directoryName, "Diagnostics")
@@ -1115,10 +1112,7 @@ class OptionFinder(plugins.OptionFinder):
             return os.environ["TEXTTEST_HOME"]
         else:
             return os.getcwd()
-    def getActionSequence(self, app):
-        if self.useStaticGUI():
-            return []
-        
+    def getActionSequence(self, app):        
         if not self.has_key("s"):
             return app.getActionSequence()
             
@@ -1151,6 +1145,13 @@ class OptionFinder(plugins.OptionFinder):
             raise BadConfigError, "Could not instantiate script action " + repr(actionCom) + " with arguments " + repr(actionArgs) 
     def getNonPython(self):
         return [ plugins.NonPythonAction(self["s"]) ]
+
+# Compulsory responder to generate application events. Always present. See respond module
+class ApplicationEventResponder(Responder):
+    def notifyLifecycleChange(self, test, changeDesc):
+        eventName = "test " + test.uniqueName + " to " + changeDesc
+        category = test.uniqueName
+        self.scriptEngine.applicationEvent(eventName, category, timeDelay=1)
             
 class MultiEntryDictionary(seqdict):
     def __init__(self):

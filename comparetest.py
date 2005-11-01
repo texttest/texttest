@@ -90,8 +90,8 @@ class TestComparison(plugins.TestState):
         return self.changedResults + self.newResults
     def _comparisonsString(self, comparisons):
         return string.join([repr(x) for x in comparisons], ",")
-    def getDifferenceSummary(self, actionDesc):
-        return repr(self) + actionDesc + self._getDifferenceSummary()
+    def getDifferenceSummary(self):
+        return repr(self) + self._getDifferenceSummary()
     def _getDifferenceSummary(self):
         diffText = ""
         if len(self.changedResults) > 0:

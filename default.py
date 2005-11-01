@@ -28,15 +28,54 @@ class Config(plugins.Configuration):
                 group.addSwitch("noperf", "Disable any performance testing")
             elif group.name.startswith("Invisible"):
                 # Only relevant without the GUI
+                group.addSwitch("g", "use dynamic GUI", 1)
+                group.addSwitch("gx", "use static GUI")
                 group.addSwitch("o", "Overwrite all failures")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addSwitch("n", "Create new results files (overwrite everything)")
             elif group.name.startswith("Side"):
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
     def getActionSequence(self):
+        if self.useStaticGUI():
+            return []
+
         return self._getActionSequence(makeDirs=1)
+    def useGUI(self):
+        return self.optionMap.has_key("g") or self.useStaticGUI()
+    def useStaticGUI(self):
+        return self.optionMap.has_key("gx")
+    def getResponderClasses(self):
+        classes = []
+##        if not self.isReconnecting():
+##            actions.append(CollectFailureData())
+        # Put the GUI first ... first one gets the script engine - see respond module :)
+        if self.useGUI():
+            self.addGuiResponder(classes)
+        if self.batchMode():
+            classes.append(batch.BatchResponder)
+        if self.keepTemporaryDirectories():
+            classes.append(respond.SaveState)
+        if not self.useGUI() and not self.batchMode():
+            classes.append(self.getTextResponder())
+        return classes
+    def getRunIdentifier(self, prefix):
+        basicId = plugins.Configuration.getRunIdentifier(self, prefix)
+        if prefix and self.useStaticGUI():
+            return "static_gui." + basicId
+        else:
+            return basicId
+    def addGuiResponder(self, classes):
+        try:
+            from texttestgui import TextTestGUI
+            classes.append(TextTestGUI)
+        except:
+            print "Cannot use GUI: caught exception:"
+            plugins.printException()
+    def useTextResponder(self):
+        return not self.optionMap.useGUI()
+
     def _getActionSequence(self, makeDirs):
-        actions = [ self.getTestProcessor(), self.getTestPostProcessor() ]
+        actions = [ self.getTestProcessor() ]
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
@@ -143,19 +182,8 @@ class Config(plugins.Configuration):
         actions = [ self.getFileExtractor() ]
         if not self.isReconnectingFast():
             actions += [ self.getTestPredictionChecker(), self.getTestComparator(),
-                         self.getFailureExplainer(), NotifyChanges() ]
+                         self.getFailureExplainer() ]
         return actions
-    def getTestPostProcessor(self):
-        actions = []
-##        if not self.isReconnecting():
-##            actions.append(CollectFailureData())
-        if self.keepTemporaryDirectories():
-            actions.append(SaveState())
-        if self.useTextResponder():
-            actions.append(self.getTestResponder())
-        return actions
-    def useTextResponder(self):
-        return not self.optionMap.useGUI()
     def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull"))
@@ -194,15 +222,8 @@ class Config(plugins.Configuration):
     def getTestComparator(self):
         comparetest.MakeComparisons.testComparisonClass = performance.PerformanceTestComparison
         return comparetest.MakeComparisons()
-    def getTestResponder(self):
-        if self.batchMode():
-            return batch.BatchResponder(self.optionValue("b"))
-    
-        overwriteSuccess = self.optionMap.has_key("n")
-        if self.optionMap.has_key("o"):
-            return respond.OverwriteOnFailures(overwriteSuccess)
-        else:
-            return respond.InteractiveResponder(overwriteSuccess)
+    def getTextResponder(self):
+        return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         if self.optionMap.has_key(option):
@@ -322,10 +343,6 @@ class Config(plugins.Configuration):
             app.setConfigDefault("login_shell", self.defaultLoginShell(), \
                                  "(UNIX) Which shell to use when starting processes")
 
-class NotifyChanges(plugins.Action):
-    def __call__(self, test):
-        test.notifyChanged()
-
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeBasicWriteDirectory()
@@ -340,10 +357,6 @@ class PrepareWriteDirectory(plugins.Action):
         test.prepareBasicWriteDirectory()
     def __repr__(self):
         return "Prepare write directory for"
-
-class SaveState(plugins.Action):
-    def __call__(self, test):
-        test.saveState()
 
 class CollectFailureData(plugins.Action):
     def __init__(self):
@@ -522,7 +535,8 @@ class Pending(plugins.TestState):
 
 class Running(plugins.TestState):
     def __init__(self, execMachines, bkgProcess = None, freeText = "", briefText = ""):
-        plugins.TestState.__init__(self, "running", freeText, briefText, started=1, executionHosts = execMachines)
+        plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
+                                   executionHosts = execMachines, lifecycleChange="start")
         self.bkgProcess = bkgProcess
     def processCompleted(self):
         return self.bkgProcess.hasTerminated()
@@ -572,7 +586,7 @@ class RunTest(plugins.Action):
         briefText = self.getBriefText(execMachines)
         freeText = "Running on " + string.join(execMachines, ",")
         newState = self.runningClass(execMachines, process, briefText=briefText, freeText=freeText)
-        test.changeState(newState, notify=1)
+        test.changeState(newState)
     def getBriefText(self, execMachines):
         # Default to not bothering to print the machine name: all is local anyway
         return ""
@@ -596,7 +610,7 @@ class RunTest(plugins.Action):
             return
         process = plugins.BackgroundProcess(testCommand, testRun=1)
         # Working around Python bug
-        test.changeState(Pending(process), notify=1)
+        test.changeState(Pending(process))
         process.waitForStart()
         if not inChild:
             self.changeToRunningState(test, process)
@@ -808,13 +822,10 @@ class ReconnectTest(plugins.Action):
             if not storedState.hasResults():
                 test.changeState(storedState)
             else:
-                # Also pick up execution machines (if we can), we can't get them otherwise... don't crash if they fail
-                try:
-                    test.state.executionHosts = storedState.executionHosts
-                except AttributeError:
-                    pass
+                # Also pick up execution machines, we can't get them otherwise...
+                test.state.executionHosts = storedState.executionHosts
         else:
-            test.changeState(storedState, notify=1)
+            test.changeState(storedState)
 
         # State will refer to TEXTTEST_HOME in the original (which we may not have now,
         # and certainly don't want to save), try to fix this...

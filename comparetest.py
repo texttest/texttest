@@ -172,6 +172,9 @@ class TestComparison(plugins.TestState):
             comparison.overwrite(exact, versionString)
             storageList.remove(comparison)
             self.correctResults.append(comparison)
+        if len(self.getComparisons()) == 0:
+            self.category = "success"
+            self.freeText = ""
     def findComparison(self, stem):
         for comparison in self.changedResults:
             if comparison.stem == stem:

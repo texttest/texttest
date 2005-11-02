@@ -532,10 +532,10 @@ class GenHTML(plugins.Action):
 
         # Info from status file
         logFile = test.makeFileName(test.app.getConfigValue("log_file"), temporary = 0)
-        optRun = optimization.OptimizationRun(test.app, ["legs\.", "Period"] ,[] ,logFile)
+        optRun = optimization.OptimizationRun(test.app, ["legs\.", optimization.periodEntryName] ,[] ,logFile)
         if optRun.solutions:
             input = optRun.solutions[0]
-            period_start, period_end = input["Period"]
+            period_start, period_end = input[optimization.periodEntryName]
             date_start = time.mktime(time.strptime(period_start, "%Y%m%d"))
             date_end = time.mktime(time.strptime(period_end, "%Y%m%d"))
             
@@ -576,7 +576,7 @@ class GenHTML(plugins.Action):
         self.currentSuitePage["group"][group]["interestingParameters"] = interestingParametersFound
     
     def readKPIGroupFile(self, suite):
-        self.kpiGroupForTest,self.kpiGroups= apc.readKPIGroupFileCommon(suite)
+        self.kpiGroupForTest, self.kpiGroups = apc.readKPIGroupFileCommon(suite)
         self.kpiGroupsList = {}
                 
     def setUpSuite(self, suite):

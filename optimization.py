@@ -46,6 +46,8 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                If a comma-seperated list is given, all the listed items are plotted.
                                An abreviation is 'i=apctimes', which is equivalent to specifying 'i=OC_to_DH_time,
                                Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time'.
+                             - ix=item
+                               Item to plot against (use on the x axis) from the status file. Default is "cpu time".
                              - av
                                Also add an average over the tests for the items and versions plotted.
                              - oav
@@ -117,7 +119,7 @@ costEntryName = "cost of plan"
 timeEntryName = "cpu time"
 memoryEntryName = "memory"
 methodEntryName = "Running.*\.\.\."
-periodEntryName = "Period"
+periodEntryName = "Period\."
 dateEntryName = "Date"
 activeMethodEntryName = "Active method"
 apcLibraryDateName = "APC library date"
@@ -1270,6 +1272,7 @@ class TestGraph:
                          ("p", "Absolute file to print to", ""),
                          ("pr", "Printer to print to", ""),
                          ("i", "Log file item to plot", costEntryName),
+                         ("ix", "Log file item to plot against", timeEntryName),
                          ("v", "Extra versions to plot", ""),
                          ("title", "Title of the plot", ""),
                          ("tu", "Search for temporary files in user", "") ]
@@ -1457,8 +1460,12 @@ class TestGraph:
         if plotItemsText == "apctimes":
             plotItemsText = "DH_post_processing,Generation_time,Coordination_time,Conn_fixing_time,Optimization_time,Network_generation_time"
         plotItems = plugins.commasplit(plotItemsText.replace("_", " "))
+
+        xItem = self.optionGroup.getOptionValue("ix").replace("_", " ")
+        if not xItem:
+            xItem = timeEntryName
         
-        optRun = OptimizationRun(test.app, [ timeEntryName ], plotItems, logFile)
+        optRun = OptimizationRun(test.app, [ xItem ], plotItems, logFile)
         if len(optRun.solutions) == 0:
             return
 
@@ -1469,7 +1476,7 @@ class TestGraph:
                     averager = self.plotAveragers[lineName+item] = PlotAverager(test.app.writeDirectory)
                 else:
                     averager = self.plotAveragers[lineName+item]
-            plotLine = PlotLine(test, lineName, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), scaling, averager)
+            plotLine = PlotLine(test, lineName, xItem, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), scaling, averager)
             self.addLine(plotLine)
     def createPlotLinesForTest(self, test):
         logFileStem = test.app.getConfigValue("log_file")
@@ -1508,7 +1515,7 @@ class TestGraph:
 
 # Class representing ONE curve in plot.
 class PlotLine:
-    def __init__(self, test, lineName, item, optRun, plotAgainstSolution, plotTimeScale, scaling, averager):
+    def __init__(self, test, lineName, xItem, item, optRun, plotAgainstSolution, plotTimeScale, scaling, averager):
         self.test = test
         self.name = lineName
         self.lineType = None
@@ -1516,8 +1523,11 @@ class PlotLine:
         if item != costEntryName:
             self.name += "." + item
         self.axisLabels = {}
-        timeScaleFactor = 0.0
-        if plotAgainstSolution:
+        timeScaleFactor = 1.0
+
+        if xItem != timeEntryName:
+            self.axisLabels["x"] = xItem
+        elif plotAgainstSolution:
             self.axisLabels["x"] = "Solution number"
         else:
             if plotTimeScale == "hours":
@@ -1535,7 +1545,7 @@ class PlotLine:
             timeScaleFactor *= scaling
         self.axisLabels["y"] = item
         self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
-        self.createGraph(optRun, item, plotAgainstSolution, timeScaleFactor)
+        self.createGraph(optRun, xItem, item, plotAgainstSolution, timeScaleFactor)
         if averager:
             averager.addGraph(self.graph)
             if not averager.plotLineRepresentant:
@@ -1547,18 +1557,18 @@ class PlotLine:
             return "plot-" + lineName.replace(" ", "-")
         else:
             return "plot-" + lineName.replace(" ", "-") + "-" + item.replace(" ", "-")
-    def createGraph(self, optRun, item, plotAgainstSolution, timeScaleFactor):
+    def createGraph(self, optRun, xItem, item, plotAgainstSolution, timeScaleFactor):
         self.graph = {}
         self.min = None
         cnt = 0
         for solution in optRun.solutions:
-            if solution.has_key(item):
+            if solution.has_key(item) and solution.has_key(xItem):
                 if cnt > 0 and (self.min == None or self.min > solution[item]):
                     self.min = solution[item]
                 if plotAgainstSolution:
                     self.graph[cnt] = solution[item]
                 else:
-                    self.graph[solution[timeEntryName]*timeScaleFactor] = solution[item]
+                    self.graph[solution[xItem]*timeScaleFactor] = solution[item]
             cnt = cnt + 1
     def writeFile(self, min):
         dir, localName = os.path.split(self.plotFileName)

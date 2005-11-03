@@ -1100,6 +1100,8 @@ class OptionFinder(plugins.OptionFinder):
             return ""
     def helpMode(self):
         return self.has_key("help")
+    def runScript(self):
+        return self.has_key("s")
     def _getDiagnosticFile(self):
         if not os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             os.environ["TEXTTEST_DIAGNOSTICS"] = os.path.join(self.directoryName, "Diagnostics")
@@ -1113,7 +1115,7 @@ class OptionFinder(plugins.OptionFinder):
         else:
             return os.getcwd()
     def getActionSequence(self, app):        
-        if not self.has_key("s"):
+        if not self.runScript():
             return app.getActionSequence()
             
         actionCom = self["s"].split(" ")[0]

@@ -205,10 +205,8 @@ class ActionRunner:
             testRunner = TestRunner(test, actionSequence, appRunner, self.diag)
             self.testQueue.append(testRunner)
             self.allTests.append(testRunner)
-    def hasTests(self):
-        return len(self.allTests) > 0
-    def hasActions(self):
-        return len(self.appRunners) > 0
+    def isEmpty(self):
+        return len(self.appRunners) == 0
     def runCleanup(self):
         for testRunner in self.allTests:
             self.diag.info("Running cleanup actions for test " + testRunner.test.getRelPath())
@@ -289,6 +287,7 @@ class TextTest:
     def __init__(self):
         if os.environ.has_key("FAKE_OS"):
             os.name = os.environ["FAKE_OS"]
+        self.allResponders = []
         self.inputOptions = testmodel.OptionFinder()
         self.diag = plugins.getDiagnostics("Find Applications")
         self.allApps = self.findApps()
@@ -365,6 +364,9 @@ class TextTest:
                 return 1
         return 0
     def createResponders(self):
+        # With scripts, we ignore all responder options, we're just transforming data
+        if self.inputOptions.runScript():
+            return
         responderClasses = []
         for app in self.allApps:
             for respClass in app.configObject.getResponderClasses():
@@ -399,7 +401,13 @@ class TextTest:
                 responder.addSuite(testSuite)
     def createActionRunner(self, appSuites):
         actionRunner = ActionRunner()
+        extraVersions = []
         for app, testSuite in appSuites:
+            extraVersions += app.extras
+            if testSuite.size() == 0:
+                if not app in extraVersions:
+                    sys.stderr.write("No tests matching the selection criteria found for " + app.description() + "\n")
+                continue
             try:
                 actionSequence = self.inputOptions.getActionSequence(app)
                 actionRunner.addTestActions(testSuite, actionSequence)
@@ -440,10 +448,8 @@ class TextTest:
             self.destroyTestSuites(appSuites)
     def runWithTests(self, ownThreadResponder, appSuites):                
         actionRunner = self.createActionRunner(appSuites)
-        if not actionRunner.hasActions():
-            return # assume error already printed
-        if not actionRunner.hasTests():
-            return self.writeNoTestsError(appSuites)
+        if actionRunner.isEmpty():
+            return # error already printed
         try:
             if ownThreadResponder:
                 actionThread = ActionThread(actionRunner)
@@ -453,12 +459,6 @@ class TextTest:
                 actionRunner.run()
         finally:
             actionRunner.runCleanup()
-    def writeNoTestsError(self, appSuites):
-        if len(appSuites) > 0:
-            sys.stderr.write("No tests matched the selected applications/versions. The following were tried: \n")
-            for app, testSuite in appSuites:
-                sys.stderr.write(app.description() + "\n")
-
 
 class ActionThread(Thread):
     def __init__(self, actionRunner):

@@ -165,6 +165,9 @@ class BatchResponder(respond.Responder):
         self.describeFailures(test)
         self.batchAppData[test.app].storeCategory(test)
     def addSuite(self, suite):
+        # Don't do anything with empty suites
+        if suite.size() == 0:
+            return
         app = suite.app
         self.batchAppData[app] = BatchApplicationData(suite)
         if not self.allApps.has_key(app.name):

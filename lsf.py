@@ -94,5 +94,5 @@ class MachineInfo:
     
 # Need to get all hosts for parallel
 def getExecutionMachines():
-    hosts = os.environ["LSB_HOSTS"].split(":")
+    hosts = os.environ["LSB_HOSTS"].split()
     return [ host.split(".")[0] for host in hosts ] 

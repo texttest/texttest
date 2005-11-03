@@ -106,11 +106,12 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         return basicName
     def findQueue(self):
         return self.normalSubmissionRules.findDefaultQueue()
-    def getMajorReleaseResource(self):
-        majorRelease = carmen.getMajorReleaseId(self.test.app)
-        return "carmbuild" + majorRelease.replace("carmen_", "") + "=1"
     def findResourceList(self):
-        return self.normalSubmissionRules.findResourceList() + [ self.getMajorReleaseResource() ]
+        normalResources = self.normalSubmissionRules.findResourceList()
+        majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
+        if majRelResource:
+            normalResources.append(majRelResource)
+        return normalResources
     def getSubmitSuffix(self, name):
         return " (" + self.getRuleSetName(self.test) + " ruleset)" + self.normalSubmissionRules.getSubmitSuffix(name)
     def forceOnPerformanceMachines(self):

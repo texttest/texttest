@@ -94,6 +94,9 @@ class SgeSubmissionRules(CarmenSubmissionRules):
             return "normal"
         else:
             return "idle"
+    def getMajorReleaseResource(self):
+        majorRelease = getMajorReleaseId(self.test.app)
+        return "carmbuild" + majorRelease.replace("carmen_", "") + "=1"
     def findConcreteResources(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
@@ -118,6 +121,8 @@ class LsfSubmissionRules(CarmenSubmissionRules):
             return "sparc"
         else:
             return self.archToUse
+    def getMajorReleaseResource(self):
+        return ""
     def getQueuePerformancePrefix(self):
         category = self.getPerformanceCategory()
         if category == "short":

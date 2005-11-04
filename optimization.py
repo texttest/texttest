@@ -33,7 +33,7 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                              - per
                                Plots percentage relative to the minimal cost.
                              - p=an absolute file name
-                               Produces a postscript file instead of displaying the graph.
+                               Produces a file (default postscript) instead of displaying the graph.
                              - pr=printer name
                                Produces postscript output and sends it to the printer specified.
                              - pc
@@ -75,7 +75,12 @@ helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the 
                                Sets the title of the graph to graphtitle, rather than the default generated one.
                              - ts=hours|days|minutes
                                Used as time scale on the x-axis. Default is minutes.
-                               
+                             - terminal
+                               Set what type of terminal gnuplot should use for plotting, effective in
+                               conjuction with the p option. See the gnuplot documentation for all possibilities,
+                               some interesting ones are: postscript, png, svg.
+                             - size
+                               Sets the size of the plot, see the gnuplot manual for details.
 optimization.TableTest     - Displays solution data in a table. Works the same as PlotTest in most respects,
                              in terms of which data is displayed and the fact that temporary files are used if possible.
                              Currently supports these options:
@@ -1275,7 +1280,9 @@ class TestGraph:
                          ("ix", "Log file item to plot against", timeEntryName),
                          ("v", "Extra versions to plot", ""),
                          ("title", "Title of the plot", ""),
-                         ("tu", "Search for temporary files in user", "") ]
+                         ("tu", "Search for temporary files in user", ""),
+                         ("terminal", "gnuplot terminal to use", "postscript"),
+                         ("size", "gnuplot size", "1,1") ]
         self.switches = [ ("per", "Plot percentage"),
                           ("oem", "Only plot exactly matching versions"),
                           ("pc", "Print in colour"),
@@ -1327,7 +1334,7 @@ class TestGraph:
             plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
         return plotArguments
     def plot(self, writeDir):
-        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title = self.getPlotOptions()
+        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize = self.getPlotOptions()
         if len(self.plotLines) == 0:
             return
 
@@ -1346,15 +1353,18 @@ class TestGraph:
             # Mainly for testing...
             if not os.path.isabs(absTargetFile):
                 absTargetFile = os.path.join(writeDir, absTargetFile)
-            self.writePlot(self.terminalLine(colour))
+            self.writePlot(self.terminalLine(terminal, colour))
         if printer:
             absTargetFile = os.path.join(writeDir, "texttest.ps")
-            self.writePlot(self.terminalLine(colour, printA3))
+            self.writePlot(self.terminalLine(terminal, colour, printA3))
             if printA3:
                 self.writePlot("set size 1.45,1.45")
                 self.writePlot("set origin 0,-0.43")
         if targetFile or printer:
             self.undesiredLineTypes = [5, 6]
+
+        if not (printer and printA3):
+            self.writePlot("set size " + plotSize)
 
         self.writePlot("set ylabel '" + self.getAxisLabel("y") + "'")
         self.writePlot("set xlabel '" + self.getAxisLabel("x") + "'")
@@ -1397,8 +1407,8 @@ class TestGraph:
                 open(absTargetFile, "w").write(tmppf)
             if printer:
                 os.system("lpr -o PageSize=A3 -P" + printer + " " + absTargetFile)
-    def terminalLine(self, colour, printA3=0):
-        line = "set terminal postscript"
+    def terminalLine(self, terminal, colour, printA3=0):
+        line = "set terminal " + terminal
         if printA3:
             line += " landscape"
         if colour:
@@ -1451,7 +1461,9 @@ class TestGraph:
         title = self.optionGroup.getOptionValue("title")
         printer = self.optionGroup.getOptionValue("pr")
         plotPercentage = self.optionGroup.getSwitchValue("per")
-        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title
+        terminal = self.optionGroup.getOptionValue("terminal")
+        plotSize = self.optionGroup.getOptionValue("size")
+        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize
 
     # The routines below are the ones creating all the PlotLine instances for ONE test.
     def createPlotLines(self, lineName, logFile, test, scaling):

@@ -96,7 +96,11 @@ class SgeSubmissionRules(CarmenSubmissionRules):
             return "idle"
     def getMajorReleaseResource(self):
         majorRelease = getMajorReleaseId(self.test.app)
-        return "carmbuild" + majorRelease.replace("carmen_", "") + "=1"
+        if majorRelease != "carmen_9":
+            # Can't build on these machines anyway - texttest won't work!
+            return "carmbuild" + majorRelease.replace("carmen_", "") + "=1"
+        else:
+            return ""
     def findConcreteResources(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)

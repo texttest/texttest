@@ -113,7 +113,11 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
             normalResources.append(majRelResource)
         return normalResources
     def getSubmitSuffix(self, name):
-        return " (" + self.getRuleSetName(self.test) + " ruleset)" + self.normalSubmissionRules.getSubmitSuffix(name)
+        normalSuffix = " (" + self.getRuleSetName(self.test) + " ruleset)" + self.normalSubmissionRules.getSubmitSuffix(name)
+        majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
+        if majRelResource:
+            normalSuffix += "," + majRelResource
+        return normalSuffix
     def forceOnPerformanceMachines(self):
         return 0
     def getProcessesNeeded(self):

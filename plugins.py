@@ -699,7 +699,7 @@ class OptionGroup:
             self.options[key].defaultValue = value
             return 1
         elif self.switches.has_key(key):
-            self.switches[key].defaultValue = 1
+            self.switches[key].defaultValue = value
             return 1
         return 0
     def getDefault(self, name, value):

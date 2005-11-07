@@ -551,4 +551,21 @@ class CleanSubplans(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 
+class PrintStrings(plugins.Action):
+    def __init__(self):
+        self.strings = []
+    def __call__(self, test):
+        logFile = test.makeFileName("output")
+        for line in open(logFile).readlines():
+            line = line.strip()
+            if len(line) == 0:
+                continue
+            pos = line.find(".:")
+            if pos != -1:
+                line = line[:pos + 2]
+            if line in self.strings:
+                continue
+            self.strings.append(line)
+            print line
+
 guiplugins.interactiveActionHandler.testClasses.append(optimization.PlotTestInGUI)

@@ -64,6 +64,12 @@ apc.CVSBranchTests         - This script is useful when two versions of a test s
                              For all relevant APC files in the current testselection, it check if the
                              files are CVS modified. If they are, the check-in result is stored in version v.
                              Example: texttest -a apc -s apc.CVSBranchTests 11
+                             
+apc.PlotKPIGroups          - A specialization of optimization.PlotTest for APC where the main feature is that tests grouped
+                             in an KPI group is plotted in one window, and that one get a window per KPI group.
+                             See optimization.PlotTest for details and options, this script takes all the options
+                             that PlotTest supports, do however note that some of the options doesn't make sense
+                             to use for several KPI groups, for example, p, print to file.
 
 """
 
@@ -75,11 +81,13 @@ from ndict import seqdict
 def readKPIGroupFileCommon(suite):
     kpiGroupForTest = {}
     kpiGroups = []
+    kpiGroupsScale = {}
     kpiGroupsFileName = suite.makeFileName("kpi_groups")
     if not os.path.isfile(kpiGroupsFileName):
-        return {},[]
+        return {}, [], {}
     groupFile = open(kpiGroupsFileName)
     groupName = None
+    groupScale = None
     for line in groupFile.readlines():
         if line[0] == '#' or not ':' in line:
             continue
@@ -93,14 +101,18 @@ def readKPIGroupFileCommon(suite):
                 ind = kpiGroups.index(groupKey)
             except ValueError:
                 kpiGroups.append(groupKey)
+            if not kpiGroupsScale.has_key(groupKey):
+                kpiGroupsScale[groupKey] = groupScale
         else:
             gk = groupKey.split("_")
             kpigroup = gk[0]
             item = gk[1]
             if item == "name":
                 groupName = groupValue
+            if item == "percscale":
+                groupScale = groupValue
     groupFile.close()
-    return kpiGroupForTest,kpiGroups
+    return kpiGroupForTest, kpiGroups, kpiGroupsScale
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -1553,7 +1565,7 @@ class SaveBestSolution(guiplugins.InteractiveAction):
         return 0
         
     def canPerformOnTest(self):
-        self.kpiGroupForTest, self.kpiGroups = readKPIGroupFileCommon(self.test.parent)
+        self.kpiGroupForTest, self.kpiGroups, dummy = readKPIGroupFileCommon(self.test.parent)
         if not self.kpiGroupForTest.has_key(self.test.name):
             self.hostCaseName = self.test.name
         else:
@@ -1577,7 +1589,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
         if self.optionGroup.getSwitchValue("kpi"):
             oldTestDir = test.getDirectory(None)
             path, originalTestName = os.path.split(oldTestDir)
-            kpiGroupForTest, kpiGroups = readKPIGroupFileCommon(self.test.parent)
+            kpiGroupForTest, kpiGroups, dummy = readKPIGroupFileCommon(self.test.parent)
             if kpiGroupForTest.has_key(originalTestName):
                 testInGroup = kpiGroupForTest[originalTestName]
                 for kpiTest in kpiGroupForTest.keys():
@@ -1590,3 +1602,42 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
         self.plotGraph(test.app.writeDirectory)  
 
 guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUIAPC, ViewApcLog, SaveBestSolution ] 
+
+# A script that mimics _PlotTest in optimization.py, but that is specialized for
+# APC to plot all (selected) KPI groups.
+class PlotKPIGroups(plugins.Action):
+    def __init__(self, args = []):
+        self.args = args
+        self.groupsToPlot = {}
+        self.groupScale = {}
+    def __call__(self, test):
+        kpiGroupForTest, kpiGroups, kpiGroupsScale = readKPIGroupFileCommon(test.parent)
+        if kpiGroupForTest.has_key(test.name):
+            testInGroup = kpiGroupForTest[test.name]
+            if not self.groupsToPlot.has_key(testInGroup):
+                self.groupsToPlot[testInGroup] = []
+            self.groupsToPlot[testInGroup].append(test)
+            self.groupScale[testInGroup] = kpiGroupsScale[testInGroup]
+    def __del__(self):
+        self.allGroups = self.groupsToPlot.keys()
+        self.allGroups.sort()
+        for group in self.allGroups:
+            # Create a test graph
+            testGraph = optimization.TestGraph()
+            testGraph.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
+            for name, expl, value in testGraph.options:
+                testGraph.optionGroup.addOption(name, expl, value)
+            for name, expl in testGraph.switches:
+                testGraph.optionGroup.addSwitch(name, expl)
+            testGraph.optionGroup.readCommandLineArguments(self.args)
+            testGraph.optionGroup.setValue("title", "APC user " + self.groupsToPlot[group][0].getRelPath().split(os.sep)[0] + " - KPI group " + group)
+            if testGraph.optionGroup.getSwitchValue("per") and self.groupScale[group]:
+                testGraph.optionGroup.setValue("yr", self.groupScale[group])
+            self.setExtraOptions(testGraph.optionGroup, group)
+            for test in self.groupsToPlot[group]:
+                testGraph.createPlotLinesForTest(test)
+            testGraph.plot(test.app.writeDirectory)
+        print "Plotted", len(self.groupsToPlot.keys()), "KPI groups."
+    def setExtraOptions(self):
+        pass
+

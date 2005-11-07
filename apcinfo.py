@@ -761,6 +761,6 @@ class PlotKPIGroupsAndGeneratePage(apc.PlotKPIGroups):
         optionGroup.setValue("pc", 1)
         optionGroup.setValue("p", self.getPlotName(group, self.average))
         optionGroup.setValue("terminal", "png")
-        optionGroup.setValue("size", "1,1")
+        optionGroup.setValue("size", "0.65,0.65")
     def getPlotName(self, group, average):
         return os.path.join(self.dir, group + str(average) + ".png")

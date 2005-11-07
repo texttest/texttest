@@ -1638,6 +1638,6 @@ class PlotKPIGroups(plugins.Action):
                 testGraph.createPlotLinesForTest(test)
             testGraph.plot(test.app.writeDirectory)
         print "Plotted", len(self.groupsToPlot.keys()), "KPI groups."
-    def setExtraOptions(self):
+    def setExtraOptions(self, group, average):
         pass
 

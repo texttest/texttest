@@ -1,4 +1,4 @@
-import plugins, os, re, string, math, exceptions, optimization, performance, time, copy, apc
+import plugins, os, re, string, math, exceptions, optimization, performance, time, copy, apc, sys
 from testmodel import BadConfigError
 
 try:
@@ -736,12 +736,12 @@ class PlotKPIGroupsAndGeneratePage(apc.PlotKPIGroups):
                 os.mkdir(self.dir)
             except:
                 raise plugins.TextTestError, "Failed to create dir " + self.dir
-        PlotKPIGroups.__init__(self, args)
+        apc.PlotKPIGroups.__init__(self, args)
     def __del__(self):
         self.average = 0
-        PlotKPIGroups.__del__(self)
+        apc.PlotKPIGroups.__del__(self)
         self.average = 1
-        PlotKPIGroups.__del__(self)
+        apc.PlotKPIGroups.__del__(self)
         # Now generate a simple HTML doc.
         doc = HTMLgen.SimpleDocument(title="")
         introFile = os.path.join(self.dir, "intro.html")

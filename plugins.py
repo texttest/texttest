@@ -265,9 +265,12 @@ def rmtree(dir, attempts=5):
             shutil.rmtree(dir)
             return
         except OSError:
-            print "Write directory still in use, waiting 1 second to remove..."
-            time.sleep(1)
-    print "Something still using write directory", dir, ": leaving it"
+            if i == attempts - 1:
+                print "Unable to remove directory", dir, ":"
+                printException()
+            else:
+                print "Problems removing directory", dir, "- waiting 1 second to retry..."
+                time.sleep(1)                
 
 def readList(filename):
     if not os.path.isfile(filename):

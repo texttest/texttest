@@ -939,11 +939,7 @@ class Application:
             if file.startswith(currTmpString):
                 previousWriteDir = os.path.join(rootDir, file)
                 print "Removing previous write directory", previousWriteDir
-                try:
-                    shutil.rmtree(previousWriteDir)
-                except OSError:
-                    print "Unable to remove previous write directory", previousWriteDir, ":"
-                    plugins.printException()
+                plugins.rmtree(previousWriteDir, attempts=3)
     def getTmpIdentifier(self):
         return self.configObject.getRunIdentifier(self.name + self.versionSuffix())
     def ownsFile(self, fileName, unknown = 1):

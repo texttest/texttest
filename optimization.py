@@ -146,7 +146,10 @@ class OptimizationConfig(ravebased.Config):
                 group.addOption("prrep", "Run KPI progress report")
                 group.addOption("kpiData", "Output KPI curve data etc.")
                 group.addOption("kpi", "Run Henrik's old KPI")
+                group.addOption("plot", "Plot Graph of selected runs")
     def getActionSequence(self):
+        if self.optionMap.has_key("plot"):
+            return [ PlotTest(self.optionMap["plot"].split()) ]
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
                         KPI.cFullRosteringOptTimeKPI,

@@ -20,68 +20,70 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
 -kpi <ver> - Generate a Key Performance Indicator ("KPI") relative to the version <ver>. This will try to apply
              some formula to boil down the results of the tests given to a single-number "performance indicator".
              Please note that the results so far are not very reliable, as the formula itself is still under development.
+
+-plot <++> - Displays a gnuplot graph with the cpu time (in minutes) versus total cost. 
+             The data is extracted from the status file of test(s), and if the test is
+             currently running, the temporary status file is used, see however the
+             option nt below. All tests selected are plotted in the same graph.
+             The following options are supported:
+             - r=range
+               The x-axis has the range range. Default is the whole data set. Example: 60:
+             - yr=range
+               The y-axis has the y-range range. Default is the whole data set. Example: 2e7:3e7
+             - per
+               Plots percentage relative to the minimal cost.
+             - p=an absolute file name
+               Produces a file (default postscript) instead of displaying the graph.
+             - pr=printer name
+               Produces postscript output and sends it to the printer specified.
+             - pc
+               The postscript file will be in color.
+             - pa3
+               The postscript will be in A3 format and landscape.
+             - i=item,item,...
+               Which item to plot from the status file. Note that whitespaces are replaced
+               by underscores. Default is TOTAL cost. Example: i=overcover_cost.
+               If a comma-seperated list is given, all the listed items are plotted.
+               An abreviation is 'i=apctimes', which is equivalent to specifying 'i=OC_to_DH_time,
+               Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time'.
+             - ix=item
+               Item to plot against (use on the x axis) from the status file. Default is "cpu time".
+             - av
+               Also add an average over the tests for the items and versions plotted.
+             - oav
+               Only plot the average curves, and not the individual test curves.
+             - s
+               Plot against solution number instead of cpu time.
+             - nt
+               Do not use status file from the currently running test.
+             - tu=user_name
+               Looks for temporary files in /users/user_name/texttesttmp instead of default textttesttmp. 
+             - ns
+               Do not scale times with the performance of the test.
+             - nv
+               No line type grouping for different versions of the test.
+             - v=v1,v2
+               Plot multiple versions in same dia, ie 'v=,9' means master and version 9
+               Moreover, you may supply a time scale factor for the different versions
+               using the syntax v1:scale1,v2:scale2.
+             - oem
+               Plot only exactly matching version, rather than plotting the closest
+               matching version if no exact match exists.
+             - sg
+               Plot all tests chosen on the same graph, rather than one window per test
+             - title=graphtitle
+               Sets the title of the graph to graphtitle, rather than the default generated one.
+             - ts=hours|days|minutes
+               Used as time scale on the x-axis. Default is minutes.
+             - terminal
+               Set what type of terminal gnuplot should use for plotting, effective in
+               conjuction with the p option. See the gnuplot documentation for all possibilities,
+               some interesting ones are: postscript, png, svg.
+             - size
+               Sets the size of the plot, see the gnuplot manual for details.
 """
-helpScripts = """optimization.PlotTest [++] - Displays a gnuplot graph with the cpu time (in minutes) versus total cost. 
-                             The data is extracted from the status file of test(s), and if the test is
-                             currently running, the temporary status file is used, see however the
-                             option nt below. All tests selected are plotted in the same graph.
-                             The following options are supported:
-                             - r=range
-                               The x-axis has the range range. Default is the whole data set. Example: 60:
-                             - yr=range
-                               The y-axis has the y-range range. Default is the whole data set. Example: 2e7:3e7
-                             - per
-                               Plots percentage relative to the minimal cost.
-                             - p=an absolute file name
-                               Produces a file (default postscript) instead of displaying the graph.
-                             - pr=printer name
-                               Produces postscript output and sends it to the printer specified.
-                             - pc
-                               The postscript file will be in color.
-                             - pa3
-                               The postscript will be in A3 format and landscape.
-                             - i=item,item,...
-                               Which item to plot from the status file. Note that whitespaces are replaced
-                               by underscores. Default is TOTAL cost. Example: i=overcover_cost.
-                               If a comma-seperated list is given, all the listed items are plotted.
-                               An abreviation is 'i=apctimes', which is equivalent to specifying 'i=OC_to_DH_time,
-                               Generation_time,Costing_time,Conn_fixing,Optimization_time,Network_generation_time'.
-                             - ix=item
-                               Item to plot against (use on the x axis) from the status file. Default is "cpu time".
-                             - av
-                               Also add an average over the tests for the items and versions plotted.
-                             - oav
-                               Only plot the average curves, and not the individual test curves.
-                             - s
-                               Plot against solution number instead of cpu time.
-                             - nt
-                               Do not use status file from the currently running test.
-                             - tu=user_name
-                               Looks for temporary files in /users/user_name/texttesttmp instead of default textttesttmp. 
-                             - ns
-                               Do not scale times with the performance of the test.
-                             - nv
-                               No line type grouping for different versions of the test.
-                             - v=v1,v2
-                               Plot multiple versions in same dia, ie 'v=,9' means master and version 9
-                               Moreover, you may supply a time scale factor for the different versions
-                               using the syntax v1:scale1,v2:scale2.
-                             - oem
-                               Plot only exactly matching version, rather than plotting the closest
-                               matching version if no exact match exists.
-                             - sg
-                               Plot all tests chosen on the same graph, rather than one window per test
-                             - title=graphtitle
-                               Sets the title of the graph to graphtitle, rather than the default generated one.
-                             - ts=hours|days|minutes
-                               Used as time scale on the x-axis. Default is minutes.
-                             - terminal
-                               Set what type of terminal gnuplot should use for plotting, effective in
-                               conjuction with the p option. See the gnuplot documentation for all possibilities,
-                               some interesting ones are: postscript, png, svg.
-                             - size
-                               Sets the size of the plot, see the gnuplot manual for details.
-optimization.TableTest     - Displays solution data in a table. Works the same as PlotTest in most respects,
+             
+helpScripts="""optimization.TableTest     - Displays solution data in a table. Works the same as PlotTest in most respects,
                              in terms of which data is displayed and the fact that temporary files are used if possible.
                              Currently supports these options:
                              - nt

@@ -83,7 +83,7 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
                Sets the size of the plot, see the gnuplot manual for details.
 """
              
-helpScripts="""optimization.TableTest     - Displays solution data in a table. Works the same as PlotTest in most respects,
+helpScripts="""optimization.TableTest     - Displays solution data in a table. Works the same as -plot in most respects,
                              in terms of which data is displayed and the fact that temporary files are used if possible.
                              Currently supports these options:
                              - nt
@@ -117,6 +117,7 @@ optimization.TraverseSubPlans
 import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy
 from ndict import seqdict
 from time import sleep
+from respond import Responder
 
 itemNamesConfigKey = "_itemnames_map"
 noIncreasMethodsConfigKey = "_noincrease_methods_map"
@@ -151,7 +152,7 @@ class OptimizationConfig(ravebased.Config):
                 group.addOption("plot", "Plot Graph of selected runs")
     def getActionSequence(self):
         if self.optionMap.has_key("plot"):
-            return [ PlotTest(self.optionMap["plot"].split()) ]
+            return [ self.getWriteDirectoryMaker(), DescribePlotTest() ]
         if self.optionMap.has_key("kpi"):
             listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
                         KPI.cFullRosteringOptTimeKPI,
@@ -164,6 +165,11 @@ class OptimizationConfig(ravebased.Config):
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
         return ravebased.Config.getActionSequence(self)
+    def getResponderClasses(self):
+        if self.optionMap.has_key("plot"):
+            return [ GraphPlotResponder ]
+        else:
+            return ravebased.Config.getResponderClasses(self)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def defaultBuildRules(self):
@@ -1173,59 +1179,32 @@ class TraverseSubPlans(plugins.Action):
 # Classes for using gnuplot to plot test curves of tests
 #
 
-# The actions PlotTest, _PlotTest and GraphPlot are used for command line plotting.
-
-commonPlotter = 0
-commonPlotCount = 0
-
-class PlotTest(plugins.Action):
-    def __init__(self, args = []):
-        global commonPlotCount, commonPlotter
-        if commonPlotter == 0:
-            commonPlotter = _PlotTest(args)
-            commonPlotCount = 1
-        else:
-            commonPlotCount += 1
-            commonPlotter.__init__(args)
-    def __del__(self):
-        global commonPlotCount, commonPlotter
-        commonPlotCount -= 1
-        if commonPlotCount == 0:
-            commonPlotter = []
+# Simple description action for backwards compatibility to show what we're doing (command line only)
+class DescribePlotTest(plugins.Action):
     def __repr__(self):
         return "Plotting"
     def __call__(self, test):
-        test.makeBasicWriteDirectory()
         self.describe(test)
-        commonPlotter(test)
     def setUpSuite(self, suite):
         self.describe(suite)
-    def setUpApplication(self, app):
-        app.makeWriteDirectory()
-    def getCleanUpAction(self):
-        return GraphPlot()
 
-class _PlotTest(plugins.Action):
-    def __init__(self, args = []):
+# Responder for plotting from the command line
+class GraphPlotResponder(Responder):
+    def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
         self.testGraph = TestGraph()
-        # Create the options and read the command line arguments.
-        self.testGraph.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
-        for name, expl, value in self.testGraph.options:
-            self.testGraph.optionGroup.addOption(name, expl, value)
-        for name, expl in self.testGraph.switches:
-            self.testGraph.optionGroup.addSwitch(name, expl)
-        self.testGraph.optionGroup.readCommandLineArguments(args)
-    def __call__(self, test):
+        self.testGraph.readCommandLine(optionMap["plot"].split())
+        self.writeDir = None
+    def addSuite(self, suite):
+        if not self.writeDir:
+            self.writeDir = suite.app.writeDirectory
+    def notifyComplete(self, test):
         self.testGraph.createPlotLinesForTest(test)
-    
-class GraphPlot(plugins.Action):
-    def setUpApplication(self, app):
-        if commonPlotter.testGraph:
-            try:
-                commonPlotter.testGraph.plot(app.writeDirectory)
-            except plugins.TextTestError, e:
-                print e
-        commonPlotter.testGraph = None
+    def notifyAllComplete(self):
+        try:
+            self.testGraph.plot(self.writeDir)
+        except plugins.TextTestError, e:
+            print e
 
 # This is the action responsible for plotting from the GUI.
 class PlotTestInGUI(guiplugins.InteractiveAction):
@@ -1297,6 +1276,14 @@ class TestGraph:
                           ("oav", "Plot only average"),
                           ("nt", "Don't search for temporary files") ]
         self.diag = plugins.getDiagnostics("Test Graph")
+        self.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
+    def readCommandLine(self, args):
+        # Create the options and read the command line arguments.
+        for name, expl, value in self.options:
+            self.optionGroup.addOption(name, expl, value)
+        for name, expl in self.switches:
+            self.optionGroup.addSwitch(name, expl)
+        self.optionGroup.readCommandLineArguments(args)
     def findMinOverPlotLines(self):
         min = self.plotLines[0].min
         for plotLine in self.plotLines[1:]:

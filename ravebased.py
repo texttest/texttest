@@ -49,6 +49,7 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
 import carmen, queuesystem, default, os, string, shutil, plugins, sys, signal
 from socket import gethostname
 from tempfile import mktemp
+from respond import Responder
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -151,8 +152,12 @@ class Config(carmen.CarmenConfig):
     def getResponderClasses(self):
         if self.raveSlave():
             return [ queuesystem.SocketResponder ]
-        else:
-            return carmen.CarmenConfig.getResponderClasses(self)
+        baseResponders = carmen.CarmenConfig.getResponderClasses(self)
+        if self.optionMap.has_key("build"):
+            baseResponders.append(RemoteBuildResponder)
+        if self.useQueueSystem():
+            baseResponders.append(RuleBuildSynchroniser)
+        return baseResponders
     def getActionSequence(self):
         if self.slaveRun():
             return carmen.CarmenConfig.getActionSequence(self)
@@ -451,10 +456,6 @@ class CompileRules(plugins.Action):
             test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + ruleset + " succesfully compiled"))
         os.remove(compTmp)
     def getErrorMessage(self, test, ruleset, compTmp):
-        if plugins.emergencySignal:
-            short, long = plugins.getSignalText()
-            return "Ruleset build " + short, "Ruleset compilation " + long
-        
         maxLength = test.getConfigValue("lines_of_text_difference")
         maxWidth = test.getConfigValue("max_width_text_difference")
         previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
@@ -463,49 +464,94 @@ class CompileRules(plugins.Action):
     def setUpSuite(self, suite):
         if suite.abspath == suite.app.abspath or isUserSuite(suite):
             self.describe(suite)
+    def getInterruptActions(self):
+        return [ RuleBuildKilled() ]
+
+class RuleBuildKilled(queuesystem.KillTestInSlave):
+    def __call__(self, test):
+        if test.state.category != "running_rulecompile":
+            return
+        short, long = self.getKillInfo(test)
+        briefText = "Ruleset build " + short
+        freeText = "Ruleset compilation " + long
+        test.changeState(RuleBuildFailed(briefText, freeText))
 
 class SynchroniseState(plugins.Action):
-    def getCompilingTest(self, test):
+    def getCompilingTestState(self, test):
         try:
-            return test.state.testCompiling
+            return test.state.testCompiling.state
         except AttributeError:
             return None
     def __call__(self, test):
-        testCompiling = self.getCompilingTest(test)
-        if not testCompiling:
+        newState = self.getCompilingTestState(test)
+        if not newState:
             return 0
-        if testCompiling.state.category == "running_rulecompile" and test.state.category == "pend_rulecompile":
-            test.changeState(RunningRuleCompilation(test.state, testCompiling.state))
-        elif testCompiling.state.category == "unrunnable":
+        self.synchronise(test, newState)
+        return 1
+    def synchronise(self, test, newState):
+        if test.state.hasStarted():
+            return
+        if newState.category == "running_rulecompile" and test.state.category == "pend_rulecompile":
+            test.changeState(RunningRuleCompilation(test.state, newState))
+        elif newState.category == "unrunnable":
             errMsg = "Trying to use ruleset '" + test.state.rulesetName + "' that failed to build."
             test.changeState(RuleBuildFailed("Ruleset build failed (repeat)", errMsg))
-        elif not testCompiling.state.category.endswith("_rulecompile"):
+        elif not newState.category.endswith("_rulecompile") and test.state.category.endswith("_rulecompile"):
             test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + \
                                                test.state.rulesetName + " succesfully compiled"))
-        return 1
+
+class RuleBuildSynchroniser(Responder):
+    def __init__(self, optionMap):
+        self.updateMap = {}
+        self.synchroniser = SynchroniseState()
+        self.diag = plugins.getDiagnostics("Synchroniser")
+    def notifyChange(self, test, state):
+        if not state:
+            return
+        self.diag.info("Got change " + repr(test) + " -> " + state.category)
+        if state.category == "need_rulecompile":
+            self.registerUpdate(state.testCompiling, test)
+        elif self.updateMap.has_key(test):
+            for updateTest in self.updateMap[test]:
+                self.diag.info("Generated change for " + repr(updateTest))
+                self.synchroniser.synchronise(updateTest, state)
+    def registerUpdate(self, comptest, test):
+        if comptest:
+            self.updateMap[comptest].append(test)
+        else:
+            self.updateMap[test] = []
 
 class WaitForRuleCompile(queuesystem.WaitForCompletion):
     def __init__(self, getRuleSetName):
-        queuesystem.WaitForCompletion.__init__(self)
         self.getRuleSetName = getRuleSetName
+    def __repr__(self):
+        return "Evaluating Rule Build for"
     def __call__(self, test):
         # Don't do this if tests not compiled
         if test.state.category == "not_started":
             return
-        synchroniser = SynchroniseState()
-        synchronisePerformed = synchroniser(test)
         if not test.state.isComplete() and test.state.category != "ruleset_compiled":
-            return self.waitFor(test)
-        if not synchronisePerformed:
-            print test.getIndent() + "Evaluating compilation of ruleset", self.getRuleSetName(test) + " - " + self.resultText(test)
-    def resultText(self, test):
+            return self.WAIT | self.RETRY
+        self.describe(test, self.getResultText(test))
+    def getResultText(self, test):
+        text = " (ruleset " + self.getRuleSetName(test) + " "
         if test.state.isComplete():
-            return "FAILED!"
+            text += "FAILED!"
         else:
-            return "ok"
+            text += "ok"
+        return text + ")"
+    def getInterruptActions(self):
+        return [ KillRuleBuildSubmission(), queuesystem.WaitForKill() ]
+
+class KillRuleBuildSubmission(queuesystem.KillTestSubmission):
+    def __repr__(self):
+        return "Cancelling Rule Build"
     def jobStarted(self, test):
         return test.state.category != "need_rulecompile" and test.state.category != "pend_rulecompile"
-    
+    def describeJob(self, test, jobId, jobName):
+        postText = self.getPostText(test, jobId)
+        print test.getIndent() + repr(self), jobName + postText
+
 class NeedRuleCompilation(plugins.TestState):
     def __init__(self, rulesetName, testCompiling = None):
         self.rulesetName = rulesetName
@@ -608,10 +654,10 @@ class BuildCode(plugins.Action):
     builtDirs = {}
     buildFailedDirs = {}
     builtDirsBackground = {}
+    childProcesses = []
     def __init__(self, target, remote = 1):
         self.target = target
         self.remote = remote
-        self.childProcesses = []
     def setUpApplication(self, app):
         targetDir = app.getConfigValue("build_targets")
         if not targetDir.has_key(self.target):
@@ -688,7 +734,7 @@ class BuildCode(plugins.Action):
         machine = self.getMachine(app, arch)
         print "Building", app, "in", absPath, "on", machine, "..."
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
-        if self.checkBuildFile(buildFile):
+        if checkBuildFile(buildFile):
             self.buildFailedDirs[arch].append(absPath)
             raise plugins.TextTestError, "BUILD ERROR: Product " + repr(app) + " did not build!" + os.linesep + \
                   "(See " + os.path.join(absPath, buildFile) + " for details)"
@@ -720,7 +766,7 @@ class BuildCode(plugins.Action):
             result = self.buildRemoteInChild(machine, arch, buildDirs)
             os._exit(result)
         else:
-            tuple = processId, arch
+            tuple = processId, arch, buildDirs
             self.childProcesses.append(tuple)
     def buildRemoteInChild(self, machine, arch, buildDirs):
         sys.stdin = open("/dev/null")
@@ -731,55 +777,48 @@ class BuildCode(plugins.Action):
             commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& build." + arch)
             os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
         return 0            
-    def checkBuildFile(self, buildFile):
-        for line in open(buildFile).xreadlines():
-            if line.find("***") != -1 and line.find("Error") != -1:
-                return 1
-        return 0
     def killBuild(self):
         print "Terminating remote build."
-    def getCleanUpAction(self):
-        if self.remote:
-            return CheckBuild(self)
-        else:
-            return None
 
-class CheckBuild(plugins.Action):
-    checkedDirs = {}
-    def __init__(self, builder):
-        self.builder = builder
-    def setUpApplication(self, app):
-        if len(self.builder.childProcesses) > 0:
-            print "Waiting for remote builds..." 
-        for process, arch in self.builder.childProcesses:
-            pid, status = os.waitpid(process, 0)
-            # In theory we should be able to trust the status. In practice, it seems to be 0, even when the build failed.
-            targetDir = app.getConfigValue("build_targets")
-            if not targetDir.has_key("codebase"):
-                return
-            for optValue in targetDir["codebase"]:
-                absPath, makeTargets = self.builder.getPathAndTargets(optValue)
-                self.checkBuild(arch, absPath)
+def checkBuildFile(buildFile):
+    for line in open(buildFile).xreadlines():
+        if line.find("***") != -1 and line.find("Error") != -1:
+            return 1
+    return 0
+    
+
+class RemoteBuildResponder(Responder):
+    def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
+        self.target = optionMap["build"]
+        self.checkedDirs = {}
+    def notifyAllComplete(self):
+        print "Waiting for remote builds..." 
+        for process, arch, buildDirs in BuildCode.childProcesses:
+            os.waitpid(process, 0)
+            for absPath, makeTargets in buildDirs:
+                # In theory we should be able to trust the status. In practice, it seems to be 0, even when the build failed.
+                if os.path.isdir(absPath):
+                    self.checkBuild(arch, absPath)
     def checkBuild(self, arch, absPath):
-        if os.path.isdir(absPath):
-            os.chdir(absPath)
-            if not self.checkedDirs.has_key(arch):
-                self.checkedDirs[arch] = []
-            if absPath in self.checkedDirs[arch]:
-                return
-            else:
-                self.checkedDirs[arch].append(absPath)
-            fileName = "build." + arch
-            if not os.path.isfile(fileName):
-                print "FILE NOT FOUND: ", os.path.join(absPath, fileName)
-                return
-            result = self.builder.checkBuildFile(fileName)
-            resultString = " SUCCEEDED!"
-            if result:
-                resultString = " FAILED!"
-            print "Build on " + arch + " in " + absPath + resultString
-            if result == 0:
-                os.remove(fileName)
+        os.chdir(absPath)
+        if not self.checkedDirs.has_key(arch):
+            self.checkedDirs[arch] = []
+        if absPath in self.checkedDirs[arch]:
+            return
+        
+        self.checkedDirs[arch].append(absPath)
+        fileName = "build." + arch
+        if not os.path.isfile(fileName):
+            print "FILE NOT FOUND: ", os.path.join(absPath, fileName)
+            return
+        result = checkBuildFile(fileName)
+        resultString = " SUCCEEDED!"
+        if result:
+            resultString = " FAILED!"
+        print "Build on " + arch + " in " + absPath + resultString
+        if result == 0:
+            os.remove(fileName)
 
 class TraverseCarmUsers(plugins.Action):
     def __init__(self, args = []):

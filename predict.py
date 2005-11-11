@@ -1,10 +1,9 @@
 #!/usr/local/bin/python
 
-import os, filecmp, string, plugins, signal, copy
+import os, filecmp, string, plugins, copy
 
 plugins.addCategory("badPredict", "internal errors", "had internal errors")
 plugins.addCategory("crash", "CRASHED")
-plugins.addCategory("killed", "killed", "were terminated before completion")
 
 # For backwards compatibility...
 class FailedPrediction(plugins.TestState):
@@ -50,10 +49,6 @@ class CheckPredictions(CheckLogFilePredictions):
             prevLine = line
         return "unknown " + crashType
     def collectErrors(self, test):
-        if plugins.emergencySignal:
-            briefText, freeText = self.getKillText()
-            self.insertError(test, "killed", briefText, freeText + "\n")
-            return 1
         # Hard-coded prediction: check test didn't crash
         stackTraceFile = test.makeFileName("stacktrace", temporary=1)
         if os.path.isfile(stackTraceFile):
@@ -75,9 +70,6 @@ class CheckPredictions(CheckLogFilePredictions):
         for comp in compsNotFound:
             self.insertError(test, "badPredict", "missing '" + comp + "'")
         return errorsFound
-    def getKillText(self):
-        brief, full = plugins.getSignalText()
-        return brief, "Test " + full
     def extractErrorsFrom(self, test, fileStem, compsNotFound):
         errorsFound = 0
         logFile = self.getLogFile(test, fileStem)

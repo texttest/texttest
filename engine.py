@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-import plugins, os, sys, testmodel
+
+import plugins, os, sys, testmodel, time, signal
 from threading import Thread
-from time import sleep
 from usecase import ScriptEngine
 
 plugins.addCategory("unrunnable", "unrunnable", "could not be run")
@@ -13,6 +13,15 @@ class TestRunner:
         self.interrupted = 0
         self.actionSequence = []
         self.appRunner = appRunner
+        self.setActionSequence(actionSequence)
+    def switchToCleanup(self):
+        self.interrupted = 0
+        newActionSequence = []
+        for action in self.actionSequence:
+            newActionSequence += action.getInterruptActions()
+        self.actionSequence = newActionSequence
+    def setActionSequence(self, actionSequence):
+        self.actionSequence = []
         # Copy the action sequence, so we can edit it and mark progress
         for action in actionSequence:
             self.actionSequence.append(action)
@@ -24,7 +33,7 @@ class TestRunner:
         except plugins.TextTestError, e:
             self.failTest(str(sys.exc_value))
         except KeyboardInterrupt:
-            raise sys.exc_type, sys.exc_info
+            raise
         except:
             print "WARNING : caught exception while running", self.test, "changing state to UNRUNNABLE :"
             exceptionText = plugins.printException()
@@ -74,7 +83,7 @@ class TestRunner:
             tryOthers = retValue & plugins.Action.WAIT and not runToCompletion
             # Don't busy-wait : assume lack of completion is a sign we might keep doing this
             if not completed:
-                sleep(0.1)
+                time.sleep(0.1)
             if completed or tryOthers:
                 # Don't attempt to retry the action, mark complete
                 return completed, tryOthers 
@@ -83,12 +92,6 @@ class TestRunner:
         retValue = self.handleExceptions(self.test.callAction, action)
         self.test.tearDownEnvironment()
         return retValue
-    def performCleanUpActions(self):
-        for action in self.appRunner.cleanupSequence:
-            self.diag.info("Performing cleanup " + str(action) + " on " + repr(self.test))
-            self.test.callAction(action)
-        if self.test.app.cleanMode & plugins.Configuration.CLEAN_NONBASIC:
-            self.test.cleanNonBasicWriteDirectories()
     def findSuitesToChange(self, previousTestRunner):
         tearDownSuites = []
         commonAncestor = None
@@ -131,21 +134,10 @@ class ApplicationRunner:
     def __init__(self, testSuite, actionSequence, diag):
         self.testSuite = testSuite
         self.actionSequence = actionSequence
-        self.cleanupSequence = self.getCleanUpSequence(actionSequence)
         self.suitesSetUp = {}
         self.suitesToSetUp = {}
         self.diag = diag
         self.setUpApplications(self.actionSequence)
-    def getCleanUpSequence(self, actionSequence):
-        cleanupSequence = []
-        for action in actionSequence:
-            cleanAction = action.getCleanUpAction()
-            if cleanAction:
-                cleanupSequence.append(cleanAction)
-        cleanupSequence.reverse()
-        return cleanupSequence
-    def performCleanup(self):
-        self.setUpApplications(self.cleanupSequence)
     def setUpApplications(self, sequence):
         self.testSuite.setUpEnvironment()
         for action in sequence:
@@ -153,7 +145,7 @@ class ApplicationRunner:
             try:
                 action.setUpApplication(self.testSuite.app)
             except KeyboardInterrupt:
-                raise sys.exc_type, sys.exc_value
+                raise
             except:
                 message = str(sys.exc_value)
                 if sys.exc_type != plugins.TextTestError:
@@ -207,13 +199,28 @@ class ActionRunner:
             self.allTests.append(testRunner)
     def isEmpty(self):
         return len(self.appRunners) == 0
-    def runCleanup(self):
-        for testRunner in self.allTests:
+    def switchToCleanup(self):
+        for testRunner in self.testQueue:
             self.diag.info("Running cleanup actions for test " + testRunner.test.getRelPath())
-            testRunner.performCleanUpActions()
-        for appRunner in self.appRunners:
-            appRunner.performCleanup()
+            testRunner.switchToCleanup()
+        self.interrupted = 0
     def run(self):
+        try:
+            self.runNormal()
+        except KeyboardInterrupt, e:
+            self.writeTermMessage(e)
+            self.switchToCleanup()
+            self.runNormal()
+        for responder in testmodel.Test.observers:
+            responder.notifyAllComplete()
+    def writeTermMessage(self, e):
+        message = "Terminating testing due to external interruption"
+        excData = str(e)
+        if excData:
+            message += " (" + excData + ")"
+        print message
+        sys.stdout.flush() # Try not to lose log file information...
+    def runNormal(self):
         while len(self.testQueue):
             if self.interrupted:
                 raise KeyboardInterrupt, "Interrupted externally"
@@ -226,8 +233,6 @@ class ActionRunner:
                 self.diag.info("Incomplete - putting to back of queue")
                 self.testQueue.append(self.currentTestRunner)
             self.previousTestRunner = self.currentTestRunner
-        for responder in testmodel.Test.observers:
-            responder.notifyAllComplete()
     def interrupt(self):
         self.interrupted = 1
         if self.currentTestRunner:
@@ -285,6 +290,7 @@ class UniqueNameFinder:
 
 class TextTest:
     def __init__(self):
+        self.setSignalHandlers()
         if os.environ.has_key("FAKE_OS"):
             os.name = os.environ["FAKE_OS"]
         self.allResponders = []
@@ -328,7 +334,7 @@ class TextTest:
                     for version in versionList:
                         appList += self.addApplications(appName, dirName, pathname, version)
                 except (SystemExit, KeyboardInterrupt):
-                    raise sys.exc_type, sys.exc_value
+                    raise
                 except testmodel.BadConfigError:
                     sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + "\n")
                     raisedError = 1
@@ -392,9 +398,13 @@ class TextTest:
             uniqueNameFinder.addSuite(testSuite)
             print "Using", app.description() + ", checkout", app.checkout
         return appSuites
-    def destroyTestSuites(self, appSuites):
+    def deleteTempFiles(self, appSuites):
         for app, testSuite in appSuites:
-            app.removeWriteDirectory()
+            if app.cleanMode & plugins.Configuration.CLEAN_NONBASIC:
+                for test in testSuite.testCaseList():
+                    test.cleanNonBasicWriteDirectories()
+            if app.cleanMode & plugins.Configuration.CLEAN_BASIC:
+                app.removeWriteDirectory()
     def setUpResponders(self, appSuites):
         for responder in self.allResponders:
             for app, testSuite in appSuites:
@@ -415,19 +425,16 @@ class TextTest:
                 sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + "\n")
         return actionRunner
     def run(self):
-        try:
-            if self.inputOptions.helpMode():
-                if len(self.allApps) > 0:
-                    self.allApps[0].printHelpText()
-                else:
-                    print testmodel.helpIntro
-                    print "TextTest didn't find any valid test applications - you probably need to tell it where to find them."
-                    print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
-                    print "If this makes no sense, read the online documentation..."
-                return
-            self._run()
-        except KeyboardInterrupt:
-            print "Terminated due to interruption"
+        if self.inputOptions.helpMode():
+            if len(self.allApps) > 0:
+                self.allApps[0].printHelpText()
+            else:
+                print testmodel.helpIntro
+                print "TextTest didn't find any valid test applications - you probably need to tell it where to find them."
+                print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
+                print "If this makes no sense, read the online documentation..."
+            return
+        self._run()
     def findOwnThreadResponder(self):
         for responder in self.allResponders:
             if responder.needsOwnThread():
@@ -445,20 +452,40 @@ class TextTest:
             else:
                 ownThreadResponder.runAlone()
         finally:
-            self.destroyTestSuites(appSuites)
+            self.deleteTempFiles(appSuites)
     def runWithTests(self, ownThreadResponder, appSuites):                
         actionRunner = self.createActionRunner(appSuites)
         if actionRunner.isEmpty():
             return # error already printed
-        try:
-            if ownThreadResponder:
-                actionThread = ActionThread(actionRunner)
-                actionThread.start()
-                ownThreadResponder.runWithActionThread(actionThread)
-            else:
-                actionRunner.run()
-        finally:
-            actionRunner.runCleanup()
+        
+        if ownThreadResponder:
+            actionThread = ActionThread(actionRunner)
+            actionThread.start()
+            ownThreadResponder.runWithActionThread(actionThread)
+        else:
+            actionRunner.run()
+    def writeNoTestsError(self, appSuites):
+        if len(appSuites) > 0:
+            sys.stderr.write("No tests matched the selected applications/versions. The following were tried: \n")
+            for app, testSuite in appSuites:
+                sys.stderr.write(app.description() + "\n")
+    def setSignalHandlers(self):
+        # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
+        if os.name == "posix":
+            signal.signal(signal.SIGUSR1, self.handleSignal)
+            signal.signal(signal.SIGUSR2, self.handleSignal)
+            signal.signal(signal.SIGXCPU, self.handleSignal)
+    def handleSignal(self, sig, stackFrame):
+        raise KeyboardInterrupt, self.getSignalText(sig)
+    def getSignalText(self, sig):
+        if sig == signal.SIGUSR1:
+            return "RUNLIMIT1"
+        elif sig == signal.SIGXCPU:
+            return "CPULIMIT"
+        elif sig == signal.SIGUSR2:
+            return "RUNLIMIT2"
+        else:
+            return "signal " + str(sig)
 
 class ActionThread(Thread):
     def __init__(self, actionRunner):

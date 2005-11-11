@@ -21,13 +21,21 @@ class QueueSystem:
         return "bsub " + bsubArgs
     def findSubmitError(self, stderr):
         for errorMessage in stderr.readlines():
-            if errorMessage and errorMessage.find("still trying") == -1:
+            if self.isRealError(errorMessage):
                 return errorMessage
         return ""
+    def isRealError(self, errorMessage):
+        if not errorMessage:
+            return 0
+        okStrings = [ "still trying", "Waiting for dispatch", "Job is finished" ]
+        for okStr in okStrings:
+            if errorMessage.find(okStr) != -1:
+                return 0
+        return 1
     def getJobFailureInfo(self, jobId):
         return os.popen("bjobs -a -l " + jobId).read()
     def killJob(self, jobId):
-        os.system("bkill -s USR2 " + jobId + " > /dev/null 2>&1")
+        os.system("bkill -s USR1 " + jobId + " > /dev/null 2>&1")
     def getJobId(self, line):
         word = line.split()[1]
         return word[1:-1]
@@ -91,6 +99,15 @@ class MachineInfo:
             jobName = fields[6]
             jobs.append((user, jobName))
         return jobs
+
+# Interpret what the limit signals mean...
+def getLimitInterpretation(origLimitText):
+    if origLimitText == "RUNLIMIT1":
+        return "KILLED"
+    elif origLimitText == "RUNLIMIT2":
+        return "RUNLIMIT"
+    else:
+        return origLimitText
     
 # Need to get all hosts for parallel
 def getExecutionMachines():

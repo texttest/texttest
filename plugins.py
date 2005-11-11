@@ -1,22 +1,5 @@
 
-import signal, sys
-
-emergencySignal = 0
-# imperative to install signal handlers as soon as possible...
-def handleEmergencySignal(signal, stackFrame):
-    print "Received signal for termination, killing all remaining tests..."
-    sys.stdout.flush() # Try not to lose log file information...
-    global emergencySignal
-    emergencySignal = signal
-
-try:
-    signal.signal(signal.SIGUSR1, handleEmergencySignal)
-    signal.signal(signal.SIGUSR2, handleEmergencySignal)
-    signal.signal(signal.SIGXCPU, handleEmergencySignal)
-except AttributeError:
-    pass
-
-import os, log4py, string, shutil, time, re, stat
+import signal, sys, os, log4py, string, shutil, time, re, stat
 from types import FileType
 from ndict import seqdict
 from traceback import format_exception
@@ -27,18 +10,6 @@ def localtime(format="%d%b%H:%M:%S"):
     return time.strftime(format, time.localtime())
 
 globalStartTime = localtime()
-
-# utility for emergency signals, give a brief and a longer description of what they mean
-def getSignalText():
-    if emergencySignal == signal.SIGUSR1:
-        return "RUNLIMIT", "exceeded maximum wallclock time allowed"
-    elif emergencySignal == signal.SIGXCPU:
-        return "CPULIMIT", "exceeded maximum cpu time allowed"
-    elif emergencySignal == signal.SIGUSR2:
-        timeStr = localtime("%H:%M")
-        return "killed at " + timeStr, "killed explicitly at " + timeStr
-    else:
-        return "signal " + str(emergencySignal), "terminated by signal " + str(emergencySignal)
 
 # Need somewhat different formats on Windows/UNIX
 def tmpString():
@@ -104,8 +75,9 @@ class Action:
         pass
     def tearDownSuite(self, suite):
         pass
-    def getCleanUpAction(self):
-        return None
+    # Return the actions to replace the current one if run is interrupted
+    def getInterruptActions(self):
+        return [ self ]
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText

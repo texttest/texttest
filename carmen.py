@@ -209,7 +209,11 @@ class RunWithParallelAction(plugins.Action):
         processId = os.fork()
         if processId == 0:
             # Note, this is a child process, so any state changes made by baseRunner will not be reflected, and anything written will not get printed...
-            self.baseRunner(test, inChild=1)
+            try:
+                self.baseRunner(test, inChild=1)
+            except KeyboardInterrupt:
+                # Don't allow interruptions to propagate, we want to kill this off
+                pass
             os._exit(0)
         else:
             try:
@@ -260,6 +264,8 @@ class RunWithParallelAction(plugins.Action):
     def handleNoTimeAvailable(self, test):
         # Do nothing by default
         pass
+    def getInterruptActions(self):
+        return self.baseRunner.getInterruptActions()
                 
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, execProcess, parentProcess):

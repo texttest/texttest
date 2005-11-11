@@ -120,6 +120,15 @@ class MachineInfo:
                 jobs.append((user, jobName))
         return jobs
 
+# Interpret what the limit signals mean...
+def getLimitInterpretation(origLimitText):
+    if origLimitText == "RUNLIMIT1":
+        return "RUNLIMIT"
+    elif origLimitText == "RUNLIMIT2":
+        return "KILLED"
+    else:
+        return origLimitText
+    
 # Used by slave to find all execution machines    
 def getExecutionMachines():
     if not os.environ.has_key("PE_HOSTFILE"):

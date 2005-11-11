@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import default, respond, performance, predict, os, shutil, plugins, string, time
+import default, respond, performance, predict, os, shutil, plugins, string, time, sys
 from socket import gethostname
                 
 class RunTest(default.RunTest):
@@ -223,4 +223,9 @@ class CollateFiles(default.CollateFiles):
             shutil.copyfile(sourcePath, targetFile)
         else:
             plugins.movefile(sourcePath, targetFile)
+    def getInterruptActions(self):
+        if str(sys.exc_value) == "CPULIMIT":
+            return [ default.CollateFiles() ]
+        else:
+            return [ self ]
 

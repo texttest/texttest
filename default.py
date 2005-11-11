@@ -7,6 +7,8 @@ from knownbugs import CheckForBugs
 from cPickle import Unpickler
 from socket import gethostname
 
+plugins.addCategory("killed", "killed", "were terminated before completion")
+
 def getConfig(optionMap):
     return Config(optionMap)
 
@@ -544,6 +546,7 @@ class Running(plugins.TestState):
         if self.bkgProcess and self.bkgProcess.processId:
             print "Killing running test (process id", str(self.bkgProcess.processId) + ")"
             self.bkgProcess.killAll()
+        return 1
 
 # Poll CPU time values as well
 class WindowsRunning(Running):
@@ -634,8 +637,8 @@ class RunTest(plugins.Action):
             return "/dev/null"
         else:
             return "nul"
-    def getCleanUpAction(self):
-        return KillTest()
+    def getInterruptActions(self):
+        return [ KillTest() ]
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
@@ -644,8 +647,34 @@ class RunTest(plugins.Action):
 
 class KillTest(plugins.Action):
     def __call__(self, test):
-        if test.state.hasStarted() and not test.state.isComplete():
-            test.state.killProcess()
+        if test.state.isComplete():
+            return
+        if not test.state.hasStarted():
+            raise plugins.TextTestError, "Termination already in progress before test started."
+        
+        test.state.killProcess()
+        briefText, fullText = self.getKillInfo(test)
+        freeText = "Test " + fullText + "\n"
+        newState = plugins.TestState("killed", briefText=briefText, freeText=freeText, \
+                                     started=1, executionHosts=test.state.executionHosts)
+        test.changeState(newState)
+    def getKillInfo(self, test):
+        briefText = self.getBriefText(test, str(sys.exc_value))
+        if briefText:
+            return briefText, self.getFullText(briefText)
+        else:
+            return "quit", "terminated by quitting"
+    def getBriefText(self, test, origBriefText):
+        return origBriefText
+    def getFullText(self, briefText):
+        if briefText.startswith("RUNLIMIT"):
+            return "exceeded maximum wallclock time allowed"
+        elif briefText == "CPULIMIT":
+            return "exceeded maximum cpu time allowed"
+        elif briefText.startswith("signal"):
+            return "terminated by " + briefText
+        else:
+            return briefText
 
 class CreateCatalogue(plugins.Action):
     def __init__(self):

@@ -18,7 +18,7 @@ class TestComparison(plugins.TestState):
         self.newResults = []
         self.correctResults = []
         self.failedPrediction = None
-        if isinstance(previousInfo, FailedPrediction):
+        if previousInfo.category == "killed" or isinstance(previousInfo, FailedPrediction):
             self.setFailedPrediction(previousInfo)
         self.diag = plugins.getDiagnostics("TestComparison")
         # Cache this only so it gets output when we pickle, so we can re-interpret if needed...
@@ -211,8 +211,7 @@ class MakeComparisons(plugins.Action):
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):
-        # Don't compare already completed tests if they have errors
-        if test.state.isComplete() and not test.state.hasResults():
+        if test.state.isComplete() and not test.state.hasResults() and test.state.category != "killed":
             return
         testComparison = self.testComparisonClass(test.state, test.app.abspath)
         testComparison.makeComparisons(test)
@@ -262,7 +261,7 @@ class MakeComparisons(plugins.Action):
         maxWidth = app.getConfigValue("max_width_text_difference")
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = self.findTextDiffTool(app)
-
+    
 class FileComparison:
     def __init__(self, test, standardFile, tmpFile, makeNew = 0):
         self.stdFile = standardFile

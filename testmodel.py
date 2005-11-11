@@ -128,6 +128,7 @@ class Test:
         readFiles[""] = localFiles
         return readFiles + self.app.configObject.extraReadFiles(self)
     def notifyCompleted(self):
+        debugLog.info("Completion notified, test " + self.name)
         for observer in self.observers:
             observer.notifyLifecycleChange(self, "complete")
             observer.notifyComplete(self)
@@ -225,11 +226,6 @@ class TestCase(Test):
             self.properties.addEntry("jusecase", {}, insert=1)
         if os.path.isfile(self.useCaseFile):
             self.setReplayEnvironment()
-        # For self testing. Should really be more general...
-        slaveUseCase = self.makeFileName("slave_usecase")
-        if os.path.isfile(slaveUseCase):
-            self.environment["SLAVE_USECASE_REPLAY_SCRIPT"] = slaveUseCase
-            self.environment["SLAVE_USECASE_RECORD_SCRIPT"] = self.makeFileName("slave_usecase", temporary=1)
     def useJavaRecorder(self):
         return self.app.getConfigValue("use_case_recorder") == "jusecase"
     # Here we assume the application uses either PyUseCase or JUseCase

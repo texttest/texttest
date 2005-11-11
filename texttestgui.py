@@ -362,6 +362,7 @@ class TextTestGUI(ThreadedResponder):
             if checkUpToDate and test.state.isComplete() and test.state.needsRecalculation():
                 guilog.info("Recalculating result info for test: result file changed since created")
                 cmpAction = comparetest.MakeComparisons()
+                cmpAction.setUpApplication(test.app)
                 cmpAction(test)
             self.rightWindowGUI = TestCaseGUI(test, self.dynamic)
         if self.contents:

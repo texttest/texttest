@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, string, sys, default, unixonly, performance, plugins, socket
+import os, string, sys, default, unixonly, performance, plugins, socket, time
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
@@ -36,6 +36,25 @@ class RunTestInSlave(unixonly.RunTest):
         return _getExecutionMachines()
     def getBriefText(self, execMachines):
         return "RUN (" + string.join(execMachines, ",") + ")"
+    def getInterruptActions(self):
+        return [ KillTestInSlave() ]
+
+class KillTestInSlave(default.KillTest):
+    def getBriefText(self, test, origBriefText):
+        moduleName = queueSystemName(test.app).lower()
+        command = "from " + moduleName + " import getLimitInterpretation as _getLimitInterpretation"
+        exec command
+        interpretation = _getLimitInterpretation(origBriefText)
+        if interpretation == "KILLED":
+            timeStr = plugins.localtime("%H:%M")
+            return "killed at " + timeStr
+        else:
+            return interpretation
+    def getFullText(self, briefText):
+        if briefText.startswith("killed at"):
+            return briefText.replace("killed", "killed explicitly")
+        else:
+            return default.KillTest.getFullText(self, briefText)
     
 class SocketResponder(Responder):
     def __init__(self, optionMap):
@@ -254,7 +273,10 @@ class QueueSystemServer:
         self.socketServer.testSubmitted(test)
         self.submitDiag.info("Creating job at " + plugins.localtime())
         queueSystem = self.getQueueSystem(test)
+        extraArgs = os.getenv("QUEUE_SYSTEM_SUBMIT_ARGS")
         submitCommand = queueSystem.getSubmitCommand(submissionRules)
+        if extraArgs:
+            submitCommand += " " + extraArgs
         fullCommand = self.getEnvString(slaveEnv) + submitCommand + " '" + command + "'"
         jobName = submissionRules.getJobName()
         self.submitDiag.info("Creating job " + jobName + " with command : " + fullCommand)
@@ -294,7 +316,7 @@ class QueueSystemServer:
         system = _QueueSystem()
         self.queueSystems[queueModule] = system
         return system
-        
+                                 
 class SubmitTest(plugins.Action):
     def __init__(self, submitRuleFunction, optionMap):
         self.loginShell = None
@@ -308,16 +330,8 @@ class SubmitTest(plugins.Action):
             self.slaveEnv["TEXTTEST_DIAGDIR"] = os.path.join(os.getenv("TEXTTEST_DIAGDIR"), self.slaveType())
     def setUpScriptEngine(self):
         # For self-testing: make sure the slave doesn't read the master use cases.
-        # If it reads anything, it should read its own. Check for "SLAVE_" versions of the variables,
-        # set them to the real values
         variables = [ "USECASE_RECORD_STDIN", "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]
         for var in variables:
-            self.setUpUseCase(var)
-    def setUpUseCase(self, var):
-        slaveVar = self.slaveType().upper() + "_" + var
-        if os.environ.has_key(slaveVar):
-            self.slaveEnv[var] = os.environ[slaveVar]
-        else:
             self.slaveEnv[var] = ""
     def slaveType(self):
         return "slave"
@@ -328,19 +342,16 @@ class SubmitTest(plugins.Action):
     def __call__(self, test):
         if not self.shouldSubmit(test):
             return
-
-        if plugins.emergencySignal:
-            raise plugins.TextTestError, "Termination time already reached when trying to submit to " + \
-                  queueSystemName(test.app)
         
         self.tryStartServer()
         command = self.getExecuteCommand(test)
         submissionRules = self.submitRuleFunction(test)
         self.describe(test, self.getPostText(test, submissionRules))
 
-        self.setPending(test)
         self.diag.info("Submitting job : " + command)
         QueueSystemServer.instance.submitJob(test, submissionRules, command, self.slaveEnv)
+        if not test.state.hasStarted():
+            self.setPending(test)
         return self.WAIT
     def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)
@@ -395,44 +406,40 @@ class SubmitTest(plugins.Action):
         self.setUpDisplay(app)
         self.runOptions = self.setRunOptions(app)
         self.loginShell = app.getConfigValue("login_shell")
-    
-class WaitForCompletion(plugins.Action):
-    def __init__(self):
-        self.killer = KillTest()
-        self.testsWaitingForKill = {}
+    def getInterruptActions(self):
+        return [ SubmissionMissed() ]
+
+class SubmissionMissed(plugins.Action):
+    def __call__(self, test):
+        if not test.state.isComplete():
+            raise plugins.TextTestError, "Termination already in progress when trying to submit to " + \
+                  queueSystemName(test.app)
+
+class KillTestSubmission(plugins.Action):
     def __repr__(self):
-        return "Evaluating"
+        return "Cancelling"
     def __call__(self, test):
         if test.state.isComplete():
-            return self.describe(test, self.getPostText(test))
-        else:
-            return self.waitFor(test)
-    def waitFor(self, test):
-        if plugins.emergencySignal:
-            return self.tryKillJob(test)
+            return
 
-        return self.WAIT | self.RETRY
-    def getPostText(self, test):
-        try:
-            return test.state.getPostText()
-        except AttributeError:
-            return " (" + test.state.category + ")"
-    def tryKillJob(self, test):
-        if self.testsWaitingForKill.has_key(test):
-            return self.handleTestWaiting(test)
+        jobId, jobName = self.performKill(test)
+        if not jobId:
+            return
 
-        postText = "Emergency finish of "
-        self.killer(test, postText)
-        if self.jobStarted(test):
-            self.testsWaitingForKill[test] = 0
-            return self.WAIT | self.RETRY
-        else:
-            failReason, fullText = self.getSlaveFailure(test)
-            fullText = failReason + "\n" + fullText
-            return test.changeState(plugins.TestState("unrunnable", briefText=failReason, \
-                                                      freeText=fullText, completed=1))
+        self.describeJob(test, jobId, jobName)
+        if not self.jobStarted(test):
+            self.setSlaveFailed(test)
     def jobStarted(self, test):
         return test.state.hasStarted()
+    def performKill(self, test):
+        if not QueueSystemServer.instance:
+            return None, None
+        return QueueSystemServer.instance.killJob(test)
+    def setSlaveFailed(self, test):
+        failReason, fullText = self.getSlaveFailure(test)
+        fullText = failReason + "\n" + fullText
+        test.changeState(plugins.TestState("unrunnable", briefText=failReason, \
+                                           freeText=fullText, completed=1))
     def getSlaveFailure(self, test):
         slaveErrFile = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
         if os.path.isfile(slaveErrFile):
@@ -442,8 +449,38 @@ class WaitForCompletion(plugins.Action):
         name = queueSystemName(test.app)
         return name + "/system error", "Full accounting info from " + name + " follows:\n" + \
                QueueSystemServer.instance.getJobFailureInfo(test)
-    def handleTestWaiting(self, test):
-        if self.testsWaitingForKill[test] > 600:
+    def getPostText(self, test, jobId):
+        name = queueSystemName(test.app)
+        return " in " + name + " (job " + jobId + ")"
+    def describeJob(self, test, jobId, jobName):
+        postText = self.getPostText(test, jobId)
+        self.describe(test, postText)
+    
+class WaitForCompletion(plugins.Action):
+    def __repr__(self):
+        return "Evaluating"
+    def __call__(self, test):
+        if test.state.isComplete():
+            self.describe(test, self.getPostText(test))
+        else:
+            return self.WAIT | self.RETRY
+    def getPostText(self, test):
+        try:
+            return test.state.getPostText()
+        except AttributeError:
+            return " (" + test.state.category + ")"
+    def getInterruptActions(self):
+        return [ KillTestSubmission(), WaitForKill() ]
+    
+class WaitForKill(plugins.Action):
+    def __init__(self):
+        self.testsWaitingForKill = {}
+    def __call__(self, test, postText=""):
+        if test.state.isComplete():
+            return
+
+        attempt = self.getAttempt(test)
+        if attempt > 600:
             freeText = "Could not delete " + repr(test) + " in queuesystem: have abandoned it"
             newState = plugins.TestState("abandoned", briefText="job deletion failed", \
                                                       freeText=freeText, completed=1)
@@ -452,30 +489,14 @@ class WaitForCompletion(plugins.Action):
         self.testsWaitingForKill[test] += 1
         attempt = self.testsWaitingForKill[test]
         if attempt % 10 == 0:
-            print test.getIndent() + "Emergency finish in progress for " + repr(test) + \
+            print test.getIndent() + "Cancellation in progress for " + repr(test) + \
                   ", queue system wait time " + str(attempt)
         return self.WAIT | self.RETRY
-    def getCleanUpAction(self):
-        return self.killer
-
-    
-class KillTest(plugins.Action):
-    def __repr__(self):
-        return "Cancelling"
-    def __call__(self, test, postText=""):
-        if test.state.isComplete() or not QueueSystemServer.instance:
-            return
-
-        jobId, jobName = QueueSystemServer.instance.killJob(test)
-        if not jobId:
-            return
-        
-        name = queueSystemName(test.app)
-        postTextToUse = " in " + name + " (" + postText + "job " + jobId + ")" 
-        if jobName.find(test.getTmpExtension()) == -1:
-            print test.getIndent() + repr(self), jobName + postTextToUse
-        else:
-            self.describe(test, postTextToUse)
+    def getAttempt(self, test):
+        if not self.testsWaitingForKill.has_key(test):
+            self.testsWaitingForKill[test] = 0
+        self.testsWaitingForKill[test] += 1
+        return self.testsWaitingForKill[test]    
             
 class MachineInfoFinder(default.MachineInfoFinder):
     def __init__(self):
@@ -529,5 +550,4 @@ class MakePerformanceFile(default.MakePerformanceFile):
                 descriptor = "Suspected of SLOWING DOWN "
             jobs.append(descriptor + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
-    
         

@@ -204,8 +204,6 @@ class RunWithParallelAction(plugins.Action):
     def __repr__(self):
         return repr(self.baseRunner)
     def __call__(self, test):
-        if test.state.isComplete():
-            return
         processId = os.fork()
         if processId == 0:
             # Note, this is a child process, so any state changes made by baseRunner will not be reflected, and anything written will not get printed...

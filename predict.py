@@ -36,8 +36,7 @@ class CheckPredictions(CheckLogFilePredictions):
     def __repr__(self):
         return "Checking predictions for"
     def __call__(self, test):
-        if not test.state.isComplete():
-            self.collectErrors(test)
+        self.collectErrors(test)
     def findCrashSummary(self, errInfo):
         prevLine = ""
         crashType = "CRASH"

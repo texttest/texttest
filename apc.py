@@ -316,8 +316,6 @@ class RunApcTestInDebugger(default.RunTest):
     def __repr__(self):
         return "Debugging"
     def __call__(self, test):
-        if test.state.isComplete():
-            return
         self.describe(test)
         # Get the options that are sent to APCbatch.sh
         opts = test.options.split(" ")

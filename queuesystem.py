@@ -337,12 +337,7 @@ class SubmitTest(plugins.Action):
         return "slave"
     def __repr__(self):
         return "Submitting"
-    def shouldSubmit(self, test):
-        return not test.state.isComplete()
-    def __call__(self, test):
-        if not self.shouldSubmit(test):
-            return
-        
+    def __call__(self, test):    
         self.tryStartServer()
         command = self.getExecuteCommand(test)
         submissionRules = self.submitRuleFunction(test)
@@ -411,17 +406,13 @@ class SubmitTest(plugins.Action):
 
 class SubmissionMissed(plugins.Action):
     def __call__(self, test):
-        if not test.state.isComplete():
-            raise plugins.TextTestError, "Termination already in progress when trying to submit to " + \
-                  queueSystemName(test.app)
+        raise plugins.TextTestError, "Termination already in progress when trying to submit to " + \
+              queueSystemName(test.app)
 
 class KillTestSubmission(plugins.Action):
     def __repr__(self):
         return "Cancelling"
     def __call__(self, test):
-        if test.state.isComplete():
-            return
-
         jobId, jobName = self.performKill(test)
         if not jobId:
             return
@@ -471,6 +462,13 @@ class WaitForCompletion(plugins.Action):
             return " (" + test.state.category + ")"
     def getInterruptActions(self):
         return [ KillTestSubmission(), WaitForKill() ]
+
+class Abandoned(plugins.TestState):
+    def __init__(self, freeText):
+        plugins.TestState.__init__(self, "abandoned", briefText="job deletion failed", \
+                                                      freeText=freeText, completed=1)
+    def shouldAbandon(self):
+        return 1
     
 class WaitForKill(plugins.Action):
     def __init__(self):
@@ -482,9 +480,7 @@ class WaitForKill(plugins.Action):
         attempt = self.getAttempt(test)
         if attempt > 600:
             freeText = "Could not delete " + repr(test) + " in queuesystem: have abandoned it"
-            newState = plugins.TestState("abandoned", briefText="job deletion failed", \
-                                                      freeText=freeText, completed=1)
-            return test.changeState(newState)
+            return test.changeState(Abandoned(freeText))
 
         self.testsWaitingForKill[test] += 1
         attempt = self.testsWaitingForKill[test]

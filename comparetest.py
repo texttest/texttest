@@ -211,8 +211,6 @@ class MakeComparisons(plugins.Action):
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):
-        if test.state.isComplete() and not test.state.hasResults() and test.state.category != "killed":
-            return
         testComparison = self.testComparisonClass(test.state, test.app.abspath)
         testComparison.makeComparisons(test)
         self.categorise(testComparison)

@@ -54,7 +54,11 @@ class TestRunner:
             completed, tryOthersNow = self.performAction(action, runToCompletion)
             self.diag.info("<-End Performing action " + str(action) + self.returnString(completed, tryOthersNow))
             if completed:
-                self.actionSequence.pop(0)
+                if self.test.state.shouldAbandon():
+                    self.actionSequence = []
+                    break
+                else:
+                    self.actionSequence.pop(0)
             if tryOthersNow:
                 return 0
         self.test.notifyCompleted()

@@ -430,8 +430,6 @@ class CollateFiles(plugins.Action):
 	self.diag.info("coll final:", str(newColl))
 	return newColl
     def __call__(self, test):
-        if test.state.isComplete():
-            return
 	testCollations = self.expandCollations(test, self.collations)
         errorWrites = []
         for targetStem, sourcePattern in testCollations.items():
@@ -576,8 +574,6 @@ class RunTest(plugins.Action):
     def __repr__(self):
         return "Running"
     def __call__(self, test, inChild=0):
-        if test.state.isComplete():
-            return
         # Change to the directory so any incidental files can be found easily
         os.chdir(test.writeDirs[0])
         return self.runTest(test, inChild)
@@ -647,8 +643,6 @@ class RunTest(plugins.Action):
 
 class KillTest(plugins.Action):
     def __call__(self, test):
-        if test.state.isComplete():
-            return
         if not test.state.hasStarted():
             raise plugins.TextTestError, "Termination already in progress before test started."
         
@@ -924,8 +918,7 @@ class PerformanceFileCreator(plugins.Action):
                 return 0
         return 1
     def __call__(self, test, temp=1):
-        if not test.state.isComplete():
-            return self.makePerformanceFiles(test, temp)
+        return self.makePerformanceFiles(test, temp)
 
 class UNIXPerformanceInfoFinder:
     def __init__(self, diag):

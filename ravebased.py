@@ -400,15 +400,14 @@ class SubmitRuleCompilations(queuesystem.SubmitTest):
         return "raveslave"
     def __repr__(self):
         return "Submitting Rule Builds for"
-    def shouldSubmit(self, test):
+    def __call__(self, test):
         if test.state.category != "need_rulecompile":
-            return 0
+            return
 
         if test.state.testCompiling:
             self.setPending(test)
-            return 0
-        else:
-            return 1
+            return
+        queuesystem.SubmitTest.__call__(self, test)
     def getPendingState(self, test):
         return PendingRuleCompilation(test.state)
 
@@ -484,10 +483,8 @@ class SynchroniseState(plugins.Action):
             return None
     def __call__(self, test):
         newState = self.getCompilingTestState(test)
-        if not newState:
-            return 0
-        self.synchronise(test, newState)
-        return 1
+        if newState:
+            self.synchronise(test, newState)
     def synchronise(self, test, newState):
         if test.state.hasStarted():
             return

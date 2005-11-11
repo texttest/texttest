@@ -228,7 +228,7 @@ class MakeTmpSubPlan(plugins.Action):
     def tearDownSuite(self, suite):
         self.unreadRaveParameters()
     def __call__(self, test):
-        if test.state.isComplete() or os.environ.has_key("DISABLE_TMP_DIR_CREATION"):
+        if os.environ.has_key("DISABLE_TMP_DIR_CREATION"):
             return
         dirName = self.subplanFunction(test)
         if not os.path.isdir(dirName):

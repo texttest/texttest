@@ -221,38 +221,33 @@ class TestCase(Test):
         # Always include the working directory of the test in PATH, to pick up linked
         # executables. Allow for expansion of references...
         self.environment["PATH"] = self.writeDirs[0] + os.pathsep + "$PATH"
+        # Here we assume the application uses either PyUseCase or JUseCase
+        # PyUseCase reads environment variables, but you can't do that from java,
+        # so we have a "properties file" set up as well. Do both always, to save forcing
+        # apps to tell us which to do...
     def setUseCaseEnvironment(self):
         if self.useJavaRecorder():
             self.properties.addEntry("jusecase", {}, insert=1)
+        self.setRecord(self.makeFileName("usecase", temporary=1), self.makeFileName("input", temporary=1))
+        self.setReplay(self.findReplayUseCase())
+    def findReplayUseCase(self):
         if os.path.isfile(self.useCaseFile):
-            self.setReplayEnvironment()
+            return self.useCaseFile
+        else:
+            return os.getenv("USECASE_REPLAY_SCRIPT")
     def useJavaRecorder(self):
         return self.app.getConfigValue("use_case_recorder") == "jusecase"
-    # Here we assume the application uses either PyUseCase or JUseCase
-    # PyUseCase reads environment variables, but you can't do that from java,
-    # so we have a "properties file" set up as well. Do both always, to save forcing
-    # apps to tell us which to do...
-    def setReplayEnvironment(self):
-        self.setReplay(self.useCaseFile, self.app.slowMotionReplaySpeed)
-        self.setRecord(self.makeFileName("usecase", temporary=1))
-    def setRecordEnvironment(self):
-        self.setRecord(self.useCaseFile, self.inputFile)
-        self.disableReplay()
-    def disableReplay(self):
-        if not self.useJavaRecorder():
-            if self.environment.has_key("USECASE_REPLAY_SCRIPT"):
-                del self.environment["USECASE_REPLAY_SCRIPT"]
-            if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
-                self.previousEnv["USECASE_REPLAY_SCRIPT"] = os.environ["USECASE_REPLAY_SCRIPT"]
-                del os.environ["USECASE_REPLAY_SCRIPT"]
     def addJusecaseProperty(self, name, value):
         self.properties.addEntry(name, value, sectionName="jusecase", insert=1)
-    def setReplay(self, replayScript, replaySpeed):
-        if replayScript:
-            if self.useJavaRecorder():
-                self.addJusecaseProperty("replay", replayScript)
-            else:
-                self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
+    def setReplay(self, replayScript):
+        if not replayScript:
+            return
+        
+        if self.useJavaRecorder():
+            self.addJusecaseProperty("replay", replayScript)
+        else:
+            self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
+        replaySpeed = self.app.getConfigValue("slow_motion_replay_speed")
         if replaySpeed:
             if self.useJavaRecorder():
                 self.addJusecaseProperty("delay", str(replaySpeed))
@@ -616,6 +611,11 @@ class ConfigurationWrapper:
             return self.target.useExtraVersions()
         except:
             self.raiseException(req = "extra versions")
+    def getRunOptions(self):
+        try:
+            return self.target.getRunOptions()
+        except:
+            self.raiseException(req = "run options")
     def addToOptionGroups(self, app, groups):
         try:
             return self.target.addToOptionGroups(app, groups)
@@ -700,7 +700,6 @@ class Application:
         debugLog.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(inputOptions)
         self.useDiagnostics = self.setDiagnosticSettings(inputOptions)
-        self.slowMotionReplaySpeed = self.setSlowMotionSettings(inputOptions)
         debugLog.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
     def __repr__(self):
         return self.fullName
@@ -810,11 +809,11 @@ class Application:
             envVarName = self.getConfigValue("diagnostics")["trace_level_variable"]
             os.environ[envVarName] = inputOptions["trace"]
         return 0
-    def setSlowMotionSettings(self, inputOptions):
-        if inputOptions.has_key("actrep"):
-            return self.getConfigValue("slow_motion_replay_speed")
-        else:
-            return 0
+    def useSlowMotion(self):
+        return self.inputOptions.has_key("actrep")
+    def getRunOptions(self):
+        return "-d " + self.abspath + " -a " + self.name + self.versionSuffix() \
+               + " -c " + self.checkout + " " + self.configObject.getRunOptions()
     def addToOptionGroup(self, group):
         if group.name.startswith("Select"):
             group.addOption("vs", "Tests for version", self.getFullVersion())
@@ -822,7 +821,7 @@ class Application:
             group.addOption("c", "Use checkout")
             group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("How"):
-            if self.getConfigValue("slow_motion_replay_speed"):
+            if self.getConfigValue("use_case_record_mode") != "disabled":
                 group.addSwitch("actrep", "Run with slow motion replay")
             diagDict = self.getConfigValue("diagnostics")
             if diagDict.has_key("configuration_file"):

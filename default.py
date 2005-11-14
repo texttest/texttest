@@ -615,7 +615,11 @@ class RunTest(plugins.Action):
             self.changeToRunningState(test, process)
         return self.RETRY
     def getExecuteCommand(self, test):
-        testCommand = test.getExecuteCommand() + " < " + self.getInputFile(test)
+        testCommand = test.getExecuteCommand()
+        if self.recordMode == "console" and test.app.useSlowMotion():
+            # Replaying in a shell, need everything visible...
+            return testCommand
+        testCommand += " < " + self.getInputFile(test)
         outfile = test.makeFileName("output", temporary=1)
         testCommand += " > " + outfile
         if self.collectStdErr:
@@ -640,6 +644,7 @@ class RunTest(plugins.Action):
     def setUpApplication(self, app):
         app.checkBinaryExists()
         self.collectStdErr = app.getConfigValue("collect_standard_error")
+        self.recordMode = app.getConfigValue("use_case_record_mode")
 
 class KillTest(plugins.Action):
     def __call__(self, test):

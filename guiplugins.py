@@ -66,7 +66,8 @@ class InteractiveAction(plugins.Action):
         process = plugins.BackgroundProcess(commandLine, shellTitle=shellTitle, holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         processTerminationMonitor.addMonitoring(process)
         return process
-    def startExtProgramNewUsecase(self, commandLine, usecase, exitHandler, exitHandlerArgs): 
+    def startExtProgramNewUsecase(self, commandLine, usecase, \
+                                  exitHandler, exitHandlerArgs, shellTitle=None, holdShell=0): 
         recScript = os.getenv("USECASE_RECORD_SCRIPT")
         if recScript:
             os.environ["USECASE_RECORD_SCRIPT"] = self.getNewUsecase(recScript, usecase)
@@ -79,11 +80,12 @@ class InteractiveAction(plugins.Action):
                 os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
             else:
                 del os.environ["USECASE_REPLAY_SCRIPT"]
-        self.startExternalProgram(commandLine, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        process = self.startExternalProgram(commandLine, shellTitle, holdShell, exitHandler, exitHandlerArgs)
         if recScript:
             os.environ["USECASE_RECORD_SCRIPT"] = recScript
         if repScript:
             os.environ["USECASE_REPLAY_SCRIPT"] = repScript
+        return process
     def getNewUsecase(self, script, usecase):
         dir, file = os.path.split(script)
         return os.path.join(dir, usecase + "_" + file)
@@ -282,65 +284,67 @@ class ImportTest(InteractiveAction):
 class RecordTest(InteractiveAction):
     def __init__(self, test, oldOptionGroup):
         InteractiveAction.__init__(self, test, oldOptionGroup, "Recording")
-        self.addSwitch(oldOptionGroup, "hold", "Hold record shell after recording")
         self.recordMode = self.test.getConfigValue("use_case_record_mode")
+        if self.canPerformOnTest():
+            self.addSwitch(oldOptionGroup, "rep", "Automatically replay test after recording it", 1)
+            self.addSwitch(oldOptionGroup, "repgui", "Auto-replay in dynamic GUI", nameForOff="Auto-replay invisible")
+        if self.recordMode == "console":
+            self.addSwitch(oldOptionGroup, "hold", "Hold record shell after recording")
     def __call__(self, test):
         description = "Running " + test.app.fullName + " in order to capture user actions..."
         guilog.info(description)
-        test.app.makeWriteDirectory()
-        test.makeBasicWriteDirectory()
-        test.setRecordEnvironment()
-        test.prepareBasicWriteDirectory()
-        test.setUpEnvironment(parents=1)
-        os.chdir(test.writeDirs[0])
-        recordCommand = test.getExecuteCommand()
-        shellTitle = None
-        if self.recordMode == "console":
-            shellTitle = description
+        recordUseCase = os.path.join(test.abspath, "usecase." + test.app.name + test.app.versionSuffix())
+        if os.path.isfile(recordUseCase):
+            os.remove(recordUseCase)
+        self.startTextTestProcess(test, "record", description)
+    def startTextTestProcess(self, test, usecase, shellDescription=""):
+        shellTitle, holdShell = self.getShellInfo(shellDescription)
+        ttOptions = self.getRunOptions(test, usecase)
+        commandLine = self.getTextTestName() + " " + ttOptions
+        if not shellTitle:
+            if not os.path.isfile(test.app.writeDirectory):
+                test.app.makeWriteDirectory()
+            logFile = os.path.join(test.app.writeDirectory, usecase + "_run.log")
+            errFile = os.path.join(test.app.writeDirectory, usecase + "_errors.log")
+            commandLine +=  " > " + logFile + " 2> " + errFile
+        process = self.startExtProgramNewUsecase(commandLine, usecase, \
+                                                 exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase),
+                                                 shellTitle=shellTitle, holdShell=holdShell)
+        if shellTitle:
+            scriptEngine.monitorProcess("records use cases in a shell", process, [ test.inputFile, test.useCaseFile ])
+    def getShellInfo(self, description):
+        if self.recordMode == "console" and description:
+            return description, self.optionGroup.getSwitchValue("hold")
         else:
-            logFile = os.path.join(test.app.writeDirectory, "record_run.log")
-            errFile = os.path.join(test.app.writeDirectory, "record_errors.log")
-            recordCommand +=  " > " + logFile + " 2> " + errFile
-        holdShell = self.optionGroup.getSwitchValue("hold")
-        guilog.info("Recorder settings: record " + self.switchOutput("USECASE_RECORD_SCRIPT") +\
-                    " replay " + self.switchOutput("USECASE_REPLAY_SCRIPT"))
-        process = self.startExternalProgram(recordCommand, shellTitle, holdShell, \
-                                            exitHandler=self.setTestRecorded, exitHandlerArgs=(test,))
-        test.tearDownEnvironment(parents=1)
-        test.setReplayEnvironment()
-        scriptEngine.monitorProcess("records use cases", process, [ test.inputFile, test.useCaseFile ])
-    def switchOutput(self, envVar):
-        if os.getenv(envVar) is not None:
-            return "on"
-        else:
-            return "off"
+            return None, 0
     def canPerformOnTest(self):
         return self.recordMode != "disabled"
+    def textTestCompleted(self, test, usecase):
+        scriptEngine.applicationEvent(usecase + " texttest to complete")
+        if usecase == "record":
+            self.setTestRecorded(test)
+        else:
+            self.setTestReady(test)
+        test.notifyChanged()
     def setTestRecorded(self, test):
         if not os.path.isfile(test.useCaseFile) and not os.path.isfile(test.inputFile):
             raise plugins.TextTestError, "Recording did not produce any results (no usecase or input file)"
 
-        test.state.freeText = "Recorded use case - now attempting to replay in the background to collect standard files" + \
-                              "\n" + "These will appear shortly. You do not need to submit the test manually."
-        test.notifyChanged()
-        ttOptions = self.getRunOptions(test)
-        commandLine = self.getTextTestName() + " " + ttOptions
-        logFile = os.path.join(test.app.writeDirectory, "replaylog")
-        errFile = os.path.join(test.app.writeDirectory, "replayerrs")
-        commandLine +=  " > " + logFile + " 2> " + errFile
-        process = self.startExtProgramNewUsecase(commandLine, usecase="replay", exitHandler=self.setTestReady, exitHandlerArgs=(test,))
-    def setTestReady(self, test):
-        test.app.removeWriteDirectory()
-        scriptEngine.applicationEvent("replay texttest to complete")
-        test.state.freeText = "Recorded use case and collected all standard files"
-        test.notifyChanged()
-    def getRunOptions(self, test):
-        basicOptions = "-tp " + self.test.getRelPath() + " -a " + self.test.app.name
-        logFile = test.makeFileName(test.getConfigValue("log_file"))
-        if os.path.isfile(logFile):
-            return "-g " + basicOptions
+        if self.optionGroup.getSwitchValue("rep"):
+            self.startTextTestProcess(test, usecase="replay")
+            test.state.freeText = "Recorded use case - now attempting to replay in the background to collect standard files" + \
+                                  "\n" + "These will appear shortly. You do not need to submit the test manually."
         else:
-            return "-o " + basicOptions
+            self.setTestReady(test)
+    def setTestReady(self, test, usecase=""):
+        test.state.freeText = "Recorded use case and collected all standard files"
+    def getRunOptions(self, test, usecase):
+        basicOptions = "-o -tp " + self.test.getRelPath() + " " + test.app.getRunOptions()
+        if usecase == "record":
+            return "-actrep " + basicOptions
+        elif self.optionGroup.getSwitchValue("repgui"):
+            return basicOptions.replace("-o ", "-g ")
+        return basicOptions
     def matchesMode(self, dynamic):
         return not dynamic
     def __repr__(self):

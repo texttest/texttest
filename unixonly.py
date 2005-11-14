@@ -50,7 +50,7 @@ class RunTest(default.RunTest):
 class VirtualDisplayFinder:
     def __init__(self, app):
         self.machines = app.getConfigValue("virtual_display_machine")
-        self.slowMotionReplay = app.slowMotionReplaySpeed != 0
+        self.slowMotionReplay = app.useSlowMotion()
         self.diag = plugins.getDiagnostics("virtual display")
     def getDisplay(self):
         if len(self.machines) == 0 or self.slowMotionReplay:

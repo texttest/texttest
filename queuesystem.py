@@ -95,6 +95,9 @@ class QueueSystemConfig(default.Config):
         if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l"):
             return 0
         return 1
+    def getRunOptions(self):
+        # Options to add by default when recording, auto-replaying or running as slave
+        return "-l"
     def slaveRun(self):
         return self.optionMap.has_key("slave")
     def getRunIdentifier(self, prefix):
@@ -357,9 +360,8 @@ class SubmitTest(plugins.Action):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
         tmpDir, local = os.path.split(test.app.writeDirectory)
-        commandLine = "exec python " + sys.argv[0] + " -d " + test.app.abspath + " -a " + test.app.name + test.app.versionSuffix() \
-                      + " -c " + test.app.checkout + " -tp " + test.getRelPath() + self.getSlaveArgs(test) \
-                      + " -tmp " + tmpDir + " " + self.runOptions
+        commandLine = "exec python " + sys.argv[0] + " " + test.app.getRunOptions() + " -tp " + test.getRelPath() \
+                      + self.getSlaveArgs(test) + " -tmp " + tmpDir + " " + self.runOptions
         return "exec " + self.loginShell + " -c \"" + commandLine + "\""
     def getSlaveArgs(self, test):
         host, port = QueueSystemServer.instance.getServerAddress()

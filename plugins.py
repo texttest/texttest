@@ -43,6 +43,8 @@ class Configuration:
     def getRunIdentifier(self, prefix=""):
         global globalStartTime
         return prefix + tmpString() + globalStartTime
+    def getRunOptions(self):
+        return ""
     def useExtraVersions(self):
         return 1
     def printHelpText(self):

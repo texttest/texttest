@@ -72,7 +72,7 @@ class RecordTest(guiplugins.RecordTest):
         # originally recorded 'input' file. i.e. copy 'dmserverlog' to 'input'
         if os.path.isfile(newLogFile):
             shutil.copyfile(newLogFile, serverLog)
-    def getRunOptions(self, test):
-        baseOptions = guiplugins.RecordTest.getRunOptions(self, test)
+    def getRunOptions(self, test, usecase):
+        baseOptions = guiplugins.RecordTest.getRunOptions(self, test, usecase)
         os.environ["DMG_RECORD_TEST"] = ""
-        return baseOptions + " -actrep -l "
+        return baseOptions + " -l "

@@ -303,6 +303,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
         app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
         app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
+        app.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
+        app.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         app.setConfigDefault("collate_file", {}, "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("run_dependent_text", { "" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "" : [] }, "Mapping of patterns to extract and sort from result files")
@@ -355,10 +357,45 @@ class MakeWriteDirectory(plugins.Action):
         app.makeWriteDirectory()
 
 class PrepareWriteDirectory(plugins.Action):
-    def __call__(self, test):
-        test.prepareBasicWriteDirectory()
+    def __init__(self):
+        self.diag = plugins.getDiagnostics("Prepare Writedir")
     def __repr__(self):
         return "Prepare write directory for"
+    def __call__(self, test):
+        self.collatePaths(test, "copy_test_path", self.copyTestPath)
+        self.collatePaths(test, "link_test_path", self.linkTestPath)
+        self.createPropertiesFiles(test)
+        if test.app.useDiagnostics:
+            plugins.ensureDirectoryExists(os.path.join(test.writeDirs[0], "Diagnostics"))
+    def collatePaths(self, test, configListName, collateMethod):
+        for copyTestPath in test.getConfigValue(configListName):
+            fullPath = test.makePathName(copyTestPath, test.abspath)
+            self.diag.info("Path for linking/copying at " + fullPath)
+            target = os.path.join(test.writeDirs[0], os.path.basename(copyTestPath))
+            plugins.ensureDirExistsForFile(target)
+            collateMethod(fullPath, target)
+    def copyTestPath(self, fullPath, target):
+        if os.path.isfile(fullPath):
+            shutil.copy(fullPath, target)
+        if os.path.isdir(fullPath):
+            shutil.copytree(fullPath, target)
+            if os.name == "posix":
+                # Cannot get os.chmod to work recursively, or worked out the octal digits..."
+                # In any case, it's important that it's writeable
+                os.system("chmod -R +w " + target)
+    def linkTestPath(self, fullPath, target):
+        # Linking doesn't exist on windows!
+        if os.name != "posix":
+            return self.copyTestPath(fullPath, target)
+        if os.path.exists(fullPath):
+            os.symlink(fullPath, target)
+    def createPropertiesFiles(self, test):
+        for var, value in test.properties.items():
+            propFileName = os.path.join(test.writeDirs[0], var + ".properties")
+            self.diag.info("Writing " + propFileName + " for " + var + " : " + repr(value))
+            file = open(propFileName, "w")
+            for subVar, subValue in value.items():
+                file.write(subVar + " = " + subValue + "\n")            
 
 class CollectFailureData(plugins.Action):
     def __init__(self):

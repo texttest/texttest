@@ -346,19 +346,6 @@ class TestCase(Test):
     def makeBasicWriteDirectory(self):
         fullPathToMake = os.path.join(self.writeDirs[0], "framework_tmp")
         plugins.ensureDirectoryExists(fullPathToMake)
-    def prepareBasicWriteDirectory(self):
-        self.collatePaths("copy_test_path", self.copyTestPath)
-        self.collatePaths("link_test_path", self.linkTestPath)
-        self.createPropertiesFiles()
-        if self.app.useDiagnostics:
-            plugins.ensureDirectoryExists(os.path.join(self.writeDirs[0], "Diagnostics"))
-    def createPropertiesFiles(self):
-        for var, value in self.properties.items():
-            propFileName = os.path.join(self.writeDirs[0], var + ".properties")
-            debugLog.info("Writing " + propFileName + " for " + var + " : " + repr(value))
-            file = open(propFileName, "w")
-            for subVar, subValue in value.items():
-                file.write(subVar + " = " + subValue + "\n")            
     def cleanNonBasicWriteDirectories(self):
         if len(self.writeDirs) > 0:
             for writeDir in self.writeDirs[1:]:
@@ -370,28 +357,6 @@ class TestCase(Test):
             plugins.rmtree(writeDir)
         elif parent:
             self._removeDir(parent)
-    def collatePaths(self, configListName, collateMethod):
-        for copyTestPath in self.app.getConfigValue(configListName):
-            fullPath = self.makePathName(copyTestPath, self.abspath)
-            debugLog.info("Path for linking/copying at " + fullPath)
-            target = os.path.join(self.writeDirs[0], os.path.basename(copyTestPath))
-            plugins.ensureDirExistsForFile(target)
-            collateMethod(fullPath, target)
-    def copyTestPath(self, fullPath, target):
-        if os.path.isfile(fullPath):
-            shutil.copy(fullPath, target)
-        if os.path.isdir(fullPath):
-            shutil.copytree(fullPath, target)
-            if os.name == "posix":
-                # Cannot get os.chmod to work recursively, or worked out the octal digits..."
-                # In any case, it's important that it's writeable
-                os.system("chmod -R +w " + target)
-    def linkTestPath(self, fullPath, target):
-        # Linking doesn't exist on windows!
-        if os.name != "posix":
-            return self.copyTestPath(fullPath, target)
-        if os.path.exists(fullPath):
-            os.symlink(fullPath, target)
     # Find a name base which doesn't clash with existing tests
     def getNameBaseToUse(self, rootDir, nameBase):
         fullWriteDir = self.getFullWriteDir(rootDir, nameBase)
@@ -742,8 +707,6 @@ class Application:
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
-        self.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
-        self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         self.setConfigDefault("slow_motion_replay_speed", 0, "How long in seconds to wait between each GUI action")
         # External viewing tools
         # Do this here rather than from the GUI: if applications can be run with the GUI

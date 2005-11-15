@@ -268,7 +268,7 @@ class RunWithParallelAction(plugins.Action):
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, execProcess, parentProcess):
         self.describe(test, ", profiling process '" + execProcess.getName() + "'")
-        os.chdir(test.writeDirs[0])
+        os.chdir(test.writeDirectory)
         runLine = "/users/lennart/bin/gprofile " + str(execProcess.processId) + " >& gprof.output"
         os.system(runLine)
     def handleNoTimeAvailable(self, test):

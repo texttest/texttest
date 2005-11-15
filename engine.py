@@ -404,10 +404,7 @@ class TextTest:
         return appSuites
     def deleteTempFiles(self, appSuites):
         for app, testSuite in appSuites:
-            if app.cleanMode & plugins.Configuration.CLEAN_NONBASIC:
-                for test in testSuite.testCaseList():
-                    test.cleanNonBasicWriteDirectories()
-            if app.cleanMode & plugins.Configuration.CLEAN_BASIC:
+            if app.cleanMode & plugins.Configuration.CLEAN_SELF:
                 app.removeWriteDirectory()
     def setUpResponders(self, appSuites):
         for responder in self.allResponders:

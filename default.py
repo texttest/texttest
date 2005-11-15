@@ -153,7 +153,7 @@ class Config(plugins.Configuration):
         if self.keepTemporaryDirectories():
             return self.CLEAN_PREVIOUS
         
-        return self.CLEAN_NONBASIC | self.CLEAN_BASIC
+        return self.CLEAN_SELF
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
@@ -344,7 +344,7 @@ class Config(plugins.Configuration):
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeBasicWriteDirectory()
-        os.chdir(test.writeDirs[0])
+        os.chdir(test.writeDirectory)
     def __repr__(self):
         return "Make write directory for"
     def setUpApplication(self, app):
@@ -360,12 +360,12 @@ class PrepareWriteDirectory(plugins.Action):
         self.collatePaths(test, "link_test_path", self.linkTestPath)
         self.createPropertiesFiles(test)
         if test.app.useDiagnostics:
-            plugins.ensureDirectoryExists(os.path.join(test.writeDirs[0], "Diagnostics"))
+            plugins.ensureDirectoryExists(os.path.join(test.writeDirectory, "Diagnostics"))
     def collatePaths(self, test, configListName, collateMethod):
         for copyTestPath in test.getConfigValue(configListName):
             fullPath = test.makePathName(copyTestPath, test.abspath)
             self.diag.info("Path for linking/copying at " + fullPath)
-            target = os.path.join(test.writeDirs[0], os.path.basename(copyTestPath))
+            target = os.path.join(test.writeDirectory, os.path.basename(copyTestPath))
             plugins.ensureDirExistsForFile(target)
             collateMethod(fullPath, target)
     def copyTestPath(self, fullPath, target):
@@ -385,7 +385,7 @@ class PrepareWriteDirectory(plugins.Action):
             os.symlink(fullPath, target)
     def createPropertiesFiles(self, test):
         for var, value in test.properties.items():
-            propFileName = os.path.join(test.writeDirs[0], var + ".properties")
+            propFileName = os.path.join(test.writeDirectory, var + ".properties")
             self.diag.info("Writing " + propFileName + " for " + var + " : " + repr(value))
             file = open(propFileName, "w")
             for subVar, subValue in value.items():
@@ -448,7 +448,7 @@ class CollateFiles(plugins.Action):
 				os.path.splitext(sourcePattern)[1]
 	    self.diag.info("sourcePtn: " + sourcePtn)
             for file in glob.glob(sourcePtn):
-                fileList.append(file.replace(test.writeDirs[0] + os.sep, ""))
+                fileList.append(file.replace(test.writeDirectory + os.sep, ""))
 	    fileList.sort()
 
 	    # add each file to newColl using suffix from sourcePtn
@@ -487,13 +487,12 @@ class CollateFiles(plugins.Action):
     def getErrorText(self, sourcePattern):
         return "Expected file '" + sourcePattern + "' not created by test"
     def findPath(self, test, sourcePattern):
-        for writeDir in test.writeDirs:
-            self.diag.info("Looking for pattern " + sourcePattern + " in " + writeDir)
-            pattern = os.path.join(writeDir, sourcePattern)
-            paths = glob.glob(pattern)
-            for path in paths:
-                if os.path.isfile(path):
-                    return path
+        self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
+        pattern = os.path.join(test.writeDirectory, sourcePattern)
+        paths = glob.glob(pattern)
+        for path in paths:
+            if os.path.isfile(path):
+                return path
     def transformToText(self, path, test):
         # By default assume it is text
         pass
@@ -606,7 +605,7 @@ class RunTest(plugins.Action):
         return "Running"
     def __call__(self, test, inChild=0):
         # Change to the directory so any incidental files can be found easily
-        os.chdir(test.writeDirs[0])
+        os.chdir(test.writeDirectory)
         return self.runTest(test, inChild)
     def getExecutionMachines(self, test):
         return [ gethostname() ]
@@ -721,7 +720,7 @@ class CreateCatalogue(plugins.Action):
     def createCatalogueChangeFile(self, test):
         oldFiles = self.catalogues[test]
         newFiles = self.findAllFiles(test)
-        filesLost, filesGained = self.findDifferences(oldFiles, newFiles, test.writeDirs)
+        filesLost, filesGained = self.findDifferences(oldFiles, newFiles, test.writeDirectory)
         processesGained = self.findProcessesGained(test)
         if len(filesLost) == 0 and len(filesGained) == 0:
             return
@@ -776,12 +775,10 @@ class CreateCatalogue(plugins.Action):
                     processes.append(parts[1])
         return processes
     def findAllFiles(self, test):
-        fileList = []
-        for writeDir in test.writeDirs:
-            if os.path.isdir(writeDir):
-                fileList += self.listDirectory(test.app, writeDir, firstLevel = 1)
-        self.diag.info("Found all files present as follows : \n" + repr(fileList))
-        return fileList
+        if os.path.isdir(test.writeDirectory):
+            return self.listDirectory(test.app, test.writeDirectory, firstLevel = 1)
+        else:
+            return []
     def listDirectory(self, app, writeDir, firstLevel = 0):
         subDirs = []
         files = []
@@ -793,7 +790,8 @@ class CreateCatalogue(plugins.Action):
             if writeFile == "CVS" or (firstLevel and writeFile in frameworkDirs):
                 continue
             fullPath = os.path.join(writeDir, writeFile)
-            if os.path.isdir(fullPath):
+            # important not to follow soft links in catalogues...
+            if os.path.isdir(fullPath) and not os.path.islink(fullPath):
                 subDirs.append(fullPath)
             elif not app.ownsFile(writeFile, unknown=0):
                 files.append(fullPath)
@@ -801,28 +799,21 @@ class CreateCatalogue(plugins.Action):
         for subDir in subDirs:
             files += self.listDirectory(app, subDir)
         return files
-    def findDifferences(self, oldFiles, newFiles, writeDirs):
+    def findDifferences(self, oldFiles, newFiles, writeDir):
         filesGained, filesLost = [], []
         for file in newFiles:
             if not file in oldFiles:
-                filesGained.append(self.outputFileName(file, writeDirs))
+                filesGained.append(self.outputFileName(file, writeDir))
         for file in oldFiles:
             if not file in newFiles:
-                filesLost.append(self.outputFileName(file, writeDirs))
+                filesLost.append(self.outputFileName(file, writeDir))
         return filesLost, filesGained
-    def outputFileName(self, file, writeDirs):
+    def outputFileName(self, file, writeDir):
         self.diag.info("Output name for " + file)
-        for index in range(len(writeDirs)):
-            writeDir = writeDirs[index]
-            self.diag.info("Checked real write directory " + writeDir)
-            if file.startswith(writeDir):
-                return file.replace(writeDir, self.outputDirName(index))
-        return file
-    def outputDirName(self, index):
-        if index == 0:
-            return "<Test Directory>"
+        if file.startswith(writeDir):
+            return file.replace(writeDir, "<Test Directory>")
         else:
-            return "<Temporary Write Directory " + str(index) + ">"
+            return file
                     
 class CountTest(plugins.Action):
     def __init__(self):
@@ -862,14 +853,14 @@ class ReconnectTest(plugins.Action):
         if self.fullRecalculate:
             self.copyFiles(reconnLocation, test)
         else:
-            test.writeDirs[0] = reconnLocation
+            test.writeDirectory = reconnLocation
     def copyFiles(self, reconnLocation, test):
         if not self.canReconnectTo(reconnLocation):
             return
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
             if os.path.isfile(fullPath):
-                shutil.copyfile(fullPath, os.path.join(test.writeDirs[0], file))
+                shutil.copyfile(fullPath, os.path.join(test.writeDirectory, file))
         testStateFile = os.path.join(reconnLocation, "framework_tmp", "teststate")
         if os.path.isfile(testStateFile):
             shutil.copyfile(testStateFile, test.getStateFile())

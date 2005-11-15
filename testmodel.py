@@ -199,8 +199,8 @@ class TestCase(Test):
         self.inputFile = self.makeFileName("input")
         self.useCaseFile = self.makeFileName("usecase")
         self._setOptions()
-        # List of directories where this test will write files. First is where it executes from
-        self.writeDirs = [ os.path.join(app.writeDirectory, self.getRelPath()) ]
+        # Directory where test executes from and hopefully where all its files end up
+        self.writeDirectory = os.path.join(app.writeDirectory, self.getRelPath())
         if self.valid and self.isAcceptedByAll(filters):
             self.readEnvironment()
             self.setTestEnvironment()
@@ -208,19 +208,18 @@ class TestCase(Test):
             self.valid = 0
     def setTestEnvironment(self):
         diagDict = self.app.getConfigValue("diagnostics")
-        basicWriteDir = self.writeDirs[0]
         if self.app.useDiagnostics:
             inVarName = diagDict["input_directory_variable"]
             self.addDiagVariable(diagDict, inVarName, os.path.join(self.abspath, "Diagnostics"))
             outVarName = diagDict["write_directory_variable"]
-            self.addDiagVariable(diagDict, outVarName, os.path.join(basicWriteDir, "Diagnostics"))
+            self.addDiagVariable(diagDict, outVarName, os.path.join(self.writeDirectory, "Diagnostics"))
         elif diagDict.has_key("write_directory_variable"):
             outVarName = diagDict["write_directory_variable"]
-            self.addDiagVariable(diagDict, outVarName, basicWriteDir)
+            self.addDiagVariable(diagDict, outVarName, self.writeDirectory)
         self.setUseCaseEnvironment()
         # Always include the working directory of the test in PATH, to pick up linked
         # executables. Allow for expansion of references...
-        self.environment["PATH"] = self.writeDirs[0] + os.pathsep + "$PATH"
+        self.environment["PATH"] = self.writeDirectory + os.pathsep + "$PATH"
         # Here we assume the application uses either PyUseCase or JUseCase
         # PyUseCase reads environment variables, but you can't do that from java,
         # so we have a "properties file" set up as well. Do both always, to save forcing
@@ -273,7 +272,6 @@ class TestCase(Test):
     def expandEnvironmentReferences(self, referenceVars = []):
         debugLog.info("Expanding " + self.name)
         self._expandEnvironmentReferences(referenceVars)
-        self.options = os.path.expandvars(self.options)
         self.tearDownEnvironment()
         debugLog.info("End expanding " + self.name)
     def _setOptions(self):
@@ -286,9 +284,9 @@ class TestCase(Test):
     def getDirectory(self, temporary, forComparison = 1):
         if temporary:
             if forComparison:
-                return self.writeDirs[0]
+                return self.writeDirectory
             else:
-                return os.path.join(self.writeDirs[0], "framework_tmp")
+                return os.path.join(self.writeDirectory, "framework_tmp")
         else:
             return self.abspath
     def callAction(self, action):
@@ -344,60 +342,8 @@ class TestCase(Test):
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
     def makeBasicWriteDirectory(self):
-        fullPathToMake = os.path.join(self.writeDirs[0], "framework_tmp")
+        fullPathToMake = os.path.join(self.writeDirectory, "framework_tmp")
         plugins.ensureDirectoryExists(fullPathToMake)
-    def cleanNonBasicWriteDirectories(self):
-        if len(self.writeDirs) > 0:
-            for writeDir in self.writeDirs[1:]:
-                self._removeDir(writeDir)
-    def _removeDir(self, writeDir):
-        parent, local = os.path.split(writeDir)
-        if local.find(self.app.getTmpIdentifier()) != -1:
-            directoryLog.info("Removing write directory under " + parent)
-            plugins.rmtree(writeDir)
-        elif parent:
-            self._removeDir(parent)
-    # Find a name base which doesn't clash with existing tests
-    def getNameBaseToUse(self, rootDir, nameBase):
-        fullWriteDir = self.getFullWriteDir(rootDir, nameBase)
-        if os.path.isdir(fullWriteDir):
-            return self.getNameBaseToUse(rootDir, "x" + nameBase)
-        else:
-            return nameBase
-    def getFullWriteDir(self, rootDir, nameBase):
-        localName = nameBase + self.app.getTmpIdentifier()
-        return os.path.join(rootDir, localName)
-    def createDir(self, rootDir, nameBase = "", subDir = None):
-        writeDir = self.getFullWriteDir(rootDir, nameBase)
-        fullWriteDir = writeDir
-        if subDir:
-            fullWriteDir = os.path.join(writeDir, subDir)
-        self.createDirs(fullWriteDir)    
-        return writeDir
-    def createDirs(self, fullWriteDir):
-        os.makedirs(fullWriteDir)
-        directoryLog.info("Created write directory " + fullWriteDir)
-        self.writeDirs.append(fullWriteDir)
-        return fullWriteDir
-    def makeWriteDirectory(self, rootDir, basicDir, subDir = None):
-        nameBase = self.getNameBaseToUse(rootDir, basicDir + ".")
-        self.app.tryCleanPreviousWriteDirs(rootDir, nameBase)
-        try:
-            writeDir = self.createDir(rootDir, nameBase, subDir)
-        except OSError:
-            return self.makeWriteDirectory(rootDir, basicDir, subDir)
-        newBasic = os.path.basename(writeDir)
-        debugLog.info("Replacing " + basicDir + " with " + newBasic)
-        self.options = self.options.replace(basicDir, newBasic)
-        debugLog.info("Options string now '" + self.options + "'") 
-        if os.path.isfile(self.inputFile):
-            tmpFileName = self.makeFileName("input", temporary=1)
-            tmpFile = open(tmpFileName, "w")
-            for line in open(self.inputFile).xreadlines():
-                tmpFile.write(line.replace(basicDir, newBasic))
-            self.inputFile = tmpFileName
-            debugLog.info("Input file now '" + self.inputFile + "'")
-        return writeDir
             
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters, parent=None, allVersions=0):
@@ -882,7 +828,7 @@ class Application:
         plugins.ensureDirectoryExists(self.writeDirectory)
         debugLog.info("Made root directory at " + self.writeDirectory)
     def removeWriteDirectory(self):
-        doRemove = self.cleanMode & plugins.Configuration.CLEAN_BASIC
+        doRemove = self.cleanMode & plugins.Configuration.CLEAN_SELF
         if doRemove and os.path.isdir(self.writeDirectory):
             plugins.rmtree(self.writeDirectory)
     def tryCleanPreviousWriteDirs(self, rootDir, nameBase = ""):

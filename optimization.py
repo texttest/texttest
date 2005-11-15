@@ -176,7 +176,7 @@ class OptimizationConfig(ravebased.Config):
         # Assume we always want to build at least some rules, by default...
         return 1
     def getWriteDirectoryPreparer(self):
-        return [ ravebased.Config.getWriteDirectoryPreparer(self), MakeTmpSubPlan(self._getSubPlanDirName) ]
+        return [ ravebased.Config.getWriteDirectoryPreparer(self), MakeTmpCarmusr(self._getSubPlanDirName) ]
     def extraReadFiles(self, test):
         readDirs = seqdict()
         if test.classId() == "test-case":
@@ -216,7 +216,7 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault("testoverview_pages", "")
         app.addConfigEntry("definition_file_stems", "raveparameters")
 
-class MakeTmpSubPlan(plugins.Action):
+class MakeTmpCarmusr(plugins.Action):
     def __init__(self, subplanFunction):
         self.subplanFunction = subplanFunction
         self.raveParameters = []
@@ -228,18 +228,47 @@ class MakeTmpSubPlan(plugins.Action):
     def __call__(self, test):
         if os.environ.has_key("DISABLE_TMP_DIR_CREATION"):
             return
-        dirName = self.subplanFunction(test)
-        if not os.path.isdir(dirName):
+        subplanSource = self.subplanFunction(test)
+        if not os.path.isdir(subplanSource):
             raise plugins.TextTestError, "Cannot run test, subplan directory at " + dirName + " does not exist"
-        rootDir, baseDir = os.path.split(dirName)
-        tmpDir = test.makeWriteDirectory(rootDir, baseDir, "APC_FILES")
+
+        tmpCarmusr = self.makeCarmusr(test)
+        tmpSubplan = self.copySubplan(test, tmpCarmusr, subplanSource)
+        self.createBypassLink(test, tmpSubplan)
+    def makeCarmusr(self, test):
+        sourcePath = os.getenv("CARMUSR")
+        if not sourcePath:
+            raise plugins.TextTestError, "Cannot run test, CARMUSR not defined"
+
+        target = os.path.join(test.writeDirectory, "CARMUSR")
+        plugins.ensureDirectoryExists(target)
+        test.environment["CARMUSR"] = target
+        test.previousEnv["CARMUSR"] = sourcePath
+        for file in os.listdir(sourcePath):
+            if file != "LOCAL_PLAN":
+                os.symlink(os.path.join(sourcePath, file), os.path.join(target, file))
+        return target
+    def copySubplan(self, test, tmpCarmusr, subplanSource):
+        subplanTarget = self.createTarget(test, tmpCarmusr, subplanSource)
         self.readRaveParameters(test.makeFileName("raveparameters"))
-        self.makeLinksIn(tmpDir, dirName)
+        self.makeLinksIn(subplanTarget, subplanSource)
         self.unreadRaveParameters()
+        return subplanTarget
+    def createBypassLink(self, test, tmpSubplan):
+        fullSource = os.path.join(tmpSubplan, "APC_FILES")
+        source = fullSource.replace(test.writeDirectory + "/", "")
+        target = os.path.join(test.writeDirectory, "APC_FILES")
+        os.symlink(source, target)
+    def createTarget(self, test, tmpCarmusr, subplanSource):
+        sourcePath = os.path.normpath(os.getenv("CARMUSR"))
+        targetDir = subplanSource.replace(sourcePath, tmpCarmusr)
+        plugins.ensureDirectoryExists(targetDir)
+        return targetDir
     def makeLinksIn(self, inDir, fromDir):
         for file in os.listdir(fromDir):
             if file == "APC_FILES":
                 apcFiles = os.path.join(inDir, file)
+                plugins.ensureDirectoryExists(apcFiles)
                 self.makeLinksIn(apcFiles, os.path.join(fromDir, file))
                 continue
             if file.find("Solution_") != -1:

@@ -6,6 +6,7 @@ from ndict import seqdict
 from predict import FailedPrediction
 from shutil import copyfile
 from fnmatch import fnmatch
+from tempfile import mktemp
 
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
@@ -246,7 +247,7 @@ class MakeComparisons(plugins.Action):
         return "------------------ " + titleText + " --------------------"
     def fileComparisonBody(self, comparison):
         if comparison.newResult():
-            return self.previewGenerator.getPreview(open(comparison.tmpFile))
+            return self.previewGenerator.getPreview(open(comparison.tmpCmpFile))
         
         cmdLine = self.textDiffTool + " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
         stdout = os.popen(cmdLine)
@@ -556,7 +557,6 @@ class RemoveObsoleteVersions(plugins.Action):
         return "Removing obsolete versions for"
     def __call__(self, test):
         self.describe(test)
-        test.makeBasicWriteDirectory()
         compFiles = {}
         for file in os.listdir(test.abspath):
             if test.app.ownsFile(file):
@@ -570,6 +570,7 @@ class RemoveObsoleteVersions(plugins.Action):
             for index1 in range(len(compFilesMatchingStem)):
                 for index2 in range(index1 + 1, len(compFilesMatchingStem)):
                     self.compareFiles(test, compFilesMatchingStem[index1], compFilesMatchingStem[index2])
+                os.remove(compFilesMatchingStem[index1])
         for file in self.filesToRemove:
             os.system("cvs rm -f " + file)
         self.filesToRemove = []
@@ -577,7 +578,7 @@ class RemoveObsoleteVersions(plugins.Action):
         return "Removes (from CVS) all files with version IDs that are equivalent to a non-versioned file"
     def cmpFile(self, test, file):
         basename = os.path.basename(file)
-        return test.makeFileName(basename + "cmp", temporary=1, forComparison=0)
+        return mktemp(basename + "cmp")
     def origFile(self, test, file):
         if file.endswith("cmp"):
             return os.path.join(test.abspath, os.path.basename(file)[:-3])
@@ -605,5 +606,3 @@ class RemoveObsoleteVersions(plugins.Action):
                 print test.getIndent() + local1, "equivalent to", local2
     def setUpSuite(self, suite):
         self.describe(suite)
-    def setUpApplication(self, app):
-        app.makeWriteDirectory()

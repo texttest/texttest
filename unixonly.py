@@ -136,7 +136,7 @@ def isCompressed(path):
 class CollateFiles(default.CollateFiles):
     def __init__(self, keepCoreFiles):
         default.CollateFiles.__init__(self)
-        self.collations["stacktrace"] = "core*"
+        self.collations["stacktrace"] = self.getCorePattern()
         self.keepCoreFiles = keepCoreFiles
     def transformToText(self, path, test):
         if isCompressed(path):
@@ -146,6 +146,8 @@ class CollateFiles(default.CollateFiles):
         if self.isCoreFile(path) and self.extractCoreFor(test):
             # Extract just the stack trace rather than the whole core
             self.interpretCoreFile(path, test)
+    def getCorePattern(self):
+        return "core*"
     def isCoreFile(self, path):
         return os.path.basename(path).startswith("stacktrace")
     def extractCoreFor(self, test):

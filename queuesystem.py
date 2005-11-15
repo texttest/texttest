@@ -114,10 +114,7 @@ class QueueSystemConfig(default.Config):
         return not self.slaveRun()
     def getCleanMode(self):
         if self.slaveRun():
-            if self.optionMap.has_key("keeptmp"):
-                return self.CLEAN_NONE
-            else:
-                return self.CLEAN_NONBASIC
+            return self.CLEAN_NONE
         else:
             return default.Config.getCleanMode(self)
     def getTestProcessor(self):
@@ -284,7 +281,7 @@ class QueueSystemServer:
         jobName = submissionRules.getJobName()
         self.submitDiag.info("Creating job " + jobName + " with command : " + fullCommand)
         # Change directory to the appropriate test dir
-        os.chdir(submissionRules.test.writeDirs[0])
+        os.chdir(submissionRules.test.writeDirectory)
         stdin, stdout, stderr = os.popen3(fullCommand)
         errorMessage = plugins.retryOnInterrupt(queueSystem.findSubmitError, stderr)
         if errorMessage:

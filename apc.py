@@ -77,6 +77,7 @@ import default, ravebased, carmen, queuesystem, performance, os, sys, stat, stri
 from socket import gethostname
 from time import sleep
 from ndict import seqdict
+from tempfile import mktemp
 
 def readKPIGroupFileCommon(suite):
     kpiGroupForTest = {}
@@ -199,8 +200,7 @@ class ApcConfig(optimization.OptimizationConfig):
             return basicInfo + "\n" + self.getRunStatusInfo(test)
         return basicInfo
     def getRunStatusInfo(self, test):
-        subplanDir = test.writeDirs[-1]
-        runStatusHeadFile = os.path.join(subplanDir, "run_status_head")
+        runStatusHeadFile = os.path.join(test.writeDirectory, "APC_FILES", "run_status_head")
         if os.path.isfile(runStatusHeadFile):
             try:
                 return open(runStatusHeadFile).read()
@@ -429,9 +429,7 @@ class ApcCompileRules(ravebased.CompileRules):
         commandLine += "-o " + apcExecutable
         self.diag.debug("Linking APC binary using the command " + commandLine)
         # We create a temporary file that the output goes to.
-        if len(test.writeDirs) < 1:
-            test.makeBasicWriteDirectory()
-        compTmp = test.makeFileName("ravecompile", temporary=1)
+        compTmp = mktemp()
         returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
         if returnValue:
             #self.rulesCompileFailed.append(ruleset.name)
@@ -483,14 +481,15 @@ class RemoveLogs(plugins.Action):
         return "Remove logs"
 
 class FetchApcCore(unixonly.CollateFiles):
+    def getCorePattern(self):
+        return "apc_tmp_dir/core*"
     def isApcLogFileKept(self, errorFileName):
         for line in open(errorFileName).xreadlines():
             if line.find("*** Keeping the logfiles in") != -1:
                 return 1
         return None
     def extractCoreFor(self, test):
-        subplanDir = test.writeDirs[1]
-        scriptErrorsFileName = os.path.join(subplanDir, "run_status_script_error")
+        scriptErrorsFileName = os.path.join(test.writeDirectory, "APC_FILES", "run_status_script_error")
         self.diag.info(scriptErrorsFileName)
         if not os.path.isfile(scriptErrorsFileName):
             return 0
@@ -501,9 +500,9 @@ class FetchApcCore(unixonly.CollateFiles):
             return 0
         self.diag.info("APC log files are kept.")
         #Find out APC tmp directory.
-        apcTmpDir = test.writeDirs[-1]
+        debugFile = os.path.join(test.writeDirectory, "apc_tmp_dir", "apc_debug")
         # Check if there is a apc_debug file.
-        if os.path.isfile(os.path.join(apcTmpDir, "apc_debug")):
+        if os.path.isfile(debugFile):
             self.diag.info("apc_debug file is found. Aborting.")
             return 0
         return 1
@@ -522,7 +521,8 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         return "/tmp"
     def getApcLogDir(self, test, processId = None):
         # Logfile dir
-        subplanName, apcFiles = os.path.split(test.writeDirs[1])
+        subplanPath = os.path.realpath(os.path.join(test.writeDirectory, "APC_FILES"))
+        subplanName, apcFiles = os.path.split(subplanPath)
         baseSubPlan = os.path.basename(subplanName)
         if processId:
             return os.path.join(self.getApcHostTmp(), baseSubPlan + "_" + processId)
@@ -533,14 +533,14 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         # We try to pick out the log directory, at least
         apcLogDir = self.getApcLogDir(test)
         if apcLogDir:
-            test.writeDirs.append(apcLogDir)
+            self.makeLinks(test, apcLogDir)
     def makeLinks(self, test, apcTmpDir):
-        sourceName = os.path.join(test.writeDirs[1], "run_status_head")
-        targetName = os.path.join(test.writeDirs[0], "run_status_head")
+        linkTarget = os.path.join(test.writeDirectory, "apc_tmp_dir")
         try:
-            os.symlink(sourceName, targetName)
+            os.symlink(apcTmpDir, linkTarget)
         except OSError:
-            print "Failed to create run_status_head link"
+            print "Failed to create apc_tmp_dir link"
+            
         viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
         file = open(viewLogScript, "w")
         logFileName = os.path.join(apcTmpDir, "apclog")
@@ -552,7 +552,6 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         if not os.path.isdir(apcTmpDir):
             raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + execProcess.getName()
         self.makeLinks(test, apcTmpDir)
-        test.writeDirs.append(apcTmpDir)
         self.describe(test)
         if self.keepLogs:
             fileName = os.path.join(apcTmpDir, "apc_debug")
@@ -567,7 +566,7 @@ class ExtractApcLogs(plugins.Action):
             print "No argument given, using default value for extract_logs"
             self.args = "default"
     def __call__(self, test):
-        apcTmpDir = test.writeDirs[-1]
+        apcTmpDir = os.path.join(test.writeDirectory, "apc_tmp_dir")
         if not os.path.isdir(apcTmpDir):
             return
         self.diag.info("Extracting from APC tmp directory " + apcTmpDir)
@@ -1186,7 +1185,7 @@ class ImportTestSuite(optimization.ImportTestSuite):
 class ImportTestCase(optimization.ImportTestCase):
     def getSubplanPath(self, suite, subplan):
         suite.setUpEnvironment(parents=1)
-        subplanPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", subplan, "APC_FILES")
+        subplanPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", subplan)
         suite.tearDownEnvironment(parents=1)
         return subplanPath
     def findRuleset(self, suite, subplan):
@@ -1194,7 +1193,7 @@ class ImportTestCase(optimization.ImportTestCase):
         return self.getRuleSetName(subplanPath)
     # copied from TestCaseInformation...
     def getRuleSetName(self, absSubPlanDir):
-        problemPath = os.path.join(absSubPlanDir,"problems")
+        problemPath = os.path.join(absSubPlanDir, "APC_FILES", "problems")
         if not unixonly.isCompressed(problemPath):
             problemLines = open(problemPath).xreadlines()
         else:
@@ -1210,10 +1209,10 @@ class ImportTestCase(optimization.ImportTestCase):
     def writeResultsFiles(self, suite, testDir):
         subPlanDir = self.getSubplanPath(suite, self.getSubplanName())
         collationFiles = suite.app.getConfigValue("collate_file")
-        for file in collationFiles.keys():
-            origFile = os.path.join(subPlanDir, collationFiles[file])
+        for ttStem, relPath in collationFiles.items():
+            origFile = os.path.join(subPlanDir, relPath)
             if os.path.isfile(origFile):
-                newFile = os.path.join(testDir, file + "." + suite.app.name)
+                newFile = os.path.join(testDir, ttStem + "." + suite.app.name)
                 if not os.path.isfile(newFile):
                     shutil.copyfile(origFile, newFile)
         perf = self.getPerformance(os.path.join(testDir, "status." + suite.app.name))
@@ -1222,8 +1221,7 @@ class ImportTestCase(optimization.ImportTestCase):
         perfFile.close()
     def getEnvironment(self, suite):
         env = seqdict()
-        subPlanDir = self.getSubplanPath(suite, self.getSubplanName())
-        spDir, local = os.path.split(subPlanDir)
+        spDir = self.getSubplanPath(suite, self.getSubplanName())
         env["SP_ETAB_DIR"] = os.path.join(spDir, "etable")
         lpDir, local = os.path.split(spDir)
         env["LP_ETAB_DIR"] = os.path.join(lpDir, "etable")

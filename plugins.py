@@ -21,9 +21,8 @@ def tmpString():
 # Generic configuration class
 class Configuration:
     CLEAN_NONE = 0
-    CLEAN_BASIC = 1
-    CLEAN_NONBASIC = 2
-    CLEAN_PREVIOUS = 4
+    CLEAN_SELF = 1
+    CLEAN_PREVIOUS = 2
     def __init__(self, optionMap):
         self.optionMap = optionMap
     def addToOptionGroups(self, app, groups):
@@ -35,11 +34,11 @@ class Configuration:
     def getFilterList(self, app):
         return []
     def getExecuteCommand(self, binary, test):
-        return binary + " " + test.options
+        return binary + " " + os.path.expandvars(test.options)
     def getApplicationEnvironment(self, app):
         return []
     def getCleanMode(self):
-        return self.CLEAN_BASIC | self.CLEAN_NONBASIC
+        return self.CLEAN_SELF
     def getRunIdentifier(self, prefix=""):
         global globalStartTime
         return prefix + tmpString() + globalStartTime

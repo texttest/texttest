@@ -153,13 +153,13 @@ class ApcConfig(optimization.OptimizationConfig):
             return MakeProgressReport(self.optionValue("prrep"))
     def getRuleBuildObject(self):
         return ApcCompileRules(self.getRuleSetName, self.raveMode(), self.optionValue("rulecomp"))
-    def getSpecificTestRunner(self):
+    def getTestRunner(self):
         return [ CheckFilesForApc(), self._getApcTestRunner() ]
     def _getApcTestRunner(self):
         if self.optionMap.has_key("rundebug"):
             return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
         else:
-            baseRunner = optimization.OptimizationConfig.getSpecificTestRunner(self)
+            baseRunner = optimization.OptimizationConfig.getTestRunner(self)
             if self.slaveRun():
                 return MarkApcLogDir(baseRunner, self.isExecutable, self.optionMap.has_key("extractlogs"))
             else:

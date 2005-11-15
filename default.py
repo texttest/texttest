@@ -82,6 +82,9 @@ class Config(plugins.Configuration):
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
     def getTestProcessor(self):
+        if self.isReconnectingFast():
+            return self.getFileExtractor()
+        
         catalogueCreator = self.getCatalogueCreator()
         return [ self.getWriteDirectoryPreparer(), catalogueCreator, \
                  self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
@@ -159,10 +162,7 @@ class Config(plugins.Configuration):
         else:
             return self._getWriteDirectoryMaker()
     def getWriteDirectoryPreparer(self):
-        if self.isReconnectingFast():
-            return None
-        else:
-            return PrepareWriteDirectory()
+        return PrepareWriteDirectory()
     def _getWriteDirectoryMaker(self):
         return MakeWriteDirectory()
     def tryGetTestRunner(self):
@@ -181,11 +181,8 @@ class Config(plugins.Configuration):
     def isReconnectingFast(self):
         return self.isReconnecting() and not self.optionMap.has_key("reconnfull")
     def getTestEvaluator(self):
-        actions = [ self.getFileExtractor() ]
-        if not self.isReconnectingFast():
-            actions += [ self.getTestPredictionChecker(), self.getTestComparator(),
-                         self.getFailureExplainer() ]
-        return actions
+        return [ self.getFileExtractor(), self.getTestPredictionChecker(), \
+                 self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull"))
@@ -198,10 +195,7 @@ class Config(plugins.Configuration):
             else:
                 return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getPerformanceExtractor() ] 
     def getCatalogueCreator(self):
-        if self.isReconnectingFast():
-            return None
-        else:
-            return CreateCatalogue()
+        return CreateCatalogue()
     def getTestCollator(self):
         if os.name == "posix":
             # Handle UNIX compression and collect core files

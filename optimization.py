@@ -175,8 +175,8 @@ class OptimizationConfig(ravebased.Config):
     def defaultBuildRules(self):
         # Assume we always want to build at least some rules, by default...
         return 1
-    def getTestRunner(self):
-        return [ MakeTmpSubPlan(self._getSubPlanDirName), self.getSpecificTestRunner() ]
+    def getWriteDirectoryPreparer(self):
+        return [ ravebased.Config.getWriteDirectoryPreparer(self), MakeTmpSubPlan(self._getSubPlanDirName) ]
     def extraReadFiles(self, test):
         readDirs = seqdict()
         if test.classId() == "test-case":
@@ -197,8 +197,6 @@ class OptimizationConfig(ravebased.Config):
         return readDirs
     def filesFromRulesFile(self, test, rulesFile):
         return []
-    def getSpecificTestRunner(self):
-        return ravebased.Config.getTestRunner(self) 
     def printHelpDescription(self):
         print helpDescription
         ravebased.Config.printHelpDescription(self)

@@ -234,6 +234,7 @@ class MakeTmpCarmusr(plugins.Action):
 
         tmpCarmusr = self.makeCarmusr(test)
         tmpSubplan = self.copySubplan(test, tmpCarmusr, subplanSource)
+        self.createLocalPlanLink(subplanSource, tmpSubplan)
         self.createBypassLink(test, tmpSubplan)
     def makeCarmusr(self, test):
         sourcePath = os.getenv("CARMUSR")
@@ -248,6 +249,12 @@ class MakeTmpCarmusr(plugins.Action):
             if file != "LOCAL_PLAN":
                 os.symlink(os.path.join(sourcePath, file), os.path.join(target, file))
         return target
+    def createLocalPlanLink(self, subplanSource, subplanTarget):
+        lpSource, local = os.path.split(subplanSource)
+        lpEtab = os.path.join(lpSource, "etable")
+        if os.path.isdir(lpEtab):
+            lpTarget, local = os.path.split(subplanTarget)
+            os.symlink(lpEtab, os.path.join(lpTarget, "etable"))
     def copySubplan(self, test, tmpCarmusr, subplanSource):
         subplanTarget = self.createTarget(test, tmpCarmusr, subplanSource)
         self.readRaveParameters(test.makeFileName("raveparameters"))

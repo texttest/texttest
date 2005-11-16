@@ -240,7 +240,7 @@ class MakeTmpCarmusr(plugins.Action):
         if not sourcePath:
             raise plugins.TextTestError, "Cannot run test, CARMUSR not defined"
 
-        target = os.path.join(test.writeDirectory, "CARMUSR")
+        target = os.path.join(test.writeDirectory, os.path.basename(os.path.normpath(sourcePath)))
         plugins.ensureDirectoryExists(target)
         test.environment["CARMUSR"] = target
         test.previousEnv["CARMUSR"] = sourcePath

@@ -566,4 +566,35 @@ class PrintStrings(plugins.Action):
             self.strings.append(line)
             print line
 
+class SelectTests(guiplugins.SelectTests):
+    def __init__(self, app, oldOptionGroup):
+        guiplugins.SelectTests.__init__(self, app, oldOptionGroup)
+        featureFile = os.path.join(app.abspath, "features." + app.name)
+        self.features = []
+        if os.path.exists(featureFile):
+            for line in open(featureFile).readlines():
+                parts = line.split()
+                if len(parts) > 0:
+                    featureName = parts[0]
+                    self.addSwitch(oldOptionGroup, featureName, featureName, 0)
+                    self.features.append(featureName)
+    def getSelectedTests(self, rootTestSuites):
+        tests = guiplugins.SelectTests.getSelectedTests(self, rootTestSuites)
+        selectedFeatures = self.getSelectedFeatures()
+        if len(selectedFeatures) == 0:
+            return tests
+        selectedTests = []
+        grepCommand = "grep -E '" + string.join(selectedFeatures, "|") + "'"
+        for test in tests:
+            logFile = test.makeFileName("output")
+            if os.system("tail -100 " + logFile + " | " + grepCommand + " > /dev/null 2>1") == 0:
+                selectedTests.append(test)
+        return selectedTests
+    def getSelectedFeatures(self):
+        result = []
+        for feature in self.features:
+            if self.optionGroup.getSwitchValue(feature, 0):
+                result.append(feature)
+        return result
+
 guiplugins.interactiveActionHandler.testClasses.append(optimization.PlotTestInGUI)

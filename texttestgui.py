@@ -491,6 +491,7 @@ class RightWindowGUI:
             text += " (checked)"
         guilog.info(text)        
     def createDisplay(self, optionGroup):
+        vboxWindow = gtk.ScrolledWindow()
         vbox = gtk.VBox()
         for option in optionGroup.options.values():
             hbox = self.createOptionBox(option)
@@ -498,8 +499,10 @@ class RightWindowGUI:
         for switch in optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
             vbox.pack_start(hbox, expand=False, fill=False)
-        vbox.show()    
-        return vbox
+        vboxWindow.add_with_viewport(vbox)
+        vbox.show()
+        vboxWindow.show()
+        return vboxWindow
     def createOptionBox(self, option):
         hbox = gtk.HBox()
         self.diagnoseOption(option)

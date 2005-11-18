@@ -58,10 +58,8 @@ def getOption(options, optionVal):
 
 class MatadorConfig(optimization.OptimizationConfig):
     def _getLocalPlanPath(self, test):
-        if os.environ.has_key("CARM_LOCALPLAN"):
-            return os.environ["CARM_LOCALPLAN"]
-        else:
-            return os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN")
+        # Assumption to avoid reading Carmen Resource system LocalPlanPath
+        return os.path.join(optimization.getCarmdata(), "LOCAL_PLAN")
     def _getSubPlanDirName(self, test):
         subPlan = self._subPlanName(test)
         fullPath = os.path.join(self._getLocalPlanPath(test), subPlan)

@@ -176,7 +176,7 @@ class OptimizationConfig(ravebased.Config):
         # Assume we always want to build at least some rules, by default...
         return 1
     def getWriteDirectoryPreparer(self):
-        return [ ravebased.Config.getWriteDirectoryPreparer(self), MakeTmpCarmusr(self._getSubPlanDirName) ]
+        return [ ravebased.Config.getWriteDirectoryPreparer(self), MakeTmpCarmdata(self._getSubPlanDirName) ]
     def extraReadFiles(self, test):
         readDirs = seqdict()
         if test.classId() == "test-case":
@@ -216,7 +216,17 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault("testoverview_pages", "")
         app.addConfigEntry("definition_file_stems", "raveparameters")
 
-class MakeTmpCarmusr(plugins.Action):
+def getCarmdataVar():
+    if os.getenv("CARMDATA"):
+        return "CARMDATA"
+    else:
+        return "CARMUSR"
+    
+def getCarmdata():
+    return os.path.normpath(os.getenv(getCarmdataVar()))
+        
+
+class MakeTmpCarmdata(plugins.Action):
     def __init__(self, subplanFunction):
         self.subplanFunction = subplanFunction
         self.raveParameters = []
@@ -230,24 +240,27 @@ class MakeTmpCarmusr(plugins.Action):
             return
         subplanSource = self.subplanFunction(test)
         if not os.path.isdir(subplanSource):
-            raise plugins.TextTestError, "Cannot run test, subplan directory at " + dirName + " does not exist"
+            raise plugins.TextTestError, "Cannot run test, subplan directory at " + subplanSource + " does not exist"
 
-        tmpCarmusr = self.makeCarmusr(test)
-        tmpSubplan = self.copySubplan(test, tmpCarmusr, subplanSource)
+        tmpCarmdata = self.makeCarmdata(test)
+        tmpSubplan = self.copySubplan(test, tmpCarmdata, subplanSource)
         self.createLocalPlanLink(subplanSource, tmpSubplan)
         self.createBypassLink(test, tmpSubplan)
-    def makeCarmusr(self, test):
-        sourcePath = os.getenv("CARMUSR")
+    def makeCarmdata(self, test):
+        sourcePath = getCarmdata()
         if not sourcePath:
-            raise plugins.TextTestError, "Cannot run test, CARMUSR not defined"
+            raise plugins.TextTestError, "Cannot run test, " + carmdataVar + " not defined"
 
         target = os.path.join(test.writeDirectory, os.path.basename(os.path.normpath(sourcePath)))
         plugins.ensureDirectoryExists(target)
-        test.environment["CARMUSR"] = target
-        test.previousEnv["CARMUSR"] = sourcePath
+        
+        carmdataVar = getCarmdataVar()
+        test.environment[carmdataVar] = target
+        test.previousEnv[carmdataVar] = sourcePath
         for file in os.listdir(sourcePath):
             if file != "LOCAL_PLAN":
-                os.symlink(os.path.join(sourcePath, file), os.path.join(target, file))
+                linkSource = os.path.normpath(os.path.realpath(os.path.join(sourcePath, file)))
+                os.symlink(linkSource, os.path.join(target, file))
         return target
     def createLocalPlanLink(self, subplanSource, subplanTarget):
         lpSource, local = os.path.split(subplanSource)
@@ -255,8 +268,8 @@ class MakeTmpCarmusr(plugins.Action):
         if os.path.isdir(lpEtab):
             lpTarget, local = os.path.split(subplanTarget)
             os.symlink(lpEtab, os.path.join(lpTarget, "etable"))
-    def copySubplan(self, test, tmpCarmusr, subplanSource):
-        subplanTarget = self.createTarget(test, tmpCarmusr, subplanSource)
+    def copySubplan(self, test, tmpCarmdata, subplanSource):
+        subplanTarget = self.createTarget(test, tmpCarmdata, subplanSource)
         self.readRaveParameters(test.makeFileName("raveparameters"))
         self.makeLinksIn(subplanTarget, subplanSource)
         self.unreadRaveParameters()
@@ -266,9 +279,8 @@ class MakeTmpCarmusr(plugins.Action):
         source = fullSource.replace(test.writeDirectory + "/", "")
         target = os.path.join(test.writeDirectory, "APC_FILES")
         os.symlink(source, target)
-    def createTarget(self, test, tmpCarmusr, subplanSource):
-        sourcePath = os.path.normpath(os.getenv("CARMUSR"))
-        targetDir = subplanSource.replace(sourcePath, tmpCarmusr)
+    def createTarget(self, test, tmpCarmdata, subplanSource):
+        targetDir = subplanSource.replace(getCarmdata(), tmpCarmdata)
         plugins.ensureDirectoryExists(targetDir)
         return targetDir
     def makeLinksIn(self, inDir, fromDir):

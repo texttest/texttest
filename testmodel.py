@@ -341,9 +341,6 @@ class TestCase(Test):
         return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
-    def makeBasicWriteDirectory(self):
-        fullPathToMake = os.path.join(self.writeDirectory, "framework_tmp")
-        plugins.ensureDirectoryExists(fullPathToMake)
             
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters, parent=None, allVersions=0):

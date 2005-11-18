@@ -7,6 +7,7 @@ from predict import FailedPrediction
 from shutil import copyfile
 from fnmatch import fnmatch
 from tempfile import mktemp
+from re import sub
 
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
@@ -266,7 +267,7 @@ class FileComparison:
         self.stdFile = standardFile
         self.tmpFile = tmpFile
         self.stem = os.path.basename(tmpFile).split('.')[0]
-        filter = RunDependentTextFilter(test.app, self.stem)
+        filter = RunDependentTextFilter(test, self.stem)
         filterFileBase = test.makeFileName(os.path.basename(tmpFile), temporary=1, forComparison=0)
         self.stdCmpFile = filter.filterFile(standardFile, filterFileBase + "origcmp")
         tmpCmpFileName = filterFileBase + "cmp"
@@ -352,18 +353,18 @@ class FileComparison:
         copyfile(self.tmpFile, destFile)
         
 class RunDependentTextFilter:
-    def __init__(self, app, stem):
+    def __init__(self, test, stem):
         self.diag = plugins.getDiagnostics("Run Dependent Text")
         self.contentFilters = []
         self.orderFilters = seqdict()
-        dict = app.getConfigValue("run_dependent_text")
+        dict = test.getConfigValue("run_dependent_text")
         for text in self.findConfigTexts(dict, stem):
-            self.contentFilters.append(LineFilter(text, self.diag))
-        dict = app.getConfigValue("unordered_text")
+            self.contentFilters.append(LineFilter(text, test.writeDirectory, self.diag))
+        dict = test.getConfigValue("unordered_text")
         for text in self.findConfigTexts(dict, stem):
-            orderFilter = LineFilter(text, self.diag)
+            orderFilter = LineFilter(text, test.writeDirectory, self.diag)
             self.orderFilters[orderFilter] = []
-        self.osChange = self.changedOs(app)
+        self.osChange = self.changedOs(test.app)
     def changedOs(self, app):
         homeOs = app.getConfigValue("home_operating_system")
         if homeOs == "any":
@@ -441,53 +442,94 @@ class RunDependentTextFilter:
             newFile.write("\n")
             self.orderFilters[filter] = []
 
+class LineNumberTrigger:
+    def __init__(self, lineNumber):
+        self.lineNumber = lineNumber
+    def matches(self, line, lineNumber):
+        return lineNumber == self.lineNumber
+    def replace(self, line, newText):
+        return newText
+
 class LineFilter:
-    # Order is important here: word processing first, line number last.
-    # This is because WORD can be combined with the others, and LINE screws up the model...
-    syntaxStrings = [ "{WORD ", "{LINES ", "{->}", "{LINE " ]
-    def __init__(self, text, diag):
+    divider = "{->}"
+    # All syntax that affects how a match is found
+    matcherStrings = [ "{LINE ", "{INTERNAL " ]
+    # All syntax that affects what is done when a match is found
+    matchModifierStrings = [ "{WORD ", "{REPLACE ", "{LINES " ]
+    def __init__(self, text, testWriteDir, diag):
         self.originalText = text
         self.diag = diag
-        self.trigger = text
+        self.trigger = None
         self.untrigger = None
-        self.triggerNumber = 0
         self.linesToRemove = 1
         self.autoRemove = 0
         self.wordNumber = None
-        self.removeWordsAfter = 0                                         
-        for syntaxString in self.syntaxStrings:
-            linePoint = self.trigger.find(syntaxString)
+        self.replaceText = None
+        self.removeWordsAfter = 0
+        self.internalExpressions = { "writedir" : testWriteDir }
+        self.parseOriginalText()
+    def makeRegex(self, parameter):
+        if parameter != "writedir":
+            return parameter
+        thisText = self.internalExpressions[parameter]
+        userName = os.getenv("USER", "tmp")
+        thisText = thisText.replace(userName, "[^/0123]*")
+        dateRegexp = "[0-3][0-9][A-Z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
+        return sub(dateRegexp, dateRegexp, thisText)
+    def parseOriginalText(self):
+        dividerPoint = self.originalText.find(self.divider)
+        if dividerPoint != -1:
+            beforeText, afterText, parameter = self.extractParameter(self.originalText, dividerPoint, self.divider)
+            self.trigger = self.parseText(beforeText)
+            self.untrigger = self.parseText(afterText)
+        else:
+            self.trigger = self.parseText(self.originalText)
+    def parseText(self, text):
+        for matchModifierString in self.matchModifierStrings:
+            linePoint = text.find(matchModifierString)
             if linePoint != -1:
-                beforeText = self.trigger[:linePoint]
-                afterText = self.trigger[linePoint + len(syntaxString):]
-                self.readSyntax(syntaxString, beforeText, afterText)
-        if self.trigger:
-            self.trigger = plugins.TextTrigger(self.trigger)
-        if self.untrigger:
-            self.untrigger = plugins.TextTrigger(self.untrigger)
+                beforeText, afterText, parameter = self.extractParameter(text, linePoint, matchModifierString)
+                self.readMatchModifier(matchModifierString, parameter)
+                text = beforeText + afterText
+        matcherString, parameter = self.findMatcherInfo(text)
+        return self.createTrigger(matcherString, parameter)
+    def findMatcherInfo(self, text):
+        for matcherString in self.matcherStrings:
+            linePoint = text.find(matcherString)
+            if linePoint != -1:
+                beforeText, afterText, parameter = self.extractParameter(text, linePoint, matcherString)
+                return matcherString, parameter
+        return "", text
     def reset(self):
         self.autoRemove = 0
-    def readSyntax(self, syntaxString, beforeText, afterText):
-        if syntaxString == "{WORD ":
-            self.trigger = beforeText
-            wordText = afterText[:-1]
-            if wordText.endswith("+"):
+    def extractParameter(self, textToParse, linePoint, syntaxString):
+        beforeText = textToParse[:linePoint]
+        afterText = textToParse[linePoint + len(syntaxString):]
+        endPos = afterText.find("}")
+        parameter = afterText[:endPos]
+        afterText = afterText[endPos + 1:]
+        return beforeText, afterText, parameter
+    def readMatchModifier(self, matchModifierString, parameter):
+        if matchModifierString == "{REPLACE ":
+            self.replaceText = parameter
+        elif matchModifierString == "{WORD ":
+            if parameter.endswith("+"):
                 self.removeWordsAfter = 1
-                self.wordNumber = int(wordText[:-1])
+                self.wordNumber = int(parameter[:-1])
             else:
-                self.wordNumber = int(wordText)
+                self.wordNumber = int(parameter)
             # Somewhat non-intuitive to count from 0...
             if self.wordNumber > 0:
                 self.wordNumber -= 1
-        elif syntaxString == "{LINES ":
-            self.trigger = beforeText
-            self.linesToRemove = int(afterText[:-1])
-        elif syntaxString == "{LINE ":
-            self.trigger = None
-            self.triggerNumber = int(afterText[:-1])
-        elif syntaxString == "{->}":
-            self.trigger = beforeText
-            self.untrigger = afterText
+        elif matchModifierString == "{LINES ":
+            self.linesToRemove = int(parameter)
+    def createTrigger(self, matcherString, parameter):
+        if matcherString == "{LINE ":
+            return LineNumberTrigger(int(parameter))
+        elif matcherString == "{INTERNAL " and self.internalExpressions.has_key(parameter):
+            return plugins.TextTrigger(self.makeRegex(parameter))
+        else:
+            return plugins.TextTrigger(parameter)
     def applyTo(self, line, lineNumber):
         if self.autoRemove:
             if self.untrigger:
@@ -498,15 +540,12 @@ class LineFilter:
                 self.autoRemove -= 1
             return 1, self.filterWords(line)
         
-        if self.triggerNumber == lineNumber:
-            return 1, self.filterWords(line)
-          
-        if self.checkMatch(line):
+        if self.checkMatch(line, lineNumber):
             return 1, self.filterWords(line)
         else:
             return 0, line
-    def checkMatch(self, line):
-        if self.trigger and self.trigger.matches(line):
+    def checkMatch(self, line, lineNumber):
+        if self.trigger and self.trigger.matches(line, lineNumber):
             if self.untrigger:
                 self.autoRemove = 1
                 return 0
@@ -524,9 +563,16 @@ class LineFilter:
             if realNumber < len(words):
                 if self.removeWordsAfter:
                     words = words[:realNumber]
+                    if self.replaceText:
+                        words.append(self.replaceText)
                 else:
-                    del words[realNumber]
+                    if self.replaceText:
+                        words[realNumber] = self.replaceText
+                    else:
+                        del words[realNumber]
             return string.join(words).rstrip() + "\n"
+        elif self.replaceText != None:
+            return self.trigger.replace(line, self.replaceText)
         else:
             return None
     def findRealWordNumber(self, words):
@@ -586,7 +632,7 @@ class RemoveObsoleteVersions(plugins.Action):
             return file
     def filterFile(self, test, file):
         newFile = self.cmpFile(test, file)
-        filter = RunDependentTextFilter(test.app, os.path.basename(file).split(".")[0])
+        filter = RunDependentTextFilter(test, os.path.basename(file).split(".")[0])
         return filter.filterFile(file, newFile)
     def compareFiles(self, test, file1, file2):
         origFile1 = self.origFile(test, file1)

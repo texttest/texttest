@@ -343,7 +343,8 @@ class Config(plugins.Configuration):
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
-        test.makeBasicWriteDirectory()
+        fullPathToMake = os.path.join(test.writeDirectory, "framework_tmp")
+        plugins.ensureDirectoryExists(fullPathToMake)
         os.chdir(test.writeDirectory)
     def __repr__(self):
         return "Make write directory for"

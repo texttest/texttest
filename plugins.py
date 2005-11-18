@@ -388,11 +388,16 @@ class TextTrigger:
                 self.regex = re.compile(text)
             except:
                 pass
-    def matches(self, line):
+    def matches(self, line, lineNumber=0):
         if self.regex:
             return self.regex.search(line)
         else:
             return line.find(self.text) != -1
+    def replace(self, line, newText):
+        if self.regex:
+            return re.sub(self.text, newText, line)
+        else:
+            return line.replace(self.text, newText)
 
 class UNIXProcessHandler:
     def spawnProcess(self, commandLine, shellTitle, holdShell):

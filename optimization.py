@@ -249,7 +249,7 @@ class MakeTmpCarmdata(plugins.Action):
     def makeCarmdata(self, test):
         sourcePath = getCarmdata()
         if not sourcePath:
-            raise plugins.TextTestError, "Cannot run test, " + carmdataVar + " not defined"
+            raise plugins.TextTestError, "Cannot run test, CARMUSR not defined"
 
         target = os.path.join(test.writeDirectory, os.path.basename(os.path.normpath(sourcePath)))
         plugins.ensureDirectoryExists(target)

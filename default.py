@@ -422,9 +422,13 @@ class CreateSelectionFiles(plugins.Action):
 class CollateFiles(plugins.Action):
     def __init__(self):
         self.collations = {}
+        self.collectStdErr = 1
+        self.collectStdOut = 1
         self.diag = plugins.getDiagnostics("Collate Files")
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
+        self.collectStdErr = app.getConfigValue("collect_standard_error")
+        self.collectStdOut = app.getConfigValue("collect_standard_output")
     def expandCollations(self, test, coll):
 	newColl = {}
 	# copy items specified without "*" in targetStem
@@ -462,6 +466,18 @@ class CollateFiles(plugins.Action):
 	self.diag.info("coll final:", str(newColl))
 	return newColl
     def __call__(self, test):
+        self.removeUnwanted(test)
+        self.collate(test)
+    def removeUnwanted(self, test):
+        if not self.collectStdErr:
+            self.removeFile(test, "errors")
+        if not self.collectStdOut:
+            self.removeFile(test, "output")
+    def removeFile(self, test, stem):
+        filePath = test.makeFileName(stem, temporary=1)
+        if os.path.isfile(filePath):
+            os.remove(filePath)
+    def collate(self, test):
 	testCollations = self.expandCollations(test, self.collations)
         errorWrites = []
         for targetStem, sourcePattern in testCollations.items():
@@ -600,7 +616,6 @@ class RunTest(plugins.Action):
     else:
         runningClass = WindowsRunning
     def __init__(self):
-        self.collectStdErr = 1
         self.diag = plugins.getDiagnostics("run test")
     def __repr__(self):
         return "Running"
@@ -653,11 +668,8 @@ class RunTest(plugins.Action):
         testCommand += " < " + self.getInputFile(test)
         outfile = test.makeFileName("output", temporary=1)
         testCommand += " > " + outfile
-        if self.collectStdErr:
-            errfile = test.makeFileName("errors", temporary=1)
-            return self.getStdErrRedirect(testCommand, errfile)
-        else:
-            return testCommand
+        errfile = test.makeFileName("errors", temporary=1)
+        return self.getStdErrRedirect(testCommand, errfile)
     def getStdErrRedirect(self, command, file):
         return command + " 2> " + file
     def getInputFile(self, test):
@@ -674,7 +686,6 @@ class RunTest(plugins.Action):
         self.describe(suite)
     def setUpApplication(self, app):
         app.checkBinaryExists()
-        self.collectStdErr = app.getConfigValue("collect_standard_error")
         self.recordMode = app.getConfigValue("use_case_record_mode")
 
 class KillTest(plugins.Action):

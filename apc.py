@@ -174,7 +174,6 @@ class ApcConfig(optimization.OptimizationConfig):
     def getFileCollator(self):
         subActions = []
         subActions.append(FetchApcCore(self.optionMap.has_key("keeptmp")))
-        subActions.append(RemoveLogs())
         if self.slaveRun():
             useExtractLogs = self.optionValue("extractlogs")
             if useExtractLogs == "":
@@ -469,17 +468,6 @@ class ApcCompileRules(ravebased.CompileRules):
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
                           
-class RemoveLogs(plugins.Action):
-    def __call__(self, test):
-        self.removeFile(test, "errors")
-        self.removeFile(test, "output")
-    def removeFile(self, test, stem):
-        filePath = test.makeFileName(stem, temporary=1)
-        if os.path.isfile(filePath):
-            os.remove(filePath)
-    def __repr__(self):
-        return "Remove logs"
-
 class FetchApcCore(unixonly.CollateFiles):
     def getCorePattern(self):
         return "apc_tmp_dir/core*"

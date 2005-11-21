@@ -417,6 +417,8 @@ class KillTestSubmission(plugins.Action):
             return
 
         self.describeJob(test, jobId, jobName)
+        if str(sys.exc_value) == "Interrupted externally":
+            raise plugins.TextTestError, "interrupted externally"
         if not self.jobStarted(test):
             self.setSlaveFailed(test)
     def jobStarted(self, test):

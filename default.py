@@ -810,11 +810,17 @@ class CreateCatalogue(plugins.Action):
             if os.path.isdir(fullPath) and not os.path.islink(fullPath):
                 subDirs.append(fullPath)
             elif not app.ownsFile(writeFile, unknown=0):
-                files[fullPath] = plugins.modifiedTime(fullPath)
+                files[fullPath] = self.getEditInfo(fullPath)
                 
         for subDir in subDirs:
             files += self.listDirectory(app, subDir)
         return files
+    def getEditInfo(self, fullPath):
+        # Check modified times for files, targets for links
+        if os.path.islink(fullPath):
+            return os.path.realpath(fullPath)
+        else:
+            return plugins.modifiedTime(fullPath)
     def findDifferences(self, oldFiles, newFiles, writeDir):
         filesGained, filesEdited, filesLost = [], [], []
         for file, modTime in newFiles.items():

@@ -6,6 +6,7 @@ from threading import currentThread
 from knownbugs import CheckForBugs
 from cPickle import Unpickler
 from socket import gethostname
+from ndict import seqdict
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -732,15 +733,18 @@ class CreateCatalogue(plugins.Action):
     def createCatalogueChangeFile(self, test):
         oldFiles = self.catalogues[test]
         newFiles = self.findAllFiles(test)
-        filesLost, filesGained = self.findDifferences(oldFiles, newFiles, test.writeDirectory)
+        filesLost, filesEdited, filesGained = self.findDifferences(oldFiles, newFiles, test.writeDirectory)
         processesGained = self.findProcessesGained(test)
-        if len(filesLost) == 0 and len(filesGained) == 0:
-            return
-        
         fileName = test.makeFileName("catalogue", temporary=1)
         file = open(fileName, "w")
-        file.write("The following new files were created:\n")
-        self.writeFileStructure(file, filesGained)
+        if len(filesLost) == 0 and len(filesEdited) == 0 and len(filesGained) == 0:
+            file.write("No files were created, edited or deleted.\n")
+        if len(filesGained) > 0:
+            file.write("The following new files were created:\n")
+            self.writeFileStructure(file, filesGained)
+        if len(filesEdited) > 0:
+            file.write("\nThe following existing files changed their contents:\n")
+            self.writeFileStructure(file, filesEdited)
         if len(filesLost) > 0:
             file.write("\nThe following existing files were deleted:\n")
             self.writeFileStructure(file, filesLost)
@@ -790,10 +794,10 @@ class CreateCatalogue(plugins.Action):
         if os.path.isdir(test.writeDirectory):
             return self.listDirectory(test.app, test.writeDirectory, firstLevel = 1)
         else:
-            return []
+            return seqdict()
     def listDirectory(self, app, writeDir, firstLevel = 0):
         subDirs = []
-        files = []
+        files = seqdict()
         availFiles = os.listdir(writeDir)
         availFiles.sort()
         frameworkDirs = [ "framework_tmp", "file_edits", "Diagnostics" ]
@@ -806,20 +810,22 @@ class CreateCatalogue(plugins.Action):
             if os.path.isdir(fullPath) and not os.path.islink(fullPath):
                 subDirs.append(fullPath)
             elif not app.ownsFile(writeFile, unknown=0):
-                files.append(fullPath)
+                files[fullPath] = plugins.modifiedTime(fullPath)
                 
         for subDir in subDirs:
             files += self.listDirectory(app, subDir)
         return files
     def findDifferences(self, oldFiles, newFiles, writeDir):
-        filesGained, filesLost = [], []
-        for file in newFiles:
-            if not file in oldFiles:
+        filesGained, filesEdited, filesLost = [], [], []
+        for file, modTime in newFiles.items():
+            if not oldFiles.has_key(file):
                 filesGained.append(self.outputFileName(file, writeDir))
-        for file in oldFiles:
-            if not file in newFiles:
+            elif modTime != oldFiles[file]:
+                filesEdited.append(self.outputFileName(file, writeDir))
+        for file, modTime in oldFiles.items():
+            if not newFiles.has_key(file):
                 filesLost.append(self.outputFileName(file, writeDir))
-        return filesLost, filesGained
+        return filesLost, filesEdited, filesGained
     def outputFileName(self, file, writeDir):
         self.diag.info("Output name for " + file)
         if file.startswith(writeDir):

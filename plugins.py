@@ -193,7 +193,11 @@ def commasplit(input):
 
 # Another useful thing that saves an import and remembering weird stuff
 def modifiedTime(filename):
-    return os.stat(filename)[stat.ST_MTIME]
+    try:
+        return os.stat(filename)[stat.ST_MTIME]
+    except OSError:
+        # Dead links etc.
+        return None
 
 def findDiffTool(name):
     if name != "ndiff":

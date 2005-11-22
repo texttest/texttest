@@ -48,6 +48,8 @@ class ExtractTestStates(plugins.Action):
     def extract(self, app, version, date, dir):
         for entries in os.listdir(dir):
             name = os.path.join(dir, entries)
+            if entries == "LOCAL_PLAN" or os.path.islink(name):
+                continue
             if os.path.isdir(name):
                 self.extract(app, version, date, name)
             elif entries == "teststate":

@@ -1291,14 +1291,13 @@ class TestGraph:
         self.plotLines = []
         self.pointTypes = {}
         self.lineTypes = {}
-        self.yLabel = ""
         self.pointTypeCounter = 1
-        self.lineTypeCounter = 2
-        self.undesiredLineTypes = []
         self.users = []
         self.apps = []
         self.gnuplotFile = None
         self.plotAveragers = {}
+        self.axisXLabel = None
+        self.xScaleFactor = 1
         # This is the options and switches that are common
         # both for the GUI and command line.
         self.options = [ ("r", "Horizontal range", "0:"),
@@ -1330,11 +1329,31 @@ class TestGraph:
         for name, expl in self.switches:
             self.optionGroup.addSwitch(name, expl)
         self.optionGroup.readCommandLineArguments(args)
+    def plot(self, writeDir):
+        # Add the PlotAveragers last in the PlotLine list.
+        for plotAverager in self.plotAveragers:
+            self.plotLines.append(self.plotAveragers[plotAverager])
+        engine = PlotEngine(self)
+        return engine.plot(writeDir)
+    def getPlotOptions(self):
+        xrange = self.optionGroup.getOptionValue("r")
+        yrange = self.optionGroup.getOptionValue("yr")
+        fileName = self.optionGroup.getOptionValue("p")
+        writeColour = self.optionGroup.getSwitchValue("pc")
+        printA3 = self.optionGroup.getSwitchValue("pa3")
+        onlyAverage = self.optionGroup.getSwitchValue("oav")
+        title = self.optionGroup.getOptionValue("title")
+        printer = self.optionGroup.getOptionValue("pr")
+        plotPercentage = self.optionGroup.getSwitchValue("per")
+        terminal = self.optionGroup.getOptionValue("terminal")
+        plotSize = self.optionGroup.getOptionValue("size")
+        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize
     def findMinOverPlotLines(self):
         min = self.plotLines[0].min
         for plotLine in self.plotLines[1:]:
-            if plotLine.min < min:
-                min = plotLine.min
+            if not plotLine.plotLineRepresentant:
+                if plotLine.min < min:
+                    min = plotLine.min
         return min
     def addLine(self, plotLine):
         self.plotLines.append(plotLine)
@@ -1352,125 +1371,17 @@ class TestGraph:
             plotLine.pointType = self.pointTypes[test.name]
         # Fill in the map for later deduction
         self.lineTypes[plotLine.name] = 0
-    def writeLinesAndGetPlotArguments(self, min):
-        multipleApps = len(self.apps) > 1
-        multipleLines = (len(self.plotLines) > 1)
-        multipleUsers = len(self.users) > 1
-        multipleTests = len(self.pointTypes) > 1
-        multipleLineTypes = len(self.lineTypes) > 1
-        plotArguments = []
-        for plotLine in self.plotLines:
-            plotLine.writeFile(min)
-            if not multipleTests or not multipleLineTypes or self.lineTypes[plotLine.name] == 0:
-                plotLine.lineType = str(self.lineTypeCounter)
-                self.lineTypes[plotLine.name] = plotLine.lineType
-                self.lineTypeCounter += 1
-                while self.undesiredLineTypes.count(self.lineTypeCounter) > 0:
-                    self.lineTypeCounter += 1
-            else:
-                plotLine.lineType = self.lineTypes[plotLine.name]
-            plotArguments.append(plotLine.getPlotArguments(multipleApps, multipleUsers, multipleLines, multipleTests))
-        return plotArguments
-    def plot(self, writeDir):
-        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize = self.getPlotOptions()
-        if len(self.plotLines) == 0:
-            return
-
-        # Make sure that the writeDir is there, seems important in the static GUI.
-        # Before, this was done as a side effect when writing the PlotLines.
-        if not os.path.isdir(writeDir):
-            os.makedirs(writeDir)
-            
-        os.chdir(writeDir)
-        errsFile = os.path.join(writeDir, "gnuplot.errors")
-        self.gnuplotFile, outputFile = os.popen2("gnuplot -persist -background white 2> " + errsFile)
-        absTargetFile = None
-        
-        if targetFile:
-            absTargetFile = os.path.expanduser(targetFile)
-            # Mainly for testing...
-            if not os.path.isabs(absTargetFile):
-                absTargetFile = os.path.join(writeDir, absTargetFile)
-            self.writePlot(self.terminalLine(terminal, colour))
-        if printer:
-            absTargetFile = os.path.join(writeDir, "texttest.ps")
-            self.writePlot(self.terminalLine(terminal, colour, printA3))
-            if printA3:
-                self.writePlot("set size 1.45,1.45")
-                self.writePlot("set origin 0,-0.43")
-        if targetFile or printer:
-            self.undesiredLineTypes = [5, 6]
-
-        if not (printer and printA3):
-            self.writePlot("set size " + plotSize)
-
-        self.writePlot("set ylabel '" + self.getAxisLabel("y") + "'")
-        self.writePlot("set xlabel '" + self.getAxisLabel("x") + "'")
-        self.writePlot("set time")
-        self.writePlot("set title \"" + self.makeTitle(title) + "\"")
-        self.writePlot("set xtics border nomirror norotate")
-        self.writePlot("set ytics border nomirror norotate")
-        self.writePlot("set border 3")
-        self.writePlot("set xrange [" + xrange +"];")
-        if yrange:
-            self.writePlot("set yrange [" + yrange +"];")
-        min = None
-        if plotPercentage:
-            min = self.findMinOverPlotLines()
-            #self.writePlot("set label \"%\" at screen 0.03,0.5 rotate")
-            #self.writePlot("set label \"Percentage above " + str(min) + "\" at screen 0.97,0.02 right")
-            self.writePlot("set ylabel \"" + self.getAxisLabel("y") + "\\n% above " + str(min) + "\"")
-        plotArguments = self.writeLinesAndGetPlotArguments(min)
-        if self.plotAveragers:
-            avgArguments = [ self.plotAveragers[plotAverager].plotArgument(min) for plotAverager in self.plotAveragers ]
-            if onlyAverage:
-                plotArguments = avgArguments
-            else:
-                plotArguments += avgArguments
-        relPlotArgs = [ arg.replace(writeDir, ".") for arg in plotArguments ]
-        self.writePlot("plot " + string.join(relPlotArgs, ", "))
-        if not absTargetFile:
-            self.gnuplotFile.flush()
-            gnuplotProcess = self.findGnuplotProcess()
-            self.gnuplotFile.close()
-            if gnuplotProcess:
-                print "Created process : gnuplot window :", gnuplotProcess.processId
-            else:
-                raise plugins.TextTestError, "Failed to create gnuplot process - errors from gnuplot:\n" + open(errsFile).read() 
-            return gnuplotProcess
-        else:
-            self.gnuplotFile.close()
-            tmppf = outputFile.read()
-            if len(tmppf) > 0:
-                open(absTargetFile, "w").write(tmppf)
-            if printer:
-                os.system("lpr -o PageSize=A3 -P" + printer + " " + absTargetFile)
-    def terminalLine(self, terminal, colour, printA3=0):
-        line = "set terminal " + terminal
-        if printA3:
-            line += " landscape"
-        if colour:
-            line += " color solid"
-        return line
-    def writePlot(self, line):
-        self.gnuplotFile.write(line + os.linesep)
-        self.diag.info(line + os.linesep)
-    def findGnuplotProcess(self):
-        thisProc = plugins.Process(os.getpid())
-        for attempt in range(10):
-            for childProc in thisProc.findChildProcesses():
-                name = childProc.getName()
-                if name.startswith("gnuplot_x11"):
-                    return childProc
-            sleep(0.1)
-    def getAxisLabel(self, axis):
+    def getMultiple(self):
+        return (self.apps, self.users, self.pointTypes, self.lineTypes)
+    def getYAxisLabel(self):
         label = None
         for plotLine in self.plotLines:
-            lineLabel = plotLine.getAxisLabel(axis)
-            if not label:
-                label = lineLabel
-            elif label != lineLabel:
-                return ""
+            if not plotLine.plotLineRepresentant:
+                lineLabel = plotLine.getYAxisLabel()
+                if not label:
+                    label = lineLabel
+                elif label != lineLabel:
+                    return ""
         return label
     def makeTitle(self, title):
         if title:
@@ -1489,20 +1400,30 @@ class TestGraph:
         if len(self.pointTypes) == 1:
             title += ": Test " + firstTestName
         return title
-    def getPlotOptions(self):
-        xrange = self.optionGroup.getOptionValue("r")
-        yrange = self.optionGroup.getOptionValue("yr")
-        fileName = self.optionGroup.getOptionValue("p")
-        writeColour = self.optionGroup.getSwitchValue("pc")
-        printA3 = self.optionGroup.getSwitchValue("pa3")
-        onlyAverage = self.optionGroup.getSwitchValue("oav")
-        title = self.optionGroup.getOptionValue("title")
-        printer = self.optionGroup.getOptionValue("pr")
-        plotPercentage = self.optionGroup.getSwitchValue("per")
-        terminal = self.optionGroup.getOptionValue("terminal")
-        plotSize = self.optionGroup.getOptionValue("size")
-        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize
-
+    def setXAxisScaleAndLabel(self):
+        xItem = self.optionGroup.getOptionValue("ix").replace("_", " ")
+        if not xItem:
+            xItem = timeEntryName
+        plotTimeScale = self.optionGroup.getOptionValue("ts")
+        plotAgainstSolution = self.optionGroup.getSwitchValue("s")
+        if xItem != timeEntryName:
+            self.axisXLabel = xItem
+        elif plotAgainstSolution:
+            self.axisXLabel = "Solution number"
+        else:
+            if plotTimeScale == "hours":
+                self.xScaleFactor = 1.0/60.0
+                self.axisXLabel = "CPU time (hours)"
+            elif plotTimeScale == "days":
+                self.xScaleFactor = 1.0/(60.0*24.0)
+                self.axisXLabel = "CPU time (days)"
+            else:
+                if not plotTimeScale == "minutes":
+                    print "Unknown time scale unit", plotTimeScale, ", using minutes."
+                self.xScaleFactor = 1.0
+                self.axisXLabel = "CPU time (min)"
+    def getXAxisLabel(self):
+        return self.axisXLabel
     # The routines below are the ones creating all the PlotLine instances for ONE test.
     def createPlotLines(self, lineName, logFile, test, scaling):
         # Find out what to plot.
@@ -1520,14 +1441,17 @@ class TestGraph:
             return
 
         for item in plotItems:
-            averager = None
+            plotLine = PlotLine(test, lineName, xItem, item, optRun, self.optionGroup.getSwitchValue("s"), scaling)
+            self.addLine(plotLine)
+            # Average
             if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
                 if not self.plotAveragers.has_key(lineName+item):
                     averager = self.plotAveragers[lineName+item] = PlotAverager(test.app.writeDirectory)
                 else:
                     averager = self.plotAveragers[lineName+item]
-            plotLine = PlotLine(test, lineName, xItem, item, optRun, self.optionGroup.getSwitchValue("s"), self.optionGroup.getOptionValue("ts"), scaling, averager)
-            self.addLine(plotLine)
+                averager.addGraph(plotLine.graph)
+                if not averager.plotLineRepresentant:
+                    averager.plotLineRepresentant = plotLine
     def createPlotLinesForTest(self, test):
         logFileStem = test.app.getConfigValue("log_file")
         searchInUser = self.optionGroup.getOptionValue("tu")
@@ -1563,45 +1487,153 @@ class TestGraph:
                 if not (onlyExactMatch and not isExactMatch):
                     self.createPlotLines(versionName, logFile, test, scaling)
 
+class PlotEngine:
+    def __init__(self, testGraph):
+        self.testGraph = testGraph
+        self.lineTypeCounter = 2
+        self.undesiredLineTypes = []
+        self.diag = plugins.getDiagnostics("Test Graph")
+    # Create gnuplot plot arguments.
+    def getStyle(self, plotLine, multipleLines):
+        if plotLine.plotLineRepresentant:
+            style = " with lines lt " + plotLine.plotLineRepresentant.lineType + " lw 2"
+        elif multipleLines:
+            style = " with linespoints lt " +  plotLine.lineType + " pt " + plotLine.pointType
+        else:
+            style = " with linespoints "
+        return style
+    def getPlotArgument(self, plotLine, multipleApps, multipleUsers, multipleLines, multipleTests):
+        return "'" + plotLine.plotFileName + "' " + " title \"" + plotLine.getPlotName(multipleApps, multipleUsers, multipleTests) + "\" " + self.getStyle(plotLine, multipleLines)
+    def writeLinesAndGetPlotArguments(self, plotLines, multiple, xScaleFactor, min, onlyAverage):
+        multipleLines = len(plotLines) > 1
+        (apps, users, pointTypes, lineTypes) = multiple
+        multipleApps = len(apps) > 1
+        multipleUsers = len(users) > 1
+        multipleTests = len(pointTypes) > 1
+        multipleLineTypes = len(lineTypes) > 1
+        plotArguments = []
+        for plotLine in plotLines:
+            plotLine.writeFile(xScaleFactor, min)
+            if not plotLine.plotLineRepresentant:
+                if not multipleTests or not multipleLineTypes or lineTypes[plotLine.name] == 0:
+                    plotLine.lineType = str(self.lineTypeCounter)
+                    lineTypes[plotLine.name] = plotLine.lineType
+                    self.lineTypeCounter += 1
+                    while self.undesiredLineTypes.count(self.lineTypeCounter) > 0:
+                        self.lineTypeCounter += 1
+                else:
+                    plotLine.lineType = lineTypes[plotLine.name]
+            if not onlyAverage or (onlyAverage and plotLine.plotLineRepresentant):
+                plotArguments.append(self.getPlotArgument(plotLine, multipleApps, multipleUsers, multipleLines, multipleTests))
+        return plotArguments
+    def plot(self, writeDir):
+        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize = self.testGraph.getPlotOptions()
+        if len(self.testGraph.plotLines) == 0:
+            return
+
+        # Make sure that the writeDir is there, seems important in the static GUI.
+        # Before, this was done as a side effect when writing the PlotLines.
+        if not os.path.isdir(writeDir):
+            os.makedirs(writeDir)
+            
+        os.chdir(writeDir)
+        errsFile = os.path.join(writeDir, "gnuplot.errors")
+        self.gnuplotFile, outputFile = os.popen2("gnuplot -persist -background white 2> " + errsFile)
+        absTargetFile = None
+        
+        if targetFile:
+            absTargetFile = os.path.expanduser(targetFile)
+            # Mainly for testing...
+            if not os.path.isabs(absTargetFile):
+                absTargetFile = os.path.join(writeDir, absTargetFile)
+            self.writePlot(self.terminalLine(terminal, colour))
+        if printer:
+            absTargetFile = os.path.join(writeDir, "texttest.ps")
+            self.writePlot(self.terminalLine(terminal, colour, printA3))
+            if printA3:
+                self.writePlot("set size 1.45,1.45")
+                self.writePlot("set origin 0,-0.43")
+        if targetFile or printer:
+            self.undesiredLineTypes = [5, 6]
+
+        if not (printer and printA3):
+            self.writePlot("set size " + plotSize)
+
+        self.testGraph.setXAxisScaleAndLabel()
+        self.writePlot("set ylabel '" + self.testGraph.getYAxisLabel() + "'")
+        self.writePlot("set xlabel '" + self.testGraph.getXAxisLabel() + "'")
+        self.writePlot("set time")
+        self.writePlot("set title \"" + self.testGraph.makeTitle(title) + "\"")
+        self.writePlot("set xtics border nomirror norotate")
+        self.writePlot("set ytics border nomirror norotate")
+        self.writePlot("set border 3")
+        self.writePlot("set xrange [" + xrange +"];")
+        if yrange:
+            self.writePlot("set yrange [" + yrange +"];")
+        min = None
+        if plotPercentage:
+            min = self.testGraph.findMinOverPlotLines()
+            #self.writePlot("set label \"%\" at screen 0.03,0.5 rotate")
+            #self.writePlot("set label \"Percentage above " + str(min) + "\" at screen 0.97,0.02 right")
+            self.writePlot("set ylabel \"" + self.testGraph.getYAxisLabel() + "\\n% above " + str(min) + "\"")
+        plotArguments = self.writeLinesAndGetPlotArguments(self.testGraph.plotLines, self.testGraph.getMultiple(), self.testGraph.xScaleFactor, min, onlyAverage)
+        relPlotArgs = [ arg.replace(writeDir, ".") for arg in plotArguments ]
+        self.writePlot("plot " + string.join(relPlotArgs, ", "))
+        if not absTargetFile:
+            self.gnuplotFile.flush()
+            gnuplotProcess = self.findGnuplotProcess()
+            self.gnuplotFile.close()
+            if gnuplotProcess:
+                print "Created process : gnuplot window :", gnuplotProcess.processId
+            else:
+                raise plugins.TextTestError, "Failed to create gnuplot process - errors from gnuplot:\n" + open(errsFile).read() 
+            return gnuplotProcess
+        else:
+            self.gnuplotFile.close()
+            tmppf = outputFile.read()
+            if len(tmppf) > 0:
+                open(absTargetFile, "w").write(tmppf)
+            if printer:
+                os.system("lpr -o PageSize=A3 -P" + printer + " " + absTargetFile)
+    def terminalLine(self, terminal, colour, printA3=0):
+        line = "set terminal " + terminal
+        if printA3:
+            line += " landscape"
+        if colour:
+            line += " color solid"
+        return line
+    def writePlot(self, line):
+        self.gnuplotFile.write(line + os.linesep)
+        self.diag.info(line + os.linesep)
+    def findGnuplotProcess(self):
+        thisProc = plugins.Process(os.getpid())
+        for attempt in range(10):
+            for childProc in thisProc.findChildProcesses():
+                name = childProc.getName()
+                if name.startswith("gnuplot_x11"):
+                    return childProc
+            sleep(0.1)    
+
 # Class representing ONE curve in plot.
 class PlotLine:
-    def __init__(self, test, lineName, xItem, item, optRun, plotAgainstSolution, plotTimeScale, scaling, averager):
+    def __init__(self, test, lineName, xItem, item, optRun, plotAgainstSolution, scaling):
         self.test = test
         self.name = lineName
         self.lineType = None
         self.pointType = None
         if item != costEntryName:
             self.name += "." + item
-        self.axisLabels = {}
+        self.axisYLabel = None
+        self.plotLineRepresentant = None
         timeScaleFactor = 1.0
 
-        if xItem != timeEntryName:
-            self.axisLabels["x"] = xItem
-        elif plotAgainstSolution:
-            self.axisLabels["x"] = "Solution number"
-        else:
-            if plotTimeScale == "hours":
-                timeScaleFactor = 1.0/60.0
-                self.axisLabels["x"] = "CPU time (hours)"
-            elif plotTimeScale == "days":
-                timeScaleFactor = 1.0/(60.0*24.0)
-                self.axisLabels["x"] = "CPU time (days)"
-            else:
-                if not plotTimeScale == "minutes":
-                    print "Unknown time scale unit", plotTimeScale, ", using minutes."
-                timeScaleFactor = 1.0
-                self.axisLabels["x"] = "CPU time (min)"
         if scaling:
             timeScaleFactor *= scaling
-        self.axisLabels["y"] = item
+        self.axisYLabel = item
         self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
         self.createGraph(optRun, xItem, item, plotAgainstSolution, timeScaleFactor)
-        if averager:
-            averager.addGraph(self.graph)
-            if not averager.plotLineRepresentant:
-                averager.plotLineRepresentant = self
-    def getAxisLabel(self, axis):
-        return self.axisLabels[axis]
+    def getYAxisLabel(self):
+        return self.axisYLabel
     def getPlotFileName(self, lineName, item):
         if item == costEntryName:
             return "plot-" + lineName.replace(" ", "-")
@@ -1620,7 +1652,7 @@ class PlotLine:
                 else:
                     self.graph[solution[xItem]*timeScaleFactor] = solution[item]
             cnt = cnt + 1
-    def writeFile(self, min):
+    def writeFile(self, xScaleFactor, min):
         dir, localName = os.path.split(self.plotFileName)
         if not os.path.isdir(dir):
             os.makedirs(dir)
@@ -1632,28 +1664,20 @@ class PlotLine:
                 y = 100.0*float(self.graph[x])/float(min)-100.0
             else:
                 y = self.graph[x]
-            plotFile.write(str(x) + "  " + str(y) + os.linesep)
+            plotFile.write(str(x*xScaleFactor) + "  " + str(y) + os.linesep)
         plotFile.close()
-    def getPlotArguments(self, multipleApps, multipleUsers, multipleLines, multipleTests):
-        return "'" + self.plotFileName + "' " + self.getPlotName(multipleApps, multipleUsers, multipleTests) + self.getStyle(multipleLines)
     def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):
-        title = " title \""
+        title = ""
         if addAppDescriptor:
             title += self.test.app.fullName + "."
         if addUserDescriptor:
             title += self.getUserName() + "."
         if addTestDescriptor:
             title += self.test.name + "."
-        title += self.name + "\" "
+        title += self.name
         return title
     def getUserName(self):
         return self.test.getRelPath().split(os.sep)[0]
-    def getStyle(self, multipleLines):
-        if multipleLines:
-            style = " with linespoints lt " +  self.lineType + " pt " + self.pointType
-        else:
-            style = " with linespoints "
-        return style
 
 # Create averages of several graphs.
 class Averager:
@@ -1746,12 +1770,11 @@ class PlotAverager(Averager):
         Averager.__init__(self)
         self.plotLineRepresentant = None
         self.tmpFileDirectory = tmpFileDirectory
-    
-    def plotArgument(self, min):
+    def writeFile(self, xScaleFactor, min):
         global plotAveragerCount
-        plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))
+        self.plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))
         plotAveragerCount += 1
-        plotFile = open(plotFileName, "w")
+        plotFile = open(self.plotFileName, "w")
         xValues = self.average.keys()
         xValues.sort()
         for xVal in xValues:
@@ -1759,9 +1782,10 @@ class PlotAverager(Averager):
                 y = 100.0*float(self.average[xVal])/float(self.numberOfGraphs*min)-100.0
             else:
                 y = self.average[xVal]/self.numberOfGraphs
-            plotFile.write(str(xVal) + " " + str(y) + os.linesep)
+            plotFile.write(str(xVal*xScaleFactor) + " " + str(y) + os.linesep)
         plotFile.close()
-        return "'" + plotFileName + "' " + " title \"" + self.plotLineRepresentant.name + "\" with lines lt " + self.plotLineRepresentant.lineType + " lw 2"
+    def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):
+        return self.plotLineRepresentant.name
 
 # End of "PlotTest" functionality.
 

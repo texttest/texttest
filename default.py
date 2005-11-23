@@ -1233,6 +1233,8 @@ class ReplaceText(plugins.Action):
         self.oldText = argDict["old"]
         self.newText = argDict["new"]
         self.logFile = None
+        if argDict.has_key("file"):
+            self.logFile = argDict["file"]
         self.textDiffTool = None
     def __repr__(self):
         return "Replacing " + self.oldText + " with " + self.newText + " for"
@@ -1260,5 +1262,6 @@ class ReplaceText(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
-        self.logFile = app.getConfigValue("log_file")
+        if not self.logFile:
+            self.logFile = app.getConfigValue("log_file")
         self.textDiffTool = plugins.findDiffTool(app.getConfigValue("text_diff_program"))

@@ -1173,7 +1173,7 @@ class ImportTestSuite(optimization.ImportTestSuite):
 class ImportTestCase(optimization.ImportTestCase):
     def getSubplanPath(self, suite, subplan):
         suite.setUpEnvironment(parents=1)
-        subplanPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", subplan)
+        subplanPath = os.path.join(optimization.getCarmdata(), "LOCAL_PLAN", subplan)
         suite.tearDownEnvironment(parents=1)
         return subplanPath
     def findRuleset(self, suite, subplan):
@@ -1234,7 +1234,7 @@ class ImportTestCase(optimization.ImportTestCase):
         else:
             return "APC"
     def buildOptions(self, subplan, ruleSet, application):
-        path = os.path.join("$CARMUSR", "LOCAL_PLAN", subplan, "APC_FILES")
+        path = os.path.join("$" + optimization.getCarmdataVar(), "LOCAL_PLAN", subplan, "APC_FILES")
         statusFile = os.path.join(path, "run_status")
         ruleSetPath = os.path.join("${CARMTMP}", "crc", "rule_set", application, "PUTS_ARCH_HERE")
         ruleSetFile = os.path.join(ruleSetPath, ruleSet)

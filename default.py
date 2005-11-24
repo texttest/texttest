@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, batch, re
+import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, batch, re, stat
 import glob
 from threading import currentThread
 from knownbugs import CheckForBugs
@@ -374,11 +374,38 @@ class PrepareWriteDirectory(plugins.Action):
         if os.path.isfile(fullPath):
             shutil.copy(fullPath, target)
         if os.path.isdir(fullPath):
-            shutil.copytree(fullPath, target)
-            if os.name == "posix":
-                # Cannot get os.chmod to work recursively, or worked out the octal digits..."
-                # In any case, it's important that it's writeable
-                os.system("chmod -R +w " + target)
+            self.copytree(fullPath, target)
+    def copytimes(self, src, dst):
+        # copy modification times, but not permissions. This is a copy of half of shutil.copystat
+        st = os.stat(src)
+        if hasattr(os, 'utime'):
+            os.utime(dst, (st[stat.ST_ATIME], st[stat.ST_MTIME]))
+    def copytree(self, src, dst):
+        # Code is a copy of shutil.copytree, with copying modification times
+        # so that we can tell when things change...
+        names = os.listdir(src)
+        os.mkdir(dst)
+        for name in names:
+            srcname = os.path.join(src, name)
+            dstname = os.path.join(dst, name)
+            try:
+                if os.path.islink(srcname):
+                    linkto = os.path.realpath(srcname)
+                    os.symlink(linkto, dstname)
+                elif os.path.isdir(srcname):
+                    self.copytree(srcname, dstname)
+                else:
+                    shutil.copy2(srcname, dstname)
+                    self.addWritePermission(dstname)
+            except (IOError, os.error), why:
+                print "Can't copy %s to %s: %s" % (`srcname`, `dstname`, str(why))
+        # Last of all, keep the modification time as it was
+        self.copytimes(src, dst)
+    def addWritePermission(self, file):
+        currMode = os.stat(file)[stat.ST_MODE]
+        currPerm = stat.S_IMODE(currMode)
+        newPerm = currPerm | 0220
+        os.chmod(file, newPerm)
     def linkTestPath(self, fullPath, target):
         # Linking doesn't exist on windows!
         if os.name != "posix":
@@ -729,25 +756,25 @@ class CreateCatalogue(plugins.Action):
         if self.catalogues.has_key(test):
             self.createCatalogueChangeFile(test)
         else:
-            self.catalogues[test] = self.findAllFiles(test)
+            self.catalogues[test] = self.findAllPaths(test)
     def createCatalogueChangeFile(self, test):
-        oldFiles = self.catalogues[test]
-        newFiles = self.findAllFiles(test)
-        filesLost, filesEdited, filesGained = self.findDifferences(oldFiles, newFiles, test.writeDirectory)
+        oldPaths = self.catalogues[test]
+        newPaths = self.findAllPaths(test)
+        pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, test.writeDirectory)
         processesGained = self.findProcessesGained(test)
         fileName = test.makeFileName("catalogue", temporary=1)
         file = open(fileName, "w")
-        if len(filesLost) == 0 and len(filesEdited) == 0 and len(filesGained) == 0:
-            file.write("No files were created, edited or deleted.\n")
-        if len(filesGained) > 0:
-            file.write("The following new files were created:\n")
-            self.writeFileStructure(file, filesGained)
-        if len(filesEdited) > 0:
-            file.write("\nThe following existing files changed their contents:\n")
-            self.writeFileStructure(file, filesEdited)
-        if len(filesLost) > 0:
-            file.write("\nThe following existing files were deleted:\n")
-            self.writeFileStructure(file, filesLost)
+        if len(pathsLost) == 0 and len(pathsEdited) == 0 and len(pathsGained) == 0:
+            file.write("No files or directories were created, edited or deleted.\n")
+        if len(pathsGained) > 0:
+            file.write("The following new files/directories were created:\n")
+            self.writeFileStructure(file, pathsGained)
+        if len(pathsEdited) > 0:
+            file.write("\nThe following existing files/directories changed their contents:\n")
+            self.writeFileStructure(file, pathsEdited)
+        if len(pathsLost) > 0:
+            file.write("\nThe following existing files/directories were deleted:\n")
+            self.writeFileStructure(file, pathsLost)
         if len(processesGained) > 0:
             file.write("\nThe following processes were created:\n")
             self.writeProcesses(file, processesGained) 
@@ -755,11 +782,11 @@ class CreateCatalogue(plugins.Action):
     def writeProcesses(self, file, processesGained):
         for process in processesGained:
             file.write("- " + process + "\n")
-    def writeFileStructure(self, file, fileNames):
+    def writeFileStructure(self, file, pathNames):
         prevParts = []
         tabSize = 4
-        for fileName in fileNames:
-            parts = fileName.split(os.sep)
+        for pathName in pathNames:
+            parts = pathName.split(os.sep)
             indent = 0
             for index in range(len(parts)):
                 part = parts[index]
@@ -790,54 +817,68 @@ class CreateCatalogue(plugins.Action):
                     process.killAll()
                     processes.append(parts[1])
         return processes
-    def findAllFiles(self, test):
+    def findAllPaths(self, test):
+        allPaths = seqdict()
         if os.path.isdir(test.writeDirectory):
-            return self.listDirectory(test.app, test.writeDirectory, firstLevel = 1)
-        else:
-            return seqdict()
-    def listDirectory(self, app, writeDir, firstLevel = 0):
+            # Don't list the framework's own temporary files
+            pathsToIgnore = [ "framework_tmp", "file_edits", "Diagnostics" ]
+            self.listDirectory(test.app, test.writeDirectory, allPaths, pathsToIgnore)
+        return allPaths
+    def listDirectory(self, app, dir, allPaths, pathsToIgnore=[]):
+        # Never list special directories (CVS is the one we know about...)
+        pathsToIgnore.append("CVS")
         subDirs = []
-        files = seqdict()
-        availFiles = os.listdir(writeDir)
-        availFiles.sort()
-        frameworkDirs = [ "framework_tmp", "file_edits", "Diagnostics" ]
-        for writeFile in availFiles:
-            # Don't list special directories or the framework's own temporary files
-            if writeFile == "CVS" or (firstLevel and writeFile in frameworkDirs):
+        availPaths = os.listdir(dir)
+        availPaths.sort()
+        for writeFile in availPaths:
+            if writeFile in pathsToIgnore:
                 continue
-            fullPath = os.path.join(writeDir, writeFile)
+            fullPath = os.path.join(dir, writeFile)
             # important not to follow soft links in catalogues...
             if os.path.isdir(fullPath) and not os.path.islink(fullPath):
                 subDirs.append(fullPath)
-            elif not app.ownsFile(writeFile, unknown=0):
-                files[fullPath] = self.getEditInfo(fullPath)
+            if not app.ownsFile(writeFile, unknown=0):
+                allPaths[fullPath] = self.getEditInfo(fullPath)
                 
         for subDir in subDirs:
-            files += self.listDirectory(app, subDir)
-        return files
+            self.listDirectory(app, subDir, allPaths)
     def getEditInfo(self, fullPath):
-        # Check modified times for files, targets for links
+        # Check modified times for files and directories, targets for links
         if os.path.islink(fullPath):
             return os.path.realpath(fullPath)
         else:
             return plugins.modifiedTime(fullPath)
-    def findDifferences(self, oldFiles, newFiles, writeDir):
-        filesGained, filesEdited, filesLost = [], [], []
-        for file, modTime in newFiles.items():
-            if not oldFiles.has_key(file):
-                filesGained.append(self.outputFileName(file, writeDir))
-            elif modTime != oldFiles[file]:
-                filesEdited.append(self.outputFileName(file, writeDir))
-        for file, modTime in oldFiles.items():
-            if not newFiles.has_key(file):
-                filesLost.append(self.outputFileName(file, writeDir))
-        return filesLost, filesEdited, filesGained
-    def outputFileName(self, file, writeDir):
-        self.diag.info("Output name for " + file)
-        if file.startswith(writeDir):
-            return file.replace(writeDir, "<Test Directory>")
+    def findDifferences(self, oldPaths, newPaths, writeDir):
+        pathsGained, pathsEdited, pathsLost = [], [], []
+        for path, modTime in newPaths.items():
+            if not oldPaths.has_key(path):
+                pathsGained.append(self.outputPathName(path, writeDir))
+            elif modTime != oldPaths[path]:
+                pathsEdited.append(self.outputPathName(path, writeDir))
+        for path, modTime in oldPaths.items():
+            if not newPaths.has_key(path):
+                pathsLost.append(self.outputPathName(path, writeDir))
+        # Clear out duplicates
+        self.removeParents(pathsEdited, pathsGained)
+        self.removeParents(pathsEdited, pathsEdited)
+        self.removeParents(pathsEdited, pathsLost)
+        self.removeParents(pathsGained, pathsGained)
+        self.removeParents(pathsLost, pathsLost)
+        return pathsLost, pathsEdited, pathsGained
+    def removeParents(self, toRemove, toFind):
+        removeList = []
+        for path in toFind:
+            parent, local = os.path.split(path)
+            if parent in toRemove and not parent in removeList:
+                removeList.append(parent)
+        for path in removeList:
+            toRemove.remove(path)
+    def outputPathName(self, path, writeDir):
+        self.diag.info("Output name for " + path)
+        if path.startswith(writeDir):
+            return path.replace(writeDir, "<Test Directory>")
         else:
-            return file
+            return path
                     
 class CountTest(plugins.Action):
     def __init__(self):
@@ -903,7 +944,7 @@ class ReconnectTest(plugins.Action):
 
         # State will refer to TEXTTEST_HOME in the original (which we may not have now,
         # and certainly don't want to save), try to fix this...
-        test.state.updateAbsPath(test.app.abspath)
+        test.state.updatePaths(test.app.abspath, self.rootDirToCopy)
         self.describe(test, " (state " + test.state.category + ")")
     def canReconnectTo(self, dir):
         # If the directory does not exist or is empty, we cannot reconnect to it.

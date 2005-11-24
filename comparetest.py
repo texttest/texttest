@@ -477,7 +477,9 @@ class LineFilter:
             return parameter
         thisText = self.internalExpressions[parameter]
         userName = os.getenv("USER", "tmp")
-        thisText = thisText.replace(userName, "[^/0123]*")
+        versionRegexp = "\..*" + userName
+        thisText = sub(versionRegexp, ".*", thisText)
+        thisText = thisText.replace(userName, "[^/]*")
         dateRegexp = "[0-3][0-9][A-Z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
         return sub(dateRegexp, dateRegexp, thisText)
     def parseOriginalText(self):
@@ -488,6 +490,7 @@ class LineFilter:
             self.untrigger = self.parseText(afterText)
         else:
             self.trigger = self.parseText(self.originalText)
+        self.diag.info("Created trigger : " + self.trigger.text)
     def parseText(self, text):
         for matchModifierString in self.matchModifierStrings:
             linePoint = text.find(matchModifierString)

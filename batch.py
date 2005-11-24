@@ -373,6 +373,8 @@ class CollectFiles(plugins.Action):
         # Collection should not itself use collection
         app.addConfigEntry("collection", "false", "batch_use_collection")
         userName, rootDir = app.getPreviousWriteDirInfo(self.userName)
+        if not os.path.isdir(rootDir):
+            return
         dirlist = os.listdir(rootDir)
         dirlist.sort()
         for dir in dirlist:

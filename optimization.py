@@ -450,6 +450,8 @@ class LogFileFinder:
             self.diag.info("Looked for " + fromThisRun)
             if os.path.isfile(fromThisRun): # Temp removed, doesn't work for matador. and fromThisRun.find(searchString) != -1:
                 return fromThisRun, app.writeDirectory
+        if not os.path.isdir(root):
+            return None, None
         for subDir in os.listdir(root):
             fullDir = os.path.join(root, subDir)
             if os.path.isdir(fullDir) and subDir.startswith(searchString):

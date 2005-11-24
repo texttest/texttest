@@ -157,7 +157,7 @@ class TestState:
         return self.category == "unrunnable"
     def isSaveable(self):
         return self.hasFailed() and self.hasResults()
-    def updateAbsPath(self, newAbsPath):
+    def updatePaths(self, newAbsPath, newWriteDir):
         pass
 
 # Simple handle to get diagnostics object. Better than using log4py directly,

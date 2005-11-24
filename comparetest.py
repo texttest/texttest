@@ -13,7 +13,7 @@ plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
 
 class TestComparison(plugins.TestState):
-    def __init__(self, previousInfo, appAbs):
+    def __init__(self, previousInfo, app):
         plugins.TestState.__init__(self, "failure", "", started=1, completed=1, executionHosts=previousInfo.executionHosts)
         self.allResults = []
         self.changedResults = []
@@ -23,20 +23,24 @@ class TestComparison(plugins.TestState):
         if previousInfo.category == "killed" or isinstance(previousInfo, FailedPrediction):
             self.setFailedPrediction(previousInfo)
         self.diag = plugins.getDiagnostics("TestComparison")
-        # Cache this only so it gets output when we pickle, so we can re-interpret if needed...
-        self.appAbsPath = appAbs
+        # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved
+        self.appAbsPath = app.abspath
+        self.appWriteDir = app.writeDirectory
     def __repr__(self):    
         if self.failedPrediction:
             briefDescription, longDescription = self.categoryDescriptions[self.category]
             return longDescription + " (" + self.failedPrediction.briefText + ")" + self.hostRepr()
         else:
             return plugins.TestState.__repr__(self)
-    def updateAbsPath(self, newAbsPath):
+    def updatePaths(self, newAbsPath, newWriteDir):
         self.diag = plugins.getDiagnostics("TestComparison")
         self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
+        self.diag.info("Updating writedir " + self.appWriteDir + " to " + newWriteDir)
         for comparison in self.allResults:
             comparison.updatePaths(self.appAbsPath, newAbsPath)
+            comparison.updatePaths(self.appWriteDir, newWriteDir)
         self.appAbsPath = newAbsPath
+        self.appWriteDir = newWriteDir
     def setFailedPrediction(self, prediction):
         self.failedPrediction = prediction
         self.freeText = str(prediction)
@@ -213,7 +217,7 @@ class MakeComparisons(plugins.Action):
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):
-        testComparison = self.testComparisonClass(test.state, test.app.abspath)
+        testComparison = self.testComparisonClass(test.state, test.app)
         testComparison.makeComparisons(test)
         self.categorise(testComparison)
         self.describe(test, testComparison.getPostText())

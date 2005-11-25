@@ -330,7 +330,7 @@ class RunApcTestInDebugger(default.RunTest):
         gdbArgs = test.makeFileName("gdb_args", temporary=1)
         gdbArgsFile = open(gdbArgs, "w")
         gdbArgsFile.write("set pagination off" + os.linesep)
-        gdbArgsFile.write("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep)
+        gdbArgsFile.write(os.path.expandvars("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep))
         if not self.noRun:
             gdbArgsFile.write("run" + os.linesep)
             gdbArgsFile.write("if $_exitcode" + os.linesep)
@@ -346,7 +346,7 @@ class RunApcTestInDebugger(default.RunTest):
         outFile.write("SUBPLAN " + opts[0] + os.linesep)
         outFile.close()
         # Create execute command.
-        binName = opts[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app))
+        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app)))
         if self.inXEmacs:
             gdbStart, gdbWithArgs = self.runInXEmacs(test, binName, gdbArgs)
             executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"

@@ -449,6 +449,8 @@ class RunDependentTextFilter:
 class LineNumberTrigger:
     def __init__(self, lineNumber):
         self.lineNumber = lineNumber
+    def __repr__(self):
+        return "Line number trigger for line " + str(self.lineNumber)
     def matches(self, line, lineNumber):
         return lineNumber == self.lineNumber
     def replace(self, line, newText):
@@ -490,7 +492,7 @@ class LineFilter:
             self.untrigger = self.parseText(afterText)
         else:
             self.trigger = self.parseText(self.originalText)
-        self.diag.info("Created trigger : " + self.trigger.text)
+        self.diag.info("Created trigger : " + repr(self.trigger))
     def parseText(self, text):
         for matchModifierString in self.matchModifierStrings:
             linePoint = text.find(matchModifierString)

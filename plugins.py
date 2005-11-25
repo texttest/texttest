@@ -392,6 +392,8 @@ class TextTrigger:
                 self.regex = re.compile(text)
             except:
                 pass
+    def __repr__(self):
+        return self.text
     def matches(self, line, lineNumber=0):
         if self.regex:
             return self.regex.search(line)

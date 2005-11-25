@@ -225,6 +225,7 @@ class ApcConfig(optimization.OptimizationConfig):
         self.itemNamesInFile[optimization.newSolutionMarker] = "apc_status Solution"
         app.setConfigDefault("link_libs", "")
         app.setConfigDefault("extract_logs", {})
+        app.setConfigDefault("apcinfo", {})
 
 def verifyAirportFile(arch):
     diag = plugins.getDiagnostics("APC airport")

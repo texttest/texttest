@@ -248,6 +248,13 @@ class GenHTML(plugins.Action):
         self.interParamsFile = self.htmlDir + os.sep + "deadheadparams.html"
         
     def setUpApplication(self, app):
+        # Override some setting with what's specified in the config file.
+        dict = app.getConfigValue("apcinfo")
+        if dict.has_key("profilesDir"):
+            self.profilesDir = dict["profilesDir"]
+        if dict.has_key("profilesDirAsHtml"):
+            self.profilesDirAsHtml = dict["profilesDirAsHtml"]
+        
         self.RCFile = app.abspath + os.sep + "apcinfo.rc"
         self.idoc = CarmenDocument(self.RCFile)
         self.ilist = HTMLgen.List(style="compact")
@@ -590,6 +597,7 @@ class GenHTML(plugins.Action):
         # Create page for suite.
         self.currentSuitePage = self.suitePages[suite.name] = { 'page': CarmenDocument(self.RCFile) , 'group': {} }
         self.currentSuitePage["page"].append(HTMLgen.Center(HTMLgen.Heading(1, suite.name)))
+        self.currentSuite = suite
         # Lists for the KPI groups.
         self.readKPIGroupFile(suite)
         for kpigr in self.kpiGroups:
@@ -662,7 +670,7 @@ class GenHTML(plugins.Action):
         self.totalCPUtime += testPerformance
         
     def extractProfiling(self, test, group):
-        lprofFile = test.makeFileName("lprof", temporary = 0)
+        lprofFile = os.path.join(self.profilesDir, self.currentSuite.name + "__" + test.name + "_lprof.apc")
         if os.path.isfile(lprofFile):
             if not self.currentSuitePage["group"][group]["profiling"]:
                 data = self.currentSuitePage["group"][group]["profiling"] = { 'fcns': {}, 'count': 0 , 'tests': [] , 'ravebc': self.raveBC.createBC("RAVE") }

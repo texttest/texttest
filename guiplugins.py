@@ -356,20 +356,22 @@ class ImportTestCase(ImportTest):
     def __init__(self, suite, oldOptionGroup):
         ImportTest.__init__(self, suite, oldOptionGroup)
         if self.canPerformOnTest():
-            self.addOptionsFileOption(oldOptionGroup)
+            self.addDefinitionFileOption(suite, oldOptionGroup)
     def testType(self):
         return "Test"
-    def addOptionsFileOption(self, oldOptionGroup):
+    def addDefinitionFileOption(self, suite, oldOptionGroup):
         self.addOption(oldOptionGroup, "opt", "Command line options")
     def createTestContents(self, suite, testDir):
-        self.writeOptionFile(suite, testDir)
+        self.writeDefinitionFiles(suite, testDir)
         self.writeEnvironmentFile(suite, testDir)
         self.writeResultsFiles(suite, testDir)
-    def getWriteFile(self, name, suite, testDir):
+    def getWriteFileName(self, name, suite, testDir):
         fileName = os.path.join(testDir, name + "." + suite.app.name)
         if os.path.isfile(fileName):
             raise plugins.TextTestError, "Test already exists for application " + suite.app.fullName + " : " + os.path.basename(testDir)
-        return open(fileName, "w")
+        return fileName
+    def getWriteFile(self, name, suite, testDir):
+        return open(self.getWriteFileName(name, suite, testDir), "w")
     def writeEnvironmentFile(self, suite, testDir):
         envDir = self.getEnvironment(suite)
         if len(envDir) == 0:
@@ -379,7 +381,7 @@ class ImportTestCase(ImportTest):
             guilog.info("Setting test env: " + var + " = " + value)
             envFile.write(var + ":" + value + "\n")
         envFile.close()
-    def writeOptionFile(self, suite, testDir):
+    def writeDefinitionFiles(self, suite, testDir):
         optionString = self.getOptions(suite)
         guilog.info("Using option string : " + optionString)
         optionFile = self.getWriteFile("options", suite, testDir)

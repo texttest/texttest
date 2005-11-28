@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.8 2005/11/28 14:20:10 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.9 2005/11/28 16:41:04 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -12,11 +12,40 @@ def getConfig(optionMap):
     return StudioConfig(optionMap)
 
 class StudioConfig(ravebased.Config):
+    def _getLocalPlanPath(self, test):
+        # Assumption to avoid reading Carmen Resource system LocalPlanPath
+        return os.path.join(ravebased.getCarmdata(), "LOCAL_PLAN")
+    def _getSubPlanDirName(self, test):
+        subPlan = self._subPlanName(test)
+        fullPath = os.path.join(self._getLocalPlanPath(test), subPlan)
+        return os.path.normpath(fullPath)
     def getWriteDirectoryPreparer(self):
         return ravebased.PrepareCarmdataWriteDir()
     def getRuleSetName(self, test):
-        # Hack for now, should define from used subplans...
-        return "LBA_MTV"
+        subplanDir = self._getSubPlanDirName(test)
+        headerFile = os.path.join(subplanDir, "subplanHeader")
+        origPath = self.findOrigRulePath(headerFile)
+        return os.path.basename(origPath)
+    def findOrigRulePath(self, headerFile):
+        for line in open(headerFile).xreadlines():
+            if line.startswith("554"):
+                return line.split(";")[22]
+        return ""
+    def _subPlanName(self, test):
+        macroLine = self.getSubPlanLineInMacro(test)
+        start = macroLine.find("value=\"")
+        end = macroLine.rfind("\"")
+        return macroLine[start + 7:end]
+    def getSubPlanLineInMacro(self, test):
+        macroFile = test.useCaseFile
+        if not os.path.isfile(macroFile):
+            raise plugins.TextTestError, "Cannot find ruleset name, no macro yet recorded or imported to indicate it!"
+        useNext = 0
+        for line in open(macroFile).xreadlines():
+            if useNext:
+                return line
+            elif line.find("OPEN_PLAN") != -1:
+                useNext = 1
     
 # Graphical import suite. Basically the same as those used for optimizers
 class ImportTestSuite(ravebased.ImportTestSuite):

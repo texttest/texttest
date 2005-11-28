@@ -1626,11 +1626,16 @@ class PlotEngineMPL:
         self.testGraph.setXAxisScaleAndLabel()
         self.testGraph.deduceLineTypes(self.getNextLineType)
 
+        # The plotlines will be plotted in an indeterministic order
+        # if we don't specify the zorder. This is not to affect the
+        # apperance of the plot.
+        zOrder = 0 
         for plotLine in self.testGraph.plotLines:
             if not onlyAverage or (onlyAverage and plotLine.plotLineRepresentant):
                  x, y = plotLine.getGraph(self.testGraph.xScaleFactor, min)
                  plot(x, y, self.getPlotArgument(plotLine), linewidth = self.getLineSize(plotLine),
-                      label = self.testGraph.getPlotLineName(plotLine), linestyle = "steps")
+                      label = self.testGraph.getPlotLineName(plotLine), linestyle = "steps", zorder = zOrder)
+            zOrder += 1
         gca().set_xlim(self.parseRangeArg(xrange, gca().get_xlim()))
         gca().set_ylim(self.parseRangeArg(yrange, gca().get_ylim()))
         grid()
@@ -1641,7 +1646,12 @@ class PlotEngineMPL:
             ylabel(self.testGraph.getYAxisLabel())
         else:
             ylabel(self.testGraph.getYAxisLabel() + " % above " + str(min))
-        show()
+        if targetFile:
+            os.chdir(writeDir)
+            absTargetFile = os.path.expanduser(targetFile)
+            savefig(absTargetFile)
+        else:
+            show()
 
 
 # Class representing ONE curve in plot.

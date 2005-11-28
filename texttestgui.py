@@ -793,8 +793,8 @@ class TestCaseGUI(RightWindowGUI):
     
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):
-    def addOptionsFileOption(self, oldOptionGroup):
-        guiplugins.ImportTestCase.addOptionsFileOption(self, oldOptionGroup)
+    def addDefinitionFileOption(self, suite, oldOptionGroup):
+        guiplugins.ImportTestCase.addDefinitionFileOption(self, suite, oldOptionGroup)
         self.addSwitch(oldOptionGroup, "GUI", "Use TextTest GUI", 1)
         self.addSwitch(oldOptionGroup, "sGUI", "Use TextTest Static GUI", 0)
         targetApp = self.test.makePathName("TargetApp", self.test.abspath)

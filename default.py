@@ -298,6 +298,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
         app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
         app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
+        app.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
         app.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
         app.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         app.setConfigDefault("collate_file", {}, "Mapping of result file names to paths to collect them from")
@@ -359,18 +360,21 @@ class PrepareWriteDirectory(plugins.Action):
         return "Prepare write directory for"
     def __call__(self, test):
         self.collatePaths(test, "copy_test_path", self.copyTestPath)
+        self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
         self.collatePaths(test, "link_test_path", self.linkTestPath)
         self.createPropertiesFiles(test)
         if test.app.useDiagnostics:
             plugins.ensureDirectoryExists(os.path.join(test.writeDirectory, "Diagnostics"))
     def collatePaths(self, test, configListName, collateMethod):
-        for copyTestPath in test.getConfigValue(configListName):
-            fullPath = test.makePathName(copyTestPath, test.abspath)
-            self.diag.info("Path for linking/copying at " + fullPath)
-            target = os.path.join(test.writeDirectory, os.path.basename(copyTestPath))
+        for sourcePath in self.getSourcePaths(test, configListName):
+            self.diag.info("Path for linking/copying at " + sourcePath)
+            target = os.path.join(test.writeDirectory, os.path.basename(sourcePath))
             plugins.ensureDirExistsForFile(target)
-            collateMethod(fullPath, target)
-    def copyTestPath(self, fullPath, target):
+            collateMethod(test, sourcePath, target)
+    def getSourcePaths(self, test, configListName):
+        origPaths = test.getConfigValue(configListName)
+        return map(lambda path: test.makePathName(path, test.abspath), origPaths)
+    def copyTestPath(self, test, fullPath, target):
         if os.path.isfile(fullPath):
             shutil.copy(fullPath, target)
         if os.path.isdir(fullPath):
@@ -395,23 +399,110 @@ class PrepareWriteDirectory(plugins.Action):
                 elif os.path.isdir(srcname):
                     self.copytree(srcname, dstname)
                 else:
-                    shutil.copy2(srcname, dstname)
-                    self.addWritePermission(dstname)
+                    self.copyfile(srcname, dstname)
             except (IOError, os.error), why:
                 print "Can't copy %s to %s: %s" % (`srcname`, `dstname`, str(why))
         # Last of all, keep the modification time as it was
         self.copytimes(src, dst)
-    def addWritePermission(self, file):
-        currMode = os.stat(file)[stat.ST_MODE]
+    def copyfile(self, srcname, dstname):
+        # Basic aim is to keep the permission bits and times where possible, but ensure it is writeable
+        shutil.copy2(srcname, dstname)
+        currMode = os.stat(dstname)[stat.ST_MODE]
         currPerm = stat.S_IMODE(currMode)
         newPerm = currPerm | 0220
-        os.chmod(file, newPerm)
-    def linkTestPath(self, fullPath, target):
+        os.chmod(dstname, newPerm)
+    def linkTestPath(self, test, fullPath, target):
         # Linking doesn't exist on windows!
         if os.name != "posix":
-            return self.copyTestPath(fullPath, target)
+            return self.copyTestPath(test, fullPath, target)
         if os.path.exists(fullPath):
             os.symlink(fullPath, target)
+    def partialCopyTestPath(self, test, sourcePath, targetPath):
+        modifiedPaths = self.getModifiedPaths(test, sourcePath)
+        if modifiedPaths is None:
+            # If we don't know, assume anything can change...
+            self.copyTestPath(test, sourcePath, targetPath)
+        elif not modifiedPaths.has_key(sourcePath):
+            self.linkTestPath(test, sourcePath, targetPath)
+        elif os.path.exists(sourcePath):
+            os.mkdir(targetPath)
+            self.diag.info("Copying/linking for Test " + repr(test))
+            writeDirs = self.copyAndLink(sourcePath, targetPath, modifiedPaths)
+            # Link everywhere new files appear from the write directory for ease of collection
+            for writeDir in writeDirs:
+                self.diag.info("Creating bypass link to " + writeDir)
+                linkTarget = os.path.join(test.writeDirectory, os.path.basename(writeDir))
+                if linkTarget != writeDir and not os.path.exists(linkTarget):
+                    # Don't link locally - and it's possible to have the same name twice under different paths
+                    os.symlink(writeDir, linkTarget)
+            self.copytimes(sourcePath, targetPath)
+    def copyAndLink(self, sourcePath, targetPath, modifiedPaths):
+        writeDirs = []
+        self.diag.info("Copying/linking from " + sourcePath)
+        modPathsLocal = modifiedPaths[sourcePath]
+        self.diag.info("Modified paths here " + repr(modPathsLocal))
+        for file in os.listdir(sourcePath):
+            sourceFile = os.path.normpath(os.path.join(sourcePath, file))
+            targetFile = os.path.join(targetPath, file)
+            if sourceFile in modPathsLocal:
+                if os.path.isdir(sourceFile):
+                    os.mkdir(targetFile)
+                    writeDirs += self.copyAndLink(sourceFile, targetFile, modifiedPaths)
+                    self.copytimes(sourceFile, targetFile)
+                else:
+                    self.copyfile(sourceFile, targetFile)
+            else:
+                self.handleReadOnly(sourceFile, targetFile)
+        if self.isWriteDir(targetPath, modPathsLocal):
+            self.diag.info("Registering " + targetPath + " as a write directory")
+            writeDirs.append(targetPath)
+        return writeDirs
+    def handleReadOnly(self, sourceFile, targetFile):
+        if os.path.basename(sourceFile) == "CVS":
+            return
+        try:
+            os.symlink(sourceFile, targetFile)
+        except OSError:
+            print "Failed to create symlink " + targetFile
+    def isWriteDir(self, targetPath, modPaths):
+        for modPath in modPaths:
+            if not os.path.isdir(modPath):
+                return True
+        return False
+    def getModifiedPaths(self, test, sourcePath):
+        catFile = test.makeFileName("catalogue")
+        if not os.path.isfile(catFile):
+            # This means we don't know
+            return None
+        # Catalogue file is actually relative to temporary directory, need to take one level above...
+        rootDir, local = os.path.split(sourcePath)
+        fullPaths = { rootDir : [] }
+        currentPaths = [ rootDir ]
+        for line in open(catFile).readlines():
+            fileName, indent = self.parseCatalogue(line)
+            if not fileName:
+                continue
+            prevPath = currentPaths[indent - 1]
+            fullPath = os.path.join(prevPath, fileName)
+            if indent >= len(currentPaths):
+                currentPaths.append(fullPath)
+            else:
+                currentPaths[indent] = fullPath
+            if not fullPaths.has_key(fullPath):
+                fullPaths[fullPath] = []
+            if not fullPath in fullPaths[prevPath]:
+                fullPaths[prevPath].append(fullPath)
+        del fullPaths[rootDir]
+        return fullPaths
+    def parseCatalogue(self, line):
+        pos = line.rfind("----")
+        if pos == -1:
+            return None, None
+        pos += 4
+        dashes = line[:pos]
+        indent = len(dashes) / 4
+        fileName = line.strip()[pos:]
+        return fileName, indent
     def createPropertiesFiles(self, test):
         for var, value in test.properties.items():
             propFileName = os.path.join(test.writeDirectory, var + ".properties")

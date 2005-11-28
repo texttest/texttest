@@ -150,6 +150,7 @@ class OptimizationConfig(ravebased.Config):
                 group.addOption("kpiData", "Output KPI curve data etc.")
                 group.addOption("kpi", "Run Henrik's old KPI")
                 group.addOption("plot", "Plot Graph of selected runs")
+                group.addOption("cleandata", "Clean Carmdata")
     def getActionSequence(self):
         if self.optionMap.has_key("plot"):
             return [ self.getWriteDirectoryMaker(), DescribePlotTest() ]
@@ -176,7 +177,7 @@ class OptimizationConfig(ravebased.Config):
         # Assume we always want to build at least some rules, by default...
         return 1
     def getWriteDirectoryPreparer(self):
-        return [ ravebased.Config.getWriteDirectoryPreparer(self), MakeTmpCarmdata(self._getSubPlanDirName) ]
+        return PrepareCarmdataWriteDir(self._getSubPlanDirName)
     def extraReadFiles(self, test):
         readDirs = seqdict()
         if test.classId() == "test-case":
@@ -216,114 +217,65 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault("testoverview_pages", "")
         app.addConfigEntry("definition_file_stems", "raveparameters")
 
-def getCarmdataVar():
-    if os.getenv("CARMDATA"):
-        return "CARMDATA"
-    else:
-        return "CARMUSR"
-    
-def getCarmdata():
-    return os.path.normpath(os.getenv(getCarmdataVar()))
-        
-
-class MakeTmpCarmdata(plugins.Action):
+# Insert the contents of all raveparameters into the temporary rules file
+# Also assume the subplan will be changed, but nothing else.
+class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
     def __init__(self, subplanFunction):
+        ravebased.PrepareCarmdataWriteDir.__init__(self)
         self.subplanFunction = subplanFunction
         self.raveParameters = []
-        self.diag = plugins.getDiagnostics("Tmp Subplan")
     def setUpSuite(self, suite):
         self.readRaveParameters(suite.makeFileName("raveparameters"))
     def tearDownSuite(self, suite):
         self.unreadRaveParameters()
-    def __call__(self, test):
-        if os.environ.has_key("DISABLE_TMP_DIR_CREATION"):
-            return
-        subplanSource = self.subplanFunction(test)
-        if not os.path.isdir(subplanSource):
-            raise plugins.TextTestError, "Cannot run test, subplan directory at " + subplanSource + " does not exist"
-
-        tmpCarmdata = self.makeCarmdata(test)
-        tmpSubplan = self.copySubplan(test, tmpCarmdata, subplanSource)
-        self.createLocalPlanLink(subplanSource, tmpSubplan)
-        self.createBypassLink(test, tmpSubplan)
-    def makeCarmdata(self, test):
-        sourcePath = getCarmdata()
-        if not sourcePath:
-            raise plugins.TextTestError, "Cannot run test, CARMUSR not defined"
-
-        target = os.path.join(test.writeDirectory, os.path.basename(os.path.normpath(sourcePath)))
-        plugins.ensureDirectoryExists(target)
-        
-        carmdataVar = getCarmdataVar()
-        test.environment[carmdataVar] = target
-        test.previousEnv[carmdataVar] = sourcePath
-        for file in os.listdir(sourcePath):
-            if file != "LOCAL_PLAN":
-                linkSource = os.path.normpath(os.path.realpath(os.path.join(sourcePath, file)))
-                os.symlink(linkSource, os.path.join(target, file))
-        return target
-    def createLocalPlanLink(self, subplanSource, subplanTarget):
-        lpSource, local = os.path.split(subplanSource)
-        lpEtab = os.path.join(lpSource, "etable")
-        if os.path.isdir(lpEtab):
-            lpTarget, local = os.path.split(subplanTarget)
-            os.symlink(lpEtab, os.path.join(lpTarget, "etable"))
-    def copySubplan(self, test, tmpCarmdata, subplanSource):
-        subplanTarget = self.createTarget(test, tmpCarmdata, subplanSource)
+    def partialCopyTestPath(self, test, carmdataSource, carmdataTarget):
         self.readRaveParameters(test.makeFileName("raveparameters"))
-        self.makeLinksIn(subplanTarget, subplanSource)
+        ravebased.PrepareCarmdataWriteDir.partialCopyTestPath(self, test, carmdataSource, carmdataTarget)
         self.unreadRaveParameters()
-        return subplanTarget
-    def createBypassLink(self, test, tmpSubplan):
-        fullSource = os.path.join(tmpSubplan, "APC_FILES")
-        source = fullSource.replace(test.writeDirectory + "/", "")
-        target = os.path.join(test.writeDirectory, "APC_FILES")
-        os.symlink(source, target)
-    def createTarget(self, test, tmpCarmdata, subplanSource):
-        targetDir = subplanSource.replace(getCarmdata(), tmpCarmdata)
-        plugins.ensureDirectoryExists(targetDir)
-        return targetDir
-    def makeLinksIn(self, inDir, fromDir):
-        for file in os.listdir(fromDir):
-            if file == "APC_FILES":
-                apcFiles = os.path.join(inDir, file)
-                plugins.ensureDirectoryExists(apcFiles)
-                self.makeLinksIn(apcFiles, os.path.join(fromDir, file))
-                continue
-            if file.find("Solution_") != -1:
-                continue
-            if file.find("status") != -1:
-                continue
-            if file.find("run_status") != -1:
-                continue
-            if file.find("colgen_analysis.example_rotations") != -1:
-                continue
-            if file.find("hostname") != -1:
-                continue
-            if file.find("best_solution") != -1:
-                continue
-            if file.find("core") != -1:
-                continue
-            if file == "input":
-                continue
-            if file.endswith(".log"):
-                continue
+    def getModifiedPaths(self, test, carmdataSource):
+        modPathsBasic = ravebased.PrepareCarmdataWriteDir.getModifiedPaths(self, test, carmdataSource)
+        if modPathsBasic is None:
+            return self.getModPathsFromSubplan(test, carmdataSource)
+        else:
+            return modPathsBasic
+    def getModPathsFromSubplan(self, test, carmdataSource):
+        if os.environ.has_key("DISABLE_TMP_DIR_CREATION"):
+            return {}
 
-            fromPath = os.path.join(fromDir, file)
-            toPath = os.path.join(inDir, file)
-            if (len(self.raveParameters) > 0) and file.find("rules") != -1:
-                file = open(toPath, 'w')
-                for line in open(fromPath).xreadlines():
-                    if line.find("<SETS>") != -1:
-                        for overrideItems in self.raveParameters:
-                            for override in overrideItems:
-                                file.write(override)
-                    file.write(line)
-            else:
-                try:
-                    os.symlink(fromPath, toPath)
-                except OSError:
-                    print "Failed to create symlink " + toPath
+        subplan = self.subplanFunction(test)
+        if not os.path.isdir(subplan):
+            raise plugins.TextTestError, "Cannot run test " + test.name + " - subplan at " + subplan + " does not exist."
+
+        currPath = os.path.join(subplan, "APC_FILES", "input")
+        modPaths = {}
+        while currPath != carmdataSource:
+            parent, local = os.path.split(currPath)
+            modPaths[parent] = [ currPath ]
+            currPath = parent
+        return modPaths
+    def handleReadOnly(self, sourceFile, targetFile):
+        if self.shouldLink(sourceFile) and not self.insertRaveParameters(sourceFile, targetFile):
+            ravebased.PrepareCarmdataWriteDir.handleReadOnly(self, sourceFile, targetFile)
+    def insertRaveParameters(self, sourceFile, targetFile):
+        if os.path.basename(sourceFile) != "rules":
+            return False
+
+        overrides = self.getAllOverrides()
+        if len(overrides) == 0:
+            return False
+        
+        file = open(targetFile, 'w')
+        for line in open(sourceFile).xreadlines():
+            if line.find("<SETS>") != -1:
+                for override in overrides:
+                    file.write(override)
+            file.write(line)
+        return True
+    def getAllOverrides(self):
+        allOverrides = []
+        for overrideItems in self.raveParameters:
+            allOverrides += overrideItems
+        return allOverrides
     def readRaveParameters(self, fileName):
         if not os.path.isfile(fileName):
             self.raveParameters.append([])
@@ -333,8 +285,26 @@ class MakeTmpCarmdata(plugins.Action):
     def unreadRaveParameters(self):
         self.raveParameters.pop()
         self.diag.info("Removed from list : " + repr(self.raveParameters))
-        
+    def shouldLink(self, sourceFile):
+        dirname, file = os.path.split(sourceFile)
+        if file == "etable" or dirname.find("LOCAL_PLAN") == -1:
+            return True
+        if os.path.basename(dirname) != "APC_FILES":
+            return False
 
+        names = [ "input", "status", "run_status", "colgen_analysis.example_rotations", "hostname", "best_solution" ]
+        prefixes = [ "Solution_", "core" ]
+        postfixes = [ ".log" ]
+        if file in names:
+            return False
+        for prefix in prefixes:
+            if file.startswith(prefix):
+                return False
+        for postfix in postfixes:
+            if file.endswith(postfix):
+                return False
+        return True   
+ 
 class CheckOptimizationRun(predict.CheckLogFilePredictions):
     def __repr__(self):
         return "Checking optimization values for"

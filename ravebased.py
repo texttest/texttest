@@ -46,7 +46,7 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
                              the specified time. Default time is 1440 minutes.
 """
 
-import carmen, queuesystem, default, os, string, shutil, plugins, sys, signal
+import carmen, queuesystem, default, os, string, shutil, plugins, sys, signal, stat
 from socket import gethostname
 from tempfile import mktemp
 from respond import Responder
@@ -280,6 +280,36 @@ class CheckCarmVariables(plugins.Action):
                 print "CARMTMP", carmTmp, "did not exist, attempting to create it"
                 os.makedirs(os.environ["CARMTMP"])
         return 1
+
+def getCarmdataVar():
+    if os.getenv("CARMDATA"):
+        return "CARMDATA"
+    else:
+        return "CARMUSR"
+    
+def getCarmdata():
+    return os.path.normpath(os.getenv(getCarmdataVar()))
+
+# Pick up a temporary CARMUSR. Used directly by Studio, and a derived form used by the optimizers,
+# that includes the raveparamters functionality
+class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
+    def getSourcePaths(self, test, pathType):
+        # Tell it to pick up the carmdata, whereever that may be found
+        basePaths = default.PrepareWriteDirectory.getSourcePaths(self, test, pathType)
+        if pathType.find("partial") == -1:
+            return basePaths
+        
+        carmdataSource = getCarmdata()
+        if not carmdataSource:
+            raise plugins.TextTestError, "Cannot run test, CARMUSR not defined"
+        basePaths.append(carmdataSource)
+        return basePaths
+    def partialCopyTestPath(self, test, sourcePath, targetPath):
+        # Make sure we update the environment to point at the new temporary location
+        carmdataVar = getCarmdataVar()
+        test.environment[carmdataVar] = targetPath
+        test.previousEnv[carmdataVar] = sourcePath
+        default.PrepareWriteDirectory.partialCopyTestPath(self, test, sourcePath, targetPath)    
 
 class CleanupRules(plugins.Action):
     def __init__(self, getRuleSetName):
@@ -862,170 +892,3 @@ class TraverseCarmUsers(plugins.Action):
     def getSwitches(self):
         switches = {}
         return switches
-
-#
-# This class reads a CarmResources etab file and gives access to it
-#
-class ConfigEtable:
-    def __init__(self, fileName):
-        self.inFile = open(fileName)
-        self.applications = {}
-        self.columns = self._readColumns()
-        self.parser = ConfigEtableParser(self.inFile)
-        self.diag = plugins.getDiagnostics("ConfigEtable")
-        lineTuple = self._readTuple()
-        while lineTuple != None:
-            self._storeValue(lineTuple[0], lineTuple[1], lineTuple[2], lineTuple[4])
-            lineTuple = self._readTuple()
-    def getValue(self, application, module, name):
-        try:
-            appDict = self.applications[application]
-            moduleDict = appDict[module]
-            value = moduleDict[name]
-        except:
-            return None
-        return self._etabExpand(value)
-    def _storeValue(self, app, module, name, value):
-        if not self.applications.has_key(app):
-            self.applications[app] = {}
-        if not self.applications[app].has_key(module):
-            self.applications[app][module] = {}
-        self.applications[app][module][name] = value
-    def _readTuple(self):
-        tup = []
-        while len(tup) < len(self.columns):
-            tok = self._readConfigToken()
-            if tok == None:
-                break
-            if tok != ",":
-                tup.append(tok)
-        if len(tup) == len(self.columns):
-            return tup
-        else:
-            return None
-    def _readColumns(self):
-        numCols = self._readNumCols()
-        cols = []
-        while len(cols) < numCols:
-            line = self.inFile.readline()
-            parts = line.split()
-            if len(parts) > 0 and len(parts[0].strip()) > 0:
-                cols.append(parts[0])
-        return cols
-    def _readNumCols(self):
-        numCols = -1
-        inComment = 0
-        while numCols == -1:
-            line = self.inFile.readline()
-            if line.startswith("/*"):
-                inComment = 1
-            if line.strip().endswith("*/"):
-                inComment = 0
-            if not inComment:
-                try:
-                    numCols = int(line.strip())
-                except:
-                    pass
-        return numCols
-    def _readConfigToken(self):
-        tok = self.parser.get_token()
-        while tok != None and tok.startswith("/*"):
-            while not tok.endswith("*/"):
-                tok = self.parser.get_token()
-            tok = self.parser.get_token()
-        return tok
-    def _etabExpand(self, value):
-        self.diag.info("Expanding etable value " + value)
-        if not value.startswith("$("):
-            return value
-        lPos = value.find(")")
-        if lPos == -1:
-            return value
-      
-        parts = value[2:lPos].split(".")
-        self.diag.debug("parts = " + repr(parts))
-        if len(parts) == 3:
-            expanded = self.getValue(parts[0], parts[1], parts[2])
-            self.diag.debug("expanded = " + repr(expanded))
-            whole = expanded + self._etabExpand(value[lPos + 1:])
-            return self._etabExpand(whole)
-        else:
-            whole = "${" + value[2:lPos] + "}" + self._etabExpand(value[lPos + 1:])
-            return os.path.expandvars(whole)
-
-class ConfigEtableParser:
-    def __init__(self, infile):
-        self.file = infile
-        self.quotes = [ '"', "'" ]
-        self.specials = {}
-        self.specials["n"] = "\n"
-        self.specials["r"] = "\r"
-        self.specials["t"] = "\t"
-        self.lastChar = None
-    def _readChar(self):
-        ch = self.__readChar()
-        return ch
-    def __readChar(self):
-        if self.lastChar != None:
-            ch = self.lastChar
-            self.lastChar = None
-            return ch
-        return self.file.read(1)
-    def _pushBack(self, ch):
-        self.lastChar = ch
-    def _peekCheck(self, ch, firstChar, nextChar):
-        if ch == firstChar:
-            ch2 = self._readChar()
-            if ch2 == nextChar:
-                return 1
-            self._pushBack(ch2)
-        return 0
-    def _readElement(self):
-        ch = self._readChar()
-        if self._peekCheck(ch, "/", "*"):
-            return "/*"
-        if self._peekCheck(ch, "*", "/"):
-            return "*/"
-        if len(os.linesep) > 1:
-            if self._peekCheck(ch, os.linesep[0], os.linesep[1]):
-                return os.linesep
-        if ch == "\\":
-            ch = self._readChar()
-        return ch
-    def _readQuote(self, quote):
-        text = ""
-        ch = self._readChar()
-        while len(ch) > 0 and ch != quote:
-            if ch == "\\":
-                ch = self._readChar()
-                if self.specials.has_key(ch):
-                    ch = self.specials[ch]
-            text += ch
-            ch = self._readChar()
-        return text
-
-    def get_token(self):
-        tok = ""
-        ch = self._readElement()
-        while len(ch) > 0:
-            if ch in self.quotes:
-                return tok + self._readQuote(ch)
-            if ch == "/*":
-                while ch != "" and ch != "*/":
-                    ch = self._readElement()
-                continue
-            if ch == ",":
-                if len(tok) > 0:
-                    self._pushBack(ch)
-                    return tok
-                else:
-                    return ch
-            if not ch in [ ' ', os.linesep, '\t' ]:
-                tok += ch
-            else:
-                if tok != "":
-                    return tok
-            ch = self._readElement()
-        if tok == "":
-            return None
-        return tok

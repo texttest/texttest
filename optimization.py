@@ -153,7 +153,6 @@ class OptimizationConfig(ravebased.Config):
                 group.addOption("kpiData", "Output KPI curve data etc.")
                 group.addOption("kpi", "Run Henrik's old KPI")
                 group.addOption("plot", "Plot Graph of selected runs")
-                group.addOption("cleandata", "Clean Carmdata")
     def getActionSequence(self):
         if self.optionMap.has_key("plot"):
             return [ self.getWriteDirectoryMaker(), DescribePlotTest() ]

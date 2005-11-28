@@ -241,7 +241,7 @@ class ImportTestCase(optimization.ImportTestCase):
     def getOptions(self, suite):
         return "-s " + self.getSubplanName()
 
-class ImportTestSuite(optimization.ImportTestSuite):
+class ImportTestSuite(ravebased.ImportTestSuite):
     def hasStaticLinkage(self, carmUsr):
         resourceFile = os.path.join(carmUsr, "Resources", "CarmResources", "Customer.etab")
         if not os.path.isfile(resourceFile):

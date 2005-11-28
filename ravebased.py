@@ -46,7 +46,7 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
                              the specified time. Default time is 1440 minutes.
 """
 
-import carmen, queuesystem, default, os, string, shutil, plugins, sys, signal, stat
+import carmen, queuesystem, default, os, string, shutil, plugins, sys, signal, stat, guiplugins
 from socket import gethostname
 from tempfile import mktemp
 from respond import Responder
@@ -676,6 +676,50 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
             return 1
         ttHome = os.getenv("TEXTTEST_HOME")
         return ttHome and carmtmp.find(ttHome) != -1
+
+# Graphical import suite
+class ImportTestSuite(guiplugins.ImportTestSuite):
+    def addEnvironmentFileOptions(self, oldOptionGroup):
+        self.optionGroup.addOption("usr", "CARMUSR")
+        self.optionGroup.addOption("data", "CARMDATA")
+    def getCarmValue(self, val):
+        optionVal = self.optionGroup.getOptionValue(val)
+        if optionVal:
+            return os.path.normpath(optionVal)
+    def hasStaticLinkage(self, carmUsr):
+        return 1
+    def openFile(self, fileName):
+        guiplugins.guilog.info("Writing file " + os.path.basename(fileName))
+        return open(fileName, "w")
+    def writeLine(self, file, line):
+        file.write(line + os.linesep)
+        guiplugins.guilog.info(line)
+    def getCarmtmpDirName(self, carmUsr):
+        return os.path.basename(carmUsr).replace("_user", "_tmp")
+    def getEnvironmentFileName(self, suite):
+        return "environment." + suite.app.name
+    def writeEnvironmentFiles(self, suite, testDir):
+        carmUsr = self.getCarmValue("usr")
+        if not carmUsr:
+            return
+        envFile = os.path.join(testDir, self.getEnvironmentFileName(suite))
+        file = self.openFile(envFile)
+        self.writeLine(file, "CARMUSR:" + carmUsr)
+        carmData = self.getCarmValue("data")
+        if carmData:
+            self.writeLine(file, "CARMDATA:" + carmData)
+        carmtmp = self.getCarmtmpDirName(carmUsr)
+        if self.hasStaticLinkage(carmUsr):
+            self.writeLine(file, "CARMTMP:$CARMSYS/" + carmtmp)
+            return
+
+        self.writeLine(file, "CARMTMP:" + self.getCarmtmpPath(carmtmp))
+        envLocalFile = os.path.join(testDir, "environment.local")
+        localFile = self.openFile(envLocalFile)
+        self.writeLine(localFile, "CARMTMP:$CARMSYS/" + carmtmp)
+    def getCarmtmpPath(self, carmtmp):
+        pass
+    # getCarmtmpPath implemented by subclasses
 
 class BuildCode(plugins.Action):
     builtDirs = {}

@@ -1164,11 +1164,9 @@ class ApcTestSuiteInformation(optimization.TestSuiteInformation):
         tmpContent = "CARMTMP:${CARMSYS}" + os.sep + self.makeCarmTmpName()
         return usrContent + os.linesep + tmpContent
 
-class ImportTestSuite(optimization.ImportTestSuite):
+class ImportTestSuite(ravebased.ImportTestSuite):
     def getCarmtmpDirName(self, carmUsr):
-        return optimization.ImportTestSuite.getCarmtmpDirName(self, carmUsr) + ".apc"
-    def getEnvironmentFileName(self, suite):
-        return "environment." + suite.app.name
+        return ravebased.ImportTestSuite.getCarmtmpDirName(self, carmUsr) + ".apc"
     
 # Graphical import
 class ImportTestCase(optimization.ImportTestCase):

@@ -182,7 +182,7 @@ class OptimizationConfig(ravebased.Config):
     def getWriteDirectoryPreparer(self):
         return PrepareCarmdataWriteDir(self._getSubPlanDirName)
     def extraReadFiles(self, test):
-        readDirs = seqdict()
+        readDirs = ravebased.Config.extraReadFiles(self, test)
         if test.classId() == "test-case":
             test.setUpEnvironment(parents=1)
             dirName = self._getSubPlanDirName(test)
@@ -1112,7 +1112,7 @@ class ImportTest(plugins.Action):
 
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
-    def addOptionsFileOption(self, oldOptionGroup):
+    def addDefinitionFileOption(self, suite, oldOptionGroup):
         self.addOption(oldOptionGroup, "sp", "Subplan name")
     def getSubplanName(self):
         return self.optionGroup.getOptionValue("sp")
@@ -1129,42 +1129,6 @@ class ImportTestCase(guiplugins.ImportTestCase):
     def getOptions(self, suite):
         pass
     # getOptions implemented in subclasses
-
-# Graphical import suite
-class ImportTestSuite(guiplugins.ImportTestSuite):
-    def addEnvironmentFileOptions(self, oldOptionGroup):
-        self.optionGroup.addOption("usr", "CARMUSR")
-    def getCarmusr(self):
-        return os.path.normpath(self.optionGroup.getOptionValue("usr"))
-    def hasStaticLinkage(self, carmUsr):
-        return 1
-    def openFile(self, fileName):
-        guiplugins.guilog.info("Writing file " + os.path.basename(fileName))
-        return open(fileName, "w")
-    def writeLine(self, file, line):
-        file.write(line + os.linesep)
-        guiplugins.guilog.info(line)
-    def getCarmtmpDirName(self, carmUsr):
-        return os.path.basename(carmUsr).replace("_user", "_tmp")
-    def getEnvironmentFileName(self, suite):
-        return "environment"
-    def writeEnvironmentFiles(self, suite, testDir):
-        carmUsr = self.getCarmusr()
-        envFile = os.path.join(testDir, self.getEnvironmentFileName(suite))
-        file = self.openFile(envFile)
-        self.writeLine(file, "CARMUSR:" + carmUsr)
-        carmtmp = self.getCarmtmpDirName(carmUsr)
-        if self.hasStaticLinkage(carmUsr):
-            self.writeLine(file, "CARMTMP:$CARMSYS/" + carmtmp)
-            return
-
-        self.writeLine(file, "CARMTMP:" + self.getCarmtmpPath(carmtmp))
-        envLocalFile = os.path.join(testDir, "environment.local")
-        localFile = self.openFile(envLocalFile)
-        self.writeLine(localFile, "CARMTMP:$CARMSYS/" + carmtmp)
-    def getCarmtmpPath(self, carmtmp):
-        pass
-    # getCarmtmpPath implemented by subclasses
         
 class TraverseSubPlans(plugins.Action):
     def __init__(self, args = []):

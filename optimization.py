@@ -75,6 +75,9 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
                Sets the title of the graph to graphtitle, rather than the default generated one.
              - ts=hours|days|minutes
                Used as time scale on the x-axis. Default is minutes.
+             - engine=gnuplot|mpl
+               Use as plot engine. Currently, gnuplot and matplotlib is supported, gnuplot is the default.
+               The matplotlib engine doesn't have the printing options (p, pc, pr and pa3) implemented yet.
              - terminal
                Set what type of terminal gnuplot should use for plotting, effective in
                conjuction with the p option. See the gnuplot documentation for all possibilities,
@@ -1283,7 +1286,8 @@ class TestGraph:
                          ("title", "Title of the plot", ""),
                          ("tu", "Search for temporary files in user", ""),
                          ("terminal", "gnuplot terminal to use", "postscript"),
-                         ("size", "gnuplot size", "1,1") ]
+                         ("size", "gnuplot size", "1,1"),
+                         ("engine", "Plot engine to use", "gnuplot") ]
         self.switches = [ ("per", "Plot percentage"),
                           ("oem", "Only plot exactly matching versions"),
                           ("pc", "Print in colour"),
@@ -1305,7 +1309,13 @@ class TestGraph:
         # Add the PlotAveragers last in the PlotLine list.
         for plotAverager in self.plotAveragers:
             self.plotLines.append(self.plotAveragers[plotAverager])
-        engine = PlotEngine(self)
+        engineOpt = self.optionGroup.getOptionValue("engine")
+        if engineOpt == "gnuplot":
+            engine = PlotEngine(self)
+        elif engineOpt == "mpl" and mplDefined:
+            engine = PlotEngineMPL(self)
+        else:
+            raise plugins.TextTestError, "Unknown plot engine " + engineOpt + " - aborting plotting."
         return engine.plot(writeDir)
     def getPlotOptions(self):
         xrange = self.optionGroup.getOptionValue("r")
@@ -1343,8 +1353,19 @@ class TestGraph:
             plotLine.pointType = self.pointTypes[test.name]
         # Fill in the map for later deduction
         self.lineTypes[plotLine.name] = 0
-    def getMultiple(self):
-        return (self.apps, self.users, self.pointTypes, self.lineTypes)
+    def deduceLineTypes(self, nextLineType):
+        self.multipleApps = len(self.apps) > 1
+        self.multipleUsers = len(self.users) > 1
+        self.multipleTests = len(self.pointTypes) > 1
+        self.multipleLineTypes = len(self.lineTypes) > 1
+        plotArguments = []
+        for plotLine in self.plotLines:
+            if not plotLine.plotLineRepresentant:
+                if not self.multipleTests or not self.multipleLineTypes or self.lineTypes[plotLine.name] == 0:
+                    plotLine.lineType = str(nextLineType())
+                    self.lineTypes[plotLine.name] = plotLine.lineType
+                else:
+                    plotLine.lineType = self.lineTypes[plotLine.name]
     def getYAxisLabel(self):
         label = None
         for plotLine in self.plotLines:
@@ -1355,6 +1376,8 @@ class TestGraph:
                 elif label != lineLabel:
                     return ""
         return label
+    def getPlotLineName(self, plotLine):
+        return plotLine.getPlotName(self.multipleApps, self.multipleUsers, self.multipleTests)
     def makeTitle(self, title):
         if title:
             return title;
@@ -1462,9 +1485,14 @@ class TestGraph:
 class PlotEngine:
     def __init__(self, testGraph):
         self.testGraph = testGraph
-        self.lineTypeCounter = 2
+        self.lineTypeCounter = 1
         self.undesiredLineTypes = []
         self.diag = plugins.getDiagnostics("Test Graph")
+    def getNextLineType(self):
+        self.lineTypeCounter += 1
+        while self.undesiredLineTypes.count(self.lineTypeCounter) > 0:
+            self.lineTypeCounter += 1
+        return self.lineTypeCounter
     # Create gnuplot plot arguments.
     def getStyle(self, plotLine, multipleLines):
         if plotLine.plotLineRepresentant:
@@ -1474,29 +1502,14 @@ class PlotEngine:
         else:
             style = " with linespoints "
         return style
-    def getPlotArgument(self, plotLine, multipleApps, multipleUsers, multipleLines, multipleTests):
-        return "'" + plotLine.plotFileName + "' " + " title \"" + plotLine.getPlotName(multipleApps, multipleUsers, multipleTests) + "\" " + self.getStyle(plotLine, multipleLines)
-    def writeLinesAndGetPlotArguments(self, plotLines, multiple, xScaleFactor, min, onlyAverage):
-        multipleLines = len(plotLines) > 1
-        (apps, users, pointTypes, lineTypes) = multiple
-        multipleApps = len(apps) > 1
-        multipleUsers = len(users) > 1
-        multipleTests = len(pointTypes) > 1
-        multipleLineTypes = len(lineTypes) > 1
+    def getPlotArgument(self, plotLine, multipleLines):
+        return "'" + plotLine.plotFileName + "' " + " title \"" + self.testGraph.getPlotLineName(plotLine) + "\" " + self.getStyle(plotLine, multipleLines)
+    def writeLinesAndGetPlotArguments(self, plotLines, xScaleFactor, min, onlyAverage):
         plotArguments = []
         for plotLine in plotLines:
             plotLine.writeFile(xScaleFactor, min)
-            if not plotLine.plotLineRepresentant:
-                if not multipleTests or not multipleLineTypes or lineTypes[plotLine.name] == 0:
-                    plotLine.lineType = str(self.lineTypeCounter)
-                    lineTypes[plotLine.name] = plotLine.lineType
-                    self.lineTypeCounter += 1
-                    while self.undesiredLineTypes.count(self.lineTypeCounter) > 0:
-                        self.lineTypeCounter += 1
-                else:
-                    plotLine.lineType = lineTypes[plotLine.name]
             if not onlyAverage or (onlyAverage and plotLine.plotLineRepresentant):
-                plotArguments.append(self.getPlotArgument(plotLine, multipleApps, multipleUsers, multipleLines, multipleTests))
+                plotArguments.append(self.getPlotArgument(plotLine, len(plotLines) > 1))
         return plotArguments
     def plot(self, writeDir):
         xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize = self.testGraph.getPlotOptions()
@@ -1532,6 +1545,7 @@ class PlotEngine:
             self.writePlot("set size " + plotSize)
 
         self.testGraph.setXAxisScaleAndLabel()
+        self.testGraph.deduceLineTypes(self.getNextLineType)
         self.writePlot("set ylabel '" + self.testGraph.getYAxisLabel() + "'")
         self.writePlot("set xlabel '" + self.testGraph.getXAxisLabel() + "'")
         self.writePlot("set time")
@@ -1548,7 +1562,8 @@ class PlotEngine:
             #self.writePlot("set label \"%\" at screen 0.03,0.5 rotate")
             #self.writePlot("set label \"Percentage above " + str(min) + "\" at screen 0.97,0.02 right")
             self.writePlot("set ylabel \"" + self.testGraph.getYAxisLabel() + "\\n% above " + str(min) + "\"")
-        plotArguments = self.writeLinesAndGetPlotArguments(self.testGraph.plotLines, self.testGraph.getMultiple(), self.testGraph.xScaleFactor, min, onlyAverage)
+        plotArguments = self.writeLinesAndGetPlotArguments(self.testGraph.plotLines,
+                                                           self.testGraph.xScaleFactor, min, onlyAverage)
         relPlotArgs = [ arg.replace(writeDir, ".") for arg in plotArguments ]
         self.writePlot("plot " + string.join(relPlotArgs, ", "))
         if not absTargetFile:
@@ -1584,7 +1599,86 @@ class PlotEngine:
                 name = childProc.getName()
                 if name.startswith("gnuplot_x11"):
                     return childProc
-            sleep(0.1)    
+            sleep(0.1)
+
+mplDefined = None
+try:
+    from matplotlib import *
+    use('TkAgg')
+    from matplotlib.pylab import *
+    mplDefined = 1
+except:
+    pass
+
+mplFigureNumber = 1
+
+class PlotEngineMPL:
+    def __init__(self, testGraph):
+        self.testGraph = testGraph
+        self.diag = plugins.getDiagnostics("Test Graph")
+        self.markers = ["o", "s", "x", "d", "+", "v", "1", "^"]
+        self.colors = ["b","r","g","c","m"]
+        self.lineTypeCounter = -1
+    def getNextLineType(self):
+        self.lineTypeCounter += 1
+        return self.lineTypeCounter
+    def parseRangeArg(self, arg, currentLim):
+        entries = arg.split(":")
+        if len(entries) != 2:
+            return currentLim
+        new = []
+        for ent in [0, 1]:
+            if entries[ent]:
+                new.append(entries[ent])
+            else:
+                new.append(currentLim[ent])
+        return new
+    def getLineSize(self, plotLine):
+        if plotLine.plotLineRepresentant:
+            return 2
+        else:
+            return 1
+    def getMarker(self, plotLine):
+        if plotLine.plotLineRepresentant:
+            return ""
+        else:
+            return self.markers[int(plotLine.pointType) % len(self.markers)]
+    def getLineColor(self, plotLine):
+        if plotLine.plotLineRepresentant:
+            return self.colors[int(plotLine.plotLineRepresentant.lineType) % len(self.colors)]
+        else:
+            return self.colors[int(plotLine.lineType) % len(self.colors)]
+    def getPlotArgument(self, plotLine):
+        return self.getLineColor(plotLine) + "-" + self.getMarker(plotLine)
+    def plot(self, writeDir):
+        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, terminal, plotSize = self.testGraph.getPlotOptions()
+        global mplFigureNumber
+        figure(mplFigureNumber, facecolor = 'w')
+        mplFigureNumber += 1
+        axes(axisbg = '#f6f6f6')
+        min = None
+        if plotPercentage:
+            min = self.testGraph.findMinOverPlotLines()
+        self.testGraph.setXAxisScaleAndLabel()
+        self.testGraph.deduceLineTypes(self.getNextLineType)
+
+        for plotLine in self.testGraph.plotLines:
+            if not onlyAverage or (onlyAverage and plotLine.plotLineRepresentant):
+                 x, y = plotLine.getGraph(self.testGraph.xScaleFactor, min)
+                 plot(x, y, self.getPlotArgument(plotLine), linewidth = self.getLineSize(plotLine),
+                      label = self.testGraph.getPlotLineName(plotLine), linestyle = "steps")
+        gca().set_xlim(self.parseRangeArg(xrange, gca().get_xlim()))
+        gca().set_ylim(self.parseRangeArg(yrange, gca().get_ylim()))
+        grid()
+        title(self.testGraph.makeTitle(userTitle))
+        legend()
+        xlabel(self.testGraph.getXAxisLabel())
+        if not plotPercentage:
+            ylabel(self.testGraph.getYAxisLabel())
+        else:
+            ylabel(self.testGraph.getYAxisLabel() + " % above " + str(min))
+        show()
+
 
 # Class representing ONE curve in plot.
 class PlotLine:
@@ -1629,15 +1723,24 @@ class PlotLine:
         if not os.path.isdir(dir):
             os.makedirs(dir)
         plotFile = open(self.plotFileName, "w")
+        x, y = self.getGraph(xScaleFactor, min)
+        for xx in x:
+            yy = y.pop(0)
+            plotFile.write(str(xx) + "  " + str(yy) + os.linesep)
+        plotFile.close()
+    def getGraph(self, xScaleFactor, min):
         xx = self.graph.keys()
         xx.sort()
+        yy = []
+        xxx = []
         for x in xx:
             if min:
                 y = 100.0*float(self.graph[x])/float(min)-100.0
             else:
                 y = self.graph[x]
-            plotFile.write(str(x*xScaleFactor) + "  " + str(y) + os.linesep)
-        plotFile.close()
+            yy.append(y)
+            xxx.append(x*xScaleFactor)
+        return xxx, yy
     def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):
         title = ""
         if addAppDescriptor:
@@ -1747,6 +1850,14 @@ class PlotAverager(Averager):
         self.plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))
         plotAveragerCount += 1
         plotFile = open(self.plotFileName, "w")
+        x, y = self.getGraph(xScaleFactor, min)
+        for xx in x:
+            yy = y.pop(0)
+            plotFile.write(str(xx) + " " + str(yy) + os.linesep)
+        plotFile.close()
+    def getGraph(self, xScaleFactor, min):
+        yValues = []
+        xx = []
         xValues = self.average.keys()
         xValues.sort()
         for xVal in xValues:
@@ -1754,8 +1865,9 @@ class PlotAverager(Averager):
                 y = 100.0*float(self.average[xVal])/float(self.numberOfGraphs*min)-100.0
             else:
                 y = self.average[xVal]/self.numberOfGraphs
-            plotFile.write(str(xVal*xScaleFactor) + " " + str(y) + os.linesep)
-        plotFile.close()
+            yValues.append(y)
+            xx.append(xScaleFactor * xVal)
+        return xx, yValues
     def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):
         return self.plotLineRepresentant.name
 

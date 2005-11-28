@@ -239,6 +239,17 @@ class Config(plugins.Configuration):
         if not test.state.isComplete():
             info += self.progressText(test)
         return info
+    def extraReadFiles(self, test):
+        localFiles = []
+        knownDataFiles = test.getConfigValue("link_test_path") + test.getConfigValue("copy_test_path") + \
+                         test.getConfigValue("partial_copy_test_path")
+        for file in knownDataFiles:
+            fullPath = os.path.join(test.abspath, file)
+            if os.path.exists(fullPath):
+                localFiles.append(fullPath)
+        readFiles = seqdict()
+        readFiles[""] = localFiles
+        return readFiles
     def progressText(self, test):
         perc = self.calculatePercentage(test)
         if perc > 0:

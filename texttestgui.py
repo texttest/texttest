@@ -713,7 +713,7 @@ class TestCaseGUI(RightWindowGUI):
             self.model.set_value(exiter, 0, "Diagnostics")
             self.addFilesUnderIter(exiter, diagFiles)
     def addStaticDataFilesToModel(self, test):
-        dataFileList = test.extraReadFiles().items()
+        dataFileList = test.app.configObject.extraReadFiles(test).items()
         if len(dataFileList) > 0:
             datiter = self.model.insert_before(None, None)
             self.model.set_value(datiter, 0, "Data Files")            

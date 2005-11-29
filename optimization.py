@@ -180,24 +180,13 @@ class OptimizationConfig(ravebased.Config):
         return 1
     def getWriteDirectoryPreparer(self):
         return PrepareCarmdataWriteDir(self._getSubPlanDirName)
-    def extraReadFiles(self, test):
-        readDirs = ravebased.Config.extraReadFiles(self, test)
-        if test.classId() == "test-case":
-            test.setUpEnvironment(parents=1)
-            dirName = self._getSubPlanDirName(test)
-            rulesFile = os.path.join(dirName, "APC_FILES", "rules")
-            if os.path.isfile(rulesFile):
-                readDirs["Subplan"] = [ rulesFile ]
-                readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", self.getRuleSetName(test)) ]
-                for title, fileName in self.filesFromRulesFile(test, rulesFile):
-                    readDirs[title] = [ fileName ]
-            test.tearDownEnvironment(parents=1)
-        elif test.environment.has_key("CARMUSR"):
-            readDirs["Resource"] = [ os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab") ]
-        elif test.environment.has_key("CARMSYS"):
-            readDirs["RAVE module"] = [ os.path.join(test.environment["CARMSYS"], \
-            "carmusr_default", "crc", "modules", test.getConfigValue("rave_name")) ]
-        return readDirs
+    def filesFromSubplan(self, test, subplanDir):
+        rulesFile = os.path.join(subplanDir, "APC_FILES", "rules")
+        if not os.path.isfile(rulesFile):
+            return []
+
+        subplanFiles = [ ("Subplan", rulesFile ) ]
+        return subplanFiles + self.filesFromRulesFile(test, rulesFile)
     def filesFromRulesFile(self, test, rulesFile):
         return []
     def printHelpDescription(self):

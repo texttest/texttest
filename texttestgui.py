@@ -712,18 +712,27 @@ class TestCaseGUI(RightWindowGUI):
             exiter = self.model.insert_before(stditer, None)
             self.model.set_value(exiter, 0, "Diagnostics")
             self.addFilesUnderIter(exiter, diagFiles)
+    def getDataFileList(self, test):
+        dataFileList = []
+        filesToSearch = test.app.configObject.extraReadFiles(test).items()
+        for name, filelist in filesToSearch:
+            existingFileList = filter(lambda file: os.path.exists(file), filelist)
+            if len(existingFileList) > 0:
+                dataFileList.append((name, existingFileList))
+        return dataFileList
     def addStaticDataFilesToModel(self, test):
-        dataFileList = test.app.configObject.extraReadFiles(test).items()
-        if len(dataFileList) > 0:
-            datiter = self.model.insert_before(None, None)
-            self.model.set_value(datiter, 0, "Data Files")            
-            for name, filelist in dataFileList:
-                if len(name) > 0:
-                    exiter = self.model.insert_before(datiter, None)
-                    self.model.set_value(exiter, 0, name)
-                    self.addFilesUnderIter(exiter, filelist)
-                else:
-                    self.addFilesUnderIter(datiter, filelist)
+        dataFileList = self.getDataFileList(test)
+        if len(dataFileList) == 0:
+            return
+        datiter = self.model.insert_before(None, None)
+        self.model.set_value(datiter, 0, "Data Files")            
+        for name, filelist in dataFileList:
+            if len(name) > 0:
+                exiter = self.model.insert_before(datiter, None)
+                self.model.set_value(exiter, 0, name)
+                self.addFilesUnderIter(exiter, filelist)
+            else:
+                self.addFilesUnderIter(datiter, filelist)
     def getDiagDefinitionFile(self, app):
         diagDict = app.getConfigValue("diagnostics")
         if diagDict.has_key("configuration_file"):

@@ -231,6 +231,36 @@ class Config(carmen.CarmenConfig):
             return BuildCode(self.optionValue("buildl"), remote = 0)
         else:
             return None
+    def _getLocalPlanPath(self, test):
+        # Key assumption : to avoid reading Carmen Resource system LocalPlanPath
+        # If this does not hold changing the CARMUSR is needed
+        return os.path.join(getCarmdata(), "LOCAL_PLAN")
+    def _getSubPlanDirName(self, test):
+        subPlan = self._subPlanName(test)
+        fullPath = os.path.join(self._getLocalPlanPath(test), subPlan)
+        return os.path.normpath(fullPath)
+    def extraReadFiles(self, test):
+        readDirs = carmen.CarmenConfig.extraReadFiles(self, test)
+        if test.classId() == "test-case":
+            test.setUpEnvironment(parents=1)
+            subplan = self._getSubPlanDirName(test)
+            if os.path.isdir(subplan):
+                for title, fileName in self.filesFromSubplan(test, subplan):
+                    readDirs[title] = [ fileName ]
+            ruleset = self.getRuleSetName(test)
+            if ruleset:
+                readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", ruleset) ]
+            test.tearDownEnvironment(parents=1)
+        elif test.environment.has_key("CARMUSR"):
+            customerFile = os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab")
+            impFile = os.path.join(test.environment["CARMUSR"], "data", "config", "CarmResources", "Implementation.etab")
+            readDirs["Resources"] = [ customerFile, impFile ]
+        elif test.environment.has_key("CARMSYS"):
+            readDirs["RAVE module"] = [ os.path.join(test.environment["CARMSYS"], \
+                                        "carmusr_default", "crc", "modules", test.getConfigValue("rave_name")) ]
+        return readDirs
+    def filesFromSubplan(self, test, subplanDir):
+        return []
     def isSlowdownJob(self, user, jobName):
         # APC is observed to slow down the other job on its machine by up to 20%. Detect it
         apcDevelopers = [ "curt", "lennart", "johani", "rastjo", "tomasg", "fredrik", "henrike" ]

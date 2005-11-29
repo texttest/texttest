@@ -57,13 +57,6 @@ def getOption(options, optionVal):
     return None
 
 class MatadorConfig(optimization.OptimizationConfig):
-    def _getLocalPlanPath(self, test):
-        # Assumption to avoid reading Carmen Resource system LocalPlanPath
-        return os.path.join(ravebased.getCarmdata(), "LOCAL_PLAN")
-    def _getSubPlanDirName(self, test):
-        subPlan = self._subPlanName(test)
-        fullPath = os.path.join(self._getLocalPlanPath(test), subPlan)
-        return os.path.normpath(fullPath)
     def _subPlanName(self, test):
         subPlan = getOption(test.options, "-s")            
         if subPlan == None:

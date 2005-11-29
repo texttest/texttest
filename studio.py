@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.11 2005/11/29 11:55:14 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.12 2005/11/29 16:46:16 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -23,6 +23,8 @@ class StudioConfig(ravebased.Config):
         if self.optionMap.has_key("rset"):
             return self.optionMap["rset"]
         subplanDir = self._getSubPlanDirName(test)
+        if not subplanDir:
+            return ""
         headerFile = os.path.join(subplanDir, "subplanHeader")
         origPath = self.findOrigRulePath(headerFile)
         return os.path.basename(origPath)
@@ -103,13 +105,26 @@ class RecordTest(guiplugins.RecordTest):
         if not carmUsr:
             return []
         sourceDir = os.path.join(carmUsr, "crc", "source")
-        return filter(self.isRuleSource, os.listdir(sourceDir))
+        if os.path.isdir(sourceDir):
+            return filter(self.isRuleSource, os.listdir(sourceDir))
+        else:
+            return []
     def isRuleSource(self, fileName):
         return not fileName.startswith(".")
     def getRunOptions(self, test, usecase):
         basicOptions = guiplugins.RecordTest.getRunOptions(self, test, usecase)
         ruleset = self.optionGroup.getOptionValue("rset")
-        if usecase == "record" and ruleset:
-            return "-rulecomp -rset " + ruleset + " " + basicOptions
+        if usecase == "record":
+            # We want the dynamic GUI up for recording, so we can see what we create
+            basicOptions = basicOptions.replace("-o ", "-g ")
+            if ruleset:
+                return "-rulecomp -rset " + ruleset + " " + basicOptions
+        return basicOptions
+    # We want to generate a second auto-replay...
+    def setTestReady(self, test, usecase=""):
+        if usecase == "replay":
+            self.startTextTestProcess(test, usecase="replay2")
+            test.state.freeText = "First auto-replay completed - second now in progress to collect standard files" + \
+                                  "\n" + "These will appear shortly. You do not need to submit the test manually."
         else:
-            return basicOptions
+            guiplugins.RecordTest.setTestReady(self, test, usecase)

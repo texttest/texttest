@@ -324,7 +324,7 @@ class RecordTest(InteractiveAction):
         if usecase == "record":
             self.setTestRecorded(test)
         else:
-            self.setTestReady(test)
+            self.setTestReady(test, usecase)
         test.notifyChanged()
     def setTestRecorded(self, test):
         if not os.path.isfile(test.useCaseFile) and not os.path.isfile(test.inputFile):

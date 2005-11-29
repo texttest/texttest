@@ -58,10 +58,6 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
                Do not use status file from the currently running test.
              - tu=user_name
                Looks for temporary files in /users/user_name/texttesttmp instead of default textttesttmp. 
-             - ns
-               Do not scale times with the performance of the test.
-             - nv
-               No line type grouping for different versions of the test.
              - v=v1,v2
                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
                Moreover, you may supply a time scale factor for the different versions
@@ -69,12 +65,14 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
              - oem
                Plot only exactly matching version, rather than plotting the closest
                matching version if no exact match exists.
-             - sg
-               Plot all tests chosen on the same graph, rather than one window per test
              - title=graphtitle
                Sets the title of the graph to graphtitle, rather than the default generated one.
              - ts=hours|days|minutes
                Used as time scale on the x-axis. Default is minutes.
+             - nl
+               No legend.
+             - olav
+               Only legend for the averages.
              - engine=gnuplot|mpl
                Use as plot engine. Currently, gnuplot and matplotlib is supported, gnuplot is the default.
                The matplotlib engine doesn't have the printing options (p, pc, pr and pa3) implemented yet.
@@ -83,7 +81,7 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
                conjuction with the p option. See the gnuplot documentation for all possibilities,
                some interesting ones are: postscript, png, svg.
              - size
-               Sets the size of the plot, see the gnuplot manual for details.
+               Sets the size of the plot, the meaning may vary from engine to engine.
 """
              
 helpScripts="""optimization.TableTest     - Displays solution data in a table. Works the same as -plot in most respects,
@@ -1237,8 +1235,8 @@ class TestGraph:
                          ("v", "Extra versions to plot", ""),
                          ("title", "Title of the plot", ""),
                          ("tu", "Search for temporary files in user", ""),
+                         ("size", "size of the plot", ""),
                          ("terminal", "gnuplot terminal to use", "postscript"),
-                         ("size", "gnuplot size", "1,1"),
                          ("engine", "Plot engine to use", "gnuplot") ]
         self.switches = [ ("per", "Plot percentage"),
                           ("oem", "Only plot exactly matching versions"),
@@ -1247,6 +1245,8 @@ class TestGraph:
                           ("s", "Plot against solution number rather than time"),
                           ("av", "Plot also average"),
                           ("oav", "Plot only average"),
+                          ("nl", "No legend"), 
+                          ("olav", "Only legend for the averages"),
                           ("nt", "Don't search for temporary files") ]
         self.diag = plugins.getDiagnostics("Test Graph")
         self.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
@@ -1277,11 +1277,13 @@ class TestGraph:
         printA3 = self.optionGroup.getSwitchValue("pa3")
         onlyAverage = self.optionGroup.getSwitchValue("oav")
         title = self.optionGroup.getOptionValue("title")
+        noLegend = self.optionGroup.getSwitchValue("nl")
+        onlyLegendAverage = self.optionGroup.getSwitchValue("olav")
         printer = self.optionGroup.getOptionValue("pr")
         plotPercentage = self.optionGroup.getSwitchValue("per")
         terminal = self.optionGroup.getOptionValue("terminal")
         plotSize = self.optionGroup.getOptionValue("size")
-        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize
+        return xrange, yrange, fileName, printer, writeColour, printA3, onlyAverage, plotPercentage, title, noLegend, onlyLegendAverage, terminal, plotSize
     def findMinOverPlotLines(self):
         min = self.plotLines[0].min
         for plotLine in self.plotLines[1:]:
@@ -1328,7 +1330,11 @@ class TestGraph:
                 elif label != lineLabel:
                     return ""
         return label
-    def getPlotLineName(self, plotLine):
+    def getPlotLineName(self, plotLine, noLegend, onlyLegendAverage):
+        if noLegend:
+            return None
+        if onlyLegendAverage and not plotLine.plotLineRepresentant:
+            return None
         return plotLine.getPlotName(self.multipleApps, self.multipleUsers, self.multipleTests)
     def makeTitle(self, title):
         if title:
@@ -1454,17 +1460,24 @@ class PlotEngine:
         else:
             style = " with linespoints "
         return style
-    def getPlotArgument(self, plotLine, multipleLines):
-        return "'" + plotLine.plotFileName + "' " + " title \"" + self.testGraph.getPlotLineName(plotLine) + "\" " + self.getStyle(plotLine, multipleLines)
-    def writeLinesAndGetPlotArguments(self, plotLines, xScaleFactor, min, onlyAverage):
+    def getPlotLineTitle(self, plotLine, noLegend, onlyLegendAverage):
+        label = self.testGraph.getPlotLineName(plotLine, noLegend, onlyLegendAverage)
+        if label:
+            return " title \"" + label + "\" "
+        else:
+            return " notitle "
+    def getPlotArgument(self, plotLine, multipleLines, noLegend, onlyLegendAverage):
+        return "'" + plotLine.plotFileName + "' " + self.getPlotLineTitle(plotLine, noLegend, onlyLegendAverage) + self.getStyle(plotLine, multipleLines)
+    def writeLinesAndGetPlotArguments(self, plotLines, xScaleFactor, min, onlyAverage, noLegend, onlyLegendAverage):
         plotArguments = []
         for plotLine in plotLines:
             plotLine.writeFile(xScaleFactor, min)
             if not onlyAverage or (onlyAverage and plotLine.plotLineRepresentant):
-                plotArguments.append(self.getPlotArgument(plotLine, len(plotLines) > 1))
+                plotArguments.append(self.getPlotArgument(plotLine, len(plotLines) > 1,
+                                                          noLegend, onlyLegendAverage))
         return plotArguments
     def plot(self, writeDir):
-        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title, terminal, plotSize = self.testGraph.getPlotOptions()
+        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, title, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()
         if len(self.testGraph.plotLines) == 0:
             return
 
@@ -1493,7 +1506,7 @@ class PlotEngine:
         if targetFile or printer:
             self.undesiredLineTypes = [5, 6]
 
-        if not (printer and printA3):
+        if not (printer and printA3) and plotSize:
             self.writePlot("set size " + plotSize)
 
         self.testGraph.setXAxisScaleAndLabel()
@@ -1515,7 +1528,8 @@ class PlotEngine:
             #self.writePlot("set label \"Percentage above " + str(min) + "\" at screen 0.97,0.02 right")
             self.writePlot("set ylabel \"" + self.testGraph.getYAxisLabel() + "\\n% above " + str(min) + "\"")
         plotArguments = self.writeLinesAndGetPlotArguments(self.testGraph.plotLines,
-                                                           self.testGraph.xScaleFactor, min, onlyAverage)
+                                                           self.testGraph.xScaleFactor, min, onlyAverage,
+                                                           noLegend, onlyLegendAverage)
         relPlotArgs = [ arg.replace(writeDir, ".") for arg in plotArguments ]
         self.writePlot("plot " + string.join(relPlotArgs, ", "))
         if not absTargetFile:
@@ -1602,10 +1616,17 @@ class PlotEngineMPL:
             return self.colors[int(plotLine.lineType) % len(self.colors)]
     def getPlotArgument(self, plotLine):
         return self.getLineColor(plotLine) + "-" + self.getMarker(plotLine)
+    def getPlotSize(self, plotSize):
+        if plotSize:
+            nums = plotSize.split(",")
+            if len(nums) == 2:
+                return (nums[0], nums[1])
+        else:
+            return None
     def plot(self, writeDir):
-        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, terminal, plotSize = self.testGraph.getPlotOptions()
+        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()
         global mplFigureNumber
-        figure(mplFigureNumber, facecolor = 'w')
+        figure(mplFigureNumber, facecolor = 'w', figsize = self.getPlotSize(plotSize))
         mplFigureNumber += 1
         axes(axisbg = '#f6f6f6')
         min = None
@@ -1617,24 +1638,33 @@ class PlotEngineMPL:
         # The plotlines will be plotted in an indeterministic order
         # if we don't specify the zorder. This is not to affect the
         # apperance of the plot.
-        zOrder = 0 
+        zOrder = 0
+        legendLine = []
+        legendLabel = []
         for plotLine in self.testGraph.plotLines:
             if not onlyAverage or (onlyAverage and plotLine.plotLineRepresentant):
                  x, y = plotLine.getGraph(self.testGraph.xScaleFactor, min)
-                 plot(x, y, self.getPlotArgument(plotLine), linewidth = self.getLineSize(plotLine),
-                      label = self.testGraph.getPlotLineName(plotLine), linestyle = "steps", zorder = zOrder)
+                 line = plot(x, y, self.getPlotArgument(plotLine), linewidth = self.getLineSize(plotLine),
+                             linestyle = "steps", zorder = zOrder)
+                 label = self.testGraph.getPlotLineName(plotLine, noLegend, onlyLegendAverage)
+                 if label:
+                     legendLine.append(line)
+                     legendLabel.append(label)
             zOrder += 1
         gca().set_xlim(self.parseRangeArg(xrange, gca().get_xlim()))
         gca().set_ylim(self.parseRangeArg(yrange, gca().get_ylim()))
         grid()
         title(self.testGraph.makeTitle(userTitle))
-        legend()
+        if legendLine:
+            legend(legendLine, legendLabel)
         xlabel(self.testGraph.getXAxisLabel())
         if not plotPercentage:
             ylabel(self.testGraph.getYAxisLabel())
         else:
             ylabel(self.testGraph.getYAxisLabel() + " % above " + str(min))
         if targetFile:
+            if not os.path.isdir(writeDir):
+                os.makedirs(writeDir)
             os.chdir(writeDir)
             absTargetFile = os.path.expanduser(targetFile)
             savefig(absTargetFile)

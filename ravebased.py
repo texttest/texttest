@@ -239,6 +239,8 @@ class Config(carmen.CarmenConfig):
         return os.path.join(getCarmdata(), "LOCAL_PLAN")
     def _getSubPlanDirName(self, test):
         subPlan = self._subPlanName(test)
+        if not subPlan:
+            return
         fullPath = os.path.join(self._getLocalPlanPath(test), subPlan)
         return os.path.normpath(fullPath)
     def extraReadFiles(self, test):
@@ -246,7 +248,7 @@ class Config(carmen.CarmenConfig):
         if test.classId() == "test-case":
             test.setUpEnvironment(parents=1)
             subplan = self._getSubPlanDirName(test)
-            if os.path.isdir(subplan):
+            if subplan and os.path.isdir(subplan):
                 for title, fileName in self.filesFromSubplan(test, subplan):
                     readDirs[title] = [ fileName ]
             ruleset = self.getRuleSetName(test)

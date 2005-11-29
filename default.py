@@ -96,14 +96,13 @@ class Config(plugins.Configuration):
         return [ self.getWriteDirectoryPreparer(ignoreCatalogues), catalogueCreator, \
                  self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def getPossibleResultFiles(self, app):
-        files = []
-        if app.getConfigValue("collect_standard_output"):
-            files.append("output")
-        if app.getConfigValue("collect_standard_error"):
-            files.append("errors")
+        files = [ "output", "errors" ]
         if app.getConfigValue("create_catalogues") == "true":
             files.append("catalogue")
         files += app.getConfigValue("collate_file").keys()
+        for file in app.getConfigValue("discard_file"):
+            if file in files:
+                files.remove(file)
         return files
     def getPossibleFilterFiles(self, app):
         filterFiles = []
@@ -331,8 +330,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("performance_test_minimum", { "default" : 0 }, \
                              "Minimum time/memory to be consumed before data is collected")
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
-        app.setConfigDefault("collect_standard_output", 1, "Is standard output of the SUT collected by default")
-        app.setConfigDefault("collect_standard_error", 1, "Is standard error of the SUT collected by default")
+        app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         app.addConfigEntry("pending", "white", "test_colours")
         app.addConfigEntry("definition_file_stems", "knownbugs")
         # Batch values. Maps from session name to values
@@ -554,13 +552,11 @@ class CreateSelectionFiles(plugins.Action):
 class CollateFiles(plugins.Action):
     def __init__(self):
         self.collations = {}
-        self.collectStdErr = 1
-        self.collectStdOut = 1
+        self.discardFiles = []
         self.diag = plugins.getDiagnostics("Collate Files")
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
-        self.collectStdErr = app.getConfigValue("collect_standard_error")
-        self.collectStdOut = app.getConfigValue("collect_standard_output")
+        self.discardFiles = app.getConfigValue("discard_file")
     def expandCollations(self, test, coll):
 	newColl = {}
 	# copy items specified without "*" in targetStem
@@ -601,14 +597,10 @@ class CollateFiles(plugins.Action):
         self.removeUnwanted(test)
         self.collate(test)
     def removeUnwanted(self, test):
-        if not self.collectStdErr:
-            self.removeFile(test, "errors")
-        if not self.collectStdOut:
-            self.removeFile(test, "output")
-    def removeFile(self, test, stem):
-        filePath = test.makeFileName(stem, temporary=1)
-        if os.path.isfile(filePath):
-            os.remove(filePath)
+        for stem in self.discardFiles:
+            filePath = test.makeFileName(stem, temporary=1)
+            if os.path.isfile(filePath):
+                os.remove(filePath)
     def collate(self, test):
 	testCollations = self.expandCollations(test, self.collations)
         errorWrites = []

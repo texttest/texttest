@@ -73,6 +73,5 @@ class RecordTest(guiplugins.RecordTest):
         if os.path.isfile(newLogFile):
             shutil.copyfile(newLogFile, serverLog)
     def getRunOptions(self, test, usecase):
-        baseOptions = guiplugins.RecordTest.getRunOptions(self, test, usecase)
         os.environ["DMG_RECORD_TEST"] = ""
-        return baseOptions + " -l "
+        return guiplugins.RecordTest.getRunOptions(self, test, usecase)

@@ -149,6 +149,8 @@ class Config(carmen.CarmenConfig):
         return carmen.CarmenConfig.getFilterClasses(self) + [ UserFilter ]
     def useExtraVersions(self):
         return carmen.CarmenConfig.useExtraVersions(self) and not self.raveSlave()
+    def isolatesDataUsingCatalogues(self, app):
+        return app.getConfigValue("create_catalogues") == "true"
     def getResponderClasses(self):
         if self.raveSlave():
             return [ queuesystem.SocketResponder ]

@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.10 2005/11/29 10:27:25 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.11 2005/11/29 11:55:14 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -17,8 +17,8 @@ class StudioConfig(ravebased.Config):
         for group in groups:
             if group.name.startswith("Invisible"):
                 group.addOption("rset", "Private: used for submitting ruleset compilation along with recording")
-    def getWriteDirectoryPreparer(self):
-        return ravebased.PrepareCarmdataWriteDir()
+    def getWriteDirectoryPreparer(self, ignoreCatalogues):
+        return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues)
     def getRuleSetName(self, test):
         if self.optionMap.has_key("rset"):
             return self.optionMap["rset"]
@@ -58,7 +58,7 @@ class StudioConfig(ravebased.Config):
 # Graphical import suite. Basically the same as those used for optimizers
 class ImportTestSuite(ravebased.ImportTestSuite):
     def hasStaticLinkage(self, carmUsr):
-        return 0
+        return False
     def getCarmtmpPath(self, carmtmp):
         return os.path.join("/carm/proj/studio/carmtmps/${MAJOR_RELEASE_ID}/${ARCHITECTURE}", carmtmp)
 

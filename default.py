@@ -26,6 +26,8 @@ class Config(plugins.Configuration):
             elif group.name.startswith("What"):
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
+                if self.isolatesDataUsingCatalogues(app):
+                    group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("How"):
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("noperf", "Disable any performance testing")
@@ -61,6 +63,9 @@ class Config(plugins.Configuration):
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
         return classes
+    def isolatesDataUsingCatalogues(self, app):
+        return app.getConfigValue("create_catalogues") == "true" and \
+               len(app.getConfigValue("partial_copy_test_path")) > 0
     def getRunIdentifier(self, prefix):
         basicId = plugins.Configuration.getRunIdentifier(self, prefix)
         if prefix and self.useStaticGUI():
@@ -87,7 +92,8 @@ class Config(plugins.Configuration):
             return self.getFileExtractor()
         
         catalogueCreator = self.getCatalogueCreator()
-        return [ self.getWriteDirectoryPreparer(), catalogueCreator, \
+        ignoreCatalogues = self.optionMap.has_key("ignorecat")
+        return [ self.getWriteDirectoryPreparer(ignoreCatalogues), catalogueCreator, \
                  self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def getPossibleResultFiles(self, app):
         files = []
@@ -162,8 +168,8 @@ class Config(plugins.Configuration):
             return None
         else:
             return self._getWriteDirectoryMaker()
-    def getWriteDirectoryPreparer(self):
-        return PrepareWriteDirectory()
+    def getWriteDirectoryPreparer(self, ignoreCatalogues):
+        return PrepareWriteDirectory(ignoreCatalogues)
     def _getWriteDirectoryMaker(self):
         return MakeWriteDirectory()
     def tryGetTestRunner(self):
@@ -360,8 +366,9 @@ class MakeWriteDirectory(plugins.Action):
         app.makeWriteDirectory()
 
 class PrepareWriteDirectory(plugins.Action):
-    def __init__(self):
+    def __init__(self, ignoreCatalogues):
         self.diag = plugins.getDiagnostics("Prepare Writedir")
+        self.ignoreCatalogues = ignoreCatalogues
     def __repr__(self):
         return "Prepare write directory for"
     def __call__(self, test):
@@ -477,7 +484,7 @@ class PrepareWriteDirectory(plugins.Action):
         return False
     def getModifiedPaths(self, test, sourcePath):
         catFile = test.makeFileName("catalogue")
-        if not os.path.isfile(catFile):
+        if not os.path.isfile(catFile) or self.ignoreCatalogues:
             # This means we don't know
             return None
         # Catalogue file is actually relative to temporary directory, need to take one level above...

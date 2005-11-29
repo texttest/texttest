@@ -1288,7 +1288,7 @@ class TestGraph:
         min = self.plotLines[0].min
         for plotLine in self.plotLines[1:]:
             if not plotLine.plotLineRepresentant:
-                if plotLine.min < min:
+                if plotLine.min and plotLine.min < min:
                     min = plotLine.min
         return min
     def addLine(self, plotLine):

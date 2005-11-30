@@ -850,8 +850,10 @@ class CreateCatalogue(plugins.Action):
             return
 
         if self.catalogues.has_key(test):
+            self.diag.info("Creating catalogue change file...")
             self.createCatalogueChangeFile(test)
         else:
+            self.diag.info("Collecting original information...")
             self.catalogues[test] = self.findAllPaths(test)
     def createCatalogueChangeFile(self, test):
         oldPaths = self.catalogues[test]
@@ -934,7 +936,9 @@ class CreateCatalogue(plugins.Action):
             if os.path.isdir(fullPath) and not os.path.islink(fullPath):
                 subDirs.append(fullPath)
             if not app.ownsFile(writeFile, unknown=0):
-                allPaths[fullPath] = self.getEditInfo(fullPath)
+                editInfo = self.getEditInfo(fullPath)
+                self.diag.info("Path " + fullPath + " edit info " + str(editInfo))
+                allPaths[fullPath] = editInfo
                 
         for subDir in subDirs:
             self.listDirectory(app, subDir, allPaths)

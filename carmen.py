@@ -174,7 +174,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return SgeSubmissionRules(self.optionMap, test)
     def isNightJob(self):
         batchSession = self.optionValue("b")
-        return batchSession == "nightjob" or batchSession == "wkendjob"
+        return batchSession == "nightjob" or batchSession == "wkendjob" or batchSession == "nightly_publish" or batchSession == "weekly_publish"
     def printHelpOptions(self):
         print helpOptions
     def printHelpDescription(self):

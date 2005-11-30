@@ -545,6 +545,11 @@ class SynchroniseState(plugins.Action):
             return test.state.testCompiling.state
         except AttributeError:
             return None
+    def getRuleSetName(self, test):
+        try:
+            return test.state.rulesetName
+        except AttributeError:
+            return None
     def __call__(self, test):
         newState = self.getCompilingTestState(test)
         if newState:
@@ -553,13 +558,17 @@ class SynchroniseState(plugins.Action):
         if test.state.hasStarted():
             return
         if newState.category == "running_rulecompile" and test.state.category == "pend_rulecompile":
-            test.changeState(RunningRuleCompilation(test.state, newState))
-        elif newState.category == "unrunnable":
-            errMsg = "Trying to use ruleset '" + test.state.rulesetName + "' that failed to build."
+            return test.changeState(RunningRuleCompilation(test.state, newState))
+        rulesetName = self.getRuleSetName(test)
+        if not rulesetName:
+            # Means we've got some other situation than a rule compilation failing or succeeding...
+            return
+        if newState.category == "unrunnable":
+            errMsg = "Trying to use ruleset '" + rulesetName + "' that failed to build."
             test.changeState(RuleBuildFailed("Ruleset build failed (repeat)", errMsg))
         elif not newState.category.endswith("_rulecompile") and test.state.category.endswith("_rulecompile"):
             test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + \
-                                               test.state.rulesetName + " succesfully compiled"))
+                                               rulesetName + " succesfully compiled"))
 
 class RuleBuildSynchroniser(Responder):
     def __init__(self, optionMap):

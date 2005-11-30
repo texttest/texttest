@@ -220,11 +220,11 @@ class CollateFiles(default.CollateFiles):
         for line in open(stderrFile).xreadlines():
             writeFile.write(line)
     def extract(self, sourcePath, targetFile):
-        # Renaming links is fairly dangerous, if they point at relative paths. Copy these.
-        if os.path.islink(sourcePath):
-            shutil.copyfile(sourcePath, targetFile)
-        else:
+        # Core files can be pretty huge and generally aren't test data. Move them rather than copy them...
+        if os.path.basename(targetFile).startswith("stacktrace."):
             plugins.movefile(sourcePath, targetFile)
+        else:
+            shutil.copyfile(sourcePath, targetFile)
     def getInterruptActions(self):
         if str(sys.exc_value) == "CPULIMIT":
             return [ default.CollateFiles() ]

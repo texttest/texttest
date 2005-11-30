@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.12 2005/11/29 16:46:16 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.13 2005/11/30 13:12:35 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -74,7 +74,8 @@ def getCarmUsr(suite):
 class ImportTestCase(guiplugins.ImportTestCase):
     newMacroString = "<Record new macro>"
     def addDefinitionFileOption(self, suite, oldOptionGroup):
-        self.addOption(oldOptionGroup, "mac", "Macro to use", self.newMacroString, self.getExistingMacros(suite))
+        # Don't use oldOptionGroup, we probably don't want the same macro more than once
+        self.optionGroup.addOption("mac", "Macro to use", self.newMacroString, self.getExistingMacros(suite))
     def getExistingMacros(self, suite):
         carmUsr = getCarmUsr(suite)
         if not carmUsr:
@@ -99,7 +100,7 @@ class RecordTest(guiplugins.RecordTest):
     def __init__(self, test, oldOptionGroup):
         guiplugins.RecordTest.__init__(self, test, oldOptionGroup)
         if self.canPerformOnTest():
-            self.addOption(oldOptionGroup, "rset", "Compile this ruleset first", possibleValues=self.findRuleSets(test))
+            self.optionGroup.addOption("rset", "Compile this ruleset first", possibleValues=self.findRuleSets(test))
     def findRuleSets(self, test):
         carmUsr = getCarmUsr(test)
         if not carmUsr:

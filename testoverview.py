@@ -223,10 +223,12 @@ class TestTable:
         fgcol = "BLACK"
         if type == "faster" or type == "slower":
             bgcol = HTMLcolors.TAN
-            if self.getPercent(detail) >= 5:
+            result = self.getPercent(detail)
+            if result[0] and result[1] >= 5:
                 fgcol = HTMLcolors.RED6
         elif type == "smaller" or type == "larger":
-            if self.getPercent(detail) >= 3:
+            result = self.getPercent(detail)
+            if result[0] and result[1] >= 3:
                 fgcol = HTMLcolors.RED6
             bgcol = HTMLcolors.PINK
         elif type == "success":
@@ -245,8 +247,13 @@ class TestTable:
         cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))
         return HTMLgen.Container(cap, heading)
     def getPercent(self, detail):
-        return int(detail.split("%")[0]) # Bad: Hard coded interpretation of texttest print-out.
-
+        potentialNumber = detail.split("%")[0] # Bad: Hard coded interpretation of texttest print-out.
+        if potentialNumber.isdigit():
+            return (1, int(potentialNumber))
+        else:
+            print "Warning: Failed to get percentage from",detail
+            return (0, 0)
+        
 class TestDetails:
     def generate(self, categoryHandler, version, tags):
         detailsContainers = {}

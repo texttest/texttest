@@ -568,7 +568,7 @@ class SelectTests(guiplugins.SelectTests):
             for line in open(featureFile).readlines():
                 parts = line.split()
                 if len(parts) > 0:
-                    featureName = parts[0]
+                    featureName = line.replace("\n", "")
                     self.addSwitch(oldOptionGroup, featureName, featureName, 0)
                     self.features.append(featureName)
     def getSelectedTests(self, rootTestSuites):

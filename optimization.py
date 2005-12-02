@@ -115,7 +115,7 @@ optimization.TraverseSubPlans
 """
 
 
-import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy
+import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy, comparetest
 from ndict import seqdict
 from time import sleep
 from respond import Responder
@@ -171,6 +171,8 @@ class OptimizationConfig(ravebased.Config):
             return [ GraphPlotResponder ]
         else:
             return ravebased.Config.getResponderClasses(self)
+    def getTestComparator(self):
+        return comparetest.MakeComparisons(OptimizationTestComparison)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def defaultBuildRules(self):
@@ -293,6 +295,47 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             if file.endswith(postfix):
                 return False
         return True   
+
+class OptimizationTestComparison(performance.PerformanceTestComparison):
+    def __init__(self, previousInfo, app):
+        performance.PerformanceTestComparison.__init__(self, previousInfo, app)
+        self.costName = costEntryName
+        itemsInFile = app.getConfigValue(itemNamesConfigKey)
+        if itemsInFile.has_key(costEntryName):
+            self.costName = itemsInFile[costEntryName]
+        self.logStem = app.getConfigValue("log_file")
+    def getTypeBreakdown(self):
+        category, details = performance.PerformanceTestComparison.getTypeBreakdown(self)
+        if not details.startswith("solution different"):
+            return category, details
+        logComp, resultList = self.findComparison(self.logStem)
+        if not logComp or resultList is self.newResults:
+            return category, details
+        try:
+            oldCost = self.getCost(logComp.stdFile)
+            newCost = self.getCost(logComp.tmpFile)
+            if oldCost == newCost:
+                return category, details
+            changeDesc = self.getChangeDescription(oldCost, newCost)
+            return category, details.replace("solution different", changeDesc)
+        except:
+            return category, details
+    def getCost(self, file):
+        cmd = "grep '" + self.costName + "' " + file
+        grepLines = os.popen(cmd).readlines()
+        lastField = grepLines[-1].split(" ")[-1]
+        return float(lastField.strip())
+    def getChangeDescription(self, oldCost, newCost):
+        if oldCost < newCost:
+            return "solution " + self.calculatePercentageIncrease(oldCost, newCost) + "% worse"
+        else:
+            return "solution " + self.calculatePercentageIncrease(newCost, oldCost) + "% better"
+    def calculatePercentageIncrease(self, smallest, largest):
+        if smallest == 0.0:
+            return 0.0
+
+        floatVal = ((largest - smallest) / abs(smallest)) * 100
+        return str(round(floatVal, 1))    
  
 class CheckOptimizationRun(predict.CheckLogFilePredictions):
     def __repr__(self):

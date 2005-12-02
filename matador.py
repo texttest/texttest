@@ -39,7 +39,7 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
                             making the changes it has shown, and writing an options.<app> file.
 """
 
-import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins
+import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins, performance
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
@@ -79,31 +79,38 @@ class MatadorConfig(optimization.OptimizationConfig):
                 return line.split(";")[3]
         return ""
     def filesFromRulesFile(self, test, rulesFile):
-        raveParamName = "raveparameters." + test.app.name + test.app.versionSuffix()
-        raveParamFile = test.makePathName(raveParamName, test.abspath)
-        scriptFile = self.findScriptFile(raveParamFile)
-        if not scriptFile:
-            scriptFile = self.findScriptFile(rulesFile)
+        scriptFile = self.getRuleSetting(test, "script_file_name")
         if scriptFile:
-            return [ ("Script", scriptFile) ]
+            return [ ("Script", self.getScriptPath(scriptFile)) ]
         else:
             return []
-    def findScriptFile(self, fileName):
+    def getRuleSetting(self, test, paramName, rulesFile=None):
+        raveParamName = "raveparameters." + test.app.name + test.app.versionSuffix()
+        raveParamFile = test.makePathName(raveParamName, test.abspath)
+        setting = self.getRuleSettingFromFile(raveParamFile, paramName)
+        if setting:
+            return setting
+        else:
+            if not rulesFile:
+                rulesFile = os.path.join(self._getSubPlanDirName(test), "APC_FILES", "rules")
+            return self.getRuleSettingFromFile(rulesFile, paramName)
+    def getRuleSettingFromFile(self, fileName, paramName):
         if not os.path.isfile(fileName):
             return
         for line in open(fileName).xreadlines():
             words = line.split()
             if len(words) < 2:
                 continue
-            if words[0].endswith("script_file_name"):
-                return self.getScriptPath(words[1])
+            if words[0].endswith(paramName):
+                return words[1]
+    def getTestComparator(self):
+        return MakeComparisons(optimization.OptimizationTestComparison, self.getRuleSetting)
     def getScriptPath(self, file):
         fullPath = os.path.join(os.environ["CARMUSR"], "apc_scripts", file)
         if os.path.isfile(fullPath):
             return fullPath
         fullPath = os.path.join(os.environ["CARMUSR"], "matador_scripts", file)
-        if os.path.isfile(fullPath):
-            return fullPath
+        return fullPath
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -129,6 +136,20 @@ class MatadorConfig(optimization.OptimizationConfig):
         self.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
         self.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]
         app.setConfigDefault("diagnostics", self.getDiagnosticSettings())
+
+class MakeComparisons(comparetest.MakeComparisons):
+    def __init__(self, testComparisonClass, getRuleSetting):
+        comparetest.MakeComparisons.__init__(self, testComparisonClass)
+        self.getRuleSetting = getRuleSetting
+    def __call__(self, test):
+        if self.isSeniority(test):
+            self.testComparisonClass = performance.PerformanceTestComparison
+        else:
+            self.testComparisonClass = optimization.OptimizationTestComparison
+        comparetest.MakeComparisons.__call__(self, test)
+    def isSeniority(self, test):
+        ruleVal = self.getRuleSetting(test, "map_seniority")
+        return ruleVal and not ruleVal.startswith("#")
 
 class MatadorTestCaseInformation(optimization.TestCaseInformation):
     def isComplete(self):

@@ -222,8 +222,7 @@ class Config(plugins.Configuration):
     def showExecHostsInFailures(self):
         return self.batchMode()
     def getTestComparator(self):
-        comparetest.MakeComparisons.testComparisonClass = performance.PerformanceTestComparison
-        return comparetest.MakeComparisons()
+        return comparetest.MakeComparisons(performance.PerformanceTestComparison)
     def getTextResponder(self):
         return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes

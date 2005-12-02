@@ -209,11 +209,16 @@ class TestComparison(plugins.TestState):
         self.freeText = ""
 
 class MakeComparisons(plugins.Action):
-    testComparisonClass = TestComparison
-    def __init__(self):
+    defaultComparisonClass = None
+    def __init__(self, testComparisonClass=None):
         self.lineCount = None
         self.maxLineWidth = None
         self.textDiffTool = None
+        if testComparisonClass:
+            self.testComparisonClass = testComparisonClass
+            MakeComparisons.defaultComparisonClass = testComparisonClass
+        else:
+            self.testComparisonClass = MakeComparisons.defaultComparisonClass
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):

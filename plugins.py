@@ -236,9 +236,12 @@ def rmtree(dir, attempts=5):
         print "Write directory", dir, "externally removed"
         return
     # Don't be somewhere under the directory when it's removed
-    if os.getcwd().startswith(dir):
-        root, local = os.path.split(dir)
-        os.chdir(root)
+    try:
+        if os.getcwd().startswith(dir):
+            root, local = os.path.split(dir)
+            os.chdir(root)
+    except OSError:
+        pass
     for i in range(attempts):
         try:
             shutil.rmtree(dir)

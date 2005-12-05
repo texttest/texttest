@@ -327,24 +327,11 @@ def getCarmdata():
 # Pick up a temporary CARMUSR. Used directly by Studio, and a derived form used by the optimizers,
 # that includes the raveparamters functionality
 class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
-    def getSourcePaths(self, test, pathType):
-        # Tell it to pick up the carmdata, whereever that may be found
-        basePaths = default.PrepareWriteDirectory.getSourcePaths(self, test, pathType)
-        if pathType.find("partial") == -1:
-            return basePaths
-        
-        carmdataSource = getCarmdata()
-        if not carmdataSource:
-            raise plugins.TextTestError, "Cannot run test, CARMUSR not defined"
-        basePaths.append(carmdataSource)
-        return basePaths
-    def partialCopyTestPath(self, test, sourcePath, targetPath):
-        # Make sure we update the environment to point at the new temporary location
-        carmdataVar = getCarmdataVar()
-        test.environment[carmdataVar] = targetPath
-        test.previousEnv[carmdataVar] = sourcePath
-        default.PrepareWriteDirectory.partialCopyTestPath(self, test, sourcePath, targetPath)    
-
+    def __call__(self, test):
+        default.PrepareWriteDirectory.__call__(self, test)
+        # Collate the CARMUSR/CARMDATA. Hard to change config as we don't know which variable!
+        self.collatePath(test, "$" + getCarmdataVar(), self.partialCopyTestPath)
+    
 class CleanupRules(plugins.Action):
     def __init__(self, getRuleSetName):
         self.rulesCleaned = []
@@ -406,17 +393,12 @@ class FilterRuleBuilds(plugins.Action):
     rulesCompiled = {}
     def __init__(self, getRuleSetName, filter = None):
         self.raveName = None
-        self.acceptTestCases = 1
         self.getRuleSetName = getRuleSetName
         self.filter = filter
         self.diag = plugins.getDiagnostics("Filter Rule Builds")
     def __repr__(self):
         return "Filtering rule builds for"
     def __call__(self, test):
-        if not self.acceptTestCases:
-            self.diag.info("Rejected entire test suite for " + test.name)
-            return
-
         if self.filter and not self.filter.acceptsTestCase(test):
             self.diag.info("Filter rejected rule build for " + test.name)
             return
@@ -448,12 +430,6 @@ class FilterRuleBuilds(plugins.Action):
             self.describe(test, " - copying precompiled ruleset " + ruleset.name)
         else:
             test.changeState(NeedRuleCompilation(self.getRuleSetName(test)))
-    def setUpSuite(self, suite):
-        if self.filter and not self.filter.acceptsTestSuite(suite):
-            self.acceptTestCases = 0
-            self.diag.info("Rejecting ruleset compile for " + suite.name)
-        elif isUserSuite(suite):
-            self.acceptTestCases = 1
     def setUpApplication(self, app):
         self.raveName = app.getConfigValue("rave_name")
     def getFilter(self):
@@ -704,21 +680,12 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
             self.diag.info("Not compiled")
             return 1
         libFile = test.getConfigValue("rave_static_library")
-        if libFile:
+        self.diag.info("Library file is " + libFile)
+        if libFile and os.path.isfile(libFile):
             return plugins.modifiedTime(ruleset.targetFile) < plugins.modifiedTime(libFile)
         else:
-            return 1
-    def acceptsTestSuite(self, suite):
-        if not isUserSuite(suite):
-            return 1
-
-        carmtmp = suite.environment["CARMTMP"]
-        self.diag.info("CARMTMP: " + carmtmp)
-        # Ruleset is local if CARMTMP depends on the CARMSYS or the tests
-        if carmtmp.find(os.environ["CARMSYS"]) != -1:
-            return 1
-        ttHome = os.getenv("TEXTTEST_HOME")
-        return ttHome and carmtmp.find(ttHome) != -1
+            # If we don't have the library file there isn't much point in rebuilding...
+            return 0
 
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):

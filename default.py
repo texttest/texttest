@@ -311,6 +311,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
         app.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
         app.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
+        app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("collate_file", {}, "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("run_dependent_text", { "" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "" : [] }, "Mapping of patterns to extract and sort from result files")
@@ -376,14 +377,29 @@ class PrepareWriteDirectory(plugins.Action):
         if test.app.useDiagnostics:
             plugins.ensureDirectoryExists(os.path.join(test.writeDirectory, "Diagnostics"))
     def collatePaths(self, test, configListName, collateMethod):
-        for sourcePath in self.getSourcePaths(test, configListName):
-            self.diag.info("Path for linking/copying at " + sourcePath)
-            target = os.path.join(test.writeDirectory, os.path.basename(sourcePath))
-            plugins.ensureDirExistsForFile(target)
-            collateMethod(test, sourcePath, target)
-    def getSourcePaths(self, test, configListName):
-        origPaths = test.getConfigValue(configListName)
-        return map(lambda path: test.makePathName(path, test.abspath), origPaths)
+        for configName in test.getConfigValue(configListName):
+            self.collatePath(test, configName, collateMethod)
+    def collatePath(self, test, configName, collateMethod):
+        sourcePath = self.getSourcePath(test, configName)
+        self.diag.info("Path for linking/copying at " + sourcePath)
+        target = os.path.join(test.writeDirectory, os.path.basename(sourcePath))
+        plugins.ensureDirExistsForFile(target)
+        collateMethod(test, sourcePath, target)
+        envVarToSet = self.findEnvironmentVariable(test, configName)
+        if envVarToSet:
+            test.environment[envVarToSet] = target
+            test.previousEnv[envVarToSet] = sourcePath
+    def getSourcePath(self, test, configName):
+        # These can refer to environment variables or to paths within the test structure
+        if configName.startswith("$"):
+            return os.path.normpath(os.path.expandvars(configName))
+        else:
+            return test.makePathName(configName, test.abspath)
+    def findEnvironmentVariable(self, test, configName):
+        if configName.startswith("$"):
+            return configName[1:]
+        envVarDict = test.getConfigValue("test_data_environment")
+        return envVarDict.get(configName)
     def copyTestPath(self, test, fullPath, target):
         if os.path.isfile(fullPath):
             shutil.copy(fullPath, target)

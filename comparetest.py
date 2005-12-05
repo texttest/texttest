@@ -470,7 +470,7 @@ class LineFilter:
     def __init__(self, text, testWriteDir, diag):
         self.originalText = text
         self.diag = diag
-        self.trigger = None
+        self.triggers = []
         self.untrigger = None
         self.linesToRemove = 1
         self.autoRemove = 0
@@ -479,25 +479,31 @@ class LineFilter:
         self.removeWordsAfter = 0
         self.internalExpressions = { "writedir" : testWriteDir }
         self.parseOriginalText()
-    def makeRegex(self, parameter):
+    def makeRegexTriggers(self, parameter):
         if parameter != "writedir":
-            return parameter
-        thisText = self.internalExpressions[parameter]
+            return [ plugins.TextTrigger(parameter) ]
+        writeDir = self.internalExpressions[parameter]
+        realPath = os.path.realpath(writeDir)
+        triggers = [ self.makeRegex(writeDir) ]
+        if writeDir != realPath:
+            triggers.append(self.makeRegex(realPath))
+        return triggers
+    def makeRegex(self, thisText):
         userName = os.getenv("USER", "tmp")
         versionRegexp = "\..*" + userName
         thisText = sub(versionRegexp, ".*", thisText)
         thisText = thisText.replace(userName, "[^/]*")
         dateRegexp = "[0-3][0-9][A-Z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
-        return sub(dateRegexp, dateRegexp, thisText)
+        return plugins.TextTrigger(sub(dateRegexp, dateRegexp, thisText))
     def parseOriginalText(self):
         dividerPoint = self.originalText.find(self.divider)
         if dividerPoint != -1:
             beforeText, afterText, parameter = self.extractParameter(self.originalText, dividerPoint, self.divider)
-            self.trigger = self.parseText(beforeText)
-            self.untrigger = self.parseText(afterText)
+            self.triggers = self.parseText(beforeText)
+            self.untrigger = self.parseText(afterText)[0]
         else:
-            self.trigger = self.parseText(self.originalText)
-        self.diag.info("Created trigger : " + repr(self.trigger))
+            self.triggers = self.parseText(self.originalText)
+        self.diag.info("Created triggers : " + repr(self.triggers))
     def parseText(self, text):
         for matchModifierString in self.matchModifierStrings:
             linePoint = text.find(matchModifierString)
@@ -506,7 +512,7 @@ class LineFilter:
                 self.readMatchModifier(matchModifierString, parameter)
                 text = beforeText + afterText
         matcherString, parameter = self.findMatcherInfo(text)
-        return self.createTrigger(matcherString, parameter)
+        return self.createTriggers(matcherString, parameter)
     def findMatcherInfo(self, text):
         for matcherString in self.matcherStrings:
             linePoint = text.find(matcherString)
@@ -537,38 +543,42 @@ class LineFilter:
                 self.wordNumber -= 1
         elif matchModifierString == "{LINES ":
             self.linesToRemove = int(parameter)
-    def createTrigger(self, matcherString, parameter):
+    def createTriggers(self, matcherString, parameter):
         if matcherString == "{LINE ":
-            return LineNumberTrigger(int(parameter))
+            return [ LineNumberTrigger(int(parameter)) ]
         elif matcherString == "{INTERNAL " and self.internalExpressions.has_key(parameter):
-            return plugins.TextTrigger(self.makeRegex(parameter))
+            return self.makeRegexTriggers(parameter)
         else:
-            return plugins.TextTrigger(parameter)
+            return [ plugins.TextTrigger(parameter) ]
     def applyTo(self, line, lineNumber):
         if self.autoRemove:
-            if self.untrigger:
-                if self.untrigger.matches(line.strip()):
-                    self.autoRemove = 0
-                    return 0, line
-            else:
-                self.autoRemove -= 1
-            return 1, self.filterWords(line)
-        
-        if self.checkMatch(line, lineNumber):
-            return 1, self.filterWords(line)
+            return self.applyAutoRemove(line)
+
+        trigger = self.getMatchingTrigger(line, lineNumber)
+        if trigger:
+            return self.applyMatchingTrigger(line, trigger)
         else:
-            return 0, line
-    def checkMatch(self, line, lineNumber):
-        if self.trigger and self.trigger.matches(line, lineNumber):
-            if self.untrigger:
-                self.autoRemove = 1
-                return 0
-            if self.linesToRemove:
-                self.autoRemove = self.linesToRemove - 1
-            return 1
+            return False, line
+    def applyAutoRemove(self, line):
+        if self.untrigger:
+            if self.untrigger.matches(line.strip()):
+                self.autoRemove = 0
+                return False, line
         else:
-            return 0
-    def filterWords(self, line):
+            self.autoRemove -= 1
+        return True, self.filterWords(line)
+    def applyMatchingTrigger(self, line, trigger):
+        if self.untrigger:
+            self.autoRemove = 1
+            return False, line
+        if self.linesToRemove:
+            self.autoRemove = self.linesToRemove - 1
+        return True, self.filterWords(line, trigger)
+    def getMatchingTrigger(self, line, lineNumber):
+        for trigger in self.triggers:
+            if trigger.matches(line, lineNumber):
+                return trigger
+    def filterWords(self, line, trigger=None):
         if self.wordNumber != None:
             words = line.rstrip().split(" ")
             self.diag.info("Removing word " + str(self.wordNumber) + " from " + repr(words))
@@ -585,8 +595,8 @@ class LineFilter:
                     else:
                         del words[realNumber]
             return string.join(words).rstrip() + "\n"
-        elif self.replaceText != None:
-            return self.trigger.replace(line, self.replaceText)
+        elif trigger and self.replaceText != None:
+            return trigger.replace(line, self.replaceText)
         else:
             return None
     def findRealWordNumber(self, words):

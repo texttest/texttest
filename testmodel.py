@@ -746,9 +746,9 @@ class Application:
                 os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
             else:
                 os.environ["TEXTTEST_TMP"] = os.environ["TEMP"]
-        root = os.path.expanduser(os.environ["TEXTTEST_TMP"])
         global globalTmpDirectory
-        globalTmpDirectory = plugins.abspath(root)
+        globalTmpDirectory = os.path.expanduser(os.environ["TEXTTEST_TMP"])
+        debugLog.info("Global tmp directory at " + globalTmpDirectory)
         localName = self.getTmpIdentifier().replace(":", "")
         return os.path.join(globalTmpDirectory, localName)
     def getFullVersion(self, forSave = 0):
@@ -997,7 +997,6 @@ class OptionFinder(plugins.OptionFinder):
         if self.has_key("d"):
             return plugins.abspath(self["d"])
         elif os.environ.has_key("TEXTTEST_HOME"):
-            os.environ["TEXTTEST_HOME"] = plugins.abspath(os.environ["TEXTTEST_HOME"])
             return os.environ["TEXTTEST_HOME"]
         else:
             return os.getcwd()

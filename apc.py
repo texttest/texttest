@@ -325,8 +325,9 @@ class RunApcTestInDebugger(default.RunTest):
         apcLogFile.write("")
         apcLogFile.close()
         if self.showLogFile:
-            command = "xon " + os.environ["HOST"] + " 'xterm -bg white -fg black -T " + "APCLOG-" + test.name + "" + " -e 'less +F " + apcLog + "''"
+            command = "xterm -bg white -fg black -T " + "APCLOG-" + test.name + "" + " -e 'less +F " + apcLog + "'"
             process = plugins.BackgroundProcess(command)
+            print "Created process : log file viewer :", process.processId
         # Create a script for gdb to run.
         gdbArgs = test.makeFileName("gdb_args", temporary=1)
         gdbArgsFile = open(gdbArgs, "w")

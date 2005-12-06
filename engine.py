@@ -211,12 +211,12 @@ class ActionRunner:
     def run(self):
         try:
             self.runNormal()
+            for responder in testmodel.Test.observers:
+                responder.notifyAllComplete()
         except KeyboardInterrupt, e:
             self.writeTermMessage(e)
             self.switchToCleanup()
-            self.runNormal()
-        for responder in testmodel.Test.observers:
-            responder.notifyAllComplete()
+            self.run()
     def writeTermMessage(self, e):
         message = "Terminating testing due to external interruption"
         excData = str(e)

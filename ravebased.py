@@ -393,12 +393,17 @@ class FilterRuleBuilds(plugins.Action):
     rulesCompiled = {}
     def __init__(self, getRuleSetName, filter = None):
         self.raveName = None
+        self.acceptTestCases = 1
         self.getRuleSetName = getRuleSetName
         self.filter = filter
         self.diag = plugins.getDiagnostics("Filter Rule Builds")
     def __repr__(self):
         return "Filtering rule builds for"
     def __call__(self, test):
+        if not self.acceptTestCases:
+            self.diag.info("Rejected entire test suite for " + test.name)
+            return
+
         if self.filter and not self.filter.acceptsTestCase(test):
             self.diag.info("Filter rejected rule build for " + test.name)
             return
@@ -430,6 +435,12 @@ class FilterRuleBuilds(plugins.Action):
             self.describe(test, " - copying precompiled ruleset " + ruleset.name)
         else:
             test.changeState(NeedRuleCompilation(self.getRuleSetName(test)))
+    def setUpSuite(self, suite):
+        if self.filter and not self.filter.acceptsTestSuite(suite):
+            self.acceptTestCases = 0
+            self.diag.info("Rejecting ruleset compile for " + suite.name)
+        elif isUserSuite(suite):
+            self.acceptTestCases = 1
     def setUpApplication(self, app):
         self.raveName = app.getConfigValue("rave_name")
     def getFilter(self):
@@ -686,7 +697,16 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
         else:
             # If we don't have the library file there isn't much point in rebuilding...
             return 0
+    def acceptsTestSuite(self, suite):
+        if not isUserSuite(suite):
+            return 1
 
+        carmtmp = suite.environment["CARMTMP"]
+        self.diag.info("CARMTMP: " + carmtmp)
+        # Ruleset is local if CARMTMP depends on the CARMSYS or the home directory
+        return carmtmp.find(os.getenv("CARMSYS")) != -1 or \
+               os.path.expandvars(carmtmp).startswith(os.getenv("HOME"))
+    
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):
     def addEnvironmentFileOptions(self, oldOptionGroup):

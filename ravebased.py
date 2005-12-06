@@ -711,7 +711,7 @@ class UpdatedLocalRulesetFilter(plugins.Filter):
 class ImportTestSuite(guiplugins.ImportTestSuite):
     def addEnvironmentFileOptions(self, oldOptionGroup):
         self.optionGroup.addOption("usr", "CARMUSR")
-        self.optionGroup.addOption("data", "CARMDATA")
+        self.optionGroup.addOption("data", "CARMDATA (only if different)")
     def getCarmValue(self, val):
         optionVal = self.optionGroup.getOptionValue(val)
         if optionVal:

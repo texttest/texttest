@@ -236,9 +236,13 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             raise plugins.TextTestError, "Cannot run test " + test.name + " - subplan at " + subplan + " does not exist."
 
         currPath = os.path.join(subplan, "APC_FILES", "input")
+        self.diag.info("Modified path at " + currPath)
         modPaths = {}
         while currPath != carmdataSource:
             parent, local = os.path.split(currPath)
+            if parent == currPath:
+                raise plugins.TextTestError, "Subplan " + subplan + " is not relative to " + carmdataSource + \
+                      " - probably mismatch between CARMUSR and CARMDATA"
             modPaths[parent] = [ currPath ]
             currPath = parent
         return modPaths

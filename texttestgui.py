@@ -360,10 +360,12 @@ class TextTestGUI(ThreadedResponder):
             self.rightWindowGUI = ApplicationGUI(test, self.selection, self.itermap)
         else:
             if checkUpToDate and test.state.isComplete() and test.state.needsRecalculation():
-                guilog.info("Recalculating result info for test: result file changed since created")
                 cmpAction = comparetest.MakeComparisons()
-                cmpAction.setUpApplication(test.app)
-                cmpAction(test)
+                if cmpAction.defaultComparisonClass:
+                    guilog.info("Recalculating result info for test: result file changed since created")
+                    # Not present for fast reconnect, don't crash...
+                    cmpAction.setUpApplication(test.app)
+                    cmpAction(test)
             self.rightWindowGUI = TestCaseGUI(test, self.dynamic)
         if self.contents:
             self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=True, fill=True)

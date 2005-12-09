@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, performance, plugins, respond, sys, string, time, types, smtplib
+import os, performance, plugins, respond, sys, string, time, types, smtplib, shutil
 from ndict import seqdict
 from cPickle import Pickler
 
@@ -355,7 +355,38 @@ class MailSender:
                 if not version in batchData.suite.app.versions:
                     versions.remove(version)
         return versions
+
+# Allow saving results to a historical repository
+class SaveState(respond.SaveState):
+    def __init__(self, optionMap):
+        respond.SaveState.__init__(self, optionMap)
+        self.batchSession = optionMap["b"]
+        self.dateString = self.calculateDate()
+        self.repositories = {}
+    def performSave(self, test):
+        test.saveState()
+        if self.repositories.has_key(test.app):
+            self.saveToRepository(test)
+    def calculateDate(self):
+        # The normal thing is that the tests starts before midnight.
+        # However, this is not true sometimes, this tries to correct that.
+        timeinseconds = plugins.globalStartTime - 12*60*60
+        return time.strftime("%d%b%Y", time.localtime(timeinseconds))
+    def saveToRepository(self, test):
+        testRepository = self.repositories[test.app]
+        targetFile = os.path.join(testRepository, test.app.name, test.app.getFullVersion(), \
+                                  test.getRelPath(), "teststate_" + self.dateString)
+        if os.path.isfile(targetFile):
+            print "Warning: file already exists at", targetFile, "- not overwriting!"
+        else:
+            plugins.ensureDirExistsForFile(targetFile)
+            shutil.copyfile(test.getStateFile(), targetFile)
+    def addSuite(self, suite):
+        testStateRepository = suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+        if testStateRepository:
+            self.repositories[suite.app] = os.path.abspath(testStateRepository)
         
+
 class CollectFiles(plugins.Action):
     def __init__(self, args=[""]):
         self.mailSender = MailSender("collection")

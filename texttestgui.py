@@ -49,7 +49,7 @@ class TextTestGUI(ThreadedResponder):
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
         if self.dynamic:
-            win.set_title("TextTest dynamic GUI (tests started at " + plugins.globalStartTime + ")")
+            win.set_title("TextTest dynamic GUI (tests started at " + plugins.startTimeString() + ")")
         else:
             win.set_title("TextTest static GUI : management of tests")
         scriptEngine.connect("close window", "delete_event", win, self.exit)

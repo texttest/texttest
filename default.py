@@ -59,7 +59,7 @@ class Config(plugins.Configuration):
         if self.batchMode():
             classes.append(batch.BatchResponder)
         if self.keepTemporaryDirectories():
-            classes.append(respond.SaveState)
+            classes.append(self.getStateSaver())
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
         return classes
@@ -223,6 +223,11 @@ class Config(plugins.Configuration):
         return self.batchMode()
     def getTestComparator(self):
         return comparetest.MakeComparisons(performance.PerformanceTestComparison)
+    def getStateSaver(self):
+        if self.batchMode():
+            return batch.SaveState
+        else:
+            return respond.SaveState
     def getTextResponder(self):
         return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes
@@ -335,6 +340,7 @@ class Config(plugins.Configuration):
         app.addConfigEntry("definition_file_stems", "knownbugs")
         # Batch values. Maps from session name to values
         app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
+        app.setConfigDefault("batch_result_repository", { "default" : "" }, "Directory to store historical batch results under")
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
         app.setConfigDefault("batch_timelimit", { "default" : None }, "Maximum length of test to include in batch mode runs")

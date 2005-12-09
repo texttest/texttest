@@ -6,10 +6,14 @@ from traceback import format_exception
 from threading import currentThread
 
 # Useful utility...
-def localtime(format="%d%b%H:%M:%S"):
-    return time.strftime(format, time.localtime())
+def localtime(format="%d%b%H:%M:%S", seconds=time.time()):
+    return time.strftime(format, time.localtime(seconds))
 
-globalStartTime = localtime()
+globalStartTime = time.time()
+
+def startTimeString():
+    global globalStartTime
+    return localtime(seconds=globalStartTime)
 
 # Need somewhat different formats on Windows/UNIX
 def tmpString():
@@ -40,8 +44,7 @@ class Configuration:
     def getCleanMode(self):
         return self.CLEAN_SELF
     def getRunIdentifier(self, prefix=""):
-        global globalStartTime
-        return prefix + tmpString() + globalStartTime
+        return prefix + tmpString() + startTimeString()
     def getRunOptions(self):
         return ""
     def useExtraVersions(self):

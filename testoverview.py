@@ -3,20 +3,13 @@
 # The purpose of these scripts is to generate a historical overview (in HTML) of how
 # the tests has operated over a period of time.
 #
-# The first script scans through the texttesttmp directory for the specified user
-# and copies the relevant data to the testoverview repository. The testoverview repository
-# is specified by the config value testoverview_repository that must be set by the application.
-#
-#   texttest -a <app> -s testoverview.ExtractTestStates <username to extract from, typically nightjob>
-#            <major versions:master,12,11 etc> <minor versions, arch:i386_linux,sparc etc>
-#
 # The second script reads all the data in the testoverview repository and build up the relevant
 # HTML pages. These are saved in the directory pointed out by the testoverview_pages config value.
 #
 #   texttest -a <app> -s testoverview.GenererateTestStatus <major versions> <minor versions> 
 #
 
-import os, performance, plugins, respond, sys, string, time, types, smtplib, shutil
+import os, performance, plugins, respond, sys, string, time, types, shutil
 from cPickle import Pickler, Unpickler, UnpicklingError
 
 try:
@@ -24,68 +17,12 @@ try:
 except:
     raise BadConfigError, "Python modules HTMLgen and/or HTMLcolors not found."
 
-
-class ExtractTestStates(plugins.Action):
-    def __init__(self,args):
-        self.user = args[0]
-        self.extractDir = "/users/" + self.user + "/texttesttmp"
-        self.numExtracted = 0
-        self.majorVersions = args[1].split(",")
-        self.minorVersions = args[2].split(",")
-    def setUpApplication(self, app):
-        self.testStateRepository = app.getConfigValue("testoverview_repository")
-        if not os.path.isdir(self.testStateRepository):
-            raise plugins.TextTestError, "Testoverview repository " + self.testStateRepository + " does not exist"
-        for majorVersion in self.majorVersions:
-            for minorVersion in self.minorVersions:
-                version = majorVersion + "." + minorVersion
-                for entries in os.listdir(self.extractDir):
-                    if entries.startswith(app.name + "." + version + self.user):
-                        print "Extracting from", os.path.join(self.extractDir, entries)
-                        date = self.getDate(entries)
-                        if os.path.isdir(os.path.join(self.extractDir, entries)):
-                            self.extract(app, version, date, os.path.join(self.extractDir, entries))
-    def extract(self, app, version, date, dir):
-        for entries in os.listdir(dir):
-            name = os.path.join(dir, entries)
-            if entries == "LOCAL_PLAN" or os.path.islink(name):
-                continue
-            if os.path.isdir(name):
-                self.extract(app, version, date, name)
-            elif entries == "teststate":
-                testIdentifier = self.getTestIdentifier(name)
-                testDir = os.path.join(app.name, version, testIdentifier)
-                if not os.path.isdir(os.path.join(self.testStateRepository, testDir)):
-                    self.createTestDir(self.testStateRepository, testDir)
-                shutil.copy(name, os.path.join(self.testStateRepository, testDir, "teststate_" + date))
-                self.numExtracted += 1
-    def createTestDir(self, root, testDir):
-        checkDir = root
-        for parts in testDir.split(os.sep):
-            checkDir += os.sep + parts
-            if not os.path.isdir(checkDir):
-                os.mkdir(checkDir)
-    def getTestIdentifier(self, name):
-        # Use everything after the application/version dir as identifier for the test.
-        return string.join(name.split(os.sep)[len(self.extractDir.split(os.sep)) + 1:-2], os.sep)
-    def getDate(self, texttesttmp):
-        year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(texttesttmp[-11:], "%d%b%H%M%S")
-        year = 2005
-        timeinseconds = time.mktime((year, month, day, hour, minute, second, wday, yday, dummy))
-        # The normal thing is that the tests starts before midnight.
-        # However, this is not true sometimes, this try to correct that.
-        if hour < 12:
-            timeinseconds -= 12*60*60
-        return time.strftime("%d%b%Y", time.gmtime(timeinseconds))
-    def __del__(self):
-        print "Extracted state for", self.numExtracted, " tests"
-
 class GenererateTestStatus(plugins.Action):
     def __init__(self, args):
         self.majorVersions = args[0].split(",")
         self.minorVersions = args[1].split(",")
     def setUpApplication(self, app):
-        self.testStateRepository = app.getConfigValue("testoverview_repository")
+        self.testStateRepository = app.getCompositeConfigValue("batch_result_repository", "default")
         if not os.path.isdir(self.testStateRepository):
             raise plugins.TextTestError, "Testoverview repository " + self.testStateRepository + " does not exist"
         pageTopDir = app.getConfigValue("testoverview_pages")

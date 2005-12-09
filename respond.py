@@ -43,7 +43,10 @@ class Responder:
 class SaveState(Responder):
     def notifyComplete(self, test):
         if test.state.isComplete():
-            test.saveState()
+            self.performSave(test)
+    def performSave(self, test):
+        # overridden in subclasses
+        test.saveState()
 
 # Utility for responders that want a separate thread to run permanently... generally useful for GUIs
 class ThreadedResponder(Responder):

@@ -237,7 +237,7 @@ def rmtree(dir, attempts=5):
         return
     # Don't be somewhere under the directory when it's removed
     try:
-        if os.getcwd().startswith(dir):
+        if os.getcwd().startswith(os.path.realpath(dir)):
             root, local = os.path.split(dir)
             os.chdir(root)
     except OSError:

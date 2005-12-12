@@ -27,13 +27,8 @@ class GenererateTestStatus(plugins.Action):
         if not os.path.isdir(self.testStateRepository):
             raise plugins.TextTestError, "Testoverview repository " + self.testStateRepository + " does not exist"
         pageTopDir = app.getConfigValue("testoverview_pages")
-        plugins.ensureDirectoryExists(pageTopDir)
         self.pageDir = os.path.join(pageTopDir, app.name)
-        if not os.path.isdir(self.pageDir):
-            try:
-                os.mkdir(self.pageDir)
-            except:
-                raise plugins.TextTestError, "Failed to create application page directory" + self.pageDir
+        plugins.ensureDirectoryExists(self.pageDir)
             
         for majorVersion in self.majorVersions:
             self.pagesOverview = {}

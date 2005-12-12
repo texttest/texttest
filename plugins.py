@@ -6,7 +6,9 @@ from traceback import format_exception
 from threading import currentThread
 
 # Useful utility...
-def localtime(format="%d%b%H:%M:%S", seconds=time.time()):
+def localtime(format="%d%b%H:%M:%S", seconds=None):
+    if not seconds:
+        seconds = time.time()
     return time.strftime(format, time.localtime(seconds))
 
 globalStartTime = time.time()

@@ -323,6 +323,8 @@ class OptimizationTestComparison(performance.PerformanceTestComparison):
         except:
             return category, details
     def getCost(self, file):
+        if not os.path.isfile(file):
+            raise plugins.TextTestError, "File has been deleted in the meantime..."
         cmd = "grep '" + self.costName + "' " + file
         grepLines = os.popen(cmd).readlines()
         lastField = grepLines[-1].split(" ")[-1]

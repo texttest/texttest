@@ -21,13 +21,13 @@ class GenererateTestStatus(plugins.Action):
     def __init__(self, args):
         self.majorVersions = args[0].split(",")
         self.minorVersions = args[1].split(",")
+        self.diag = plugins.getDiagnostics("GenerateTestStatus")
     def setUpApplication(self, app):
         self.testStateRepository = app.getCompositeConfigValue("batch_result_repository", "default")
         if not os.path.isdir(self.testStateRepository):
             raise plugins.TextTestError, "Testoverview repository " + self.testStateRepository + " does not exist"
         pageTopDir = app.getConfigValue("testoverview_pages")
-        if not os.path.isdir(pageTopDir):
-            raise plugins.TextTestError, "Testoverview pages directory " + pageOverview + " does not exist"
+        plugins.ensureDirectoryExists(pageTopDir)
         self.pageDir = os.path.join(pageTopDir, app.name)
         if not os.path.isdir(self.pageDir):
             try:
@@ -43,6 +43,7 @@ class GenererateTestStatus(plugins.Action):
             usedSelectors = {}
             for minorVersion in self.minorVersions:
                 version = majorVersion + "." + minorVersion
+                self.diag.info("Generating " + version)
                 loggedTests = {}
                 tagsFound = []
                 categoryHandler = CategoryHandler()

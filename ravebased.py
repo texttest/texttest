@@ -57,6 +57,12 @@ def getConfig(optionMap):
 def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
+def getCarmUsr(test):
+    if isUserSuite(test):
+        return test.environment["CARMUSR"]
+    elif test.parent:
+        return getCarmUsr(test.parent)
+
 class UserFilter(default.TextFilter):
     option = "u"
     def isUserSuite(self, suite):
@@ -181,10 +187,8 @@ class Config(carmen.CarmenConfig):
         return CleanupRules(self.getRuleSetName)
     def isRaveRun(self):
         return self.optionValue("a").find("rave") != -1 or self.optionValue("v").find("rave") != -1
-    def getRuleBuildFilter(self):
-        if self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp")) or self.isRaveRun():
-            return None
-        return UpdatedLocalRulesetFilter(self.getRuleSetName)
+    def rebuildAllRulesets(self):
+        return self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp")) or self.isRaveRun()
     def getRuleActions(self):
         if self.buildRules():
             realBuilder = self.getRealRuleActions()
@@ -196,8 +200,10 @@ class Config(carmen.CarmenConfig):
             return None
     def getRuleSetName(self, test):
         raise plugins.TextTestError, "Cannot determine ruleset name, need to provide derived configuration to use rule compilation"
+    def getRuleBuildFilterer(self):
+        return FilterRuleBuilds(self.getRuleSetName, self.rebuildAllRulesets())
     def getRealRuleActions(self):
-        filterer = FilterRuleBuilds(self.getRuleSetName, self.getRuleBuildFilter())
+        filterer = self.getRuleBuildFilterer()
         if self.useQueueSystem():
             # If building rulesets remotely, don't distribute them further...
             os.environ["_AUTOTEST__LOCAL_COMPILE_"] = "1"
@@ -391,23 +397,14 @@ class SetBuildRequired(plugins.Action):
 
 class FilterRuleBuilds(plugins.Action):
     rulesCompiled = {}
-    def __init__(self, getRuleSetName, filter = None):
+    def __init__(self, getRuleSetName, forceRebuild):
         self.raveName = None
-        self.acceptTestCases = 1
         self.getRuleSetName = getRuleSetName
-        self.filter = filter
+        self.forceRebuild = forceRebuild
         self.diag = plugins.getDiagnostics("Filter Rule Builds")
     def __repr__(self):
         return "Filtering rule builds for"
     def __call__(self, test):
-        if not self.acceptTestCases:
-            self.diag.info("Rejected entire test suite for " + test.name)
-            return
-
-        if self.filter and not self.filter.acceptsTestCase(test):
-            self.diag.info("Filter rejected rule build for " + test.name)
-            return
-
         arch = carmen.getArchitecture(test.app)
         try:
             ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
@@ -421,6 +418,11 @@ class FilterRuleBuilds(plugins.Action):
                 return
             else:
                 raise plugins.TextTestError, "Could not compile ruleset '" + ruleset.name + "' : rule source file does not exist"
+
+        if not self.shouldCompileFor(test, ruleset):
+            self.diag.info("Filter rejected rule build for " + test.name)
+            return
+        
         targetName = ruleset.targetFile
         if self.rulesCompiled.has_key(targetName):
             test.changeState(NeedRuleCompilation(ruleset.name, self.rulesCompiled[targetName]))
@@ -435,16 +437,21 @@ class FilterRuleBuilds(plugins.Action):
             self.describe(test, " - copying precompiled ruleset " + ruleset.name)
         else:
             test.changeState(NeedRuleCompilation(self.getRuleSetName(test)))
-    def setUpSuite(self, suite):
-        if self.filter and not self.filter.acceptsTestSuite(suite):
-            self.acceptTestCases = 0
-            self.diag.info("Rejecting ruleset compile for " + suite.name)
-        elif isUserSuite(suite):
-            self.acceptTestCases = 1
     def setUpApplication(self, app):
         self.raveName = app.getConfigValue("rave_name")
-    def getFilter(self):
-        return self.filter
+    def shouldCompileFor(self, test, ruleset):
+        if self.forceRebuild or not ruleset.isCompiled():
+            return 1
+
+        libFile = test.getConfigValue("rave_static_library")
+        self.diag.info("Library file is " + libFile)
+        if self.assumeDynamicLinkage(libFile, getCarmUsr(test)):
+            return 0
+        else:            
+            return plugins.modifiedTime(ruleset.targetFile) < plugins.modifiedTime(libFile)
+    def assumeDynamicLinkage(self, libFile, carmUsr):
+        # If library file not defined, assume dynamic linkage and don't recompile
+        return not libFile or not os.path.isfile(libFile)        
 
 class SubmitRuleCompilations(queuesystem.SubmitTest):
     def slaveType(self):
@@ -675,38 +682,7 @@ class RuleSet:
         if os.path.isfile(debugVersion):
             os.remove(self.targetFile)
             os.rename(debugVersion, self.targetFile)
-        
-class UpdatedLocalRulesetFilter(plugins.Filter):
-    def __init__(self, getRuleSetName):
-        self.getRuleSetName = getRuleSetName
-        self.diag = plugins.getDiagnostics("UpdatedLocalRulesetFilter")
-    def acceptsTestCase(self, test):
-        ruleset = RuleSet(self.getRuleSetName(test), getRaveName(test), carmen.getArchitecture(test.app))
-        self.diag.info("Checking " + self.getRuleSetName(test))
-        self.diag.info("Target file is " + ruleset.targetFile)
-        if not ruleset.isValid():
-            self.diag.info("Invalid")
-            return 0
-        if not ruleset.isCompiled():
-            self.diag.info("Not compiled")
-            return 1
-        libFile = test.getConfigValue("rave_static_library")
-        self.diag.info("Library file is " + libFile)
-        if libFile and os.path.isfile(libFile):
-            return plugins.modifiedTime(ruleset.targetFile) < plugins.modifiedTime(libFile)
-        else:
-            # If we don't have the library file there isn't much point in rebuilding...
-            return 0
-    def acceptsTestSuite(self, suite):
-        if not isUserSuite(suite):
-            return 1
-
-        carmtmp = suite.environment["CARMTMP"]
-        self.diag.info("CARMTMP: " + carmtmp)
-        # Ruleset is local if CARMTMP depends on the CARMSYS or the home directory
-        return carmtmp.find(os.getenv("CARMSYS")) != -1 or \
-               os.path.expandvars(carmtmp).startswith(os.getenv("HOME"))
-    
+            
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):
     def addEnvironmentFileOptions(self, oldOptionGroup):

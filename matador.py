@@ -78,6 +78,8 @@ class MatadorConfig(optimization.OptimizationConfig):
             if line.startswith("153"):
                 return line.split(";")[3]
         return ""
+    def getRuleBuildFilterer(self):
+        return FilterRuleBuilds(self.getRuleSetName, self.rebuildAllRulesets())
     def filesFromRulesFile(self, test, rulesFile):
         scriptFile = self.getRuleSetting(test, "script_file_name")
         if scriptFile:
@@ -251,23 +253,30 @@ class ImportTest(optimization.ImportTest):
         else:
             self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
 
+def staticLinkageInCustomerFile(carmUsr):
+    resourceFile = os.path.join(carmUsr, "Resources", "CarmResources", "Customer.etab")
+    if not os.path.isfile(resourceFile):
+        return 0
+    for line in open(resourceFile).xreadlines():
+        if line.find("UseStaticLinking") != -1 and line.find("matador") != -1:
+            parts = plugins.commasplit(line.strip())
+            if parts[4].find("true") != -1:
+                return 1
+    return 0
+
 class ImportTestCase(optimization.ImportTestCase):
     def getOptions(self, suite):
         return "-s " + self.getSubplanName()
 
 class ImportTestSuite(ravebased.ImportTestSuite):
     def hasStaticLinkage(self, carmUsr):
-        resourceFile = os.path.join(carmUsr, "Resources", "CarmResources", "Customer.etab")
-        if not os.path.isfile(resourceFile):
-            return 0
-        for line in open(resourceFile).xreadlines():
-            if line.find("UseStaticLinking") != -1 and line.find("matador") != -1:
-                parts = plugins.commasplit(line.strip())
-                if parts[4].find("true") != -1:
-                    return 1
-        return 0
+        return staticLinkageInCustomerFile(carmUsr)
     def getCarmtmpPath(self, carmtmp):
         return os.path.join("/carm/proj/matador/carmtmps/${MAJOR_RELEASE_ID}/${ARCHITECTURE}", carmtmp)
+
+class FilterRuleBuilds(ravebased.FilterRuleBuilds):
+    def assumeDynamicLinkage(self, libFile, carmUsr):
+        return not staticLinkageInCustomerFile(carmUsr)
 
 class MigrateApcTest(plugins.Action):
     def __init__(self):

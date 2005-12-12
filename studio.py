@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.13 2005/11/30 13:12:35 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.14 2005/12/12 16:05:50 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -64,12 +64,6 @@ class ImportTestSuite(ravebased.ImportTestSuite):
     def getCarmtmpPath(self, carmtmp):
         return os.path.join("/carm/proj/studio/carmtmps/${MAJOR_RELEASE_ID}/${ARCHITECTURE}", carmtmp)
 
-def getCarmUsr(suite):
-    if suite.environment.has_key("CARMUSR"):
-        return suite.environment["CARMUSR"]
-    elif suite.parent:
-        return getCarmUsr(suite.parent)
-
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
     newMacroString = "<Record new macro>"
@@ -77,7 +71,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
         # Don't use oldOptionGroup, we probably don't want the same macro more than once
         self.optionGroup.addOption("mac", "Macro to use", self.newMacroString, self.getExistingMacros(suite))
     def getExistingMacros(self, suite):
-        carmUsr = getCarmUsr(suite)
+        carmUsr = ravebased.getCarmUsr(suite)
         if not carmUsr:
             return []
         path = os.path.join(carmUsr, "macros")
@@ -93,7 +87,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
         macroToImport = self.optionGroup.getOptionValue("mac")
         if macroToImport != self.newMacroString:
             usecaseFile = self.getWriteFileName("usecase", suite, testDir)
-            fullMacroPath = os.path.join(getCarmUsr(suite), "macros", macroToImport)
+            fullMacroPath = os.path.join(ravebased.getCarmUsr(suite), "macros", macroToImport)
             shutil.copyfile(fullMacroPath, usecaseFile)
 
 class RecordTest(guiplugins.RecordTest):
@@ -102,7 +96,7 @@ class RecordTest(guiplugins.RecordTest):
         if self.canPerformOnTest():
             self.optionGroup.addOption("rset", "Compile this ruleset first", possibleValues=self.findRuleSets(test))
     def findRuleSets(self, test):
-        carmUsr = getCarmUsr(test)
+        carmUsr = ravebased.getCarmUsr(test)
         if not carmUsr:
             return []
         sourceDir = os.path.join(carmUsr, "crc", "source")

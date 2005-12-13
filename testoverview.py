@@ -49,14 +49,15 @@ class GenererateTestStatus(plugins.Action):
                 if len(loggedTests.keys()) > 0:
                     tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
                     selectors = [ SelectorLast6Days(tagsFound), SelectorAll(tagsFound), SelectorWeekend(tagsFound) ]
+                    linkFromDetailsToOverview = {}
                     for sel in selectors:
-                        selTags = sel.getSelectedTags()
                         if not usedSelectors.has_key(repr(sel)):
                             usedSelectors[repr(sel)] = sel.getFileNameExtension()
+                        linkFromDetailsToOverview[repr(sel)] = self.getOverviewPageName(majorVersion, sel.getFileNameExtension())
                         testTable = TestTable()
-                        table = testTable.generate(categoryHandler, majorVersion, version, loggedTests, selTags)
+                        table = testTable.generate(categoryHandler, majorVersion, version, loggedTests, sel.getSelectedTags())
                         self.addOverviewPages(sel.getFileNameExtension(), version, table, app)
-                    det = details.generate(categoryHandler, version, tagsFound)
+                    det = details.generate(categoryHandler, version, tagsFound, linkFromDetailsToOverview)
                     self.addDetailPages(app, det)
                     foundMinorVersions.append(HTMLgen.Href("#" + version, minorVersion))
             selContainer = HTMLgen.Container()
@@ -92,6 +93,8 @@ class GenererateTestStatus(plugins.Action):
                 except EOFError:
                     print "EOFError in ",file
                     print "Ignoring this file"
+                except AttributeError:
+                    print "AttrError for ", file
             else:
                 print "Unknown file", entries
     def addOverviewPages(self, item, version, table, app):
@@ -128,7 +131,7 @@ class TestTable:
         tests.sort()
         for test in tests:
             results = loggedTests[test]
-            row = [ HTMLgen.TD(test, bgcolor = "#FFFFCC") ]
+            row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test), test), bgcolor = "#FFFFCC") ]
             for tag in tagsFound:
                 if results.has_key(tag):
                     state = results[tag]
@@ -188,7 +191,7 @@ class TestTable:
             return (0, 0)
         
 class TestDetails:
-    def generate(self, categoryHandler, version, tags):
+    def generate(self, categoryHandler, version, tags, linkFromDetailsToOverview):
         detailsContainers = {}
         for tag in tags:
             container = detailsContainers[tag] = HTMLgen.Container()
@@ -198,13 +201,13 @@ class TestDetails:
             for cat in categories.keys():
                 test, state = categories[cat][0]
                 shortDescr, longDescr = getCategoryDescription(state, cat)
-                fullDescription = self.getFullDescription(categories[cat], version)
+                fullDescription = self.getFullDescription(categories[cat], version, linkFromDetailsToOverview)
                 if fullDescription:
                     container.append(HTMLgen.Name(version + longDescr))
                     container.append(HTMLgen.Heading(3, "Detailed information for the tests that " + longDescr + ":"))
                     container.append(fullDescription)
         return detailsContainers
-    def getFullDescription(self, tests, version):
+    def getFullDescription(self, tests, version, linkFromDetailsToOverview):
         fullText = HTMLgen.Container()
         textFound = None
         for test in tests:
@@ -213,14 +216,20 @@ class TestDetails:
             if freeText:
                 textFound = 1
                 fullText.append(HTMLgen.Name(version + testName))
-                fullText.append(HTMLgen.Heading(4, "TEST " + repr(state) + " " + testName))
+                fullText.append(HTMLgen.Heading(4, HTMLgen.Container("TEST " + repr(state) + " " + testName + " (",
+                                                                     self.getLinksToOverview(version, testName, linkFromDetailsToOverview)),")"))
                 freeText = string.replace(freeText, "\n", "<BR>")
                 fullText.append(HTMLgen.RawText(freeText))
         if textFound:
             return fullText
         else:
             return None
-
+    def getLinksToOverview(self, version, testName, linkFromDetailsToOverview):
+        links = HTMLgen.Container()
+        for sel in linkFromDetailsToOverview:
+            links.append(HTMLgen.Href(linkFromDetailsToOverview[sel] + "#" + version + testName, sel))
+        return links
+        
 class CategoryHandler:
     def __init__(self):
         self.testsInCategory = {}

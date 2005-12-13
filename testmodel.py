@@ -634,7 +634,7 @@ class Application:
         self.setConfigDefault("binary", "", "Full path to the System Under Test")
         self.setConfigDefault("config_module", "default", "Configuration module to use")
         self.setConfigDefault("full_name", string.upper(self.name), "Expanded name to use for application")
-        self.setConfigDefault("checkout_location", ".", "Absolute path to look for checkouts under")
+        self.setConfigDefault("checkout_location", [], "Absolute paths to look for checkouts under")
         self.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         self.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
@@ -892,18 +892,25 @@ class Application:
         if len(docString) > 0:
             self.configDocs[key] = docString
     def makeCheckout(self, checkoutOverride):
-        if checkoutOverride:
-            checkout = checkoutOverride
-        else:
+        checkout = checkoutOverride
+        if not checkoutOverride:
             checkout = self.getConfigValue("default_checkout")
         if os.path.isabs(checkout):
             return checkout
-        checkoutLocation = os.path.expanduser(self.getConfigValue("checkout_location"))
-        checkout = os.path.join(checkoutLocation, checkout)
-        if os.path.isabs(checkout):
-            return checkout
-        # Assume relative checkouts are relative to the root directory...
-        return os.path.join(self.abspath, checkout)
+        checkoutLocations = self.getConfigValue("checkout_location")
+        if len(checkoutLocations) > 0:
+            return self.makeAbsoluteCheckout(checkoutLocations, checkout)
+        else:
+            # Assume relative checkouts are relative to the root directory...
+            return os.path.join(self.abspath, checkout)
+    def makeAbsoluteCheckout(self, locations, checkout):
+        for location in locations:
+            fullCheckout = self.absCheckout(location, checkout)
+            if os.path.isdir(fullCheckout):
+                return fullCheckout
+        return self.absCheckout(locations[0], checkout)
+    def absCheckout(self, location, checkout):
+        return os.path.join(os.path.expanduser(location), checkout)
     def getExecuteCommand(self, test):
         binary = self.getConfigValue("binary")
         if self.configDir.has_key("interpreter"):

@@ -1054,22 +1054,33 @@ class ReconnectTest(plugins.Action):
         if os.path.isfile(testStateFile):
             shutil.copyfile(testStateFile, test.getStateFile())
     def loadStoredState(self, test):
-        storedState = test.getStoredState()
+        loaded, newState = test.getStoredStateInfo()
         if self.fullRecalculate:
+            if not loaded and self.hasFiles(test):
+                # If the teststate file isn't there or we can't read it, ignore it and recompute, provided
+                # we have some files to do so with...
+                return self.describe(test)
             # Only pick up errors here, recalculate the rest. Don't notify until
             # we're done with recalculation.
-            if not storedState.hasResults():
-                test.changeState(storedState)
+            if not newState.hasResults():
+                test.changeState(newState)
             else:
                 # Also pick up execution machines, we can't get them otherwise...
-                test.state.executionHosts = storedState.executionHosts
+                test.state.executionHosts = newState.executionHosts
         else:
-            test.changeState(storedState)
+            test.changeState(newState)
 
         # State will refer to TEXTTEST_HOME in the original (which we may not have now,
         # and certainly don't want to save), try to fix this...
         test.state.updatePaths(test.app.abspath, self.rootDirToCopy)
         self.describe(test, " (state " + test.state.category + ")")
+    def hasFiles(self, test):
+        dir = test.getDirectory(temporary=1)
+        for file in os.listdir(dir):
+            fullPath = os.path.join(dir, file)
+            if os.path.isfile(fullPath):
+                return True
+        return False
     def canReconnectTo(self, dir):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0

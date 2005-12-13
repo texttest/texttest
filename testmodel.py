@@ -296,20 +296,22 @@ class TestCase(Test):
             return None
         
         return open(stateFile)
-    def getStoredState(self):
+    def getStoredStateInfo(self):
         file = self.getFileToLoad()
         return self.getNewState(file)
     def loadState(self, file):
-        state = self.getNewState(file)
+        loaded, state = self.getNewState(file)
         self.changeState(state)
     def getNewState(self, file):
         if not file:
-            return plugins.TestState("unrunnable", briefText="no results", freeText="No file found to load results from", completed=1)
+            return False, plugins.TestState("unrunnable", briefText="no results", \
+                                            freeText="No file found to load results from", completed=1)
         try:
             unpickler = Unpickler(file)
-            return unpickler.load()
+            return True, unpickler.load()
         except UnpicklingError:
-            return plugins.TestState("unrunnable", briefText="read error", freeText="Failed to read results file", completed=1)
+            return False, plugins.TestState("unrunnable", briefText="read error", \
+                                            freeText="Failed to read results file", completed=1)
     def saveState(self):
         stateFile = self.getStateFile()
         if os.path.isfile(stateFile):

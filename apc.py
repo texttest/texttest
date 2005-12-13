@@ -1502,6 +1502,24 @@ class CleanSubplans(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 
+class CopyMPSFiles(plugins.Action):
+    def __init__(self, args):
+        self.destination = args[0]
+        if not os.path.isdir(self.destination):
+            raise plugins.TextTestError, "Destination directory " + self.destination + " does not exist."
+        self.cnt = 0
+    def __repr__(self):
+        return ""
+    def getFileName(self, test):
+        self.cnt += 1
+        return os.path.join(self.destination, "primal_heur_" + str(self.cnt) + ".mps")
+    def __call__(self, test):
+        fileName = test.makeFileName("mps", temporary = 0)
+        if os.path.isfile(fileName):
+            newFileName = self.getFileName(test)
+            print "Copying MPS file for test " + test.name + " to " + newFileName
+            shutil.copyfile(fileName, newFileName)
+            os.system("gzip " + newFileName)
 
 class SaveBestSolution(guiplugins.InteractiveAction):
     def __call__(self, test):

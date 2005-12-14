@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.14 2005/12/12 16:05:50 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.15 2005/12/14 08:21:44 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -19,6 +19,9 @@ class StudioConfig(ravebased.Config):
                 group.addOption("rset", "Private: used for submitting ruleset compilation along with recording")
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues)
+    def defaultBuildRules(self):
+        # Overriding this assures rule builds in the nightjob and with -v rave.
+        return 1
     def getRuleSetName(self, test):
         if self.optionMap.has_key("rset"):
             return self.optionMap["rset"]

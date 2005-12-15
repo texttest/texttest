@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.15 2005/12/14 08:21:44 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.16 2005/12/15 10:32:27 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -32,6 +32,8 @@ class StudioConfig(ravebased.Config):
         origPath = self.findOrigRulePath(headerFile)
         return os.path.basename(origPath)
     def findOrigRulePath(self, headerFile):
+        if not os.path.isfile(headerFile):
+            return ""
         for line in open(headerFile).xreadlines():
             if line.startswith("554"):
                 return line.split(";")[22]
@@ -49,6 +51,13 @@ class StudioConfig(ravebased.Config):
         start = macroLine.find("value=\"")
         end = macroLine.rfind("\"")
         return macroLine[start + 7:end]
+    def _getSubPlanDirName(self, test):
+        origDirName = ravebased.Config._getSubPlanDirName(self, test)
+        if origDirName and not os.path.isdir(origDirName):
+            parent, local = os.path.split(origDirName)
+            if os.path.isdir(parent):
+                return parent
+        return origDirName
     def getSubPlanLineInMacro(self, test):
         macroFile = test.useCaseFile
         if not os.path.isfile(macroFile):

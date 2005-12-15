@@ -412,6 +412,10 @@ class FilterRuleBuilds(plugins.Action):
             # assume problems here are due to compilation itself not being setup, ignore
             print e
             return
+
+        # If no ruleset is associated with the test anyway, don't try to build it...
+        if not ruleset.name:
+            return
         
         if not ruleset.isValid():
             if os.environ.has_key("ALLOW_INVALID_RULESETS"):

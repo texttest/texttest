@@ -235,9 +235,9 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         if not os.path.isdir(subplan):
             raise plugins.TextTestError, "Cannot run test " + test.name + " - subplan at " + subplan + " does not exist."
 
-        currPath = os.path.join(subplan, "APC_FILES", "input")
+        currPath = os.path.join(subplan, "APC_FILES")
         self.diag.info("Modified path at " + currPath)
-        modPaths = {}
+        modPaths = { currPath : [] }
         while currPath != carmdataSource:
             parent, local = os.path.split(currPath)
             if parent == currPath:
@@ -246,6 +246,8 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             modPaths[parent] = [ currPath ]
             currPath = parent
         return modPaths
+    def isWriteDir(self, targetPath, modPaths):
+        return os.path.basename(targetPath) == "APC_FILES"
     def handleReadOnly(self, sourceFile, targetFile):
         if self.shouldLink(sourceFile) and not self.insertRaveParameters(sourceFile, targetFile):
             ravebased.PrepareCarmdataWriteDir.handleReadOnly(self, sourceFile, targetFile)

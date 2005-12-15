@@ -557,7 +557,10 @@ class ConfigurationWrapper:
         try:
             return self.target.extraReadFiles(test)
         except:
-            self.raiseException(req = "extra read files")
+            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.moduleName + \
+                             "' configuration while requesting extra data files, not displaying any such files")
+            plugins.printException()
+            return seqdict()
     def getTextualInfo(self, test):
         try:
             return self.target.getTextualInfo(test)

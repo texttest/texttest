@@ -493,7 +493,7 @@ class LineFilter:
         versionRegexp = "\..*" + userName
         thisText = sub(versionRegexp, ".*", thisText)
         thisText = thisText.replace(userName, "[^/]*")
-        dateRegexp = "[0-3][0-9][A-Z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
+        dateRegexp = "[0-3][0-9][A-Za-z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
         return plugins.TextTrigger(sub(dateRegexp, dateRegexp, thisText))
     def parseOriginalText(self):
         dividerPoint = self.originalText.find(self.divider)

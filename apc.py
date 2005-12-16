@@ -296,6 +296,7 @@ class RunApcTestInDebugger(default.RunTest):
         default.RunTest.__init__(self)
         self.inXEmacs = None
         self.runPlain = None
+        self.runValgrind = None
         self.showLogFile = 1
         self.noRun = None
         self.keepTmps = keepTmpFiles;
@@ -311,6 +312,8 @@ class RunApcTestInDebugger(default.RunTest):
                 self.runPlain = 1
             elif opt == "norun":
                 self.noRun = 1
+            elif opt == "valgrind":
+                self.runValgrind = 1
             else:
                 print "Ignoring unknown option " + opt
     def __repr__(self):
@@ -354,6 +357,8 @@ class RunApcTestInDebugger(default.RunTest):
             executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
         elif self.runPlain:
             executeCommand = binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
+        elif self.runValgrind:
+            executeCommand = "valgrind --tool=memcheck -v " + binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
         else:
             executeCommand = "gdb " + binName + " -silent -x " + gdbArgs
         # Check for personal .gdbinit.

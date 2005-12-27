@@ -75,6 +75,8 @@ class GenererateTestStatus(plugins.Action):
                 self.pagesOverview[sel].prepend(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + majorVersion + "-"),
                                                                           foundMinorVersions), align = 'center'))
                 self.pagesOverview[sel].prepend(HTMLgen.Heading(1, "Test results for ", repr(app), align = 'center'))
+                # We should try to find out if there is a better way to do this...
+                self.pagesOverview[sel].prepend(HTMLgen.RawText('<style type="text/css"><!--body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}--></style>'))
             
             self.writePages(app, majorVersion)
     def loadTestStates(self, dir, categoryHandler, loggedTests, tagsFound, subVersion = None):
@@ -139,7 +141,7 @@ class GenererateTestStatus(plugins.Action):
 
 class TestTable:
     def generate(self, categoryHandler, majorVersion, version, loggedTests, tagsFound):
-        t = HTMLgen.TableLite(border=2, cellpadding=4, cellspacing=1,width="100%")
+        t = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
         t.append(self.generateTableHead(majorVersion, version, tagsFound))
 
         table = []
@@ -181,10 +183,10 @@ class TestTable:
         t.append(HTMLgen.BR())
         return t
     def getColors(self, type, detail):
-        bgcol = "RED"
+        bgcol = "#FF3118"
         fgcol = "BLACK"
         if type == "faster" or type == "slower":
-            bgcol = HTMLcolors.TAN
+            bgcol = "#FFC6A5"
             result = self.getPercent(detail)
             if result[0] and result[1] >= 5:
                 fgcol = HTMLcolors.RED6
@@ -194,7 +196,7 @@ class TestTable:
                 fgcol = HTMLcolors.RED6
             bgcol = HTMLcolors.PINK
         elif type == "success":
-            bgcol = "LIME"
+            bgcol = "#CEEFBD"
         return fgcol, bgcol
     def generateTableHead(self, majorVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]

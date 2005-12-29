@@ -519,11 +519,18 @@ class MarkApcLogDir(carmen.RunWithParallelAction):
         subplanPath = os.path.realpath(os.path.join(test.writeDirectory, "APC_FILES"))
         subplanName, apcFiles = os.path.split(subplanPath)
         baseSubPlan = os.path.basename(subplanName)
+        apcHostTmp = self.getApcHostTmp()
         if processId:
-            return os.path.join(self.getApcHostTmp(), baseSubPlan + "_" + processId)
-        for file in os.listdir(self.getApcHostTmp()):
+            logdir = os.path.join(apcHostTmp, baseSubPlan + "_" + gethostname() + "_" + processId)
+            if os.path.isdir(logdir):
+                return logdir
+            # maintain backward compatibility with the old APCbatch.sh (v1.38)
+            # collision prone naming scheme
+            return os.path.join(apcHostTmp, baseSubPlan + "_" + processId)
+        # Hmmm the code below might return something that doesn't "belong" to us
+        for file in os.listdir(apcHostTmp):
             if file.startswith(baseSubPlan + "_"):
-                return os.path.join(self.getApcHostTmp(), file)
+                return os.path.join(apcHostTmp, file)
     def handleNoTimeAvailable(self, test):
         # We try to pick out the log directory, at least
         apcLogDir = self.getApcLogDir(test)
@@ -597,7 +604,7 @@ class ExtractApcLogs(plugins.Action):
         #    os.system(cmdLine)
         
         # When apc_debug is present, we want to remove the error file
-        # (which is create because we are keeping the logfiles,
+        # (which was created because we are keeping the logfiles,
         # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***"),
         # otherwise the test is flagged failed.
         if os.path.isfile(os.path.join(apcTmpDir, "apc_debug")):

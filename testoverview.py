@@ -75,8 +75,6 @@ class GenererateTestStatus(plugins.Action):
                 self.pagesOverview[sel].prepend(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + majorVersion + "-"),
                                                                           foundMinorVersions), align = 'center'))
                 self.pagesOverview[sel].prepend(HTMLgen.Heading(1, "Test results for ", repr(app), align = 'center'))
-                # We should try to find out if there is a better way to do this...
-                self.pagesOverview[sel].prepend(HTMLgen.RawText('<style type="text/css"><!--body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}--></style>'))
             
             self.writePages(app, majorVersion)
     def loadTestStates(self, dir, categoryHandler, loggedTests, tagsFound, subVersion = None):
@@ -117,7 +115,8 @@ class GenererateTestStatus(plugins.Action):
                 print "Unknown file", entries
     def addOverviewPages(self, item, version, table, app):
         if not self.pagesOverview.has_key(item):
-            self.pagesOverview[item] = HTMLgen.SimpleDocument(title="Test results for " + repr(app))
+            self.pagesOverview[item] = HTMLgen.SimpleDocument(title="Test results for " + repr(app),
+                                                              style = "body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}")
         self.pagesOverview[item].append(HTMLgen.Name(version))
         self.pagesOverview[item].append(table)
     def addDetailPages(self, app, details):

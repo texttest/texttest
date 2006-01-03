@@ -33,14 +33,16 @@ def getTestMemory(test, version = None):
     return getPerformance(test.makeFileName("memory", version))
 
 class PerformanceTestComparison(comparetest.TestComparison):
+    def getOptionalStems(self, test):
+        # All of these things should not be warned for if missing...
+        return comparetest.TestComparison.getOptionalStems(self, test) + \
+               self.getPerformanceStems(test)
+    def getPerformanceStems(self, test):
+        return [ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys()
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
-        baseName = os.path.basename(standardFile)
-        if baseName.find(".") == -1:
-            return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile, makeNew)
-        
+        baseName = os.path.basename(standardFile)        
         stem, ext = baseName.split(".", 1)
-        extractedPerfStems = test.getConfigValue("performance_logfile_extractor").keys()
-        if stem == "performance" or stem in extractedPerfStems:
+        if stem in self.getPerformanceStems(test):
             descriptors = self.findDescriptors(stem)
             return PerformanceFileComparison(test, standardFile, tmpFile, descriptors, makeNew)
         else:
@@ -95,8 +97,6 @@ class PerformanceFileComparison(comparetest.FileComparison):
         else:
             return self.descriptors["badperf"]
     def getSummary(self):
-        if self.newResult():
-            return comparetest.FileComparison.getSummary(self)
         type = self.getType()
         return str(int(self.calculatePercentageIncrease())) + "% " + type
     def getDetails(self):

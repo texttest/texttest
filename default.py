@@ -627,7 +627,6 @@ class CollateFiles(plugins.Action):
                 os.remove(filePath)
     def collate(self, test):
 	testCollations = self.expandCollations(test, self.collations)
-        errorWrites = []
         for targetStem, sourcePattern in testCollations.items():
             targetFile = test.makeFileName(targetStem, temporary=1)
             fullpath = self.findPath(test, sourcePattern)
@@ -635,22 +634,6 @@ class CollateFiles(plugins.Action):
                 self.diag.info("Extracting " + fullpath + " to " + targetFile) 
                 self.extract(fullpath, targetFile)
                 self.transformToText(targetFile, test)
-            elif os.path.isfile(test.makeFileName(targetStem)):
-                errorWrites.append((sourcePattern, targetFile))
-
-        # Don't write collation failures if there aren't any files anyway : the point
-        # is to highlight partial failure to collect files
-        if self.hasAnyFiles(test):
-            for sourcePattern, targetFile in errorWrites:
-                errText = self.getErrorText(sourcePattern)
-                open(targetFile, "w").write(errText + "\n")
-    def hasAnyFiles(self, test):
-        for file in os.listdir(test.getDirectory(temporary=1)):
-            if os.path.isfile(file) and test.app.ownsFile(file):
-                return 1
-        return 0
-    def getErrorText(self, sourcePattern):
-        return "Expected file '" + sourcePattern + "' not created by test"
     def findPath(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = os.path.join(test.writeDirectory, sourcePattern)

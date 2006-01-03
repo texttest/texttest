@@ -63,7 +63,8 @@ class InteractiveAction(plugins.Action):
     def getScriptTitle(self):
         return self.getTitle()
     def startExternalProgram(self, commandLine, shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
-        process = plugins.BackgroundProcess(commandLine, shellTitle=shellTitle, holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        process = plugins.BackgroundProcess(commandLine, shellTitle=shellTitle, \
+                                            holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         processTerminationMonitor.addMonitoring(process)
         return process
     def startExtProgramNewUsecase(self, commandLine, usecase, \
@@ -95,8 +96,8 @@ class InteractiveAction(plugins.Action):
         if not plugins.canExecute(viewProgram):
             raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
                   "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
-        baseName = os.path.basename(fileName)
-        guilog.info("Viewing file " + baseName + " using '" + viewProgram + "', refresh set to " + str(refresh))
+
+        guilog.info("Viewing file " + fileName + " using '" + viewProgram + "', refresh set to " + str(refresh))
         exitHandler = None
         if refresh:
             exitHandler = self.test.filesChanged
@@ -208,10 +209,12 @@ class ViewFile(InteractiveAction):
             return self.viewFile(fileName, refresh=refresh)
         if self.shouldTakeDiff(comparison):
             self.takeDiff(comparison)
+        elif comparison.missingResult():
+            self.viewFile(self.stdFile(comparison))
         else:
             self.viewFile(self.tmpFile(comparison))
     def shouldTakeDiff(self, comparison):
-        if comparison.newResult() or not self.optionGroup.getSwitchValue("nf"):
+        if comparison.newResult() or comparison.missingResult() or not self.optionGroup.getSwitchValue("nf"):
             return 0
         if comparison.hasDifferences():
             return 1

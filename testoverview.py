@@ -91,6 +91,7 @@ class GenererateTestStatus(plugins.Action):
                 try:
                     unpickler = Unpickler(file)
                     state = unpickler.load()
+                    state.ensureCompatible()
                     tag = entries.split("_")[-1]
                     if tagsFound.count(tag) == 0:
                         tagsFound.append(tag)

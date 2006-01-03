@@ -627,34 +627,38 @@ class TestCaseGUI(RightWindowGUI):
         return [(textview, "Text Info")]
     def addFilesToModel(self):
         if self.test.state.hasStarted():
-            self.addDynamicFilesToModel(self.test)
+            try:
+                self.addDynamicFilesToModel(self.test)
+            except AttributeError:
+                # The above code assumes we have failed on comparison: if not, don't display things
+                pass
         else:
             self.addStaticFilesToModel(self.test)
+    def createHeader(self, list, title):
+        if len(list) > 0:
+            iter = self.model.insert_before(None, None)
+            self.model.set_value(iter, 0, title)
+            return iter
     def addDynamicFilesToModel(self, test):
-        compiter = self.model.insert_before(None, None)
-        self.model.set_value(compiter, 0, "Comparison Files")
-        newiter = self.model.insert_before(None, None)
-        self.model.set_value(newiter, 0, "New Files")
-
         self.testComparison = test.state
         if not test.state.isComplete():
             self.testComparison = comparetest.TestComparison(test.state, test.app)
             self.testComparison.makeComparisons(test, makeNew = 1)
+        compiter = self.createHeader(self.testComparison.correctResults + self.testComparison.changedResults, "Comparison Files")
+        newiter = self.createHeader(self.testComparison.newResults, "New Files")
+        missingiter = self.createHeader(self.testComparison.missingResults, "Missing Files")
         diagComps = []
         hasNewDiags, hasOldDiags = 0, 0
-        try:
-            for fileComparison in self.testComparison.allResults:
-                if fileComparison.isDiagnostic():
-                    if fileComparison.newResult():
-                        hasNewDiags = 1
-                    else:
-                        hasOldDiags = 1
-                    diagComps.append(fileComparison)
+        for fileComparison in self.testComparison.allResults:
+            if fileComparison.isDiagnostic():
+                if fileComparison.newResult():
+                    hasNewDiags = 1
                 else:
-                    self.addDynamicComparisonToModel(newiter, compiter, fileComparison)
-        except AttributeError:
-            # The above code assumes we have failed on comparison: if not, don't display things
-            pass
+                    hasOldDiags = 1
+                diagComps.append(fileComparison)
+            else:
+                self.addDynamicComparisonToModel(newiter, compiter, missingiter, fileComparison)
+
         diagcompiter, diagnewiter = None, None
         if hasOldDiags:
             guilog.info("Adding subtree for diagnostic comparisons") 
@@ -665,16 +669,21 @@ class TestCaseGUI(RightWindowGUI):
             diagnewiter = self.model.insert_before(newiter, None)
             self.model.set_value(diagnewiter, 0, "Diagnostics")
         for diagComp in diagComps:
-            self.addDynamicComparisonToModel(diagnewiter, diagcompiter, diagComp)
-    def addDynamicComparisonToModel(self, newiter, compiter, fileComparison):
+            self.addDynamicComparisonToModel(diagnewiter, diagcompiter, missingiter, diagComp)
+    def addDynamicComparisonToModel(self, newiter, compiter, missingiter, fileComparison):
         if fileComparison.newResult():
             self.addDynamicFileToModel(newiter, fileComparison, self.getFailureColour())
+        elif fileComparison.missingResult():
+            self.addDynamicFileToModel(missingiter, fileComparison, self.getFailureColour())
         elif fileComparison.hasDifferences():
             self.addDynamicFileToModel(compiter, fileComparison, self.getFailureColour())
         else:
             self.addDynamicFileToModel(compiter, fileComparison, self.getSuccessColour())
     def addDynamicFileToModel(self, iter, comparison, colour):
-        self.addFileToModel(iter, comparison.tmpFile, comparison, colour)
+        if comparison.missingResult():
+            self.addFileToModel(iter, comparison.stdFile, comparison, colour)
+        else:
+            self.addFileToModel(iter, comparison.tmpFile, comparison, colour)
     def addStaticFilesToModel(self, test):
         if test.classId() == "test-case":
             stditer = self.model.insert_before(None, None)

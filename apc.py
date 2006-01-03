@@ -585,7 +585,8 @@ class ExtractApcLogs(plugins.Action):
 
         self.describe(test)
         # Extract from the apclog
-        extractToFile = test.makeFileName(saveName, temporary = 1)
+        extractToFile = test.makeFileName("Diagnostics/" + saveName, temporary = 1)
+        plugins.ensureDirExistsForFile(extractToFile)
         cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + extractToFile
         os.system(cmdLine)
         # We sometimes have problems with an empty file extracted.

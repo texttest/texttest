@@ -86,7 +86,7 @@ class Test:
         self.expandChildEnvironmentReferences(childReferenceVars)
     def expandChildEnvironmentReferences(self, referenceVars):
         pass
-    def makeFileName(self, stem, refVersion = None, temporary = 0, forComparison = 1):
+    def makeFileName(self, stem, refVersion = None, temporary=0, forComparison=1, findInTmp=0):
         root = self.getDirectory(temporary, forComparison)
         if not forComparison:
             return os.path.join(root, stem)
@@ -102,7 +102,9 @@ class Test:
             return nonVersionName
         
         # Prioritise finding earlier versions
-        testNonVersion = os.path.join(self.abspath, stem)
+        if not findInTmp:
+            root = self.abspath
+        testNonVersion = os.path.join(root, stem)
         for version in versions:
             versionName = testNonVersion + "." + version
             if os.path.isfile(versionName):

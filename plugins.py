@@ -147,6 +147,9 @@ class TestState:
             return "not compared"
     def getTypeBreakdown(self):
         return self.category, self.briefText
+    def ensureCompatible(self):
+        # If loaded from old pickle files, can get out of date objects...
+        pass
     def hasStarted(self):
         return self.started or self.completed
     def isComplete(self):

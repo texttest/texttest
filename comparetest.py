@@ -18,6 +18,7 @@ class TestComparison(plugins.TestState):
         self.allResults = []
         self.changedResults = []
         self.newResults = []
+        self.missingResults = []
         self.correctResults = []
         self.failedPrediction = None
         if previousInfo.category == "killed" or isinstance(previousInfo, FailedPrediction):
@@ -32,6 +33,10 @@ class TestComparison(plugins.TestState):
             return longDescription + " (" + self.failedPrediction.briefText + ")" + self.hostRepr()
         else:
             return plugins.TestState.__repr__(self)
+    def ensureCompatible(self):
+        # If loaded from old pickle files, can get out of date objects...
+        if not hasattr(self, "missingResults"):
+            self.missingResults = []
     def updatePaths(self, newAbsPath, newWriteDir):
         self.diag = plugins.getDiagnostics("TestComparison")
         self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
@@ -46,8 +51,6 @@ class TestComparison(plugins.TestState):
         self.freeText = str(prediction)
         self.briefText = prediction.briefText
         self.category = prediction.category
-    def hasNewResults(self):
-        return len(self.newResults) > 0
     def hasSucceeded(self):
         return self.category == "success"
     def isSaveable(self):
@@ -83,35 +86,45 @@ class TestComparison(plugins.TestState):
         worstResult = self.getMostSevereFileComparison()
         worstSeverity = worstResult.severity
         self.diag.info("Severity " + str(worstSeverity) + " for failing test")
-        details = worstResult.getSummary()
+        details = self.getSummary(worstResult)
         if len(self.getComparisons()) > 1:
             details += "(+)"
         if worstSeverity == 1:
             return "failure", details
         else:
             return "success", details
+    def getSummary(self, worstResult):
+        # Don't call worstResult.newResult() - we want the right answer
+        # even if all the files are gone, for the sake of testoverview etc.
+        if worstResult in self.newResults:
+            return worstResult.stem + " new"
+        elif worstResult in self.missingResults:
+            return worstResult.stem + " missing"
+        else:
+            return worstResult.getSummary()
     def hasResults(self):
         return len(self.allResults) > 0
     def getComparisons(self):
-        return self.changedResults + self.newResults
+        return self.changedResults + self.newResults + self.missingResults
     def _comparisonsString(self, comparisons):
         return string.join([repr(x) for x in comparisons], ",")
     def getDifferenceSummary(self):
         return repr(self) + self._getDifferenceSummary()
     def _getDifferenceSummary(self):
-        diffText = ""
+        if len(self.getComparisons()) == 0:
+            return ""
+        texts = []
+        if len(self.newResults) > 0:
+            texts.append("new results in " + self._comparisonsString(self.newResults))
+        if len(self.missingResults) > 0:
+            texts.append("missing results for " + self._comparisonsString(self.missingResults))
         if len(self.changedResults) > 0:
-            diffText = " differences in " + self._comparisonsString(self.changedResults)
-        if len(self.newResults) == 0:
-            return diffText
-        newText = " new results in " + self._comparisonsString(self.newResults)
-        if len(self.changedResults) == 0:
-            return newText
-        return newText + "," + diffText        
+            texts.append("differences in " + self._comparisonsString(self.changedResults))
+        return " " + string.join(texts, ", ")
     def getPostText(self):
         if not self.hasResults():
             return " - NONE!"
-        if len(self.newResults) == 0 and len(self.changedResults) == 0:
+        if len(self.getComparisons()) == 0:
             return " - SUCCESS! (on " + self.attemptedComparisonsOutput() + ")"
         return " (on " + self.attemptedComparisonsOutput() + ")"
     def attemptedComparisonsOutput(self):
@@ -120,56 +133,69 @@ class TestComparison(plugins.TestState):
             baseNames.append(os.path.basename(comparison.tmpFile))
         return string.join(baseNames, ",")
     def addComparison(self, comparison):
+        info = "Making comparison for " + comparison.stem + " "
         self.allResults.append(comparison)
         if comparison.newResult():
             self.newResults.append(comparison)
+            info += "(new)"
+        elif comparison.missingResult():
+            self.missingResults.append(comparison)
+            info += "(missing)"
         elif comparison.hasDifferences():
             self.changedResults.append(comparison)
+            info += "(diff)"
         else:
             self.correctResults.append(comparison)
+            info += "(correct)"
+        self.diag.info(info)
     def makeComparisons(self, test, makeNew = 0):
-        self.makeComparisonsInDir(test, test.getDirectory(temporary=1), makeNew)
+        stems = self.getFileStems(test, makeNew)
+        for stem in stems:
+            stdFile = test.makeFileName(stem)
+            tmpFile = test.makeFileName(stem, temporary=1, findInTmp=1)
+            if os.path.isfile(stdFile) or os.path.isfile(tmpFile):
+                comparison = self.createFileComparison(test, stdFile, tmpFile, makeNew)
+                self.addComparison(comparison)
+        self.handleSingleDiffWithExcuse(test)
+    def handleSingleDiffWithExcuse(self, test):
         if len(self.changedResults) == 1 and self.changedResults[0].checkExternalExcuses(test.app):
             # If the only difference has an excuse, remove it...
             fileComparison = self.changedResults[0]
             del self.changedResults[0]
             self.correctResults.append(fileComparison)
-    def makeComparisonsInDir(self, test, dir, makeNew = 0):
-        fileList = os.listdir(dir)
+    def getFileStems(self, test, makeNew):
+        stems = []
+        relDirs = [ "", "Diagnostics", "Diagnostics/slave" ]
+        for relDir in relDirs:
+            self.getFileStemsFromDir(stems, test.writeDirectory, test.app.name, relDir)
+
+        # Pick up anything that disappeared, if we've actually completed
+        if not makeNew:
+            self.getFileStemsFromDir(stems, test.abspath, test.app.name, ignoreStems=self.getOptionalStems(test))
+        return stems
+    def getOptionalStems(self, test):
+        return test.getConfigValue("definition_file_stems")
+    def getFileStemsFromDir(self, stems, rootDir, allowedExt, relDir="", ignoreStems=[]):
+        absDir = os.path.join(rootDir, relDir)
+        if not os.path.isdir(absDir):
+            return
+        fileList = os.listdir(absDir)
         fileList.sort()
         for file in fileList:
-            if file == "framework_tmp":
+            fullPath = os.path.join(absDir, file)
+            if not os.path.isfile(fullPath) or os.path.islink(fullPath):
                 continue
-            fullPath = os.path.join(dir, file)
-            # Don't go everywhere, compare specific subdirectories only
-            compSubDirs = [ "Diagnostics", "slave" ]
-            if file in compSubDirs and os.path.isdir(fullPath):
-                self.makeComparisonsInDir(test, fullPath, makeNew)
-            elif self.shouldCompare(file, dir, test.app):
-                self.diag.info("Decided we should compare " + file)
-                stdFile = self.findTestDirectory(fullPath, test)
-                self.diag.info("Using standard file " + stdFile)
-                comparison = self.createFileComparison(test, stdFile, fullPath, makeNew)
-                self.addComparison(comparison)
-            else:
-                self.diag.info("Rejected " + file)
-    def shouldCompare(self, file, dir, app):
-        return not file.startswith("input.") and not file.startswith("environment") and app.ownsFile(file)
-    def findTestDirectory(self, fullPath, test):
-        result = os.path.normpath(fullPath.replace(test.app.writeDirectory, test.app.abspath))
-        if result != fullPath:
-            self.diag.info("Finding standard file from " + result)
-            return self.getStandardFile(result, test)
-        # writeDir contains so
-        savedir = os.getcwd()
-        os.chdir(test.app.writeDirectory)
-        result = os.path.normpath(fullPath.replace(os.getcwd(), test.app.abspath))
-        os.chdir(savedir)
-        return self.getStandardFile(result, test)
-    def getStandardFile(self, fullPath, test):
-        realPath = os.path.normpath(fullPath)
-        local = realPath.replace(test.abspath + os.sep, "")
-        return os.path.join(test.abspath, test.makeFileName(local))
+
+            parts = file.split(".")
+            if len(parts) == 1:
+                continue
+            stem, ext = parts[:2]
+            if len(stem) == 0 or stem in ignoreStems or ext != allowedExt:
+                continue
+            if relDir:
+                stem = os.path.join(relDir, stem)
+            if not stem in stems:
+                stems.append(stem)
     def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
         return FileComparison(test, standardFile, tmpFile, makeNew)
     def saveSingle(self, stem, exact = 1, versionString = ""):
@@ -182,12 +208,11 @@ class TestComparison(plugins.TestState):
             self.category = "success"
             self.freeText = ""
     def findComparison(self, stem):
-        for comparison in self.changedResults:
-            if comparison.stem == stem:
-                return comparison, self.changedResults
-        for comparison in self.newResults:
-            if comparison.stem == stem:
-                return comparison, self.newResults
+        lists = [ self.changedResults, self.newResults, self.missingResults ]
+        for list in lists:
+            for comparison in list:
+                if comparison.stem == stem:
+                    return comparison, list
         return None, None
     def save(self, exact = 1, versionString = "", overwriteSuccessFiles = 0):
         # Force exactness unless there is only one difference : otherwise
@@ -197,14 +222,17 @@ class TestComparison(plugins.TestState):
             exact = 1
         for comparison in self.changedResults:
             comparison.overwrite(exact, versionString)
-        for comparison in self.newResults:
+        for comparison in self.newResults + self.missingResults:
             comparison.overwrite(1, versionString)
+        for comparison in self.missingResults:
+            self.allResults.remove(comparison)
         if overwriteSuccessFiles:
             for comparison in self.correctResults:
                 comparison.overwrite(exact, versionString)
         self.correctResults += self.changedResults + self.newResults
         self.changedResults = []
         self.newResults = []
+        self.missingResults = []
         self.category = "success"
         self.freeText = ""
 
@@ -249,7 +277,9 @@ class MakeComparisons(plugins.Action):
             fullText += self.fileComparisonBody(comparison)
         return fullText
     def fileComparisonTitle(self, comparison):
-        if comparison.newResult():
+        if comparison.missingResult():
+            titleText = "Missing result in"
+        elif comparison.newResult():
             titleText = "New result in"
         else:
             titleText = "Differences in"
@@ -258,6 +288,8 @@ class MakeComparisons(plugins.Action):
     def fileComparisonBody(self, comparison):
         if comparison.newResult():
             return self.previewGenerator.getPreview(open(comparison.tmpCmpFile))
+        elif comparison.missingResult():
+            return self.previewGenerator.getPreview(open(comparison.stdCmpFile))
         
         cmdLine = self.textDiffTool + " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
         stdout = os.popen(cmdLine)
@@ -276,6 +308,7 @@ class FileComparison:
         self.stdFile = standardFile
         self.tmpFile = tmpFile
         self.stem = os.path.basename(tmpFile).split('.')[0]
+        self.diag = plugins.getDiagnostics("FileComparison")
         filter = RunDependentTextFilter(test, self.stem)
         filterFileBase = test.makeFileName(os.path.basename(tmpFile), temporary=1, forComparison=0)
         self.stdCmpFile = filter.filterFile(standardFile, filterFileBase + "origcmp")
@@ -283,6 +316,7 @@ class FileComparison:
         if makeNew:
             tmpCmpFileName = filterFileBase + "partcmp"
         self.tmpCmpFile = filter.filterFile(tmpFile, tmpCmpFileName, makeNew)
+        self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
         self._cacheValues(test.app)
     def _cacheValues(self, app):
         self.differenceId = self._hasDifferences(app)
@@ -311,7 +345,8 @@ class FileComparison:
         
         if plugins.modifiedTime(self.tmpCmpFile) < plugins.modifiedTime(self.tmpFile):
             return 1
-        return not self.newResult() and (plugins.modifiedTime(self.stdCmpFile) <= plugins.modifiedTime(self.stdFile))
+        return not self.newResult() and not self.missingResult() and \
+               (plugins.modifiedTime(self.stdCmpFile) <= plugins.modifiedTime(self.stdFile))
     def getType(self):
         return "failure"
     def isDiagnostic(self):
@@ -321,16 +356,15 @@ class FileComparison:
         # Nothing to report above what is already known
         return ""
     def getSummary(self):
-        if self.newResult():
-            return self.stem + " new"
-        else:
-            return self.stem + " different"
+        return self.stem + " different"
     def newResult(self):
         return not os.path.exists(self.stdFile)
+    def missingResult(self):
+        return not os.path.exists(self.tmpFile)
     def hasDifferences(self):
         return self.differenceId
     def _hasDifferences(self, app):
-        if os.path.isfile(self.stdCmpFile):
+        if os.path.isfile(self.stdCmpFile) and os.path.isfile(self.tmpCmpFile):
             return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
         else:
             return 0
@@ -349,10 +383,11 @@ class FileComparison:
         # Allow for subclasses to differentiate between a literal overwrite and a
         # more intelligent save, e.g. for performance. Default is the same for exact
         # and inexact save
-        if exact:
-            copyfile(self.tmpFile, stdFile)
-        else:
-            self.saveResults(stdFile)
+        if not self.missingResult():
+            if exact:
+                copyfile(self.tmpFile, stdFile)
+            else:
+                self.saveResults(stdFile)
         # Try to get everything to behave normally after a save...
         self.differenceId = 0
         self.tmpFile = stdFile

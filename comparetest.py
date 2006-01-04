@@ -203,7 +203,10 @@ class TestComparison(plugins.TestState):
         if comparison:
             comparison.overwrite(exact, versionString)
             storageList.remove(comparison)
-            self.correctResults.append(comparison)
+            if storageList is self.missingResults:
+                self.allResults.remove(comparison)
+            else:
+                self.correctResults.append(comparison)
         if len(self.getComparisons()) == 0:
             self.category = "success"
             self.freeText = ""

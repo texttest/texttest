@@ -405,6 +405,7 @@ class CollectFiles(plugins.Action):
         app.addConfigEntry("collection", "false", "batch_use_collection")
         userName, rootDir = app.getPreviousWriteDirInfo(self.userName)
         if not os.path.isdir(rootDir):
+            self.diag.info("No directory at " + rootDir)
             return
         dirlist = os.listdir(rootDir)
         dirlist.sort()
@@ -413,6 +414,7 @@ class CollectFiles(plugins.Action):
             if os.path.isdir(fullDir) and dir.startswith(app.name + app.versionSuffix()):
                 fileBodies += self.parseDirectory(fullDir, app, totalValues)
         if len(fileBodies) == 0:
+            self.diag.info("No information found in " + rootDir)
             return
         
         mailTitle = self.getTitle(app, totalValues)

@@ -270,7 +270,7 @@ class TextTestGUI(ThreadedResponder):
                 self.redrawTest(test, test.state)
         else:
             self.redrawSuite(test)
-        if self.rightWindowGUI and self.rightWindowGUI.object == test:
+        if self.rightWindowGUI and self.rightWindowGUI.object is test:
             self.recreateTestView(test)
     # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test, state):

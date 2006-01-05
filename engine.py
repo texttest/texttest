@@ -308,11 +308,13 @@ class TextTest:
         dirName = self.inputOptions.directoryName
         self.diag.info("Using test suite at " + dirName)
         raisedError, appList = self._findApps(dirName, 1)
-        appList.sort()
+        appList.sort(self.compareApps)
         self.diag.info("Found applications : " + repr(appList))
         if len(appList) == 0 and not raisedError:
             print "Could not find any matching applications (files of the form config.<app>) under", dirName
         return appList
+    def compareApps(self, app1, app2):
+        return cmp(app1.name, app2.name)
     def _findApps(self, dirName, recursive):
         appList = []
         raisedError = 0

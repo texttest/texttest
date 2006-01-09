@@ -1953,18 +1953,19 @@ class CVSLogInGUI(guiplugins.InteractiveAction):
         cvsInfo = ""
         for file in files:
             fullName = test.makeFileName(file)
-            cvsInfo += self.getCVSInfo(fullName)
+            path = os.path.abspath(os.path.dirname(fullName))            
+            cvsInfo += self.getCVSInfo(path, os.path.basename(fullName))
         raise  plugins.TextTestError, "CVS Logs" + os.linesep + os.linesep + cvsInfo
     def getTitle(self):
         return "CVS"
-    def getCVSInfo(self, file):
-        if not os.path.isfile(file):
+    def getCVSInfo(self, path, file):
+        if not os.path.isfile(path + os.sep + file):
             return ""
         info = os.path.basename(file) + ":" + os.linesep
-        cvsCommand = "cvs log -N -rHEAD " + file
+        cvsCommand = "cd " + path + ";cvs log -N -rHEAD " + file
         stdin, stdouterr = os.popen4(cvsCommand)
         cvsLines = stdouterr.readlines()
-        if len(cvsLines) > 0:
+        if len(cvsLines) > 0:            
             addLine = None
             for line in cvsLines:
                 isMinusLine = None
@@ -1975,6 +1976,9 @@ class CVSLogInGUI(guiplugins.InteractiveAction):
                     addLine = None
                 if line.find("nothing known about") != -1:
                     info += "Not CVS controlled"
+                    break
+                if line.find("No CVSROOT specified") != -1:
+                    info += "No CVSROOT specified"
                     break
                 if addLine and not isMinusLine:
                     info += line

@@ -385,7 +385,56 @@ class SaveState(respond.SaveState):
         testStateRepository = suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession)
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
-        
+
+class GenerateHistoricalReport(plugins.Action):
+    appsGenerated = []
+    def __init__(self, args):
+        self.batchSession = args[0]
+    def scriptDoc(self):
+        return "Generate reports based on the historical repository"
+    def setUpApplication(self, app):
+        if app in self.appsGenerated:
+            return
+        self.appsGenerated.append(app)
+        self.appsGenerated += app.extras
+        repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+        if not repository:
+            return
+        repository = os.path.join(repository, app.name)
+        if not os.path.isdir(repository):
+            raise plugins.TextTestError, "Batch result repository " + repository + " does not exist"
+
+        extraVersions = self.getExtraVersions(app)
+        relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
+        pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
+        pageDir = os.path.join(pageTopDir, app.name)
+        plugins.ensureDirectoryExists(pageDir)
+        try:
+            from testoverview import GenerateWebPages
+            generator = GenerateWebPages(app.fullName, app.getFullVersion(), pageDir, extraVersions)
+            generator.generate(relevantSubDirs)
+        except:
+            sys.stderr.write("Caught exception while generating web pages :\n")
+            plugins.printException()
+    def findRelevantSubdirectories(self, repository, app, extraVersions):
+        subdirs = []
+        for dir in os.listdir(repository):
+            dirVersions = dir.split(".")
+            if self.isSubset(app.versions, dirVersions) and not dirVersions[-1] in extraVersions:
+                subdirs.append(os.path.join(repository, dir))
+        return subdirs
+    def getExtraVersions(self, app):
+        extraVersions = []
+        for extraApp in app.extras:
+            for version in extraApp.versions:
+                if not version in app.versions:
+                    extraVersions.append(version)
+        return extraVersions
+    def isSubset(self, appVersions, dirVersions):
+        for version in appVersions:
+            if not version in dirVersions:
+                return False
+        return True
 
 class CollectFiles(plugins.Action):
     def __init__(self, args=[""]):

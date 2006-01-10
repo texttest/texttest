@@ -184,7 +184,6 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("default_architecture", "i386_linux")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10)
         app.setConfigDefault("maximum_cputime_for_chunking", 0.0)
-        app.setConfigDefault("testoverview_pages", "")
     def defaultLoginShell(self):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"

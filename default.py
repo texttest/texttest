@@ -36,6 +36,7 @@ class Config(plugins.Configuration):
                 group.addSwitch("g", "use dynamic GUI", 1)
                 group.addSwitch("gx", "use static GUI")
                 group.addSwitch("o", "Overwrite all failures")
+                group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addSwitch("n", "Create new results files (overwrite everything)")
             elif group.name.startswith("Side"):
@@ -43,6 +44,8 @@ class Config(plugins.Configuration):
     def getActionSequence(self):
         if self.useStaticGUI():
             return []
+        if self.optionMap.has_key("coll"):
+            return [ batch.CollectFiles(), batch.GenerateHistoricalReport([ self.optionValue("b") ]) ]
 
         return self._getActionSequence(makeDirs=1)
     def useGUI(self):
@@ -56,7 +59,7 @@ class Config(plugins.Configuration):
         # Put the GUI first ... first one gets the script engine - see respond module :)
         if self.useGUI():
             self.addGuiResponder(classes)
-        if self.batchMode():
+        if self.batchMode() and not self.optionMap.has_key("coll"):
             classes.append(batch.BatchResponder)
         if self.keepTemporaryDirectories():
             classes.append(self.getStateSaver())
@@ -341,6 +344,7 @@ class Config(plugins.Configuration):
         # Batch values. Maps from session name to values
         app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
         app.setConfigDefault("batch_result_repository", { "default" : "" }, "Directory to store historical batch results under")
+        app.setConfigDefault("historical_report_location", { "default" : "" }, "Directory to create reports on historical batch data under")
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
         app.setConfigDefault("batch_timelimit", { "default" : None }, "Maximum length of test to include in batch mode runs")

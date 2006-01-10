@@ -9,157 +9,160 @@
 #   texttest -a <app> -s testoverview.GenererateTestStatus <major versions> <minor versions> 
 #
 
-import os, performance, plugins, respond, sys, string, time, types, shutil
+import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors
 from cPickle import Pickler, Unpickler, UnpicklingError
 
-try:
-    import HTMLgen, HTMLcolors
-except:
-    raise BadConfigError, "Python modules HTMLgen and/or HTMLcolors not found."
+class GenerateWebPages(plugins.Action):
+    def __init__(self, pageAppName, pageVersion, pageDir, extraVersions):
+        self.pageAppName = pageAppName
+        self.pageVersion = pageVersion
+        self.extraVersions = extraVersions
+        self.pageDir = pageDir
+        self.pagesOverview = {}
+        self.pagesDetails = {}
+        self.diag = plugins.getDiagnostics("GenerateWebPages")
+    def generate(self, repositoryDirs):            
+        foundMinorVersions = HTMLgen.Container()
+        details = TestDetails()
+        usedSelectors = {}
+        for repositoryDir in repositoryDirs:
+            version = os.path.basename(repositoryDir)
+            self.diag.info("Generating " + version)
+            loggedTests = {}
+            tagsFound = []
+            categoryHandler = CategoryHandler()
+            self.processTestStateFiles(categoryHandler, loggedTests, tagsFound, repositoryDir)
+    
+            if len(loggedTests.keys()) > 0:
+                tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
+                selectors = [ SelectorLast6Days(tagsFound), SelectorAll(tagsFound), SelectorWeekend(tagsFound) ]
+                linkFromDetailsToOverview = {}
+                for sel in selectors:
+                    if not usedSelectors.has_key(repr(sel)):
+                        usedSelectors[repr(sel)] = sel.getFileNameExtension()
+                    linkFromDetailsToOverview[repr(sel)] = self.getOverviewPageName(sel.getFileNameExtension())
+                    testTable = TestTable()
+                    table = testTable.generate(categoryHandler, self.pageVersion, version, loggedTests, sel.getSelectedTags())
+                    self.addOverviewPages(sel.getFileNameExtension(), version, table)
+                det = details.generate(categoryHandler, version, tagsFound, linkFromDetailsToOverview)
+                self.addDetailPages(det)
+                foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
+        selContainer = HTMLgen.Container()
+        for sel in usedSelectors.keys():
+            selContainer.append(HTMLgen.Href(self.getOverviewPageName(usedSelectors[sel]), sel))
+        for sel in self.pagesOverview.keys():
+            self.pagesOverview[sel].prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
+            self.pagesOverview[sel].prepend(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + self.pageVersion + "-"),
+                                                                      foundMinorVersions), align = 'center'))
+            self.pagesOverview[sel].prepend(HTMLgen.Heading(1, "Test results for ", self.pageAppName, align = 'center'))
 
-class GenererateTestStatus(plugins.Action):
-    def __init__(self, args):
-        self.majorVersions = args[0].split(",")
-        self.minorVersions = args[1].split(",")
-        if len(args) == 3:
-            self.subVersions = args[2].split(",")
-        else:
-            self.subVersions = None
-        self.diag = plugins.getDiagnostics("GenerateTestStatus")
-    def setUpApplication(self, app):
-        self.testStateRepository = app.getCompositeConfigValue("batch_result_repository", "default")
-        if not os.path.isdir(self.testStateRepository):
-            raise plugins.TextTestError, "Testoverview repository " + self.testStateRepository + " does not exist"
-        pageTopDir = app.getConfigValue("testoverview_pages")
-        self.pageDir = os.path.join(pageTopDir, app.name)
-        plugins.ensureDirectoryExists(self.pageDir)
-            
-        for majorVersion in self.majorVersions:
-            self.pagesOverview = {}
-            foundMinorVersions = HTMLgen.Container()
-            details = TestDetails()
-            self.pagesDetails = {}
-            usedSelectors = {}
-            for minorVersion in self.minorVersions:
-                version = majorVersion + "." + minorVersion
-                self.diag.info("Generating " + version)
-                loggedTests = {}
-                tagsFound = []
-                categoryHandler = CategoryHandler()
-                
-                baseDir = os.path.join(self.testStateRepository, app.name, version)
-                self.loadTestStates(baseDir, categoryHandler, loggedTests, tagsFound)
-                if self.subVersions:
-                    for subVersion in self.subVersions:
-                        dir = baseDir + "." + subVersion
-                        self.loadTestStates(dir, categoryHandler, loggedTests, tagsFound, subVersion)
-                if len(loggedTests.keys()) > 0:
-                    tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
-                    selectors = [ SelectorLast6Days(tagsFound), SelectorAll(tagsFound), SelectorWeekend(tagsFound) ]
-                    linkFromDetailsToOverview = {}
-                    for sel in selectors:
-                        if not usedSelectors.has_key(repr(sel)):
-                            usedSelectors[repr(sel)] = sel.getFileNameExtension()
-                        linkFromDetailsToOverview[repr(sel)] = self.getOverviewPageName(majorVersion, sel.getFileNameExtension())
-                        testTable = TestTable()
-                        table = testTable.generate(categoryHandler, majorVersion, version, loggedTests, sel.getSelectedTags())
-                        self.addOverviewPages(sel.getFileNameExtension(), version, table, app)
-                    det = details.generate(categoryHandler, version, tagsFound, linkFromDetailsToOverview)
-                    self.addDetailPages(app, det)
-                    foundMinorVersions.append(HTMLgen.Href("#" + version, minorVersion))
-            selContainer = HTMLgen.Container()
-            for sel in usedSelectors.keys():
-                selContainer.append(HTMLgen.Href(self.getOverviewPageName(majorVersion, usedSelectors[sel]), sel))
-            for sel in self.pagesOverview.keys():
-                self.pagesOverview[sel].prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
-                self.pagesOverview[sel].prepend(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + majorVersion + "-"),
-                                                                          foundMinorVersions), align = 'center'))
-                self.pagesOverview[sel].prepend(HTMLgen.Heading(1, "Test results for ", repr(app), align = 'center'))
-            
-            self.writePages(app, majorVersion)
-    def loadTestStates(self, dir, categoryHandler, loggedTests, tagsFound, subVersion = None):
-        if os.path.isdir(dir):
-            for entries in os.listdir(dir):
-                self.traverseDirectories(categoryHandler, loggedTests, tagsFound, os.path.join(dir, entries), subVersion)
-    def traverseDirectories(self, categoryHandler, loggedTests, tagsFound, dir, subVersion = None):
-        for entries in os.listdir(dir):
-            if os.path.isdir(os.path.join(dir, entries)):
-                self.traverseDirectories(categoryHandler, loggedTests, tagsFound, os.path.join(dir, entries), subVersion)
-            elif entries.startswith("teststate"):
-                stateFile = os.path.join(dir, entries) 
-                file = open(stateFile)
-                try:
-                    unpickler = Unpickler(file)
-                    state = unpickler.load()
-                    state.ensureCompatible()
-                    tag = entries.split("_")[-1]
-                    if tagsFound.count(tag) == 0:
-                        tagsFound.append(tag)
-                    key = self.getTestIdentifier(dir)
-                    keySubVersion = subVersion
-                    if not keySubVersion:
-                        keySubVersion = "None"
-                    if not loggedTests.has_key(keySubVersion):
-                        loggedTests[keySubVersion] = {}
-                    if not loggedTests[keySubVersion].has_key(key):
-                        loggedTests[keySubVersion][key] = {}
-                    loggedTests[keySubVersion][key][tag] = state
-                    categoryHandler.registerInCategory(tag, key, state, keySubVersion)
-                except UnpicklingError:
-                    print "unpickling error"
-                except EOFError:
-                    print "EOFError in ",file
-                    print "Ignoring this file"
-                except AttributeError:
-                    print "AttrError for ", file
-            else:
-                print "Unknown file", entries
-    def addOverviewPages(self, item, version, table, app):
+        self.writePages()
+    def processTestStateFiles(self, categoryHandler, loggedTests, tagsFound, repositoryDir):
+        dirs = [ repositoryDir ]
+        for extra in self.extraVersions:
+            extraDir = repositoryDir + "." + extra
+            if os.path.isdir(extraDir):
+                dirs.append(extraDir)
+        for dir in dirs:
+            for testStateFile in self.findTestStateFiles(dir):
+                self.processTestStateFile(testStateFile, categoryHandler, loggedTests, tagsFound, dir)
+    def findTestStateFiles(self, dir):
+        files = []
+        for file in os.listdir(dir):
+            fullPath = os.path.join(dir, file)
+            if os.path.isdir(fullPath):
+                files += self.findTestStateFiles(fullPath)
+            elif os.path.isfile(fullPath) and file.startswith("teststate"):
+                files.append(fullPath)
+        return files
+    def removePageVersion(self, version):
+        leftVersions = []
+        pageSubVersions = self.pageVersion.split(".")
+        for subVersion in version.split("."):
+            if not subVersion in pageSubVersions:
+                leftVersions.append(subVersion)
+        return string.join(leftVersions, ".")
+    def processTestStateFile(self, stateFile, categoryHandler, loggedTests, tagsFound, repository):
+        state = self.readState(stateFile)
+        if not state:
+            print "Ignoring file at", stateFile
+            return
+
+        tag = os.path.basename(stateFile).split("_")[-1]
+        if tagsFound.count(tag) == 0:
+            tagsFound.append(tag)
+        key = self.getTestIdentifier(stateFile, repository)
+        keyExtraVersion = self.findExtraVersion(repository)
+        if not loggedTests.has_key(keyExtraVersion):
+            loggedTests[keyExtraVersion] = {}
+        if not loggedTests[keyExtraVersion].has_key(key):
+            loggedTests[keyExtraVersion][key] = {}
+
+        loggedTests[keyExtraVersion][key][tag] = state
+        categoryHandler.registerInCategory(tag, key, state, keyExtraVersion)
+    def findExtraVersion(self, repository):
+        for version in os.path.basename(repository).split("."):
+            if version in self.extraVersions:
+                return version
+        return "None"
+    def readState(self, stateFile):
+        file = open(stateFile)
+        try:
+            unpickler = Unpickler(file)
+            state = unpickler.load()
+            state.ensureCompatible()
+            return state
+        except UnpicklingError:
+            print "unpickling error..."
+        except EOFError:
+            print "EOFError..."
+    def addOverviewPages(self, item, version, table):
         if not self.pagesOverview.has_key(item):
-            self.pagesOverview[item] = HTMLgen.SimpleDocument(title="Test results for " + repr(app),
+            self.pagesOverview[item] = HTMLgen.SimpleDocument(title="Test results for " + self.pageAppName,
                                                               style = "body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}")
         self.pagesOverview[item].append(HTMLgen.Name(version))
         self.pagesOverview[item].append(table)
-    def addDetailPages(self, app, details):
+    def addDetailPages(self, details):
         for tag in details.keys():
             if not self.pagesDetails.has_key(tag):
                 self.pagesDetails[tag] = HTMLgen.SimpleDocument()
-                self.pagesDetails[tag].append(HTMLgen.Heading(1, tag + " - detailed test results for application ", app.name, align = 'center'))
+                self.pagesDetails[tag].append(HTMLgen.Heading(1, tag + " - detailed test results for ", self.pageAppName, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
-    def writePages(self, app, majorVersion):
+    def writePages(self):
         for sel in self.pagesOverview.keys():
-            self.pagesOverview[sel].write(os.path.join(self.pageDir, self.getOverviewPageName(majorVersion, sel)))
+            self.pagesOverview[sel].write(os.path.join(self.pageDir, self.getOverviewPageName(sel)))
         for tag in self.pagesDetails.keys():
             page = self.pagesDetails[tag]
-            page.write(os.path.join(self.pageDir, getDetailPageName(majorVersion, tag)))
-    def getTestIdentifier(self, dir):
-        return string.join(dir.split(os.sep)[len(self.testStateRepository.split(os.sep)) + 2:])
+            page.write(os.path.join(self.pageDir, getDetailPageName(self.pageVersion, tag)))
+    def getTestIdentifier(self, stateFile, repository):
+        dir = os.path.dirname(stateFile)
+        return dir.replace(repository + os.sep, "").replace(os.sep, " ")
     def getTagTimeInSeconds(self, tag):
         return time.mktime(time.strptime(tag, "%d%b%Y"))
-    def getOverviewPageName(self, majorVersion, sel):
-        return "test_" + majorVersion + sel + ".html"
+    def getOverviewPageName(self, sel):
+        return "test_" + self.pageVersion + sel + ".html"
 
 class TestTable:
-    def generate(self, categoryHandler, majorVersion, version, loggedTests, tagsFound):
+    def generate(self, categoryHandler, pageVersion, version, loggedTests, tagsFound):
         t = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
-        t.append(self.generateTableHead(majorVersion, version, tagsFound))
+        t.append(self.generateTableHead(pageVersion, version, tagsFound))
 
         table = []
-        subVersions = loggedTests.keys()
-        for subVersion in subVersions:
-            tests = loggedTests[subVersion].keys()
+        extraVersions = loggedTests.keys()
+        for extraVersion in extraVersions:
+            tests = loggedTests[extraVersion].keys()
             tests.sort()
             # Add an extra line in the table only if there are several versions.
-            if len(subVersions) > 1:
-                if subVersion != "None":
-                    subVersionName = version + "." + subVersion
+            if len(extraVersions) > 1:
+                if extraVersion != "None":
+                    extraVersionName = version + "." + extraVersion
                 else:
-                    subVersionName = version
-                table.append(HTMLgen.TR() + [HTMLgen.TH(subVersionName, colspan = len(tagsFound) + 1,
+                    extraVersionName = version
+                table.append(HTMLgen.TR() + [HTMLgen.TH(extraVersionName, colspan = len(tagsFound) + 1,
                                                     bgcolor = HTMLcolors.GRAY1 )])
             for test in tests:
-                results = loggedTests[subVersion][test]
-                row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + subVersion), test), bgcolor = "#FFFFCC") ]
+                results = loggedTests[extraVersion][test]
+                row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + extraVersion), test), bgcolor = "#FFFFCC") ]
                 for tag in tagsFound:
                     if results.has_key(tag):
                         state = results[tag]
@@ -169,7 +172,7 @@ class TestTable:
                         if category == "success":
                             cellContaint =  HTMLgen.Font(repr(state) + detail, color = fgcol)
                         else:
-                            cellContaint = HTMLgen.Href(getDetailPageName(majorVersion, tag) + "#" + version + test + subVersion,
+                            cellContaint = HTMLgen.Href(getDetailPageName(pageVersion, tag) + "#" + version + test + extraVersion,
                                                         HTMLgen.Font(repr(state) + detail, color = fgcol))
                     else:
                         bgcol = HTMLcolors.GRAY2
@@ -178,7 +181,7 @@ class TestTable:
                 body = HTMLgen.TR()
                 body = body + row
                 table.append(body)
-        table = categoryHandler.generateSummaries(majorVersion, version, tagsFound) + table
+        table = categoryHandler.generateSummaries(pageVersion, version, tagsFound) + table
         t.append(table)
         t.append(HTMLgen.BR())
         return t
@@ -198,14 +201,14 @@ class TestTable:
         elif type == "success":
             bgcol = "#CEEFBD"
         return fgcol, bgcol
-    def generateTableHead(self, majorVersion, version, tagsFound):
+    def generateTableHead(self, pageVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]
         for tag in tagsFound:
             tagColor = HTMLcolors.BLACK
             year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(tag, "%d%b%Y")
             if wday == 4: # Weekend jobs start Friday.
                 tagColor = HTMLcolors.RED
-            head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(majorVersion, tag), HTMLgen.Font(tag, color = tagColor))))
+            head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(pageVersion, tag), HTMLgen.Font(tag, color = tagColor))))
         heading = HTMLgen.TR()
         heading = heading + head
         cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))
@@ -227,7 +230,7 @@ class TestDetails:
             container.append(HTMLgen.HR())
             container.append(HTMLgen.Heading(2, version + ": " + categoryHandler.generateSummary(categories)))
             for cat in categories.keys():
-                test, state, subVersion = categories[cat][0]
+                test, state, extraVersion = categories[cat][0]
                 shortDescr, longDescr = getCategoryDescription(state, cat)
                 fullDescription = self.getFullDescription(categories[cat], version, linkFromDetailsToOverview)
                 if fullDescription:
@@ -239,50 +242,50 @@ class TestDetails:
         fullText = HTMLgen.Container()
         textFound = None
         for test in tests:
-            testName, state, subVersion = test
+            testName, state, extraVersion = test
             freeText = state.freeText
             if freeText:
                 textFound = 1
-                fullText.append(HTMLgen.Name(version + testName + subVersion))
+                fullText.append(HTMLgen.Name(version + testName + extraVersion))
                 fullText.append(HTMLgen.Heading(4, HTMLgen.Container("TEST " + repr(state) + " " + testName + " (",
-                                                                     self.getLinksToOverview(version, testName, subVersion, linkFromDetailsToOverview)),")"))
+                                                                     self.getLinksToOverview(version, testName, extraVersion, linkFromDetailsToOverview)),")"))
                 freeText = string.replace(freeText, "\n", "<BR>")
                 fullText.append(HTMLgen.RawText(freeText))
         if textFound:
             return fullText
         else:
             return None
-    def getLinksToOverview(self, version, testName, subVersion, linkFromDetailsToOverview):
+    def getLinksToOverview(self, version, testName, extraVersion, linkFromDetailsToOverview):
         links = HTMLgen.Container()
         for sel in linkFromDetailsToOverview:
-            links.append(HTMLgen.Href(linkFromDetailsToOverview[sel] + "#" + version + testName + subVersion, sel))
+            links.append(HTMLgen.Href(linkFromDetailsToOverview[sel] + "#" + version + testName + extraVersion, sel))
         return links
         
 class CategoryHandler:
     def __init__(self):
         self.testsInCategory = {}
-    def registerInCategory(self, tag, test, state, subVersion):
+    def registerInCategory(self, tag, test, state, extraVersion):
         if not self.testsInCategory.has_key(tag):
             self.testsInCategory[tag] = {}
         if not self.testsInCategory[tag].has_key(state.category):
             self.testsInCategory[tag][state.category] = []
-        self.testsInCategory[tag][state.category].append((test, state, subVersion))
-    def generateSummaries(self, majorVersion, version, tags):
+        self.testsInCategory[tag][state.category].append((test, state, extraVersion))
+    def generateSummaries(self, pageVersion, version, tags):
         row = [ HTMLgen.TD("Summary", bgcolor = HTMLcolors.GRAY1) ]
         for tag in tags:
-            summary = self.generateSummaryHTML(tag, majorVersion, version, self.testsInCategory[tag])
+            summary = self.generateSummaryHTML(tag, pageVersion, version, self.testsInCategory[tag])
             row.append(HTMLgen.TD(summary, bgcolor = HTMLcolors.GRAY1))
         return HTMLgen.TR() + row
-    def generateSummaryHTML(self, tag, majorVersion, version, categories):
+    def generateSummaryHTML(self, tag, pageVersion, version, categories):
         summary = HTMLgen.Container()
         numTests = 0
         for cat in categories.keys():
-            test, state, subVersion = categories[cat][0]
+            test, state, extraVersion = categories[cat][0]
             shortDescr, longDescr = getCategoryDescription(state, cat)
             if cat == "success":
                 summary.append(HTMLgen.Text("%d %s" % (len(categories[cat]), shortDescr)))
             else:
-                summary.append(HTMLgen.Href(getDetailPageName(majorVersion, tag) + "#" + version + longDescr,
+                summary.append(HTMLgen.Href(getDetailPageName(pageVersion, tag) + "#" + version + longDescr,
                                             HTMLgen.Text("%d %s" % (len(categories[cat]), shortDescr))))
             numTests += len(categories[cat])
         return HTMLgen.Container(HTMLgen.Text("%d tests: " % numTests), summary)
@@ -290,7 +293,7 @@ class CategoryHandler:
         summary = ""
         numTests = 0
         for cat in categories.keys():
-            test, state, subVersion = categories[cat][0]
+            test, state, extraVersion = categories[cat][0]
             shortDescr, longDescr = getCategoryDescription(state, cat)
             summary += "%d %s " % (len(categories[cat]), shortDescr)
             numTests += len(categories[cat])
@@ -303,8 +306,8 @@ def getCategoryDescription(state, cat):
     else:
         shortDescr, longDescr = cat, cat
     return shortDescr, longDescr
-def getDetailPageName(majorVersion, tag):
-    return "test_" + majorVersion + "_" + tag + ".html"
+def getDetailPageName(pageVersion, tag):
+    return "test_" + pageVersion + "_" + tag + ".html"
 
 
 class Selector:

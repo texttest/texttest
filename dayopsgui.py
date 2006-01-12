@@ -1,22 +1,23 @@
 helpDescription = """
 It follows the usage of the Carmen configuration.""" 
 
-import carmen, guiplugins, os, string, shutil
+import guiplugins, os, string, shutil
+from carmenqueuesystem import CarmenConfig
 
 def getConfig(optionMap):
     return DayOPsGUIConfig(optionMap)
 
-class DayOPsGUIConfig(carmen.CarmenConfig):
+class DayOPsGUIConfig(CarmenConfig):
     def printHelpDescription(self):
         print helpDescription
-        carmen.CarmenConfig.printHelpDescription(self)
+        CarmenConfig.printHelpDescription(self)
     def getExecuteCommand(self, binary, test):
         propFile = test.makeFileName("properties")
         logFile = test.makeFileName("dmserverlog", temporary=1)
         os.environ["DMG_RUN_TEST"] = test.abspath + "#" + propFile + "#" + logFile
-        return carmen.CarmenConfig.getExecuteCommand(self, binary, test)
+        return CarmenConfig.getExecuteCommand(self, binary, test)
     def setApplicationDefaults(self, app):
-        carmen.CarmenConfig.setApplicationDefaults(self, app)
+        CarmenConfig.setApplicationDefaults(self, app)
         app.addConfigEntry("definition_file_stems", "properties")
 
 class JavaPropertyReader:

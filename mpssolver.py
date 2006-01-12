@@ -3,12 +3,13 @@ The MpsSolver configuration is a simple extension to the UNIX configuration. The
 purpose of it is to be able to create links to the MPS files, so that two tests using
 the same MPS files will not collide""" 
 
-import unixConfig, carmen, os
+import unixConfig, os
+from carmenqueuesystem import CarmenConfig
 
 def getConfig(optionMap):
     return MpsSolverConfig(optionMap)
 
-class MpsSolverConfig(carmen.CarmenConfig):
+class MpsSolverConfig(CarmenConfig):
     def getExecuteCommand(self, binary, test):
         return binary + " " + test.options + " " + self.makeMpsSymLinks(test)
     def makeMpsSymLinks(self, test):
@@ -30,7 +31,7 @@ class MpsSolverConfig(carmen.CarmenConfig):
         return mpsFiles
     def printHelpDescription(self):
         print helpDescription
-        carmen.CarmenConfig.printHelpDescription(self)
+        CarmenConfig.printHelpDescription(self)
 
 
         

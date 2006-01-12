@@ -38,7 +38,7 @@ helpOptions = """
 helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associated with the selected tests,
                              and executes the command specified by argument. Be careful to quote the command
                              if you use options, otherwise texttest will try to interpret the options.
-                             Example: texttest -s carmen.TraverseCarmUsers "pwd". This will
+                             Example: texttest -s ravebased.TraverseCarmUsers "pwd". This will
                              display the path of all CARMUSR's in the test suite.
                                               
                              If the argument findchanges=<changed within minutes> is given,
@@ -46,10 +46,11 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
                              the specified time. Default time is 1440 minutes.
 """
 
-import carmen, queuesystem, default, os, string, shutil, plugins, sys, signal, stat, guiplugins
+import queuesystem, default, os, string, shutil, plugins, sys, signal, stat, guiplugins
 from socket import gethostname
 from tempfile import mktemp
 from respond import Responder
+from carmenqueuesystem import getArchitecture, CarmenConfig
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -92,7 +93,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         self.normalSubmissionRules.optionMap = {}
         self.normalSubmissionRules.presetPerfCategory = "short"
         # Must always use the correct architecture, remove run hacks
-        self.normalSubmissionRules.archToUse = carmen.getArchitecture(self.test.app)
+        self.normalSubmissionRules.archToUse = getArchitecture(self.test.app)
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY_RAVE"):
             self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):
@@ -134,9 +135,9 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
             return test.parent.name
         return self.getUserParentName(test.parent)
 
-class Config(carmen.CarmenConfig):
+class Config(CarmenConfig):
     def addToOptionGroups(self, app, groups):
-        carmen.CarmenConfig.addToOptionGroups(self, app, groups)
+        CarmenConfig.addToOptionGroups(self, app, groups)
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("u", "CARMUSRs containing")
@@ -152,15 +153,15 @@ class Config(carmen.CarmenConfig):
             elif group.name.startswith("Invisible"):
                 group.addOption("raveslave", "Private: used for submitting slaves to compile rulesets")
     def getFilterClasses(self):
-        return carmen.CarmenConfig.getFilterClasses(self) + [ UserFilter ]
+        return CarmenConfig.getFilterClasses(self) + [ UserFilter ]
     def useExtraVersions(self):
-        return carmen.CarmenConfig.useExtraVersions(self) and not self.raveSlave()
+        return CarmenConfig.useExtraVersions(self) and not self.raveSlave()
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true"
     def getResponderClasses(self):
         if self.raveSlave():
             return [ queuesystem.SocketResponder ]
-        baseResponders = carmen.CarmenConfig.getResponderClasses(self)
+        baseResponders = CarmenConfig.getResponderClasses(self)
         if self.optionMap.has_key("build"):
             baseResponders.append(RemoteBuildResponder)
         if self.useQueueSystem():
@@ -168,14 +169,14 @@ class Config(carmen.CarmenConfig):
         return baseResponders
     def getActionSequence(self):
         if self.slaveRun() or self.optionMap.has_key("coll"):
-            return carmen.CarmenConfig.getActionSequence(self)
+            return CarmenConfig.getActionSequence(self)
 
         if self.raveSlave():
             return [ SetBuildRequired(self.getRuleSetName), self.getRuleBuildObject() ]
         
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
         return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleActions() ] + \
-                 carmen.CarmenConfig._getActionSequence(self, makeDirs = 0)
+                 CarmenConfig._getActionSequence(self, makeDirs = 0)
     def raveSlave(self):
         return self.optionMap.has_key("raveslave")
     def getCarmVarChecker(self):
@@ -250,7 +251,7 @@ class Config(carmen.CarmenConfig):
         fullPath = os.path.join(self._getLocalPlanPath(test), subPlan)
         return os.path.normpath(fullPath)
     def extraReadFiles(self, test):
-        readDirs = carmen.CarmenConfig.extraReadFiles(self, test)
+        readDirs = CarmenConfig.extraReadFiles(self, test)
         if test.classId() == "test-case":
             test.setUpEnvironment(parents=1)
             subplan = self._getSubPlanDirName(test)
@@ -281,16 +282,16 @@ class Config(carmen.CarmenConfig):
         parts = jobName.split(os.sep)
         return parts[0].find("APC") != -1 or parts[0].find("MpsSolver") != -1
     def printHelpOptions(self):
-        carmen.CarmenConfig.printHelpOptions(self)
+        CarmenConfig.printHelpOptions(self)
         print helpOptions
     def printHelpScripts(self):
-        carmen.CarmenConfig.printHelpScripts(self)
+        CarmenConfig.printHelpScripts(self)
         print helpScripts
     def printHelpDescription(self):
         print helpDescription
-        carmen.CarmenConfig.printHelpDescription(self)
+        CarmenConfig.printHelpDescription(self)
     def setApplicationDefaults(self, app):
-        carmen.CarmenConfig.setApplicationDefaults(self, app)
+        CarmenConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("rave_name", None)
         app.setConfigDefault("rave_static_library", "")
         # dictionary of lists
@@ -346,7 +347,7 @@ class CleanupRules(plugins.Action):
     def __repr__(self):
         return "Cleanup rules for"
     def __call__(self, test):
-        arch = carmen.getArchitecture(test.app)
+        arch = getArchitecture(test.app)
         ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
         if self.shouldCleanup(ruleset):
             self.describe(test, " - ruleset " + ruleset.name)
@@ -405,7 +406,7 @@ class FilterRuleBuilds(plugins.Action):
     def __repr__(self):
         return "Filtering rule builds for"
     def __call__(self, test):
-        arch = carmen.getArchitecture(test.app)
+        arch = getArchitecture(test.app)
         try:
             ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
         except plugins.TextTestError, e:
@@ -483,7 +484,7 @@ class CompileRules(plugins.Action):
     def __call__(self, test):
         if test.state.category != "need_rulecompile" or test.state.testCompiling != None:
             return
-        arch = carmen.getArchitecture(test.app)
+        arch = getArchitecture(test.app)
         raveName = getRaveName(test)
         ruleset = RuleSet(self.getRuleSetName(test), raveName, arch)
         self.describe(test, " - ruleset " + ruleset.name)
@@ -743,7 +744,7 @@ class BuildCode(plugins.Action):
         targetDir = app.getConfigValue("build_targets")
         if not targetDir.has_key(self.target):
             return
-        arch = carmen.getArchitecture(app)
+        arch = getArchitecture(app)
         if not self.builtDirs.has_key(arch):
             self.builtDirs[arch] = []
             self.buildFailedDirs[arch] = []
@@ -809,7 +810,7 @@ class BuildCode(plugins.Action):
         return commandLine
     def buildLocal(self, absPath, app, makeTargets):
         os.chdir(absPath)
-        arch = carmen.getArchitecture(app)
+        arch = getArchitecture(app)
         buildFile = "build.default." + arch
         commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& " + buildFile)
         machine = self.getMachine(app, arch)

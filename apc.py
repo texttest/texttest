@@ -73,11 +73,12 @@ apc.PlotKPIGroups          - A specialization of optimization.PlotTest for APC w
 
 """
 
-import default, ravebased, carmen, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel
+import default, ravebased, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel
 from socket import gethostname
 from time import sleep
 from ndict import seqdict
 from tempfile import mktemp
+from carmenqueuesystem import getArchitecture, RunWithParallelAction
 
 def readKPIGroupFileCommon(suite):
     kpiGroupForTest = {}
@@ -269,8 +270,8 @@ def verifyLogFileDir(arch):
                 
 class CheckFilesForApc(plugins.Action):
     def __call__(self, test):
-        verifyAirportFile(carmen.getArchitecture(test.app))
-        verifyLogFileDir(carmen.getArchitecture(test.app))        
+        verifyAirportFile(getArchitecture(test.app))
+        verifyLogFileDir(getArchitecture(test.app))        
 
 class ViewApcLog(guiplugins.InteractiveAction):
     def __repr__(self):
@@ -351,7 +352,7 @@ class RunApcTestInDebugger(default.RunTest):
         outFile.write("SUBPLAN " + opts[0] + os.linesep)
         outFile.close()
         # Create execute command.
-        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app)))
+        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
         if self.inXEmacs:
             gdbStart, gdbWithArgs = self.runInXEmacs(test, binName, gdbArgs)
             executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
@@ -401,7 +402,7 @@ class ApcCompileRules(ravebased.CompileRules):
     def compileRulesForTest(self, test):
         self.apcLib = test.getConfigValue("rave_static_library")
         # If there is a filter we assume we aren't compelled to build rulesets properly...        
-        if self.filter and carmen.getArchitecture(test.app) == "i386_linux" and self.ruleCompFlags == "apc":
+        if self.filter and getArchitecture(test.app) == "i386_linux" and self.ruleCompFlags == "apc":
             self.linuxRuleSetBuild(test)
         else:
             return ravebased.CompileRules.compileRulesForTest(self, test)
@@ -502,11 +503,11 @@ class FetchApcCore(unixonly.CollateFiles):
             return 0
         return 1
     def getBinaryFromCore(self, path, test):
-        return os.path.expandvars(test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app)))
+        return os.path.expandvars(test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
 
-class MarkApcLogDir(carmen.RunWithParallelAction):
+class MarkApcLogDir(RunWithParallelAction):
     def __init__(self, baseRunner, isExecutable, keepLogs):
-        carmen.RunWithParallelAction.__init__(self, baseRunner, isExecutable)
+        RunWithParallelAction.__init__(self, baseRunner, isExecutable)
         self.keepLogs = keepLogs
     def getApcHostTmp(self):
         configFile = os.path.join(os.environ["CARMSYS"],"CONFIG")

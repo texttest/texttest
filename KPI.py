@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/KPI.py,v 1.7 2003/10/23 16:04:03 henrike Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/KPI.py,v 1.8 2006/01/12 12:55:25 geoff Exp $
 #
 # Classes to calculate the KPI (Key Performance Indicator)
 #
@@ -11,7 +11,7 @@
 import sys, os, re, string, time, shutil
 from encodings import raw_unicode_escape
 # Test suite imports
-import default, carmen, lsf, stat, optimization, plugins
+import default, stat, optimization, plugins
 
 # Constants to use in listKPIs for creating the class CalculateKPIs(referenceVersion, listKPIs)
 cSimpleRosteringOptTimeKPI    = 0

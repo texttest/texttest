@@ -11,6 +11,7 @@
 
 import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors
 from cPickle import Pickler, Unpickler, UnpicklingError
+from ndict import seqdict
 
 class GenerateWebPages(plugins.Action):
     def __init__(self, pageAppName, pageVersion, pageDir, extraVersions):
@@ -28,7 +29,7 @@ class GenerateWebPages(plugins.Action):
         for repositoryDir in repositoryDirs:
             version = os.path.basename(repositoryDir)
             self.diag.info("Generating " + version)
-            loggedTests = {}
+            loggedTests = seqdict()
             tagsFound = []
             categoryHandler = CategoryHandler()
             self.processTestStateFiles(categoryHandler, loggedTests, tagsFound, repositoryDir)

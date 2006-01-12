@@ -418,7 +418,9 @@ class GenerateHistoricalReport(plugins.Action):
             plugins.printException()
     def findRelevantSubdirectories(self, repository, app, extraVersions):
         subdirs = []
-        for dir in os.listdir(repository):
+        dirlist = os.listdir(repository)
+        dirlist.sort()
+        for dir in dirlist:
             dirVersions = dir.split(".")
             if self.isSubset(app.versions, dirVersions) and not dirVersions[-1] in extraVersions:
                 subdirs.append(os.path.join(repository, dir))

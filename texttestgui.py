@@ -157,6 +157,7 @@ class TextTestGUI(ThreadedResponder):
         buttons = [("Quit", self.quit)]
         if self.dynamic:
             buttons.append(("Save All", self.saveAll))
+            buttons.append(("Save Selected", self.saveSelected))
         else:
             buttons.append(("View App", self.viewApp))
         buttonbox = self.makeButtons(buttons)
@@ -179,8 +180,7 @@ class TextTestGUI(ThreadedResponder):
     def createTreeWindow(self):
         view = gtk.TreeView(self.model)
         self.selection = view.get_selection()
-        if not self.dynamic:
-            self.selection.set_mode(gtk.SELECTION_MULTIPLE)
+        self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Test Behaviour", renderer, text=0, background=1)
         view.append_column(column)
@@ -193,8 +193,7 @@ class TextTestGUI(ThreadedResponder):
         view.connect("row_expanded", self.expandSuite)
         # The order of these two is vital!
         scriptEngine.connect("select test", "row_activated", view, self.viewTest, modelIndexer)
-        if not self.dynamic:
-            scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
+        scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
         view.show()
 
         # Create scrollbars around the view.
@@ -261,7 +260,7 @@ class TextTestGUI(ThreadedResponder):
         # May have already closed down, don't crash if so
         if not self.selection.get_tree_view():
             return
-        if test.classId() == "test-case":
+        if test.classId() == "test-case":            
             # Working around python bug 853411: main thread must do all forking
             if state:
                 state.notifyInMainThread()
@@ -319,6 +318,9 @@ class TextTestGUI(ThreadedResponder):
         self.topWindow.destroy()
         self.exit()
     def saveAll(self, *args):
+        self.selection.select_all()
+        self.saveSelected(args)
+    def saveSelected(self, *args):
         saveActionFromWindow = self.rightWindowGUI.getSaveTestAction()
         windowVersion = None
         if saveActionFromWindow:
@@ -326,6 +328,8 @@ class TextTestGUI(ThreadedResponder):
             saveTestAction = saveActionFromWindow
 
         for test in self.itermap.keys():
+            if not self.selection.iter_is_selected(self.itermap[test]):
+                continue
             currFullVersion = test.app.getFullVersion()
             if currFullVersion == windowVersion:
                 saveTestAction = saveActionFromWindow

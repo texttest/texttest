@@ -307,6 +307,12 @@ class Config(plugins.Configuration):
     def getDefaultMailAddress(self):
         user = os.getenv("USER", "$USER")
         return user + "@localhost"
+    def getDefaultTestOverviewColours(self):
+        try:
+            from testoverview import colourFinder
+            return colourFinder.getDefaultDict()
+        except:
+            return {}
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output", "Result file to search, by default")
         app.setConfigDefault("failure_severity", self.defaultSeverities(), \
@@ -345,6 +351,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
         app.setConfigDefault("batch_result_repository", { "default" : "" }, "Directory to store historical batch results under")
         app.setConfigDefault("historical_report_location", { "default" : "" }, "Directory to create reports on historical batch data under")
+        app.setConfigDefault("testoverview_colours", self.getDefaultTestOverviewColours())
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
         app.setConfigDefault("batch_timelimit", { "default" : None }, "Maximum length of test to include in batch mode runs")

@@ -410,7 +410,8 @@ class GenerateHistoricalReport(plugins.Action):
         pageDir = os.path.join(pageTopDir, app.name)
         plugins.ensureDirectoryExists(pageDir)
         try:
-            from testoverview import GenerateWebPages
+            from testoverview import GenerateWebPages, colourFinder
+            colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
             generator = GenerateWebPages(app.fullName, app.getFullVersion(), pageDir, extraVersions)
             generator.generate(relevantSubDirs)
         except:

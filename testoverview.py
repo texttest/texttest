@@ -13,6 +13,31 @@ import os, performance, plugins, respond, sys, string, time, types, shutil, HTML
 from cPickle import Pickler, Unpickler, UnpicklingError
 from ndict import seqdict
 
+class ColourFinder:
+    def setColourDict(self, colourDict):
+        self.colourDict = colourDict
+    def find(self, title):
+        colourName = self.colourDict[title]
+        if not colourName.startswith("#"):
+            exec "colourName = HTMLcolors." + colourName.upper()
+        return colourName
+    def getDefaultDict(self):
+        colours = {}
+        colours["column_header_bg"] = "gray1"
+        colours["row_header_bg"] = "#FFFFCC"
+        colours["performance_fg"] = "red6"
+        colours["memory_bg"] = "pink"
+        colours["success_bg"] = "#CEEFBD"
+        colours["failure_bg"] = "#FF3118"
+        colours["no_results_bg"] = "gray2"
+        colours["performance_bg"] = "#FFC6A5"
+        colours["test_default_fg"] = "black"
+        for wday in range(7):
+            colours["date_fg_" + str(wday)] = "black"
+        return colours
+
+colourFinder = ColourFinder()
+
 class GenerateWebPages(plugins.Action):
     def __init__(self, pageAppName, pageVersion, pageDir, extraVersions):
         self.pageAppName = pageAppName
@@ -93,6 +118,7 @@ class GenerateWebPages(plugins.Action):
         if tagsFound.count(tag) == 0:
             tagsFound.append(tag)
         key = self.getTestIdentifier(stateFile, repository)
+        self.diag.info(tag + " : reading " + key)
         keyExtraVersion = self.findExtraVersion(repository)
         if not loggedTests.has_key(keyExtraVersion):
             loggedTests[keyExtraVersion] = {}
@@ -159,11 +185,13 @@ class TestTable:
                     extraVersionName = version + "." + extraVersion
                 else:
                     extraVersionName = version
+                bgColour = colourFinder.find("column_header_bg")
                 table.append(HTMLgen.TR() + [HTMLgen.TH(extraVersionName, colspan = len(tagsFound) + 1,
-                                                    bgcolor = HTMLcolors.GRAY1 )])
+                                                    bgcolor=bgColour )])
             for test in tests:
                 results = loggedTests[extraVersion][test]
-                row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + extraVersion), test), bgcolor = "#FFFFCC") ]
+                bgColour = colourFinder.find("row_header_bg")
+                row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + extraVersion), test), bgcolor=bgColour) ]
                 for tag in tagsFound:
                     if results.has_key(tag):
                         state = results[tag]
@@ -176,7 +204,7 @@ class TestTable:
                             cellContaint = HTMLgen.Href(getDetailPageName(pageVersion, tag) + "#" + version + test + extraVersion,
                                                         HTMLgen.Font(repr(state) + detail, color = fgcol))
                     else:
-                        bgcol = HTMLcolors.GRAY2
+                        bgcol = colourFinder.find("no_results_bg")
                         cellContaint = "No results avaliable"
                     row.append(HTMLgen.TD(cellContaint, bgcolor = bgcol))
                 body = HTMLgen.TR()
@@ -187,28 +215,26 @@ class TestTable:
         t.append(HTMLgen.BR())
         return t
     def getColors(self, type, detail):
-        bgcol = "#FF3118"
-        fgcol = "BLACK"
+        bgcol = colourFinder.find("failure_bg")
+        fgcol = colourFinder.find("test_default_fg")
         if type == "faster" or type == "slower":
-            bgcol = "#FFC6A5"
+            bgcol = colourFinder.find("performance_bg")
             result = self.getPercent(detail)
             if result[0] and result[1] >= 5:
-                fgcol = HTMLcolors.RED6
+                fgcol = colourFinder.find("performance_fg")
         elif type == "smaller" or type == "larger":
             result = self.getPercent(detail)
             if result[0] and result[1] >= 3:
-                fgcol = HTMLcolors.RED6
-            bgcol = HTMLcolors.PINK
+                fgcol = colourFinder.find("performance_fg")
+            bgcol = colourFinder.find("memory_bg")
         elif type == "success":
-            bgcol = "#CEEFBD"
+            bgcol = colourFinder.find("success_bg")
         return fgcol, bgcol
     def generateTableHead(self, pageVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]
         for tag in tagsFound:
-            tagColor = HTMLcolors.BLACK
             year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(tag, "%d%b%Y")
-            if wday == 4: # Weekend jobs start Friday.
-                tagColor = HTMLcolors.RED
+            tagColor = colourFinder.find("date_fg_" + str(wday))
             head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(pageVersion, tag), HTMLgen.Font(tag, color = tagColor))))
         heading = HTMLgen.TR()
         heading = heading + head
@@ -272,10 +298,11 @@ class CategoryHandler:
             self.testsInCategory[tag][state.category] = []
         self.testsInCategory[tag][state.category].append((test, state, extraVersion))
     def generateSummaries(self, pageVersion, version, tags):
-        row = [ HTMLgen.TD("Summary", bgcolor = HTMLcolors.GRAY1) ]
+        bgColour = colourFinder.find("column_header_bg")
+        row = [ HTMLgen.TD("Summary", bgcolor = bgColour) ]
         for tag in tags:
             summary = self.generateSummaryHTML(tag, pageVersion, version, self.testsInCategory[tag])
-            row.append(HTMLgen.TD(summary, bgcolor = HTMLcolors.GRAY1))
+            row.append(HTMLgen.TD(summary, bgcolor = bgColour))
         return HTMLgen.TR() + row
     def generateSummaryHTML(self, tag, pageVersion, version, categories):
         summary = HTMLgen.Container()

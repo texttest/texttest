@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.16 2005/12/15 10:32:27 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.17 2006/01/18 14:19:12 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -34,9 +34,12 @@ class StudioConfig(ravebased.Config):
     def findOrigRulePath(self, headerFile):
         if not os.path.isfile(headerFile):
             return ""
+        index = -1
         for line in open(headerFile).xreadlines():
-            if line.startswith("554"):
-                return line.split(";")[22]
+            if line.startswith("552"):
+                index = line.split(";").index("SUB_PLAN_HEADER_RULE_SET_NAME")
+            if line.startswith("554") and index > 0:
+                return line.split(";")[index]
         return ""
     def filesFromSubplan(self, test, subplanDir):
         rulesFile = os.path.join(subplanDir, "subplanRules")

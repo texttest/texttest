@@ -238,8 +238,8 @@ class TestCase(Test):
             self.addJusecaseProperty("replay", replayScript)
         else:
             self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
-        replaySpeed = self.app.getConfigValue("slow_motion_replay_speed")
-        if replaySpeed:
+        if self.app.useSlowMotion():
+            replaySpeed = self.app.getConfigValue("slow_motion_replay_speed")
             if self.useJavaRecorder():
                 self.addJusecaseProperty("delay", str(replaySpeed))
             else:

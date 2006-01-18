@@ -379,12 +379,80 @@ class SaveState(respond.SaveState):
         if os.path.isfile(targetFile):
             print "Warning: file already exists at", targetFile, "- not overwriting!"
         else:
-            plugins.ensureDirExistsForFile(targetFile)
-            shutil.copyfile(test.getStateFile(), targetFile)
+            try:
+                plugins.ensureDirExistsForFile(targetFile)
+                shutil.copyfile(test.getStateFile(), targetFile)
+            except IOError:
+                print "Warning: could not write file at", targetFile
     def addSuite(self, suite):
         testStateRepository = suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession)
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
+
+class ArchiveRepository(plugins.Action):
+    def __init__(self, args):
+        argDict = self.parseArguments(args)
+        self.descriptor = ""
+        self.beforeDate = self.parseDate(argDict, "before")
+        self.afterDate = self.parseDate(argDict, "after")
+        self.batchSession = argDict.get("session", "default")
+        self.repositoryDirs = []
+        if not self.beforeDate and not self.afterDate:
+            raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates!"
+    def __repr__(self):
+        return "Archiving historical files dated" + self.descriptor
+    def scriptDoc(self):
+        return "Archive parts of the batch result repository to a history directory"
+    def parseArguments(self, args):
+        currKey = ""
+        dict = {}
+        for arg in args:
+            if arg.find("=") != -1:
+                currKey, val = arg.split("=")
+                dict[currKey] = val
+            else:
+                dict[currKey] += " " + arg
+        return dict
+    def parseDate(self, dict, key):
+        if not dict.has_key(key):
+            return
+        val = dict[key]
+        self.descriptor += " " + key + " " + val + "..."
+        return self.dateInSeconds(val)
+    def dateInSeconds(self, val):
+        return time.mktime(time.strptime(val, "%d%b%Y"))
+    def __call__(self, test):
+        self.describe(test)
+        for versionDir in self.repositoryDirs:
+            testDir = os.path.join(versionDir, test.getRelPath())
+            if os.path.isdir(testDir):
+                self.archiveFiles(testDir, test)
+    def setUpApplication(self, app):
+        repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+        repository = os.path.join(repository, app.name)
+        if not os.path.isdir(repository):
+            raise plugins.TextTestError, "Batch result repository " + repository + " does not exist"
+        repositoryDirs = os.listdir(repository)
+        repositoryDirs.sort()
+        for dir in repositoryDirs:
+            self.repositoryDirs.append(os.path.join(repository, dir))
+    def archiveFiles(self, testDir, test):
+        for file in os.listdir(testDir):
+            if not file.startswith("teststate"):
+                continue
+            teststate, dateStr = file.split("_")
+            date = self.dateInSeconds(dateStr)
+            if self.shouldArchiveFor(date):
+                fullPath = os.path.join(testDir, file)
+                targetPath = fullPath.replace(os.sep + test.app.name + os.sep, os.sep + test.app.name + "_history" + os.sep)
+                plugins.ensureDirExistsForFile(targetPath)
+                os.rename(fullPath, targetPath)
+    def shouldArchiveFor(self, date):
+        if self.beforeDate and date >= self.beforeDate:
+            return False
+        if self.afterDate and date <= self.afterDate:
+            return False
+        return True
 
 class GenerateHistoricalReport(plugins.Action):
     appsGenerated = []

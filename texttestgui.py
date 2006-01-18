@@ -279,6 +279,9 @@ class TextTestGUI(ThreadedResponder):
         secondColumnText = self.model.get_value(iter, 4)
         if self.dynamic and secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 5) + ")")
+
+        if state.isComplete() and test.getConfigValue("auto_collapse_successful") == 1:
+            self.collapseIfAllComplete(self.model.iter_parent(iter))               
     def redrawSuite(self, suite):
         if len(suite.testcases) == 0:
             return
@@ -289,6 +292,52 @@ class TextTestGUI(ThreadedResponder):
         else:
             self.addNewTestToModel(suiteIter, maybeNewTest, suiteIter)
         self.selection.get_tree_view().grab_focus()
+        
+    def collapseIfAllComplete(self, iter):
+        # Collapse if all child tests are complete and successful
+        if iter == None or not self.model.iter_has_child(iter): 
+            return
+
+        successColor = self.model.get_value(iter, 2).getConfigValue("test_colours")["success"]
+        nofChildren = 0
+        childIters = []
+        childIter = self.model.iter_children(iter)
+
+        # Put all children in list to be treated
+        while childIter != None:
+            childIters.append(childIter)
+            childIter = self.model.iter_next(childIter)
+
+        while len(childIters) > 0:
+            childIter = childIters[0]
+            if (not self.model.iter_has_child(childIter)):
+                nofChildren = nofChildren + 1
+            childTest = self.model.get_value(childIter, 2)
+
+            # If this iter has children, add these to the list to be treated
+            if self.model.iter_has_child(childIter):                            
+                subChildIter = self.model.iter_children(childIter)
+                while subChildIter != None:
+                    childIters.append(subChildIter)
+                    subChildIter = self.model.iter_next(subChildIter)
+            # For now, we determine if a test is complete by checking whether
+            # it is colored in the success color rather than checking isComplete()
+            # The reason is that checking isComplete() will sometimes collapse suites
+            # before all tests have been colored by the GUI update function, which
+            # doesn't look good.
+            elif not self.model.get_value(childIter, 5) == successColor:
+                return
+            childIters = childIters[1:len(childIters)]
+
+        # By now, we know that all tests were successful:
+        # Print how many tests succeeded, color details column in success color,
+        # collapse row, and try to collapse parent suite.
+        guilog.info("All " + str(nofChildren) + " tests successful in suite " + repr(self.model.get_value(iter, 2)) + ", collapsing row.")
+        self.model.set_value(iter, 4, "All " + str(nofChildren) + " tests successful")
+        self.model.set_value(iter, 5, successColor) 
+        self.selection.get_tree_view().collapse_row(self.model.get_path(iter))
+        self.collapseIfAllComplete(self.model.iter_parent(iter))
+
     def addNewTestToModel(self, suite, newTest, suiteIter):
         iter = self.addSuiteWithParent(newTest, suiteIter)
         self.itermap[newTest] = iter.copy()

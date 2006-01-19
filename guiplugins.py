@@ -307,14 +307,16 @@ class RecordTest(InteractiveAction):
         if not shellTitle:
             if not os.path.isfile(test.app.writeDirectory):
                 test.app.makeWriteDirectory()
-            logFile = os.path.join(test.app.writeDirectory, usecase + "_run.log")
-            errFile = os.path.join(test.app.writeDirectory, usecase + "_errors.log")
+            logFile = self.getLogFile(test, usecase, "run")
+            errFile = self.getLogFile(test, usecase)
             commandLine +=  " > " + logFile + " 2> " + errFile
         process = self.startExtProgramNewUsecase(commandLine, usecase, \
                                                  exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase),
                                                  shellTitle=shellTitle, holdShell=holdShell)
         if shellTitle:
             scriptEngine.monitorProcess("records use cases in a shell", process, [ test.inputFile, test.useCaseFile ])
+    def getLogFile(self, test, usecase, type="errors"):
+        return os.path.join(test.app.writeDirectory, usecase + "_" + type + ".log")
     def getShellInfo(self, description):
         if self.recordMode == "console" and description:
             return description, self.optionGroup.getSwitchValue("hold")
@@ -325,13 +327,19 @@ class RecordTest(InteractiveAction):
     def textTestCompleted(self, test, usecase):
         scriptEngine.applicationEvent(usecase + " texttest to complete")
         if usecase == "record":
-            self.setTestRecorded(test)
+            self.setTestRecorded(test, usecase)
         else:
             self.setTestReady(test, usecase)
         test.notifyChanged()
-    def setTestRecorded(self, test):
+    def setTestRecorded(self, test, usecase):
         if not os.path.isfile(test.useCaseFile) and not os.path.isfile(test.inputFile):
-            raise plugins.TextTestError, "Recording did not produce any results (no usecase or input file)"
+            message = "Recording did not produce any results (no usecase or input file)"
+            errFile = self.getLogFile(test, usecase)
+            if os.path.isfile(errFile):
+                errors = open(errFile).read()
+                if len(errors) > 0:
+                    message += " - details follow:\n" + errors
+            raise plugins.TextTestError, message
 
         if self.optionGroup.getSwitchValue("rep"):
             self.startTextTestProcess(test, usecase="replay")

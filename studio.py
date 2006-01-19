@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.17 2006/01/18 14:19:12 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.18 2006/01/19 10:20:12 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -90,11 +90,14 @@ class ImportTestCase(guiplugins.ImportTestCase):
         if not carmUsr:
             return []
         path = os.path.join(carmUsr, "macros")
+        if not os.path.isdir(path):
+            return []
         macros = []
         for userDir in os.listdir(path):
             fullUserDir = os.path.join(path, userDir)
-            for macro in os.listdir(fullUserDir):
-                macros.append(os.path.join(userDir, macro))
+            if os.path.isdir(fullUserDir):
+                for macro in os.listdir(fullUserDir):
+                    macros.append(os.path.join(userDir, macro))
         return macros
     def writeDefinitionFiles(self, suite, testDir):
         optionFile = self.getWriteFile("options", suite, testDir)

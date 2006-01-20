@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.18 2006/01/19 10:20:12 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.19 2006/01/20 11:11:57 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -86,7 +86,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
         # Don't use oldOptionGroup, we probably don't want the same macro more than once
         self.optionGroup.addOption("mac", "Macro to use", self.newMacroString, self.getExistingMacros(suite))
     def getExistingMacros(self, suite):
-        carmUsr = ravebased.getCarmUsr(suite)
+        carmUsr = suite.getEnvironment("CARMUSR")
         if not carmUsr:
             return []
         path = os.path.join(carmUsr, "macros")
@@ -105,7 +105,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
         macroToImport = self.optionGroup.getOptionValue("mac")
         if macroToImport != self.newMacroString:
             usecaseFile = self.getWriteFileName("usecase", suite, testDir)
-            fullMacroPath = os.path.join(ravebased.getCarmUsr(suite), "macros", macroToImport)
+            fullMacroPath = os.path.join(suite.getEnvironment("CARMUSR"), "macros", macroToImport)
             shutil.copyfile(fullMacroPath, usecaseFile)
 
 class RecordTest(guiplugins.RecordTest):
@@ -114,7 +114,7 @@ class RecordTest(guiplugins.RecordTest):
         if self.canPerformOnTest():
             self.optionGroup.addOption("rset", "Compile this ruleset first", possibleValues=self.findRuleSets(test))
     def findRuleSets(self, test):
-        carmUsr = ravebased.getCarmUsr(test)
+        carmUsr = test.getEnvironment("CARMUSR")
         if not carmUsr:
             return []
         sourceDir = os.path.join(carmUsr, "crc", "source")
@@ -141,3 +141,17 @@ class RecordTest(guiplugins.RecordTest):
                                   "\n" + "These will appear shortly. You do not need to submit the test manually."
         else:
             guiplugins.RecordTest.setTestReady(self, test, usecase)
+
+class ViewFile(guiplugins.ViewFile):
+    def getViewCommand(self, fileName):
+        if not os.path.basename(fileName).startswith("usecase."):
+            return guiplugins.ViewFile.getViewCommand(self, fileName)
+        carmSys = self.test.getEnvironment("CARMSYS")
+        carmUsr = self.test.getEnvironment("CARMUSR")
+        viewProgram = os.path.join(carmSys, "lib", "python", "StartMacroRecorder.py")
+        if not os.path.isfile(viewProgram):
+            raise plugins.TextTestError, "Could not find macro editor at " + viewProgram
+        envStr = "env 'CARMSYS=" + carmSys + "' 'CARMUSR=" + carmUsr + "' "
+        commandLine = envStr + "python " + viewProgram + " -v " + fileName + plugins.nullRedirect()
+        return commandLine, "macro editor"
+    

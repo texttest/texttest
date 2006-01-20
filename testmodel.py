@@ -86,6 +86,11 @@ class Test:
         self.expandChildEnvironmentReferences(childReferenceVars)
     def expandChildEnvironmentReferences(self, referenceVars):
         pass
+    def getEnvironment(self, var):
+        if self.environment.has_key(var):
+            return self.environment[var]
+        elif self.parent:
+            return self.parent.getEnvironment(var)
     def makeFileName(self, stem, refVersion = None, temporary=0, forComparison=1, findInTmp=0):
         root = self.getDirectory(temporary, forComparison)
         if not forComparison:

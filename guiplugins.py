@@ -90,18 +90,18 @@ class InteractiveAction(plugins.Action):
     def getNewUsecase(self, script, usecase):
         dir, file = os.path.split(script)
         return os.path.join(dir, usecase + "_" + file)
-
-    def viewFile(self, fileName, refresh=0):
+    def getViewCommand(self, fileName):
         viewProgram = self.test.getConfigValue("view_program")
         if not plugins.canExecute(viewProgram):
             raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
                   "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
-
-        guilog.info("Viewing file " + fileName + " using '" + viewProgram + "', refresh set to " + str(refresh))
+        return viewProgram + " " + fileName + plugins.nullRedirect(), viewProgram
+    def viewFile(self, fileName, refresh=0):
         exitHandler = None
         if refresh:
             exitHandler = self.test.filesChanged
-        commandLine = viewProgram + " " + fileName + plugins.nullRedirect()
+        commandLine, descriptor = self.getViewCommand(fileName)
+        guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
         process = self.startExternalProgram(commandLine, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getTextTestName(self):

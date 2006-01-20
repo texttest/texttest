@@ -58,12 +58,6 @@ def getConfig(optionMap):
 def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
-def getCarmUsr(test):
-    if isUserSuite(test):
-        return test.environment["CARMUSR"]
-    elif test.parent:
-        return getCarmUsr(test.parent)
-
 class UserFilter(default.TextFilter):
     option = "u"
     def isUserSuite(self, suite):
@@ -450,7 +444,7 @@ class FilterRuleBuilds(plugins.Action):
 
         libFile = test.getConfigValue("rave_static_library")
         self.diag.info("Library file is " + libFile)
-        if self.assumeDynamicLinkage(libFile, getCarmUsr(test)):
+        if self.assumeDynamicLinkage(libFile, test.getEnvironment("CARMUSR")):
             return 0
         else:            
             return plugins.modifiedTime(ruleset.targetFile) < plugins.modifiedTime(libFile)

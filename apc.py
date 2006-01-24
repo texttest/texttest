@@ -1662,7 +1662,7 @@ class GenerateWebPages(optimization.GenerateWebPages):
     def createTestTable(self):
         return ApcTestTable()
 
-class ApcTestTable(testoverview.TestTable):
+class ApcTestTable(optimization.TestTable):
     def getColors(self, type, detail):
         colourFinder = testoverview.colourFinder
         bgcol = colourFinder.find("failure_bg")

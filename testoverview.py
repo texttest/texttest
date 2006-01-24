@@ -25,11 +25,14 @@ class ColourFinder:
         self.colourDict = colourDict
     def find(self, title):
         colourName = self.colourDict[title]
+        return self.htmlColour(colourName)
+    def htmlColour(self, colourName):
         if not colourName.startswith("#"):
             exec "colourName = HTMLcolors." + colourName.upper()
         return colourName
     def getDefaultDict(self):
         colours = {}
+        colours["column_header_fg"] = "black"
         colours["column_header_bg"] = "gray1"
         colours["row_header_bg"] = "#FFFFCC"
         colours["performance_fg"] = "red6"
@@ -39,8 +42,6 @@ class ColourFinder:
         colours["no_results_bg"] = "gray2"
         colours["performance_bg"] = "#FFC6A5"
         colours["test_default_fg"] = "black"
-        for wday in range(7):
-            colours["date_fg_" + str(wday)] = "black"
         return colours
 
 colourFinder = ColourFinder()
@@ -242,13 +243,14 @@ class TestTable:
     def generateTableHead(self, pageVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]
         for tag in tagsFound:
-            year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(tag, "%d%b%Y")
-            tagColor = colourFinder.find("date_fg_" + str(wday))
-            head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(pageVersion, tag), HTMLgen.Font(tag, color = tagColor))))
+            tagColour = self.findTagColour(tag)
+            head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(pageVersion, tag), HTMLgen.Font(tag, color=tagColour))))
         heading = HTMLgen.TR()
         heading = heading + head
         cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))
         return HTMLgen.Container(cap, heading)
+    def findTagColour(self, tag):
+        return colourFinder.find("column_header_fg")
         
 class TestDetails:
     def generate(self, categoryHandler, version, tags, linkFromDetailsToOverview):

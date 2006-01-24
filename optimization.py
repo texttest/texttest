@@ -1920,14 +1920,23 @@ class PlotAverager(Averager):
 class GenerateWebPages(testoverview.GenerateWebPages):
     def getSelectorClasses(self):
         return testoverview.GenerateWebPages.getSelectorClasses(self) + [ SelectorWeekend ]
+    def createTestTable(self):
+        return TestTable()
+
+def isWeekend(tag):
+    year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(tag, "%d%b%Y")
+    return wday == 4
+
+class TestTable(testoverview.TestTable):
+    def findTagColour(self, tag):
+        if isWeekend(tag):
+            return testoverview.colourFinder.htmlColour("red")
+        else:
+            return testoverview.TestTable.findTagColour(self, tag)
 
 class SelectorWeekend(testoverview.Selector):
     def __init__(self, tags):
-        self.selectedTags = []
-        for tag in tags:
-            year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(tag, "%d%b%Y")
-            if wday == 4:
-                self.selectedTags.append(tag)
+        self.selectedTags = filter(isWeekend, tags)
     def getFileNameExtension(self):
         return "_weekend"
     def __repr__(self):

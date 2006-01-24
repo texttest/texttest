@@ -181,14 +181,15 @@ class TextTestGUI(ThreadedResponder):
         view = gtk.TreeView(self.model)
         self.selection = view.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
+        self.selection.connect("changed", self.selectionChanged)
         renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Test Behaviour", renderer, text=0, background=1)
-        view.append_column(column)
+        self.testsColumn = gtk.TreeViewColumn("Tests", renderer, text=0, background=1)
+        view.append_column(self.testsColumn)
         if self.dynamic:
             perfColumn = gtk.TreeViewColumn("Details", renderer, text=4, background=5)
             view.append_column(perfColumn)
         view.expand_all()
-        modelIndexer = TreeModelIndexer(self.model, column, 3)
+        modelIndexer = TreeModelIndexer(self.model, self.testsColumn, 3)
         # This does not interact with TextTest at all, so don't bother to connect to PyUseCase
         view.connect("row_expanded", self.expandSuite)
         # The order of these two is vital!
@@ -201,6 +202,14 @@ class TextTestGUI(ThreadedResponder):
         scrolled.add(view)
         scrolled.show()    
         return scrolled
+    def selectionChanged(self, selection):
+        self.nofSelectedTests = 0
+        self.selection.selected_foreach(self.countSelected)
+        self.testsColumn.set_title("Tests: " + str(self.nofSelectedTests) + " selected")
+        guilog.info(str(self.nofSelectedTests) + " tests selected")
+    def countSelected(self, model, path, iter):
+        if self.model.get_value(iter, 2).classId() == "test-case":
+            self.nofSelectedTests = self.nofSelectedTests + 1
     def expandSuite(self, view, iter, path, *args):
         # Make sure expanding expands everything, better than just one level as default...
         view.expand_row(path, open_all=True)

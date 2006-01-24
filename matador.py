@@ -40,6 +40,7 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
 """
 
 import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins, performance
+from optimization import GenerateWebPages
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)

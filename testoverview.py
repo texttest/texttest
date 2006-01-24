@@ -9,9 +9,16 @@
 #   texttest -a <app> -s testoverview.GenererateTestStatus <major versions> <minor versions> 
 #
 
-import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors
+import os, performance, plugins, respond, sys, string, time, types, shutil
 from cPickle import Pickler, Unpickler, UnpicklingError
 from ndict import seqdict
+# Make sure this module can be imported even if these two don't exist. Will
+# get errors later on if you actually try to generate the pages but not from
+# running tests normally.
+try:
+    import HTMLgen, HTMLcolors
+except:
+    pass
 
 class ColourFinder:
     def setColourDict(self, colourDict):
@@ -47,6 +54,11 @@ class GenerateWebPages(plugins.Action):
         self.pagesOverview = {}
         self.pagesDetails = {}
         self.diag = plugins.getDiagnostics("GenerateWebPages")
+    def createTestTable(self):
+        # Hook for configurations to inherit from
+        return TestTable()
+    def getSelectorClasses(self):
+        return [ SelectorLast6Days, SelectorAll ]
     def generate(self, repositoryDirs):            
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
@@ -61,13 +73,13 @@ class GenerateWebPages(plugins.Action):
     
             if len(loggedTests.keys()) > 0:
                 tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
-                selectors = [ SelectorLast6Days(tagsFound), SelectorAll(tagsFound), SelectorWeekend(tagsFound) ]
+                selectors = map(lambda selClass : selClass(tagsFound), self.getSelectorClasses())
                 linkFromDetailsToOverview = {}
                 for sel in selectors:
                     if not usedSelectors.has_key(repr(sel)):
                         usedSelectors[repr(sel)] = sel.getFileNameExtension()
                     linkFromDetailsToOverview[repr(sel)] = self.getOverviewPageName(sel.getFileNameExtension())
-                    testTable = TestTable()
+                    testTable = self.createTestTable()
                     table = testTable.generate(categoryHandler, self.pageVersion, version, loggedTests, sel.getSelectedTags())
                     self.addOverviewPages(sel.getFileNameExtension(), version, table)
                 det = details.generate(categoryHandler, version, tagsFound, linkFromDetailsToOverview)
@@ -215,20 +227,17 @@ class TestTable:
         t.append(HTMLgen.BR())
         return t
     def getColors(self, type, detail):
-        bgcol = colourFinder.find("failure_bg")
         fgcol = colourFinder.find("test_default_fg")
         if type == "faster" or type == "slower":
             bgcol = colourFinder.find("performance_bg")
-            result = self.getPercent(detail)
-            if result[0] and result[1] >= 5:
-                fgcol = colourFinder.find("performance_fg")
+            fgcol = colourFinder.find("performance_fg")
         elif type == "smaller" or type == "larger":
-            result = self.getPercent(detail)
-            if result[0] and result[1] >= 3:
-                fgcol = colourFinder.find("performance_fg")
             bgcol = colourFinder.find("memory_bg")
+            fgcol = colourFinder.find("performance_fg")
         elif type == "success":
             bgcol = colourFinder.find("success_bg")
+        else:
+            bgcol = colourFinder.find("failure_bg")
         return fgcol, bgcol
     def generateTableHead(self, pageVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]
@@ -240,13 +249,6 @@ class TestTable:
         heading = heading + head
         cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))
         return HTMLgen.Container(cap, heading)
-    def getPercent(self, detail):
-        potentialNumber = detail.split("%")[0] # Bad: Hard coded interpretation of texttest print-out.
-        if potentialNumber.isdigit():
-            return (1, int(potentialNumber))
-        else:
-            print "Warning: Failed to get percentage from",detail
-            return (0, 0)
         
 class TestDetails:
     def generate(self, categoryHandler, version, tags, linkFromDetailsToOverview):
@@ -362,15 +364,3 @@ class SelectorAll(Selector):
         return "_all"
     def __repr__(self):
         return "All"
-    
-class SelectorWeekend(Selector):
-    def __init__(self, tags):
-        self.selectedTags = []
-        for tag in tags:
-            year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(tag, "%d%b%Y")
-            if wday == 4:
-                self.selectedTags.append(tag)
-    def getFileNameExtension(self):
-        return "_weekend"
-    def __repr__(self):
-        return "Weekend"

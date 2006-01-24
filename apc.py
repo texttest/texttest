@@ -73,7 +73,7 @@ apc.PlotKPIGroups          - A specialization of optimization.PlotTest for APC w
 
 """
 
-import default, ravebased, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel
+import default, ravebased, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview
 from socket import gethostname
 from time import sleep
 from ndict import seqdict
@@ -1656,6 +1656,37 @@ class PlotKPIGroups(plugins.Action):
         print "Plotted", len(self.groupsToPlot.keys()), "KPI groups."
     def setExtraOptions(self, group, average):
         pass
+
+# Override for webpage generation with APC-specific stuff in it
+class GenerateWebPages(optimization.GenerateWebPages):
+    def createTestTable(self):
+        return ApcTestTable()
+
+class ApcTestTable(testoverview.TestTable):
+    def getColors(self, type, detail):
+        colourFinder = testoverview.colourFinder
+        bgcol = colourFinder.find("failure_bg")
+        fgcol = colourFinder.find("test_default_fg")
+        if type == "faster" or type == "slower":
+            bgcol = colourFinder.find("performance_bg")
+            result = self.getPercent(detail)
+            if result[0] and result[1] >= 5:
+                fgcol = colourFinder.find("performance_fg")
+        elif type == "smaller" or type == "larger":
+            result = self.getPercent(detail)
+            if result[0] and result[1] >= 3:
+                fgcol = colourFinder.find("performance_fg")
+            bgcol = colourFinder.find("memory_bg")
+        elif type == "success":
+            bgcol = colourFinder.find("success_bg")
+        return fgcol, bgcol
+    def getPercent(self, detail):
+        potentialNumber = detail.split("%")[0] # Bad: Hard coded interpretation of texttest print-out.
+        if potentialNumber.isdigit():
+            return (1, int(potentialNumber))
+        else:
+            print "Warning: Failed to get percentage from",detail
+            return (0, 0)
 
 #
 # This class reads a CarmResources etab file and gives access to it

@@ -115,7 +115,7 @@ optimization.TraverseSubPlans
 """
 
 
-import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy, comparetest
+import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy, comparetest, testoverview, time
 from ndict import seqdict
 from time import sleep
 from respond import Responder
@@ -1916,6 +1916,23 @@ class PlotAverager(Averager):
 
 # End of "PlotTest" functionality.
 
+# Override for webpage generation with generation of weekend page in it
+class GenerateWebPages(testoverview.GenerateWebPages):
+    def getSelectorClasses(self):
+        return testoverview.GenerateWebPages.getSelectorClasses(self) + [ SelectorWeekend ]
+
+class SelectorWeekend(testoverview.Selector):
+    def __init__(self, tags):
+        self.selectedTags = []
+        for tag in tags:
+            year, month, day, hour, minute, second, wday, yday, dummy = time.strptime(tag, "%d%b%Y")
+            if wday == 4:
+                self.selectedTags.append(tag)
+    def getFileNameExtension(self):
+        return "_weekend"
+    def __repr__(self):
+        return "Weekend"
+    
 class StartStudio(guiplugins.InteractiveAction):
     def __repr__(self):
         return "Studio"

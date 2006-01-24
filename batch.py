@@ -478,13 +478,21 @@ class GenerateHistoricalReport(plugins.Action):
         pageDir = os.path.join(pageTopDir, app.name)
         plugins.ensureDirectoryExists(pageDir)
         try:
-            from testoverview import GenerateWebPages, colourFinder
-            colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
-            generator = GenerateWebPages(app.fullName, app.getFullVersion(), pageDir, extraVersions)
-            generator.generate(relevantSubDirs)
+            self.generateWebPages(app, pageDir, extraVersions, relevantSubDirs)
         except:
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
+    def generateWebPages(self, app, pageDir, extraVersions, relevantSubDirs):
+        from testoverview import colourFinder
+        colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
+        module = app.getConfigValue("interactive_action_module")
+        command = "from " + module + " import GenerateWebPages"
+        try:
+            exec command
+        except ImportError:
+            from testoverview import GenerateWebPages
+        generator = GenerateWebPages(app.fullName, app.getFullVersion(), pageDir, extraVersions)
+        generator.generate(relevantSubDirs)
     def findRelevantSubdirectories(self, repository, app, extraVersions):
         subdirs = []
         dirlist = os.listdir(repository)

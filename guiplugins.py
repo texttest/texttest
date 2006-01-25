@@ -249,7 +249,7 @@ class ImportTest(InteractiveAction):
     def getTabTitle(self):
         return "Adding " + self.testType()
     def getTitle(self):
-        return "Add " + self.testType()
+        return "Add _" + self.testType()
     def testType(self):
         return ""
     def getNewTestName(self):
@@ -361,7 +361,7 @@ class RecordTest(InteractiveAction):
     def __repr__(self):
         return "Recording"
     def getTitle(self):
-        return "Record Use-Case"
+        return "Record _Use-Case"
     
 class ImportTestCase(ImportTest):
     def __init__(self, suite, oldOptionGroup):
@@ -449,7 +449,7 @@ class SelectTests(InteractiveAppAction):
     def __repr__(self):
         return "Selecting"
     def getTitle(self):
-        return "Select"
+        return "_Select"
     def getScriptTitle(self):
         return "Select indicated tests"
     def getFilterList(self):
@@ -498,7 +498,7 @@ class SelectTests(InteractiveAppAction):
 
 class ResetGroups(InteractiveAppAction):
     def getTitle(self):
-        return "Reset"
+        return "R_eset"
     def getScriptTitle(self):
         return "Reset running options"
     def performOn(self, app, selTests):
@@ -517,7 +517,7 @@ class SaveSelection(InteractiveAppAction):
     def __repr__(self):
         return "Saving"
     def getTitle(self):
-        return "Save Selection"
+        return "S_ave Selection"
     def getScriptTitle(self):
         return "Save Selection"
     def getFileName(self, app):
@@ -561,7 +561,7 @@ class RunTests(InteractiveAppAction):
     def __repr__(self):
         return "Running"
     def getTitle(self):
-        return "Run Tests"
+        return "_Run Tests"
     def getScriptTitle(self):
         return "Run selected tests"
     def performOn(self, app, selTests):
@@ -601,7 +601,7 @@ class EnableDiagnostics(InteractiveAction):
     def __repr__(self):
         return "Diagnostics"
     def getTitle(self):
-        return "New Diagnostics"
+        return "New _Diagnostics"
     def getScriptTitle(self):
         return "Enable Diagnostics"
     def matchesMode(self, dynamic):
@@ -633,7 +633,7 @@ class CopyTest(ImportTest):
     def getDefaultDesc(self, test):
         return "Copy of " + test.name
     def getTitle(self):
-        return "Copy"
+        return "_Copy"
     def getScriptTitle(self):
         return "Copy Test"
     def __call__(self, test):

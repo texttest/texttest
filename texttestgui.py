@@ -154,12 +154,12 @@ class TextTestGUI(ThreadedResponder):
         return self.contents
     def createTestWindows(self):
         # Create some command buttons.
-        buttons = [("Quit", self.quit)]
+        buttons = [("_Quit", self.quit)]
         if self.dynamic:
-            buttons.append(("Save All", self.saveAll))
-            buttons.append(("Save Selected", self.saveSelected))
+            buttons.append(("Save _All", self.saveAll))
+            buttons.append(("Save _Selected", self.saveSelected))
         else:
-            buttons.append(("View App", self.viewApp))
+            buttons.append(("_View App", self.viewApp))
         buttonbox = self.makeButtons(buttons)
         window = self.createTreeWindow()
 
@@ -436,8 +436,9 @@ class TextTestGUI(ThreadedResponder):
         buttonbox = gtk.HBox()
         for label, func in list:
             button = gtk.Button()
-            button.set_label(label)
-            scriptEngine.connect(label, "clicked", button, func)
+            button.set_use_underline(1)
+            button.set_label(label)            
+            scriptEngine.connect(label.replace("_", ""), "clicked", button, func)
             button.show()
             buttonbox.pack_start(button, expand=False, fill=False)
         buttonbox.show()
@@ -533,8 +534,9 @@ class RightWindowGUI:
             showError(str(e))
     def addButton(self, method, buttonbox, label, scriptTitle, option):
         button = gtk.Button()
+        button.set_use_underline(1)
         button.set_label(label)
-        scriptEngine.connect(scriptTitle, "clicked", button, method, None, option)
+        scriptEngine.connect(scriptTitle.replace("_", ""), "clicked", button, method, None, option)
         button.show()
         buttonbox.pack_start(button, expand=False, fill=False)
     def diagnoseOption(self, option):

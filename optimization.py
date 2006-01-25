@@ -1244,7 +1244,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
     def __repr__(self):
         return "Plotting Graph"
     def getTitle(self):
-        return "Plot Graph"
+        return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
     def __call__(self, test):
@@ -1946,7 +1946,7 @@ class StartStudio(guiplugins.InteractiveAction):
     def __repr__(self):
         return "Studio"
     def getTitle(self):
-        return "Studio"
+        return "_Studio"
     def getScriptTitle(self):
         return "Start Studio"
     def matchesMode(self, dynamic):
@@ -1983,7 +1983,7 @@ class CVSLogInGUI(guiplugins.InteractiveAction):
             cvsInfo += self.getCVSInfo(path, os.path.basename(fullName))
         raise  plugins.TextTestError, "CVS Logs" + os.linesep + os.linesep + cvsInfo
     def getTitle(self):
-        return "CVS"
+        return "CVS _Log"
     def getCVSInfo(self, path, file):
         if not os.path.isfile(path + os.sep + file):
             return ""

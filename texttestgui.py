@@ -183,7 +183,7 @@ class TextTestGUI(ThreadedResponder):
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         self.selection.connect("changed", self.selectionChanged)
         renderer = gtk.CellRendererText()
-        self.testsColumn = gtk.TreeViewColumn("Tests", renderer, text=0, background=1)
+        self.testsColumn = gtk.TreeViewColumn("Tests: 0 selected", renderer, text=0, background=1)
         view.append_column(self.testsColumn)
         if self.dynamic:
             perfColumn = gtk.TreeViewColumn("Details", renderer, text=4, background=5)

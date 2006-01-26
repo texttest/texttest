@@ -156,6 +156,8 @@ class GenerateWebPages(plugins.Action):
             print "unpickling error..."
         except EOFError:
             print "EOFError..."
+        except AttributeError:
+            print "Attribute Error..."
     def addOverviewPages(self, item, version, table):
         if not self.pagesOverview.has_key(item):
             self.pagesOverview[item] = HTMLgen.SimpleDocument(title="Test results for " + self.pageAppName,
@@ -218,7 +220,7 @@ class TestTable:
                                                         HTMLgen.Font(repr(state) + detail, color = fgcol))
                     else:
                         bgcol = colourFinder.find("no_results_bg")
-                        cellContaint = "No results avaliable"
+                        cellContaint = "No results available"
                     row.append(HTMLgen.TD(cellContaint, bgcolor = bgcol))
                 body = HTMLgen.TR()
                 body = body + row

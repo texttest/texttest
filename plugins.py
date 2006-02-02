@@ -207,14 +207,6 @@ def modifiedTime(filename):
         # Dead links etc.
         return None
 
-def findDiffTool(name):
-    if name != "ndiff":
-        return name
-    for dir in sys.path:
-        fullPath = os.path.join(dir, "ndiff.py")
-        if os.path.isfile(fullPath):
-            return sys.executable + " " + fullPath + " -q"
-
 # Another useful utility, for moving files around and copying where not possible
 def movefile(sourcePath, targetFile):
     try:

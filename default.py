@@ -291,11 +291,6 @@ class Config(plugins.Configuration):
     def defaultLoginShell(self):
         # For UNIX
         return "sh"
-    def defaultTextDiffTool(self):
-        if os.name == "posix":
-            return "diff"
-        else:
-            return "ndiff"
     def defaultSeverities(self):
         severities = {}
         severities["errors"] = 1
@@ -317,7 +312,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("log_file", "output", "Result file to search, by default")
         app.setConfigDefault("failure_severity", self.defaultSeverities(), \
                              "Mapping of result files to how serious diffs in them are")
-        app.setConfigDefault("text_diff_program", self.defaultTextDiffTool(), \
+        app.setConfigDefault("text_diff_program", "diff", \
                              "External program to use for textual comparison of files")
         app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
         app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
@@ -1434,4 +1429,4 @@ class ReplaceText(plugins.Action):
     def setUpApplication(self, app):
         if not self.logFile:
             self.logFile = app.getConfigValue("log_file")
-        self.textDiffTool = plugins.findDiffTool(app.getConfigValue("text_diff_program"))
+        self.textDiffTool = app.getConfigValue("text_diff_program")

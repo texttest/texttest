@@ -293,18 +293,18 @@ class MakeComparisons(plugins.Action):
             return self.previewGenerator.getPreview(open(comparison.tmpCmpFile))
         elif comparison.missingResult():
             return self.previewGenerator.getPreview(open(comparison.stdCmpFile))
-        
-        cmdLine = self.textDiffTool + " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
-        stdout = os.popen(cmdLine)
-        return self.previewGenerator.getPreview(stdout)
-    def findTextDiffTool(self, app):
-        configVal = app.getConfigValue("text_diff_program")
-        return plugins.findDiffTool(configVal)
+
+        if plugins.canExecute(self.textDiffTool):
+            cmdLine = self.textDiffTool + " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
+            stdout = os.popen(cmdLine)
+            return self.previewGenerator.getPreview(stdout)
+        else:
+            return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'"
     def setUpApplication(self, app):
         maxLength = app.getConfigValue("lines_of_text_difference")
         maxWidth = app.getConfigValue("max_width_text_difference")
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
-        self.textDiffTool = self.findTextDiffTool(app)
+        self.textDiffTool = app.getConfigValue("text_diff_program")
     
 class FileComparison:
     def __init__(self, test, standardFile, tmpFile, makeNew = 0):

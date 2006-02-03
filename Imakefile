@@ -1,9 +1,9 @@
 XCOMM Install test components in generally available place.
-XCOMM $Id: Imakefile,v 1.37 2006/02/02 15:18:31 geoff Exp $
+XCOMM $Id: Imakefile,v 1.38 2006/02/03 14:08:21 geoff Exp $
 
 MODULEDIR=/usr/local/lib/python
-FRAMEWORK_MODULES=batch.py comparetest.py default.py engine.py guiplugins.py knownbugs.py lsf.py performance.py plugins.py predict.py queuesystem.py respond.py sge.py testmodel.py texttestgui.py unixonly.py
-CARMEN_MODULES=carmenqueuesystem.py ravebased.py dayopsgui.py optimization.py apc.py KPI.py matador.py studio.py fleet.py mpssolver.py testoverview.py
+FRAMEWORK_MODULES=batch.py comparetest.py default.py engine.py guiplugins.py knownbugs.py lsf.py performance.py plugins.py predict.py queuesystem.py respond.py sge.py testmodel.py testoverview.py texttestgui.py unixonly.py
+CARMEN_MODULES=carmenqueuesystem.py ravebased.py dayopsgui.py optimization.py apc.py KPI.py matador.py studio.py fleet.py mpssolver.py
 
 CarmFirstTarget()
 

@@ -658,7 +658,21 @@ class ApplicationGUI(RightWindowGUI):
             iter = self.itermap[test.app][test]
             self.selection.select_iter(iter)
         self.selection.get_tree_view().grab_focus()
+        if self.app.getConfigValue("auto_scroll_to_first_selected"):
+            first = self.getFirstSelectedTest()
+            if first != None:
+                self.selection.get_tree_view().scroll_to_cell(first, None, True, 0.1)
         guilog.info("Marking " + str(len(self.getSelectedTests())) + " tests as selected")
+    def getFirstSelectedTest(self):
+        firstTest = []
+        self.selection.selected_foreach(self.findFirstTest, firstTest)
+        if len(firstTest) != 0:
+            return firstTest[0]
+        else:
+            return None
+    def findFirstTest(self, model, path, iter, firstTest, *args):
+        if len(firstTest) == 0:
+            firstTest.append(path)    
     def getRootSuites(self):
         suites = [ self.getRootSuite(self.app) ]
         for extraApp in self.app.extras:

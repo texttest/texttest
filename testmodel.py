@@ -661,6 +661,7 @@ class Application:
         self.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
         self.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
         self.setConfigDefault("auto_collapse_successful", 0, "Automatically collapse successful test suites?")
+        self.setConfigDefault("auto_scroll_to_first_selected", 0, "Automatically scroll the tree view to the first selected test?")
         self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ], \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")

@@ -418,6 +418,9 @@ class PrepareWriteDirectory(plugins.Action):
         if os.path.isdir(fullPath):
             self.copytree(fullPath, target)
     def copytimes(self, src, dst):
+        if os.path.isdir(src) and os.name == "nt":
+            # Windows doesn't let you update modification times of directories!
+            return
         # copy modification times, but not permissions. This is a copy of half of shutil.copystat
         st = os.stat(src)
         if hasattr(os, 'utime'):
@@ -456,6 +459,9 @@ class PrepareWriteDirectory(plugins.Action):
         if os.path.exists(fullPath):
             os.symlink(fullPath, target)
     def partialCopyTestPath(self, test, sourcePath, targetPath):
+        # Linking doesn't exist on windows!
+        if os.name != "posix":
+            return self.copyTestPath(test, sourcePath, targetPath)
         modifiedPaths = self.getModifiedPaths(test, sourcePath)
         if modifiedPaths is None:
             # If we don't know, assume anything can change...
@@ -825,6 +831,16 @@ class RunTest(plugins.Action):
         app.checkBinaryExists()
         self.recordMode = app.getConfigValue("use_case_record_mode")
 
+class Killed(plugins.TestState):
+    def __init__(self, briefText, freeText, prevState):
+        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
+                                   started=1, executionHosts=prevState.executionHosts)
+        # Cache running information, it can be useful to have this available...
+        self.prevState = prevState
+    def getProcessCpuTime(self):
+        # for Windows
+        return self.prevState.getProcessCpuTime()
+
 class KillTest(plugins.Action):
     def __call__(self, test):
         if not test.state.hasStarted():
@@ -833,8 +849,7 @@ class KillTest(plugins.Action):
         test.state.killProcess()
         briefText, fullText = self.getKillInfo(test)
         freeText = "Test " + fullText + "\n"
-        newState = plugins.TestState("killed", briefText=briefText, freeText=freeText, \
-                                     started=1, executionHosts=test.state.executionHosts)
+        newState = Killed(briefText, freeText, test.state)
         test.changeState(newState)
     def getKillInfo(self, test):
         briefText = self.getBriefText(test, str(sys.exc_value))
@@ -1217,7 +1232,6 @@ class MakePerformanceFile(PerformanceFileCreator):
         # the machine environment right now.
         pass
 
-
 # Relies on the config entry performance_logfile_extractor, so looks in the log file for anything reported
 # by the program
 class ExtractPerformanceFiles(PerformanceFileCreator):
@@ -1423,6 +1437,7 @@ class ReplaceText(plugins.Action):
             writeFile.write(line.replace(self.oldText, self.newText))
         writeFile.close()
         os.system(self.textDiffTool + " " + logFile + " " + newLogFile)
+        os.remove(logFile)
         os.rename(newLogFile, logFile)
     def setUpSuite(self, suite):
         self.describe(suite)

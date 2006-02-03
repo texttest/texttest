@@ -101,7 +101,7 @@ class InteractiveAction(plugins.Action):
         if refresh:
             exitHandler = self.test.filesChanged
         commandLine, descriptor = self.getViewCommand(fileName)
-        guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
+        guilog.info("Viewing file " + fileName.replace(os.sep, "/") + " using '" + descriptor + "', refresh set to " + str(refresh))
         process = self.startExternalProgram(commandLine, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getTextTestName(self):

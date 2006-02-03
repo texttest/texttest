@@ -406,10 +406,10 @@ class RunDependentTextFilter:
         self.orderFilters = seqdict()
         dict = test.getConfigValue("run_dependent_text")
         for text in self.findConfigTexts(dict, stem):
-            self.contentFilters.append(LineFilter(text, test.writeDirectory, self.diag))
+            self.contentFilters.append(LineFilter(text, self.getWriteDirRegexp(test), self.diag))
         dict = test.getConfigValue("unordered_text")
         for text in self.findConfigTexts(dict, stem):
-            orderFilter = LineFilter(text, test.writeDirectory, self.diag)
+            orderFilter = LineFilter(text, self.getWriteDirRegexp(test), self.diag)
             self.orderFilters[orderFilter] = []
         self.osChange = self.changedOs(test.app)
     def changedOs(self, app):
@@ -488,6 +488,9 @@ class RunDependentTextFilter:
                 newFile.write(line)
             newFile.write("\n")
             self.orderFilters[filter] = []
+    def getWriteDirRegexp(self, test):
+        dateRegexp = "[0-3][0-9][A-Za-z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
+        return "[^ ]*/" + test.app.name + "[^/]*" + dateRegexp + "/" + test.getRelPath()
 
 class LineNumberTrigger:
     def __init__(self, lineNumber):
@@ -505,7 +508,7 @@ class LineFilter:
     matcherStrings = [ "{LINE ", "{INTERNAL " ]
     # All syntax that affects what is done when a match is found
     matchModifierStrings = [ "{WORD ", "{REPLACE ", "{LINES " ]
-    def __init__(self, text, testWriteDir, diag):
+    def __init__(self, text, writeDirRegexp, diag):
         self.originalText = text
         self.diag = diag
         self.triggers = []
@@ -515,24 +518,14 @@ class LineFilter:
         self.wordNumber = None
         self.replaceText = None
         self.removeWordsAfter = 0
-        self.internalExpressions = { "writedir" : testWriteDir }
+        self.internalExpressions = { "writedir" : writeDirRegexp }
         self.parseOriginalText()
     def makeRegexTriggers(self, parameter):
-        if parameter != "writedir":
-            return [ plugins.TextTrigger(parameter) ]
-        writeDir = self.internalExpressions[parameter]
-        realPath = os.path.realpath(writeDir)
-        triggers = [ self.makeRegex(writeDir) ]
-        if writeDir != realPath:
-            triggers.append(self.makeRegex(realPath))
+        expression = self.internalExpressions.get(parameter, parameter)
+        triggers = [ plugins.TextTrigger(expression) ]
+        if parameter == "writedir" and os.name != "posix":
+            triggers.append(plugins.TextTrigger(expression.replace("/", "\\\\")))
         return triggers
-    def makeRegex(self, thisText):
-        userName = os.getenv("USER", "tmp")
-        versionRegexp = "\..*" + userName
-        thisText = sub(versionRegexp, ".*", thisText)
-        thisText = thisText.replace(userName, "[^/]*")
-        dateRegexp = "[0-3][0-9][A-Za-z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
-        return plugins.TextTrigger(sub(dateRegexp, dateRegexp, thisText))
     def parseOriginalText(self):
         dividerPoint = self.originalText.find(self.divider)
         if dividerPoint != -1:

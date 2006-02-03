@@ -183,7 +183,7 @@ class TestComparison(plugins.TestState):
         fileList.sort()
         for file in fileList:
             fullPath = os.path.join(absDir, file)
-            if not os.path.isfile(fullPath) or os.path.islink(fullPath):
+            if not os.path.isfile(fullPath):
                 continue
 
             parts = file.split(".")

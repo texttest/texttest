@@ -349,6 +349,9 @@ class TestSuite(Test):
         if self.valid and os.path.isfile(self.testCaseFile) and self.isAcceptedByAll(filters):
             self.readEnvironment()
             self.readTestCases(filters, allVersions)
+            for filter in filters:
+                if not filter.acceptsTestSuiteContents(self):
+                    self.valid = 0
         else:
             self.valid = 0
     def readTestCases(self, filters, allVersions):

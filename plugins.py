@@ -66,6 +66,8 @@ class Filter:
         return 1
     def acceptsTestSuite(self, suite):
         return 1
+    def acceptsTestSuiteContents(self, suite):
+        return 1
     def acceptsApplication(self, app):
         return 1
 

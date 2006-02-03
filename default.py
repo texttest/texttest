@@ -668,8 +668,8 @@ class TextFilter(plugins.Filter):
     def stringContainsText(self, searchString):
         for trigger in self.textTriggers:
             if trigger.matches(searchString):
-                return 1
-        return 0
+                return True
+        return False
     def equalsText(self, test):
         return test.name in self.texts
 
@@ -680,8 +680,8 @@ class TestPathFilter(TextFilter):
     def acceptsTestSuite(self, suite):
         for relPath in self.texts:
             if relPath.startswith(suite.getRelPath()):
-                return 1
-        return 0
+                return True
+        return False
     
 class TestNameFilter(TextFilter):
     option = "t"
@@ -691,13 +691,9 @@ class TestNameFilter(TextFilter):
 class TestSuiteFilter(TextFilter):
     option = "ts"
     def acceptsTestCase(self, test):
-        pathComponents = test.getRelPath().split(os.sep)
-        for path in pathComponents:
-            if len(path) and path != test.name:
-                for trigger in self.textTriggers:
-                    if trigger.matches(path):
-                        return 1
-        return 0
+        return self.stringContainsText(test.parent.getRelPath())
+    def acceptsTestSuiteContents(self, suite):
+        return not suite.isEmpty()
 
 class GrepFilter(TextFilter):
     def __init__(self, filterText, fileStem):

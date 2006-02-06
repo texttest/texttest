@@ -118,11 +118,21 @@ class Config(plugins.Configuration):
                     if os.path.isfile(os.path.join(fullPath, filename)):
                         filterFiles.append(filename)
         return filterFiles
+    def getExtensions(self, app):
+        appExt = "." + app.name        
+        versions = app.getVersionFileExtensions()
+        extensions = map(lambda ver: appExt + "." + ver, versions)
+        extensions.append(appExt)
+        extensions.append("")
+        return extensions
     def makeFilterFileName(self, app, filename):
+        extensions = self.getExtensions(app)
         for directory in app.getConfigValue("test_list_files_directory"):
-            fullPath = os.path.join(app.abspath, directory, filename)
-            if os.path.isfile(fullPath):
-                return fullPath
+            fullDir = os.path.join(app.abspath, directory)
+            for extension in extensions:
+                fullPath = os.path.join(fullDir, filename + extension)
+                if os.path.isfile(fullPath):
+                    return fullPath
     def getFilterClasses(self):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  batch.BatchFilter, performance.TimeFilter ]

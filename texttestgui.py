@@ -297,7 +297,13 @@ class TextTestGUI(ThreadedResponder):
         maybeNewTest = suite.testcases[-1]
         suiteIter = self.itermap[suite]
         if self.itermap.has_key(maybeNewTest):
-            self.redoOrder(suite, suiteIter)
+            # There wasn't a new test: assume something disappeared or changed order and regenerate the model...
+            self.recreateSuiteModel(suite, suiteIter)
+            # If we're viewing a test that isn't there any more, view the suite instead!
+            if self.rightWindowGUI.object.classId() == "test-case":
+                viewedTest = self.rightWindowGUI.object
+                if not os.path.isdir(viewedTest.abspath):
+                    self.recreateTestView(suite)
         else:
             self.addNewTestToModel(suiteIter, maybeNewTest, suiteIter)
         self.selection.get_tree_view().grab_focus()
@@ -357,9 +363,9 @@ class TextTestGUI(ThreadedResponder):
         self.selection.get_tree_view().expand_all()
         self.selection.unselect_all()
         self.selection.select_iter(iter)
-    def redoOrder(self, suite, suiteIter):
+    def recreateSuiteModel(self, suite, suiteIter):
         iter = self.model.iter_children(suiteIter)
-        for i in range(len(suite.testcases)):
+        for i in range(self.model.iter_n_children(suiteIter)):
             self.model.remove(iter)
         for test in suite.testcases:
             iter = self.addSuiteWithParent(test, suiteIter)

@@ -52,8 +52,8 @@ class GenerateWebPages(plugins.Action):
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
         self.pageDir = pageDir
-        self.pagesOverview = {}
-        self.pagesDetails = {}
+        self.pagesOverview = seqdict()
+        self.pagesDetails = seqdict()
         self.diag = plugins.getDiagnostics("GenerateWebPages")
     def createTestTable(self):
         # Hook for configurations to inherit from
@@ -63,7 +63,7 @@ class GenerateWebPages(plugins.Action):
     def generate(self, repositoryDirs):            
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
-        usedSelectors = {}
+        usedSelectors = seqdict()
         for repositoryDir in repositoryDirs:
             version = os.path.basename(repositoryDir)
             self.diag.info("Generating " + version)
@@ -87,13 +87,13 @@ class GenerateWebPages(plugins.Action):
                 self.addDetailPages(det)
                 foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
         selContainer = HTMLgen.Container()
-        for sel in usedSelectors.keys():
-            selContainer.append(HTMLgen.Href(self.getOverviewPageName(usedSelectors[sel]), sel))
-        for sel in self.pagesOverview.keys():
-            self.pagesOverview[sel].prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
-            self.pagesOverview[sel].prepend(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + self.pageVersion + "-"),
+        for selKey, usedSel in usedSelectors.items():
+            selContainer.append(HTMLgen.Href(self.getOverviewPageName(usedSel), selKey))
+        for page in self.pagesOverview.values():
+            page.prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
+            page.prepend(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + self.pageVersion + "-"),
                                                                       foundMinorVersions), align = 'center'))
-            self.pagesOverview[sel].prepend(HTMLgen.Heading(1, "Test results for ", self.pageAppName, align = 'center'))
+            page.prepend(HTMLgen.Heading(1, "Test results for ", self.pageAppName, align = 'center'))
 
         self.writePages()
     def processTestStateFiles(self, categoryHandler, loggedTests, tagsFound, repositoryDir):
@@ -134,9 +134,9 @@ class GenerateWebPages(plugins.Action):
         self.diag.info(tag + " : reading " + key)
         keyExtraVersion = self.findExtraVersion(repository)
         if not loggedTests.has_key(keyExtraVersion):
-            loggedTests[keyExtraVersion] = {}
+            loggedTests[keyExtraVersion] = seqdict()
         if not loggedTests[keyExtraVersion].has_key(key):
-            loggedTests[keyExtraVersion][key] = {}
+            loggedTests[keyExtraVersion][key] = seqdict()
 
         loggedTests[keyExtraVersion][key][tag] = state
         categoryHandler.registerInCategory(tag, key, state, keyExtraVersion)
@@ -173,8 +173,7 @@ class GenerateWebPages(plugins.Action):
     def writePages(self):
         for sel in self.pagesOverview.keys():
             self.pagesOverview[sel].write(os.path.join(self.pageDir, self.getOverviewPageName(sel)))
-        for tag in self.pagesDetails.keys():
-            page = self.pagesDetails[tag]
+        for tag, page in self.pagesDetails.items():
             page.write(os.path.join(self.pageDir, getDetailPageName(self.pageVersion, tag)))
     def getTestIdentifier(self, stateFile, repository):
         dir = os.path.dirname(stateFile)
@@ -256,7 +255,7 @@ class TestTable:
         
 class TestDetails:
     def generate(self, categoryHandler, version, tags, linkFromDetailsToOverview):
-        detailsContainers = {}
+        detailsContainers = seqdict()
         for tag in tags:
             container = detailsContainers[tag] = HTMLgen.Container()
             categories = categoryHandler.testsInCategory[tag]
@@ -296,10 +295,10 @@ class TestDetails:
         
 class CategoryHandler:
     def __init__(self):
-        self.testsInCategory = {}
+        self.testsInCategory = seqdict()
     def registerInCategory(self, tag, test, state, extraVersion):
         if not self.testsInCategory.has_key(tag):
-            self.testsInCategory[tag] = {}
+            self.testsInCategory[tag] = seqdict()
         if not self.testsInCategory[tag].has_key(state.category):
             self.testsInCategory[tag][state.category] = []
         self.testsInCategory[tag][state.category].append((test, state, extraVersion))

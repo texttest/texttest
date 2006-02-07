@@ -489,7 +489,7 @@ class GenerateHistoricalReport(plugins.Action):
         command = "from " + module + " import GenerateWebPages"
         try:
             exec command
-        except ImportError:
+        except:
             from testoverview import GenerateWebPages
         generator = GenerateWebPages(app.fullName, app.getFullVersion(), pageDir, extraVersions)
         generator.generate(relevantSubDirs)

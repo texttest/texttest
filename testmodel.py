@@ -454,6 +454,9 @@ class TestSuite(Test):
             testSuite = TestSuite(testName, testPath, self.app, [], self)
             if testSuite.valid:
                 return self.newTest(testSuite)
+    def removeTest(self, test):
+        self.testcases.remove(test)
+        self.notifyChanged()
     def newTest(self, test):
         self.testcases.append(test)
         self.expandEnvironmentReferences()

@@ -6,6 +6,7 @@ from glob import glob
 from Queue import Queue, Empty
 global scriptEngine
 global processTerminationMonitor
+from log4py import LOGLEVEL_NORMAL
 
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
@@ -617,6 +618,39 @@ class EnableDiagnostics(InteractiveAction):
         shutil.copyfile(diagFile, targetDiagFile)
         self.viewFile(targetDiagFile, refresh=1)
 
+class RemoveTest(InteractiveAction):
+    def getTitle(self):
+        return "_Remove"
+    def getScriptTitle(self):
+        return "Remove Test"
+    def matchesMode(self, dynamic):
+        return not dynamic
+    def __call__(self, test):
+        plugins.rmtree(test.abspath)
+        suite = test.parent
+        self.removeFromTestFile(suite, test.name)
+        suite.removeTest(test)
+    def removeFromTestFile(self, suite, testName):
+        newFileName = os.path.join(suite.app.writeDirectory)
+        newFile = plugins.openForWrite(newFileName)
+        description = ""
+        for line in open(suite.testCaseFile).xreadlines():
+            stripLine = line.strip()
+            description += line
+            if line.startswith("#") or len(stripLine) == 0:
+                continue
+            
+            if stripLine != testName:
+                newFile.write(description)
+            description = ""
+        newFile.close()
+        if guilog.get_loglevel() >= LOGLEVEL_NORMAL:
+            difftool = suite.getConfigValue("text_diff_program")
+            diffInfo = os.popen(difftool + " " + suite.testCaseFile + " " + newFileName).read()
+            guilog.info("Changes made to testcase file : \n" + diffInfo)
+            guilog.info("") # blank line
+        os.rename(newFileName, suite.testCaseFile)
+
 class CopyTest(ImportTest):
     def __repr__(self):
         return "Copy"
@@ -649,8 +683,8 @@ class CopyTest(ImportTest):
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.testClasses =  [ SaveTest, RecordTest, EnableDiagnostics, CopyTest ]
-        self.suiteClasses = [ ImportTestCase, ImportTestSuite ]
+        self.testClasses =  [ SaveTest, RecordTest, EnableDiagnostics, CopyTest, RemoveTest ]
+        self.suiteClasses = [ ImportTestCase, ImportTestSuite, RemoveTest ]
         self.appClasses = [ SelectTests, RunTests, ResetGroups, SaveSelection ]
         self.optionGroupMap = {}
     def getInstance(self, test, className):

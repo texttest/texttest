@@ -479,6 +479,8 @@ class TextTest:
             signal.signal(signal.SIGUSR2, self.handleSignal)
             signal.signal(signal.SIGXCPU, self.handleSignal)
     def handleSignal(self, sig, stackFrame):
+        # Don't respond to the same signal more than once!
+        signal.signal(sig, signal.SIG_IGN)
         raise KeyboardInterrupt, self.getSignalText(sig)
     def getSignalText(self, sig):
         if sig == signal.SIGUSR1:

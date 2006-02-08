@@ -71,9 +71,9 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
         if self.presetPerfCategory:
             return self.presetPerfCategory
         cpuTime = performance.getTestPerformance(self.test)
-        if cpuTime < self.test.getConfigValue("maximum_cputime_for_short_queue"):
+        if cpuTime < plugins.getNumberOfSeconds(str(self.test.getConfigValue("maximum_cputime_for_short_queue"))):
             return "short"
-        elif cpuTime > 120:
+        elif cpuTime > 7200:
             return "long"
         else:
             return "medium"
@@ -115,7 +115,7 @@ class LsfSubmissionRules(CarmenSubmissionRules):
     def findDefaultQueue(self):
         if self.archToUse == "i386_linux" and not self.presetPerfCategory:
             cpuTime = performance.getTestPerformance(self.test)
-            chunkLimit = float(self.test.app.getConfigValue("maximum_cputime_for_chunking"))
+            chunkLimit = plugins.getNumberOfSeconds(self.test.app.getConfigValue("maximum_cputime_for_chunking"))
             if cpuTime > 0 and cpuTime < chunkLimit:
                 return "short_rd_testing_chunked"
         return self.getQueuePerformancePrefix() + self.getArchQueueName() +\

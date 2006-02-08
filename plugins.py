@@ -24,6 +24,23 @@ def tmpString():
     else:
         return "tmp"
 
+# Parse a time string, either a HH:MM:SS string, or a single int/float,
+# which is interpreted as a number of minutes, for backwards compatibility.
+# Observe that in either 'field' in the HH:MM:SS case, any number is allowed,
+# so e.g. 144:5.3:0.01 is interpreted as 144 hours + 5.3 minutes + 0.01 seconds.
+def getNumberOfSeconds(timeString):
+    parts = timeString.split(":")
+    if len(parts) > 3:
+        raise "Illegal time format '" + timeString + "' :  Use format HH:MM:SS or MM:SS, or a single number to denote a number of minutes."
+    if len(parts) == 1:  # Backwards compatible, assume single ints/floats means minutes
+        return 60 * float(timeString)
+    else:                # Assume format is HH:MM:SS ...
+        seconds = 0
+        for i in range(len(parts) - 1, -1, -1):            
+            seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)
+        return seconds 
+
+
 # Generic configuration class
 class Configuration:
     CLEAN_NONE = 0

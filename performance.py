@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, comparetest, string, plugins
+import os, comparetest, string, plugins, sys
 
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing
@@ -27,10 +27,23 @@ def getPerformance(fileName):
         return float(-1)
 
 def getTestPerformance(test, version = None):
-    return getPerformance(test.makeFileName("performance", version)) / 60
+    return getPerformance(test.makeFileName("performance", version))
 
 def getTestMemory(test, version = None):
     return getPerformance(test.makeFileName("memory", version))
+
+def parseTimeExpression(timeExpression):
+    # Starts with <, >, <=, >= ?
+    if timeExpression == "":
+        return "", 0
+    if timeExpression.startswith("<="):
+        return "<=", plugins.getNumberOfSeconds(timeExpression[2:])
+    if timeExpression.startswith("<"):
+        return "<", plugins.getNumberOfSeconds(timeExpression[1:])
+    if timeExpression.startswith(">="):
+        return ">=", plugins.getNumberOfSeconds(timeExpression[2:])
+    if timeExpression.startswith(">"):
+        return ">", plugins.getNumberOfSeconds(timeExpression[1:])  
 
 class PerformanceTestComparison(comparetest.TestComparison):
     def getOptionalStems(self, test):
@@ -144,19 +157,39 @@ class TimeFilter(plugins.Filter):
     option = "r"
     def __init__(self, timeLimit):
         self.minTime = 0.0
-        self.maxTime = None
+        self.maxTime = sys.maxint
         times = plugins.commasplit(timeLimit)
-        if len(times) == 1:
-            self.maxTime = float(timeLimit)
+        if timeLimit.count("<") == 0 and timeLimit.count(">") == 0: # Backwards compatible
+            if len(times) == 1:
+                self.maxTime = plugins.getNumberOfSeconds(timeLimit)
+            else:
+                self.minTime = plugins.getNumberOfSeconds(times[0])
+                if len(times[1]):
+                    self.maxTime = plugins.getNumberOfSeconds(times[1])
         else:
-            self.minTime = float(times[0])
-            if len(times[1]):
-                self.maxTime = float(times[1])
+            for expression in times:
+                parsedExpression = parseTimeExpression(expression)
+                if parsedExpression[0] == "":
+                    continue
+                elif parsedExpression[0] == "<":
+                    self.adjustMaxTime(parsedExpression[1] - 1) # We don't care about fractions of seconds ...
+                elif parsedExpression[0] == "<=":
+                    self.adjustMaxTime(parsedExpression[1]) 
+                elif parsedExpression[0] == ">":
+                    self.adjustMinTime(parsedExpression[1] + 1) # We don't care about fractions of seconds ...
+                else:
+                    self.adjustMinTime(parsedExpression[1])
+    def adjustMinTime(self, newMinTime):
+        if newMinTime > self.minTime:
+            self.minTime = newMinTime
+    def adjustMaxTime(self, newMaxTime):
+        if newMaxTime < self.maxTime:
+            self.maxTime = newMaxTime
     def acceptsTestCase(self, test):
         testPerformance = getTestPerformance(test)
         if testPerformance < 0:
             return 1
-        return testPerformance >= self.minTime and (self.maxTime == None or testPerformance <= self.maxTime)
+        return testPerformance >= self.minTime and testPerformance <= self.maxTime
 
 class AddTestPerformance(plugins.Action):
     def __init__(self):
@@ -165,7 +198,7 @@ class AddTestPerformance(plugins.Action):
     def __repr__(self):
         return "Adding performance for"
     def __call__(self, test):
-        testPerformance = getTestPerformance(test)
+        testPerformance = getTestPerformance(test) / 60 # getTestPerformance returns seconds now ...
         if os.environ.has_key("LSF_PROCESSES"):
             parCPUs = int(os.environ["LSF_PROCESSES"])
             self.describe(test, ": " + str(int(testPerformance)) + " minutes * " + str(parCPUs))
@@ -223,9 +256,9 @@ class PerformanceStatistics(plugins.Action):
     def setUpSuite(self, suite):
         self.suiteName = suite.name + "\n" + "   "
     def __call__(self, test):
-        refPerf = getTestPerformance(test, self.referenceVersion)
+        refPerf = getTestPerformance(test, self.referenceVersion) / 60 # getTestPerformance returns seconds now ...
         if self.currentVersion is not None:
-            currPerf = getTestPerformance(test, self.currentVersion)
+            currPerf = getTestPerformance(test, self.currentVersion) / 60 # getTestPerformance returns seconds now ...
             pDiff = percentDiff(currPerf, refPerf)
             if self.limit == 0 or pDiff > self.limit:
                 print self.suiteName + test.name.ljust(30) + "\t", self.minsec(refPerf), self.minsec(currPerf), "\t" + str(pDiff) + "%"

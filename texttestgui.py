@@ -22,11 +22,17 @@ def showError(message):
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show()
 
+def renderParentsBold(column, cell, model, iter):
+    if model.iter_has_child(iter):
+        cell.set_property('font', "bold")
+    else:
+        cell.set_property('font', "")
+
 class TextTestGUI(ThreadedResponder):
     def __init__(self, optionMap):
+        self.readGtkRCFile()
         self.dynamic = not optionMap.has_key("gx")
         ThreadedResponder.__init__(self, optionMap)
-        scriptEngine = self.scriptEngine
         guiplugins.scriptEngine = self.scriptEngine
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
@@ -35,6 +41,19 @@ class TextTestGUI(ThreadedResponder):
         self.rightWindowGUI = None
         self.actionThread = None
         self.contents = None
+    def readGtkRCFile(self):
+        if not os.environ.has_key("TEXTTEST_GTK_RC_FILE"):
+            return
+
+        file = os.environ["TEXTTEST_GTK_RC_FILE"]
+        if file == "":
+            return
+        elif os.path.isfile(file):
+            gtk.rc_add_default_file(file)
+        elif os.path.isfile(os.path.join(os.environ["HOME"], file)):
+            gtk.rc_add_default_file(os.path.join(os.environ["HOME"], file))            
+        elif os.path.isfile(os.path.expanduser(file)):
+            gtk.rc_add_default_file(os.path.expanduser(file))
     def setUpScriptEngine(self):
         guiplugins.setUpGuiLog(self.dynamic)
         global guilog, scriptEngine
@@ -182,11 +201,13 @@ class TextTestGUI(ThreadedResponder):
         self.selection = view.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         self.selection.connect("changed", self.selectionChanged)
-        renderer = gtk.CellRendererText()
-        self.testsColumn = gtk.TreeViewColumn("Tests: 0 selected", renderer, text=0, background=1)
+        testRenderer = gtk.CellRendererText()
+        self.testsColumn = gtk.TreeViewColumn("Tests: 0 selected", testRenderer, text=0, background=1)
+        self.testsColumn.set_cell_data_func(testRenderer, renderParentsBold)
         view.append_column(self.testsColumn)
         if self.dynamic:
-            perfColumn = gtk.TreeViewColumn("Details", renderer, text=4, background=5)
+            detailsRenderer = gtk.CellRendererText()
+            perfColumn = gtk.TreeViewColumn("Details", detailsRenderer, text=4, background=5)
             view.append_column(perfColumn)
         view.expand_all()
         modelIndexer = TreeModelIndexer(self.model, self.testsColumn, 3)
@@ -468,6 +489,7 @@ class RightWindowGUI:
         view = gtk.TreeView(self.model)
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn(self.object.name.replace("_", "__"), renderer, text=0, background=1)
+        column.set_cell_data_func(renderer, renderParentsBold)
         view.append_column(column)
         if self.dynamic:
             perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)

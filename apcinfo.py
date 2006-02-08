@@ -656,7 +656,7 @@ class GenHTML(plugins.Action):
         self.extractProfiling(test, group)
         
         # Table
-        testPerformance = performance.getTestPerformance(test)
+        testPerformance = performance.getTestPerformance(test) / 60 # getTestPerformance is seconds now ...
         testMemory = performance.getTestMemory(test)
         if testMemory > 0:
             testMemory = str(testMemory)

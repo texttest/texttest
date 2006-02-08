@@ -221,7 +221,7 @@ class SubmissionRules:
         if self.optionMap.has_key("perf"):
             return 1
 
-        minTimeForce = self.test.getConfigValue("min_time_for_performance_force")
+        minTimeForce = plugins.getNumberOfSeconds(str(self.test.getConfigValue("min_time_for_performance_force")))
         if minTimeForce >= 0 and performance.getTestPerformance(self.test) > minTimeForce:
             return 1
         # If we haven't got a log_file yet, we should do this so we collect performance reliably

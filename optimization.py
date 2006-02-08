@@ -759,8 +759,8 @@ class TestReport(plugins.Action):
         else:
             print "Skipping test due to same logfile", test.name
     def getPerformance(self, test, currentVersion, referenceVersion):
-        currPerf = performance.getTestPerformance(test, self.currentVersion)
-        refPerf = performance.getTestPerformance(test, self.referenceVersion)
+        currPerf = performance.getTestPerformance(test, self.currentVersion) / 60
+        refPerf = performance.getTestPerformance(test, self.referenceVersion) / 60
         return currPerf, refPerf
     def getLogFilesForComparison(self, test):
         currentLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.currentVersion)
@@ -788,8 +788,8 @@ class CalculateKPIs(TestReport):
     def compare(self, test, referenceRun, currentRun):
         referenceFile = referenceRun.logFile
         currentFile = currentRun.logFile
-        floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion)
-        floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion)
+        floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion) / 60
+        floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion) / 60
         aKPI = None
         listKPIs = []
         for aKPIConstant in self.listKPIs:
@@ -817,8 +817,8 @@ class WriteKPIData(TestReport):
         listThisKPI = [strCarmusr]
         referenceFile = referenceRun.logFile
         currentFile = currentRun.logFile
-        floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion)
-        floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion)
+        floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion) / 60
+        floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion) / 60
         aKPI = None
         listKPIData = []
         for aKPIConstant in self.listKPIs:

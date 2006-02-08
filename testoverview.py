@@ -75,7 +75,7 @@ class GenerateWebPages(plugins.Action):
             if len(loggedTests.keys()) > 0:
                 tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
                 selectors = map(lambda selClass : selClass(tagsFound), self.getSelectorClasses())
-                linkFromDetailsToOverview = {}
+                linkFromDetailsToOverview = seqdict()
                 for sel in selectors:
                     if not usedSelectors.has_key(repr(sel)):
                         usedSelectors[repr(sel)] = sel.getFileNameExtension()
@@ -107,7 +107,9 @@ class GenerateWebPages(plugins.Action):
                 self.processTestStateFile(testStateFile, categoryHandler, loggedTests, tagsFound, dir)
     def findTestStateFiles(self, dir):
         files = []
-        for file in os.listdir(dir):
+        filelist = os.listdir(dir)
+        filelist.sort()
+        for file in filelist:
             fullPath = os.path.join(dir, file)
             if os.path.isdir(fullPath):
                 files += self.findTestStateFiles(fullPath)
@@ -289,8 +291,8 @@ class TestDetails:
             return None
     def getLinksToOverview(self, version, testName, extraVersion, linkFromDetailsToOverview):
         links = HTMLgen.Container()
-        for sel in linkFromDetailsToOverview:
-            links.append(HTMLgen.Href(linkFromDetailsToOverview[sel] + "#" + version + testName + extraVersion, sel))
+        for sel, value in linkFromDetailsToOverview.items():
+            links.append(HTMLgen.Href(value + "#" + version + testName + extraVersion, sel))
         return links
         
 class CategoryHandler:

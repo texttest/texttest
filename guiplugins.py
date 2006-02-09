@@ -620,7 +620,7 @@ class EnableDiagnostics(InteractiveAction):
 
 class RemoveTest(InteractiveAction):
     def getTitle(self):
-        return "_Remove"
+        return "Remove"
     def getScriptTitle(self):
         return "Remove Test"
     def matchesMode(self, dynamic):

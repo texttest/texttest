@@ -651,7 +651,7 @@ class RemoveTest(InteractiveAction):
             diffInfo = os.popen(difftool + " " + suite.testCaseFile + " " + newFileName).read()
             guilog.info("Changes made to testcase file : \n" + diffInfo)
             guilog.info("") # blank line
-        os.rename(newFileName, suite.testCaseFile)
+        plugins.movefile(newFileName, suite.testCaseFile)
 
 class CopyTest(ImportTest):
     def __repr__(self):

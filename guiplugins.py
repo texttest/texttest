@@ -631,7 +631,7 @@ class RemoveTest(InteractiveAction):
         self.removeFromTestFile(suite, test.name)
         suite.removeTest(test)
     def removeFromTestFile(self, suite, testName):
-        newFileName = os.path.join(suite.app.writeDirectory)
+        newFileName = os.path.join(suite.app.writeDirectory, "tmptestsuite")
         newFile = plugins.openForWrite(newFileName)
         description = ""
         for line in open(suite.testCaseFile).xreadlines():

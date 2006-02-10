@@ -144,13 +144,14 @@ class LsfSubmissionRules(CarmenSubmissionRules):
             return "_aix5"
         return ""
 
-
 class CarmenConfig(queuesystem.QueueSystemConfig):
     def addToOptionGroups(self, app, groups):
         queuesystem.QueueSystemConfig.addToOptionGroups(self, app, groups)
         for group in groups:
             if group.name.startswith("How"):
                 group.addSwitch("lprof", "Run with LProf profiler")
+            elif group.name.startswith("SGE"):
+                group.addOption("q", "Request " + group.name + " queue", possibleValues = ["short", "normal", "idle"])
     def getTestRunner(self):
         baseRunner = queuesystem.QueueSystemConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):

@@ -48,7 +48,6 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
 
 import queuesystem, default, os, string, shutil, plugins, sys, signal, stat, guiplugins
 from socket import gethostname
-from tempfile import mktemp
 from respond import Responder
 from carmenqueuesystem import getArchitecture, CarmenConfig
 
@@ -500,7 +499,8 @@ class CompileRules(plugins.Action):
         else:
             return self.modeString
     def performCompile(self, test, ruleset, commandLine):
-        compTmp = mktemp()
+        compTmp = test.makeFileName("crc_compile_output", temporary=1, forComparison=0)
+        plugins.ensureDirExistsForFile(compTmp)
         self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.getcwd())
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
         test.changeState(RunningRuleCompilation(test.state))
@@ -510,7 +510,6 @@ class CompileRules(plugins.Action):
             test.changeState(RuleBuildFailed(briefText, fullText))
         else:
             test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + ruleset + " succesfully compiled"))
-        os.remove(compTmp)
     def getErrorMessage(self, test, ruleset, compTmp):
         maxLength = test.getConfigValue("lines_of_text_difference")
         maxWidth = test.getConfigValue("max_width_text_difference")

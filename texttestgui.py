@@ -42,18 +42,13 @@ class TextTestGUI(ThreadedResponder):
         self.actionThread = None
         self.contents = None
     def readGtkRCFile(self):
-        if not os.environ.has_key("TEXTTEST_GTK_RC_FILE"):
+        configDir = plugins.getPersonalConfigDir()
+        if not configDir:
             return
 
-        file = os.environ["TEXTTEST_GTK_RC_FILE"]
-        if file == "":
-            return
-        elif os.path.isfile(file):
+        file = os.path.join(configDir, ".texttest_gtk")
+        if os.path.isfile(file):
             gtk.rc_add_default_file(file)
-        elif os.path.isfile(os.path.join(os.environ["HOME"], file)):
-            gtk.rc_add_default_file(os.path.join(os.environ["HOME"], file))            
-        elif os.path.isfile(os.path.expanduser(file)):
-            gtk.rc_add_default_file(os.path.expanduser(file))
     def setUpScriptEngine(self):
         guiplugins.setUpGuiLog(self.dynamic)
         global guilog, scriptEngine
@@ -686,10 +681,9 @@ class ApplicationGUI(RightWindowGUI):
             iter = self.itermap[test.app][test]
             self.selection.select_iter(iter)
         self.selection.get_tree_view().grab_focus()
-        if self.app.getConfigValue("auto_scroll_to_first_selected"):
-            first = self.getFirstSelectedTest()
-            if first != None:
-                self.selection.get_tree_view().scroll_to_cell(first, None, True, 0.1)
+        first = self.getFirstSelectedTest()
+        if first != None:
+            self.selection.get_tree_view().scroll_to_cell(first, None, True, 0.1)
         guilog.info("Marking " + str(len(self.getSelectedTests())) + " tests as selected")
     def getFirstSelectedTest(self):
         firstTest = []

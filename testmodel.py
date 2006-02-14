@@ -640,10 +640,9 @@ class Application:
         else:
             return userId, globalTmpDirectory
     def getPersonalConfigFile(self):
-        if os.environ.has_key("TEXTTEST_PERSONAL_CONFIG"):
-            return os.path.join(os.environ["TEXTTEST_PERSONAL_CONFIG"], ".texttest")
-        elif os.name == "posix":
-            return os.path.join(os.environ["HOME"], ".texttest")
+        personalDir = plugins.getPersonalConfigDir()
+        if personalDir:
+            return os.path.join(personalDir, ".texttest")
         else:
             return os.path.join(self.abspath, ".texttest")
     def setConfigDefaults(self):
@@ -663,8 +662,7 @@ class Application:
         self.setConfigDefault("add_shortcut_bar", 1, "Whether or not TextTest's shortcut bar will appear")
         self.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
         self.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
-        self.setConfigDefault("auto_collapse_successful", 0, "Automatically collapse successful test suites?")
-        self.setConfigDefault("auto_scroll_to_first_selected", 0, "Automatically scroll the tree view to the first selected test?")
+        self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
         self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ], \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")

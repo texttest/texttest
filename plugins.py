@@ -192,6 +192,9 @@ class TestState:
 def getDiagnostics(diagName):
     return log4py.Logger().get_instance(diagName)
 
+def getPersonalConfigDir():
+    return os.getenv("TEXTTEST_PERSONAL_CONFIG", os.getenv("HOME"))
+
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):
     if os.environ.has_key("PWD"):

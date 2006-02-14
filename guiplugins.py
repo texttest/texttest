@@ -106,7 +106,7 @@ class InteractiveAction(plugins.Action):
         process = self.startExternalProgram(commandLine, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getTextTestName(self):
-        return "python " + sys.argv[0]
+        return sys.argv[0]
     def describe(self, testObj, postText = ""):
         guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     

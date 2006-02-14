@@ -288,6 +288,7 @@ class Config(CarmenConfig):
         CarmenConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("rave_name", None)
         app.setConfigDefault("rave_static_library", "")
+        app.setConfigDefault("lines_of_crc_compile", 30, "How many lines to present in textual previews of rave compilation failures")
         # dictionary of lists
         app.setConfigDefault("build_targets", { "" : [] })
         app.addConfigEntry("need_rulecompile", "white", "test_colours")
@@ -512,7 +513,7 @@ class CompileRules(plugins.Action):
             test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + ruleset + " succesfully compiled"))
         os.remove(compTmp)
     def getErrorMessage(self, test, ruleset, compTmp):
-        maxLength = test.getConfigValue("lines_of_text_difference")
+        maxLength = test.getConfigValue("lines_of_crc_compile")
         maxWidth = test.getConfigValue("max_width_text_difference")
         previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
         errContents = previewGenerator.getPreview(open(compTmp))

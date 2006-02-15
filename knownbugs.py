@@ -68,6 +68,10 @@ class CheckForBugs(plugins.Action):
 
         self.readBugs(test)
         for stem, entryDict in self.bugMap.items():
+            # bugs are only relevant if the file itself is changed
+            comparison, list = test.state.findComparison(stem)
+            if not comparison:
+                continue
             fileName = test.makeFileName(stem, temporary=1)
             if os.path.isfile(fileName):
                 for line in open(fileName).xreadlines():

@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, performance, plugins, respond, sys, string, time, types, smtplib, shutil
+import os, performance, plugins, respond, sys, string, time, types, smtplib, shutil, testoverview
 from ndict import seqdict
 from cPickle import Pickler
 
@@ -483,14 +483,13 @@ class GenerateHistoricalReport(plugins.Action):
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
     def generateWebPages(self, app, pageDir, extraVersions, relevantSubDirs):
-        from testoverview import colourFinder
-        colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
+        testoverview.colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
         module = app.getConfigValue("interactive_action_module")
         command = "from " + module + " import GenerateWebPages"
         try:
             exec command
         except:
-            from testoverview import GenerateWebPages
+            GenerateWebPages = testoverview.GenerateWebPages
         generator = GenerateWebPages(app.fullName, app.getFullVersion(), pageDir, extraVersions)
         generator.generate(relevantSubDirs)
     def findRelevantSubdirectories(self, repository, app, extraVersions):

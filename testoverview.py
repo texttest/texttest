@@ -9,16 +9,9 @@
 #   texttest -a <app> -s testoverview.GenererateTestStatus <major versions> <minor versions> 
 #
 
-import os, performance, plugins, respond, sys, string, time, types, shutil
+import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors
 from cPickle import Pickler, Unpickler, UnpicklingError
 from ndict import seqdict
-# Make sure this module can be imported even if these two don't exist. Will
-# get errors later on if you actually try to generate the pages but not from
-# running tests normally.
-try:
-    import HTMLgen, HTMLcolors
-except:
-    pass
 
 class ColourFinder:
     def setColourDict(self, colourDict):
@@ -46,7 +39,7 @@ class ColourFinder:
 
 colourFinder = ColourFinder()
 
-class GenerateWebPages(plugins.Action):
+class GenerateWebPages:
     def __init__(self, pageAppName, pageVersion, pageDir, extraVersions):
         self.pageAppName = pageAppName
         self.pageVersion = pageVersion
@@ -181,7 +174,13 @@ class GenerateWebPages(plugins.Action):
         dir = os.path.dirname(stateFile)
         return dir.replace(repository + os.sep, "").replace(os.sep, " ")
     def getTagTimeInSeconds(self, tag):
-        return time.mktime(time.strptime(tag, "%d%b%Y"))
+        try:
+            return time.mktime(time.strptime(tag, "%d%b%Y"))
+        except ValueError:
+            # As the Python docs say, strptime is buggy on some platforms (e.g. parisc)
+            # Seems to work if you insert spaces though...
+            spacedTag = tag[:2] + " " + tag[2:5] + " " + tag[5:]
+            return time.mktime(time.strptime(spacedTag, "%d %b %Y"))
     def getOverviewPageName(self, sel):
         return "test_" + self.pageVersion + sel + ".html"
 

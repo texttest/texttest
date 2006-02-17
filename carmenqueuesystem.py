@@ -40,7 +40,7 @@ def getConfig(optionMap):
     return CarmenConfig(optionMap)
 
 architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris", "ia64_hpux", "x86_64_linux" ]
-majorReleases = [ "8", "9", "10", "11", "12" ]
+majorReleases = [ "8", "9", "10", "11", "12", "master" ]
 
 def getArchitecture(app):
     for version in app.versions:
@@ -51,8 +51,14 @@ def getArchitecture(app):
 def getMajorReleaseId(app):
     for version in app.versions:
         if version in majorReleases:
-            return "carmen_" + version
-    return "master"
+            return fullVersionName(version)
+    return fullVersionName(app.getConfigValue("default_major_release"))
+
+def fullVersionName(version):
+    if version == "master":
+        return version
+    else:
+        return "carmen_" + version
 
 class CarmenSubmissionRules(queuesystem.SubmissionRules):
     def __init__(self, optionMap, test):
@@ -183,6 +189,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def setApplicationDefaults(self, app):
         queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux")
+        app.setConfigDefault("default_major_release", "master")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10)
         app.setConfigDefault("maximum_cputime_for_chunking", 0.0)
     def defaultLoginShell(self):

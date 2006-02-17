@@ -946,6 +946,7 @@ class OptionFinder(plugins.OptionFinder):
     def __init__(self):
         plugins.OptionFinder.__init__(self, sys.argv[1:])
         self.directoryName = os.path.normpath(self.findDirectoryName())
+        os.environ["TEXTTEST_HOME"] = self.directoryName
         self._setUpLogging()
         debugLog.debug(repr(self))
     def _setUpLogging(self):

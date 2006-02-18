@@ -563,7 +563,8 @@ class PrepareWriteDirectory(plugins.Action):
             self.diag.info("Writing " + propFileName + " for " + var + " : " + repr(value))
             file = open(propFileName, "w")
             for subVar, subValue in value.items():
-                file.write(subVar + " = " + subValue + "\n")
+                # Don't write windows separators, they get confused with escape characters...
+                file.write(subVar + " = " + subValue.replace(os.sep, "/") + "\n")
     def getInterruptActions(self):
         # This can take a very long time, best to let it be interrupted...
         return []

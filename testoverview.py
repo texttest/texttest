@@ -1,17 +1,10 @@
-#
-# This file contains two scripts, ExtractTestStates and GenererateTestStatus.
-# The purpose of these scripts is to generate a historical overview (in HTML) of how
-# the tests has operated over a period of time.
-#
-# The second script reads all the data in the testoverview repository and build up the relevant
-# HTML pages. These are saved in the directory pointed out by the testoverview_pages config value.
-#
-#   texttest -a <app> -s testoverview.GenererateTestStatus <major versions> <minor versions> 
-#
+# Code to generate HTML report of historical information. This report generated
+# either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
 import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors
 from cPickle import Pickler, Unpickler, UnpicklingError
 from ndict import seqdict
+HTMLgen.PRINTECHO = 0
 
 class ColourFinder:
     def setColourDict(self, colourDict):
@@ -166,10 +159,16 @@ class GenerateWebPages:
                 self.pagesDetails[tag].append(HTMLgen.Heading(1, tag + " - detailed test results for ", self.pageAppName, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
     def writePages(self):
-        for sel in self.pagesOverview.keys():
-            self.pagesOverview[sel].write(os.path.join(self.pageDir, self.getOverviewPageName(sel)))
+        print "Writing overview pages..."
+        for sel, page in self.pagesOverview.items():
+            pageName = self.getOverviewPageName(sel)
+            page.write(os.path.join(self.pageDir, pageName))
+            print "wrote: '" + pageName + "'"
+        print "Writing detail pages..."
         for tag, page in self.pagesDetails.items():
-            page.write(os.path.join(self.pageDir, getDetailPageName(self.pageVersion, tag)))
+            pageName = getDetailPageName(self.pageVersion, tag)
+            page.write(os.path.join(self.pageDir, pageName))
+            print "wrote: '" + pageName + "'"
     def getTestIdentifier(self, stateFile, repository):
         dir = os.path.dirname(stateFile)
         return dir.replace(repository + os.sep, "").replace(os.sep, " ")

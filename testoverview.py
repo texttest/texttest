@@ -112,7 +112,7 @@ class GenerateWebPages:
     def processTestStateFile(self, stateFile, categoryHandler, loggedTests, tagsFound, repository):
         state = self.readState(stateFile)
         if not state:
-            print "Ignoring file at", stateFile
+            print "Ignoring file at", stateFile.replace(os.sep, "/")
             return
 
         tag = os.path.basename(stateFile).split("_")[-1]

@@ -603,17 +603,18 @@ class SelectTests(guiplugins.SelectTests):
                     self.addSwitch(oldOptionGroup, featureName, featureName, 0)
                     self.features.append(featureName)
     def getSelectedTests(self, rootTestSuites):
-        tests = guiplugins.SelectTests.getSelectedTests(self, rootTestSuites)
+        tests, testCmd = guiplugins.SelectTests.getSelectedTests(self, rootTestSuites)
         selectedFeatures = self.getSelectedFeatures()
         if len(selectedFeatures) == 0:
-            return tests
+            return tests, testCmd
         selectedTests = []
         grepCommand = "grep -E '" + string.join(selectedFeatures, "|") + "'"
         for test in tests:
             logFile = test.makeFileName("output")
             if os.system("tail -100 " + logFile + " | " + grepCommand + " > /dev/null 2>1") == 0:
                 selectedTests.append(test)
-        return selectedTests
+        # There is no way to select features from the command line...
+        return selectedTests, None
     def getSelectedFeatures(self):
         result = []
         for feature in self.features:

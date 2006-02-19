@@ -467,7 +467,8 @@ class SelectTests(InteractiveAppAction):
             newTests = self.getTestsFromSuite(suite, filters)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
-        return selectedTests
+        commandLines = self.optionGroup.getCommandLines()
+        return selectedTests, string.join(commandLines)
     def getTestsFromSuite(self, suite, filters):
         if not suite.isAcceptedByAll(filters):
             return []
@@ -502,7 +503,7 @@ class ResetGroups(InteractiveAppAction):
         return "R_eset"
     def getScriptTitle(self):
         return "Reset running options"
-    def performOn(self, app, selTests):
+    def performOn(self, app, selTests, selCmd):
         for group in app.optionGroups:
             group.reset()
 
@@ -537,7 +538,7 @@ class SaveSelection(InteractiveAppAction):
         else:
             commandLines = self.selectionGroup.getCommandLines()
             return string.join(commandLines)
-    def performOn(self, app, selTests):
+    def performOn(self, app, selTests, selCmd):
         fileName = self.getFileName(app)
         toWrite = self.getTextToSave(app, selTests)
         file = open(fileName, "w")
@@ -565,11 +566,11 @@ class RunTests(InteractiveAppAction):
         return "_Run Tests"
     def getScriptTitle(self):
         return "Run selected tests"
-    def performOn(self, app, selTests):
+    def performOn(self, app, selTests, selCmd):
         selTestCases = filter(self.isTestCase, selTests)
         if len(selTestCases) == 0:
             raise plugins.TextTestError, "No tests selected - cannot run!"
-        ttOptions = string.join(self.getTextTestOptions(app, selTestCases))
+        ttOptions = string.join(self.getTextTestOptions(app, selTestCases, selCmd))
         app.makeWriteDirectory()
         logFile = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber) + ".log")
         errFile = os.path.join(app.writeDirectory, "dynamic_errors" + str(self.runNumber) + ".log")
@@ -584,12 +585,15 @@ class RunTests(InteractiveAppAction):
             errText = open(errFile).read()
             if len(errText):
                 raise plugins.TextTestError, "Dynamic run failed, with the following errors:\n" + errText
-    def getTextTestOptions(self, app, selTests):
+    def getTextTestOptions(self, app, selTests, selCmd):
         ttOptions = [ "-a " + app.name ]
         ttOptions += self.invisibleGroup.getCommandLines()
         for group in self.optionGroups:
             ttOptions += group.getCommandLines()
-        ttOptions.append(self.getSelectionOption(selTests))
+        if selCmd is None:
+            ttOptions.append(self.getSelectionOption(selTests))
+        else:
+            ttOptions.append(selCmd)
         return ttOptions
 
 class EnableDiagnostics(InteractiveAction):

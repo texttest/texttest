@@ -652,6 +652,8 @@ class ApplicationGUI(RightWindowGUI):
         self.app = app
         RightWindowGUI.__init__(self, app, 1)
         self.selection = selection
+        self.lastSelectionTests = []
+        self.lastSelectionCmd = ""
         self.itermap = {}
         for test, iter in itermap.items():
             if not self.itermap.has_key(test.app):
@@ -673,11 +675,15 @@ class ApplicationGUI(RightWindowGUI):
         if isinstance(action, guiplugins.SelectTests):
             self.selectTests(action)
         else:
-            action.performOn(self.app, self.getSelectedTests())
+            selTests = self.getSelectedTests()
+            selCmd = None
+            if selTests == self.lastSelectionTests:
+                selCmd = self.lastSelectionCmd
+            action.performOn(self.app, self.getSelectedTests(), selCmd)
     def selectTests(self, action):
-        selectedTests = action.getSelectedTests(self.getRootSuites())
+        self.lastSelectionTests, self.lastSelectionCmd = action.getSelectedTests(self.getRootSuites())
         self.selection.unselect_all()
-        for test in selectedTests:
+        for test in self.lastSelectionTests:
             iter = self.itermap[test.app][test]
             self.selection.select_iter(iter)
         self.selection.get_tree_view().grab_focus()

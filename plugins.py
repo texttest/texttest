@@ -486,11 +486,14 @@ class UNIXProcessHandler:
 class WindowsProcessHandler:
     def __init__(self):
         self.processManagement = 1
+        self.diag = None
         stdout = os.popen("handle none").read()
         if stdout.find("administrator") != -1:
             print "Cannot determine process IDs: possibly lack of administrator rights for 'handle'"
             self.processManagement = 0
     def spawnProcess(self, commandLine, shellTitle, holdShell):
+        if not self.diag:
+            self.diag = getDiagnostics("Windows Processes")
         # Start the process in a subshell so redirection works correctly
         args = [os.environ["COMSPEC"], self.getShellOptions(holdShell), commandLine ]
         processHandle = os.spawnv(os.P_NOWAIT, args[0], args)
@@ -500,6 +503,7 @@ class WindowsProcessHandler:
         # on the process running in it. Unlike UNIX, killing the shell is not enough!
         cmdProcId = self.findProcessId(processHandle)
         if not cmdProcId:
+            self.diag.info("Process Handle " + str(processHandle) + " has already exited!")
             # The process may have already exited by this point, don't crash if so!
             return None, processHandle
         for subProcId, subProcHandle in self.findChildProcessesWithHandles(cmdProcId):
@@ -556,8 +560,11 @@ class WindowsProcessHandler:
             sys.stderr.write("Unexpected output from pslist for " + str(processId) + ": \n" + repr(words) + "\n")
             return 1
     def getCpuTime(self, processId):
+        if not self.diag:
+            self.diag = getDiagnostics("Windows Processes")
         words = self.getPsWords(processId)
         cpuEntry = words[6]
+        self.diag.info("Cpu time for " + str(processId) + " is " + cpuEntry)
         try:
             hours, mins, seconds = cpuEntry.split(":")
             return 3600 * float(hours) + 60 * float(mins) + float(seconds)
@@ -638,7 +645,7 @@ class BackgroundProcess(Process):
     def doFork(self):
         self.processId, self.processHandle = self.processHandler.spawnProcess(self.commandLine, self.shellTitle, self.holdShell)
     def waitForStart(self):
-        while self.processId == None:
+        while self.processHandle is None:
             time.sleep(0.1)
     def runExitHandler(self):
         if self.exitHandler:

@@ -806,6 +806,7 @@ class RunTest(plugins.Action):
         process = plugins.BackgroundProcess(testCommand, testRun=1)
         # Working around Python bug
         test.changeState(Pending(process))
+        self.diag.info("Waiting for process start...")
         process.waitForStart()
         if not inChild:
             self.changeToRunningState(test, process)
@@ -983,12 +984,18 @@ class CreateCatalogue(plugins.Action):
             return os.path.realpath(fullPath)
         else:
             return plugins.modifiedTime(fullPath)
+    def editInfoChanged(self, fullPath, oldInfo, newInfo):
+        if os.path.islink(fullPath):
+            return oldInfo != newInfo
+        else:
+            # Allow one second error margin, seems necessary on Windows...
+            return newInfo - oldInfo > 1
     def findDifferences(self, oldPaths, newPaths, writeDir):
         pathsGained, pathsEdited, pathsLost = [], [], []
         for path, modTime in newPaths.items():
             if not oldPaths.has_key(path):
                 pathsGained.append(self.outputPathName(path, writeDir))
-            elif modTime != oldPaths[path]:
+            elif self.editInfoChanged(path, oldPaths[path], modTime):
                 pathsEdited.append(self.outputPathName(path, writeDir))
         for path, modTime in oldPaths.items():
             if not newPaths.has_key(path):

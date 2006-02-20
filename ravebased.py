@@ -424,19 +424,15 @@ class FilterRuleBuilds(plugins.Action):
             return
         
         targetName = ruleset.targetFile
+        # We WAIT here to avoid race conditions - make sure everyone knows the state of their
+        # rule compilations before we start any of them.
         if self.rulesCompiled.has_key(targetName):
             test.changeState(NeedRuleCompilation(ruleset.name, self.rulesCompiled[targetName]))
-            return
+            return self.WAIT
         ruleset.backup()
         self.rulesCompiled[targetName] = test
-        if ruleset.precompiled:
-            root = os.path.dirname(ruleset.targetFile)
-            if not os.path.isdir(root):
-                os.makedirs(root)
-            shutil.copyfile(ruleset.precompiled, ruleset.targetFile)
-            self.describe(test, " - copying precompiled ruleset " + ruleset.name)
-        else:
-            test.changeState(NeedRuleCompilation(self.getRuleSetName(test)))
+        test.changeState(NeedRuleCompilation(self.getRuleSetName(test)))
+        return self.WAIT
     def setUpApplication(self, app):
         self.raveName = app.getConfigValue("rave_name")
     def shouldCompileFor(self, test, ruleset):
@@ -655,14 +651,6 @@ class RuleSet:
             return
         self.sourceFile = self.sourcePath(self.name)
         self.targetFile = self.targetPath("rule_set", raveName, arch, self.name)
-        self.precompiled = None
-        if not os.path.isfile(self.sourceFile):
-            # Might be a test rule set, have a try
-            parts = self.name.split(".")
-            if len(parts) == 2 and os.path.isdir("/users/" + parts[1]):
-                self.sourceFile = self.sourcePath(parts[0])
-                self.precompiled = self.targetPath("rule_set", raveName, arch, parts[0])
-                self.targetFile = self.targetPath("test_rule_set", raveName, arch, self.name)
     def isValid(self):
         return self.name and os.path.isfile(self.sourceFile)
     def isCompiled(self):

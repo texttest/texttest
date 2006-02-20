@@ -724,7 +724,7 @@ class Application:
     def useSlowMotion(self):
         return self.inputOptions.has_key("actrep")
     def getRunOptions(self):
-        return "-d " + self.abspath + " -a " + self.name + self.versionSuffix() \
+        return "-d " + self.inputOptions.directoryName + " -a " + self.name + self.versionSuffix() \
                + " -c " + self.checkout + " " + self.configObject.getRunOptions()
     def addToOptionGroup(self, group):
         if group.name.startswith("Select"):

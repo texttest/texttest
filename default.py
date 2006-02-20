@@ -356,7 +356,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
         app.setConfigDefault("batch_result_repository", { "default" : "" }, "Directory to store historical batch results under")
         app.setConfigDefault("historical_report_location", { "default" : "" }, "Directory to create reports on historical batch data under")
-        app.setConfigDefault("testoverview_colours", self.getDefaultTestOverviewColours())
+        app.setConfigDefault("testoverview_colours", self.getDefaultTestOverviewColours(), "Colours to use for historical batch HTML reports")
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
         app.setConfigDefault("batch_timelimit", { "default" : None }, "Maximum length of test to include in batch mode runs")
@@ -1413,7 +1413,11 @@ class DocumentScripts(plugins.Action):
                 try:
                     exec constructCommand
                 except TypeError:
-                    continue
+                    constructWithArgCmd = "obj = " + scriptName + '([ "before=21Jan2006" ])'
+                    try:
+                        exec constructWithArgCmd
+                    except:
+                        continue
                 try:
                     docString = obj.scriptDoc()
                     print scriptName + "|" + docString

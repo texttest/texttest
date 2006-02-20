@@ -420,7 +420,7 @@ class TextTest:
             if testSuite.size() == 0:
                 if not app in extraVersions:
                     sys.stderr.write("No tests matching the selection criteria found for " + app.description() + "\n")
-                continue
+#                continue
             try:
                 actionSequence = self.inputOptions.getActionSequence(app)
                 actionRunner.addTestActions(testSuite, actionSequence)
@@ -458,8 +458,8 @@ class TextTest:
             self.deleteTempFiles(appSuites)
     def runWithTests(self, ownThreadResponder, appSuites):                
         actionRunner = self.createActionRunner(appSuites)
-        if actionRunner.isEmpty():
-            return # error already printed
+#        if actionRunner.isEmpty():
+#            return # error already printed
         
         if ownThreadResponder:
             actionThread = ActionThread(actionRunner)

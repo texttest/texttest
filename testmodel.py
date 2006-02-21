@@ -224,8 +224,12 @@ class TestCase(Test):
     def setUseCaseEnvironment(self):
         if self.useJavaRecorder():
             self.properties.addEntry("jusecase", {}, insert=1)
-        self.setRecord(self.makeFileName("usecase", temporary=1), self.makeFileName("input", temporary=1))
-        self.setReplay(self.findReplayUseCase())
+        usecaseFile = self.findReplayUseCase()
+        if usecaseFile:
+            self.setReplay(usecaseFile)
+        if os.path.isfile(self.useCaseFile) or self.app.useSlowMotion() or os.path.isfile(self.inputFile):
+            # slow motion implies recording a use case
+            self.setRecord(self.makeFileName("usecase", temporary=1), self.makeFileName("input", temporary=1))
     def findReplayUseCase(self):
         if os.path.isfile(self.useCaseFile):
             return self.useCaseFile
@@ -235,10 +239,7 @@ class TestCase(Test):
         return self.app.getConfigValue("use_case_recorder") == "jusecase"
     def addJusecaseProperty(self, name, value):
         self.properties.addEntry(name, value, sectionName="jusecase", insert=1)
-    def setReplay(self, replayScript):
-        if not replayScript:
-            return
-        
+    def setReplay(self, replayScript):        
         if self.useJavaRecorder():
             self.addJusecaseProperty("replay", replayScript)
         else:
@@ -250,6 +251,7 @@ class TestCase(Test):
             else:
                 self.environment["USECASE_REPLAY_DELAY"] = str(replaySpeed)
     def setRecord(self, recordScript, recinpScript = None):
+        debugLog.info("Enabling recording")
         if recordScript:
             if self.useJavaRecorder():
                 self.addJusecaseProperty("record", recordScript)

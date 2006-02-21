@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.20 2006/01/27 17:33:11 perb Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.21 2006/02/21 13:34:15 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -83,6 +83,7 @@ class ImportTestSuite(ravebased.ImportTestSuite):
 class ImportTestCase(guiplugins.ImportTestCase):
     newMacroString = "<Record new macro>"
     def addDefinitionFileOption(self, suite, oldOptionGroup):
+        guiplugins.ImportTestCase.addDefinitionFileOption(self, suite, oldOptionGroup)
         # Don't use oldOptionGroup, we probably don't want the same macro more than once
         self.optionGroup.addOption("mac", "Macro to use", self.newMacroString, self.getExistingMacros(suite))
     def getExistingMacros(self, suite):
@@ -100,8 +101,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
                     macros.append(os.path.join(userDir, macro))
         return macros
     def writeDefinitionFiles(self, suite, testDir):
-        optionFile = self.getWriteFile("options", suite, testDir)
-        optionFile.write("\n")
+        guiplugins.ImportTestCase.writeDefinitionFiles(self, suite, testDir)
         macroToImport = self.optionGroup.getOptionValue("mac")
         if macroToImport != self.newMacroString:
             usecaseFile = self.getWriteFileName("usecase", suite, testDir)

@@ -298,9 +298,6 @@ class Config(plugins.Configuration):
         print "\nPython scripts: (as given to -s <module>.<class> [args])"
         print "--------------------------------------------------------"
         self.printHelpScripts()
-    def defaultLoginShell(self):
-        # For UNIX
-        return "sh"
     def defaultSeverities(self):
         severities = {}
         severities["errors"] = 1
@@ -372,8 +369,6 @@ class Config(plugins.Configuration):
         if os.name == "posix":
             app.setConfigDefault("virtual_display_machine", [], \
                                  "(UNIX) List of machines to run virtual display server (Xvfb) on")
-            app.setConfigDefault("login_shell", self.defaultLoginShell(), \
-                                 "(UNIX) Which shell to use when starting processes")
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):

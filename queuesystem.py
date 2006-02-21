@@ -149,6 +149,9 @@ class QueueSystemConfig(default.Config):
             return MachineInfoFinder()
         else:
             return default.Config.getMachineInfoFinder(self)
+    def defaultLoginShell(self):
+        # For UNIX
+        return "sh"
     def isSlowdownJob(self, jobUser, jobName):
         return 0
     def printHelpDescription(self):
@@ -161,6 +164,8 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "'*'", "(SGE) Which SGE parallel environment to use when SUT is parallel")
+        app.setConfigDefault("login_shell", self.defaultLoginShell(), \
+                             "Which shell to use when starting remote processes")
 
 class SubmissionRules:
     def __init__(self, optionMap, test):

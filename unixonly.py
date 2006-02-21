@@ -6,7 +6,6 @@ from socket import gethostname
 class RunTest(default.RunTest):
     def __init__(self):
         default.RunTest.__init__(self)
-        self.loginShell = None
         self.testDisplay = None
         self.realDisplay = os.getenv("DISPLAY")
     def __call__(self, test, inChild=0):
@@ -23,14 +22,8 @@ class RunTest(default.RunTest):
         cmdFile = test.makeFileName("cmd", temporary=1, forComparison=0)
         self.buildCommandFile(test, cmdFile, testCommand)
         unixPerfFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
-        timedTestCommand = '\\time -p ' + self.loginShell + ' ' + cmdFile + ' 2> ' + unixPerfFile
+        timedTestCommand = '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
         return timedTestCommand
-    def getStdErrRedirect(self, command, file):
-        # C-shell based shells have different syntax here...
-        if self.loginShell.find("csh") != -1:
-            return "( " + command + " ) >& " + file
-        else:
-            return default.RunTest.getStdErrRedirect(self, command, file)        
     def buildCommandFile(self, test, cmdFile, testCommand):
         f = plugins.openForWrite(cmdFile)
         f.write(testCommand + "\n")
@@ -38,7 +31,6 @@ class RunTest(default.RunTest):
         return cmdFile
     def setUpApplication(self, app):
         default.RunTest.setUpApplication(self, app)
-        self.loginShell = app.getConfigValue("login_shell")
         self.setUpVirtualDisplay(app)
     def setUpVirtualDisplay(self, app):
         finder = VirtualDisplayFinder(app)

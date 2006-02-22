@@ -983,8 +983,12 @@ class CreateCatalogue(plugins.Action):
         if os.path.islink(fullPath):
             return oldInfo != newInfo
         else:
-            # Allow one second error margin, seems necessary on Windows...
-            return newInfo - oldInfo > 1
+            try:
+                # Allow one second error margin, seems necessary on Windows...
+                return newInfo - oldInfo > 1
+            except ValueError:
+                # Handle the case where a link becomes a normal file
+                return oldInfo != newInfo
     def findDifferences(self, oldPaths, newPaths, writeDir):
         pathsGained, pathsEdited, pathsLost = [], [], []
         for path, modTime in newPaths.items():

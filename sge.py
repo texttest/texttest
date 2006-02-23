@@ -38,12 +38,13 @@ class QueueSystem:
     def getJobId(self, line):
         return line.split()[2]
     def findJobId(self, stdout):
+        jobId = ""
         for line in stdout.readlines():
             if line.find("has been submitted") != -1:
-                return self.getJobId(line)
+                jobId = self.getJobId(line)
             else:
                 print "Unexpected output from qsub :", line.strip()
-        return ""
+        return jobId
     def getJobFailureInfo(self, jobId):
         trials = 10
         sleepTime = 0.5

@@ -394,7 +394,7 @@ class PrepareWriteDirectory(plugins.Action):
         if test.app.useDiagnostics:
             plugins.ensureDirectoryExists(os.path.join(test.writeDirectory, "Diagnostics"))
     def collatePaths(self, test, configListName, collateMethod):
-        for configName in test.getConfigValue(configListName):
+        for configName in test.getConfigValue(configListName, expandVars=False):
             self.collatePath(test, configName, collateMethod)
     def collatePath(self, test, configName, collateMethod):
         sourcePath = self.getSourcePath(test, configName)
@@ -404,6 +404,7 @@ class PrepareWriteDirectory(plugins.Action):
         collateMethod(test, sourcePath, target)
         envVarToSet = self.findEnvironmentVariable(test, configName)
         if envVarToSet:
+            self.diag.info("Setting env. variable " + envVarToSet + " to " + target)
             test.environment[envVarToSet] = target
             test.previousEnv[envVarToSet] = sourcePath
     def getSourcePath(self, test, configName):
@@ -413,6 +414,7 @@ class PrepareWriteDirectory(plugins.Action):
         else:
             return test.makePathName(configName, test.abspath)
     def findEnvironmentVariable(self, test, configName):
+        self.diag.info("Finding env. var name from " + configName)
         if configName.startswith("$"):
             return configName[1:]
         envVarDict = test.getConfigValue("test_data_environment")

@@ -116,8 +116,8 @@ class Test:
                 debugLog.info("Chosen " + versionName)
                 return nonVersionName + "." + version
         return nonVersionName
-    def getConfigValue(self, key):
-        return self.app.getConfigValue(key)
+    def getConfigValue(self, key, expandVars=True):
+        return self.app.getConfigValue(key, expandVars)
     def makePathName(self, fileName, startDir):
         fullPath = os.path.join(startDir, fileName)
         if os.path.exists(fullPath) or startDir == self.app.abspath:
@@ -875,8 +875,10 @@ class Application:
             header += "-"
         print header
         self.configObject.printHelpText()
-    def getConfigValue(self, key):
+    def getConfigValue(self, key, expandVars=True):
         value = self.configDir[key]
+        if not expandVars:
+            return value
         if type(value) == types.StringType:
             return os.path.expandvars(value)
         elif type(value) == types.ListType:

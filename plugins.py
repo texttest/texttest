@@ -760,7 +760,7 @@ class OptionGroup:
         commandLines = []
         for key, option in self.options.items():
             if len(option.getValue()):
-                commandLines.append("-" + key + " " + option.getValue())
+                commandLines.append("-" + key + " '" + option.getValue() + "'")
         for key, switch in self.switches.items():
             if switch.getValue():
                 commandLines.append("-" + key)

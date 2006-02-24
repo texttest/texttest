@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.21 2006/02/21 13:34:15 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.22 2006/02/24 16:24:41 geoff Exp $
 #
 import ravebased, os, plugins, guiplugins, shutil
 
@@ -30,7 +30,12 @@ class StudioConfig(ravebased.Config):
             return ""
         headerFile = os.path.join(subplanDir, "subplanHeader")
         origPath = self.findOrigRulePath(headerFile)
-        return os.path.basename(origPath)
+        rulesetName = os.path.basename(origPath)
+        if self.macroBuildsRuleset(test, rulesetName):
+            # Don't want to manage the ruleset separately if the macro is going to build it...
+            return ""
+        else:
+            return rulesetName
     def findOrigRulePath(self, headerFile):
         if not os.path.isfile(headerFile):
             return ""
@@ -71,6 +76,14 @@ class StudioConfig(ravebased.Config):
                 return line
             elif line.find("OPEN_PLAN") != -1:
                 useNext = 1
+    def macroBuildsRuleset(self, test, rulesetName):
+        macroFile = test.useCaseFile
+        if not os.path.isfile(macroFile):
+            return False
+        for line in open(macroFile).xreadlines():
+            if line.find("Build ruleset " + rulesetName) != -1:
+                return True
+        return False
     
 # Graphical import suite. Basically the same as those used for optimizers
 class ImportTestSuite(ravebased.ImportTestSuite):

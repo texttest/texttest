@@ -202,8 +202,8 @@ class CollateFiles(default.CollateFiles):
             prevLine = line
             # Sometimes you get enormous stacktraces from GDB, for example, if you have
             # an infinite recursive loop.
-            if printedStackLines >= 30:
-                writeFile.write("Stack trace print-out aborted after 30 function calls" + "\n")
+            if printedStackLines >= 100:
+                writeFile.write("Stack trace print-out aborted after 100 function calls" + "\n")
                 break
         return foundStack
     def writeGdbErrors(self, stderrFile, writeFile):

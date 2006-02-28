@@ -26,11 +26,11 @@ class Config(plugins.Configuration):
             elif group.name.startswith("What"):
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
-                if self.isolatesDataUsingCatalogues(app):
-                    group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("How"):
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("noperf", "Disable any performance testing")
+                if self.isolatesDataUsingCatalogues(app):
+                    group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("Invisible"):
                 # Only relevant without the GUI
                 group.addSwitch("g", "use dynamic GUI", 1)

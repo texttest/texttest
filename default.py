@@ -463,9 +463,6 @@ class PrepareWriteDirectory(plugins.Action):
         # Linking doesn't exist on windows!
         if os.name != "posix":
             return self.copyTestPath(test, fullPath, target)
-        if os.path.exists(target):
-            print "WARNING : cannot link", target, "to", fullPath, " - it already exists!"
-            return
         if os.path.exists(fullPath):
             os.symlink(fullPath, target)
     def partialCopyTestPath(self, test, sourcePath, targetPath):

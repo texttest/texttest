@@ -444,9 +444,16 @@ class ArchiveRepository(plugins.Action):
             date = self.dateInSeconds(dateStr)
             if self.shouldArchiveFor(date):
                 fullPath = os.path.join(testDir, file)
-                targetPath = fullPath.replace(os.sep + test.app.name + os.sep, os.sep + test.app.name + "_history" + os.sep)
+                targetPath = self.getTargetPath(fullPath, test.app.name)
                 plugins.ensureDirExistsForFile(targetPath)
                 os.rename(fullPath, targetPath)
+    def getTargetPath(self, fullPath, appName):
+        parts = fullPath.split(os.sep)
+        parts.reverse()
+        appIndex = parts.index(appName)
+        parts[appIndex] = appName + "_history"
+        parts.reverse()
+        return string.join(parts, os.sep)
     def shouldArchiveFor(self, date):
         if self.beforeDate and date >= self.beforeDate:
             return False

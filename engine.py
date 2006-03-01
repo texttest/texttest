@@ -55,6 +55,7 @@ class TestRunner:
             self.diag.info("<-End Performing action " + str(action) + self.returnString(completed, tryOthersNow))
             if completed:
                 if self.test.state.shouldAbandon():
+                    self.diag.info("Abandoning test...")
                     self.actionSequence = []
                     break
                 else:
@@ -211,6 +212,7 @@ class ActionRunner:
     def run(self):
         try:
             self.runNormal()
+            self.diag.info("Finishing - notifying all completed")
             for responder in testmodel.Test.observers:
                 responder.notifyAllComplete()
         except KeyboardInterrupt, e:

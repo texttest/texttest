@@ -74,7 +74,7 @@ class SocketResponder(Responder):
         pickleData = dumps(test.state)
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect(sendSocket)
-        sendSocket.sendall(testData + os.linesep + pickleData)
+        sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
         sendSocket.close()
     
 class QueueSystemConfig(default.Config):
@@ -235,14 +235,32 @@ class SubmissionRules:
 
 class SlaveRequestHandler(StreamRequestHandler):
     def handle(self):
+        clientPid = self.rfile.readline().strip()
         testString = self.rfile.readline().strip()
         test = self.server.getTest(testString)
-        test.loadState(self.rfile)
+        clientHost, clientPort = self.client_address
+        # Don't use port, it changes all the time
+        clientInfo = (clientHost, clientPid)
+        if self.server.clientCorrect(test, clientInfo):
+            test.loadState(self.rfile)
+            if test.state.hasStarted():
+                self.server.storeClient(test, clientInfo)
+        else:
+            expectedHost, expectedPid = self.server.testClientInfo[test]
+            sys.stderr.write("WARNING : unexpected TextTest slave for " + repr(test) + " connected from " + \
+                             self.getHostName(clientHost) + " (process " + clientPid + ")\n")
+            sys.stderr.write("Slave already registered from " + self.getHostName(expectedHost) + " (process " + expectedPid + ")\n")
+            sys.stderr.write("Ignored all communication from this unexpected TextTest slave")
+            sys.stderr.flush()
+    def getHostName(self, ipAddress):
+        name, aliasList, ipList = socket.gethostbyaddr(ipAddress)
+        return name
 
 class SlaveServer(TCPServer):
     def __init__(self):
         TCPServer.__init__(self, (socket.gethostname(), 0), SlaveRequestHandler)
         self.testMap = {}
+        self.testClientInfo = {}
         self.diag = plugins.getDiagnostics("Slave Server")
     def testSubmitted(self, test):
         testPath = test.getRelPath()
@@ -254,6 +272,14 @@ class SlaveServer(TCPServer):
         self.diag.info("Received request for '" + testString + "'")
         appName, testPath = testString.split(":")
         return self.testMap[appName][testPath]
+    def clientCorrect(self, test, clientInfo):
+        # Only allow one client per test!
+        if self.testClientInfo.has_key(test):
+            return self.testClientInfo[test] == clientInfo
+        else:
+            return True
+    def storeClient(self, test, clientInfo):
+        self.testClientInfo[test] = clientInfo
     
 class QueueSystemServer:
     instance = None

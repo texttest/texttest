@@ -1456,6 +1456,13 @@ class TestGraph:
                 averager.addGraph(plotLine.graph)
                 if not averager.plotLineRepresentant:
                     averager.plotLineRepresentant = plotLine
+    def isDate(self, version):
+        if len(version) != 6:
+            return None
+        dateEntry = re.findall(r'[0-9]{6}', version)
+	if len(dateEntry) == 0:
+            return None
+        return dateEntry[0]        
     def createPlotLinesForTest(self, test):
         logFileStem = test.app.getConfigValue("log_file")
         searchInUser = self.optionGroup.getOptionValue("tu")
@@ -1473,23 +1480,46 @@ class TestGraph:
             if versionItem.find(":") == -1:
                 versionName = version = versionItem
                 scaling = None
+                date = None
             else:
                 tmp = versionItem.split(":")
                 version = tmp[0]
-                scaling = float(tmp[1])
+                if len(tmp[1]) > 0:
+                    scaling = float(tmp[1])
+                else:
+                    scaling = None
                 versionName = version + " scaling " + str(scaling)
+                if len(tmp) == 3 and self.isDate(tmp[2]):
+                    date = self.isDate(tmp[2])
+                else:
+                    date = None
             if version:
-                if not noTmp:
-                    logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
-                    foundTmp, logFile = logFileFinder.findFile(version)
-                    if foundTmp:
-                        self.createPlotLines(versionName + "run", logFile, test, scaling)
-                logFile = test.makeFileName(logFileStem, version)
-                isExactMatch = logFile.endswith(version)
-                if not onlyExactMatch and not isExactMatch:
-                    print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
-                if not (onlyExactMatch and not isExactMatch):
-                    self.createPlotLines(versionName, logFile, test, scaling)
+                if date:
+                    originalLogFileName = test.makeFileName(logFileStem, version)
+                    CVSLogFileName = test.makeFileName(logFileStem + "_" + date, version, temporary = 1)
+                    # We may already have checked out the file.
+                    if not os.path.isfile(CVSLogFileName):
+                        try:
+                            os.makedirs(os.path.dirname(CVSLogFileName))
+                        except OSError:
+                            pass
+                        stdin, stdout, stderr = os.popen3("cvs -q upd -p -D " + date + " " + originalLogFileName + " > " + CVSLogFileName)
+                        if len(stderr.readlines()) > 0:
+                            print os.path.basename(originalLogFileName), "is not in the CVS repository at", date
+                        else:
+                            self.createPlotLines("CVS " + date, CVSLogFileName, test, None)
+                else:
+                    if not noTmp:
+                        logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
+                        foundTmp, logFile = logFileFinder.findFile(version)
+                        if foundTmp:
+                            self.createPlotLines(versionName + "run", logFile, test, scaling)
+                    logFile = test.makeFileName(logFileStem, version)
+                    isExactMatch = logFile.endswith(version)
+                    if not onlyExactMatch and not isExactMatch:
+                        print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
+                    if not (onlyExactMatch and not isExactMatch):
+                        self.createPlotLines(versionName, logFile, test, scaling)
 
 class PlotEngine:
     def __init__(self, testGraph):
@@ -1652,9 +1682,9 @@ class PlotEngineMPL:
         return new
     def getLineSize(self, plotLine):
         if plotLine.plotLineRepresentant:
-            return 2
+            return 1.5
         else:
-            return 1
+            return 0.75
     def getMarker(self, plotLine):
         if plotLine.plotLineRepresentant:
             return ""

@@ -988,7 +988,7 @@ class CreateCatalogue(plugins.Action):
             try:
                 # Allow one second error margin, seems necessary on Windows...
                 return newInfo - oldInfo > 1
-            except ValueError:
+            except:
                 # Handle the case where a link becomes a normal file
                 return oldInfo != newInfo
     def findDifferences(self, oldPaths, newPaths, writeDir):

@@ -33,9 +33,14 @@ class QueueSystem:
                 return 0
         return 1
     def getJobFailureInfo(self, jobId):
-        return os.popen("bjobs -a -l " + jobId).read()
+        resultOutput = os.popen("bjobs -a -l " + jobId + " 2>&1").read()
+        if resultOutput.find("is not found") != -1:
+            return "LSF lost job:" + jobId
+        else:
+            return resultOutput
     def killJob(self, jobId):
-        os.system("bkill -s USR1 " + jobId + " > /dev/null 2>&1")
+        resultOutput = os.popen("bkill -s USR1 " + jobId + " 2>&1").read()
+        return resultOutput.find("is being terminated") != -1 
     def getJobId(self, line):
         word = line.split()[1]
         return word[1:-1]

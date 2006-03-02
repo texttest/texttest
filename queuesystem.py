@@ -331,12 +331,12 @@ class QueueSystemServer:
         return queueSystem.getJobFailureInfo(jobId)
     def killJob(self, test):
         if not self.jobs.has_key(test) or test in self.killedTests:
-            return None, None
+            return False, None, None
         queueSystem = self.getQueueSystem(test)
         jobId, jobName = self.jobs[test]
-        queueSystem.killJob(jobId)
+        jobExisted = queueSystem.killJob(jobId)
         self.killedTests.append(test)
-        return jobId, jobName
+        return jobExisted, jobId, jobName
     def getQueueSystem(self, test):
         queueModule = test.app.getConfigValue("queue_system_module").lower()
         if self.queueSystems.has_key(queueModule):
@@ -443,7 +443,7 @@ class KillTestSubmission(plugins.Action):
     def __repr__(self):
         return "Cancelling"
     def __call__(self, test):
-        jobId, jobName = self.performKill(test)
+        jobExisted, jobId, jobName = self.performKill(test)
         if not jobId:
             return
 
@@ -451,13 +451,22 @@ class KillTestSubmission(plugins.Action):
         if str(sys.exc_value) == "Interrupted externally":
             raise plugins.TextTestError, "interrupted externally"
         if not self.jobStarted(test):
-            self.setSlaveFailed(test)
+            if jobExisted:
+                self.setKilledPending(test)
+            else:
+                self.setSlaveFailed(test)
     def jobStarted(self, test):
         return test.state.hasStarted()
     def performKill(self, test):
         if not QueueSystemServer.instance:
-            return None, None
+            return False, None, None
         return QueueSystemServer.instance.killJob(test)
+    def setKilledPending(self, test):
+        timeStr =  plugins.localtime("%H:%M")
+        briefText = "killed pending job at " + timeStr
+        freeText = "Test job was killed (while still pending in " + queueSystemName(test.app) +\
+                   ") at " + timeStr
+        test.changeState(plugins.TestState("killed", briefText=briefText, freeText=freeText, completed=1))
     def setSlaveFailed(self, test):
         failReason, fullText = self.getSlaveFailure(test)
         fullText = failReason + "\n" + fullText

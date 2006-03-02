@@ -62,6 +62,8 @@ helpOptions = """-prrep <v> - Generate a Progress Report relative to the version
                Plot multiple versions in same dia, ie 'v=,9' means master and version 9
                Moreover, you may supply a time scale factor for the different versions
                using the syntax v1:scale1,v2:scale2.
+               You can also retrive old results from CVS using the syntax ::date where
+               date is specified with 6 digits. Example: master::060101
              - oem
                Plot only exactly matching version, rather than plotting the closest
                matching version if no exact match exists.
@@ -112,10 +114,20 @@ optimization.TraverseSubPlans
                              Example:
                              texttest -apc -s optimization.TraverseSubPlans "grep use_column_generation_method APC_FILES/rules"
                              This will show for which APC tests the column generation method is used.
+optimization.PlotSubplans
+                           - Uses texttest's plotting functionality to plot arbitrary subplans that isn't
+                             part of texttest's test hierarchy.'
+                             Subplans are specified using the option sp=local_plan_dir/subplan_regexp1,subplan_regexp2.
+                             Subplans specified with the different regexps are considered to be in different groups
+                             when plotting, i.e., they get different colors etc.
+                             All options for -plot (see above) that makes sense are supported.
+                             Options not supported are: v, nt, oem
+                             Example:
+                             texttest -a apc -s optimization.PlotSubplans 'sp=/nfs/vm/csc/carmdata/dl_ifs_pac_IQ_data/LOCAL_PLAN/200512_OPTEST/standard_21octOptTest/weekly/3fa_ji_,3fa_sl_na_ji per yr=:1 ts=hours oav title=3FA_weekly'
 """
 
 
-import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy, comparetest, testoverview, time
+import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy, comparetest, testoverview, time, testmodel
 from ndict import seqdict
 from time import sleep
 from respond import Responder
@@ -1260,6 +1272,44 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         # The TestGraph is "used", create a new one so that the user can do another plot.
         self.testGraph = TestGraph()
         self.testGraph.optionGroup = self.optionGroup
+
+plotSubplanDone = None
+
+class PlotSubplans(plugins.Action):
+    def __init__(self, args = []):
+        self.args = args
+    def setUpApplication(self, app):
+        # Avoid plotting several times-setUpApp is called several times when you have extra_version.
+        global plotSubplanDone
+        if plotSubplanDone:
+            return
+        plotSubplanDone = 1
+        # Create a test graph
+        testGraph = TestGraph()
+        testGraph.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
+        for name, expl, value in testGraph.options:
+            testGraph.optionGroup.addOption(name, expl, value)
+        for name, expl in testGraph.switches:
+            testGraph.optionGroup.addSwitch(name, expl)
+        testGraph.optionGroup.addOption("sp", "Subplan")
+        testGraph.optionGroup.readCommandLineArguments(self.args)
+        if not testGraph.optionGroup.getOptionValue("title"):
+            testGraph.optionGroup.setValue("title", " ")
+        subplan = testGraph.optionGroup.getOptionValue("sp")
+        splitSP = subplan.split(",")
+        dirName = os.path.dirname(splitSP[0])
+        version = 1
+        for sp in splitSP:
+            regexp = os.path.basename(sp)
+            for file in os.listdir(dirName):
+                if re.findall(regexp, file):
+                    subplan = os.path.join(dirName, file)
+                    testName = file
+                    newTest = testmodel.TestCase(testName, testName, app, [], [])
+                    logFilePath = os.path.join(subplan, "APC_FILES", app.getConfigValue("log_file"))
+                    testGraph.createPlotLines(str(version), logFilePath, newTest, None)
+            version += 1
+        testGraph.plot(app.writeDirectory)
 
 # TestGraph is the "real stuff", the PlotLine instances are created here and gnuplot is invoked here.
 class TestGraph:

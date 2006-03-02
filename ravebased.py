@@ -689,7 +689,12 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
         file.write(line + os.linesep)
         guiplugins.guilog.info(line)
     def getCarmtmpDirName(self, carmUsr):
-        return os.path.basename(carmUsr).replace("_user", "_tmp")
+        # Important not to get basename clashes - this can lead to isolation problems
+        baseName = os.path.basename(carmUsr)
+        if baseName.find("_user") != -1:
+            return baseName.replace("_user", "_tmp")
+        else:
+            return baseName + "_tmp"
     def getEnvironmentFileName(self, suite):
         return "environment." + suite.app.name
     def writeEnvironmentFiles(self, suite, testDir):

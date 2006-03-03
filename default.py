@@ -1015,6 +1015,7 @@ class CreateCatalogue(plugins.Action):
             if parent in toRemove and not parent in removeList:
                 removeList.append(parent)
         for path in removeList:
+            self.diag.info("Removing parent path " + path)
             toRemove.remove(path)
     def outputPathName(self, path, writeDir):
         self.diag.info("Output name for " + path)

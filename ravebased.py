@@ -95,7 +95,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName
-        basicName = getRaveName(self.test) + "." + self.getUserParentName(self.test) + "." + self.getRuleSetName(self.test)
+        basicName = getRaveNames(self.test)[0] + "." + self.getUserParentName(self.test) + "." + self.getRuleSetName(self.test)
         if self.namesCreated.has_key(basicName):
             carmtmp = self.namesCreated[basicName]
             if carmtmp == os.environ["CARMTMP"]:
@@ -262,7 +262,7 @@ class Config(CarmenConfig):
             readDirs["Resources"] = [ customerFile, impFile ]
         elif test.environment.has_key("CARMSYS"):
             readDirs["RAVE module"] = [ os.path.join(test.environment["CARMSYS"], \
-                                        "carmusr_default", "crc", "modules", test.getConfigValue("rave_name")) ]
+                                        "carmusr_default", "crc", "modules", getRaveNames(test)[0]) ]
         return readDirs
     def filesFromSubplan(self, test, subplanDir):
         return []
@@ -286,7 +286,7 @@ class Config(CarmenConfig):
         CarmenConfig.printHelpDescription(self)
     def setApplicationDefaults(self, app):
         CarmenConfig.setApplicationDefaults(self, app)
-        app.setConfigDefault("rave_name", None)
+        app.setConfigDefault("rave_name", [])
         app.setConfigDefault("rave_static_library", "")
         app.setConfigDefault("lines_of_crc_compile", 30, "How many lines to present in textual previews of rave compilation failures")
         # dictionary of lists
@@ -296,7 +296,7 @@ class Config(CarmenConfig):
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
         app.addConfigEntry("ruleset_compiled", "white", "test_colours")
         
-def getRaveName(test):
+def getRaveNames(test):
     return test.app.getConfigValue("rave_name")
 
 class CheckCarmVariables(plugins.Action):
@@ -337,36 +337,37 @@ class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
 class CleanupRules(plugins.Action):
     def __init__(self, getRuleSetName):
         self.rulesCleaned = []
-        self.raveName = None
+        self.raveNames = []
         self.getRuleSetName = getRuleSetName
     def __repr__(self):
         return "Cleanup rules for"
     def __call__(self, test):
         arch = getArchitecture(test.app)
-        ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
-        if self.shouldCleanup(ruleset):
-            self.describe(test, " - ruleset " + ruleset.name)
-            self.rulesCleaned.append(ruleset.name)
-            self.removeRuleSet(arch, ruleset.name)
-            self.removeRuleCompileFiles(arch)
-            self.removeRulePrecompileFiles(ruleset.name)
-    def removeRuleSet(self, arch, name):
+        ruleset = RuleSet(self.getRuleSetName(test), self.raveNames, arch)
+        for raveName in self.raveNames:
+            if self.shouldCleanup(ruleset):
+                self.describe(test, " - ruleset " + ruleset.name)
+                self.rulesCleaned.append(ruleset.name)
+                self.removeRuleSet(arch, ruleset.name, raveName)
+                self.removeRuleCompileFiles(arch, raveName)
+                self.removeRulePrecompileFiles(ruleset.name, raveName)
+    def removeRuleSet(self, arch, name, raveName):
         carmTmp = os.environ["CARMTMP"]
-        targetPath = os.path.join(carmTmp, "crc", "rule_set", string.upper(self.raveName), arch, name)
+        targetPath = os.path.join(carmTmp, "crc", "rule_set", string.upper(raveName), arch, name)
         self.removeFile(targetPath)
         self.removeFile(targetPath + ".bak")
-    def removeRuleCompileFiles(self, arch):
+    def removeRuleCompileFiles(self, arch, raveName):
         carmTmp = os.environ["CARMTMP"]
-        targetPath = os.path.join(carmTmp, "compile", string.upper(self.raveName), arch + "_opt")
+        targetPath = os.path.join(carmTmp, "compile", string.upper(raveName), arch + "_opt")
         if os.path.isdir(targetPath):
             for file in os.listdir(targetPath):
                 if file.endswith(".o"):
                     self.removeFile(os.path.join(targetPath, file))
-    def removeRulePrecompileFiles(self, name):
+    def removeRulePrecompileFiles(self, name, raveName):
         carmTmp = os.environ["CARMTMP"]
-        targetPath = os.path.join(carmTmp, "compile", string.upper(self.raveName), name)
+        targetPath = os.path.join(carmTmp, "compile", string.upper(raveName), name)
         self.removeFile(targetPath + "_recompile.xml")
-        targetPath = os.path.join(carmTmp, "crc", "rule_set", string.upper(self.raveName), name)
+        targetPath = os.path.join(carmTmp, "crc", "rule_set", string.upper(raveName), name)
         self.removeFile(targetPath + ".xml")
     def removeFile(self, fullPath):
         if os.path.isfile(fullPath):
@@ -382,8 +383,8 @@ class CleanupRules(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
         self.rulesCleaned = []
-        if self.raveName == None:
-            self.raveName = getRaveName(suite)
+        if self.raveNames == []:
+            self.raveNames = getRaveNames(suite)
 
 class SetBuildRequired(plugins.Action):
     def __init__(self, getRuleSetName):
@@ -394,7 +395,7 @@ class SetBuildRequired(plugins.Action):
 class FilterRuleBuilds(plugins.Action):
     rulesCompiled = {}
     def __init__(self, getRuleSetName, forceRebuild):
-        self.raveName = None
+        self.raveNames = []
         self.getRuleSetName = getRuleSetName
         self.forceRebuild = forceRebuild
         self.diag = plugins.getDiagnostics("Filter Rule Builds")
@@ -403,7 +404,7 @@ class FilterRuleBuilds(plugins.Action):
     def __call__(self, test):
         arch = getArchitecture(test.app)
         try:
-            ruleset = RuleSet(self.getRuleSetName(test), self.raveName, arch)
+            ruleset = RuleSet(self.getRuleSetName(test), self.raveNames, arch)
         except plugins.TextTestError, e:
             # assume problems here are due to compilation itself not being setup, ignore
             print e
@@ -423,7 +424,7 @@ class FilterRuleBuilds(plugins.Action):
             self.diag.info("Filter rejected rule build for " + test.name)
             return
         
-        targetName = ruleset.targetFile
+        targetName = ruleset.targetFiles[0]
         # We WAIT here to avoid race conditions - make sure everyone knows the state of their
         # rule compilations before we start any of them.
         if self.rulesCompiled.has_key(targetName):
@@ -434,7 +435,7 @@ class FilterRuleBuilds(plugins.Action):
         test.changeState(NeedRuleCompilation(self.getRuleSetName(test)))
         return self.WAIT
     def setUpApplication(self, app):
-        self.raveName = app.getConfigValue("rave_name")
+        self.raveNames = app.getConfigValue("rave_name")
     def shouldCompileFor(self, test, ruleset):
         if self.forceRebuild or not ruleset.isCompiled():
             return 1
@@ -444,7 +445,7 @@ class FilterRuleBuilds(plugins.Action):
         if self.assumeDynamicLinkage(libFile, test.getEnvironment("CARMUSR")):
             return 0
         else:            
-            return plugins.modifiedTime(ruleset.targetFile) < plugins.modifiedTime(libFile)
+            return plugins.modifiedTime(ruleset.targetFiles[0]) < plugins.modifiedTime(libFile)
     def assumeDynamicLinkage(self, libFile, carmUsr):
         # If library file not defined, assume dynamic linkage and don't recompile
         return not libFile or not os.path.isfile(libFile)        
@@ -476,8 +477,8 @@ class CompileRules(plugins.Action):
         if test.state.category != "need_rulecompile" or test.state.testCompiling != None:
             return
         arch = getArchitecture(test.app)
-        raveName = getRaveName(test)
-        ruleset = RuleSet(self.getRuleSetName(test), raveName, arch)
+        raveNames = getRaveNames(test)
+        ruleset = RuleSet(self.getRuleSetName(test), raveNames, arch)
         self.describe(test, " - ruleset " + ruleset.name)
 
         compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
@@ -486,7 +487,7 @@ class CompileRules(plugins.Action):
         extra = ""
         if test.app.name == "apc":
             extra = "-"
-        commandLine = compiler + " " + extra + raveName + " " + self.getModeString() \
+        commandLine = compiler + " " + extra + string.join(raveNames) + " " + self.getModeString() \
                           + " -archs " + arch + " " + ruleset.sourceFile
         self.performCompile(test, ruleset.name, commandLine)
         if self.getModeString() == "-debug":
@@ -645,16 +646,21 @@ class RuleBuildFailed(plugins.TestState):
         plugins.TestState.__init__(self, "unrunnable", briefText=briefText, freeText=freeText, completed=1)
                         
 class RuleSet:
-    def __init__(self, ruleSetName, raveName, arch):
+    def __init__(self, ruleSetName, raveNames, arch):
         self.name = ruleSetName
         if not self.name:
             return
         self.sourceFile = self.sourcePath(self.name)
-        self.targetFile = self.targetPath("rule_set", raveName, arch, self.name)
+        self.targetFiles = []
+        for raveName in raveNames:
+            self.targetFiles.append(self.targetPath("rule_set", raveName, arch, self.name))
     def isValid(self):
         return self.name and os.path.isfile(self.sourceFile)
     def isCompiled(self):
-        return os.path.isfile(self.targetFile)
+        for targetFile in self.targetFiles:
+            if not os.path.isfile(targetFile):
+                return False
+        return True
     def targetPath(self, type, raveName, arch, name):
         return os.path.join(os.environ["CARMTMP"], "crc", type, string.upper(raveName), arch, name)
     def sourcePath(self, name):
@@ -662,14 +668,16 @@ class RuleSet:
     def backup(self):
         if self.isCompiled():
             try:
-                shutil.copyfile(self.targetFile, self.targetFile + ".bak")
+                for targetFile in self.targetFiles:
+                    shutil.copyfile(targetFile, targetFile + ".bak")
             except IOError:
                 print "WARNING - did not have permissions to backup ruleset, continuing anyway"
     def moveDebugVersion(self):
-        debugVersion = self.targetFile + "_g"
-        if os.path.isfile(debugVersion):
-            os.remove(self.targetFile)
-            os.rename(debugVersion, self.targetFile)
+        for targetFile in self.targetFiles:
+            debugVersion = targetFile + "_g"
+            if os.path.isfile(debugVersion):
+                os.remove(targetFile)
+                os.rename(debugVersion, targetFile)
             
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):

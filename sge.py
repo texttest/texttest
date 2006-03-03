@@ -34,8 +34,8 @@ class QueueSystem:
         else:
             return ""
     def killJob(self, jobId):
-        resultOutput = os.popen("qdel " + jobId).read()
-        return resultOutput.find("has registered the job") != -1 
+        self.qdelOutput = os.popen("qdel " + jobId + " 2>&1").read()
+        return self.qdelOutput.find("has registered the job") != -1 
     def getJobId(self, line):
         return line.split()[2]
     def findJobId(self, stdout):
@@ -58,7 +58,7 @@ class QueueSystem:
             if sleepTime < 5:
                 sleepTime *= 2
             trials -= 1
-        return "SGE lost job:" + jobId
+        return "SGE lost job:" + jobId + "\n qdel output was as follows:\n" + self.qdelOutput
     def tryGetAccounting(self, jobId):
         errMsg, lines, found = self.getAccountingInfo(jobId, "")
         logNum = 0

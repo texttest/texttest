@@ -71,11 +71,6 @@ class InteractiveAction(plugins.Action):
             self.optionGroup.addSwitch(key, name, oldOptionGroup.getSwitchValue(key), nameForOff)
         else:
             self.optionGroup.addSwitch(key, name, value, nameForOff)
-    def addMultiSwitch(self, oldOptionGroup, key, name, options, value = 0):
-        if oldOptionGroup and oldOptionGroup.switches.has_key(key):
-            self.optionGroup.addSwitch(key, name, options, oldOptionGroup.getSwitchValue(key))
-        else:
-            self.optionGroup.addSwitch(key, name, options, value, nameForOff)
     def canPerformOnTest(self):
         return self.test
     def getTitle(self):

@@ -40,6 +40,16 @@ def getNumberOfSeconds(timeString):
             seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)
         return seconds 
 
+# Useful stuff to handle regular expressions
+regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
+def isRegularExpression(text):
+    return (regexChars.search(text) != None)
+def findRegularExpression(expr, text):
+    try:
+        regExpr = re.compile(expr)
+        return regExpr.search(text)
+    except:
+        return False
 
 # Generic configuration class
 class Configuration:
@@ -408,11 +418,10 @@ class NonPythonAction(Action):
         os.system(self.script + " " + level + " " + test.name + " " + test.app.name)
 
 class TextTrigger:
-    specialChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
     def __init__(self, text):
         self.text = text
         self.regex = None
-        if self.specialChars.search(text) != None:
+        if isRegularExpression(text):
             try:
                 self.regex = re.compile(text)
             except:
@@ -630,9 +639,12 @@ class Process:
 # Generally useful class to encapsulate a background process, of which TextTest creates
 # a few...
 class BackgroundProcess(Process):
-    def __init__(self, commandLine, testRun=0, exitHandler=None, exitHandlerArgs=(), shellTitle=None, holdShell=0):
+    def __init__(self, commandLine, description = "", testRun=0, exitHandler=None, exitHandlerArgs=(), shellTitle=None, holdShell=0):
         Process.__init__(self, None)
         self.commandLine = commandLine
+        self.description = description
+        if self.description == "":
+            self.description = self.commandLine
         self.shellTitle = shellTitle
         self.holdShell = holdShell
         self.exitHandler = exitHandler

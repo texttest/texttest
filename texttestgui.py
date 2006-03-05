@@ -22,6 +22,21 @@ def showError(message):
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show()
 
+def showQuery(message, parent, noMethod, yesMethod):
+    guilog.info("QUERY : " + message)
+    dialog = gtk.Dialog("TextTest Query", parent=parent, flags=gtk.DIALOG_MODAL|gtk.DIALOG_DESTROY_WITH_PARENT)
+    noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
+    yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
+    dialog.set_modal(True)
+    label = gtk.Label(message)
+    dialog.vbox.pack_start(label, expand=True, fill=True)
+    label.show()
+    # ScriptEngine cannot handle different signals for the same event (e.g. response
+    # from gtk.Dialog), so we connect the individual buttons instead ...
+    scriptEngine.connect("answer no to texttest query", "clicked", noButton, noMethod, gtk.RESPONSE_NO, dialog)
+    scriptEngine.connect("answer yes to texttest query", "clicked", yesButton, yesMethod, gtk.RESPONSE_YES, dialog)
+    dialog.show()
+
 def renderParentsBold(column, cell, model, iter):
     if model.iter_has_child(iter):
         cell.set_property('font', "bold")
@@ -115,11 +130,11 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 2, app)
         self.model.set_value(iter, 3, nodeName)
     def addSuite(self, suite):
-        app = suite.app
-        if app.getConfigValue("add_shortcut_bar"):
+        self.application = suite.app
+        if suite.app.getConfigValue("add_shortcut_bar"):
             scriptEngine.enableShortcuts = 1
         if not self.dynamic:
-            self.addApplication(app)
+            self.addApplication(suite.app)
         if not self.dynamic or suite.size() > 0:
             self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
@@ -216,7 +231,7 @@ class TextTestGUI(ThreadedResponder):
         # Create scrollbars around the view.
         scrolled = gtk.ScrolledWindow()
         scrolled.add(view)
-        scrolled.show()    
+        scrolled.show()
         return scrolled
     def selectionChanged(self, selection):
         self.nofSelectedTests = 0
@@ -368,7 +383,6 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 5, successColor) 
         self.selection.get_tree_view().collapse_row(self.model.get_path(iter))
         self.collapseIfAllComplete(self.model.iter_parent(iter))
-
     def addNewTestToModel(self, suite, newTest, suiteIter):
         iter = self.addSuiteWithParent(newTest, suiteIter)
         self.itermap[newTest] = iter.copy()
@@ -388,15 +402,32 @@ class TextTestGUI(ThreadedResponder):
         self.createSubIterMap(suiteIter, newTest=0)
         self.markAndExpand(suiteIter)
     def exit(self, *args):
+        self.topWindow.destroy()
         gtk.main_quit()
         sys.stdout.flush()
         if self.actionThread:
             self.actionThread.terminate()
         guiplugins.processTerminationMonitor.killAll()
+    def killDialogNo(self, button, *data):
+        data[0].destroy()
     def quit(self, *args):
-        # Generate a window closedown, so that the quit button behaves the same as closing the window
-        self.topWindow.destroy()
-        self.exit()
+        processesToReport = self.processesToReport()
+        runningProcesses = guiplugins.processTerminationMonitor.listRunning(processesToReport)
+        if len(runningProcesses) != 0:
+            showQuery("\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n", self.topWindow, self.killDialogNo, self.exit)
+        else:
+            # Generate a window closedown, so that the quit button behaves the same as closing the window
+            self.exit()
+    def processesToReport(self):
+        queryValues = self.application.getConfigValue("query_kill_processes")
+        processes = []
+        if queryValues.has_key("default"):
+            processes += queryValues["default"]
+        if self.dynamic and queryValues.has_key("dynamic"):
+            processes += queryValues["dynamic"]
+        elif queryValues.has_key("static"):        
+            processes += queryValues["static"]
+        return processes
     def saveAll(self, *args):
         self.selection.select_all()
         self.saveSelected(args)
@@ -457,9 +488,7 @@ class TextTestGUI(ThreadedResponder):
     def makeButtons(self, list):
         buttonbox = gtk.HBox()
         for label, func in list:
-            button = gtk.Button()
-            button.set_use_underline(1)
-            button.set_label(label)            
+            button = gtk.Button(label)
             scriptEngine.connect(label.replace("_", ""), "clicked", button, func)
             button.show()
             buttonbox.pack_start(button, expand=False, fill=False)
@@ -556,9 +585,7 @@ class RightWindowGUI:
         except plugins.TextTestError, e:
             showError(str(e))
     def addButton(self, method, buttonbox, label, scriptTitle, option):
-        button = gtk.Button()
-        button.set_use_underline(1)
-        button.set_label(label)
+        button = gtk.Button(label)
         scriptEngine.connect(scriptTitle.replace("_", ""), "clicked", button, method, None, option)
         button.show()
         buttonbox.pack_start(button, expand=False, fill=False)
@@ -954,4 +981,3 @@ class UpdateScripts(plugins.Action):
                 newFile.write(line.replace("test actions", "completion of test actions"))
             newFile.close()
             os.rename(fileName + ".new", fileName)
-                              

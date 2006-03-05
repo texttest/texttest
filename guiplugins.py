@@ -1,6 +1,6 @@
 
 import plugins, os, sys, shutil, string
-from testmodel import TestCase
+from testmodel import TestCase, Application
 from threading import Thread
 from glob import glob
 from Queue import Queue, Empty
@@ -29,6 +29,22 @@ class ProcessTerminationMonitor:
             return process
         except Empty:
             return None
+    def listRunning(self, processesToCheck):
+        running = []
+        if len(processesToCheck) == 0:
+            return running
+        for process in self.processes:
+            if not process.hasTerminated():
+                for processToCheck in processesToCheck:
+                    if plugins.isRegularExpression(processToCheck):
+                        if plugins.findRegularExpression(processToCheck, repr(process)):
+                            running.append("PID " + str(process.processId) + " : " + process.description)
+                            break
+                    elif processToCheck.lower() == "all" or repr(process).find(processToCheck) != -1:
+                            running.append("PID " + str(process.processId) + " : " + process.description)
+                            break
+
+        return running
     def killAll(self):
         # Don't leak processes
         for process in self.processes:
@@ -55,6 +71,11 @@ class InteractiveAction(plugins.Action):
             self.optionGroup.addSwitch(key, name, oldOptionGroup.getSwitchValue(key), nameForOff)
         else:
             self.optionGroup.addSwitch(key, name, value, nameForOff)
+    def addMultiSwitch(self, oldOptionGroup, key, name, options, value = 0):
+        if oldOptionGroup and oldOptionGroup.switches.has_key(key):
+            self.optionGroup.addSwitch(key, name, options, oldOptionGroup.getSwitchValue(key))
+        else:
+            self.optionGroup.addSwitch(key, name, options, value, nameForOff)
     def canPerformOnTest(self):
         return self.test
     def getTitle(self):
@@ -63,13 +84,13 @@ class InteractiveAction(plugins.Action):
         return 1
     def getScriptTitle(self):
         return self.getTitle()
-    def startExternalProgram(self, commandLine, shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
-        process = plugins.BackgroundProcess(commandLine, shellTitle=shellTitle, \
+    def startExternalProgram(self, commandLine, description = "", shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
+        process = plugins.BackgroundProcess(commandLine, description=description, shellTitle=shellTitle, \
                                             holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         processTerminationMonitor.addMonitoring(process)
         return process
     def startExtProgramNewUsecase(self, commandLine, usecase, \
-                                  exitHandler, exitHandlerArgs, shellTitle=None, holdShell=0): 
+                                  exitHandler, exitHandlerArgs, shellTitle=None, holdShell=0, description = ""): 
         recScript = os.getenv("USECASE_RECORD_SCRIPT")
         if recScript:
             os.environ["USECASE_RECORD_SCRIPT"] = self.getNewUsecase(recScript, usecase)
@@ -82,7 +103,7 @@ class InteractiveAction(plugins.Action):
                 os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
             else:
                 del os.environ["USECASE_REPLAY_SCRIPT"]
-        process = self.startExternalProgram(commandLine, shellTitle, holdShell, exitHandler, exitHandlerArgs)
+        process = self.startExternalProgram(commandLine, description, shellTitle, holdShell, exitHandler, exitHandlerArgs)
         if recScript:
             os.environ["USECASE_RECORD_SCRIPT"] = recScript
         if repScript:
@@ -97,13 +118,38 @@ class InteractiveAction(plugins.Action):
             raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
                   "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
         return viewProgram + " " + fileName + plugins.nullRedirect(), viewProgram
+    def getRelativeFilename(self, filename):
+        # Trim the absolute filename to be relative to the application home dir
+        # (TEXTTEST_HOME is more difficult to obtain, see testmodel.OptionFinder.getDirectoryName)
+        path = filename
+        if isinstance(self.test, Application):
+            appHome = self.test.abspath
+        else:
+            appHome = self.test.app.abspath
+
+        relativeFilename = ""
+        while path != appHome and len(path) > 0 and path != "/":
+            head, tail = os.path.split(path)
+            if relativeFilename == "":
+                relativeFilename = tail 
+            else:
+                relativeFilename = tail + os.sep + relativeFilename 
+            path = head
+            if tail == "":
+                break
+
+        if len(path) == 0 or os.path.normpath(path) == "/":
+            return filename
+        else:
+            return relativeFilename
     def viewFile(self, fileName, refresh=0):
         exitHandler = None
         if refresh:
             exitHandler = self.test.filesChanged
         commandLine, descriptor = self.getViewCommand(fileName)
+        description = self.test.getConfigValue("view_program") + " " + self.getRelativeFilename(fileName)
         guilog.info("Viewing file " + fileName.replace(os.sep, "/") + " using '" + descriptor + "', refresh set to " + str(refresh))
-        process = self.startExternalProgram(commandLine, exitHandler=exitHandler)
+        process = self.startExternalProgram(commandLine, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getTextTestName(self):
         return sys.argv[0]
@@ -198,8 +244,9 @@ class ViewFile(InteractiveAction):
         if not plugins.canExecute(followProgram.split()[0]):
             raise plugins.TextTestError, "Cannot find file-following program '" + followProgram + \
                   "'\nPlease install it somewhere on your PATH or point the follow_program setting at a different tool"
+        description = followProgram + " " + self.getRelativeFilename(fileName)
         guilog.info("Following file " + title + " using '" + followProgram + "'")
-        process = self.startExternalProgram(followProgram + " " + fileName, shellTitle=title)
+        process = self.startExternalProgram(followProgram + " " + fileName, description=description, shellTitle=title)
         scriptEngine.monitorProcess("follows progress of test files", process)
     def view(self, comparison, fileName):
         if self.optionGroup.getSwitchValue("f"):
@@ -228,8 +275,9 @@ class ViewFile(InteractiveAction):
                   "'\nPlease install it somewhere on your PATH or point the diff_program setting at a different tool"
         stdFile = self.stdFile(comparison)
         tmpFile = self.tmpFile(comparison)
+        description = diffProgram + " " + stdFile + "\n                                   " + tmpFile
         guilog.info("Comparing file " + os.path.basename(tmpFile) + " with previous version using '" + diffProgram + "'")
-        process = self.startExternalProgram(diffProgram + " " + stdFile + " " + tmpFile + plugins.nullRedirect())
+        process = self.startExternalProgram(diffProgram + " " + stdFile + " " + tmpFile + plugins.nullRedirect(), description=description)
         scriptEngine.monitorProcess("shows graphical differences in test files", process)
 
 # And a generic import test. Note acts on test suites
@@ -575,8 +623,9 @@ class RunTests(InteractiveAppAction):
         logFile = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber) + ".log")
         errFile = os.path.join(app.writeDirectory, "dynamic_errors" + str(self.runNumber) + ".log")
         self.runNumber += 1
+        description = "Dynamic GUI started at " + plugins.localtime()
         commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
-        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,))
+        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,), description = description)
     def isTestCase(self, test):
         return isinstance(test, TestCase)
     def checkTestRun(self, errFile):

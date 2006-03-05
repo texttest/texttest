@@ -665,6 +665,7 @@ class Application:
         self.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
         self.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
         self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
+        self.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ], \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")

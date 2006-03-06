@@ -434,7 +434,7 @@ class TextTestGUI(ThreadedResponder):
         self.selection.select_all()
         self.saveSelected(args)
     def saveSelected(self, *args):
-        saveActionFromWindow = self.rightWindowGUI.getSaveTestAction()
+        saveActionFromWindow = self.rightWindowGUI.intvActionGUI.getSaveTestAction()
         windowVersion = None
         if saveActionFromWindow:
             windowVersion = saveActionFromWindow.test.app.getFullVersion()
@@ -497,117 +497,45 @@ class TextTestGUI(ThreadedResponder):
         buttonbox.show()
         return buttonbox
 
-class RightWindowGUI:
-    def __init__(self, object, dynamic):
-        self.object = object
-        self.dynamic = dynamic
-        self.fileViewAction = guiplugins.interactiveActionHandler.getInstance(object, guiplugins.ViewFile)
-        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
-        self.addFilesToModel()
-        view = self.createView()
-        self.actionInstances = self.makeActionInstances()
-        buttons = self.makeButtons(self.actionInstances)
-        notebook = self.createNotebook(self.actionInstances)
-        self.window = self.createWindow(buttons, view, notebook)
-    def getWindow(self):
-        return self.window
-    def createView(self):
-        view = gtk.TreeView(self.model)
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn(self.object.name.replace("_", "__"), renderer, text=0, background=1)
-        column.set_cell_data_func(renderer, renderParentsBold)
-        view.append_column(column)
-        if self.dynamic:
-            perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)
-            view.append_column(perfColumn)
-        view.expand_all()
-        indexer = TreeModelIndexer(self.model, column, 0)
-        scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, indexer)
-        view.show()
-        return view
-    def makeActionInstances(self):
-        # The file view action is a special one that we "hardcode" so we can find it...
-        return [ self.fileViewAction ] + guiplugins.interactiveActionHandler.getInstances(self.object, self.dynamic)
-    def makeButtons(self, interactiveActions):
+class InteractiveActionGUI:
+    def __init__(self, actions, actionPerformMethod):
+        self.actions = actions
+        self.actionPerformMethod = actionPerformMethod
+        self.buttons = self.makeButtons()
+        self.notebookPages = self.createOptionGroupPages()
+    def getSaveTestAction(self):
+        for instance in self.actions:
+            if isinstance(instance, guiplugins.SaveTest) and instance.canPerformOnTest():
+                return instance
+        return None
+    def makeButtons(self):
         executeButtons = gtk.HBox()
-        for instance in interactiveActions:
+        for instance in self.actions:
             buttonTitle = instance.getTitle()
             if instance.canPerformOnTest():
                 self.addButton(self.runInteractive, executeButtons, buttonTitle, instance.getScriptTitle(), instance)
         executeButtons.show()
         return executeButtons
-    def addFileToModel(self, iter, name, comp, colour):
-        fciter = self.model.insert_before(iter, None)
-        baseName = os.path.basename(name)
-        heading = self.model.get_value(iter, 0)
-        self.model.set_value(fciter, 0, baseName)
-        self.model.set_value(fciter, 1, colour)
-        self.model.set_value(fciter, 2, name)
-        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour)
-        if comp:
-            self.model.set_value(fciter, 3, comp)
-            details = comp.getDetails()
-            if len(details) > 0:
-                self.model.set_value(fciter, 4, details)
-                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
-        return fciter
-    def createNotebook(self, interactiveActions):
-        pages = self.getHardcodedNotebookPages()
-        for instance in interactiveActions:
+    def addButton(self, method, buttonbox, label, scriptTitle, option):
+        button = gtk.Button(label)
+        scriptEngine.connect(scriptTitle.replace("_", ""), "clicked", button, method, None, option)
+        button.show()
+        buttonbox.pack_start(button, expand=False, fill=False)
+    def runInteractive(self, button, action, *args):
+        try:
+            self.actionPerformMethod(action)
+        except plugins.TextTestError, e:
+            showError(str(e))
+    def createOptionGroupPages(self):
+        pages = []
+        for instance in self.actions:
             for optionGroup in instance.getOptionGroups():
                 if optionGroup.switches or optionGroup.options:
                     guilog.info("") # blank line
                     guilog.info("Creating notebook page for '" + optionGroup.name + "'")
                     display = self.createDisplay(optionGroup)
                     pages.append((display, optionGroup.name))
-        notebook = scriptEngine.createNotebook("view options for", pages)
-        notebook.show()
-        return notebook
-    def getHardcodedNotebookPages(self):
-        return []
-    def createWindow(self, buttons, view, notebook):
-        fileWin = gtk.ScrolledWindow()
-        fileWin.add(view)
-        vbox = gtk.VBox()
-        vbox.pack_start(buttons, expand=False, fill=False)
-        vbox.pack_start(fileWin, expand=True, fill=True)
-        vbox.pack_start(notebook, expand=True, fill=True)
-        fileWin.show()
-        vbox.show()    
-        return vbox
-    def displayDifferences(self, view, path, column, *args):
-        iter = self.model.get_iter(path)
-        fileName = self.model.get_value(iter, 2)
-        if not fileName:
-            # Don't crash on double clicking the header lines...
-            return
-        comparison = self.model.get_value(iter, 3)
-        try:
-            self.fileViewAction.view(comparison, fileName)
-        except plugins.TextTestError, e:
-            showError(str(e))
-    def addButton(self, method, buttonbox, label, scriptTitle, option):
-        button = gtk.Button(label)
-        scriptEngine.connect(scriptTitle.replace("_", ""), "clicked", button, method, None, option)
-        button.show()
-        buttonbox.pack_start(button, expand=False, fill=False)
-    def diagnoseOption(self, option):
-        value = option.getValue()
-        text = "Creating entry for option '" + option.name + "'"
-        if len(value) > 0:
-            text += " (set to '" + value + "')"
-        if len(option.possibleValues) > 1:
-            text += " (drop-down list containing " + repr(option.possibleValues) + ")"
-        guilog.info(text)
-    def diagnoseSwitch(self, switch):
-        value = switch.getValue()
-        if switch.nameForOff:
-            text = "Creating radio button for switch '" + switch.name + "/" + switch.nameForOff + "'"
-        else:
-            text = "Creating check button for switch '" + switch.name + "'"
-        if value:
-            text += " (checked)"
-        guilog.info(text)        
+        return pages
     def createDisplay(self, optionGroup):
         vboxWindow = gtk.ScrolledWindow()
         vbox = gtk.VBox()
@@ -670,12 +598,100 @@ class RightWindowGUI:
             switch.setMethods(checkButton.get_active, checkButton.set_active)
             checkButton.show()
             return checkButton
-    def runInteractive(self, button, action, *args):
+    def diagnoseOption(self, option):
+        value = option.getValue()
+        text = "Creating entry for option '" + option.name + "'"
+        if len(value) > 0:
+            text += " (set to '" + value + "')"
+        if len(option.possibleValues) > 1:
+            text += " (drop-down list containing " + repr(option.possibleValues) + ")"
+        guilog.info(text)
+    def diagnoseSwitch(self, switch):
+        value = switch.getValue()
+        if switch.nameForOff:
+            text = "Creating radio button for switch '" + switch.name + "/" + switch.nameForOff + "'"
+        else:
+            text = "Creating check button for switch '" + switch.name + "'"
+        if value:
+            text += " (checked)"
+        guilog.info(text)            
+
+
+class RightWindowGUI:
+    def __init__(self, object, dynamic):
+        self.object = object
+        self.dynamic = dynamic
+        self.fileViewAction = guiplugins.interactiveActionHandler.getInstance(object, guiplugins.ViewFile)
+        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
+        self.addFilesToModel()
+        view = self.createView()
+        hardcodedPages = self.getHardcodedNotebookPages()
+        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(), self.performInteractiveAction)
+        notebook = self.createNotebook(hardcodedPages)
+        self.window = self.createWindow(view, notebook)
+    def getWindow(self):
+        return self.window
+    def createView(self):
+        view = gtk.TreeView(self.model)
+        renderer = gtk.CellRendererText()
+        column = gtk.TreeViewColumn(self.object.name.replace("_", "__"), renderer, text=0, background=1)
+        column.set_cell_data_func(renderer, renderParentsBold)
+        view.append_column(column)
+        if self.dynamic:
+            perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)
+            view.append_column(perfColumn)
+        view.expand_all()
+        indexer = TreeModelIndexer(self.model, column, 0)
+        scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, indexer)
+        view.show()
+        return view
+    def makeActionInstances(self):
+        # The file view action is a special one that we "hardcode" so we can find it...
+        return [ self.fileViewAction ] + guiplugins.interactiveActionHandler.getInstances(self.object, self.dynamic)
+    def addFileToModel(self, iter, name, comp, colour):
+        fciter = self.model.insert_before(iter, None)
+        baseName = os.path.basename(name)
+        heading = self.model.get_value(iter, 0)
+        self.model.set_value(fciter, 0, baseName)
+        self.model.set_value(fciter, 1, colour)
+        self.model.set_value(fciter, 2, name)
+        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour)
+        if comp:
+            self.model.set_value(fciter, 3, comp)
+            details = comp.getDetails()
+            if len(details) > 0:
+                self.model.set_value(fciter, 4, details)
+                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
+        return fciter
+    def createNotebook(self, pages):
+        pages += self.intvActionGUI.notebookPages
+        notebook = scriptEngine.createNotebook("view options for", pages)
+        notebook.show()
+        return notebook
+    def getHardcodedNotebookPages(self):
+        return []
+    def createWindow(self, view, notebook):
+        fileWin = gtk.ScrolledWindow()
+        fileWin.add(view)
+        vbox = gtk.VBox()
+        vbox.pack_start(self.intvActionGUI.buttons, expand=False, fill=False)
+        vbox.pack_start(fileWin, expand=True, fill=True)
+        vbox.pack_start(notebook, expand=True, fill=True)
+        fileWin.show()
+        vbox.show()    
+        return vbox
+    def displayDifferences(self, view, path, column, *args):
+        iter = self.model.get_iter(path)
+        fileName = self.model.get_value(iter, 2)
+        if not fileName:
+            # Don't crash on double clicking the header lines...
+            return
+        comparison = self.model.get_value(iter, 3)
         try:
-            self.performInteractiveAction(action)
+            self.fileViewAction.view(comparison, fileName)
         except plugins.TextTestError, e:
             showError(str(e))
-
+    
 class ApplicationGUI(RightWindowGUI):
     def __init__(self, app, selection, itermap):
         self.app = app
@@ -917,11 +933,6 @@ class TestCaseGUI(RightWindowGUI):
             return self.colours["failure"]
         else:
             return self.colours["running"]
-    def getSaveTestAction(self):
-        for instance in self.actionInstances:
-            if isinstance(instance, guiplugins.SaveTest) and instance.canPerformOnTest():
-                return instance
-        return None
     def createTextView(self, test):
         textViewWindow = gtk.ScrolledWindow()
         textview = gtk.TextView()
@@ -973,13 +984,3 @@ class ImportTestCase(guiplugins.ImportTestCase):
             if self.optionGroup.getSwitchValue("version"):
                 options += " -v 2.4"
         return options
-        
-class UpdateScripts(plugins.Action):
-    def __call__(self, test):
-        fileName = os.path.join(test.abspath, "gui_script")
-        if os.path.isfile(fileName):
-            newFile = open(fileName + ".new", "w")
-            for line in open(fileName).xreadlines():
-                newFile.write(line.replace("test actions", "completion of test actions"))
-            newFile.close()
-            os.rename(fileName + ".new", fileName)

@@ -71,13 +71,18 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
         if self.archToUse == "x86_64_linux" and "12" in self.test.app.versions:
             # circumvent the resources, we can run fine on this much larger group of machines
             self.archToUse = "i386_linux"
+    def getShortQueueSeconds(self):
+        return plugins.getNumberOfSeconds(str(self.test.getConfigValue("maximum_cputime_for_short_queue")))
     # Return "short", "medium" or "long"
     def getPerformanceCategory(self):
         # Hard-coded, useful at boundaries and for rave compilations
         if self.presetPerfCategory:
             return self.presetPerfCategory
         cpuTime = performance.getTestPerformance(self.test)
-        if cpuTime < plugins.getNumberOfSeconds(str(self.test.getConfigValue("maximum_cputime_for_short_queue"))):
+        if cpuTime == -1:
+            # This means we don't know, probably because it's not enabled
+            return "short"
+        elif cpuTime < self.getShortQueueSeconds():
             return "short"
         elif cpuTime > 7200:
             return "long"
@@ -100,6 +105,21 @@ class SgeSubmissionRules(CarmenSubmissionRules):
             return "normal"
         else:
             return "idle"
+    def findPriority(self):
+        cpuTime = performance.getTestPerformance(self.test)
+        if cpuTime == -1:
+            # We don't know yet...
+            return 0
+        shortQueueSeconds = self.getShortQueueSeconds()
+        if cpuTime < shortQueueSeconds:
+            return -cpuTime
+        else:
+            priority = -600 -cpuTime / 100
+            # don't return less than minimum priority
+            if priority > -1023:
+                return priority
+            else:
+                return -1023
     def getMajorReleaseResource(self):
         majorRelease = getMajorReleaseId(self.test.app)
         if majorRelease != "carmen_9":

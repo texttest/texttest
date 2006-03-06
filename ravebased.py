@@ -108,6 +108,9 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         return basicName
     def findQueue(self):
         return self.normalSubmissionRules.findDefaultQueue()
+    def findPriority(self):
+        # Don't lower the priority of these
+        return 0
     def findResourceList(self):
         normalResources = self.normalSubmissionRules.findResourceList()
         majRelResource = self.normalSubmissionRules.getMajorReleaseResource()

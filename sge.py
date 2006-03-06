@@ -15,6 +15,9 @@ class QueueSystem:
         queue = submissionRules.findQueue()
         if queue:
             qsubArgs += " -q " + queue
+        priority = submissionRules.findPriority()
+        if priority:
+            qsubArgs += " -p " + str(priority)
         resource = self.getResourceArg(submissionRules)
         if len(resource):
             qsubArgs += " -l " + resource

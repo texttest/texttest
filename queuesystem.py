@@ -202,6 +202,8 @@ class SubmissionRules:
             for resource in resources:
                 resourceList.append(resource)
         return resourceList
+    def findPriority(self):
+        return 0
     def findQueue(self):
         if self.optionMap.has_key("q"):
             return self.optionMap["q"]

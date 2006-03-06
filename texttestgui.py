@@ -56,6 +56,7 @@ class TextTestGUI(ThreadedResponder):
         self.rightWindowGUI = None
         self.actionThread = None
         self.contents = None
+        self.applications = []
     def readGtkRCFile(self):
         configDir = plugins.getPersonalConfigDir()
         if not configDir:
@@ -130,7 +131,7 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 2, app)
         self.model.set_value(iter, 3, nodeName)
     def addSuite(self, suite):
-        self.application = suite.app
+        self.applications.append(suite.app)
         if suite.app.getConfigValue("add_shortcut_bar"):
             scriptEngine.enableShortcuts = 1
         if not self.dynamic:
@@ -419,7 +420,8 @@ class TextTestGUI(ThreadedResponder):
             # Generate a window closedown, so that the quit button behaves the same as closing the window
             self.exit()
     def processesToReport(self):
-        queryValues = self.application.getConfigValue("query_kill_processes")
+        # Take an arbitrary app (the last one). Maybe review this?
+        queryValues = self.applications[-1].getConfigValue("query_kill_processes")
         processes = []
         if queryValues.has_key("default"):
             processes += queryValues["default"]

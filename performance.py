@@ -71,9 +71,13 @@ class PerformanceTestComparison(comparetest.TestComparison):
             descriptors["badperf"] = "slower"
             descriptors["config"] = "cputime"
         else:
-            descriptors["goodperf"] = "smaller-" + stem
-            descriptors["badperf"] = "larger-" + stem
             descriptors["config"] = stem
+            if stem.find("mem") != -1:
+                descriptors["goodperf"] = "smaller(" + stem + ")"
+                descriptors["badperf"] = "larger(" + stem + ")"
+            else:
+                descriptors["goodperf"] = "faster(" + stem + ")"
+                descriptors["badperf"] = "slower(" + stem + ")"
         return descriptors
 
 class PerformanceFileComparison(comparetest.FileComparison):

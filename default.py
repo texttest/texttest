@@ -1270,6 +1270,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
             for logFileStem in self.findLogFileStems(fileStem):
                 logFilePattern = test.makeFileName(logFileStem, temporary=temp)
                 for fileName in glob.glob(logFilePattern):
+                    self.diag.info("Scanning log file for entry: " + entryFinder)
                     values += self.findValues(fileName, entryFinder)
             if len(values) > 0:
                 fileName = test.makeFileName(fileStem, temporary=temp)
@@ -1302,7 +1303,6 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         return "Total " + string.capitalize(fileStem) + "  :      " + str(roundedSum) + " seconds"
     def findValues(self, logFile, entryFinder):
         values = []
-        self.diag.info("Scanning log file for entry: " + entryFinder)
         for line in open(logFile).xreadlines():
             value = self.getValue(line, entryFinder)
             if value:

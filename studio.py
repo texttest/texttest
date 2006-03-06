@@ -4,9 +4,10 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.22 2006/02/24 16:24:41 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.23 2006/03/06 09:45:06 geoff Exp $
 #
-import ravebased, os, plugins, guiplugins, shutil
+import ravebased, default, plugins, guiplugins
+import os, shutil, string
 
 def getConfig(optionMap):
     return StudioConfig(optionMap)
@@ -22,6 +23,8 @@ class StudioConfig(ravebased.Config):
     def defaultBuildRules(self):
         # Overriding this assures rule builds in the nightjob and with -v rave.
         return 1
+    def getPerformanceExtractor(self):
+        return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def getRuleSetName(self, test):
         if self.optionMap.has_key("rset"):
             return self.optionMap["rset"]
@@ -84,6 +87,30 @@ class StudioConfig(ravebased.Config):
             if line.find("Build ruleset " + rulesetName) != -1:
                 return True
         return False
+
+class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
+    def findValues(self, logFile, entryFinder):
+        values = []
+        currOperations = []
+        for line in open(logFile).xreadlines():
+            if not line.startswith("cslDispatcher"):
+                continue
+            if line.find("returnvalue") != -1:
+                cpuTime = int(line.split()[-2])
+                if currOperations[-1]:
+                    values.append(cpuTime)
+                del currOperations[-1]
+            elif line.find(entryFinder) == -1:
+                currOperations.append("")
+            else:
+                operation = string.join(line.strip().split()[2:])
+                currOperations.append(operation)
+        return values
+    def makeTimeLine(self, values, fileStem):
+        sum = 0
+        for value in values:
+            sum += value
+        return "Total CPU time in " + fileStem + "  :      " + str(sum) + " milliseconds"
     
 # Graphical import suite. Basically the same as those used for optimizers
 class ImportTestSuite(ravebased.ImportTestSuite):

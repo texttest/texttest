@@ -38,7 +38,7 @@ class QueueSystem:
             return ""
     def killJob(self, jobId):
         self.qdelOutput = os.popen("qdel " + jobId + " 2>&1").read()
-        return self.qdelOutput.find("has registered the job") != -1 
+        return self.qdelOutput.find("has registered the job") != -1 or self.qdelOutput.find("has deleted job") != -1
     def getJobId(self, line):
         return line.split()[2]
     def findJobId(self, stdout):

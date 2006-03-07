@@ -1298,6 +1298,9 @@ class PlotSubplans(plugins.Action):
         subplan = testGraph.optionGroup.getOptionValue("sp")
         splitSP = subplan.split(",")
         dirName = os.path.dirname(splitSP[0])
+
+        dummyUserName = "dummyUser"
+        dummyUser = testmodel.TestSuite(dummyUserName, dummyUserName, app, [])
         version = 1
         for sp in splitSP:
             regexp = os.path.basename(sp)
@@ -1305,7 +1308,7 @@ class PlotSubplans(plugins.Action):
                 if re.findall(regexp, file):
                     subplan = os.path.join(dirName, file)
                     testName = file
-                    newTest = testmodel.TestCase(testName, testName, app, [], [])
+                    newTest = testmodel.TestCase(testName, os.path.join(dummyUserName, testName), app, [], dummyUser)
                     logFilePath = os.path.join(subplan, "APC_FILES", app.getConfigValue("log_file"))
                     testGraph.createPlotLines(str(version), logFilePath, newTest, None)
             version += 1

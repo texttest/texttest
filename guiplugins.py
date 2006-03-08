@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, string
+import plugins, os, sys, shutil, string, types
 from testmodel import TestCase, Application
 from threading import Thread
 from glob import glob
@@ -78,7 +78,7 @@ class InteractiveAction(plugins.Action):
     def matchesMode(self, dynamic):
         return 1
     def getScriptTitle(self):
-        return self.getTitle()
+        return self.getTitle().replace("_", "")
     def startExternalProgram(self, commandLine, description = "", shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
         process = plugins.BackgroundProcess(commandLine, description=description, shellTitle=shellTitle, \
                                             holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
@@ -152,57 +152,87 @@ class InteractiveAction(plugins.Action):
         guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     
 # Plugin for saving tests (standard)
-class SaveTest(InteractiveAction):
-    def __init__(self, test, oldOptionGroup):
-        InteractiveAction.__init__(self, test, oldOptionGroup, "Saving")
-        self.comparisons = []
-        if self.canPerformOnTest():
-            extensions = test.app.getVersionFileExtensions(forSave = 1)
-            # Include the default version always
-            extensions.append("")
-            self.addOption(oldOptionGroup, "v", "Version to save", test.app.getFullVersion(forSave = 1), extensions)
-            self.addSwitch(oldOptionGroup, "over", "Replace successfully compared files also", 0)
-            self.comparisons = test.state.getComparisons()
-            multipleComparisons = (len(self.comparisons) > 1)
-            if self.hasPerformance():
-                self.addSwitch(oldOptionGroup, "ex", "Exact Performance", multipleComparisons, "Average Performance")
-            if multipleComparisons:
-                failedStems = [ comp.stem for comp in self.comparisons]
-                self.addOption(oldOptionGroup, "sinf", "Save single file", possibleValues=failedStems)
+class SaveTests(InteractiveAction):
+    def __init__(self, object, oldOptionGroup):
+        InteractiveAction.__init__(self, object, oldOptionGroup, "Saving")
+        self.apps = object.apps
+        extensions = []
+        for app in self.apps:
+            for ext in app.getVersionFileExtensions(forSave = 1):
+                if not ext in extensions:
+                    extensions.append(ext)
+        # Include the default version always
+        extensions.append("")
+        self.addOption(oldOptionGroup, "v", "Version to save", self.getDefaultSaveOption(), extensions)
+        self.addSwitch(oldOptionGroup, "over", "Replace successfully compared files also", 0)
+        if self.hasPerformance():
+            self.addSwitch(oldOptionGroup, "ex", "Exact Performance", True, "Average Performance")
+        allStems = self.findAllStems()
+        self.addOption(oldOptionGroup, "sinf", "Save single file", possibleValues=allStems)
     def __repr__(self):
         return "Saving"
-    def canPerformOnTest(self):
-        return self.isSaveable(self.test)
-    def isSaveable(self, test):
-        return test and test.state.isSaveable()
     def getTitle(self):
         return "Save"
     def matchesMode(self, dynamic):
         return dynamic
+    def getDefaultSaveOption(self):
+        saveVersions = self.getSaveVersions()
+        if saveVersions.find(",") != -1:
+            return "<default> - " + saveVersions
+        else:
+            return saveVersions
+    def getSaveVersions(self):
+        saveVersions = []
+        for app in self.apps:
+            ver = self.getDefaultSaveVersion(app)
+            if not ver in saveVersions:
+                saveVersions.append(ver)
+        return string.join(saveVersions, ",")
+    def getDefaultSaveVersion(self, app):
+        return app.getFullVersion(forSave = 1)
     def hasPerformance(self):
-        for comparison in self.comparisons:
-            if comparison.getType() != "failure" and comparison.hasDifferences():
-                return 1
-        return 0
+        for app in self.apps:
+            if len(app.getConfigValue("performance_logfile_extractor")) > 0 or \
+               len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0:
+                return True
+        return False
+    def findAllStems(self):
+        allStems = []
+        for app in self.apps:
+            for stem in app.getPossibleResultFiles():
+                if not stem in allStems:
+                    allStems.append(stem)
+        return allStems
     def getExactness(self):
         return int(self.optionGroup.getSwitchValue("ex", 1))
-    def __call__(self, test):
-        version = self.optionGroup.getOptionValue("v")
-        saveDesc = " - version " + version + ", exactness " + str(self.getExactness())
+    def getVersion(self, test):
+        versionString = self.optionGroup.getOptionValue("v")
+        if versionString.startswith("<default>"):
+            return self.getDefaultSaveVersion(test.app)
+        else:
+            return versionString
+    def performOn(self, selTests):
+        saveDesc = ", exactness " + str(self.getExactness())
         singleFile = self.optionGroup.getOptionValue("sinf")
         if singleFile:
             saveDesc += ", only file with stem " + singleFile
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
-        self.describe(test, saveDesc)
-        testComparison = test.state
-        if testComparison:
-            if singleFile:
-                testComparison.saveSingle(singleFile, self.getExactness(), version)
-            else:
-                testComparison.save(self.getExactness(), version, overwriteSuccess)
-            test.notifyChanged()
+
+        for test in selTests:
+            if not test.state.isSaveable():
+                continue
+            version = self.getVersion(test)
+            fullDesc = " - version " + version + saveDesc
+            self.describe(test, fullDesc)
+            testComparison = test.state
+            if testComparison:
+                if singleFile:
+                    testComparison.saveSingle(singleFile, self.getExactness(), version)
+                else:
+                    testComparison.save(self.getExactness(), version, overwriteSuccess)
+                test.notifyChanged()
 
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!
@@ -733,9 +763,10 @@ class CopyTest(ImportTest):
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.testClasses =  [ SaveTest, RecordTest, EnableDiagnostics, CopyTest, RemoveTest ]
+        self.testClasses =  [ RecordTest, EnableDiagnostics, CopyTest, RemoveTest ]
         self.suiteClasses = [ ImportTestCase, ImportTestSuite, RemoveTest ]
         self.appClasses = [ SelectTests, RunTests, ResetGroups, SaveSelection ]
+        self.selectionClasses = [ SaveTests ]
         self.optionGroupMap = {}
     def getInstance(self, test, className):
         instance = self.makeInstance(className, test)
@@ -744,22 +775,24 @@ class InteractiveActionHandler:
     def storeOptionGroup(self, className, instance):
         if len(instance.getOptionGroups()) == 1:
             self.optionGroupMap[className] = instance.getOptionGroups()[0]
-    def getInstances(self, test, dynamic):
+    def getInstances(self, object, dynamic):
         instances = []
-        classList = self.getClassList(test)
+        classList = self.getClassList(object)
         for intvActionClass in classList:
-            instance = self.makeInstance(intvActionClass, test)
+            instance = self.makeInstance(intvActionClass, object)
             if instance.matchesMode(dynamic):
                 self.storeOptionGroup(intvActionClass, instance)
                 instances.append(instance)
         return instances
-    def getClassList(self, test):
-        if test.classId() == "test-case":
+    def getClassList(self, object):
+        if object.classId() == "test-case":
             return self.testClasses
-        elif test.classId() == "test-suite":
+        elif object.classId() == "test-suite":
             return self.suiteClasses
-        else:
+        elif object.classId() == "test-app":
             return self.appClasses
+        else:
+            return self.selectionClasses
     def makeInstance(self, className, test):
         module = test.getConfigValue("interactive_action_module")
         command = "from " + module + " import " + className.__name__ + " as realClassName"

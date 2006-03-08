@@ -70,6 +70,8 @@ class Configuration:
         return binary + " " + os.path.expandvars(test.options)
     def getApplicationEnvironment(self, app):
         return []
+    def getPossibleResultFiles(self, app):
+        return []
     def getCleanMode(self):
         return self.CLEAN_SELF
     def getRunIdentifier(self, prefix=""):

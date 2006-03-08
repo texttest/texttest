@@ -521,6 +521,11 @@ class ConfigurationWrapper:
             return self.target.getRunIdentifier(prefix)
         except:
             self.raiseException(req = "run id")
+    def getPossibleResultFiles(self, app):
+        try:
+            return self.target.getPossibleResultFiles(app)
+        except:
+            self.raiseException(req = "possible result files")
     def useExtraVersions(self):
         try:
             return self.target.useExtraVersions()
@@ -729,6 +734,8 @@ class Application:
     def getRunOptions(self):
         return "-d " + self.inputOptions.directoryName + " -a " + self.name + self.versionSuffix() \
                + " -c " + self.checkout + " " + self.configObject.getRunOptions()
+    def getPossibleResultFiles(self):
+        return self.configObject.getPossibleResultFiles(self)
     def addToOptionGroup(self, group):
         if group.name.startswith("Select"):
             group.addOption("vs", "Tests for version", self.getFullVersion())

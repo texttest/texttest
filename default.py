@@ -103,6 +103,9 @@ class Config(plugins.Configuration):
         if app.getConfigValue("create_catalogues") == "true":
             files.append("catalogue")
         files += app.getConfigValue("collate_file").keys()
+        files += app.getConfigValue("performance_logfile_extractor").keys()
+        if len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0:
+            files.append("performance")
         for file in app.getConfigValue("discard_file"):
             if file in files:
                 files.remove(file)

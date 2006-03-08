@@ -77,9 +77,6 @@ class ThreadedResponder(Responder):
             self.scriptEngine.applicationEvent("completion of test actions")
         else:
             self.workQueue.put((None, "allComplete"))
-    def runMain(self):
-        # typically call main loop of GUI library
-        pass
             
 class InteractiveResponder(Responder):
     def __init__(self, optionMap):

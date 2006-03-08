@@ -172,7 +172,7 @@ class SaveTests(InteractiveAction):
     def __repr__(self):
         return "Saving"
     def getTitle(self):
-        return "Save"
+        return "_Save"
     def matchesMode(self, dynamic):
         return dynamic
     def getDefaultSaveOption(self):

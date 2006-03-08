@@ -90,6 +90,9 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
             return "medium"
 
 class SgeSubmissionRules(CarmenSubmissionRules):
+    def __init__(self, optionMap, test, nightjob=False):
+        CarmenSubmissionRules.__init__(self, optionMap, test)
+        self.nightjob = nightjob
     def findQueue(self):
         # Carmen's queues are all 'hidden', requesting them directly is not allowed.
         # They must be requested by their 'queue resources', that have the same names...
@@ -101,7 +104,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         category = self.getPerformanceCategory()
         if category == "short":
             return "short"
-        elif category == "medium":
+        elif category == "medium" or self.nightjob:
             return "normal"
         else:
             return "idle"
@@ -198,7 +201,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         if queuesystem.queueSystemName(test.app) == "LSF":
             return LsfSubmissionRules(self.optionMap, test)
         else:
-            return SgeSubmissionRules(self.optionMap, test)
+            return SgeSubmissionRules(self.optionMap, test, self.isNightJob())
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob" or batchSession == "nightly_publish" or batchSession == "weekly_publish"

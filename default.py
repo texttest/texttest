@@ -1451,9 +1451,11 @@ class ReplaceText(plugins.Action):
                 dict[currKey] += " " + arg
         return dict
     def __call__(self, test):
+        logFile = test.makeFileName(self.logFile)
+        if not os.path.isfile(logFile):
+            return
         self.describe(test)
         sys.stdout.flush()
-        logFile = test.makeFileName(self.logFile)
         newLogFile = test.makeFileName("new_" + self.logFile)
         writeFile = open(newLogFile, "w")
         for line in open(logFile).xreadlines():

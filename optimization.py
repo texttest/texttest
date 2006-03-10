@@ -1241,9 +1241,9 @@ class GraphPlotResponder(Responder):
             print e
 
 # This is the action responsible for plotting from the GUI.
-class PlotTestInGUI(guiplugins.InteractiveAction):
+class PlotTestInGUI(guiplugins.InteractiveTestAction):
     def __init__(self, test, oldOptionGroup = None):
-        guiplugins.InteractiveAction.__init__(self, test, oldOptionGroup, "Graph")
+        guiplugins.InteractiveTestAction.__init__(self, test, "Graph")
         self.createGUITestGraph(oldOptionGroup)
     def createGUITestGraph(self, oldOptionGroup = []):
         self.testGraph = TestGraph()
@@ -1259,6 +1259,8 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
+    def isFrequentUse(self):
+        return True
     def __call__(self, test):
         self.testGraph.createPlotLinesForTest(test)
         self.plotGraph(test.app.writeDirectory)  
@@ -2025,12 +2027,12 @@ class SelectorWeekend(testoverview.Selector):
     def __repr__(self):
         return "Weekend"
     
-class StartStudio(guiplugins.InteractiveAction):
+class StartStudio(guiplugins.InteractiveTestAction):
     def __repr__(self):
         return "Studio"
     def getTitle(self):
         return "_Studio"
-    def getScriptTitle(self):
+    def getScriptTitle(self, tab):
         return "Start Studio"
     def matchesMode(self, dynamic):
         return not dynamic
@@ -2054,7 +2056,7 @@ class StartStudio(guiplugins.InteractiveAction):
 
 guiplugins.interactiveActionHandler.testClasses += [ StartStudio ]
 
-class CVSLogInGUI(guiplugins.InteractiveAction):
+class CVSLogInGUI(guiplugins.InteractiveTestAction):
     def __call__(self, test):
         logFileStem = test.app.getConfigValue("log_file")
         files = [ logFileStem ]

@@ -22,46 +22,54 @@ def showError(message):
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show()
 
+class DoubleCheckDialog:
+    def __init__(self, message, yesMethod, yesMethodArgs=()):        
+        self.dialog = gtk.Dialog("TextTest Query", flags=gtk.DIALOG_MODAL)
+        self.yesMethod = yesMethod
+        self.yesMethodArgs = yesMethodArgs
+        guilog.info("QUERY : " + message)
+        noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
+        yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
+        self.dialog.set_modal(True)
+        label = gtk.Label(message)
+        self.dialog.vbox.pack_start(label, expand=True, fill=True)
+        label.show()
+        # ScriptEngine cannot handle different signals for the same event (e.g. response
+        # from gtk.Dialog), so we connect the individual buttons instead ...
+        scriptEngine.connect("answer no to texttest query", "clicked", noButton, self.respond, gtk.RESPONSE_NO, False)
+        scriptEngine.connect("answer yes to texttest query", "clicked", yesButton, self.respond, gtk.RESPONSE_YES, True)
+        self.dialog.show()
+    def respond(self, button, saidYes, *args):
+        if saidYes:
+            self.yesMethod(*self.yesMethodArgs)
+        self.dialog.destroy()
+
 def renderParentsBold(column, cell, model, iter):
     if model.iter_has_child(iter):
         cell.set_property('font', "bold")
     else:
         cell.set_property('font', "")
 
-class ApplicationGroup:
-    def __init__(self, apps):
-        self.apps = apps
-    def classId(self):
-        return "app-group"
-    def getConfigValue(self, entryName):
-        prevValue = None
-        for app in self.apps:
-            currValue = app.getConfigValue(entryName)
-            if not prevValue is None and currValue != prevValue:
-                print "WARNING - GUI configuration differs between applications, ignoring that from", app
-            else:
-                prevValue = currValue
-        return prevValue
-
-class QuitGUI(guiplugins.InteractiveAction):
-    def __init__(self, apps, dynamic, topWindow, actionThread):
-        guiplugins.InteractiveAction.__init__(self, apps, [])
+class QuitGUI(guiplugins.SelectionAction):
+    def __init__(self, rootSuites, dynamic, topWindow, actionThread):
+        guiplugins.SelectionAction.__init__(self, rootSuites)
         self.dynamic = dynamic
         self.topWindow = topWindow
         self.actionThread = actionThread
         scriptEngine.connect("close window", "delete_event", topWindow, self.exit)
     def getTitle(self):
         return "_Quit"
-    def performOn(self, tests):
+    def performOn(self, tests, selCmd):
         processesToReport = self.processesToReport()
         runningProcesses = guiplugins.processTerminationMonitor.listRunning(processesToReport)
-        if len(runningProcesses) != 0:
-            self.showQuery("\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n", self.topWindow, self.killDialogNo, self.exit)
-        else:
+        if len(runningProcesses) == 0:
             # Generate a window closedown, so that the quit button behaves the same as closing the window
             self.exit()
+        else:
+            message = "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n"
+            self.dialog = DoubleCheckDialog(message, self.exit)
     def processesToReport(self):
-        queryValues = self.test.getConfigValue("query_kill_processes")
+        queryValues = self.getConfigValue("query_kill_processes")
         processes = []
         if queryValues.has_key("default"):
             processes += queryValues["default"]
@@ -70,22 +78,6 @@ class QuitGUI(guiplugins.InteractiveAction):
         elif queryValues.has_key("static"):        
             processes += queryValues["static"]
         return processes
-    def showQuery(self, message, parent, noMethod, yesMethod):
-        guilog.info("QUERY : " + message)
-        dialog = gtk.Dialog("TextTest Query", parent=parent, flags=gtk.DIALOG_MODAL|gtk.DIALOG_DESTROY_WITH_PARENT)
-        noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
-        yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        dialog.set_modal(True)
-        label = gtk.Label(message)
-        dialog.vbox.pack_start(label, expand=True, fill=True)
-        label.show()
-        # ScriptEngine cannot handle different signals for the same event (e.g. response
-        # from gtk.Dialog), so we connect the individual buttons instead ...
-        scriptEngine.connect("answer no to texttest query", "clicked", noButton, noMethod, gtk.RESPONSE_NO, dialog)
-        scriptEngine.connect("answer yes to texttest query", "clicked", yesButton, yesMethod, gtk.RESPONSE_YES, dialog)
-        dialog.show()
-    def killDialogNo(self, button, *data):
-        data[0].destroy()
     def exit(self, *args):
         self.topWindow.destroy()
         gtk.main_quit()
@@ -93,20 +85,6 @@ class QuitGUI(guiplugins.InteractiveAction):
         if self.actionThread:
             self.actionThread.terminate()
         guiplugins.processTerminationMonitor.killAll()    
-
-# This is a hack and should go away!
-class ViewApp(guiplugins.InteractiveAction):
-    def __init__(self, viewMethod):
-        self.viewMethod = viewMethod
-    def getTitle(self):
-        return "_View App"
-    def performOn(self, selTests):
-        for test in selTests:
-            self.viewMethod(test)
-    def canPerformOnTest(self):
-        return True
-    def getOptionGroups(self):
-        return []
 
 class TextTestGUI(ThreadedResponder):
     def __init__(self, optionMap):
@@ -120,7 +98,7 @@ class TextTestGUI(ThreadedResponder):
         self.rightWindowGUI = None
         self.selectionActionGUI = None
         self.contents = None
-        self.applications = []
+        self.rootSuites = []
     def readGtkRCFile(self):
         configDir = plugins.getPersonalConfigDir()
         if not configDir:
@@ -151,9 +129,9 @@ class TextTestGUI(ThreadedResponder):
         return win
     def getAppNames(self):
         names = []
-        for app in self.applications:
-            if not app.fullName in names:
-                names.append(app.fullName)
+        for suite in self.rootSuites:
+            if not suite.app.fullName in names:
+                names.append(suite.app.fullName)
         return string.join(names, ",")
     def fillTopWindow(self, topWindow, testWins):
         mainWindow = self.createWindowContents(testWins)
@@ -172,11 +150,7 @@ class TextTestGUI(ThreadedResponder):
     def getWindowHeight(self):
         return (gtk.gdk.screen_height() * 5) / 6
     def getWindowWidth(self):
-        screenWidth = gtk.gdk.screen_width()
-        if self.dynamic:
-            return (screenWidth) / 2
-        else:
-            return (screenWidth * 2) / 5
+        return gtk.gdk.screen_width() / 2
     def createIterMap(self):
         guilog.info("Mapping tests in tree view...")
         iter = self.model.get_iter_root()
@@ -202,7 +176,7 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 2, app)
         self.model.set_value(iter, 3, nodeName)
     def addSuite(self, suite):
-        self.applications.append(suite.app)
+        self.rootSuites.append(suite)
         if suite.app.getConfigValue("add_shortcut_bar"):
             scriptEngine.enableShortcuts = 1
         if not self.dynamic:
@@ -254,17 +228,9 @@ class TextTestGUI(ThreadedResponder):
         self.contents.show()
         return self.contents
     def createSelectionActionGUI(self, topWindow, actionThread):
-        appGroup = ApplicationGroup(self.applications)
-        actions = [ QuitGUI(appGroup, self.dynamic, topWindow, actionThread) ]
-        actions += guiplugins.interactiveActionHandler.getInstances(appGroup, self.dynamic)
-        if not self.dynamic:
-            actions.append(ViewApp(self.viewAppFromTest))
-        return SelectionActionGUI(actions, self.selection)
-    def viewAppFromTest(self, test):
-        app = test.app
-        if not self.rightWindowGUI.object is app:
-            guilog.info("Viewing app " + repr(app))
-            self.recreateTestView(app)
+        actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
+        actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
+        return SelectionActionGUI(actions, self.selection, self.itermap)
     def createTestWindows(self, treeWindow):
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
@@ -335,8 +301,9 @@ class TextTestGUI(ThreadedResponder):
         idle_add(self.pickUpProcess)
         gtk.main()
     def createDefaultRightGUI(self):
-        iter = self.model.get_iter_root()
-        self.viewTestAtIter(iter)
+        rootSuite = self.rootSuites[0]
+        guilog.info("Viewing test " + repr(rootSuite))
+        self.recreateTestView(rootSuite)
     def pickUpChange(self):
         response = self.processChangesMainThread()
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
@@ -471,7 +438,7 @@ class TextTestGUI(ThreadedResponder):
             self.contents.remove(self.rightWindowGUI.getWindow())
             self.rightWindowGUI = None
         if test.classId() == "test-app":
-            self.rightWindowGUI = ApplicationGUI(test, self.selection, self.itermap, self.selectionActionGUI)
+            self.rightWindowGUI = ApplicationGUI(test, self.selectionActionGUI)
         else:
             if checkUpToDate and test.state.isComplete() and test.state.needsRecalculation():
                 cmpAction = comparetest.MakeComparisons()
@@ -486,56 +453,85 @@ class TextTestGUI(ThreadedResponder):
             self.contents.show()
 
 class InteractiveActionGUI:
-    def __init__(self, actions, performMethod = None):
+    def __init__(self, actions, test = None):
         self.actions = actions
+        self.test = test
         self.buttons = self.makeButtons()
-        self.performMethod = performMethod
+        self.pageDescriptions = { "Test" : {} }
     def makeButtons(self):
         executeButtons = gtk.HBox()
-        for instance in self.actions:
-            buttonTitle = instance.getTitle()
-            if instance.canPerformOnTest():
-                self.addButton(self.runInteractive, executeButtons, buttonTitle, instance.getScriptTitle(), instance)
+        buttonInstances = filter(lambda instance : instance.inToolBar(), self.actions)
+        for instance in buttonInstances:
+            button = self.createButton(self.runInteractive, instance.getTitle(), instance.getScriptTitle(tab=False), instance)
+            executeButtons.pack_start(button, expand=False, fill=False)
+        if len(buttonInstances) > 0:
+            buttonTitles = map(lambda b: b.getTitle(), buttonInstances)
+            guilog.info("Creating tool bar with buttons : " + string.join(buttonTitles, ", "))
         executeButtons.show()
         return executeButtons
-    def addButton(self, method, buttonbox, label, scriptTitle, option):
+    def createButton(self, method, label, scriptTitle, option):
         button = gtk.Button(label)
         scriptEngine.connect(scriptTitle.replace("_", ""), "clicked", button, method, None, option)
         button.show()
-        buttonbox.pack_start(button, expand=False, fill=False)
+        return button
     def runInteractive(self, button, action, *args):
+        message = "This action can remove a lot of data. Are you sure you wish to proceed?"
+        if action.performDoubleCheck():
+            self.dialog = DoubleCheckDialog(message, self._runInteractive, (action,))
+        else:
+            self._runInteractive(action)
+    def _runInteractive(self, action):
         try:
             self.performInteractiveAction(action)
         except plugins.TextTestError, e:
             showError(str(e))
-    def performInteractiveAction(self, action):
-        self.performMethod(action)
+    def getPageDescription(self, pageName, subPageName = ""):
+        if subPageName:
+            return self.pageDescriptions.get(pageName).get(subPageName)
+        else:
+            return self.pageDescriptions.get("Test").get(pageName)
     def createOptionGroupPages(self):
-        pages = []
+        pages = seqdict()
+        pages["Test"] = []
         for instance in self.actions:
-            for optionGroup in instance.getOptionGroups():
+            instanceTab = instance.getGroupTabTitle()
+            optionGroups = instance.getOptionGroups()
+            hasButton = len(optionGroups) == 1 and instance.canPerform()
+            for optionGroup in optionGroups:
                 if optionGroup.switches or optionGroup.options:
-                    guilog.info("") # blank line
-                    guilog.info("Creating notebook page for '" + optionGroup.name + "'")
-                    display = self.createDisplay(optionGroup)
-                    pages.append((display, optionGroup.name))
+                    display, displayDesc = self.createDisplay(optionGroup, hasButton, instance)
+                    pageDesc = "Viewing notebook page for '" + optionGroup.name + "'\n" + displayDesc
+                    if not pages.has_key(instanceTab):
+                        pages[instanceTab] = []
+                        self.pageDescriptions[instanceTab] = {}
+                    self.pageDescriptions[instanceTab][optionGroup.name] = pageDesc
+                    pages[instanceTab].append((display, optionGroup.name))
         return pages
-    def createDisplay(self, optionGroup):
+    def createDisplay(self, optionGroup, hasButton, instance):
         vboxWindow = gtk.ScrolledWindow()
         vbox = gtk.VBox()
+        displayDesc = ""
         for option in optionGroup.options.values():
             hbox = self.createOptionBox(option)
+            displayDesc += self.diagnoseOption(option) + "\n"
             vbox.pack_start(hbox, expand=False, fill=False)
         for switch in optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
+            displayDesc += self.diagnoseSwitch(switch) + "\n"
             vbox.pack_start(hbox, expand=False, fill=False)
+        if hasButton:
+            button = self.createButton(self.runInteractive, instance.getTitle(), instance.getScriptTitle(tab=True), instance)
+            buttonbox = gtk.HBox()
+            buttonbox.pack_start(button, expand=True, fill=False)
+            buttonbox.show()
+            vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
+            displayDesc += "Viewing button with title '" + instance.getTitle() + "'"
         vboxWindow.add_with_viewport(vbox)
         vbox.show()
         vboxWindow.show()
-        return vboxWindow
+        return vboxWindow, displayDesc
     def createOptionBox(self, option):
         hbox = gtk.HBox()
-        self.diagnoseOption(option)
         label = gtk.Label(option.name + "  ")
         hbox.pack_start(label, expand=False, fill=True)
         if len(option.possibleValues) > 1:
@@ -555,7 +551,6 @@ class InteractiveActionGUI:
         hbox.show()
         return hbox
     def createSwitchBox(self, switch):
-        self.diagnoseSwitch(switch)
         if switch.nameForOff:
             radioButton1 = gtk.RadioButton(None, switch.name)
             radioButton2 = gtk.RadioButton(radioButton1, switch.nameForOff)
@@ -584,48 +579,114 @@ class InteractiveActionGUI:
             return checkButton
     def diagnoseOption(self, option):
         value = option.getValue()
-        text = "Creating entry for option '" + option.name + "'"
+        text = "Viewing entry for option '" + option.name + "'"
         if len(value) > 0:
             text += " (set to '" + value + "')"
         if len(option.possibleValues) > 1:
             text += " (drop-down list containing " + repr(option.possibleValues) + ")"
-        guilog.info(text)
+        return text
     def diagnoseSwitch(self, switch):
         value = switch.getValue()
         if switch.nameForOff:
-            text = "Creating radio button for switch '" + switch.name + "/" + switch.nameForOff + "'"
+            text = "Viewing radio button for switch '" + switch.name + "/" + switch.nameForOff + "'"
         else:
-            text = "Creating check button for switch '" + switch.name + "'"
+            text = "Viewing check button for switch '" + switch.name + "'"
         if value:
             text += " (checked)"
-        guilog.info(text)            
+        return text
+    def performInteractiveAction(self, action):
+        self.test.callAction(action)
 
 class SelectionActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, selection):
+    def __init__(self, actions, selection, itermap):
         InteractiveActionGUI.__init__(self, actions)
         self.selection = selection
+        self.lastSelectionTests = []
+        self.lastSelectionCmd = ""
+        self.itermap = {}
+        for test, iter in itermap.items():
+            if not self.itermap.has_key(test.app):
+                self.itermap[test.app] = {}
+            self.itermap[test.app][test] = iter
     def performInteractiveAction(self, action):
-        action.performOn(self.getSelectedTests())
+        selTests = self.getSelectedTests()
+        selCmd = None
+        # Selection with versions doesn't work from the command line right now, work around...
+        if selTests == self.lastSelectionTests and self.lastSelectionCmd and self.lastSelectionCmd.find("-vs") == -1:
+            selCmd = self.lastSelectionCmd
+        returnVal = action.performOn(selTests, selCmd)
+        if returnVal:
+            # selection changed by action
+            self.lastSelectionTests, self.lastSelectionCmd = returnVal
+            self.selectInGUI()
     def getSelectedTests(self):
         tests = []
         self.selection.selected_foreach(self.addSelTest, tests)
         return tests
     def addSelTest(self, model, path, iter, tests, *args):
         tests.append(model.get_value(iter, 2))
+    def selectInGUI(self):
+        self.selection.unselect_all()
+        for test in self.lastSelectionTests:
+            iter = self.itermap[test.app][test]
+            self.selection.select_iter(iter)
+        self.selection.get_tree_view().grab_focus()
+        first = self.getFirstSelectedTest()
+        if first != None:
+            self.selection.get_tree_view().scroll_to_cell(first, None, True, 0.1)
+        guilog.info("Marking " + str(len(self.getSelectedTests())) + " tests as selected")
+    def getFirstSelectedTest(self):
+        firstTest = []
+        self.selection.selected_foreach(self.findFirstTest, firstTest)
+        if len(firstTest) != 0:
+            return firstTest[0]
+        else:
+            return None
+    def findFirstTest(self, model, path, iter, firstTest, *args):
+        if len(firstTest) == 0:
+            firstTest.append(path)    
 
 class RightWindowGUI:
     def __init__(self, object, dynamic, selectionActionGUI):
         self.object = object
         self.dynamic = dynamic
-        self.selectionActionGUI = selectionActionGUI
         self.fileViewAction = guiplugins.interactiveActionHandler.getInstance(object, guiplugins.ViewFile)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.addFilesToModel()
         view = self.createView()
         hardcodedPages = self.getHardcodedNotebookPages()
-        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(), self.performInteractiveAction)
-        notebook = self.createNotebook(hardcodedPages + selectionActionGUI.createOptionGroupPages())
-        self.window = self.createWindow(view, notebook)
+        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(), object)
+        self.selectionActionGUI = selectionActionGUI
+        self.notebook = self.createNotebook(hardcodedPages, selectionActionGUI)
+        self.describeNotebook(self.notebook, None, 0)
+        self.window = self.createWindow(view, self.notebook)
+    def describeNotebook(self, notebook, pagePtr, pageNum, *args):
+        outerPageNum, innerPageNum = self.getPageNumbers(notebook, pageNum)
+        currentPage, currentPageText = self.getPageText(self.notebook, outerPageNum)
+        subPageText = ""
+        if isinstance(currentPage, gtk.Notebook):
+            subPage, subPageText = self.getPageText(currentPage, innerPageNum)
+        pageDesc = self.getPageDescription(currentPageText, subPageText)
+        if pageDesc:
+            guilog.info("")
+            guilog.info(pageDesc)
+        # Can get here viewing text info window...
+    def getPageNumbers(self, notebook, pageNum):
+        if notebook is self.notebook:
+            return pageNum, None
+        else:
+            return None, pageNum
+    def getPageText(self, notebook, pageNum = None):
+        if pageNum is None:
+            pageNum = notebook.get_current_page()
+        page = notebook.get_nth_page(pageNum)
+        return page, notebook.get_tab_label_text(page)
+    def getPageDescription(self, currentPageText, subPageText):
+        selectionDesc = self.selectionActionGUI.getPageDescription(currentPageText, subPageText)
+        if selectionDesc:
+            return selectionDesc
+        else:
+            return self.intvActionGUI.getPageDescription(currentPageText, subPageText)
     def getWindow(self):
         return self.window
     def createView(self):
@@ -660,9 +721,23 @@ class RightWindowGUI:
                 self.model.set_value(fciter, 4, details)
                 guilog.info("(Second column '" + details + "' coloured " + colour + ")")
         return fciter
-    def createNotebook(self, pages):
-        pages += self.intvActionGUI.createOptionGroupPages()
+    def createNotebook(self, hardcodedPages, selectionActionGUI):
+        testCasePageDir = self.intvActionGUI.createOptionGroupPages()
+        pageDir = selectionActionGUI.createOptionGroupPages()
+        pageDir["Test"] = hardcodedPages + testCasePageDir["Test"] + pageDir["Test"]
+        if len(pageDir) == 1:
+            pages = pageDir["Test"]
+        else:
+            pages = []
+            for groupTab, tabPages in pageDir.items():
+                if len(tabPages) > 0:
+                    tabNotebook = scriptEngine.createNotebook("view sub-options for " + groupTab + " :", tabPages)
+                    tabNotebook.show()
+                    tabNotebook.connect("switch-page", self.describeNotebook)
+                    pages.append((tabNotebook, groupTab))
+                
         notebook = scriptEngine.createNotebook("view options for", pages)
+        notebook.connect("switch-page", self.describeNotebook)
         notebook.show()
         return notebook
     def getHardcodedNotebookPages(self):
@@ -690,17 +765,9 @@ class RightWindowGUI:
             showError(str(e))
     
 class ApplicationGUI(RightWindowGUI):
-    def __init__(self, app, selection, itermap, selectionActionGUI):
+    def __init__(self, app, selectionActionGUI):
         self.app = app
         RightWindowGUI.__init__(self, app, 1, selectionActionGUI)
-        self.selection = selection
-        self.lastSelectionTests = []
-        self.lastSelectionCmd = ""
-        self.itermap = {}
-        for test, iter in itermap.items():
-            if not self.itermap.has_key(test.app):
-                self.itermap[test.app] = {}
-            self.itermap[test.app][test] = iter
     def addFilesToModel(self):
         confiter = self.model.insert_before(None, None)
         self.model.set_value(confiter, 0, "Configuration Files")
@@ -713,49 +780,6 @@ class ApplicationGUI(RightWindowGUI):
         for file in configFiles:
             fullPath = os.path.join(self.app.abspath, file)
             self.addFileToModel(confiter, fullPath, None, colour)
-    def performInteractiveAction(self, action):
-        if isinstance(action, guiplugins.SelectTests):
-            self.selectTests(action)
-        else:
-            selTests = self.selectionActionGUI.getSelectedTests()
-            selCmd = None
-            if selTests == self.lastSelectionTests:
-                selCmd = self.lastSelectionCmd
-            action.performOn(self.app, selTests, selCmd)
-    def selectTests(self, action):
-        self.lastSelectionTests, self.lastSelectionCmd = action.getSelectedTests(self.getRootSuites())
-        self.selection.unselect_all()
-        for test in self.lastSelectionTests:
-            iter = self.itermap[test.app][test]
-            self.selection.select_iter(iter)
-        self.selection.get_tree_view().grab_focus()
-        first = self.getFirstSelectedTest()
-        if first != None:
-            self.selection.get_tree_view().scroll_to_cell(first, None, True, 0.1)
-        guilog.info("Marking " + str(len(self.selectionActionGUI.getSelectedTests())) + " tests as selected")
-    def getFirstSelectedTest(self):
-        firstTest = []
-        self.selection.selected_foreach(self.findFirstTest, firstTest)
-        if len(firstTest) != 0:
-            return firstTest[0]
-        else:
-            return None
-    def findFirstTest(self, model, path, iter, firstTest, *args):
-        if len(firstTest) == 0:
-            firstTest.append(path)    
-    def getRootSuites(self):
-        suites = [ self.getRootSuite(self.app) ]
-        for extraApp in self.app.extras:
-            suites.append(self.getRootSuite(extraApp))
-        return suites
-    def getRootSuite(self, app):
-        sampleTest = self.itermap[app].keys()[0]
-        return self.getRoot(sampleTest)
-    def getRoot(self, test):
-        if test.parent:
-            return self.getRoot(test.parent)
-        else:
-            return test
     
 class TestCaseGUI(RightWindowGUI):
     def __init__(self, test, dynamic, selectionActionGUI):
@@ -764,8 +788,12 @@ class TestCaseGUI(RightWindowGUI):
         RightWindowGUI.__init__(self, test, dynamic, selectionActionGUI)
         self.testComparison = None
     def getHardcodedNotebookPages(self):
-        textview = self.createTextView(self.test)
-        return [(textview, "Text Info")]
+        testInfo = self.getTestInfo(self.test)
+        if testInfo:
+            textview = self.createTextView(testInfo)
+            return [(textview, "Text Info")]
+        else:
+            return []
     def addFilesToModel(self):
         if self.test.state.hasStarted():
             try:
@@ -923,12 +951,15 @@ class TestCaseGUI(RightWindowGUI):
             return self.colours["failure"]
         else:
             return self.colours["running"]
-    def createTextView(self, test):
+    def getTestInfo(self, test):
+        if not test or test.classId() != "test-case":
+            return ""
+        return test.app.configObject.getTextualInfo(test)
+    def createTextView(self, testInfo):
         textViewWindow = gtk.ScrolledWindow()
         textview = gtk.TextView()
         textview.set_wrap_mode(gtk.WRAP_WORD)
         textbuffer = textview.get_buffer()
-        testInfo = self.getTestInfo(test)
         if len(testInfo):
             guilog.info("---------- Text Info Window ----------")
             guilog.info(testInfo)
@@ -940,12 +971,6 @@ class TestCaseGUI(RightWindowGUI):
         textview.show()
         textViewWindow.show()
         return textViewWindow
-    def getTestInfo(self, test):
-        if not test or test.classId() != "test-case":
-            return ""
-        return test.app.configObject.getTextualInfo(test)
-    def performInteractiveAction(self, action):
-        self.test.callAction(action)
     
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):

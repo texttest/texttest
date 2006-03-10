@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.23 2006/03/06 09:45:06 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.24 2006/03/10 16:14:28 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -151,7 +151,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
 class RecordTest(guiplugins.RecordTest):
     def __init__(self, test, oldOptionGroup):
         guiplugins.RecordTest.__init__(self, test, oldOptionGroup)
-        if self.canPerformOnTest():
+        if self.canPerform():
             self.optionGroup.addOption("rset", "Compile this ruleset first", possibleValues=self.findRuleSets(test))
     def findRuleSets(self, test):
         carmUsr = test.getEnvironment("CARMUSR")

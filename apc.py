@@ -273,7 +273,7 @@ class CheckFilesForApc(plugins.Action):
         verifyAirportFile(getArchitecture(test.app))
         verifyLogFileDir(getArchitecture(test.app))        
 
-class ViewApcLog(guiplugins.InteractiveAction):
+class ViewApcLog(guiplugins.InteractiveTestAction):
     def __repr__(self):
         return "Viewing log of"
     def __call__(self, test):
@@ -1535,7 +1535,7 @@ class CopyMPSFiles(plugins.Action):
             shutil.copyfile(fileName, newFileName)
             os.system("gzip " + newFileName)
 
-class SaveBestSolution(guiplugins.InteractiveAction):
+class SaveBestSolution(guiplugins.InteractiveTestAction):
     def __call__(self, test):
         import shutil
         # If we have the possibility to save, we know that the current solution is best

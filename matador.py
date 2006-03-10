@@ -591,27 +591,31 @@ class PrintStrings(plugins.Action):
             print line
 
 class SelectTests(guiplugins.SelectTests):
-    def __init__(self, app, oldOptionGroup):
-        guiplugins.SelectTests.__init__(self, app, oldOptionGroup)
-        featureFile = os.path.join(app.abspath, "features." + app.name)
+    def __init__(self, rootSuites, oldOptionGroup):
+        guiplugins.SelectTests.__init__(self, rootSuites, oldOptionGroup)
         self.features = []
-        if os.path.exists(featureFile):
+        for app in self.apps:
+            featureFile = os.path.join(app.abspath, "features." + app.name)
+            if not os.path.exists(featureFile):
+                continue
             for line in open(featureFile).readlines():
                 parts = line.split()
                 if len(parts) > 0:
                     featureName = line.replace("\n", "")
                     self.addSwitch(oldOptionGroup, featureName, featureName, 0)
                     self.features.append(featureName)
-    def getSelectedTests(self, rootTestSuites):
-        tests, testCmd = guiplugins.SelectTests.getSelectedTests(self, rootTestSuites)
+    def performOn(self, selTests, selCmd):
+        tests, testCmd = guiplugins.SelectTests.performOn(self, selTests, selCmd)
         selectedFeatures = self.getSelectedFeatures()
         if len(selectedFeatures) == 0:
             return tests, testCmd
         selectedTests = []
+        guiplugins.guilog.info("Selected " + str(len(selectedFeatures)) + " features...")
         grepCommand = "grep -E '" + string.join(selectedFeatures, "|") + "'"
         for test in tests:
             logFile = test.makeFileName("output")
-            if os.system("tail -100 " + logFile + " | " + grepCommand + " > /dev/null 2>1") == 0:
+            commandLine = "tail -100 " + logFile + " | " + grepCommand + " > /dev/null 2>1"
+            if os.system(commandLine) == 0:
                 selectedTests.append(test)
         # There is no way to select features from the command line...
         return selectedTests, None

@@ -1433,7 +1433,7 @@ class ReplaceText(plugins.Action):
     def __init__(self, args):
         argDict = self.parseArguments(args)
         self.oldText = argDict["old"]
-        self.newText = argDict["new"]
+        self.newText = argDict["new"].replace("\\n", "\n")
         self.logFile = None
         if argDict.has_key("file"):
             self.logFile = argDict["file"]

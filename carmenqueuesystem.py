@@ -68,7 +68,7 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
             self.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
         self.archToUse = getArchitecture(self.test.app)
-        if self.archToUse == "x86_64_linux" and "12" in self.test.app.versions:
+        if self.archToUse == "x86_64_linux" and "12" in self.test.app.versions and not "boost" in self.test.app.versions:
             # circumvent the resources, we can run fine on this much larger group of machines
             self.archToUse = "i386_linux"
     def getShortQueueSeconds(self):

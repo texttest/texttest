@@ -24,6 +24,26 @@ def tmpString():
     else:
         return "tmp"
 
+def makeString(char, length):
+    if length <= 0:
+        return ""
+    result = ""
+    for x in range(length):
+        result += char
+    return result
+        
+# Adjust (left/center/right) text in string of a specified length,
+# i.e. pad with spaces to the left and/or right.
+def adjustText(text, length, adjustment):
+    if adjustment == "left":
+        return text + makeString(' ', length - len(text))
+    elif adjustment == "center":
+        leftSpaces = (length - text) / 2
+        rightSpaces = length - text - leftSpaces # To adjust for integer division (text will be exactly in the middle, or one step to the left)
+        return makeString(' ', leftSpaces) + text + makeString(' ', rightSpaces)
+    else:
+        return makeString(' ', length - len(text)) + text        
+
 # Parse a time string, either a HH:MM:SS string, or a single int/float,
 # which is interpreted as a number of minutes, for backwards compatibility.
 # Observe that in either 'field' in the HH:MM:SS case, any number is allowed,

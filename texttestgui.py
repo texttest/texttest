@@ -98,6 +98,8 @@ class TextTestGUI(ThreadedResponder):
         self.rightWindowGUI = None
         self.selectionActionGUI = None
         self.contents = None
+        self.totalNofTests = 0
+        self.progressMonitor = None
         self.rootSuites = []
     def readGtkRCFile(self):
         configDir = plugins.getPersonalConfigDir()
@@ -136,15 +138,28 @@ class TextTestGUI(ThreadedResponder):
     def fillTopWindow(self, topWindow, testWins):
         mainWindow = self.createWindowContents(testWins)
         shortcutBar = scriptEngine.createShortcutBar()
+
+        vbox = gtk.VBox()
+        vbox.pack_start(self.selectionActionGUI.buttons, expand=False, fill=False)
+                
+        # Should we monitor progress? Must be checked after
+        # addSuiteWithParents has counted all tests ...
+        if self.dynamic:
+            for app in self.rootSuites:
+                testProgressOptions = app.getConfigValue("test_progress")
+                if testProgressOptions.has_key("show") and testProgressOptions["show"][0] == "1":
+                    self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.rootSuites)
+                    progressBar = self.progressMonitor.createProgressBar()
+                    progressBar.show()
+                    vbox.pack_start(progressBar, expand=False, fill=True)
+                    break
+
+        vbox.pack_start(mainWindow, expand=True, fill=True)
         if shortcutBar:
-            vbox = gtk.VBox()
-            vbox.pack_start(mainWindow, expand=True, fill=True)
             vbox.pack_start(shortcutBar, expand=False, fill=False)
             shortcutBar.show()
-            vbox.show()
-            topWindow.add(vbox)
-        else:
-            topWindow.add(mainWindow)
+        vbox.show()
+        topWindow.add(vbox)
         topWindow.show()
         topWindow.resize(self.getWindowWidth(), self.getWindowHeight())
     def getWindowHeight(self):
@@ -184,6 +199,8 @@ class TextTestGUI(ThreadedResponder):
         if not self.dynamic or suite.size() > 0:
             self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
+        if suite.classId() == "test-case":
+            self.totalNofTests += 1        
         iter = self.model.insert_before(parent, None)
         nodeName = suite.name
         if parent == None:
@@ -234,7 +251,6 @@ class TextTestGUI(ThreadedResponder):
     def createTestWindows(self, treeWindow):
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
-        vbox.pack_start(self.selectionActionGUI.buttons, expand=False, fill=False)
         vbox.pack_start(treeWindow, expand=True, fill=True)
         vbox.show()
         return vbox
@@ -344,6 +360,8 @@ class TextTestGUI(ThreadedResponder):
         if self.dynamic and secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 5) + ")")
 
+        if self.progressMonitor != None and test.classId() == "test-case":
+            self.progressMonitor.update(test, state)
         if state.isComplete() and test.getConfigValue("auto_collapse_successful") == 1:
             self.collapseIfAllComplete(self.model.iter_parent(iter))               
     def redrawSuite(self, suite):
@@ -670,7 +688,7 @@ class RightWindowGUI:
         if pageDesc:
             guilog.info("")
             guilog.info(pageDesc)
-        # Can get here viewing text info window...
+        # Can get here viewing text info window ...
     def getPageNumbers(self, notebook, pageNum):
         if notebook is self.notebook:
             return pageNum, None
@@ -999,3 +1017,194 @@ class ImportTestCase(guiplugins.ImportTestCase):
             if self.optionGroup.getSwitchValue("version"):
                 options += " -v 2.4"
         return options
+
+# Class that keeps track of (and possibly shows) the progress of
+# pending/running/completed tests
+class TestProgressMonitor:
+    def __init__(self, totalNofTests, applications):
+        # If we get here, we know that we want to show progress
+        self.completedTests = {}
+        self.totalNofTests = totalNofTests
+        self.nofCompletedTests = 0
+        self.nofPendingTests = 0
+        self.nofRunningTests = 0
+        self.nofSuccessfulTests = 0
+        self.nofFasterTests = 0
+        self.nofSlowerTests = 0
+        self.nofSmallerTests = 0
+        self.nofLargerTests = 0
+        self.nofUnrunnableTests = 0
+        self.nofCrashedTests = 0
+        self.nofBetterTests = 0
+        self.nofWorseTests = 0
+        self.nofDifferentTests = 0
+        self.nofMissingFilesTests = 0
+        self.nofNewFilesTests = 0
+        self.nofFailedTests = 0
+        self.nofNoResultTests = 0
+        self.nofKilledTests = 0
+        self.nofUnreportedBugsTests = 0
+        self.nofKnownBugsTests = 0
+        
+        # Where we print the progress report
+        self.tooltips = gtk.Tooltips()
+        
+        # Read custom error types from configuration
+        self.customErrorTypes = {}
+        self.customErrorMessages = {}
+        self.customUnrunnableTypes = {}
+        self.customUnrunnableMessages = {}
+        self.customCrashTypes = {}
+        self.customCrashMessages = {}
+        for app in applications:
+            testProgressOptions = app.getConfigValue("test_progress")
+            if testProgressOptions.has_key("custom_errors"):
+                for t in testProgressOptions["custom_errors"]:
+                    self.collectTypeAndMessage(t, self.customErrorTypes, self.customErrorMessages)
+            if testProgressOptions.has_key("custom_unrunnable_errors"):
+                for t in testProgressOptions["custom_unrunnable_errors"]:
+                    self.collectTypeAndMessage(t, self.customUnrunnableTypes, self.customUnrunnableMessages)
+            if testProgressOptions.has_key("custom_crash_errors"):
+                for t in testProgressOptions["custom_crash_errors"]:
+                    self.collectTypeAndMessage(t, self.customCrashTypes, self.customCrashMessages)
+
+    def collectTypeAndMessage(self, typeAndMessage, types, messages):
+        # typeAndMessage _might_ be of the form 'type{message}', or
+        # of the form 'type'. In the former case insert 0 in types
+        # and 'message' in messages. In the latter case, insert 0 in types
+        # and 'type' in messages.
+        t = typeAndMessage.strip("}").split("{")
+        types[t[0]] = 0
+        if len(t) > 1:
+            messages[t[0]] = t[1]
+        else:
+            messages[t[0]] = t[0]        
+    def createProgressBar(self):
+        self.progressBar = gtk.ProgressBar()
+        self.progressBar.set_text("No tests completed")
+        self.progressBar.show()
+        self.progressBarEventBox = gtk.EventBox()
+        self.progressBarEventBox.add(self.progressBar)
+        self.tooltips.set_tip(self.progressBarEventBox, "Nothing has happened.")
+        return self.progressBarEventBox
+            
+    def adjustCount(self, count, increase):
+        if increase:
+            return count + 1
+        else:
+            return count - 1
+
+    def analyzeFailure(self, category, increase = True):
+        if category[1].find("no results") != -1:
+            self.nofNoResultTests = self.adjustCount(self.nofNoResultTests, increase)                 
+        if category[1].find("slower") != -1:
+            self.nofSlowerTests = self.adjustCount(self.nofSlowerTests, increase)
+        if category[1].find("faster") != -1:
+            self.nofFasterTests = self.adjustCount(self.nofFasterTests, increase)
+        if category[1].find("smaller") != -1:
+            self.nofSmallerTests = self.adjustCount(self.nofSmallerTests, increase)
+        if category[1].find("larger") != -1:
+            self.nofLargerTests = self.adjustCount(self.nofLargerTests, increase)                    
+        if category[1].find("new") != -1:
+            self.nofNewFilesTests = self.adjustCount(self.nofNewFilesTests, increase)                    
+        if category[1].find("missing") != -1:
+            self.nofMissingFilesTests = self.adjustCount(self.nofMissingFilesTests, increase)                    
+        for (type, count) in self.customErrorTypes.items():
+            if category[1].find(type) != -1:
+                self.customErrorTypes[type] = self.adjustCount(self.customErrorTypes[type], increase)                    
+        if category[1].find("different") != -1:
+            self.nofDifferentTests = self.adjustCount(self.nofDifferentTests, increase)                    
+        if category[1].find("unreported bug") != -1:
+            self.nofUnreportedBugsTests = self.adjustCount(self.nofUnreportedBugsTests, increase)                    
+        elif category[1].find(" bug") != -1:
+            self.nofKnownBugsTests = self.adjustCount(self.nofKnownBugsTests, increase) 
+        if category[1].find("killed") != -1:
+            self.nofKilledTests = self.adjustCount(self.nofKilledTests, increase)                    
+        if category[0] == "crash":
+            self.customCrashTypes[type] = self.adjustCount(self.nofCrashedTests, increase)
+            for (type, count) in self.customCrashTypes.items():
+                if category[1].find(type) != -1:
+                    self.customCrashTypes[type] = self.adjustCount(self.customCrashTypes[type], increase)    
+        if category[0] == "unrunnable":
+            self.nofUnrunnableTests = self.adjustCount(self.nofUnrunnableTests, increase)            
+            for (type, count) in self.customUnrunnableTypes.items():
+                if category[1].find(type) != -1:
+                    self.customUnrunnableTypes[type] = self.adjustCount(self.customUnrunnableTypes[type], increase)                    
+        self.nofFailedTests = self.adjustCount(self.nofFailedTests, increase)
+
+    def getReport(self):
+        indentation = 5
+        extraIndentation = 9
+        extraExtraIndentation = 13
+        if self.nofCompletedTests >= self.totalNofTests:
+            summary = "Test summary:           \n" 
+        else:
+            summary = "Test progress:           \n"        
+            summary += "%s are pending\n" % plugins.adjustText(str(self.nofPendingTests), indentation, "right")
+            summary += "%s are running\n" % plugins.adjustText(str(self.nofRunningTests), indentation, "right")
+        summary += "%s were successful\n" % plugins.adjustText(str(self.nofSuccessfulTests), indentation, "right")
+        summary += "%s failed:\n" % plugins.adjustText(str(self.nofFailedTests), indentation, "right")
+        summary += "%s were faster\n" % plugins.adjustText(str(self.nofFasterTests), extraIndentation, "right")
+        summary += "%s were slower\n" % plugins.adjustText(str(self.nofSlowerTests), extraIndentation, "right")
+        summary += "%s used less memory\n" % plugins.adjustText(str(self.nofSmallerTests), extraIndentation, "right")
+        summary += "%s used more memory\n" % plugins.adjustText(str(self.nofLargerTests), extraIndentation, "right")
+        # Put the custom error types here, before the different count
+        for (type, count) in self.customErrorTypes.items():
+            summary += "%s %s\n" % (plugins.adjustText(str(count), extraIndentation, "right"), self.customErrorMessages[type])
+        summary += "%s produced different result\n" % plugins.adjustText(str(self.nofDifferentTests), extraIndentation, "right")
+        summary += "%s were missing file(s)\n" % plugins.adjustText(str(self.nofMissingFilesTests), extraIndentation, "right")
+        summary += "%s produced new file(s)\n" % plugins.adjustText(str(self.nofNewFilesTests), extraIndentation, "right")
+        summary += "%s encountered a known bug\n" % plugins.adjustText(str(self.nofKnownBugsTests), extraIndentation, "right")
+        summary += "%s encountered an unreported bug\n" % plugins.adjustText(str(self.nofUnreportedBugsTests), extraIndentation, "right")
+
+        summary += "%s crashed:\n" % plugins.adjustText(str(self.nofCrashedTests), extraIndentation, "right")
+        for (type, count) in self.customCrashTypes.items():
+            summary += "%s %s\n" % (plugins.adjustText(str(count), extraExtraIndentation, "right"), self.customCrashMessages[type])
+
+        summary += "%s were unrunnable:\n" % plugins.adjustText(str(self.nofUnrunnableTests), extraIndentation, "right")
+        # Put the custom error types here, before the unrunnable count
+        for (type, count) in self.customUnrunnableTypes.items():
+            summary += "%s %s\n" % (plugins.adjustText(str(count), extraExtraIndentation, "right"), self.customUnrunnableMessages[type])
+        summary += "%s produced no result\n" % plugins.adjustText(str(self.nofNoResultTests), extraExtraIndentation, "right")
+        summary += "%s were killed" % plugins.adjustText(str(self.nofKilledTests), extraExtraIndentation, "right")
+
+        return summary
+
+    def update(self, test, state):
+        if state.isComplete():
+            if self.completedTests.has_key(test):
+                # First decrease counts from last time ...
+                self.analyzeFailure(self.completedTests[test], False)
+                # ... then set new category.
+                self.completedTests[test] = state.getTypeBreakdown()
+            else:
+                self.nofCompletedTests += 1
+                self.nofRunningTests -= 1
+                self.completedTests[test] = state.getTypeBreakdown()
+        elif state.hasStarted():
+            self.nofRunningTests += 1
+            self.nofPendingTests -= 1
+        else:
+            self.nofPendingTests += 1
+
+        if state.hasSucceeded():
+            self.nofSuccessfulTests += 1
+        if state.hasFailed():
+            self.analyzeFailure(state.getTypeBreakdown(), True)
+
+        if self.nofPendingTests < 0:
+            self.nofPendingTests = 0
+        if self.nofRunningTests < 0:
+            self.nofRunningTests = 0
+            
+        if self.nofCompletedTests >= self.totalNofTests:
+            self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed")
+            self.progressBar.set_fraction(1.0)
+        else:
+            self.progressBar.set_text(str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed")
+            self.progressBar.set_fraction(float(self.nofCompletedTests) / float(self.totalNofTests))
+
+        report = self.getReport()
+        if self.nofRunningTests == 0 and self.nofPendingTests == 0:
+            guilog.info(report)
+        self.tooltips.set_tip(self.progressBarEventBox, report)        

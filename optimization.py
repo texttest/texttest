@@ -2031,7 +2031,7 @@ class StartStudio(guiplugins.InteractiveTestAction):
     def __repr__(self):
         return "Studio"
     def getTitle(self):
-        return "_Studio"
+        return "Studio"
     def getScriptTitle(self, tab):
         return "Start Studio"
     def matchesMode(self, dynamic):

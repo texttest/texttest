@@ -71,6 +71,8 @@ class InteractiveAction:
         return True
     def getTitle(self):
         pass
+    def getSecondaryTitle(self):
+        return self.getTitle()
     def isFrequentUse(self):
         # Decides how accessible to make it...
         return False
@@ -567,6 +569,8 @@ class SelectTests(SelectionAction):
         return "Selecting"
     def getTitle(self):
         return "_Select"
+    def getSecondaryTitle(self):
+        return "Select"
     def _getScriptTitle(self):
         return "Select indicated tests"
     def getGroupTabTitle(self):

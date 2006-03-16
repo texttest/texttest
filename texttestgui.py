@@ -520,7 +520,7 @@ class InteractiveActionGUI:
             displayDesc += self.diagnoseSwitch(switch) + "\n"
             vbox.pack_start(hbox, expand=False, fill=False)
         if hasButton:
-            button = self.createButton(self.runInteractive, instance.getTitle(), instance.getScriptTitle(tab=True), instance)
+            button = self.createButton(self.runInteractive, instance.getSecondaryTitle(), instance.getScriptTitle(tab=True), instance)
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()

@@ -1121,7 +1121,7 @@ class TestProgressMonitor:
         if category[1].find("killed") != -1:
             self.nofKilledTests = self.adjustCount(self.nofKilledTests, increase)                    
         if category[0] == "crash":
-            self.customCrashTypes[type] = self.adjustCount(self.nofCrashedTests, increase)
+            self.nofCrashedTests = self.adjustCount(self.nofCrashedTests, increase)
             for (type, count) in self.customCrashTypes.items():
                 if category[1].find(type) != -1:
                     self.customCrashTypes[type] = self.adjustCount(self.customCrashTypes[type], increase)    

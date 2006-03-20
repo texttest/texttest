@@ -1184,7 +1184,7 @@ class TestProgressMonitor:
         elif state.hasStarted():
             self.nofRunningTests += 1
             self.nofPendingTests -= 1
-        else:
+        elif state.category == "pending":
             self.nofPendingTests += 1
 
         if state.hasSucceeded():

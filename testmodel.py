@@ -1157,6 +1157,8 @@ class MultiEntryDictionary(seqdict):
         elif currType == types.IntType:
             self.currDict[entryName] = int(entry)
         elif currType == types.DictType:
-            self.currDict[entryName] = { "default" : entry }
+            self.currDict = self.currDict[entryName]
+            self.insertEntry("default", entry)
+            self.currDict = self
         else:
             self.currDict[entryName] = entry        

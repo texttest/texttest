@@ -445,8 +445,7 @@ class PrepareWriteDirectory(plugins.Action):
             dstname = os.path.join(dst, name)
             try:
                 if os.path.islink(srcname):
-                    linkto = os.path.realpath(srcname)
-                    os.symlink(linkto, dstname)
+                    self.copylink(srcname, dstname)
                 elif os.path.isdir(srcname):
                     self.copytree(srcname, dstname)
                 else:
@@ -455,6 +454,11 @@ class PrepareWriteDirectory(plugins.Action):
                 print "Can't copy %s to %s: %s" % (`srcname`, `dstname`, str(why))
         # Last of all, keep the modification time as it was
         self.copytimes(src, dst)
+    def copylink(self, srcname, dstname):
+        linkto = srcname
+        if os.path.islink(srcname):
+            linkto = os.readlink(srcname)
+        os.symlink(linkto, dstname)
     def copyfile(self, srcname, dstname):
         # Basic aim is to keep the permission bits and times where possible, but ensure it is writeable
         shutil.copy2(srcname, dstname)
@@ -515,7 +519,7 @@ class PrepareWriteDirectory(plugins.Action):
         if os.path.basename(sourceFile) == "CVS":
             return
         try:
-            os.symlink(sourceFile, targetFile)
+            self.copylink(sourceFile, targetFile)
         except OSError:
             print "Failed to create symlink " + targetFile
     def isWriteDir(self, targetPath, modPaths):

@@ -95,7 +95,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName
-        basicName = getRaveNames(self.test)[0] + "." + self.getUserParentName(self.test) + "." + self.getRuleSetName(self.test)
+        basicName = getBasicRaveName(self.test) + "." + self.getUserParentName(self.test) + "." + self.getRuleSetName(self.test)
         if self.namesCreated.has_key(basicName):
             carmtmp = self.namesCreated[basicName]
             if carmtmp == os.environ["CARMTMP"]:
@@ -265,7 +265,7 @@ class Config(CarmenConfig):
             readDirs["Resources"] = [ customerFile, impFile ]
         elif test.environment.has_key("CARMSYS"):
             readDirs["RAVE module"] = [ os.path.join(test.environment["CARMSYS"], \
-                                        "carmusr_default", "crc", "modules", getRaveNames(test)[0]) ]
+                                        "carmusr_default", "crc", "modules", getBasicRaveName(test)) ]
         return readDirs
     def filesFromSubplan(self, test, subplanDir):
         return []
@@ -289,7 +289,7 @@ class Config(CarmenConfig):
         CarmenConfig.printHelpDescription(self)
     def setApplicationDefaults(self, app):
         CarmenConfig.setApplicationDefaults(self, app)
-        app.setConfigDefault("rave_name", [])
+        app.setConfigDefault("rave_name", { "default" : [] })
         app.setConfigDefault("rave_static_library", "")
         app.setConfigDefault("lines_of_crc_compile", 30, "How many lines to present in textual previews of rave compilation failures")
         # dictionary of lists
@@ -298,9 +298,19 @@ class Config(CarmenConfig):
         app.addConfigEntry("pend_rulecompile", "white", "test_colours")
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
         app.addConfigEntry("ruleset_compiled", "white", "test_colours")
-        
+
+def getProductName(test):
+    return os.popen(". $CARMSYS/CONFIG > /dev/null 2>&1; echo $PRODUCT").read().strip()
+
 def getRaveNames(test):
-    return test.app.getConfigValue("rave_name")
+    raveNameDir = test.getConfigValue("rave_name")
+    if len(raveNameDir) == 1:
+        return raveNameDir["default"]
+    else:
+        return test.app.getCompositeConfigValue("rave_name", getProductName(test))
+
+def getBasicRaveName(test):
+    return test.getConfigValue("rave_name")["default"][0]
 
 class CheckCarmVariables(plugins.Action):
     def setUpSuite(self, suite):
@@ -437,8 +447,9 @@ class FilterRuleBuilds(plugins.Action):
         self.rulesCompiled[targetName] = test
         test.changeState(NeedRuleCompilation(self.getRuleSetName(test)))
         return self.WAIT
-    def setUpApplication(self, app):
-        self.raveNames = app.getConfigValue("rave_name")
+    def setUpSuite(self, suite):
+        if isUserSuite(suite):
+            self.raveNames = getRaveNames(suite)
     def shouldCompileFor(self, test, ruleset):
         if self.forceRebuild or not ruleset.isCompiled():
             return 1

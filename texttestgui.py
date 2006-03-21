@@ -279,7 +279,7 @@ class TextTestGUI(ThreadedResponder):
         view.expand_all()
         modelIndexer = TreeModelIndexer(self.model, self.testsColumn, 3)
         # This does not interact with TextTest at all, so don't bother to connect to PyUseCase
-        view.connect("row_expanded", self.expandSuite)
+        view.connect("row_expanded", self.expandFullSuite)
         # The order of these two is vital!
         scriptEngine.connect("select test", "row_activated", view, self.viewTest, modelIndexer)
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
@@ -298,7 +298,7 @@ class TextTestGUI(ThreadedResponder):
     def countSelected(self, model, path, iter):
         if self.model.get_value(iter, 2).classId() == "test-case":
             self.nofSelectedTests = self.nofSelectedTests + 1
-    def expandSuite(self, view, iter, path, *args):
+    def expandFullSuite(self, view, iter, path, *args):
         # Make sure expanding expands everything, better than just one level as default...
         view.expand_row(path, open_all=True)
     def setUpGui(self, actionThread=None):
@@ -431,9 +431,11 @@ class TextTestGUI(ThreadedResponder):
         self.itermap[newTest] = iter.copy()
         guilog.info("Viewing new test " + newTest.name)
         self.recreateTestView(newTest)
-        self.markAndExpand(iter)
-    def markAndExpand(self, iter):
-        self.selection.get_tree_view().expand_all()
+        self.expandSuite(suiteIter)
+        self.selectOnlyRow(iter)
+    def expandSuite(self, iter):
+        self.selection.get_tree_view().expand_row(self.model.get_path(iter), open_all=0)
+    def selectOnlyRow(self, iter):
         self.selection.unselect_all()
         self.selection.select_iter(iter)
     def recreateSuiteModel(self, suite, suiteIter):
@@ -443,7 +445,8 @@ class TextTestGUI(ThreadedResponder):
         for test in suite.testcases:
             iter = self.addSuiteWithParent(test, suiteIter)
         self.createSubIterMap(suiteIter, newTest=0)
-        self.markAndExpand(suiteIter)
+        self.expandSuite(suiteIter)
+        self.selectOnlyRow(suiteIter)
     def viewTest(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         self.selection.select_iter(iter)

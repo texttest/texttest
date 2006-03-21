@@ -60,14 +60,15 @@ class QuitGUI(guiplugins.SelectionAction):
     def getTitle(self):
         return "_Quit"
     def performOn(self, tests, selCmd):
+        # Generate a window closedown, so that the quit button behaves the same as closing the window
+        self.exit()
+    def getDoubleCheckMessage(self, test):
         processesToReport = self.processesToReport()
         runningProcesses = guiplugins.processTerminationMonitor.listRunning(processesToReport)
         if len(runningProcesses) == 0:
-            # Generate a window closedown, so that the quit button behaves the same as closing the window
-            self.exit()
+            return ""
         else:
-            message = "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n"
-            self.dialog = DoubleCheckDialog(message, self.exit)
+            return "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n"
     def processesToReport(self):
         queryValues = self.getConfigValue("query_kill_processes")
         processes = []
@@ -493,9 +494,9 @@ class InteractiveActionGUI:
         button.show()
         return button
     def runInteractive(self, button, action, *args):
-        message = "This action can remove a lot of data. Are you sure you wish to proceed?"
-        if action.performDoubleCheck():
-            self.dialog = DoubleCheckDialog(message, self._runInteractive, (action,))
+        doubleCheckMessage = action.getDoubleCheckMessage(self.test)
+        if doubleCheckMessage:
+            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, (action,))
         else:
             self._runInteractive(action)
     def _runInteractive(self, action):

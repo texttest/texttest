@@ -76,8 +76,8 @@ class InteractiveAction:
     def isFrequentUse(self):
         # Decides how accessible to make it...
         return False
-    def performDoubleCheck(self):
-        return False
+    def getDoubleCheckMessage(self, test):
+        return ""
     def inToolBar(self):
         return self.canPerform() and (self.isFrequentUse() or len(self.getOptionGroups()) == 0)
     def getGroupTabTitle(self):
@@ -777,8 +777,13 @@ class RemoveTest(InteractiveTestAction):
         return "Remove Test"
     def matchesMode(self, dynamic):
         return not dynamic
-    def performDoubleCheck(self):
-        return True
+    def getDoubleCheckMessage(self, test):
+        if test.classId() == "test-case":
+            return "You are about to remove the test '" + test.name + \
+                   "' and all associated files.\nAre you sure you wish to proceed?"
+        else:
+            return "You are about to remove the entire test suite '" + test.name + \
+                   "' and all " + str(test.size()) + " tests that it contains!\nAre you VERY sure you wish to proceed??"
     def __call__(self, test):
         plugins.rmtree(test.abspath)
         suite = test.parent

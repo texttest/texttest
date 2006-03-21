@@ -56,8 +56,9 @@ def getNumberOfSeconds(timeString):
         return 60 * float(timeString)
     else:                # Assume format is HH:MM:SS ...
         seconds = 0
-        for i in range(len(parts) - 1, -1, -1):            
-            seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)
+        for i in range(len(parts) - 1, -1, -1):
+            if (parts[i] != ""): # Handle empty strings (<=:10 gives empty minutes field, for example)
+                seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)                
         return seconds 
 
 # Useful stuff to handle regular expressions

@@ -587,12 +587,14 @@ class LineFilter:
 
         trigger = self.getMatchingTrigger(line, lineNumber)
         if trigger:
+            self.diag.info(repr(trigger) + " matched " + line)
             return self.applyMatchingTrigger(line, trigger)
         else:
             return False, line
     def applyAutoRemove(self, line):
         if self.untrigger:
             if self.untrigger.matches(line.strip()):
+                self.diag.info(repr(self.untrigger) + " (end) matched " + line) 
                 self.autoRemove = 0
                 return False, line
         else:

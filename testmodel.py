@@ -1124,10 +1124,9 @@ class MultiEntryDictionary(seqdict):
         if sectionName:
             self.currDict = self[sectionName]
         entryExists = self.currDict.has_key(entryName)
-        if entry == "{CLEAR LIST}":
-            if entryExists:
-                self.currDict[entryName] = []
-        elif not entryExists:
+        if entryExists:
+            self.insertEntry(entryName, entry)
+        else:
             if insert or not self.currDict is self:
                 dictValType = self.getDictionaryValueType()
                 if dictValType == types.ListType:
@@ -1138,8 +1137,6 @@ class MultiEntryDictionary(seqdict):
                     self.currDict[entryName] = entry
             elif errorOnUnknown:
                 print "ERROR : config entry name '" + entryName + "' not recognised"
-        else:
-            self.insertEntry(entryName, entry)
         # Make sure we reset...
         if sectionName:
             self.currDict = self
@@ -1152,7 +1149,9 @@ class MultiEntryDictionary(seqdict):
     def insertEntry(self, entryName, entry):
         currType = type(self.currDict[entryName]) 
         if currType == types.ListType:
-            if not entry in self.currDict[entryName]:
+            if entry == "{CLEAR LIST}":
+                self.currDict[entryName] = []
+            elif not entry in self.currDict[entryName]:
                 self.currDict[entryName].append(entry)
         elif currType == types.IntType:
             self.currDict[entryName] = int(entry)

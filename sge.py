@@ -110,16 +110,13 @@ class MachineInfo:
         return machines
     def findRunningJobs(self, machine):
         jobs = []
-        fieldInfo = 0
         user = ""
         for line in os.popen("qstat -r -s r -l hostname='" + machine + "'").xreadlines():
             if line.startswith("job") or line.startswith("----"):
-                fieldInfo = 1
                 continue
-            if fieldInfo:
+            if line[0] in string.digits:
                 fields = line.split()
                 user = fields[-6]
-                fieldInfo = 0
             elif line.find("Full jobname") != -1:
                 jobName = line.split(":")[-1].strip()
                 jobs.append((user, jobName))

@@ -428,7 +428,9 @@ class TextTestGUI(ThreadedResponder):
         self.collapseIfAllComplete(self.model.iter_parent(iter))
     def addNewTestToModel(self, suite, newTest, suiteIter):
         iter = self.addSuiteWithParent(newTest, suiteIter)
-        self.itermap[newTest] = iter.copy()
+        storeIter = iter.copy()
+        self.itermap[newTest] = storeIter
+        self.selectionActionGUI.addNewTest(newTest, storeIter)
         guilog.info("Viewing new test " + newTest.name)
         self.recreateTestView(newTest)
         self.expandSuite(suiteIter)
@@ -627,9 +629,11 @@ class SelectionActionGUI(InteractiveActionGUI):
         self.lastSelectionCmd = ""
         self.itermap = {}
         for test, iter in itermap.items():
-            if not self.itermap.has_key(test.app):
-                self.itermap[test.app] = {}
-            self.itermap[test.app][test] = iter
+            self.addNewTest(test, iter)
+    def addNewTest(self, test, iter):
+        if not self.itermap.has_key(test.app):
+            self.itermap[test.app] = {}
+        self.itermap[test.app][test] = iter
     def performInteractiveAction(self, action):
         selTests = self.getSelectedTests()
         selCmd = None

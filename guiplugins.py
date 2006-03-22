@@ -230,6 +230,8 @@ class SaveTests(SelectionAction):
         return True
     def getTitle(self):
         return "_Save"
+    def getSecondaryTitle(self):
+        return "Save"
     def matchesMode(self, dynamic):
         return dynamic
     def getDefaultSaveOption(self):

@@ -3,6 +3,7 @@
 import plugins, os, sys, testmodel, time, signal
 from threading import Thread
 from usecase import ScriptEngine
+from ndict import seqdict
 
 plugins.addCategory("unrunnable", "unrunnable", "could not be run")
 
@@ -392,7 +393,7 @@ class TextTest:
         testmodel.Test.observers = self.allResponders
     def createTestSuites(self):
         uniqueNameFinder = UniqueNameFinder()
-        appSuites = []
+        appSuites = seqdict()
         allVersions = self.readAllVersions()
         for app in self.allApps:
             try:
@@ -402,26 +403,23 @@ class TextTest:
             if not valid:
                 continue
             
-            appSuites.append((app, testSuite))
+            appSuites[app] = testSuite
             uniqueNameFinder.addSuite(testSuite)
             print "Using", app.description() + ", checkout", app.checkout
         return appSuites
     def deleteTempFiles(self, appSuites):
-        for app, testSuite in appSuites:
+        for app, testSuite in appSuites.items():
             if app.cleanMode & plugins.Configuration.CLEAN_SELF:
                 app.removeWriteDirectory()
     def setUpResponders(self, appSuites):
         for responder in self.allResponders:
-            for app, testSuite in appSuites:
+            for app, testSuite in appSuites.items():
                 responder.addSuite(testSuite)
     def createActionRunner(self, appSuites):
         actionRunner = ActionRunner()
-        extraVersions = []
-        for app, testSuite in appSuites:
-            extraVersions += app.extras
+        self.checkForNoTests(appSuites)
+        for app, testSuite in appSuites.items():
             if testSuite.size() == 0:
-                if not app in extraVersions:
-                    sys.stderr.write("No tests matching the selection criteria found for " + app.description() + "\n")
                 continue
             try:
                 actionSequence = self.inputOptions.getActionSequence(app)
@@ -469,11 +467,19 @@ class TextTest:
             ownThreadResponder.runWithActionThread(actionThread)
         else:
             actionRunner.run()
-    def writeNoTestsError(self, appSuites):
-        if len(appSuites) > 0:
-            sys.stderr.write("No tests matched the selected applications/versions. The following were tried: \n")
-            for app, testSuite in appSuites:
-                sys.stderr.write(app.description() + "\n")
+    def checkForNoTests(self, appSuites):
+        extraVersions = []
+        for app, testSuite in appSuites.items():
+            if app in extraVersions:
+                continue
+            extraVersions += app.extras
+            self.checkNoTestsInApp(app, appSuites)
+    def checkNoTestsInApp(self, app, appSuites):
+        appsToCheck = [ app ] + app.extras
+        for checkApp in appsToCheck:
+            if appSuites[checkApp].size() > 0:
+                return
+        sys.stderr.write("No tests matching the selection criteria found for " + app.description() + "\n")
     def setSignalHandlers(self):
         # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
         if os.name == "posix":

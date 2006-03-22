@@ -1204,12 +1204,18 @@ class TestProgressMonitor:
             self.nofPendingTests = 0
         if self.nofRunningTests < 0:
             self.nofRunningTests = 0
-            
+
         if self.nofCompletedTests >= self.totalNofTests:
-            self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed")
+            if self.nofFailedTests != 0:
+                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed (" + str(self.nofFailedTests) + " tests failed)")
+            else:
+                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed")
             self.progressBar.set_fraction(1.0)
         else:
-            self.progressBar.set_text(str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed")
+            if self.nofFailedTests != 0:
+                self.progressBar.set_text(str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed (" + str(self.nofFailedTests) + " tests failed)")
+            else:
+                self.progressBar.set_text(str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed")
             self.progressBar.set_fraction(float(self.nofCompletedTests) / float(self.totalNofTests))
 
         report = self.getReport()

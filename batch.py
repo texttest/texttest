@@ -427,7 +427,9 @@ class ArchiveRepository(plugins.Action):
         self.archiveFilesUnder(self.repository, app)
     def archiveFilesUnder(self, repository, app):
         count = 0
-        for file in os.listdir(repository):
+        dirList = os.listdir(repository)
+        dirList.sort()
+        for file in dirList:
             fullPath = os.path.join(repository, file)
             if self.shouldArchive(file):
                 self.archiveFile(fullPath, app)

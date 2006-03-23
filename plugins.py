@@ -309,7 +309,7 @@ def rmtree(dir, attempts=5):
                 print "Problems removing directory", dir, "- waiting 1 second to retry..."
                 time.sleep(1)                
 
-def readList(filename):
+def readList(filename, autosort=0):
     if not os.path.isfile(filename):
         return []
     items = []
@@ -317,6 +317,8 @@ def readList(filename):
         line = longline.strip()
         if len(line) > 0 and not line.startswith("#"):
             items.append(line)
+    if autosort:
+        items.sort()
     return items
 
 def inMainThread():

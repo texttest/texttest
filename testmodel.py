@@ -407,10 +407,7 @@ class TestSuite(Test):
     def filesChanged(self):
         # Here we assume that only order can change and suites be removed...
         newList = []
-        for testline in open(self.testCaseFile).xreadlines():
-            testName = testline.strip()
-            if len(testName) == 0  or testName[0] == '#':
-                continue
+        for testName in plugins.readList(self.testCaseFile, self.getConfigValue("auto_sort_test_suites")):
             for testcase in self.testcases:
                 if testcase.name == testName:
                     newList.append(testcase)
@@ -429,7 +426,7 @@ class TestSuite(Test):
     def getTestCases(self, filters, fileName, allVersions):
         testCaseList = []
         allowEmpty = 1
-        for testName in plugins.readList(fileName):
+        for testName in plugins.readList(fileName, self.getConfigValue("auto_sort_test_suites")):
             if allVersions and self.alreadyContains(self.testcases, testName):
                 continue
             if self.alreadyContains(testCaseList, testName):
@@ -670,6 +667,7 @@ class Application:
         self.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
         self.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
         self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
+        self.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
         self.setConfigDefault("test_progress", { "" : [] }, "Options for showing/customizing test progress report.")
         self.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ], \

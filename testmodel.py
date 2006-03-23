@@ -739,7 +739,7 @@ class Application:
         if group.name.startswith("Select"):
             group.addOption("vs", "Tests for version", self.getFullVersion())
         elif group.name.startswith("What"):
-            group.addOption("c", "Use checkout")
+            group.addOption("c", "Use checkout", self.checkout)
             group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("How"):
             if self.getConfigValue("use_case_record_mode") != "disabled":

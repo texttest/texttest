@@ -177,7 +177,9 @@ class TextTestGUI(ThreadedResponder):
         guilog.info("-> " + test.getIndent() + "Added " + repr(test) + " to test tree view.")
         childIter = self.model.iter_children(iter)
         if test.classId() != "test-app":
-            self.itermap[test] = iter.copy()
+            storeIter = iter.copy()
+            self.itermap[test] = storeIter
+            self.selectionActionGUI.addNewTest(test, storeIter) 
         if childIter:
             self.createSubIterMap(childIter, newTest)
         nextIter = self.model.iter_next(iter)
@@ -248,7 +250,7 @@ class TextTestGUI(ThreadedResponder):
     def createSelectionActionGUI(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
-        return SelectionActionGUI(actions, self.selection, self.itermap)
+        return SelectionActionGUI(actions, self.selection)
     def createTestWindows(self, treeWindow):
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
@@ -302,10 +304,10 @@ class TextTestGUI(ThreadedResponder):
         # Make sure expanding expands everything, better than just one level as default...
         view.expand_row(path, open_all=True)
     def setUpGui(self, actionThread=None):
-        self.createIterMap()
         topWindow = self.createTopWindow()
         treeWindow = self.createTreeWindow()
-        self.selectionActionGUI = self.createSelectionActionGUI(topWindow, actionThread) 
+        self.selectionActionGUI = self.createSelectionActionGUI(topWindow, actionThread)
+        self.createIterMap()
         testWins = self.createTestWindows(treeWindow)
         self.createDefaultRightGUI()
         self.fillTopWindow(topWindow, testWins)
@@ -445,10 +447,14 @@ class TextTestGUI(ThreadedResponder):
         for i in range(self.model.iter_n_children(suiteIter)):
             self.model.remove(iter)
         for test in suite.testcases:
+            self.removeIter(test)
             iter = self.addSuiteWithParent(test, suiteIter)
         self.createSubIterMap(suiteIter, newTest=0)
         self.expandSuite(suiteIter)
         self.selectOnlyRow(suiteIter)
+    def removeIter(self, test):
+        del self.itermap[test]
+        self.selectionActionGUI.removeTest(test)
     def viewTest(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         self.selection.select_iter(iter)
@@ -622,18 +628,19 @@ class InteractiveActionGUI:
         self.test.callAction(action)
 
 class SelectionActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, selection, itermap):
+    def __init__(self, actions, selection):
         InteractiveActionGUI.__init__(self, actions)
         self.selection = selection
         self.lastSelectionTests = []
         self.lastSelectionCmd = ""
         self.itermap = {}
-        for test, iter in itermap.items():
-            self.addNewTest(test, iter)
     def addNewTest(self, test, iter):
         if not self.itermap.has_key(test.app):
             self.itermap[test.app] = {}
         self.itermap[test.app][test] = iter
+    def removeTest(self, test):
+        toRemove = self.itermap[test.app]
+        del toRemove[test]
     def performInteractiveAction(self, action):
         selTests = self.getSelectedTests()
         selCmd = None

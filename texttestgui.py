@@ -164,9 +164,41 @@ class TextTestGUI(ThreadedResponder):
         topWindow.show()
         topWindow.resize(self.getWindowWidth(), self.getWindowHeight())
     def getWindowHeight(self):
-        return (gtk.gdk.screen_height() * 5) / 6
+        defaultHeight = (gtk.gdk.screen_height() * 5) / 6
+        height = defaultHeight
+
+        for app in self.rootSuites:
+            windowSizeOptions = app.getConfigValue("window_size")
+            if not self.dynamic:
+                if windowSizeOptions.has_key("static_height_pixels"):
+                    height = int(windowSizeOptions["static_height_pixels"][0])
+                if windowSizeOptions.has_key("static_height_screen"):
+                    height = gtk.gdk.screen_height() * float(windowSizeOptions["static_height_screen"][0])
+            else:
+                if windowSizeOptions.has_key("dynamic_height_pixels"):
+                    height = int(windowSizeOptions["dynamic_height_pixels"][0])
+                if windowSizeOptions.has_key("dynamic_height_screen"):
+                    height = gtk.gdk.screen_height() * float(windowSizeOptions["dynamic_height_screen"][0])                
+
+        return height
     def getWindowWidth(self):
-        return gtk.gdk.screen_width() / 2
+        defaultWidth = gtk.gdk.screen_width() / 2
+        width = defaultWidth        
+
+        for app in self.rootSuites:
+            windowSizeOptions = app.getConfigValue("window_size")
+            if not self.dynamic:
+                if windowSizeOptions.has_key("static_width_pixels"):
+                    width = int(windowSizeOptions["static_width_pixels"][0])
+                if windowSizeOptions.has_key("static_width_screen"):
+                    width = gtk.gdk.screen_width() * float(windowSizeOptions["static_width_screen"][0])
+            else:
+                if windowSizeOptions.has_key("dynamic_width_pixels"):
+                    width = int(windowSizeOptions["dynamic_width_pixels"][0])
+                if windowSizeOptions.has_key("dynamic_width_screen"):
+                    width = gtk.gdk.screen_width() * float(windowSizeOptions["dynamic_width_screen"][0])                
+
+        return width
     def createIterMap(self):
         guilog.info("Mapping tests in tree view...")
         iter = self.model.get_iter_root()

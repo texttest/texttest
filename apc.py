@@ -232,6 +232,7 @@ def verifyAirportFile(arch):
     diag = plugins.getDiagnostics("APC airport")
     etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
     customerEtab = os.path.join(etabPath, "Customer.etab")
+    print "etab", customerEtab
     if os.path.isfile(customerEtab):
         diag.info("Reading etable at " + customerEtab)
         etab = ConfigEtable(customerEtab)
@@ -254,8 +255,10 @@ def verifyAirportFile(arch):
                 # important environment variables set, i.e. PRODUCT and BRANCH.
                 configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
                 os.system(". " + configFile + "; " + apCompile + " " + srcFile + " > " + airportFile)
+            print airportFile
             if os.path.isfile(airportFile):
                 return
+    print "here"
     raise plugins.TextTestError, "Failed to find AirportFile"
 
 def verifyLogFileDir(arch):
@@ -359,7 +362,7 @@ class RunApcTestInDebugger(default.RunTest):
         elif self.runPlain:
             executeCommand = binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
         elif self.runValgrind:
-            executeCommand = "valgrind --tool=memcheck -v " + binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
+            executeCommand = "valgrind --tool=cachegrind -v " + binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
         else:
             executeCommand = "gdb " + binName + " -silent -x " + gdbArgs
         # Check for personal .gdbinit.
@@ -377,6 +380,12 @@ class RunApcTestInDebugger(default.RunTest):
         if self.inXEmacs:
             os.remove(gdbStart)
             os.remove(gdbWithArgs)
+        # Find cachegrind file.
+        for file in os.listdir(test.writeDirectory):
+            if file.startswith("cachegrind.out."):
+                pid = file.split(".")[-1]
+                cacheGrindFile = test.makeFileName("cachegrind", temporary = 1)
+                os.system("cg_annotate --" + pid + " --include=/users/johani/work/master_new_paqs/Optimization/APC/comb_opt_shell/ --include=/users/johani/work/master_new_paqs/Optimization/SCSolver/paqs/paract/ --include=/users/johani/work/master_new_paqs/Optimization/SCSolver/paqs/qs_core subgrad.s problem.s > " + cacheGrindFile)
     def runInXEmacs(self, test, binName, gdbArgs):
         gdbStart = test.makeFileName("gdb_start", temporary=1)
         gdbWithArgs = test.makeFileName("gdb_w_args", temporary=1)
@@ -514,7 +523,7 @@ class MarkApcLogDir(RunWithParallelAction):
         resLine = os.popen(". " + configFile + "; echo ${APC_TEMP_DIR}").readlines()[-1].strip()
         if resLine.find("/") != -1:
             return resLine
-        return "/tmp"
+        return "/nfs/local/apc_temp"
     def getApcLogDir(self, test, processId = None):
         # Logfile dir
         subplanPath = os.path.realpath(os.path.join(test.writeDirectory, "APC_FILES"))
@@ -600,6 +609,19 @@ class ExtractApcLogs(plugins.Action):
         if os.path.isfile(os.path.join(apcTmpDir, "mpatrol.log")):
             cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.log" + " > " + test.makeFileName("mpatrol_log", temporary = 1)
             os.system(cmdLine)
+        extrFiles = [ "ji_connection", "APC_contbl_0", "APC_contbl_1" , "origs", "news", "APC_contbl"]
+        for file in extrFiles:
+            if os.path.isfile(os.path.join(apcTmpDir, file)):
+                cmdLine = "cd " + apcTmpDir + "; " + "cat " + file + " > " + test.makeFileName(file, temporary = 1)
+                os.system(cmdLine)
+        gmonFile = os.path.join(apcTmpDir, "gmon.out")
+        if 0: #os.path.isfile(gmonFile):
+            opts = test.options.split(" ")
+            binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", carmen.getArchitecture(test.app)))
+            cmdLine = "cd " + apcTmpDir + "; " + "gprof " + binName + " " + gmonFile + " > " + test.makeFileName("profile", temporary = 1)
+            os.system(cmdLine)
+            #cmdLine = "cd " + apcTmpDir + "; " + "gprof -A'subgrad.cc' " + binName + " " + gmonFile + " > " + test.makeFileName("profile_ann", temporary = 1)
+            #os.system(cmdLine)
         # Extract scprob prototype...
         #if os.path.isfile(os.path.join(apcTmpDir, "APC_rot.scprob")):
         #    cmdLine = "cd " + apcTmpDir + "; " + "cat  APC_rot.scprob" + " > " + test.makeFileName(" APC_rot.scprob", temporary = 1)
@@ -614,7 +636,7 @@ class ExtractApcLogs(plugins.Action):
             if os.path.isfile(errFile):
                 os.remove(errFile)
         # Remove dir
-        plugins.rmtree(apcTmpDir)
+        #plugins.rmtree(apcTmpDir)
     def __repr__(self):
         return "Extracting APC logfile for"
         
@@ -1652,9 +1674,12 @@ class PlotKPIGroups(plugins.Action):
             self.setExtraOptions(testGraph.optionGroup, group)
             for test in self.groupsToPlot[group]:
                 testGraph.createPlotLinesForTest(test)
+                self.extraActionForTest(group, test)
             testGraph.plot(test.app.writeDirectory)
         print "Plotted", len(self.groupsToPlot.keys()), "KPI groups."
     def setExtraOptions(self, group, average):
+        pass
+    def extraActionForTest(self, group, test):
         pass
 
 # Override for webpage generation with APC-specific stuff in it
@@ -1854,3 +1879,98 @@ class ConfigEtableParser:
         if tok == "":
             return None
         return tok
+
+class ProcessProfileData(plugins.Action):
+    def __init__(self, args):
+        self.compareFcnPairs = [ [ "problem::do_n_subgrad_iter", "SubgradSolver::do_n_subgrad_iter" ],
+                                 [ "problem::update_c_bar_subgrad", "SubgradSolver::update_c_bar_subgrad"],
+                                 [ "problem::update_y_gradient", "SubgradSolver::update_y_gradient"],
+#                                 [ "std::_Rb_tree_base_iterator::_M_increment", "std::_Rb_tree_base_iterator::_M_incremen" ],
+                                 [ "problem::compute_lb_subgrad", "SubgradSolver::compute_lb_subgrad"],
+                                 [ "ParActProblem::updateProblem", "PAQS::updateProblem"],
+                                 [ "ParActProblem::findMinLocal", "PAQS::scanPassive" ],
+                                 [ "problem::do_dualstuff", "PAQS::dualbla" ],
+                                 [ "problem::compute_red_costs", "PAQS::computeReducedCosts"],
+                                 [ "problem::compute_lb" , "PAQS::computeLowerBound"] ]
+        self.interstingFcns = []
+        for pairs in self.compareFcnPairs:
+            self.interstingFcns.append(pairs[0])
+            self.interstingFcns.append(pairs[1])
+        self.data = {}
+    def __repr__(self):
+        return "Process profile data"
+    def __call__(self, test):
+        data = {}
+        profileFile = test.makeFileName("profile", temporary = 0)
+        if os.path.isfile(profileFile):
+            startLooking = 0
+            for line in open(profileFile).xreadlines():
+                if not startLooking and line.find("Call graph") != -1:
+                    startLooking = 1
+                if startLooking:
+                    if line.startswith("["):
+                        for fcn in self.interstingFcns:
+                            if line.find(fcn) != -1:
+                                splitLine = line.split()
+                                selftime = float(splitLine[2])
+                                childrentime = float(splitLine[3])
+                                try:
+                                    calls = int(splitLine[4])
+                                except:
+                                    calls = -1
+                                data[fcn] = selftime + childrentime, calls
+        if data:
+            self.data[test.name] = data
+    def __del__(self):
+        avg = {}
+        output = " " * 18
+        for pairs in self.compareFcnPairs:
+            desc = pairs[0]
+            if desc.find("::") != -1:
+                desc = desc.split("::")[-1]
+            if len(desc) > 16:
+                desc = desc[0:15]
+            output += '%-18s' % desc + "     "
+        output += "\n"
+        numTests = 0
+        testNames = self.data.keys()
+        testNames.sort()
+        for test in testNames:
+            data = self.data[test]
+            output += '%-15s' % test[0:15] + " "
+            for pairs in self.compareFcnPairs:
+                try:
+                    time1, call1 = data[pairs[0]]
+                    time2, call2 = data[pairs[1]]
+                except:
+                    print "Problem with test", test
+                output += self.printPair(time1, time2)
+                if avg.has_key(pairs[0]):
+                    avg[pairs[0]] += time1
+                else:
+                    avg[pairs[0]] = time1
+                if avg.has_key(pairs[1]):
+                    avg[pairs[1]] += time2
+                else:
+                    avg[pairs[1]] = time2  
+            output += "\n"
+            numTests += 1
+        output += "Average" + " " * 9
+        for pairs in self.compareFcnPairs:
+            avg1 = avg[pairs[0]] / numTests
+            avg2 = avg[pairs[1]] / numTests
+            output += self.printPair(avg1, avg2)
+        print output
+    def printPair(self, time1, time2):
+        output = '% 6.1f' % time1 + " "
+        output += '% 6.1f' % time2 + " "
+        if time1 > 0:
+            tf = time2/time1
+            if tf >= 1.0:
+                diff = '%+6.1f' % ((tf-1)*100)
+            else:
+                diff = '%6.1f' % (-(1-tf)*100)
+        else:
+            diff = '-'
+        output += diff + "%  "
+        return output

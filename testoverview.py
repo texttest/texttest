@@ -148,14 +148,16 @@ class GenerateWebPages:
             print "Attribute Error..."
     def addOverviewPages(self, item, version, table):
         if not self.pagesOverview.has_key(item):
-            self.pagesOverview[item] = HTMLgen.SimpleDocument(title="Test results for " + self.pageAppName,
+            pageOverviewTitle = "Test results for " + self.pageAppName + " - version " + self.pageVersion
+            self.pagesOverview[item] = HTMLgen.SimpleDocument(title = pageOverviewTitle,
                                                               style = "body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}")
         self.pagesOverview[item].append(HTMLgen.Name(version))
         self.pagesOverview[item].append(table)
     def addDetailPages(self, details):
         for tag in details.keys():
             if not self.pagesDetails.has_key(tag):
-                self.pagesDetails[tag] = HTMLgen.SimpleDocument()
+                pageDetailTitle = "Detailed test results for " + self.pageAppName + " - version " + self.pageVersion + ": " + tag
+                self.pagesDetails[tag] = HTMLgen.SimpleDocument(title = pageDetailTitle)
                 self.pagesDetails[tag].append(HTMLgen.Heading(1, tag + " - detailed test results for ", self.pageAppName, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
     def writePages(self):

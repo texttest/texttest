@@ -1,7 +1,7 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors
+import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors, re
 from cPickle import Pickler, Unpickler, UnpicklingError
 from ndict import seqdict
 HTMLgen.PRINTECHO = 0
@@ -214,11 +214,12 @@ class TestTable:
                         type, detail = state.getTypeBreakdown()
                         category = state.category # Strange but correct..... (getTypeBreakdown gives "wrong" category)
                         fgcol, bgcol = self.getColors(category, detail)
+                        filteredState = re.sub('(\w),(\w)', '\\1, \\2', repr(state))
                         if category == "success":
-                            cellContaint =  HTMLgen.Font(repr(state) + detail, color = fgcol)
+                            cellContaint =  HTMLgen.Font(filteredState + detail, color = fgcol)
                         else:
                             cellContaint = HTMLgen.Href(getDetailPageName(pageVersion, tag) + "#" + version + test + extraVersion,
-                                                        HTMLgen.Font(repr(state) + detail, color = fgcol))
+                                                        HTMLgen.Font(filteredState + detail, color = fgcol))
                     else:
                         bgcol = colourFinder.find("no_results_bg")
                         cellContaint = "No results available"

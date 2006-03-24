@@ -627,3 +627,7 @@ class SelectTests(guiplugins.SelectTests):
         return result
 
 guiplugins.interactiveActionHandler.testClasses.append(optimization.PlotTestInGUI)
+
+class ViewFile(optimization.ViewFile):
+    def view(self, comparison, fileName):
+        return optimization.ViewFile.view(self, comparison, fileName)

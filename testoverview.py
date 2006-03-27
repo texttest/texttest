@@ -214,7 +214,7 @@ class TestTable:
                         type, detail = state.getTypeBreakdown()
                         category = state.category # Strange but correct..... (getTypeBreakdown gives "wrong" category)
                         fgcol, bgcol = self.getColors(category, detail)
-                        filteredState = re.sub('(\w),(\w)', '\\1, \\2', repr(state))
+                        filteredState = self.filterState(repr(state))
                         if category == "success":
                             cellContaint =  HTMLgen.Font(filteredState + detail, color = fgcol)
                         else:
@@ -222,7 +222,7 @@ class TestTable:
                                                         HTMLgen.Font(filteredState + detail, color = fgcol))
                     else:
                         bgcol = colourFinder.find("no_results_bg")
-                        cellContaint = "No results available"
+                        cellContaint = "N/A"
                     row.append(HTMLgen.TD(cellContaint, bgcolor = bgcol))
                 body = HTMLgen.TR()
                 body = body + row
@@ -231,6 +231,21 @@ class TestTable:
         t.append(table)
         t.append(HTMLgen.BR())
         return t
+    
+    def filterState(self, cellContent):
+        result = cellContent
+        result = re.sub(r'CRASHED.*( on .*)', r'CRASH\1', result)
+        result = re.sub('(\w),(\w)', '\\1, \\2', result)
+        result = re.sub(':', '', result)
+        result = re.sub(' on', '', result)
+        result = re.sub('could not be run', '', result)
+        result = re.sub('succeeded', 'ok', result)
+        result = re.sub('used more memory','', result)
+        result = re.sub('used less memory','', result)
+        result = re.sub('ran faster','', result)
+        result = re.sub('ran slower','', result)
+        return result
+    
     def getColors(self, type, detail):
         fgcol = colourFinder.find("test_default_fg")
         if type == "faster" or type == "slower":

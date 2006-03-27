@@ -441,7 +441,11 @@ class ArchiveRepository(plugins.Action):
     def archiveFile(self, fullPath, app):
         targetPath = self.getTargetPath(fullPath, app.name)
         plugins.ensureDirExistsForFile(targetPath)
-        os.rename(fullPath, targetPath)
+        try:
+            os.rename(fullPath, targetPath)
+        except:
+            print "Rename failed: ",fullPath,targetPath
+
     def getTargetPath(self, fullPath, appName):
         parts = fullPath.split(os.sep)
         parts.reverse()

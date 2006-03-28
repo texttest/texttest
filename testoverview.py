@@ -237,7 +237,7 @@ class TestTable:
         result = re.sub(r'CRASHED.*( on .*)', r'CRASH\1', result)
         result = re.sub('(\w),(\w)', '\\1, \\2', result)
         result = re.sub(':', '', result)
-        result = re.sub(' on', '', result)
+        result = re.sub(' on ', ' ', result)
         result = re.sub('could not be run', '', result)
         result = re.sub('succeeded', 'ok', result)
         result = re.sub('used more memory','', result)

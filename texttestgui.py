@@ -23,7 +23,7 @@ def showError(message):
     dialog.show()
 
 class DoubleCheckDialog:
-    def __init__(self, message, yesMethod, yesMethodArgs=()):        
+    def __init__(self, message, yesMethod, yesMethodArgs=()):
         self.dialog = gtk.Dialog("TextTest Query", flags=gtk.DIALOG_MODAL)
         self.yesMethod = yesMethod
         self.yesMethodArgs = yesMethodArgs
@@ -180,7 +180,7 @@ class TextTestGUI(ThreadedResponder):
                 if windowSizeOptions.has_key("dynamic_height_screen"):
                     height = gtk.gdk.screen_height() * float(windowSizeOptions["dynamic_height_screen"][0])                
 
-        return height
+        return int(height)
     def getWindowWidth(self):
         defaultWidth = gtk.gdk.screen_width() / 2
         width = defaultWidth        
@@ -198,7 +198,7 @@ class TextTestGUI(ThreadedResponder):
                 if windowSizeOptions.has_key("dynamic_width_screen"):
                     width = gtk.gdk.screen_width() * float(windowSizeOptions["dynamic_width_screen"][0])                
 
-        return width
+        return int(width)
     def createIterMap(self):
         guilog.info("Mapping tests in tree view...")
         iter = self.model.get_iter_root()

@@ -18,11 +18,9 @@ def startTimeString():
     return localtime(seconds=globalStartTime)
 
 # Need somewhat different formats on Windows/UNIX
-def tmpString():
-    if os.environ.has_key("USER"):
-        return os.getenv("USER")
-    else:
-        return "tmp"
+tmpString = "tmp"
+if os.environ.has_key("USER"):
+    tmpString = os.getenv("USER")
 
 def makeString(char, length):
     if length <= 0:
@@ -96,7 +94,7 @@ class Configuration:
     def getCleanMode(self):
         return self.CLEAN_SELF
     def getRunIdentifier(self, prefix=""):
-        return prefix + tmpString() + startTimeString()
+        return prefix + tmpString + startTimeString()
     def getRunOptions(self):
         return ""
     def useExtraVersions(self):

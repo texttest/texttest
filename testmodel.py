@@ -634,7 +634,7 @@ class Application:
         configFile = os.path.join(self.abspath, "config." + self.name)
         return Application(self.name, self.abspath, configFile, version, self.inputOptions)
     def getPreviousWriteDirInfo(self, userName):
-        userId = plugins.tmpString()
+        userId = plugins.tmpString
         if userName:
             if globalTmpDirectory == os.path.expanduser("~/texttesttmp"):
                 return userName, globalTmpDirectory.replace(userId, userName)
@@ -848,7 +848,7 @@ class Application:
         doRemove = self.cleanMode & plugins.Configuration.CLEAN_PREVIOUS
         if not doRemove or not os.path.isdir(rootDir):
             return
-        currTmpString = nameBase + self.name + self.versionSuffix() + plugins.tmpString()
+        currTmpString = nameBase + self.name + self.versionSuffix() + plugins.tmpString
         for file in os.listdir(rootDir):
             fpath = os.path.join(rootDir, file)
             if not os.path.isdir(fpath):

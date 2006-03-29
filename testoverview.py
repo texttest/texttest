@@ -299,6 +299,7 @@ class TestDetails:
                 fullText.append(HTMLgen.Name(version + testName + extraVersion))
                 fullText.append(HTMLgen.Heading(4, HTMLgen.Container("TEST " + repr(state) + " " + testName + " (",
                                                                      self.getLinksToOverview(version, testName, extraVersion, linkFromDetailsToOverview)),")"))
+                freeText = freeText.replace("<", "&lt;").replace(">", "&gt;")
                 fullText.append(HTMLgen.RawText("<PRE>" + freeText + "</PRE>"))
         if textFound:
             return fullText

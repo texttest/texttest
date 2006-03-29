@@ -1121,6 +1121,7 @@ class ReconnectTest(plugins.Action):
         else:
             raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + userToFind + " under " + fetchDir
     def findReconnDirectory(self, fetchDir, app, userToFind):
+        self.diag.info("Looking for reconnection in " + fetchDir + " for " + userToFind)
         if not os.path.isdir(fetchDir):
             return None
 

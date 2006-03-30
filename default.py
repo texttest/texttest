@@ -147,8 +147,8 @@ class Config(plugins.Configuration):
     def getFiltersFromFile(self, app, filename):
         fullPath = self.makeFilterFileName(app, filename)
         if not fullPath:
-            print "File", filename, "not found for application", app
-            return []
+            print "Rejected application", app, ": filter file '" + filename + "' could be found"
+            return [ RejectFilter() ]
         fileData = string.join(plugins.readList(fullPath), ",")
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
         return self.getFiltersFromMap(optionFinder, app)
@@ -717,11 +717,22 @@ class GrepFilter(TextFilter):
     def acceptsTestCase(self, test):
         logFile = test.makeFileName(self.fileStem)
         if not os.path.isfile(logFile):
-            return 0
+            return False
         for line in open(logFile).xreadlines():
             if self.stringContainsText(line):
-                return 1
-        return 0
+                return True
+        return False
+
+# Dummy class to signify failure...
+class RejectFilter(plugins.Filter):
+    def acceptsTestCase(self, test):
+        return False
+    def acceptsTestSuite(self, suite):
+        return False
+    def acceptsTestSuiteContents(self, suite):
+        return False
+    def acceptsApplication(self, app):
+        return False
 
 # Workaround for python bug 853411: tell main thread to start the process
 # if we aren't it...

@@ -23,7 +23,15 @@ helpOptions = """-rundebug <options>
                etc are to be set before the run is started.
              - nolog
                The log file is not displayed.
-
+             - valgrind
+               Run valgrind on the problem 
+             - val_output=<filename>
+               Dump valgrinds output in the file <filename>.pid
+             - valdebug
+               Instruct valgrind to attach to a debugger when encountering
+               a memory problem. Note that this option means that output will
+               not be redirected.
+               
 -extractlogs <option>
            - (only APC) Executes the command specified by the config value extract_logs_<option>,
              and the result is piped into a file named <option>.<app>.<ver> If no option is given or the config value
@@ -304,6 +312,7 @@ class RunApcTestInDebugger(default.RunTest):
         opts = options.split(" ")
         if opts[0] == "":
             return
+        self.valopt = ""
         for opt in opts:
             if opt == "xemacs":
                 self.inXEmacs = 1
@@ -315,6 +324,12 @@ class RunApcTestInDebugger(default.RunTest):
                 self.noRun = 1
             elif opt == "valgrind":
                 self.runValgrind = 1
+            elif opt.find("val_output=")==0:
+                tmp = opt.split("=")
+                self.valopt += "--log-file=" + tmp[1] + " "
+            elif opt == "valdebug":
+                self.valopt += "--db-attach=yes "
+
             else:
                 print "Ignoring unknown option " + opt
     def __repr__(self):
@@ -359,7 +374,11 @@ class RunApcTestInDebugger(default.RunTest):
         elif self.runPlain:
             executeCommand = binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
         elif self.runValgrind:
-            executeCommand = "valgrind --tool=memcheck -v " + binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
+            #no redirecting output when attaching to debugger
+            redir = " > " + apcLog
+            if self.valopt.find("db-attach") != -1:
+                redir = "";
+            executeCommand = "valgrind --tool=memcheck -v " + self.valopt + binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + redir
         else:
             executeCommand = "gdb " + binName + " -silent -x " + gdbArgs
         # Check for personal .gdbinit.

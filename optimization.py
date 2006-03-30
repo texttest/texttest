@@ -1719,7 +1719,8 @@ class PlotEngineMPL:
         self.testGraph = testGraph
         self.diag = plugins.getDiagnostics("Test Graph")
         self.markers = ["o", "s", "x", "d", "+", "v", "1", "^"]
-        self.colors = ["b","r","g","c","m"]
+        # See /usr/lib/python2.2/site-packages/matplotlib/colors.py for more colors.
+        self.colors = [ 'blue', 'red', 'green', 'cyan', 'magenta', 'black', 'orange', 'lime', 'deepskyblue', 'brown', 'purple', 'gold' ]
         self.lineTypeCounter = -1
     def getNextLineType(self):
         self.lineTypeCounter += 1
@@ -1751,7 +1752,7 @@ class PlotEngineMPL:
         else:
             return self.colors[int(plotLine.lineType) % len(self.colors)]
     def getPlotArgument(self, plotLine):
-        return self.getLineColor(plotLine) + "-" + self.getMarker(plotLine)
+        return "-" + self.getMarker(plotLine)
     def getPlotSize(self, plotSize):
         if plotSize:
             nums = plotSize.split(",")
@@ -1780,8 +1781,10 @@ class PlotEngineMPL:
         for plotLine in self.testGraph.plotLines:
             if not onlyAverage or (onlyAverage and plotLine.plotLineRepresentant):
                  x, y = plotLine.getGraph(self.testGraph.xScaleFactor, min)
+                 col = self.getLineColor(plotLine)
                  line = plot(x, y, self.getPlotArgument(plotLine), linewidth = self.getLineSize(plotLine),
-                             linestyle = "steps", zorder = zOrder)
+                             linestyle = "steps", zorder = zOrder,
+                             color = col, markerfacecolor = col, markeredgecolor = 'black')
                  label = self.testGraph.getPlotLineName(plotLine, noLegend, onlyLegendAverage)
                  if label:
                      legendLine.append(line)

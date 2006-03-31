@@ -102,7 +102,7 @@ class VirtualDisplayFinder:
         if len(line):
             self.diag.info("Found Xvfb process running:" + "\n" + line)
             serverName = server + line.split()[-1] + ".0"
-            testCommandLine = self.getSysCommand(server, "xterm -display " + serverName + " -e echo test", background=0)
+            testCommandLine = self.getSysCommand(gethostname(), "xterm -display " + serverName + " -e echo test", background=0)
             self.diag.info("Testing with command '" + testCommandLine + "'")
             (cin, cout, cerr) = os.popen3(testCommandLine)
             lines = cerr.readlines()

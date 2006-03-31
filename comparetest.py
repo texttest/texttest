@@ -490,7 +490,7 @@ class RunDependentTextFilter:
             self.orderFilters[filter] = []
     def getWriteDirRegexp(self, test):
         dateRegexp = "[0-3][0-9][A-Za-z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
-        return "[^ ]*/" + test.app.name + "[^/]*" + dateRegexp + "/" + test.getRelPath()
+        return "[^ \"]*/" + test.app.name + "[^/]*" + dateRegexp + "/" + test.getRelPath()
 
 class LineNumberTrigger:
     def __init__(self, lineNumber):

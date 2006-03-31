@@ -68,9 +68,6 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
             self.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
         self.archToUse = getArchitecture(self.test.app)
-        if self.archToUse == "x86_64_linux" and "12" in self.test.app.versions and not "boost" in self.test.app.versions:
-            # circumvent the resources, we can run fine on this much larger group of machines
-            self.archToUse = "i386_linux"
     def getShortQueueSeconds(self):
         return plugins.getNumberOfSeconds(str(self.test.getConfigValue("maximum_cputime_for_short_queue")))
     # Return "short", "medium" or "long"
@@ -93,6 +90,23 @@ class SgeSubmissionRules(CarmenSubmissionRules):
     def __init__(self, optionMap, test, nightjob=False):
         CarmenSubmissionRules.__init__(self, optionMap, test)
         self.nightjob = nightjob
+        self.archResources = {}
+        self.archResources["i386_linux.carmen_11"]   = "osversion=\"RHEL3\",carmarch=\"i386_linux\""
+        self.archResources["i386_linux.carmen_12"]   = "carmrun12=1,carmbuildmaster=1,carmarch=\"*linux*\""
+        self.archResources["i386_linux.master"]      = "carmrunmaster=1,carmarch=\"*linux*\""
+        self.archResources["x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\""
+        self.archResources["x86_64_linux.master"]    = "osversion=\"RHEL4\",carmarch=\"x86_64_linux\""
+        
+ #
+ #                              R3-Pent_32 R3-Xeon_32  R3-Opteron_32 R3-Opteron_64 R4-Xeon_32 R4-Opteron_64
+ #
+ # i386_linux.carmen_11           X          X           X                                      x
+ # i386_linux.carmen_12           x          X           X                                      X
+ # i386_linux.master              x          x           X                           X?         X
+ # x86_64_linux.carmen_12                                X             X                        X
+ # x86_64_linux.master                                                                          X
+ #
+        
     def findQueue(self):
         # Carmen's queues are all 'hidden', requesting them directly is not allowed.
         # They must be requested by their 'queue resources', that have the same names...
@@ -133,7 +147,11 @@ class SgeSubmissionRules(CarmenSubmissionRules):
     def findConcreteResources(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
-        resources.append("carmarch=\"*" + self.archToUse + "*\"")
+        archDesc = getArchitecture(self.test.app) + "." + getMajorReleaseId(self.test.app)
+        if self.archResources.has_key(archDesc):
+            resources.append(self.archResources[archDesc])
+        else:
+            resources.append("carmarch=\"*" + self.archToUse + "*\"")
         return resources
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]

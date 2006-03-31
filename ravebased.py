@@ -75,6 +75,17 @@ class UserFilter(default.TextFilter):
         else:
             return 1
 
+
+ # Rave compilations
+ #                              R3-Pent_32 R3-Xeon_32  R3-Opteron_32 R3-Opteron_64 R4-Xeon_32 R4-Opteron_64
+ #
+ # i386_linux.carmen_11           X          X           X                                      x
+ # i386_linux.carmen_12           x          X           X                                      X
+ # i386_linux.master              x          x           X                           X?         X
+ # x86_64_linux.carmen_12                                              X                        X
+ # x86_64_linux.master                                                                          X
+ #
+
 class RaveSubmissionRules(queuesystem.SubmissionRules):
     namesCreated = {}
     def __init__(self, optionMap, test, getRuleSetName, normalSubmissionRules):
@@ -86,8 +97,6 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         # Ignore all command line options, but take account of environment etc...
         self.normalSubmissionRules.optionMap = {}
         self.normalSubmissionRules.presetPerfCategory = "short"
-        # Must always use the correct architecture, remove run hacks
-        self.normalSubmissionRules.archToUse = getArchitecture(self.test.app)
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY_RAVE"):
             self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):
@@ -116,6 +125,11 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
         if majRelResource:
             normalResources.append(majRelResource)
+        for res in normalResources:
+            if res.find("carmarch") != -1:
+                return normalResources
+        # Must always use the correct architecture
+        normalResources.append("carmarch=\"*" + getArchitecture(self.test.app) + "*\"")
         return normalResources
     def getSubmitSuffix(self, name):
         normalSuffix = " (" + self.getRuleSetName(self.test) + " ruleset)" + self.normalSubmissionRules.getSubmitSuffix(name)

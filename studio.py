@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.24 2006/03/10 16:14:28 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.25 2006/04/05 14:31:52 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -18,8 +18,8 @@ class StudioConfig(ravebased.Config):
         for group in groups:
             if group.name.startswith("Invisible"):
                 group.addOption("rset", "Private: used for submitting ruleset compilation along with recording")
-    def getWriteDirectoryPreparer(self, ignoreCatalogues):
-        return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues)
+    def getWriteDirectoryPreparer(self, ignoreCatalogues, useDiagnostics):
+        return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues, useDiagnostics)
     def defaultBuildRules(self):
         # Overriding this assures rule builds in the nightjob and with -v rave.
         return 1
@@ -70,7 +70,7 @@ class StudioConfig(ravebased.Config):
                 return parent
         return origDirName
     def getSubPlanLineInMacro(self, test):
-        macroFile = test.useCaseFile
+        macroFile = test.makeFileName("usecase")
         if not os.path.isfile(macroFile):
             return
         useNext = 0
@@ -80,7 +80,7 @@ class StudioConfig(ravebased.Config):
             elif line.find("OPEN_PLAN") != -1:
                 useNext = 1
     def macroBuildsRuleset(self, test, rulesetName):
-        macroFile = test.useCaseFile
+        macroFile = test.makeFileName("usecase")
         if not os.path.isfile(macroFile):
             return False
         for line in open(macroFile).xreadlines():

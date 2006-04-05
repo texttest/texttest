@@ -6,13 +6,12 @@ from socket import gethostname
 class RunTest(default.RunTest):
     def __init__(self):
         default.RunTest.__init__(self)
-        self.testDisplay = None
         self.realDisplay = os.getenv("DISPLAY")
     def __call__(self, test, inChild=0):
-        if self.testDisplay:
-            os.environ["DISPLAY"] = self.testDisplay
+        if os.environ.has_key("TEXTTEST_VIRTUAL_DISPLAY"):
+            os.environ["DISPLAY"] = os.environ["TEXTTEST_VIRTUAL_DISPLAY"]
         retValue = default.RunTest.__call__(self, test, inChild)
-        if self.testDisplay and self.realDisplay:
+        if self.realDisplay:
             os.environ["DISPLAY"] = self.realDisplay
         return retValue
     def getExecuteCommand(self, test):
@@ -29,23 +28,13 @@ class RunTest(default.RunTest):
         f.write(testCommand + "\n")
         f.close()
         return cmdFile
-    def setUpApplication(self, app):
-        default.RunTest.setUpApplication(self, app)
-        self.setUpVirtualDisplay(app)
-    def setUpVirtualDisplay(self, app):
-        finder = VirtualDisplayFinder(app)
-        display = finder.getDisplay()
-        if display:
-            self.testDisplay = display
-            print "Tests will run with DISPLAY variable set to", display
 
 class VirtualDisplayFinder:
     def __init__(self, app):
         self.machines = app.getConfigValue("virtual_display_machine")
-        self.slowMotionReplay = app.useSlowMotion()
         self.diag = plugins.getDiagnostics("virtual display")
     def getDisplay(self):
-        if len(self.machines) == 0 or self.slowMotionReplay:
+        if len(self.machines) == 0:
             return
         for machine in self.machines:
             self.diag.info("Looking for virtual display on " + machine)

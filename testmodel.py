@@ -33,28 +33,20 @@ class Test:
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
     def readEnvironment(self):
+        self.app.configObject.setEnvironment(self)
         if self.parent == None:
-            for var, value in self.app.getEnvironment():
-                self.environment[var] = value
-        diagDict = self.getConfigValue("diagnostics")
-        if diagDict.has_key("input_directory_variable"):
-            diagConfigFile = os.path.join(self.abspath, diagDict["configuration_file"])
-            if os.path.isfile(diagConfigFile):
-                inVarName = diagDict["input_directory_variable"]
-                self.addDiagVariable(diagDict, inVarName, self.abspath)
+            self.setEnvironment("TEXTTEST_CHECKOUT", self.app.checkout)
+    
         envFile = os.path.join(self.abspath, "environment")
         self.environment.readValuesFromFile(envFile, self.app.name, self.app.getVersionFileExtensions())
         # Should do this, but not quite yet...
         # self.properties.readValuesFromFile(os.path.join(self.abspath, "properties"), app.name, app.getVersionFileExtensions())
-    def addDiagVariable(self, diagDict, entryName, entry):
-        # Diagnostics are usually controlled from the environment, but in Java they have to work with properties...
-        if diagDict.has_key("properties_file"):
-            propFile = diagDict["properties_file"]
-            if not self.properties.has_key(propFile):
-                self.properties.addEntry(propFile, {}, insert=1)
-            self.properties.addEntry(entryName, entry.replace(os.sep, "/"), sectionName = propFile, insert=1)
-        else:
-            self.environment[entryName] = entry        
+    def getWordsInFile(self, stem):
+        file = self.makeFileName("options")
+        contents = open(file).read().strip()
+        return contents.split()
+    def setEnvironment(self, var, value):
+        self.environment[var] = value
     def expandEnvironmentReferences(self, referenceVars = []):
         debugLog.info("Expanding suite " + self.name)
         self._expandEnvironmentReferences(referenceVars)
@@ -193,75 +185,12 @@ class Test:
 class TestCase(Test):
     def __init__(self, name, abspath, app, filters, parent):
         Test.__init__(self, name, abspath, app, parent)
-        self.inputFile = self.makeFileName("input")
-        self.useCaseFile = self.makeFileName("usecase")
-        self._setOptions()
-        # Directory where test executes from and hopefully where all its files end up
-        self.writeDirectory = os.path.join(app.writeDirectory, self.getRelPath())
-        if self.valid and self.isAcceptedByAll(filters):
+        if self.isAcceptedByAll(filters):
+            # Directory where test executes from and hopefully where all its files end up
+            self.writeDirectory = os.path.join(app.writeDirectory, self.getRelPath())
             self.readEnvironment()
-            self.setTestEnvironment()
         else:
             self.valid = 0
-    def setTestEnvironment(self):
-        diagDict = self.app.getConfigValue("diagnostics")
-        if self.app.useDiagnostics:
-            inVarName = diagDict["input_directory_variable"]
-            self.addDiagVariable(diagDict, inVarName, os.path.join(self.abspath, "Diagnostics"))
-            outVarName = diagDict["write_directory_variable"]
-            self.addDiagVariable(diagDict, outVarName, os.path.join(self.writeDirectory, "Diagnostics"))
-        elif diagDict.has_key("write_directory_variable"):
-            outVarName = diagDict["write_directory_variable"]
-            self.addDiagVariable(diagDict, outVarName, self.writeDirectory)
-        self.setUseCaseEnvironment()
-        # Always include the working directory of the test in PATH, to pick up linked
-        # executables. Allow for expansion of references...
-        self.environment["PATH"] = self.writeDirectory + os.pathsep + "$PATH"
-        # Here we assume the application uses either PyUseCase or JUseCase
-        # PyUseCase reads environment variables, but you can't do that from java,
-        # so we have a "properties file" set up as well. Do both always, to save forcing
-        # apps to tell us which to do...
-    def setUseCaseEnvironment(self):
-        if self.useJavaRecorder():
-            self.properties.addEntry("jusecase", {}, insert=1)
-        usecaseFile = self.findReplayUseCase()
-        if usecaseFile:
-            self.setReplay(usecaseFile)
-        if os.path.isfile(self.useCaseFile) or self.app.useSlowMotion() or os.path.isfile(self.inputFile):
-            # slow motion implies recording a use case
-            self.setRecord(self.makeFileName("usecase", temporary=1), self.makeFileName("input", temporary=1))
-    def findReplayUseCase(self):
-        if os.path.isfile(self.useCaseFile):
-            return self.useCaseFile
-        else:
-            return os.getenv("USECASE_REPLAY_SCRIPT")
-    def useJavaRecorder(self):
-        return self.app.getConfigValue("use_case_recorder") == "jusecase"
-    def addJusecaseProperty(self, name, value):
-        self.properties.addEntry(name, value, sectionName="jusecase", insert=1)
-    def setReplay(self, replayScript):        
-        if self.useJavaRecorder():
-            self.addJusecaseProperty("replay", replayScript)
-        else:
-            self.environment["USECASE_REPLAY_SCRIPT"] = replayScript
-        if self.app.useSlowMotion():
-            replaySpeed = self.app.getConfigValue("slow_motion_replay_speed")
-            if self.useJavaRecorder():
-                self.addJusecaseProperty("delay", str(replaySpeed))
-            else:
-                self.environment["USECASE_REPLAY_DELAY"] = str(replaySpeed)
-    def setRecord(self, recordScript, recinpScript = None):
-        debugLog.info("Enabling recording")
-        if recordScript:
-            if self.useJavaRecorder():
-                self.addJusecaseProperty("record", recordScript)
-            else:
-                self.environment["USECASE_RECORD_SCRIPT"] = recordScript
-        if recinpScript:
-            if self.useJavaRecorder():
-                self.addJusecaseProperty("record_stdin", recinpScript)
-            else:
-                self.environment["USECASE_RECORD_STDIN"] = recinpScript
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -273,13 +202,6 @@ class TestCase(Test):
         self._expandEnvironmentReferences(referenceVars)
         self.tearDownEnvironment()
         debugLog.info("End expanding " + self.name)
-    def _setOptions(self):
-        optionsFile = self.makeFileName("options")
-        self.options = ""
-        if (os.path.isfile(optionsFile)):
-            self.options = open(optionsFile).readline().strip()
-        elif not os.path.isfile(self.inputFile) and not os.path.isfile(self.useCaseFile):
-            self.valid = 0
     def getDirectory(self, temporary, forComparison = 1):
         if temporary:
             if forComparison:
@@ -291,7 +213,6 @@ class TestCase(Test):
     def callAction(self, action):
         return action(self)
     def filesChanged(self):
-        self._setOptions()
         self.notifyChanged()
     def changeState(self, state):
         self.state = state
@@ -331,8 +252,6 @@ class TestCase(Test):
         pickler = Pickler(file)
         pickler.dump(self.state)
         file.close()
-    def getExecuteCommand(self):
-        return self.app.getExecuteCommand(self)
     def getTmpExtension(self):
         return self.app.configObject.getRunIdentifier()
     def isOutdated(self, filename):
@@ -346,9 +265,12 @@ class TestCase(Test):
 class TestSuite(Test):
     def __init__(self, name, abspath, app, filters, parent=None, allVersions=0):
         Test.__init__(self, name, abspath, app, parent)
-        self.testCaseFile = self.makeFileName("testsuite")
         self.testcases = []
-        if self.valid and os.path.isfile(self.testCaseFile) and self.isAcceptedByAll(filters):
+        self.testCaseFile = self.makeFileName("testsuite")
+        if not self.hasTestSuiteFile():
+            self.valid = 0
+            return
+        if self.valid and self.isAcceptedByAll(filters):
             self.readEnvironment()
             self.readTestCases(filters, allVersions)
             for filter in filters:
@@ -356,6 +278,8 @@ class TestSuite(Test):
                     self.valid = 0
         else:
             self.valid = 0
+    def hasTestSuiteFile(self):
+        return os.path.isfile(self.testCaseFile)
     def readTestCases(self, filters, allVersions):
         self.testcases = self.getTestCases(filters, self.testCaseFile, allVersions)
         debugLog.info("Test suite file " + self.testCaseFile + " had " + str(len(self.testcases)) + " tests")
@@ -438,7 +362,7 @@ class TestSuite(Test):
             testSuite = TestSuite(testName, testPath, self.app, filters, self, allVersions)
             if testSuite.valid:
                 testCaseList.append(testSuite)
-            else:
+            elif not testSuite.hasTestSuiteFile():
                 testCase = TestCase(testName, testPath, self.app, filters, self)
                 if testCase.valid:
                     testCaseList.append(testCase)
@@ -446,13 +370,13 @@ class TestSuite(Test):
             self.valid = 0
         return testCaseList
     def addTest(self, testName, testPath):
-        testCase = TestCase(testName, testPath, self.app, [], self)
-        if testCase.valid:
-            return self.newTest(testCase)
-        else:
-            testSuite = TestSuite(testName, testPath, self.app, [], self)
-            if testSuite.valid:
-                return self.newTest(testSuite)
+        testSuite = TestSuite(testName, testPath, self.app, [], self)
+        if testSuite.valid:
+            return self.newTest(testSuite)
+        elif not testSuite.hasTestSuiteFile():
+            testCase = TestCase(testName, testPath, self.app, [], self)
+            if testCase.valid:
+                return self.newTest(testCase)
     def removeTest(self, test):
         self.testcases.remove(test)
         self.notifyChanged()
@@ -565,11 +489,11 @@ class ConfigurationWrapper:
             return self.target.printHelpText()
         except:
             self.raiseException(req = "help text")
-    def getApplicationEnvironment(self, app):
+    def setEnvironment(self, test):
         try:
-            return self.target.getApplicationEnvironment(app)
+            self.target.setEnvironment(test)
         except:
-            self.raiseException(req = "application environment")
+            self.raiseException(req = "test set environment")
     def extraReadFiles(self, test):
         try:
             return self.target.extraReadFiles(test)
@@ -583,12 +507,7 @@ class ConfigurationWrapper:
             return self.target.getTextualInfo(test)
         except:
             self.raiseException(req = "textual info")
-    def getExecuteCommand(self, test, binary):
-        try:
-            return self.target.getExecuteCommand(test, binary)
-        except:
-            self.raiseException(req = "execute command")
-
+    
 class Application:
     def __init__(self, name, abspath, configFile, version, inputOptions):
         self.name = name
@@ -619,7 +538,6 @@ class Application:
         self.checkout = self.makeCheckout(inputOptions.checkoutOverride())
         debugLog.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(inputOptions)
-        self.useDiagnostics = self.setDiagnosticSettings(inputOptions)
         debugLog.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
     def __repr__(self):
         return self.fullName
@@ -658,7 +576,6 @@ class Application:
         self.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
-        self.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
         self.setConfigDefault("slow_motion_replay_speed", 0, "How long in seconds to wait between each GUI action")
         # External viewing tools
         # Do this here rather than from the GUI: if applications can be run with the GUI
@@ -671,12 +588,11 @@ class Application:
         self.setConfigDefault("window_size", { "" : [] }, "To set the initial size of the dynamic/static GUI.")
         self.setConfigDefault("test_progress", { "" : [] }, "Options for showing/customizing test progress report.")
         self.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
-        self.setConfigDefault("definition_file_stems", [ "input", "options", "environment", "usecase", "testsuite" ], \
+        self.setConfigDefault("definition_file_stems", [ "environment", "testsuite" ], \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
         self.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
         self.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
-        self.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
         self.setConfigDefault("diff_program", "tkdiff", "External program to use for graphical file comparison")
         viewDoc = "External program to use for viewing and editing text files"
         follDoc = "External program to use for following progress of a file"
@@ -722,15 +638,6 @@ class Application:
             if not optionGroup:
                 raise BadConfigError, "unrecognised option -" + option
         return optionGroups
-    def setDiagnosticSettings(self, inputOptions):
-        if inputOptions.has_key("diag"):
-            return 1
-        elif inputOptions.has_key("trace"):
-            envVarName = self.getConfigValue("diagnostics")["trace_level_variable"]
-            os.environ[envVarName] = inputOptions["trace"]
-        return 0
-    def useSlowMotion(self):
-        return self.inputOptions.has_key("actrep")
     def getRunOptions(self):
         return "-d " + self.inputOptions.directoryName + " -a " + self.name + self.versionSuffix() \
                + " -c " + self.checkout + " " + self.configObject.getRunOptions()
@@ -742,14 +649,6 @@ class Application:
         elif group.name.startswith("What"):
             group.addOption("c", "Use checkout", self.checkout)
             group.addOption("v", "Run this version", self.getFullVersion())
-        elif group.name.startswith("How"):
-            if self.getConfigValue("use_case_record_mode") != "disabled":
-                group.addSwitch("actrep", "Run with slow motion replay")
-            diagDict = self.getConfigValue("diagnostics")
-            if diagDict.has_key("configuration_file"):
-                group.addSwitch("diag", "Write target application diagnostics")
-            if diagDict.has_key("trace_level_variable"):
-                group.addOption("trace", "Target application trace level")
         elif group.name.startswith("Side"):
             group.addSwitch("x", "Write TextTest diagnostics")
         elif group.name.startswith("Invisible"):
@@ -939,20 +838,12 @@ class Application:
         return self.absCheckout(locations[0], checkout)
     def absCheckout(self, location, checkout):
         return os.path.join(os.path.expanduser(location), checkout)
-    def getExecuteCommand(self, test):
-        binary = self.getConfigValue("binary")
-        if self.configDir.has_key("interpreter"):
-            binary = self.configDir["interpreter"] + " " + binary
-        return self.configObject.getExecuteCommand(binary, test)
     def checkBinaryExists(self):
         binary = self.getConfigValue("binary")
         if not binary:
             raise plugins.TextTestError, "config file entry 'binary' not defined"
         if not os.path.isfile(binary):
             raise plugins.TextTestError, binary + " has not been built."
-    def getEnvironment(self):
-        env = [ ("TEXTTEST_CHECKOUT", self.checkout) ]
-        return env + self.configObject.getApplicationEnvironment(self)
             
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):

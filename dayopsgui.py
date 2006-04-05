@@ -11,11 +11,11 @@ class DayOPsGUIConfig(CarmenConfig):
     def printHelpDescription(self):
         print helpDescription
         CarmenConfig.printHelpDescription(self)
-    def getExecuteCommand(self, binary, test):
-        propFile = test.makeFileName("properties")
-        logFile = test.makeFileName("dmserverlog", temporary=1)
-        os.environ["DMG_RUN_TEST"] = test.abspath + "#" + propFile + "#" + logFile
-        return CarmenConfig.getExecuteCommand(self, binary, test)
+    def setEnvironment(self, test):
+        if test.classId() == "test-case":
+            propFile = test.makeFileName("properties")
+            logFile = test.makeFileName("dmserverlog", temporary=1)
+            test.setEnvironment("DMG_RUN_TEST", test.abspath + "#" + propFile + "#" + logFile)
     def setApplicationDefaults(self, app):
         CarmenConfig.setApplicationDefaults(self, app)
         app.addConfigEntry("definition_file_stems", "properties")
@@ -60,8 +60,9 @@ class RecordTest(guiplugins.RecordTest):
         serverLog = test.makeFileName("input")
         propFileInTest = test.makeFileName("properties")
         newLogFile = test.makeFileName("dmserverlog")
-        if os.path.isfile(test.useCaseFile):
-            os.remove(test.useCaseFile)
+        useCaseFile = test.makeFileName("usecase")
+        if os.path.isfile(useCaseFile):
+            os.remove(useCaseFile)
         self.props.set("host", self.optionGroup.getOptionValue("desmond_host"))
         self.props.set("port", self.optionGroup.getOptionValue("desmond_port"))
         self.props.writeFile(propFileInTest)

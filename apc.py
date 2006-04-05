@@ -190,7 +190,7 @@ class ApcConfig(optimization.OptimizationConfig):
             subActions.append(ExtractApcLogs(useExtractLogs))
         return subActions
     def _getSubPlanDirName(self, test):
-        statusFile = os.path.normpath(os.path.expandvars(test.options.split()[1]))
+        statusFile = os.path.normpath(os.path.expandvars(test.getWordsInFile("options")[1]))
         dirs = statusFile.split(os.sep)[:-2]
         return os.path.normpath(string.join(dirs, os.sep))
     def getRuleSetName(self, test):
@@ -337,7 +337,7 @@ class RunApcTestInDebugger(default.RunTest):
     def __call__(self, test):
         self.describe(test)
         # Get the options that are sent to APCbatch.sh
-        opts = test.options.split(" ")
+        opts = test.getWordsInFile("options")
         # Create and show the log file.
         apcLog = test.makeFileName("apclog", temporary=1)
         apcLogFile = open(apcLog, "w")
@@ -522,7 +522,7 @@ class FetchApcCore(unixonly.CollateFiles):
             return 0
         return 1
     def getBinaryFromCore(self, path, test):
-        return os.path.expandvars(test.options.split(" ")[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
+        return os.path.expandvars(test.getWordsInFile("options")[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
 
 class MarkApcLogDir(RunWithParallelAction):
     def __init__(self, baseRunner, isExecutable, keepLogs):
@@ -1285,9 +1285,10 @@ class PortApcTest(plugins.Action):
     def __call__(self, test):
         testInfo = ApcTestCaseInformation(self.suite, test.name)
         hasPorted = 0
-        if test.options[0] == "-":
+        opts = test.getWordsInFile("options")
+        if opts[0].startswith("-"):
             hasPorted = 1
-            subPlanDirectory = test.options.split()[3]
+            subPlanDirectory = opts[3]
             carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDirectory)
             ruleSetName = testInfo.getRuleSetName(subPlanDirectory)
             newOptions = testInfo.buildOptions(carmUsrSubPlanDirectory, ruleSetName)
@@ -1297,7 +1298,7 @@ class PortApcTest(plugins.Action):
             optionFile = open(fileName,"w")
             optionFile.write(newOptions + "\n")
         else:
-            subPlanDirectory = test.options.split()[0]
+            subPlanDirectory = opts[0]
             carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDirectory)
         envFileName = test.makeFileName("environment")
         if not os.path.isfile(envFileName):

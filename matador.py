@@ -45,8 +45,8 @@ from optimization import GenerateWebPages
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
 
-def getOption(options, optionVal):
-    optparts = options.split()
+def getOption(test, optionVal):
+    optparts = test.getWordsInFile("options")
     nextWanted = 0
     for option in optparts:
         if nextWanted:
@@ -59,13 +59,13 @@ def getOption(options, optionVal):
 
 class MatadorConfig(optimization.OptimizationConfig):
     def _subPlanName(self, test):
-        subPlan = getOption(test.options, "-s")            
+        subPlan = getOption(test, "-s")            
         if subPlan == None:
             # print help information and exit:
             return ""
         return subPlan
     def getRuleSetName(self, test):
-        fromOptions = getOption(test.options, "-r")
+        fromOptions = getOption(test, "-r")
         if fromOptions:
             return fromOptions
         outputFile = test.makeFileName("output")
@@ -187,7 +187,7 @@ class MatadorTestCaseInformation(optimization.TestCaseInformation):
             if not os.path.isfile(outputPath) and os.path.isfile(logFile):
                 shutil.copyfile(logFile, outputPath)
         else:
-            relPath = getOption(open(optionPath).readline().strip(), "-s")
+            relPath = getOption(self.suite, "-s")
             subPlanDir = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", relPath, "APC_FILES")
         if not os.path.isfile(perfPath):
             perfContent = self.buildPerformance(subPlanDir)
@@ -385,7 +385,7 @@ class PrintRuleValue(plugins.Action):
     def __repr__(self):
         return "Printing rule values for"
     def __call__(self, test):
-        rulesFile = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", getOption(test.options, "-s"), "APC_FILES", "rules")
+        rulesFile = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", getOption(test, "-s"), "APC_FILES", "rules")
         for line in open(rulesFile).xreadlines():
             if line.find(self.variable + " TRUE") != -1:
                 print test.getIndent() + self.variable + " in " + repr(test)   

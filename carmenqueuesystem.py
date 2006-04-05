@@ -236,9 +236,11 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def defaultLoginShell(self):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"
-    def getApplicationEnvironment(self, app):
-        return queuesystem.QueueSystemConfig.getApplicationEnvironment(self, app) + \
-               [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]
+    def setEnvironment(self, test):
+        queuesystem.QueueSystemConfig.setEnvironment(self, test)
+        if test.parent is None:
+            test.setEnvironment("ARCHITECTURE", getArchitecture(test.app))
+            test.setEnvironment("MAJOR_RELEASE_ID", getMajorReleaseId(test.app))
     
 class RunWithParallelAction(plugins.Action):
     def __init__(self, baseRunner, isExecutable):

@@ -190,8 +190,8 @@ class OptimizationConfig(ravebased.Config):
     def defaultBuildRules(self):
         # Assume we always want to build at least some rules, by default...
         return 1
-    def getWriteDirectoryPreparer(self, ignoreCatalogues):
-        return PrepareCarmdataWriteDir(ignoreCatalogues, self._getSubPlanDirName)
+    def getWriteDirectoryPreparer(self, ignoreCatalogues, useDiagnostics):
+        return PrepareCarmdataWriteDir(ignoreCatalogues, useDiagnostics, self._getSubPlanDirName)
     def filesFromSubplan(self, test, subplanDir):
         rulesFile = os.path.join(subplanDir, "APC_FILES", "rules")
         if not os.path.isfile(rulesFile):
@@ -221,8 +221,8 @@ class OptimizationConfig(ravebased.Config):
 # Insert the contents of all raveparameters into the temporary rules file
 # Also assume the subplan will be changed, but nothing else.
 class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
-    def __init__(self, ignoreCatalogues, subplanFunction):
-        ravebased.PrepareCarmdataWriteDir.__init__(self, ignoreCatalogues)
+    def __init__(self, ignoreCatalogues, useDiagnostics, subplanFunction):
+        ravebased.PrepareCarmdataWriteDir.__init__(self, ignoreCatalogues, useDiagnostics)
         self.subplanFunction = subplanFunction
         self.raveParameters = []
     def setUpSuite(self, suite):

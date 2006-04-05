@@ -28,6 +28,13 @@ class Config(plugins.Configuration):
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
             elif group.name.startswith("How"):
                 group.addOption("b", "Run batch mode session")
+                if app.getConfigValue("use_case_record_mode") != "disabled":
+                    group.addSwitch("actrep", "Run with slow motion replay")
+                diagDict = app.getConfigValue("diagnostics")
+                if diagDict.has_key("configuration_file"):
+                    group.addSwitch("diag", "Write target application diagnostics")
+                if diagDict.has_key("trace_level_variable"):
+                    group.addOption("trace", "Target application trace level")
                 group.addSwitch("noperf", "Disable any performance testing")
                 if self.isolatesDataUsingCatalogues(app):
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
@@ -96,7 +103,8 @@ class Config(plugins.Configuration):
         
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.optionMap.has_key("ignorecat")
-        return [ self.getWriteDirectoryPreparer(ignoreCatalogues), catalogueCreator, \
+        useDiagnostics = self.optionMap.has_key("diag")
+        return [ self.getWriteDirectoryPreparer(ignoreCatalogues, useDiagnostics), catalogueCreator, \
                  self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def getPossibleResultFiles(self, app):
         files = [ "output", "errors" ]
@@ -183,8 +191,8 @@ class Config(plugins.Configuration):
             return None
         else:
             return self._getWriteDirectoryMaker()
-    def getWriteDirectoryPreparer(self, ignoreCatalogues):
-        return PrepareWriteDirectory(ignoreCatalogues)
+    def getWriteDirectoryPreparer(self, ignoreCatalogues, useDiagnostics):
+        return PrepareWriteDirectory(ignoreCatalogues, useDiagnostics)
     def _getWriteDirectoryMaker(self):
         return MakeWriteDirectory()
     def tryGetTestRunner(self):
@@ -244,6 +252,9 @@ class Config(plugins.Configuration):
             return batch.SaveState
         else:
             return respond.SaveState
+    def setEnvironment(self, test):
+        testEnvironmentCreator = TestEnvironmentCreator(test, self.optionMap)
+        testEnvironmentCreator.setUp()
     def getTextResponder(self):
         return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes
@@ -330,6 +341,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
         app.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
         app.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
+        app.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("collate_file", {}, "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("run_dependent_text", { "" : [] }, "Mapping of patterns to remove from result files")
@@ -349,6 +361,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("performance_test_minimum", { "default" : 0 }, \
                              "Minimum time/memory to be consumed before data is collected")
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
+        app.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         app.addConfigEntry("pending", "white", "test_colours")
         app.addConfigEntry("definition_file_stems", "knownbugs")
@@ -363,6 +376,9 @@ class Config(plugins.Configuration):
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         # Sample to show that values are lists
         app.setConfigDefault("batch_version", { "default" : [] }, "Which versions are allowed as batch mode runs")
+        app.addConfigEntry("definition_file_stems", "options")
+        app.addConfigEntry("definition_file_stems", "usecase")
+        app.addConfigEntry("definition_file_stems", "input")
         # Use batch session as a base version
         batchSession = self.optionValue("b")
         if batchSession:
@@ -372,6 +388,119 @@ class Config(plugins.Configuration):
         if os.name == "posix":
             app.setConfigDefault("virtual_display_machine", [], \
                                  "(UNIX) List of machines to run virtual display server (Xvfb) on")
+
+# Class for automatically adding things to test environment files...
+class TestEnvironmentCreator:
+    def __init__(self, test, optionMap):
+        self.test = test
+        self.optionMap = optionMap
+        self.usecaseFile = self.test.makeFileName("usecase")
+        self.inputFile = self.test.makeFileName("input")
+        self.diagDict = self.test.getConfigValue("diagnostics")
+        self.diag = plugins.getDiagnostics("Environment Creator")
+    def setUp(self):
+        self.setDisplayEnvironment()
+        self.setDiagEnvironment()
+        self.setUseCaseEnvironment()
+        # Always include the working directory of the test in PATH, to pick up linked
+        # executables. Allow for expansion of references...
+        if self.testCase():
+            self.test.setEnvironment("PATH", self.test.writeDirectory + os.pathsep + "$PATH")
+    def topLevel(self):
+        return self.test.parent is None
+    def testCase(self):
+        return self.test.classId() == "test-case"
+    def setDisplayEnvironment(self):
+        if self.setVirtualDisplay():
+            from unixonly import VirtualDisplayFinder
+            finder = VirtualDisplayFinder(self.test.app)
+            display = finder.getDisplay()
+            if display:
+                self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", display)
+                print "Tests will run with DISPLAY variable set to", display
+    def setVirtualDisplay(self):
+        return os.name == "posix" and self.topLevel() and not self.optionMap.has_key("gx") and \
+               not os.environ.has_key("TEXTTEST_VIRTUAL_DISPLAY") and not self.optionMap.has_key("actrep")
+    def setDiagEnvironment(self):
+        if self.optionMap.has_key("trace"):
+            self.setTraceDiagnostics()
+        if self.optionMap.has_key("diag"):
+            self.setTemporaryDiagnostics()
+        elif self.diagDict.has_key("input_directory_variable"):
+            self.setPermanentDiagnostics()
+    def setTraceDiagnostics(self):
+        if self.topLevel:
+            envVarName = self.diagDict["trace_level_variable"]
+            self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
+            self.test.setEnvironment(envVarName, self.optionMap["trace"])
+    def setPermanentDiagnostics(self):
+        diagConfigFile = os.path.join(self.test.abspath, self.diagDict["configuration_file"])
+        if os.path.isfile(diagConfigFile):
+            inVarName = self.diagDict["input_directory_variable"]
+            self.addDiagVariable(inVarName, self.test.abspath)
+        outVarName = self.diagDict.get("write_directory_variable")
+        if outVarName and self.testCase():
+            self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
+    def setTemporaryDiagnostics(self):
+        if self.testCase():
+            inVarName = self.diagDict["input_directory_variable"]
+            self.addDiagVariable(inVarName, os.path.join(self.test.getDirectory(temporary=0), "Diagnostics"))
+            outVarName = self.diagDict["write_directory_variable"]
+            self.addDiagVariable(outVarName, os.path.join(self.test.getDirectory(temporary=1), "Diagnostics"))
+    def addDiagVariable(self, entryName, entry):
+        # Diagnostics are usually controlled from the environment, but in Java they have to work with properties...
+        if self.diagDict.has_key("properties_file"):
+            propFile = self.diagDict["properties_file"]
+            if not self.test.properties.has_key(propFile):
+                self.test.properties.addEntry(propFile, {}, insert=1)
+            self.test.properties.addEntry(entryName, entry.replace(os.sep, "/"), sectionName = propFile, insert=1)
+        else:
+            self.test.setEnvironment(entryName, entry)
+    def setUseCaseEnvironment(self):
+        # Here we assume the application uses either PyUseCase or JUseCase
+        # PyUseCase reads environment variables, but you can't do that from java,
+        # so we have a "properties file" set up as well. Do both always, to save forcing
+        # apps to tell us which to do...
+        if self.useJavaRecorder():
+            self.test.properties.addEntry("jusecase", {}, insert=1)
+        usecaseFile = self.findReplayUseCase()
+        if usecaseFile:
+            self.setReplay(usecaseFile)
+        if os.path.isfile(self.usecaseFile) or self.optionMap.has_key("actrep") or os.path.isfile(self.inputFile):
+            # slow motion implies recording a use case
+            self.setRecord(self.test.makeFileName("usecase", temporary=1), self.test.makeFileName("input", temporary=1))
+    def findReplayUseCase(self):
+        if os.path.isfile(self.usecaseFile):
+            return self.usecaseFile
+        else:
+            return os.getenv("USECASE_REPLAY_SCRIPT")
+    def useJavaRecorder(self):
+        return self.test.getConfigValue("use_case_recorder") == "jusecase"
+    def addJusecaseProperty(self, name, value):
+        self.test.properties.addEntry(name, value, sectionName="jusecase", insert=1)
+    def setReplay(self, replayScript):        
+        if self.useJavaRecorder():
+            self.addJusecaseProperty("replay", replayScript)
+        else:
+            self.test.setEnvironment("USECASE_REPLAY_SCRIPT", replayScript)
+        if self.optionMap.has_key("actrep"):
+            replaySpeed = self.test.getConfigValue("slow_motion_replay_speed")
+            if self.useJavaRecorder():
+                self.addJusecaseProperty("delay", str(replaySpeed))
+            else:
+                self.test.setEnvironment("USECASE_REPLAY_DELAY", str(replaySpeed))
+    def setRecord(self, recordScript, recinpScript = None):
+        self.diag.info("Enabling recording")
+        if recordScript:
+            if self.useJavaRecorder():
+                self.addJusecaseProperty("record", recordScript)
+            else:
+                self.test.setEnvironment("USECASE_RECORD_SCRIPT", recordScript)
+        if recinpScript:
+            if self.useJavaRecorder():
+                self.addJusecaseProperty("record_stdin", recinpScript)
+            else:
+                self.test.setEnvironment("USECASE_RECORD_STDIN", recinpScript)
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
@@ -384,9 +513,10 @@ class MakeWriteDirectory(plugins.Action):
         app.makeWriteDirectory()
 
 class PrepareWriteDirectory(plugins.Action):
-    def __init__(self, ignoreCatalogues):
+    def __init__(self, ignoreCatalogues, useDiagnostics):
         self.diag = plugins.getDiagnostics("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
+        self.useDiagnostics = useDiagnostics
     def __repr__(self):
         return "Prepare write directory for"
     def __call__(self, test):
@@ -394,7 +524,7 @@ class PrepareWriteDirectory(plugins.Action):
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
         self.collatePaths(test, "link_test_path", self.linkTestPath)
         self.createPropertiesFiles(test)
-        if test.app.useDiagnostics:
+        if self.useDiagnostics:
             plugins.ensureDirectoryExists(os.path.join(test.writeDirectory, "Diagnostics"))
     def collatePaths(self, test, configListName, collateMethod):
         for configName in test.getConfigValue(configListName, expandVars=False):
@@ -826,9 +956,19 @@ class RunTest(plugins.Action):
         if not inChild:
             self.changeToRunningState(test, process)
         return self.RETRY
+    def getOptions(self, test):
+        optionsFile = test.makeFileName("options")
+        if os.path.isfile(optionsFile):
+            return " " + os.path.expandvars(open(optionsFile).read().strip())
+        else:
+            return ""
     def getExecuteCommand(self, test):
-        testCommand = test.getExecuteCommand()
-        if self.recordMode == "console" and test.app.useSlowMotion():
+        testCommand = test.getConfigValue("binary")
+        interpreter = test.getConfigValue("interpreter")
+        if interpreter:
+            testCommand = interpreter + " " + testCommand
+        testCommand += self.getOptions(test)
+        if self.recordMode == "console" and test.app.inputOptions.has_key("actrep"):
             # Replaying in a shell, need everything visible...
             return testCommand
         testCommand += " < " + self.getInputFile(test)
@@ -839,7 +979,7 @@ class RunTest(plugins.Action):
     def getStdErrRedirect(self, command, file):
         return command + " 2> " + file
     def getInputFile(self, test):
-        inputFileName = test.inputFile
+        inputFileName = test.makeFileName("input")
         if os.path.isfile(inputFileName):
             return inputFileName
         if os.name == "posix":

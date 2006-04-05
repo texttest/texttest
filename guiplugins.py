@@ -421,6 +421,8 @@ class RecordTest(InteractiveTestAction):
     def __init__(self, test, oldOptionGroup):
         InteractiveTestAction.__init__(self, test, "Recording")
         self.recordMode = self.test.getConfigValue("use_case_record_mode")
+        self.useCaseFile = test.makeFileName("usecase")
+        self.inputFile = test.makeFileName("input")
         if self.canPerform():
             self.addSwitch(oldOptionGroup, "rep", "Automatically replay test after recording it", 1)
             self.addSwitch(oldOptionGroup, "repgui", "Auto-replay in dynamic GUI", nameForOff="Auto-replay invisible")
@@ -447,7 +449,7 @@ class RecordTest(InteractiveTestAction):
                                                  exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase),
                                                  shellTitle=shellTitle, holdShell=holdShell)
         if shellTitle:
-            scriptEngine.monitorProcess("records use cases in a shell", process, [ test.inputFile, test.useCaseFile ])
+            scriptEngine.monitorProcess("records use cases in a shell", process, [ self.inputFile, self.useCaseFile ])
     def getLogFile(self, test, usecase, type="errors"):
         return os.path.join(test.app.writeDirectory, usecase + "_" + type + ".log")
     def getShellInfo(self, description):
@@ -465,7 +467,7 @@ class RecordTest(InteractiveTestAction):
             self.setTestReady(test, usecase)
         test.notifyChanged()
     def setTestRecorded(self, test, usecase):
-        if not os.path.isfile(test.useCaseFile) and not os.path.isfile(test.inputFile):
+        if not os.path.isfile(self.useCaseFile) and not os.path.isfile(self.inputFile):
             message = "Recording did not produce any results (no usecase or input file)"
             errFile = self.getLogFile(test, usecase)
             if os.path.isfile(errFile):

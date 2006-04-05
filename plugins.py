@@ -85,10 +85,8 @@ class Configuration:
         return []
     def getFilterList(self, app):
         return []
-    def getExecuteCommand(self, binary, test):
-        return binary + " " + os.path.expandvars(test.options)
-    def getApplicationEnvironment(self, app):
-        return []
+    def setEnvironment(self, test):
+        pass
     def getPossibleResultFiles(self, app):
         return []
     def getCleanMode(self):

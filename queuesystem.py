@@ -26,9 +26,6 @@ class RunTestInSlave(unixonly.RunTest):
         if not inChild:
             self.changeToRunningState(test, None)
         os.system(command)
-    def setUpVirtualDisplay(self, app):
-        # Assume the master sets DISPLAY for us
-        pass
     def getExecutionMachines(self, test):
         moduleName = queueSystemName(test.app).lower()
         command = "from " + moduleName + " import getExecutionMachines as _getExecutionMachines"
@@ -372,7 +369,7 @@ class SubmitTest(plugins.Action):
         return "Submitting"
     def __call__(self, test):    
         self.tryStartServer()
-        command = self.getExecuteCommand(test)
+        command = self.getSlaveCommand(test)
         submissionRules = self.submitRuleFunction(test)
         self.describe(test, self.getPostText(test, submissionRules))
 
@@ -386,7 +383,7 @@ class SubmitTest(plugins.Action):
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
     def setPending(self, test):
         test.changeState(self.getPendingState(test))
-    def getExecuteCommand(self, test):
+    def getSlaveCommand(self, test):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
         tmpDir, local = os.path.split(test.app.writeDirectory)
@@ -412,12 +409,6 @@ class SubmitTest(plugins.Action):
         if self.optionMap.has_key("keeptmp"):
             runOptions.append("-keeptmp")
         return string.join(runOptions)
-    def setUpDisplay(self, app):
-        finder = unixonly.VirtualDisplayFinder(app)
-        display = finder.getDisplay()
-        if display:
-            self.slaveEnv["DISPLAY"] = display
-            print "Tests will run with DISPLAY variable set to", display
     def findRunGroup(self, app):
         for group in app.optionGroups:
             if group.name.startswith("How"):
@@ -430,7 +421,6 @@ class SubmitTest(plugins.Action):
         self.describe(suite, " to " + name + " queues")
     def setUpApplication(self, app):
         app.checkBinaryExists()
-        self.setUpDisplay(app)
         self.runOptions = self.setRunOptions(app)
         self.loginShell = app.getConfigValue("login_shell")
     def getInterruptActions(self):

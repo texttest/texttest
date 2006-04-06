@@ -112,12 +112,12 @@ class InteractiveAction:
                                   exitHandler, exitHandlerArgs, shellTitle=None, holdShell=0, description = ""): 
         recScript = os.getenv("USECASE_RECORD_SCRIPT")
         if recScript:
-            os.environ["USECASE_RECORD_SCRIPT"] = self.getNewUsecase(recScript, usecase)
+            os.environ["USECASE_RECORD_SCRIPT"] = plugins.addLocalPrefix(recScript, usecase)
         repScript = os.getenv("USECASE_REPLAY_SCRIPT")
         if repScript:
             # Dynamic GUI might not record anything (it might fail) - don't try to replay files that
             # aren't there...
-            dynRepScript = self.getNewUsecase(repScript, usecase)
+            dynRepScript = plugins.addLocalPrefix(repScript, usecase)
             if os.path.isfile(dynRepScript):
                 os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
             else:
@@ -128,9 +128,6 @@ class InteractiveAction:
         if repScript:
             os.environ["USECASE_REPLAY_SCRIPT"] = repScript
         return process
-    def getNewUsecase(self, script, usecase):
-        dir, file = os.path.split(script)
-        return os.path.join(dir, usecase + "_" + file)
     def getTextTestName(self):
         return sys.argv[0]
     def describe(self, testObj, postText = ""):
@@ -421,42 +418,50 @@ class RecordTest(InteractiveTestAction):
     def __init__(self, test, oldOptionGroup):
         InteractiveTestAction.__init__(self, test, "Recording")
         self.recordMode = self.test.getConfigValue("use_case_record_mode")
-        self.useCaseFile = test.makeFileName("usecase")
-        self.inputFile = test.makeFileName("input")
+        self.recordTime = None
         if self.canPerform():
+            self.addOption(oldOptionGroup, "v", "Version to record", test.app.getFullVersion(forSave=1))
+            self.addOption(oldOptionGroup, "c", "Checkout to use for recording", test.app.checkout) 
             self.addSwitch(oldOptionGroup, "rep", "Automatically replay test after recording it", 1)
             self.addSwitch(oldOptionGroup, "repgui", "Auto-replay in dynamic GUI", nameForOff="Auto-replay invisible")
         if self.recordMode == "console":
             self.addSwitch(oldOptionGroup, "hold", "Hold record shell after recording")
     def __call__(self, test):
-        description = "Running " + test.app.fullName + " in order to capture user actions..."
-        guilog.info(description)
-        recordUseCase = os.path.join(test.abspath, "usecase." + test.app.name + test.app.versionSuffix())
-        if os.path.isfile(recordUseCase):
-            os.remove(recordUseCase)
-        self.startTextTestProcess(test, "record", description)
-    def startTextTestProcess(self, test, usecase, shellDescription=""):
-        shellTitle, holdShell = self.getShellInfo(shellDescription)
+        guilog.info("Starting dynamic GUI in record mode...")
+        self.updateRecordTime(test)
+        self.startTextTestProcess(test, "record")
+    def updateRecordTime(self, test):
+        file = test.makeFileName("usecase", self.optionGroup.getOptionValue("v"))
+        newTime = plugins.modifiedTime(file)
+        if newTime != self.recordTime:
+            self.recordTime = newTime
+            if os.environ.has_key("USECASE_RECORD_SCRIPT"):
+                # If we have an "outer" record going on, provide the result as a target recording...
+                target = plugins.addLocalPrefix(os.getenv("USECASE_RECORD_SCRIPT"), "target_record")
+                shutil.copyfile(file, target)
+            return True
+        if self.recordMode == "console":
+            file = test.makeFileName("input", self.optionGroup.getOptionValue("v"))
+            newTime = plugins.modifiedTime(file)
+            if newTime and newTime != self.recordTime:
+                self.recordTime = newTime
+                if os.environ.has_key("USECASE_RECORD_STDIN"):
+                    target = plugins.addLocalPrefix(os.getenv("USECASE_RECORD_STDIN"), "target")
+                    shutil.copyfile(file, target)
+                return True
+        return False
+    def startTextTestProcess(self, test, usecase):
         ttOptions = self.getRunOptions(test, usecase)
         commandLine = self.getTextTestName() + " " + ttOptions
-        if not shellTitle:
-            if not os.path.isfile(test.app.writeDirectory):
-                test.app.makeWriteDirectory()
-            logFile = self.getLogFile(test, usecase, "run")
-            errFile = self.getLogFile(test, usecase)
-            commandLine +=  " > " + logFile + " 2> " + errFile
+        if not os.path.isfile(test.app.writeDirectory):
+            test.app.makeWriteDirectory()
+        logFile = self.getLogFile(test, usecase, "run")
+        errFile = self.getLogFile(test, usecase)
+        commandLine +=  " > " + logFile + " 2> " + errFile
         process = self.startExtProgramNewUsecase(commandLine, usecase, \
-                                                 exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase),
-                                                 shellTitle=shellTitle, holdShell=holdShell)
-        if shellTitle:
-            scriptEngine.monitorProcess("records use cases in a shell", process, [ self.inputFile, self.useCaseFile ])
+                                                 exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase))
     def getLogFile(self, test, usecase, type="errors"):
         return os.path.join(test.app.writeDirectory, usecase + "_" + type + ".log")
-    def getShellInfo(self, description):
-        if self.recordMode == "console" and description:
-            return description, self.optionGroup.getSwitchValue("hold")
-        else:
-            return None, 0
     def canPerform(self):
         return self.recordMode != "disabled"
     def textTestCompleted(self, test, usecase):
@@ -467,16 +472,13 @@ class RecordTest(InteractiveTestAction):
             self.setTestReady(test, usecase)
         test.notifyChanged()
     def setTestRecorded(self, test, usecase):
-        if not os.path.isfile(self.useCaseFile) and not os.path.isfile(self.inputFile):
-            message = "Recording did not produce any results (no usecase or input file)"
-            errFile = self.getLogFile(test, usecase)
-            if os.path.isfile(errFile):
-                errors = open(errFile).read()
-                if len(errors) > 0:
-                    message += " - details follow:\n" + errors
-            raise plugins.TextTestError, message
-
-        if self.optionGroup.getSwitchValue("rep"):
+        errFile = self.getLogFile(test, usecase)
+        if os.path.isfile(errFile):
+            errText = open(errFile).read()
+            if len(errText):
+                raise plugins.TextTestError, "Recording use-case failed, with the following errors:\n" + errText
+ 
+        if self.updateRecordTime(test) and self.optionGroup.getSwitchValue("rep"):
             self.startTextTestProcess(test, usecase="replay")
             test.state.freeText = "Recorded use case - now attempting to replay in the background to collect standard files" + \
                                   "\n" + "These will appear shortly. You do not need to submit the test manually."
@@ -485,12 +487,20 @@ class RecordTest(InteractiveTestAction):
     def setTestReady(self, test, usecase=""):
         test.state.freeText = "Recorded use case and collected all standard files"
     def getRunOptions(self, test, usecase):
-        basicOptions = "-o -tp " + self.test.getRelPath() + " " + test.app.getRunOptions()
+        version = self.optionGroup.getOptionValue("v")
+        checkout = self.optionGroup.getOptionValue("c")
+        basicOptions = self.getRunModeOption(usecase) + " -tp " + self.test.getRelPath() + \
+                       " " + test.app.getRunOptions(version, checkout)
         if usecase == "record":
-            return "-actrep " + basicOptions
-        elif self.optionGroup.getSwitchValue("repgui"):
-            return basicOptions.replace("-o ", "-g ")
+            basicOptions += " -record"
+            if self.optionGroup.getSwitchValue("hold"):
+                basicOptions += " -holdshell"
         return basicOptions
+    def getRunModeOption(self, usecase):
+        if usecase == "record" or self.optionGroup.getSwitchValue("repgui"):
+            return "-g"
+        else:
+            return "-o"
     def matchesMode(self, dynamic):
         return not dynamic
     def __repr__(self):

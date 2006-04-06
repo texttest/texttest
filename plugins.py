@@ -333,6 +333,10 @@ def ensureDirExistsForFile(path):
     dir, localName = os.path.split(path)
     ensureDirectoryExists(dir)
 
+def addLocalPrefix(fullPath, prefix):
+    dir, file = os.path.split(fullPath)
+    return os.path.join(dir, prefix + "_" + file)
+
 def ensureDirectoryExists(path):
     if os.path.isdir(path):
         return

@@ -638,9 +638,13 @@ class Application:
             if not optionGroup:
                 raise BadConfigError, "unrecognised option -" + option
         return optionGroups
-    def getRunOptions(self):
-        return "-d " + self.inputOptions.directoryName + " -a " + self.name + self.versionSuffix() \
-               + " -c " + self.checkout + " " + self.configObject.getRunOptions()
+    def getRunOptions(self, version=None, checkout=None):
+        if not checkout:
+            checkout = self.checkout
+        if not version:
+            version = self.getFullVersion()
+        return "-d " + self.inputOptions.directoryName + " -a " + self.name + " -v " + version \
+               + " -c " + checkout + " " + self.configObject.getRunOptions()
     def getPossibleResultFiles(self):
         return self.configObject.getPossibleResultFiles(self)
     def addToOptionGroup(self, group):

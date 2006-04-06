@@ -15,6 +15,7 @@ def getConfig(optionMap):
 
 class Config(plugins.Configuration):
     def addToOptionGroups(self, app, groups):
+        recordsUseCases = app.getConfigValue("use_case_record_mode") != "disabled"
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing")
@@ -28,7 +29,7 @@ class Config(plugins.Configuration):
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
             elif group.name.startswith("How"):
                 group.addOption("b", "Run batch mode session")
-                if app.getConfigValue("use_case_record_mode") != "disabled":
+                if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 diagDict = app.getConfigValue("diagnostics")
                 if diagDict.has_key("configuration_file"):
@@ -46,6 +47,9 @@ class Config(plugins.Configuration):
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addSwitch("n", "Create new results files (overwrite everything)")
+                if recordsUseCases:
+                    group.addSwitch("record", "Record usecase rather than replay what is present")
+                    group.addSwitch("holdshell", "Hold shells running system under test...")
             elif group.name.startswith("Side"):
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
     def getActionSequence(self):
@@ -419,8 +423,12 @@ class TestEnvironmentCreator:
                 self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", display)
                 print "Tests will run with DISPLAY variable set to", display
     def setVirtualDisplay(self):
+        # Set a virtual DISPLAY for the top level test on UNIX, if tests are going to be run (not static GUI)
+        # Don't set it if we've already got it, we've requested a slow motion replay or we're trying to record
+        # a new usecase.
         return os.name == "posix" and self.topLevel() and not self.optionMap.has_key("gx") and \
-               not os.environ.has_key("TEXTTEST_VIRTUAL_DISPLAY") and not self.optionMap.has_key("actrep")
+               not os.environ.has_key("TEXTTEST_VIRTUAL_DISPLAY") and not self.optionMap.has_key("actrep") \
+               and not self.isRecording()
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
             self.setTraceDiagnostics()
@@ -464,16 +472,24 @@ class TestEnvironmentCreator:
         if self.useJavaRecorder():
             self.test.properties.addEntry("jusecase", {}, insert=1)
         usecaseFile = self.findReplayUseCase()
-        if usecaseFile:
+        if usecaseFile and os.path.isfile(usecaseFile):
             self.setReplay(usecaseFile)
-        if os.path.isfile(self.usecaseFile) or self.optionMap.has_key("actrep") or os.path.isfile(self.inputFile):
-            # slow motion implies recording a use case
-            self.setRecord(self.test.makeFileName("usecase", temporary=1), self.test.makeFileName("input", temporary=1))
+        if os.path.isfile(self.usecaseFile) or self.isRecording() or os.path.isfile(self.inputFile):
+            # Re-record if recorded files are already present or recording explicitly requested
+            recordUseCase = self.test.makeFileName("usecase", temporary=1)
+            self.setRecord(recordUseCase, self.test.makeFileName("input", temporary=1))
+    def isRecording(self):
+        return self.optionMap.has_key("record")
     def findReplayUseCase(self):
-        if os.path.isfile(self.usecaseFile):
-            return self.usecaseFile
+        if self.isRecording():
+            if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
+                # For self-testing, to allow us to record TextTest performing recording
+                return plugins.addLocalPrefix(os.getenv("USECASE_REPLAY_SCRIPT"), "target")
+            else:
+                # Don't replay when recording - let the user do it...
+                return None
         else:
-            return os.getenv("USECASE_REPLAY_SCRIPT")
+            return self.usecaseFile
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
     def addJusecaseProperty(self, name, value):
@@ -912,6 +928,8 @@ class RunTest(plugins.Action):
         runningClass = WindowsRunning
     def __init__(self):
         self.diag = plugins.getDiagnostics("run test")
+        self.shellTitle = None
+        self.holdShell = False
     def __repr__(self):
         return "Running"
     def __call__(self, test, inChild=0):
@@ -948,7 +966,9 @@ class RunTest(plugins.Action):
             self.changeToRunningState(test, None)
             os.system(testCommand)
             return
-        process = plugins.BackgroundProcess(testCommand, testRun=1)
+
+        self.diag.info("Running test with command : " + testCommand)
+        process = plugins.BackgroundProcess(testCommand, testRun=1, shellTitle=self.shellTitle, holdShell=self.holdShell)
         # Working around Python bug
         test.changeState(Pending(process))
         self.diag.info("Waiting for process start...")
@@ -968,7 +988,12 @@ class RunTest(plugins.Action):
         if interpreter:
             testCommand = interpreter + " " + testCommand
         testCommand += self.getOptions(test)
-        if self.recordMode == "console" and test.app.inputOptions.has_key("actrep"):
+        if self.shellTitle:
+            if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
+                # self-testing... rather cheating really...
+                dir, file = os.path.split(os.environ["USECASE_REPLAY_SCRIPT"])
+                stem, ext = file.split(".", 1)
+                testCommand += " < " + os.path.join(dir, "target_input." + ext)
             # Replaying in a shell, need everything visible...
             return testCommand
         testCommand += " < " + self.getInputFile(test)
@@ -992,7 +1017,11 @@ class RunTest(plugins.Action):
         self.describe(suite)
     def setUpApplication(self, app):
         app.checkBinaryExists()
-        self.recordMode = app.getConfigValue("use_case_record_mode")
+        if app.inputOptions.has_key("record"):
+            recordMode = app.getConfigValue("use_case_record_mode")
+            if recordMode == "console":
+                self.shellTitle = "Running " + app.fullName + " in order to capture user actions..."
+                self.holdShell = app.inputOptions.has_key("holdshell")
 
 class Killed(plugins.TestState):
     def __init__(self, briefText, freeText, prevState):

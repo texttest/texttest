@@ -50,7 +50,7 @@ import queuesystem, default, os, string, shutil, plugins, sys, signal, stat, gui
 from socket import gethostname
 from tempfile import mktemp
 from respond import Responder
-from carmenqueuesystem import getArchitecture, CarmenConfig
+from carmenqueuesystem import getArchitecture, CarmenConfig, getMajorReleaseId
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -101,6 +101,10 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
             self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):
             self.normalSubmissionRules.envResource = os.environ["QUEUE_SYSTEM_RESOURCE_RAVE"]
+        self.raveArchResources = {}
+        self.raveArchResources["i386_linux.carmen_12"]   = "osversion=\"RHEL3\",carmarch=\"*i386_linux*\""
+        self.raveArchResources["i386_linux.master"]      = "osversion=\"RHEL3\",carmarch=\"*i386_linux*\""
+        self.raveArchResources["x86_64_linux.carmen_12"] = "osversion=\"RHEL3\",carmarch=\"*x86_64_linux*\""
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName
@@ -120,22 +124,35 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
     def findPriority(self):
         # Don't lower the priority of these
         return 0
+        
     def findResourceList(self):
         normalResources = self.normalSubmissionRules.findResourceList()
         majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
         if majRelResource:
             normalResources.append(majRelResource)
-        for res in normalResources:
-            if res.find("carmarch") != -1:
-                return normalResources
-        # Must always use the correct architecture
-        normalResources.append("carmarch=\"*" + getArchitecture(self.test.app) + "*\"")
+        # architecture resources
+        archDesc = getArchitecture(self.test.app) + "." + getMajorReleaseId(self.test.app)
+        
+        if self.raveArchResources.has_key(archDesc):
+            normalResources.append(self.raveArchResources[archDesc])
+        else:
+            archRes = "carmarch=\"*" + getArchitecture(self.test.app) + "*\""
+            for res in normalResources:
+                if res.find(archRes) != -1:
+                    return normalResources
+            # Must always use the correct architecture
+            normalResources.append(archRes)
         return normalResources
     def getSubmitSuffix(self, name):
-        normalSuffix = " (" + self.getRuleSetName(self.test) + " ruleset)" + self.normalSubmissionRules.getSubmitSuffix(name)
-        majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
-        if majRelResource:
-            normalSuffix += "," + majRelResource
+        tx = self.normalSubmissionRules.getSubmitSuffix(name)
+        sPos = tx.find(", requesting")
+        if sPos != -1:
+            tx = tx[:sPos] + ", requesting " + string.join(self.findResourceList(), ",")
+        normalSuffix = " (" + self.getRuleSetName(self.test) + " ruleset)" + tx
+        if sPos == -1:
+            majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
+            if majRelResource:
+                normalSuffix += "," + majRelResource
         return normalSuffix
     def forceOnPerformanceMachines(self):
         return 0

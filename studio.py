@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.25 2006/04/05 14:31:52 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.26 2006/04/06 11:46:43 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -167,11 +167,8 @@ class RecordTest(guiplugins.RecordTest):
     def getRunOptions(self, test, usecase):
         basicOptions = guiplugins.RecordTest.getRunOptions(self, test, usecase)
         ruleset = self.optionGroup.getOptionValue("rset")
-        if usecase == "record":
-            # We want the dynamic GUI up for recording, so we can see what we create
-            basicOptions = basicOptions.replace("-o ", "-g ")
-            if ruleset:
-                return "-rulecomp -rset " + ruleset + " " + basicOptions
+        if usecase == "record" and ruleset:
+            return "-rulecomp -rset " + ruleset + " " + basicOptions
         return basicOptions
     # We want to generate a second auto-replay...
     def setTestReady(self, test, usecase=""):

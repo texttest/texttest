@@ -643,8 +643,10 @@ class Application:
             checkout = self.checkout
         if not version:
             version = self.getFullVersion()
-        return "-d " + self.inputOptions.directoryName + " -a " + self.name + " -v " + version \
-               + " -c " + checkout + " " + self.configObject.getRunOptions()
+        options = "-d " + self.inputOptions.directoryName + " -a " + self.name
+        if version:
+            options += " -v " + version
+        return options + " -c " + checkout + " " + self.configObject.getRunOptions()
     def getPossibleResultFiles(self):
         return self.configObject.getPossibleResultFiles(self)
     def addToOptionGroup(self, group):

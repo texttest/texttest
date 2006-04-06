@@ -392,6 +392,9 @@ class ImportTest(InteractiveTestAction):
                   "Fill in the 'Adding " + self.testType() + "' tab below."
         if testName.find(" ") != -1:
             raise plugins.TextTestError, "The new " + self.testType() + " name is not permitted to contain spaces, please specify another"
+        for test in suite.testCaseList():
+            if test.name == testName:
+                raise plugins.TextTestError, "A " + self.testType() + " with the name '" + testName + "' already exists, please choose another name"
         guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + repr(suite))
         testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
@@ -452,6 +455,7 @@ class RecordTest(InteractiveTestAction):
         return False
     def startTextTestProcess(self, test, usecase):
         ttOptions = self.getRunOptions(test, usecase)
+        guilog.info("Starting " + usecase + " run of TextTest with arguments " + ttOptions)
         commandLine = self.getTextTestName() + " " + ttOptions
         if not os.path.isfile(test.app.writeDirectory):
             test.app.makeWriteDirectory()
@@ -539,9 +543,12 @@ class ImportTestCase(ImportTest):
         envFile.close()
     def writeDefinitionFiles(self, suite, testDir):
         optionString = self.getOptions(suite)
-        guilog.info("Using option string : " + optionString)
-        optionFile = self.getWriteFile("options", suite, testDir)
-        optionFile.write(optionString + "\n")
+        if len(optionString):
+            guilog.info("Using option string : " + optionString)
+            optionFile = self.getWriteFile("options", suite, testDir)
+            optionFile.write(optionString + "\n")
+        else:
+            guilog.info("Not creating options file")
         return optionString
     def getOptions(self, suite):
         return self.optionGroup.getOptionValue("opt")

@@ -106,10 +106,12 @@ class Config(plugins.Configuration):
             return self.getFileExtractor()
         
         catalogueCreator = self.getCatalogueCreator()
-        ignoreCatalogues = self.optionMap.has_key("ignorecat")
+        ignoreCatalogues = self.shouldIgnoreCatalogues()
         useDiagnostics = self.optionMap.has_key("diag")
         return [ self.getWriteDirectoryPreparer(ignoreCatalogues, useDiagnostics), catalogueCreator, \
                  self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
+    def shouldIgnoreCatalogues(self):
+        return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
     def getPossibleResultFiles(self, app):
         files = [ "output", "errors" ]
         if app.getConfigValue("create_catalogues") == "true":
@@ -533,6 +535,8 @@ class PrepareWriteDirectory(plugins.Action):
         self.diag = plugins.getDiagnostics("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
         self.useDiagnostics = useDiagnostics
+        if self.ignoreCatalogues:
+            self.diag.info("Ignoring all information in catalogue files")
     def __repr__(self):
         return "Prepare write directory for"
     def __call__(self, test):

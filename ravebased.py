@@ -841,7 +841,7 @@ class BuildCode(plugins.Action):
             return "wakeman"
         if arch == "x86_64_linux":
             if version12:
-                return "woodville"
+                return "centreville"
             else:
                 return "brockville"
     def getRemoteCommandLine(self, arch, absPath, makeCommand):

@@ -537,6 +537,7 @@ class Application:
         self.configDir.readValuesFromFile(personalFile, insert=0, errorOnUnknown=1)
         self.checkout = self.makeCheckout(inputOptions.checkoutOverride())
         debugLog.info("Checkout set to " + self.checkout)
+        self.setCheckoutVariable()
         self.optionGroups = self.createOptionGroups(inputOptions)
         debugLog.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
     def __repr__(self):
@@ -551,6 +552,8 @@ class Application:
     def createCopy(self, version):
         configFile = os.path.join(self.abspath, "config." + self.name)
         return Application(self.name, self.abspath, configFile, version, self.inputOptions)
+    def setCheckoutVariable(self):
+        os.environ["TEXTTEST_CHECKOUT"] = self.checkout
     def getPreviousWriteDirInfo(self, userName):
         userId = plugins.tmpString
         if userName:
@@ -693,6 +696,8 @@ class Application:
             return ""
         return "." + fullVersion
     def createTestSuite(self, filters = None, allVersions = 0):
+        # Reasonable that test-suite creation can depend on checkout...
+        self.setCheckoutVariable()
         if not filters:
             filters = self.configObject.getFilterList(self)
 

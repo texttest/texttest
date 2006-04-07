@@ -241,6 +241,9 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         if test.parent is None:
             test.setEnvironment("ARCHITECTURE", getArchitecture(test.app))
             test.setEnvironment("MAJOR_RELEASE_ID", getMajorReleaseId(test.app))
+            versions = test.app.versions
+            if "sparc_64" in versions or "x86_64_linux" in versions:
+                test.setEnvironment("BITMODE", "64")
     
 class RunWithParallelAction(plugins.Action):
     def __init__(self, baseRunner, isExecutable):

@@ -24,7 +24,7 @@ class Test:
         self.app = app
         self.parent = parent
         self.abspath = abspath
-        self.valid = os.path.isdir(abspath)
+        self.valid = True
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
         self.paddedName = self.name
@@ -270,7 +270,7 @@ class TestSuite(Test):
         if not self.hasTestSuiteFile():
             self.valid = 0
             return
-        if self.valid and self.isAcceptedByAll(filters):
+        if self.isAcceptedByAll(filters):
             self.readEnvironment()
             self.readTestCases(filters, allVersions)
             for filter in filters:
@@ -357,8 +357,11 @@ class TestSuite(Test):
                 print "WARNING: the test", testName, "was included several times in the test suite file - please check!"
                 continue
 
-            allowEmpty = 0
             testPath = os.path.join(self.abspath, testName)
+            if not os.path.isdir(testPath):
+                print "WARNING: the test", testName, "could not be found - please check!"
+                continue
+            allowEmpty = 0
             testSuite = TestSuite(testName, testPath, self.app, filters, self, allVersions)
             if testSuite.valid:
                 testCaseList.append(testSuite)

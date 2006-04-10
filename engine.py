@@ -373,11 +373,11 @@ class TextTest:
             app.extras.append(extraApp)
             appList.append(extraApp)
         return appList
-    def readAllVersions(self):
+    def needsTestRuns(self):
         for responder in self.allResponders:
-            if responder.readAllVersions():
-                return 1
-        return 0
+            if not responder.needsTestRuns():
+                return False
+        return True
     def createResponders(self):
         # With scripts, we ignore all responder options, we're just transforming data
         if self.inputOptions.runScript():
@@ -394,10 +394,10 @@ class TextTest:
     def createTestSuites(self):
         uniqueNameFinder = UniqueNameFinder()
         appSuites = seqdict()
-        allVersions = self.readAllVersions()
+        forTestRuns = self.needsTestRuns()
         for app in self.allApps:
             try:
-                valid, testSuite = app.createTestSuite(allVersions=allVersions)
+                valid, testSuite = app.createTestSuite(forTestRuns=forTestRuns)
             except testmodel.BadConfigError:
                 print "Error creating test suite for application", app, "-", sys.exc_value
             if not valid:

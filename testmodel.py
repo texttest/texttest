@@ -24,7 +24,7 @@ class Test:
         self.app = app
         self.parent = parent
         self.abspath = abspath
-        self.valid = os.path.isdir(abspath)
+        self.valid = True
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
         self.paddedName = self.name
@@ -263,16 +263,16 @@ class TestCase(Test):
         return filter.acceptsTestCase(self)
             
 class TestSuite(Test):
-    def __init__(self, name, abspath, app, filters, parent=None, allVersions=0):
+    def __init__(self, name, abspath, app, filters, parent=None, forTestRuns=0):
         Test.__init__(self, name, abspath, app, parent)
         self.testcases = []
         self.testCaseFile = self.makeFileName("testsuite")
         if not self.hasTestSuiteFile():
             self.valid = 0
             return
-        if self.valid and self.isAcceptedByAll(filters):
+        if self.isAcceptedByAll(filters):
             self.readEnvironment()
-            self.readTestCases(filters, allVersions)
+            self.readTestCases(filters, forTestRuns)
             for filter in filters:
                 if not filter.acceptsTestSuiteContents(self):
                     self.valid = 0
@@ -280,18 +280,45 @@ class TestSuite(Test):
             self.valid = 0
     def hasTestSuiteFile(self):
         return os.path.isfile(self.testCaseFile)
-    def readTestCases(self, filters, allVersions):
-        self.testcases = self.getTestCases(filters, self.testCaseFile, allVersions)
-        debugLog.info("Test suite file " + self.testCaseFile + " had " + str(len(self.testcases)) + " tests")
-        if allVersions:
-            for fileName in self.findVersionTestSuiteFiles():
-                newCases = self.getTestCases(filters, fileName, allVersions)
-                self.testcases += newCases
-                debugLog.info("Added " + str(len(newCases)) + " from " + fileName)
+    def readTestCases(self, filters, forTestRuns):
+        testNames = self.readTestNames(forTestRuns)
+        self.testcases = self.getTestCases(filters, testNames, forTestRuns)
         if len(self.testcases):
             maxNameLength = max([len(test.name) for test in self.testcases])
             for test in self.testcases:
                 test.paddedName = string.ljust(test.name, maxNameLength)
+        elif forTestRuns or len(testNames) > 0:
+            # If we want to run tests, there is no point in empty test suites. For other purposes they might be useful...
+            # If the contents are filtered away we shouldn't include the suite either though.
+            self.valid = 0
+    def readTestNames(self, forTestRuns):
+        names = self.readTestNamesFromFile(self.testCaseFile)
+        debugLog.info("Test suite file " + self.testCaseFile + " had " + str(len(names)) + " tests")
+        if forTestRuns:
+            return names
+        # If we're not running tests, we're displaying information and should find all the sub-versions 
+        for fileName in self.findVersionTestSuiteFiles():
+            newNames = self.readTestNamesFromFile(fileName)
+            for name in newNames:
+                if not name in names:
+                    names.append(name)
+            debugLog.info("Reading more tests from " + fileName)
+        return names
+    def readTestNamesFromFile(self, fileName):
+        names = []
+        for name in plugins.readList(fileName, self.getConfigValue("auto_sort_test_suites")):
+            if name in names:
+                print "WARNING: the test", name, "was included several times in a test suite file"
+                print "Please check the file at", fileName
+                continue
+
+            testPath = os.path.join(self.abspath, name)
+            if not os.path.isdir(testPath):
+                print "WARNING: the test", name, "could not be found"
+                print "Please check the file at", fileName
+                continue
+            names.append(name)
+        return names
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
     def testCaseList(self):
@@ -347,27 +374,17 @@ class TestSuite(Test):
             size += testcase.size()
         return size
 # private:
-    def getTestCases(self, filters, fileName, allVersions):
+    def getTestCases(self, filters, testNames, forTestRuns):
         testCaseList = []
-        allowEmpty = 1
-        for testName in plugins.readList(fileName, self.getConfigValue("auto_sort_test_suites")):
-            if allVersions and self.alreadyContains(self.testcases, testName):
-                continue
-            if self.alreadyContains(testCaseList, testName):
-                print "WARNING: the test", testName, "was included several times in the test suite file - please check!"
-                continue
-
-            allowEmpty = 0
+        for testName in testNames:
             testPath = os.path.join(self.abspath, testName)
-            testSuite = TestSuite(testName, testPath, self.app, filters, self, allVersions)
+            testSuite = TestSuite(testName, testPath, self.app, filters, self, forTestRuns)
             if testSuite.valid:
                 testCaseList.append(testSuite)
             elif not testSuite.hasTestSuiteFile():
                 testCase = TestCase(testName, testPath, self.app, filters, self)
                 if testCase.valid:
                     testCaseList.append(testCase)
-        if fileName == self.testCaseFile and (not allowEmpty and len(testCaseList) == 0):
-            self.valid = 0
         return testCaseList
     def addTest(self, testName, testPath):
         testSuite = TestSuite(testName, testPath, self.app, [], self)
@@ -385,12 +402,7 @@ class TestSuite(Test):
         self.expandEnvironmentReferences()
         self.notifyChanged()
         return test
-    def alreadyContains(self, testCaseList, testName):
-        for test in testCaseList:
-            if test.name == testName:
-                return 1
-        return 0
-
+    
 class BadConfigError(RuntimeError):
     pass
         
@@ -696,7 +708,7 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
-    def createTestSuite(self, filters = None, allVersions = 0):
+    def createTestSuite(self, filters = None, forTestRuns = True):
         # Reasonable that test-suite creation can depend on checkout...
         self.setCheckoutVariable()
         if not filters:
@@ -706,7 +718,7 @@ class Application:
         for filter in filters:
             if not filter.acceptsApplication(self):
                 success = 0
-        suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters, allVersions=allVersions)
+        suite = TestSuite(os.path.basename(self.abspath), self.abspath, self, filters, forTestRuns=forTestRuns)
         suite.expandEnvironmentReferences()
         return success, suite
     def description(self):

@@ -1720,7 +1720,8 @@ class PlotEngineMPL:
         self.diag = plugins.getDiagnostics("Test Graph")
         self.markers = ["o", "s", "x", "d", "+", "v", "1", "^"]
         # See /usr/lib/python2.2/site-packages/matplotlib/colors.py for more colors.
-        self.colors = [ 'blue', 'red', 'green', 'cyan', 'magenta', 'black', 'orange', 'lime', 'deepskyblue', 'brown', 'purple', 'gold' ]
+        self.colors = [ 'blue', 'red', 'green', 'cyan', 'magenta', 'black',
+                        'orange', 'lime', 'deepskyblue', 'brown', 'purple', 'gold' ]
         self.lineTypeCounter = -1
     def getNextLineType(self):
         self.lineTypeCounter += 1

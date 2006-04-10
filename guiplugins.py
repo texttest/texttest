@@ -98,11 +98,11 @@ class InteractiveAction:
             self.optionGroup.addOption(key, name, oldOptionGroup.getOptionValue(key), possibleValues)
         else:
             self.optionGroup.addOption(key, name, value, possibleValues)
-    def addSwitch(self, oldOptionGroup, key, name, value = 0, nameForOff = None):
+    def addSwitch(self, oldOptionGroup, key, name, defaultValue = 0, options = []):
         if oldOptionGroup and oldOptionGroup.switches.has_key(key):
-            self.optionGroup.addSwitch(key, name, oldOptionGroup.getSwitchValue(key), nameForOff)
+            self.optionGroup.addSwitch(key, name, oldOptionGroup.getSwitchValue(key), options)
         else:
-            self.optionGroup.addSwitch(key, name, value, nameForOff)
+            self.optionGroup.addSwitch(key, name, defaultValue, options)
     def startExternalProgram(self, commandLine, description = "", shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
         process = plugins.BackgroundProcess(commandLine, description=description, shellTitle=shellTitle, \
                                             holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
@@ -218,7 +218,7 @@ class SaveTests(SelectionAction):
         self.addOption(oldOptionGroup, "v", "Version to save", self.getDefaultSaveOption(), extensions)
         self.addSwitch(oldOptionGroup, "over", "Replace successfully compared files also", 0)
         if self.hasPerformance():
-            self.addSwitch(oldOptionGroup, "ex", "Exact Performance", True, "Average Performance")
+            self.addSwitch(oldOptionGroup, "ex", "Save: ", 1, ["Average performance", "Exact performance"])
         allStems = self.findAllStems()
         self.addOption(oldOptionGroup, "sinf", "Save single file", possibleValues=allStems)
     def __repr__(self):
@@ -426,7 +426,7 @@ class RecordTest(InteractiveTestAction):
             self.addOption(oldOptionGroup, "v", "Version to record", test.app.getFullVersion(forSave=1))
             self.addOption(oldOptionGroup, "c", "Checkout to use for recording", test.app.checkout) 
             self.addSwitch(oldOptionGroup, "rep", "Automatically replay test after recording it", 1)
-            self.addSwitch(oldOptionGroup, "repgui", "Auto-replay in dynamic GUI", nameForOff="Auto-replay invisible")
+            self.addSwitch(oldOptionGroup, "repgui", "", defaultValue = 0, options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
         if self.recordMode == "console":
             self.addSwitch(oldOptionGroup, "hold", "Hold record shell after recording")
     def __call__(self, test):
@@ -604,28 +604,45 @@ class SelectTests(SelectionAction):
         app.configObject.updateOptions(self.optionGroup)
         return app.configObject.getFilterList(app)
     def performOn(self, selTests, selCmd):
-        selectedTests = []
+        # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
+        strategy = self.optionGroup.getSwitchValue("current_selection")
+        selected = {}
+        for t in selTests:
+            selected[t] = 1
+        selectedTests = []                
         for suite in self.rootTestSuites:
             filters = self.getFilterList(suite.app)
             for filter in filters:
                 if not filter.acceptsApplication(suite.app):
                     continue
                 
-            newTests = self.getTestsFromSuite(suite, filters)
+            newTests = self.getTestsFromSuite(suite, filters, strategy, selected)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         commandLines = self.optionGroup.getCommandLines()
         return selectedTests, string.join(commandLines)
-    def getTestsFromSuite(self, suite, filters):
+    def getTestsFromSuite(self, suite, filters, strategy, selected):
+        # If we want to extend selection, we include test if it was previsouly selected,
+        # even if it doesn't fit the current criterion
+        if strategy == 2 and suite.classId() == "test-case" and selected.has_key(suite):
+            return [ suite ]
         if not suite.isAcceptedByAll(filters):
             return []
         try:
             tests = []
             for subSuite in self.findTestCaseList(suite):
-                tests += self.getTestsFromSuite(subSuite, filters)
+                tests += self.getTestsFromSuite(subSuite, filters, strategy, selected)
             return tests
         except AttributeError:
-            return [ suite ]
+            if strategy == 0 or strategy == 2:
+                return [ suite ]
+            elif strategy == 1: # Refine - only add if already selected
+                if selected.has_key(suite):
+                    return [ suite ]
+            elif strategy == 3: # Exclude - don't add if already selected
+                if not selected.has_key(suite):
+                    return [ suite ]
+            return []
     def findTestCaseList(self, suite):
         testcases = suite.testcases
         testCaseFiles = glob(os.path.join(suite.abspath, "testsuite.*"))

@@ -728,9 +728,9 @@ class TextOption(Option):
         self.possValUpdateMethod(self.possibleValues)
 
 class Switch(Option):
-    def __init__(self, name, value, nameForOff):
-        Option.__init__(self, name, value)
-        self.nameForOff = nameForOff
+    def __init__(self, name, defaultValue, options):
+        Option.__init__(self, name, defaultValue)
+        self.options = options
         self.resetMethod = None
     def reset(self):
         if self.defaultValue == 0 and self.resetMethod:
@@ -774,10 +774,10 @@ class OptionGroup:
             return values
     def getEntryName(self, name):
         return name.lower().replace(" ", "_")
-    def addSwitch(self, key, name, value = 0, nameForOff = None):
+    def addSwitch(self, key, name, value = 0, options = []):
         entryName = self.getEntryName(name)
         defaultValue = int(self.getDefault(entryName, value))
-        self.switches[key] = Switch(name, defaultValue, nameForOff)
+        self.switches[key] = Switch(name, defaultValue, options)
     def addOption(self, key, name, value = "", possibleValues = []):
         entryName = self.getEntryName(name)
         defaultValue = self.getDefault(entryName, value)

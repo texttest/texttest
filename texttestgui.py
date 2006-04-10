@@ -182,7 +182,10 @@ class TextTestGUI(ThreadedResponder):
 
         return int(height)
     def getWindowWidth(self):
-        defaultWidth = gtk.gdk.screen_width() / 2
+        if self.dynamic:
+            defaultWidth = gtk.gdk.screen_width() * 0.5
+        else:
+            defaultWidth = gtk.gdk.screen_width() * 0.6
         width = defaultWidth        
 
         for app in self.rootSuites:
@@ -520,6 +523,7 @@ class InteractiveActionGUI:
         self.test = test
         self.buttons = self.makeButtons()
         self.pageDescriptions = { "Test" : {} }
+        self.indexers = [] # Utility list for getting the values from multi-valued radio button groups :-(
     def makeButtons(self):
         executeButtons = gtk.HBox()
         buttonInstances = filter(lambda instance : instance.inToolBar(), self.actions)
@@ -613,24 +617,32 @@ class InteractiveActionGUI:
         hbox.show()
         return hbox
     def createSwitchBox(self, switch):
-        if switch.nameForOff:
-            radioButton1 = gtk.RadioButton(None, switch.name)
-            radioButton2 = gtk.RadioButton(radioButton1, switch.nameForOff)
-            if switch.getValue():
-                radioButton1.set_active(True)
-            else:
-                radioButton2.set_active(True)
-            scriptEngine.registerToggleButton(radioButton1, "choose " + switch.name)
-            scriptEngine.registerToggleButton(radioButton2, "choose " + switch.nameForOff)
-            switch.setMethods(radioButton1.get_active, radioButton1.set_active)
-            switch.resetMethod = radioButton2.set_active
+        self.diagnoseSwitch(switch)
+        if len(switch.options) >= 1:
             hbox = gtk.HBox()
-            hbox.pack_start(radioButton1, expand=True, fill=True)
-            hbox.pack_start(radioButton2, expand=True, fill=True)
-            radioButton1.show()
-            radioButton2.show()
-            hbox.show()
-            return hbox
+            hbox.pack_start(gtk.Label(switch.name), expand=False, fill=False)
+            count = 0
+            buttons = []
+            for option in switch.options:
+                if count == 0:
+                    firstRadioButton = gtk.RadioButton(None, option)
+                    radioButton = firstRadioButton
+                else:
+                    radioButton = gtk.RadioButton(firstRadioButton, option)
+                if count == switch.getValue():
+                    radioButton.set_active(True)
+                    switch.resetMethod = radioButton.set_active
+                else:
+                    radioButton.set_active(False)
+                buttons.append(radioButton)
+                scriptEngine.registerToggleButton(radioButton, "choose " + option)
+                hbox.pack_start(radioButton, expand=True, fill=True)
+                count = count + 1
+            indexer = RadioGroupIndexer(buttons)
+            self.indexers.append(indexer)
+            switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
+            hbox.show_all()
+            return hbox  
         else:
             checkButton = gtk.CheckButton(switch.name)
             if switch.getValue():
@@ -649,12 +661,16 @@ class InteractiveActionGUI:
         return text
     def diagnoseSwitch(self, switch):
         value = switch.getValue()
-        if switch.nameForOff:
-            text = "Viewing radio button for switch '" + switch.name + "/" + switch.nameForOff + "'"
+        if len(switch.options) >= 1:
+            text = "Viewing radio button for switch '" + switch.name + "', options "
+            for option in switch.options:
+                text += option + "/"
+            text = text[0:len(text) - 1] # Remove last '/'
+            text += "'. Default value " + str(value) + "."
         else:
             text = "Viewing check button for switch '" + switch.name + "'"
-        if value:
-            text += " (checked)"
+            if value:
+                text += " (checked)"
         return text
     def performInteractiveAction(self, action):
         self.test.callAction(action)
@@ -1064,6 +1080,18 @@ class ImportTestCase(guiplugins.ImportTestCase):
             if self.optionGroup.getSwitchValue("version"):
                 options += " -v 2.4"
         return options
+
+# A utility class to set and get the indices of options in radio button groups.
+class RadioGroupIndexer:
+    def __init__(self, listOfButtons):
+        self.buttons = listOfButtons
+    def getActiveIndex(self):
+        for i in xrange(0, len(self.buttons)):
+            if self.buttons[i].get_active():
+                return i
+    def setActiveIndex(self, index):
+        self.buttons[index].set_active(True)
+        
 
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests

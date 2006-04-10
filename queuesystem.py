@@ -79,7 +79,7 @@ class QueueSystemConfig(default.Config):
         default.Config.addToOptionGroups(self, app, groups)
         queueSystem = queueSystemName(app)
         queueSystemGroup = app.createOptionGroup(queueSystem)
-        queueSystemGroup.addSwitch("l", "Run tests locally", nameForOff="Submit tests to " + queueSystem)
+        queueSystemGroup.addSwitch("l", "", value = 0, options = ["Submit tests to " + queueSystem, "Run tests locally"])
         queueSystemGroup.addSwitch("perf", "Run on performance machines only")
         queueSystemGroup.addOption("R", "Request " + queueSystem + " resource")
         queueSystemGroup.addOption("q", "Request " + queueSystem + " queue")

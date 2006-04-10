@@ -183,6 +183,7 @@ class BatchResponder(respond.Responder):
 sectionHeaders = [ "Summary of all Unsuccessful tests", "Details of all Unsuccessful tests", "Summary of all Successful tests" ]
 
 class MailSender:
+    fakeMailSend = os.environ.has_key("TEXTTEST_FAKE_SEND_MAIL")
     def __init__(self, sessionName):
         self.sessionName = sessionName
         self.diag = plugins.getDiagnostics("Mail Sender")
@@ -225,7 +226,7 @@ class MailSender:
         file.close()
     def getSmtp(self):
         # Mock out sending of mail...
-        if os.environ.has_key("TEXTTEST_FAKE_SEND_MAIL"):
+        if self.fakeMailSend:
             return FakeSMTP()
         else:
             return smtplib.SMTP()

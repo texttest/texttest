@@ -87,6 +87,15 @@ class QuitGUI(guiplugins.SelectionAction):
             self.actionThread.terminate()
         guiplugins.processTerminationMonitor.killAll()    
 
+def getGtkRcFile():
+    configDir = plugins.getPersonalConfigDir()
+    if not configDir:
+        return
+    
+    file = os.path.join(configDir, ".texttest_gtk")
+    if os.path.isfile(file):
+        return file
+
 class TextTestGUI(ThreadedResponder):
     def __init__(self, optionMap):
         self.readGtkRCFile()
@@ -103,12 +112,8 @@ class TextTestGUI(ThreadedResponder):
         self.progressMonitor = None
         self.rootSuites = []
     def readGtkRCFile(self):
-        configDir = plugins.getPersonalConfigDir()
-        if not configDir:
-            return
-
-        file = os.path.join(configDir, ".texttest_gtk")
-        if os.path.isfile(file):
+        file = getGtkRcFile()
+        if file:
             gtk.rc_add_default_file(file)
     def setUpScriptEngine(self):
         guiplugins.setUpGuiLog(self.dynamic)
@@ -851,16 +856,34 @@ class ApplicationGUI(RightWindowGUI):
         RightWindowGUI.__init__(self, app, 1, selectionActionGUI)
     def addFilesToModel(self):
         confiter = self.model.insert_before(None, None)
-        self.model.set_value(confiter, 0, "Configuration Files")
+        self.model.set_value(confiter, 0, "Application Files")
+        colour = self.app.getConfigValue("file_colours")["app_static"]
+        for file in self.getConfigFiles():
+            self.addFileToModel(confiter, file, None, colour)
+
+        personalFiles = self.getPersonalFiles()
+        if len(personalFiles) > 0:
+            persiter = self.model.insert_before(None, None)
+            self.model.set_value(persiter, 0, "Personal Files")
+            for file in personalFiles:
+                self.addFileToModel(persiter, file, None, colour)
+    def getConfigFiles(self):
         configFiles = []
         for file in os.listdir(self.app.abspath):
             if self.app.ownsFile(file) and file.startswith("config."):
-                configFiles.append(file)
+                fullPath = os.path.join(self.app.abspath, file)
+                configFiles.append(fullPath)
         configFiles.sort()
-        colour = self.app.getConfigValue("file_colours")["app_static"]
-        for file in configFiles:
-            fullPath = os.path.join(self.app.abspath, file)
-            self.addFileToModel(confiter, fullPath, None, colour)
+        return configFiles
+    def getPersonalFiles(self):
+        personalFiles = []
+        personalFile = self.app.getPersonalConfigFile()
+        if os.path.isfile(personalFile):
+            personalFiles.append(personalFile)
+        gtkRcFile = getGtkRcFile()
+        if gtkRcFile:
+            personalFiles.append(gtkRcFile)
+        return personalFiles
     
 class TestCaseGUI(RightWindowGUI):
     def __init__(self, test, dynamic, selectionActionGUI):

@@ -153,12 +153,16 @@ class ApplicationRunner:
             except KeyboardInterrupt:
                 raise
             except:
-                message = str(sys.exc_value)
-                if sys.exc_type != plugins.TextTestError:
-                    plugins.printException()
-                    message = str(sys.exc_type) + ": " + message
-                raise testmodel.BadConfigError, message
+                self.handleFailedSetup()
         self.testSuite.tearDownEnvironment()
+    def handleFailedSetup(self):
+        message = str(sys.exc_value)
+        if sys.exc_type != plugins.TextTestError:
+            plugins.printException()
+            message = str(sys.exc_type) + ": " + message
+        for test in self.testSuite.testCaseList():
+            test.changeState(plugins.TestState("unrunnable", briefText="Set-up Failed", freeText=message, completed=1))
+        raise testmodel.BadConfigError, message
     def markForSetUp(self, suite):
         newActions = []
         for action in self.actionSequence:
@@ -445,22 +449,28 @@ class TextTest:
     def _run(self):
         self.createResponders()
         appSuites = self.createTestSuites()
-        self.setUpResponders(appSuites)
         try:
-            # pick out any responder that is designed to hang around executing
-            # some sort of loop in its own thread... generally GUIs of some sort
-            ownThreadResponder = self.findOwnThreadResponder()
-            if not ownThreadResponder or ownThreadResponder.needsTestRuns():
-                self.runWithTests(ownThreadResponder, appSuites)
-            else:
-                ownThreadResponder.runAlone()
+            self.runAppSuites(appSuites)
         finally:
             self.deleteTempFiles(appSuites)
+    def runAppSuites(self, appSuites):
+        # pick out any responder that is designed to hang around executing
+        # some sort of loop in its own thread... generally GUIs of some sort
+        ownThreadResponder = self.findOwnThreadResponder()
+        if not ownThreadResponder or ownThreadResponder.needsTestRuns():
+            self.runWithTests(ownThreadResponder, appSuites)
+        else:
+            self.runAlone(ownThreadResponder, appSuites)
+    def runAlone(self, ownThreadResponder, appSuites):
+        self.setUpResponders(appSuites)
+        ownThreadResponder.runAlone()
     def runWithTests(self, ownThreadResponder, appSuites):                
         actionRunner = self.createActionRunner(appSuites)
         if actionRunner.isEmpty():
             return # error already printed
-        
+
+        # Wait until now to do this, in case problems encountered so far...
+        self.setUpResponders(appSuites)
         if ownThreadResponder:
             actionThread = ActionThread(actionRunner)
             actionThread.start()

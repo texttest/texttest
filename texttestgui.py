@@ -106,6 +106,7 @@ class TextTestGUI(ThreadedResponder):
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.itermap = seqdict()
         self.rightWindowGUI = None
+        self.selection = None
         self.selectionActionGUI = None
         self.contents = None
         self.totalNofTests = 0
@@ -380,8 +381,8 @@ class TextTestGUI(ThreadedResponder):
         time.sleep(0.1)
         return True
     def notifyChangeMainThread(self, test, state):
-        # May have already closed down, don't crash if so
-        if not self.selection.get_tree_view():
+        # May have already closed down or not started yet, don't crash if so
+        if not self.selection or not self.selection.get_tree_view():
             return
         if test.classId() == "test-case":            
             # Working around python bug 853411: main thread must do all forking

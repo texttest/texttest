@@ -95,6 +95,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         self.archResources["i386_linux.carmen_12"]   = "carmrun12=1,carmbuildmaster=1,carmarch=\"*linux*\""
         self.archResources["i386_linux.master"]      = "carmrunmaster=1,carmarch=\"*linux*\""
         self.archResources["x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\""
+        self.archResources["boost.x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\",carmarch=\"x86_64_linux\""
         self.archResources["x86_64_linux.master"]    = "osversion=\"RHEL4\",carmarch=\"x86_64_linux\""
         
  #
@@ -104,6 +105,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
  # i386_linux.carmen_12           x          X           X                                      X
  # i386_linux.master              x          x           X                           X?         X
  # x86_64_linux.carmen_12                                X             X                        X
+ # boost.x86_64_linux.carmen_12                                        X                        X
  # x86_64_linux.master                                                                          X
  #
         
@@ -148,7 +150,9 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
         archDesc = getArchitecture(self.test.app) + "." + getMajorReleaseId(self.test.app)
-        if self.archResources.has_key(archDesc):
+        if "boost" in self.test.app.versions  and self.archResources.has_key("boost." + archDesc):
+            resources.append(self.archResources["boost." + archDesc])
+        elif self.archResources.has_key(archDesc):
             resources.append(self.archResources[archDesc])
         else:
             resources.append("carmarch=\"*" + self.archToUse + "*\"")

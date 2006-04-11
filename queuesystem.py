@@ -428,8 +428,9 @@ class SubmitTest(plugins.Action):
 
 class SubmissionMissed(plugins.Action):
     def __call__(self, test):
-        raise plugins.TextTestError, "Termination already in progress when trying to submit to " + \
-              queueSystemName(test.app)
+        if not test.state.hasStarted() and test.state.category != "pending":
+            raise plugins.TextTestError, "Termination already in progress when trying to submit to " + \
+                  queueSystemName(test.app)
 
 class KillTestSubmission(plugins.Action):
     def __repr__(self):

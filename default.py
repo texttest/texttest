@@ -161,7 +161,7 @@ class Config(plugins.Configuration):
     def getFiltersFromFile(self, app, filename):
         fullPath = self.makeFilterFileName(app, filename)
         if not fullPath:
-            print "Rejected application", app, ": filter file '" + filename + "' could not be found"
+            sys.stderr.write("Rejected application " + repr(app) + " : filter file '" + filename + "' could not be found\n")
             return [ RejectFilter() ]
         fileData = string.join(plugins.readList(fullPath), ",")
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")

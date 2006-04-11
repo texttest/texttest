@@ -110,6 +110,7 @@ class TextTestGUI(ThreadedResponder):
         self.selectionActionGUI = None
         self.contents = None
         self.totalNofTests = 0
+        self.nofFailedSetupTests = 0
         self.progressMonitor = None
         self.rootSuites = []
     def readGtkRCFile(self):
@@ -155,7 +156,7 @@ class TextTestGUI(ThreadedResponder):
             for app in self.rootSuites:
                 testProgressOptions = app.getConfigValue("test_progress")
                 if testProgressOptions.has_key("show") and testProgressOptions["show"][0] == "1":
-                    self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.rootSuites)
+                    self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.nofFailedSetupTests, self.rootSuites)
                     progressBar = self.progressMonitor.createProgressBar()
                     progressBar.show()
                     vbox.pack_start(progressBar, expand=False, fill=True)
@@ -244,6 +245,8 @@ class TextTestGUI(ThreadedResponder):
             self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
         if suite.classId() == "test-case":
+            if suite.state.category == "unrunnable":
+                self.nofFailedSetupTests += 1
             self.totalNofTests += 1        
         iter = self.model.insert_before(parent, None)
         nodeName = suite.name
@@ -1120,11 +1123,12 @@ class RadioGroupIndexer:
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor:
-    def __init__(self, totalNofTests, applications):
+    def __init__(self, totalNofTests, nofFailedSetupTests, applications):
         # If we get here, we know that we want to show progress
         self.completedTests = {}
         self.totalNofTests = totalNofTests
-        self.nofCompletedTests = 0
+        self.nofFailedSetupTests = nofFailedSetupTests
+        self.nofCompletedTests = nofFailedSetupTests
         self.nofPendingTests = 0
         self.nofRunningTests = 0
         self.nofSuccessfulTests = 0
@@ -1242,6 +1246,7 @@ class TestProgressMonitor:
             summary += "%s are pending\n" % plugins.adjustText(str(self.nofPendingTests), indentation, "right")
             summary += "%s are running\n" % plugins.adjustText(str(self.nofRunningTests), indentation, "right")
         summary += "%s were successful\n" % plugins.adjustText(str(self.nofSuccessfulTests), indentation, "right")
+        summary += "%s failed in setup\n" % plugins.adjustText(str(self.nofFailedSetupTests), indentation, "right")
         summary += "%s failed:\n" % plugins.adjustText(str(self.nofFailedTests), indentation, "right")
         summary += "%s were faster\n" % plugins.adjustText(str(self.nofFasterTests), extraIndentation, "right")
         summary += "%s were slower\n" % plugins.adjustText(str(self.nofSlowerTests), extraIndentation, "right")

@@ -355,6 +355,7 @@ class TextTestGUI(ThreadedResponder):
         testWins = self.createTestWindows(treeWindow)
         self.createDefaultRightGUI()
         self.fillTopWindow(topWindow, testWins)
+        treeWindow.grab_focus() # To avoid the Quit button getting the initial focus, causing unwanted quit event
     def runWithActionThread(self, actionThread):
         self.setUpGui(actionThread)
         idle_add(self.pickUpChange)

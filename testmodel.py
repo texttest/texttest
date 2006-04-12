@@ -216,7 +216,7 @@ class TestCase(Test):
         self.notifyChanged()
     def changeState(self, state):
         self.state = state
-        debugLog.info("Change notified, test " + self.name + " in state " + state.category)
+        debugLog.info("Change notified, test " + self.uniqueName + " in state " + state.category)
         self.notifyChanged(state)
     def getStateFile(self):
         return self.makeFileName("teststate", temporary=1, forComparison=0)

@@ -206,9 +206,9 @@ class CollateFiles(default.CollateFiles):
             plugins.movefile(sourcePath, targetFile)
         else:
             shutil.copyfile(sourcePath, targetFile)
-    def getInterruptActions(self):
+    def getInterruptActions(self, fetchResults):
         if str(sys.exc_value) == "CPULIMIT":
             return [ default.CollateFiles() ]
         else:
-            return [ self ]
+            return default.CollateFiles.getInterruptActions(self, fetchResults)
 

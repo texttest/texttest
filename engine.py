@@ -15,11 +15,11 @@ class TestRunner:
         self.actionSequence = []
         self.appRunner = appRunner
         self.setActionSequence(actionSequence)
-    def switchToCleanup(self):
+    def switchToCleanup(self, fetchResults):
         self.interrupted = 0
         newActionSequence = []
         for action in self.actionSequence:
-            newActionSequence += action.getInterruptActions()
+            newActionSequence += action.getInterruptActions(fetchResults)
         self.actionSequence = newActionSequence
     def setActionSequence(self, actionSequence):
         self.actionSequence = []
@@ -209,10 +209,10 @@ class ActionRunner:
             self.allTests.append(testRunner)
     def isEmpty(self):
         return len(self.appRunners) == 0
-    def switchToCleanup(self):
+    def switchToCleanup(self, fetchResults):
         for testRunner in self.testQueue:
             self.diag.info("Running cleanup actions for test " + testRunner.test.getRelPath())
-            testRunner.switchToCleanup()
+            testRunner.switchToCleanup(fetchResults)
         self.interrupted = 0
     def run(self):
         try:
@@ -221,12 +221,13 @@ class ActionRunner:
             for responder in testmodel.Test.observers:
                 responder.notifyAllComplete()
         except KeyboardInterrupt, e:
-            self.writeTermMessage(e)
-            self.switchToCleanup()
+            excData = str(e)
+            self.writeTermMessage(excData)
+            fetchResults = excData.find("LIMIT") != -1
+            self.switchToCleanup(fetchResults)
             self.run()
-    def writeTermMessage(self, e):
+    def writeTermMessage(self, excData):
         message = "Terminating testing due to external interruption"
-        excData = str(e)
         if excData:
             message += " (" + excData + ")"
         print message

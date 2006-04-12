@@ -33,7 +33,7 @@ class RunTestInSlave(unixonly.RunTest):
         return _getExecutionMachines()
     def getBriefText(self, execMachines):
         return "RUN (" + string.join(execMachines, ",") + ")"
-    def getInterruptActions(self):
+    def getInterruptActions(self, fetchResults):
         return [ KillTestInSlave() ]
 
 class KillTestInSlave(default.KillTest):
@@ -423,7 +423,7 @@ class SubmitTest(plugins.Action):
         app.checkBinaryExists()
         self.runOptions = self.setRunOptions(app)
         self.loginShell = app.getConfigValue("login_shell")
-    def getInterruptActions(self):
+    def getInterruptActions(self, fetchResults):
         return [ SubmissionMissed() ]
 
 class SubmissionMissed(plugins.Action):
@@ -441,8 +441,6 @@ class KillTestSubmission(plugins.Action):
             return
 
         self.describeJob(test, jobId, jobName)
-        if str(sys.exc_value) == "Interrupted externally":
-            raise plugins.TextTestError, "interrupted externally"
         if not self.jobStarted(test):
             if jobExisted:
                 self.setKilledPending(test)
@@ -494,8 +492,11 @@ class WaitForCompletion(plugins.Action):
             return test.state.getPostText()
         except AttributeError:
             return " (" + test.state.category + ")"
-    def getInterruptActions(self):
-        return [ KillTestSubmission(), WaitForKill() ]
+    def getInterruptActions(self, fetchResults):
+        actions = [ KillTestSubmission() ]
+        if fetchResults:
+            actions.append(WaitForKill())
+        return actions
 
 class Abandoned(plugins.TestState):
     def __init__(self, freeText):

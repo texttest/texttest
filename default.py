@@ -719,9 +719,6 @@ class PrepareWriteDirectory(plugins.Action):
             for subVar, subValue in value.items():
                 # Don't write windows separators, they get confused with escape characters...
                 file.write(subVar + " = " + subValue.replace(os.sep, "/") + "\n")
-    def getInterruptActions(self):
-        # This can take a very long time, best to let it be interrupted...
-        return []
 
 class CollectFailureData(plugins.Action):
     def __init__(self):
@@ -1015,7 +1012,7 @@ class RunTest(plugins.Action):
             return "/dev/null"
         else:
             return "nul"
-    def getInterruptActions(self):
+    def getInterruptActions(self, fetchResults):
         return [ KillTest() ]
     def setUpSuite(self, suite):
         self.describe(suite)

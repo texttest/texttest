@@ -273,9 +273,9 @@ class RunWithParallelAction(plugins.Action):
             os._exit(0)
         else:
             try:
-                execProcess, parentProcess = self.findProcessInfo(processId, test)
                 # Make the state change that would presumably be made by the baseRunner...
                 self.baseRunner.changeToRunningState(test, None)
+                execProcess, parentProcess = self.findProcessInfo(processId, test)
                 for parallelAction in self.parallelActions:
                     parallelAction.performParallelAction(test, execProcess, parentProcess)
             except plugins.TextTestError:
@@ -320,8 +320,8 @@ class RunWithParallelAction(plugins.Action):
     def handleNoTimeAvailable(self, test):
         # Do nothing by default
         pass
-    def getInterruptActions(self):
-        return self.baseRunner.getInterruptActions()
+    def getInterruptActions(self, fetchResults):
+        return self.baseRunner.getInterruptActions(fetchResults)
                 
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, execProcess, parentProcess):

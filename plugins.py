@@ -130,8 +130,11 @@ class Action:
     def tearDownSuite(self, suite):
         pass
     # Return the actions to replace the current one if run is interrupted
-    def getInterruptActions(self):
-        return [ self ]
+    def getInterruptActions(self, fetchResults):
+        if fetchResults:
+            return [ self ]
+        else:
+            return []
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText

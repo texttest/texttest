@@ -563,7 +563,7 @@ class CompileRules(plugins.Action):
     def setUpSuite(self, suite):
         if suite.abspath == suite.app.abspath or isUserSuite(suite):
             self.describe(suite)
-    def getInterruptActions(self):
+    def getInterruptActions(self, fetchResults):
         return [ RuleBuildKilled() ]
 
 class RuleBuildKilled(queuesystem.KillTestInSlave):
@@ -646,8 +646,11 @@ class WaitForRuleCompile(queuesystem.WaitForCompletion):
         else:
             text += "ok"
         return text + ")"
-    def getInterruptActions(self):
-        return [ KillRuleBuildSubmission(), queuesystem.WaitForKill() ]
+    def getInterruptActions(self, fetchResults):
+        actions = [ KillRuleBuildSubmission() ]
+        if fetchResults:
+            actions.append(queuesystem.WaitForKill())
+        return actions
 
 class KillRuleBuildSubmission(queuesystem.KillTestSubmission):
     def __repr__(self):
@@ -670,7 +673,9 @@ class PendingRuleCompilation(plugins.TestState):
         self.testCompiling = prevState.testCompiling
         briefText = "RULES PEND"
         freeText = "Build pending for ruleset '" + self.rulesetName + "'"
-        plugins.TestState.__init__(self, "pend_rulecompile", briefText=briefText, freeText=freeText)
+        lifecycleChange="become pending for rule compilation"
+        plugins.TestState.__init__(self, "pend_rulecompile", briefText=briefText, \
+                                   freeText=freeText, lifecycleChange=lifecycleChange)
 
 class RunningRuleCompilation(plugins.TestState):
     def __init__(self, prevState, compilingState = None):

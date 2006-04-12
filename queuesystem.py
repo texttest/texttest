@@ -514,6 +514,7 @@ class WaitForKill(plugins.Action):
         attempt = self.getAttempt(test)
         if attempt > 600:
             freeText = "Could not delete " + repr(test) + " in queuesystem: have abandoned it"
+            print test.getIndent() + freeText
             return test.changeState(Abandoned(freeText))
 
         self.testsWaitingForKill[test] += 1

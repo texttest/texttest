@@ -12,6 +12,7 @@ class Responder:
             self.scriptEngine = ScriptEngine.instance
         else:
             self.setUpScriptEngine()
+        self.closedown = False
     def setUpScriptEngine(self):
         logger = plugins.getDiagnostics("Use-case log")
         self.scriptEngine = ScriptEngine(logger)
@@ -32,12 +33,15 @@ class Responder:
     # Called when everything is finished
     def notifyAllComplete(self):
         pass
+    def notifyInterrupt(self, fetchResults):
+        if not fetchResults:
+            self.closedown = True
     def needsOwnThread(self):
         return 0
     def needsTestRuns(self):
         return 1
     def describeFailures(self, test):
-        if test.state.hasFailed():
+        if test.state.hasFailed() and not self.closedown:
             print test.getIndent() + repr(test), test.state.getDifferenceSummary()
         
 class SaveState(Responder):
@@ -67,6 +71,8 @@ class ThreadedResponder(Responder):
             pass
         return True
     def notifyChange(self, test, state):
+        if self.closedown:
+            return
         if not plugins.inMainThread():
             self.workQueue.put((test, state))
             return 1

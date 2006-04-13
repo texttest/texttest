@@ -158,6 +158,7 @@ class BatchApplicationData:
 # Works only on UNIX
 class BatchResponder(respond.Responder):
     def __init__(self, optionMap):
+        respond.Responder.__init__(self, optionMap)
         self.sessionName = optionMap["b"]
         self.batchAppData = seqdict()
         self.allApps = seqdict()

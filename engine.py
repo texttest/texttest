@@ -225,6 +225,8 @@ class ActionRunner:
             self.writeTermMessage(excData)
             fetchResults = excData.find("LIMIT") != -1
             self.switchToCleanup(fetchResults)
+            for responder in testmodel.Test.observers:
+                responder.notifyInterrupt(fetchResults)
             self.run()
     def writeTermMessage(self, excData):
         message = "Terminating testing due to external interruption"

@@ -590,6 +590,14 @@ class PrintStrings(plugins.Action):
             self.strings.append(line)
             print line
 
+class SplitPerformance(plugins.Action):
+    def __call__(self, test):
+        source = test.makeFileName("performance.cas.parallel")
+        target = test.makeFileName("performance.cas.12.parallel")
+        if os.path.isfile(source) and not os.path.isfile(target):
+            shutil.copyfile(source, target)
+            os.system("cvs add " + target)
+
 class SelectTests(guiplugins.SelectTests):
     def __init__(self, rootSuites, oldOptionGroup):
         guiplugins.SelectTests.__init__(self, rootSuites, oldOptionGroup)

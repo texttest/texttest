@@ -92,8 +92,8 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         self.nightjob = nightjob
         self.archResources = {}
         self.archResources["i386_linux.carmen_11"]   = "osversion=\"RHEL3\",carmarch=\"i386_linux\""
-        self.archResources["i386_linux.carmen_12"]   = "carmrun12=1,carmbuildmaster=1,carmarch=\"*linux*\""
-        self.archResources["i386_linux.master"]      = "carmrunmaster=1,carmarch=\"*linux*\""
+        self.archResources["i386_linux.carmen_12"]   = "osversion=\"RHEL3\",carmrun12=1,carmbuildmaster=1,carmarch=\"*linux*\""
+        self.archResources["i386_linux.master"]      = "osversion=\"RHEL3\",carmrunmaster=1,carmarch=\"*linux*\""
         self.archResources["x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\""
         self.archResources["boost.x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\",carmarch=\"x86_64_linux\""
         self.archResources["x86_64_linux.master"]    = "osversion=\"RHEL4\",carmarch=\"x86_64_linux\""

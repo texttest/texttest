@@ -1220,7 +1220,7 @@ class TestProgressMonitor:
             self.nofDifferentTests = self.adjustCount(self.nofDifferentTests, increase)                    
         if category[1].find("unreported bug") != -1:
             self.nofUnreportedBugsTests = self.adjustCount(self.nofUnreportedBugsTests, increase)                    
-        elif category[1].find(" bug") != -1:
+        elif category[1].find("bug") != -1:
             self.nofKnownBugsTests = self.adjustCount(self.nofKnownBugsTests, increase) 
         if category[1].find("killed") != -1:
             self.nofKilledTests = self.adjustCount(self.nofKilledTests, increase)                    

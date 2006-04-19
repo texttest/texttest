@@ -50,7 +50,7 @@ import queuesystem, default, os, string, shutil, plugins, sys, signal, stat, gui
 from socket import gethostname
 from tempfile import mktemp
 from respond import Responder
-from carmenqueuesystem import getArchitecture, CarmenConfig, getMajorReleaseId
+from carmenqueuesystem import getArchitecture, CarmenConfig, getMajorReleaseId, SgeSubmissionRules
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -124,15 +124,18 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
     def findPriority(self):
         # Don't lower the priority of these
         return 0
-        
+    def useSge(self):
+        return isinstance(self.normalSubmissionRules, SgeSubmissionRules)
     def findResourceList(self):
         normalResources = self.normalSubmissionRules.findResourceList()
         majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
         if majRelResource:
             normalResources.append(majRelResource)
-        # architecture resources
-        archDesc = getArchitecture(self.test.app) + "." + getMajorReleaseId(self.test.app)
+        # architecture resources for SGE
+        if not self.useSge():
+            return normalResources
         
+        archDesc = getArchitecture(self.test.app) + "." + getMajorReleaseId(self.test.app)
         if self.raveArchResources.has_key(archDesc):
             normalResources.append(self.raveArchResources[archDesc])
         else:

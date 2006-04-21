@@ -1,18 +1,23 @@
 XCOMM Install test components in generally available place.
-XCOMM $Id: Imakefile,v 1.40 2006/04/20 11:35:02 uddeborg Exp $
+XCOMM $Id: Imakefile,v 1.41 2006/04/21 14:10:07 uddeborg Exp $
 
 MODULEDIR=/usr/local/share/python
 FRAMEWORK_MODULES=batch.py comparetest.py default.py engine.py guiplugins.py knownbugs.py lsf.py performance.py plugins.py predict.py queuesystem.py respond.py sge.py testmodel.py testoverview.py texttestgui.py unixonly.py
 CARMEN_MODULES=carmenqueuesystem.py ravebased.py dayopsgui.py optimization.py apc.py KPI.py matador.py studio.py fleet.py mpssolver.py
 THIRD_PARTY_MODULES=HTMLgen.py HTMLcolors.py ImageH.py ImagePaletteH.py imgsize.py
 PYTHONVERSIONS=2.2 2.3 2.4
-ALLTARGETS=$(addprefix $(MODULEDIR)/, $(foreach ver, $(PYTHONVERSIONS), $(addprefix $(ver)/, $(FRAMEWORK_MODULES) $(CARMEN_MODULES) $(THIRD_PARTY_MODULES))))
+ALLDIRS=$(addprefix $(MODULEDIR)/, $(PYTHONVERSIONS))
+ALLTARGETS=$(foreach ver, $(ALLDIRS), $(addprefix $(ver)/, $(FRAMEWORK_MODULES) $(CARMEN_MODULES) $(THIRD_PARTY_MODULES)))
 
 CarmFirstTarget()
 
 install:: $(ALLTARGETS)
-$(ALLTARGETS): $$(@F)
-	cp $< $@
+$(addsuffix /%, $(ALLDIRS)): %
+	@set -xv; \
+	for pv in $(PYTHONVERSIONS); \
+	do  rm -f $(MODULEDIR)/$$pv/$<; \
+	    cp $< $(MODULEDIR)/$$pv; \
+	done
 
 XCOMM There is no single macro which both removes the suffix and installs.
 XCOMM Easiest to do by hand, as long as it is only one case.

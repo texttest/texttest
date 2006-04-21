@@ -97,7 +97,7 @@ class InteractiveResponder(Responder):
             self.presentInteractiveDialog(test)
     def getAutosaveVersion(self, test):
         versions = test.app.getVersionFileExtensions(forSave=1)
-        logFileStem = os.path.join(test.abspath, test.getConfigValue("log_file") + "." + test.app.name)
+        logFileStem = test.makeFileName(test.getConfigValue("log_file"))
         if not os.path.isfile(logFileStem):
             return ""
         # Start with the least specific, we want to create a reusable file if we can...

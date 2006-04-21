@@ -127,7 +127,7 @@ class Config(plugins.Configuration):
     def getPossibleFilterFiles(self, app):
         filterFiles = []
         for directory in app.getConfigValue("test_list_files_directory"):
-            fullPath = os.path.join(app.abspath, directory)
+            fullPath = os.path.join(app.getDirectory(), directory)
             if os.path.exists(fullPath):
                 filenames = os.listdir(fullPath)
                 filenames.sort()
@@ -145,7 +145,7 @@ class Config(plugins.Configuration):
     def makeFilterFileName(self, app, filename):
         extensions = self.getExtensions(app)
         for directory in app.getConfigValue("test_list_files_directory"):
-            fullDir = os.path.join(app.abspath, directory)
+            fullDir = os.path.join(app.getDirectory(), directory)
             for extension in extensions:
                 fullPath = os.path.join(fullDir, filename + extension)
                 if os.path.isfile(fullPath):
@@ -285,7 +285,7 @@ class Config(plugins.Configuration):
         knownDataFiles = test.getConfigValue("link_test_path") + test.getConfigValue("copy_test_path") + \
                          test.getConfigValue("partial_copy_test_path")
         readFiles = seqdict()
-        readFiles[""] = map(lambda file: os.path.join(test.abspath, file), knownDataFiles)
+        readFiles[""] = map(lambda file: test.makeFileName(file, forComparison=0), knownDataFiles)
         return readFiles
     def progressText(self, test):
         perc = self.calculatePercentage(test)
@@ -407,10 +407,10 @@ class TestEnvironmentCreator:
     def setUp(self):
         self.setDisplayEnvironment()
         self.setDiagEnvironment()
-        self.setUseCaseEnvironment()
         # Always include the working directory of the test in PATH, to pick up linked
         # executables. Allow for expansion of references...
         if self.testCase():
+            self.setUseCaseEnvironment()
             self.test.setEnvironment("PATH", self.test.writeDirectory + os.pathsep + "$PATH")
     def topLevel(self):
         return self.test.parent is None
@@ -444,10 +444,10 @@ class TestEnvironmentCreator:
             self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
             self.test.setEnvironment(envVarName, self.optionMap["trace"])
     def setPermanentDiagnostics(self):
-        diagConfigFile = os.path.join(self.test.abspath, self.diagDict["configuration_file"])
-        if os.path.isfile(diagConfigFile):
+        diagConfigFile = self.test.makeFileName(self.diagDict["configuration_file"])
+        if self.test.hasFile(diagConfigFile):
             inVarName = self.diagDict["input_directory_variable"]
-            self.addDiagVariable(inVarName, self.test.abspath)
+            self.addDiagVariable(inVarName, self.test.getDirectory())
         outVarName = self.diagDict.get("write_directory_variable")
         if outVarName and self.testCase():
             self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
@@ -474,9 +474,9 @@ class TestEnvironmentCreator:
         if self.useJavaRecorder():
             self.test.properties.addEntry("jusecase", {}, insert=1)
         usecaseFile = self.findReplayUseCase()
-        if usecaseFile and os.path.isfile(usecaseFile):
+        if usecaseFile:
             self.setReplay(usecaseFile)
-        if os.path.isfile(self.usecaseFile) or self.isRecording() or os.path.isfile(self.inputFile):
+        if self.test.hasFile(self.usecaseFile) or self.isRecording() or self.test.hasFile(self.inputFile):
             # Re-record if recorded files are already present or recording explicitly requested
             recordUseCase = self.test.makeFileName("usecase", temporary=1)
             self.setRecord(recordUseCase, self.test.makeFileName("input", temporary=1))
@@ -486,11 +486,13 @@ class TestEnvironmentCreator:
         if self.isRecording():
             if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
                 # For self-testing, to allow us to record TextTest performing recording
-                return plugins.addLocalPrefix(os.getenv("USECASE_REPLAY_SCRIPT"), "target")
+                targetReplayFile = plugins.addLocalPrefix(os.getenv("USECASE_REPLAY_SCRIPT"), "target")
+                if os.path.isfile(targetReplayFile):
+                    return targetReplayFile
             else:
                 # Don't replay when recording - let the user do it...
                 return None
-        else:
+        elif self.test.hasFile(self.usecaseFile):
             return self.usecaseFile
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
@@ -565,7 +567,7 @@ class PrepareWriteDirectory(plugins.Action):
         if configName.startswith("$"):
             return os.path.normpath(os.path.expandvars(configName))
         else:
-            return test.makePathName(configName, test.abspath)
+            return test.makePathName(configName)
     def findEnvironmentVariable(self, test, configName):
         self.diag.info("Finding env. var name from " + configName)
         if configName.startswith("$"):
@@ -979,7 +981,7 @@ class RunTest(plugins.Action):
         return self.RETRY
     def getOptions(self, test):
         optionsFile = test.makeFileName("options")
-        if os.path.isfile(optionsFile):
+        if test.hasFile(optionsFile):
             return " " + os.path.expandvars(open(optionsFile).read().strip())
         else:
             return ""
@@ -1006,7 +1008,7 @@ class RunTest(plugins.Action):
         return command + " 2> " + file
     def getInputFile(self, test):
         inputFileName = test.makeFileName("input")
-        if os.path.isfile(inputFileName):
+        if test.hasFile(inputFileName):
             return inputFileName
         if os.name == "posix":
             return "/dev/null"
@@ -1280,7 +1282,7 @@ class ReconnectTest(plugins.Action):
 
         # State will refer to TEXTTEST_HOME in the original (which we may not have now,
         # and certainly don't want to save), try to fix this...
-        test.state.updatePaths(test.app.abspath, self.rootDirToCopy)
+        test.state.updatePaths(test.app.getDirectory(), self.rootDirToCopy)
         self.describe(test, " (state " + test.state.category + ")")
     def hasFiles(self, test):
         dir = test.getDirectory(temporary=1)

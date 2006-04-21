@@ -1112,14 +1112,14 @@ class ApcTestCaseInformation(optimization.TestCaseInformation):
         return 1
     def makeImport(self):
         testPath = self.testPath()
-        optionPath = self.makeFileName("options")
-        envPath = self.makeFileName("environment")
-        statusPath = self.makeFileName("status")
-        perfPath = self.makeFileName("performance")
         createdPath = 0
         if not os.path.isdir(testPath):
             os.mkdir(testPath)
             createdPath = 1
+        optionPath = self.makeFileName("options")
+        envPath = self.makeFileName("environment")
+        statusPath = self.makeFileName("status")
+        perfPath = self.makeFileName("performance")
         if not os.path.isfile(optionPath):
             dirName = self.chooseSubPlan()
             if dirName == None:
@@ -1443,7 +1443,7 @@ class CopyEnvironment(plugins.Action):
     def setUpSuite(self, suite):
         if ravebased.isUserSuite(suite):
             self.describe(suite)
-            oldFile = os.path.join(suite.abspath, "environment.apc")
+            oldFile = suite.makeFileName("environment")
             if not os.path.isfile(oldFile):
                 return
 
@@ -1631,7 +1631,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
                 for kpiTest in kpiGroupForTest.keys():
                     if testInGroup == kpiGroupForTest[kpiTest] and  kpiTest != originalTestName:
                         testPath = os.path.join(path, kpiTest)
-                        newTest = testmodel.TestCase(kpiTest, testPath, self.test.app, [], self.test.parent)
+                        newTest = testmodel.TestCase(kpiTest, testmodel.DirectoryCache(testPath), self.test.app, self.test.parent)
                         self.testGraph.createPlotLinesForTest(newTest)
             else:
                 print "Test", test.name, "is not in an KPI group."

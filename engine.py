@@ -314,57 +314,59 @@ class TextTest:
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
         if not os.environ.has_key("USECASE_HOME"):
             os.environ["USECASE_HOME"] = os.path.join(self.inputOptions.directoryName, "usecases")
+    def findSearchDirs(self):
+        root = self.inputOptions.directoryName
+        self.diag.info("Using test suite at " + root)
+        fullPaths = map(lambda name: os.path.join(root, name), os.listdir(root))
+        return [ self.inputOptions.directoryName ] + filter(os.path.isdir, fullPaths)
     def findApps(self):
-        dirName = self.inputOptions.directoryName
-        self.diag.info("Using test suite at " + dirName)
-        raisedError, appList = self._findApps(dirName, 1)
+        root = self.inputOptions.directoryName
+        if not os.path.isdir(root):
+            sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
+            return []
+        appList = []
+        raisedError = False
+        for dir in self.findSearchDirs():
+            subRaisedError, apps = self.findAppsUnder(dir)
+            appList += apps
+            raisedError |= subRaisedError
         appList.sort(self.compareApps)
         self.diag.info("Found applications : " + repr(appList))
         if len(appList) == 0 and not raisedError:
-            print "Could not find any matching applications (files of the form config.<app>) under", dirName
+            print "Could not find any matching applications (files of the form config.<app>) under", root
         return appList
     def compareApps(self, app1, app2):
         return cmp(app1.name, app2.name)
-    def _findApps(self, dirName, recursive):
+    def findAppsUnder(self, dirName):
         appList = []
-        raisedError = 0
-        if not os.path.isdir(dirName):
-            sys.stderr.write("Test suite root directory does not exist: " + dirName + "\n")
-            return 1, []
+        raisedError = False
         selectedAppDict = self.inputOptions.findSelectedAppNames()
-        self.diag.info("Selecting apps according to dictionary :" + repr(selectedAppDict))
-        for f in os.listdir(dirName):
-            pathname = os.path.join(dirName, f)
-            if os.path.isfile(pathname):
-                components = f.split('.')
-                if len(components) != 2 or components[0] != "config":
-                    continue
-                appName = components[1]
-                if len(selectedAppDict) and not selectedAppDict.has_key(appName):
-                    continue
+        self.diag.info("Selecting apps in " + dirName + " according to dictionary :" + repr(selectedAppDict))
+        dircache = testmodel.DirectoryCache(dirName)
+        for f in dircache.findExtensionFiles("config."):
+            components = os.path.basename(f).split('.')
+            if len(components) != 2:
+                continue
+            appName = components[1]
+            if len(selectedAppDict) and not selectedAppDict.has_key(appName):
+                continue
 
-                versionList = self.inputOptions.findVersionList()
-                if selectedAppDict.has_key(appName):
-                    versionList = selectedAppDict[appName]
-                try:
-                    for version in versionList:
-                        appList += self.addApplications(appName, dirName, pathname, version)
-                except (SystemExit, KeyboardInterrupt):
-                    raise
-                except testmodel.BadConfigError:
-                    sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + "\n")
-                    raisedError = 1
-            elif os.path.isdir(pathname) and recursive:
-                subRaisedError, subApps = self._findApps(pathname, 0)
-                raisedError |= subRaisedError
-                for app in subApps:
-                    appList.append(app)
+            self.diag.info("Building apps from " + f)
+            versionList = self.inputOptions.findVersionList()
+            if selectedAppDict.has_key(appName):
+                versionList = selectedAppDict[appName]
+            try:
+                for version in versionList:
+                    appList += self.addApplications(appName, dircache, version)
+            except testmodel.BadConfigError:
+                sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + "\n")
+                raisedError = True
         return raisedError, appList
-    def createApplication(self, appName, dirName, pathname, version):
-        return testmodel.Application(appName, dirName, pathname, version, self.inputOptions)
-    def addApplications(self, appName, dirName, pathname, version):
+    def createApplication(self, appName, dircache, version):
+        return testmodel.Application(appName, dircache, version, self.inputOptions)
+    def addApplications(self, appName, dircache, version):
         appList = []
-        app = self.createApplication(appName, dirName, pathname, version)
+        app = self.createApplication(appName, dircache, version)
         appList.append(app)
         if not app.configObject.useExtraVersions():
             return appList
@@ -376,7 +378,7 @@ class TextTest:
             aggVersion = extraVersion
             if len(version) > 0:
                 aggVersion = version + "." + extraVersion
-            extraApp = self.createApplication(appName, dirName, pathname, aggVersion)
+            extraApp = self.createApplication(appName, dircache, aggVersion)
             app.extras.append(extraApp)
             appList.append(extraApp)
         return appList
@@ -403,6 +405,7 @@ class TextTest:
         appSuites = seqdict()
         forTestRuns = self.needsTestRuns()
         for app in self.allApps:
+            valid = False
             try:
                 valid, testSuite = app.createTestSuite(forTestRuns=forTestRuns)
             except testmodel.BadConfigError:

@@ -89,7 +89,7 @@ class MatadorConfig(optimization.OptimizationConfig):
             return []
     def getRuleSetting(self, test, paramName, rulesFile=None):
         raveParamName = "raveparameters." + test.app.name + test.app.versionSuffix()
-        raveParamFile = test.makePathName(raveParamName, test.abspath)
+        raveParamFile = test.makePathName(raveParamName)
         setting = self.getRuleSettingFromFile(raveParamFile, paramName)
         if setting:
             return setting
@@ -603,7 +603,7 @@ class SelectTests(guiplugins.SelectTests):
         guiplugins.SelectTests.__init__(self, rootSuites, oldOptionGroup)
         self.features = []
         for app in self.apps:
-            featureFile = os.path.join(app.abspath, "features." + app.name)
+            featureFile = os.path.join(app.getDirectory(), "features." + app.name)
             if not os.path.exists(featureFile):
                 continue
             for line in open(featureFile).readlines():

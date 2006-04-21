@@ -423,7 +423,7 @@ class TextTestGUI(ThreadedResponder):
             # If we're viewing a test that isn't there any more, view the suite instead!
             if self.rightWindowGUI.object.classId() == "test-case":
                 viewedTest = self.rightWindowGUI.object
-                if not os.path.isdir(viewedTest.abspath):
+                if not os.path.isdir(viewedTest.getDirectory()):
                     self.recreateTestView(suite)
         else:
             self.addNewTestToModel(suiteIter, maybeNewTest, suiteIter)
@@ -515,6 +515,7 @@ class TextTestGUI(ThreadedResponder):
         if test.classId() == "test-app":
             self.rightWindowGUI = ApplicationGUI(test, self.selectionActionGUI)
         else:
+            test.dircache.refresh()
             if checkUpToDate and test.state.isComplete() and test.state.needsRecalculation():
                 cmpAction = comparetest.MakeComparisons()
                 if cmpAction.defaultComparisonClass:
@@ -873,13 +874,7 @@ class ApplicationGUI(RightWindowGUI):
             for file in personalFiles:
                 self.addFileToModel(persiter, file, None, colour)
     def getConfigFiles(self):
-        configFiles = []
-        for file in os.listdir(self.app.abspath):
-            if self.app.ownsFile(file) and file.startswith("config."):
-                fullPath = os.path.join(self.app.abspath, file)
-                configFiles.append(fullPath)
-        configFiles.sort()
-        return configFiles
+        return filter(self.app.ownsFile, self.app.dircache.findExtensionFiles("config." + self.app.name))
     def getPersonalFiles(self):
         personalFiles = []
         personalFile = self.app.getPersonalConfigFile()
@@ -971,7 +966,7 @@ class TestCaseGUI(RightWindowGUI):
         stdFiles = []
         defFiles = []
         diagConfigFileName = self.getDiagDefinitionFile(test.app)
-        for file in os.listdir(test.abspath):
+        for file in test.dircache.contents:
             if test.app.ownsFile(file):
                 if self.isDefinitionFile(file, test.app):
                     defFiles.append(file)
@@ -979,13 +974,13 @@ class TestCaseGUI(RightWindowGUI):
                     stdFiles.append(file)
             elif file == diagConfigFileName:
                 defFiles.append(file)
-        self.addFilesUnderIter(defiter, defFiles, test.abspath)
+        self.addFilesUnderIter(defiter, defFiles, test.getDirectory())
         if len(stdFiles):
-            self.addFilesUnderIter(stditer, stdFiles, test.abspath)
+            self.addFilesUnderIter(stditer, stdFiles, test.getDirectory())
             self.addStaticDiagFilesToModel(test, diagConfigFileName, stditer, defiter)
         self.addStaticDataFilesToModel(test)
     def addStaticDiagFilesToModel(self, test, diagConfigFileName, stditer, defiter):
-        diagDir = os.path.join(test.abspath, "Diagnostics")
+        diagDir = test.makeFileName("Diagnostics", forComparison=0)
         configPath = os.path.join(diagDir, diagConfigFileName)
         if os.path.isfile(configPath):
             defdiagiter = self.model.insert_before(defiter, None)
@@ -1087,9 +1082,9 @@ class ImportTestCase(guiplugins.ImportTestCase):
         guiplugins.ImportTestCase.addDefinitionFileOption(self, suite, oldOptionGroup)
         self.addSwitch(oldOptionGroup, "GUI", "Use TextTest GUI", 1)
         self.addSwitch(oldOptionGroup, "sGUI", "Use TextTest Static GUI", 0)
-        targetApp = self.test.makePathName("TargetApp", self.test.abspath)
+        targetApp = self.test.makePathName("TargetApp")
         root, local = os.path.split(targetApp)
-        self.defaultTargetApp = plugins.samefile(root, self.test.app.abspath)
+        self.defaultTargetApp = plugins.samefile(root, self.test.app.getDirectory())
         if self.defaultTargetApp:
             self.addSwitch(oldOptionGroup, "sing", "Only run test A03", 1)
             self.addSwitch(oldOptionGroup, "fail", "Include test failures", 1)

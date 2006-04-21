@@ -436,11 +436,11 @@ class NonPythonAction(Action):
         self.callScript(test, "test_level")
     def setUpSuite(self, suite):
         self.describe(suite)
-        os.chdir(suite.abspath)
+        os.chdir(suite.getDirectory())
         self.callScript(suite, "suite_level")
     def setUpApplication(self, app):
         print self, "application", app
-        os.chdir(app.abspath)
+        os.chdir(app.getDirectory())
         os.system(self.script + " app_level " + app.name)
     def callScript(self, test, level):
         os.system(self.script + " " + level + " " + test.name + " " + test.app.name)

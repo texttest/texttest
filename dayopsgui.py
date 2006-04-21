@@ -15,7 +15,7 @@ class DayOPsGUIConfig(CarmenConfig):
         if test.classId() == "test-case":
             propFile = test.makeFileName("properties")
             logFile = test.makeFileName("dmserverlog", temporary=1)
-            test.setEnvironment("DMG_RUN_TEST", test.abspath + "#" + propFile + "#" + logFile)
+            test.setEnvironment("DMG_RUN_TEST", test.getDirectory() + "#" + propFile + "#" + logFile)
     def setApplicationDefaults(self, app):
         CarmenConfig.setApplicationDefaults(self, app)
         app.addConfigEntry("definition_file_stems", "properties")
@@ -67,7 +67,7 @@ class RecordTest(guiplugins.RecordTest):
         self.props.set("port", self.optionGroup.getOptionValue("desmond_port"))
         self.props.writeFile(propFileInTest)
         httpServerDir = self.optionGroup.getOptionValue("w")
-        args = [ test.abspath, propFileInTest, serverLog, httpServerDir ]
+        args = [ test.getDirectory(), propFileInTest, serverLog, httpServerDir ]
         os.environ["DMG_RECORD_TEST"] = string.join(args,":")
         guiplugins.RecordTest.__call__(self, test)
         # Use the reran tests 'dmserverlog' as 'input' for the test not the

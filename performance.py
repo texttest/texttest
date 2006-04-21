@@ -316,7 +316,7 @@ class MemoryStatistics(plugins.Action):
         stemWithApp = logFileStem + "." + test.app.name
         if version != None and version != "":
             stemWithApp = stemWithApp + "." + version
-        fileName = os.path.join(test.abspath, stemWithApp)
+        fileName = test.makeFileName(stemWithApp, forComparison=0)
         outputMemory = self.getOutputMemory(fileName)
         if outputMemory > 0.0:
             return outputMemory

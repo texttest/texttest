@@ -25,7 +25,7 @@ class TestComparison(plugins.TestState):
             self.setFailedPrediction(previousInfo)
         self.diag = plugins.getDiagnostics("TestComparison")
         # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved
-        self.appAbsPath = app.abspath
+        self.appAbsPath = app.getDirectory()
         self.appWriteDir = app.writeDirectory
     def __repr__(self):    
         if self.failedPrediction:
@@ -153,6 +153,7 @@ class TestComparison(plugins.TestState):
         for stem in stems:
             stdFile = test.makeFileName(stem)
             tmpFile = test.makeFileName(stem, temporary=1, findInTmp=1)
+            self.diag.info("Comparing " + stdFile + "\nwith " + tmpFile) 
             if os.path.isfile(stdFile) or os.path.isfile(tmpFile):
                 comparison = self.createFileComparison(test, stdFile, tmpFile, makeNew)
                 self.addComparison(comparison)
@@ -171,7 +172,7 @@ class TestComparison(plugins.TestState):
 
         # Pick up anything that disappeared, if we've actually completed
         if not makeNew:
-            self.getFileStemsFromDir(stems, test.abspath, test.app.name, ignoreStems=self.getOptionalStems(test))
+            self.getFileStemsFromDir(stems, test.getDirectory(), test.app.name, ignoreStems=self.getOptionalStems(test))
         return stems
     def getOptionalStems(self, test):
         return test.getConfigValue("definition_file_stems")
@@ -447,6 +448,7 @@ class RunDependentTextFilter:
             else:
                 return newFileName
 
+        self.diag.info("Filtering " + fileName + " to create " + newFileName)
         self.resetFilters()
         newFile = open(newFileName, "w")
         lineNumber = 0
@@ -456,7 +458,6 @@ class RunDependentTextFilter:
             if filteredLine:
                 newFile.write(filteredLine)
         self.writeUnorderedText(newFile)
-        self.diag.info("Filter for " + fileName + " returned " + newFileName)
         return newFileName
     def resetFilters(self):
         for filter in self.contentFilters:
@@ -587,7 +588,6 @@ class LineFilter:
 
         trigger = self.getMatchingTrigger(line, lineNumber)
         if trigger:
-            self.diag.info(repr(trigger) + " matched " + line)
             return self.applyMatchingTrigger(line, trigger)
         else:
             return False, line
@@ -610,6 +610,7 @@ class LineFilter:
     def getMatchingTrigger(self, line, lineNumber):
         for trigger in self.triggers:
             if trigger.matches(line, lineNumber):
+                self.diag.info(repr(trigger) + " matched " + line)
                 return trigger
     def filterWords(self, line, trigger=None):
         if self.wordNumber != None:
@@ -661,14 +662,13 @@ class RemoveObsoleteVersions(plugins.Action):
     def __call__(self, test):
         self.describe(test)
         compFiles = {}
-        for file in os.listdir(test.abspath):
-            if test.app.ownsFile(file):
-                stem = file.split(".")[0]
-                compFile = self.filterFile(test, os.path.join(test.abspath, file))
-                if compFiles.has_key(stem):
-                    compFiles[stem].append(compFile)
-                else:
-                    compFiles[stem] = [ compFile ]
+        for file in test.ownFiles():
+            stem = file.split(".")[0]
+            compFile = self.filterFile(test, file)
+            if compFiles.has_key(stem):
+                compFiles[stem].append(compFile)
+            else:
+                compFiles[stem] = [ compFile ]
         for compFilesMatchingStem in compFiles.values():
             for index1 in range(len(compFilesMatchingStem)):
                 for index2 in range(index1 + 1, len(compFilesMatchingStem)):
@@ -684,7 +684,7 @@ class RemoveObsoleteVersions(plugins.Action):
         return mktemp(basename + "cmp")
     def origFile(self, test, file):
         if file.endswith("cmp"):
-            return os.path.join(test.abspath, os.path.basename(file)[:-3])
+            return test.makeFileName(os.path.basename(file)[:-3], forComparison=0)
         else:
             return file
     def filterFile(self, test, file):

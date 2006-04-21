@@ -62,7 +62,7 @@ class UserFilter(default.TextFilter):
     option = "u"
     def isUserSuite(self, suite):
         # Don't use the generic one because we can't guarantee environment has been read yet...
-        envFiles = [ os.path.join(suite.abspath, "environment"), suite.makeFileName("environment") ]
+        envFiles = [ suite.makeFileName("environment", forComparison=0), suite.makeFileName("environment") ]
         for file in envFiles:
             if os.path.isfile(file):
                 for line in open(file).xreadlines():
@@ -564,7 +564,7 @@ class CompileRules(plugins.Action):
         errContents = previewGenerator.getPreview(open(compTmp))
         return "Ruleset build failed", "Failed to build ruleset " + ruleset + os.linesep + errContents 
     def setUpSuite(self, suite):
-        if suite.abspath == suite.app.abspath or isUserSuite(suite):
+        if suite.parent is None or isUserSuite(suite):
             self.describe(suite)
     def getInterruptActions(self, fetchResults):
         return [ RuleBuildKilled() ]

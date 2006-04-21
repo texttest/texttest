@@ -254,7 +254,7 @@ class GenHTML(plugins.Action):
         if dict.has_key("profilesDirAsHtml"):
             self.profilesDirAsHtml = dict["profilesDirAsHtml"]
         
-        self.RCFile = app.abspath + os.sep + "apcinfo.rc"
+        self.RCFile = app.dircache.pathName("apcinfo.rc")
         self.idoc = CarmenDocument(self.RCFile)
         self.ilist = HTMLgen.List(style="compact")
         self.idoc.append(self.ilist)

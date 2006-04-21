@@ -173,27 +173,10 @@ class InteractiveTestAction(plugins.Action,InteractiveAction):
     def getRelativeFilename(self, filename):
         # Trim the absolute filename to be relative to the application home dir
         # (TEXTTEST_HOME is more difficult to obtain, see testmodel.OptionFinder.getDirectoryName)
-        path = filename
-        if isinstance(self.test, Application):
-            appHome = self.test.abspath
+        if self.test.classId() == "test-app":
+            return os.path.basename(filename)
         else:
-            appHome = self.test.app.abspath
-
-        relativeFilename = ""
-        while path != appHome and len(path) > 0 and path != "/":
-            head, tail = os.path.split(path)
-            if relativeFilename == "":
-                relativeFilename = tail 
-            else:
-                relativeFilename = tail + os.sep + relativeFilename 
-            path = head
-            if tail == "":
-                break
-
-        if len(path) == 0 or os.path.normpath(path) == "/":
-            return filename
-        else:
-            return relativeFilename
+            return os.path.join(self.test.getRelPath(), os.path.basename(filename))
     def viewFile(self, fileName, refresh=0):
         exitHandler = None
         if refresh:
@@ -288,7 +271,7 @@ class SaveTests(SelectionAction):
                     testComparison.saveSingle(singleFile, self.getExactness(), version)
                 else:
                     testComparison.save(self.getExactness(), version, overwriteSuccess)
-                test.notifyChanged()
+                test.filesChanged()
 
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!
@@ -398,7 +381,7 @@ class ImportTest(InteractiveTestAction):
         guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + repr(suite))
         testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
-        newTest = suite.addTest(testName, testDir)
+        newTest = suite.addTest(testName)
     def matchesMode(self, dynamic):
         return not dynamic
     def createTestContents(self, suite, testDir):
@@ -408,7 +391,7 @@ class ImportTest(InteractiveTestAction):
         file.write("\n")
         file.write("# " + description + "\n")
         file.write(testName + "\n")
-        testDir = os.path.join(suite.abspath, testName.strip())
+        testDir = suite.makeFileName(testName.strip(), forComparison=0)
         if os.path.isdir(testDir):
             return testDir
         try:
@@ -470,6 +453,8 @@ class RecordTest(InteractiveTestAction):
         return self.recordMode != "disabled"
     def textTestCompleted(self, test, usecase):
         scriptEngine.applicationEvent(usecase + " texttest to complete")
+        # Refresh the files before changed the data
+        test.dircache.refresh()
         if usecase == "record":
             self.setTestRecorded(test, usecase)
         else:
@@ -645,7 +630,7 @@ class SelectTests(SelectionAction):
             return []
     def findTestCaseList(self, suite):
         testcases = suite.testcases
-        testCaseFiles = glob(os.path.join(suite.abspath, "testsuite.*"))
+        testCaseFiles = glob(suite.makeFileName("testsuite.*", forComparison=0))
         if len(testCaseFiles) < 2:
             return testcases
         
@@ -702,7 +687,7 @@ class SaveSelection(SelectionAction):
             raise plugins.TextTestError, "No tests are selected, cannot save selection!"
 
         app = selTests[0].app
-        dir = os.path.join(app.abspath, app.getConfigValue("test_list_files_directory")[0])
+        dir = os.path.join(app.getDirectory(), app.getConfigValue("test_list_files_directory")[0])
         plugins.ensureDirectoryExists(dir)
         return os.path.join(dir, localName)
     def getTextToSave(self, selTests):
@@ -800,10 +785,10 @@ class EnableDiagnostics(InteractiveTestAction):
     def canPerform(self):
         return self.test and self.configFile
     def __call__(self, test):
-        diagDir = os.path.join(test.abspath, "Diagnostics")
+        diagDir = test.makeFileName("Diagnostics", forComparison=0)
         if not os.path.isdir(diagDir):
             os.mkdir(diagDir)
-        diagFile = os.path.join(test.app.abspath, self.configFile)
+        diagFile = os.path.join(test.app.getDirectory(), self.configFile)
         targetDiagFile = os.path.join(diagDir, self.configFile)
         shutil.copyfile(diagFile, targetDiagFile)
         self.viewFile(targetDiagFile, refresh=1)
@@ -823,7 +808,7 @@ class RemoveTest(InteractiveTestAction):
             return "You are about to remove the entire test suite '" + test.name + \
                    "' and all " + str(test.size()) + " tests that it contains!\nAre you VERY sure you wish to proceed??"
     def __call__(self, test):
-        plugins.rmtree(test.abspath)
+        plugins.rmtree(test.getDirectory())
         suite = test.parent
         self.removeFromTestFile(suite, test.name)
         suite.removeTest(test)
@@ -873,11 +858,9 @@ class CopyTest(ImportTest):
         suite = test.parent
         self.setUpSuite(suite)
     def createTestContents(self, suite, testDir):
-        for file in os.listdir(self.test.abspath):
-            if suite.app.ownsFile(file):
-                sourceFile = os.path.join(self.test.abspath, file)
-                targetFile = os.path.join(testDir, file)
-                shutil.copyfile(sourceFile, targetFile)
+        for sourceFile in self.test.ownFiles():
+            targetFile = os.path.join(testDir, os.path.basename(sourceFile))
+            shutil.copyfile(sourceFile, targetFile)
     
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:

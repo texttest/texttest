@@ -960,14 +960,14 @@ class TestInformation:
     def absPathToCarmSys(self):
         return os.path.join(self.suite.app.checkout, self.suite.environment["CARMSYS"])
     def testPath(self):
-        return os.path.join(self.suite.abspath, self.name)
+        return self.suite.makeFileName(self.name, forComparison=0)
     def filePath(self, file):
-        return os.path.join(self.suite.abspath, self.name, file)
+        return os.path.join(self.suite.getDirectory(), self.name, file)
     def makeFileName(self, stem, version = None):
         return self.suite.makeFileName(self.name + os.sep + stem, version)
     def appSuffix(self):
         asFileName = self.suite.makeFileName("__tmp__")
-        return asFileName.replace(os.path.join(self.suite.abspath, "__tmp__"), "")
+        return asFileName.replace(os.path.join(self.suite.getDirectory(), "__tmp__"), "")
     def makeCarmTmpName(self):
         return self.name + "_tmp" + self.appSuffix()
 
@@ -1300,9 +1300,6 @@ class PlotSubplans(plugins.Action):
         subplan = testGraph.optionGroup.getOptionValue("sp")
         splitSP = subplan.split(",")
         dirName = os.path.dirname(splitSP[0])
-
-        dummyUserName = "dummyUser"
-        dummyUser = testmodel.TestSuite(dummyUserName, dummyUserName, app, [])
         version = 1
         for sp in splitSP:
             regexp = os.path.basename(sp)
@@ -1310,12 +1307,16 @@ class PlotSubplans(plugins.Action):
                 if re.findall(regexp, file):
                     subplan = os.path.join(dirName, file)
                     testName = file
-                    newTest = testmodel.TestCase(testName, os.path.join(dummyUserName, testName), app, [], dummyUser)
+                    testPath = os.path.join("dummyUser", testName)
+                    os.makedirs(testPath)
+                    newTest = testmodel.TestCase(testName, testmodel.DirectoryCache(testPath), \
+                                                 app, parent=None)
                     logFilePath = os.path.join(subplan, "APC_FILES", app.getConfigValue("log_file"))
                     testGraph.createPlotLines(str(version), logFilePath, newTest, None)
             version += 1
+        shutil.rmtree("dummyUser")
         testGraph.plot(app.writeDirectory)
-
+        
 # TestGraph is the "real stuff", the PlotLine instances are created here and gnuplot is invoked here.
 class TestGraph:
     def __init__(self):

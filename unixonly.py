@@ -26,6 +26,8 @@ class RunTest(default.RunTest):
     def buildCommandFile(self, test, cmdFile, testCommand):
         f = plugins.openForWrite(cmdFile)
         f.write(testCommand + "\n")
+        self.diag.info("Writing cmdFile at " + cmdFile)
+        self.diag.info("Contains : " + testCommand)
         f.close()
         return cmdFile
 

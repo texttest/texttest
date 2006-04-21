@@ -92,21 +92,9 @@ class InteractiveResponder(Responder):
     def notifyComplete(self, test):
         self.describeFailures(test)
         if self.shouldSave(test):
-            self.save(test, self.getAutosaveVersion(test))
+            self.save(test, test.app.getFullVersion(forSave=1))
         elif self.useInteractiveResponse(test):
             self.presentInteractiveDialog(test)
-    def getAutosaveVersion(self, test):
-        versions = test.app.getVersionFileExtensions(forSave=1)
-        logFileStem = test.makeFileName(test.getConfigValue("log_file"))
-        if not os.path.isfile(logFileStem):
-            return ""
-        # Start with the least specific, we want to create a reusable file if we can...
-        versions.reverse()
-        for version in versions:
-            logFile = logFileStem + "." + version
-            if not os.path.isfile(logFile):
-                return version
-        return test.app.getFullVersion(forSave=1)
     def shouldSave(self, test):
         if not test.state.hasResults():
             return 0

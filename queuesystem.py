@@ -229,8 +229,8 @@ class SubmissionRules:
         if minTimeForce >= 0 and performance.getTestPerformance(self.test) > minTimeForce:
             return 1
         # If we haven't got a log_file yet, we should do this so we collect performance reliably
-        logFile = self.test.makeFileName(self.test.getConfigValue("log_file"))
-        return not os.path.isfile(logFile)
+        logFile = self.test.getFileName(self.test.getConfigValue("log_file"))
+        return logFile is None
 
 class SlaveRequestHandler(StreamRequestHandler):
     def handle(self):
@@ -464,7 +464,7 @@ class KillTestSubmission(plugins.Action):
         test.changeState(plugins.TestState("unrunnable", briefText=failReason, \
                                            freeText=fullText, completed=1))
     def getSlaveFailure(self, test):
-        slaveErrFile = test.makeFileName("slaveerrs", temporary=1, forComparison=0)
+        slaveErrFile = test.makeTmpFileName("slaveerrs", forComparison=0)
         if os.path.isfile(slaveErrFile):
             errStr = open(slaveErrFile).read()
             if errStr and errStr.find("Traceback") != -1:

@@ -17,20 +17,19 @@ plugins.addCategory("slower", "slower", "ran slower")
 
 # Returns -1 as error value, if the file is the wrong format
 def getPerformance(fileName):
-    try:
-        line = open(fileName).readline()
-        pos = line.find(":")
-        if pos == -1:
-            return float(-1)
-        return float(line[pos + 1:].lstrip().split()[0])
-    except:
+    if not fileName:
         return float(-1)
-
+    line = open(fileName).readline()
+    pos = line.find(":")
+    if pos == -1:
+        return float(-1)
+    return float(line[pos + 1:].lstrip().split()[0])
+    
 def getTestPerformance(test, version = None):
-    return getPerformance(test.makeFileName("performance", version))
+    return getPerformance(test.getFileName("performance", version))
 
 def getTestMemory(test, version = None):
-    return getPerformance(test.makeFileName("memory", version))
+    return getPerformance(test.getFileName("memory", version))
 
 def parseTimeExpression(timeExpression):
     # Starts with <, >, <=, >= ?
@@ -297,7 +296,7 @@ class MemoryStatistics(plugins.Action):
     def setUpSuite(self, suite):
         self.suiteName = suite.name + "\n   "
     def getOutputMemory(self, fileName):
-        if not os.path.isfile(fileName):
+        if not fileName:
             return float(-1)
         try:
 #            memPrefix = test.app.getConfigValue("string_before_memory")
@@ -313,10 +312,7 @@ class MemoryStatistics(plugins.Action):
             return float(-1)
     def getTestMemory(self, test, version = None):
         logFileStem = test.app.getConfigValue("log_file")
-        stemWithApp = logFileStem + "." + test.app.name
-        if version != None and version != "":
-            stemWithApp = stemWithApp + "." + version
-        fileName = test.makeFileName(stemWithApp, forComparison=0)
+        fileName = test.getFileName(logFileStem, version)
         outputMemory = self.getOutputMemory(fileName)
         if outputMemory > 0.0:
             return outputMemory

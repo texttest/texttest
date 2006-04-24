@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.26 2006/04/06 11:46:43 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.27 2006/04/24 12:52:01 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -70,8 +70,8 @@ class StudioConfig(ravebased.Config):
                 return parent
         return origDirName
     def getSubPlanLineInMacro(self, test):
-        macroFile = test.makeFileName("usecase")
-        if not os.path.isfile(macroFile):
+        macroFile = test.getFileName("usecase")
+        if not macroFile:
             return
         useNext = 0
         for line in open(macroFile).xreadlines():
@@ -80,8 +80,8 @@ class StudioConfig(ravebased.Config):
             elif line.find("OPEN_PLAN") != -1:
                 useNext = 1
     def macroBuildsRuleset(self, test, rulesetName):
-        macroFile = test.makeFileName("usecase")
-        if not os.path.isfile(macroFile):
+        macroFile = test.getFileName("usecase")
+        if not macroFile:
             return False
         for line in open(macroFile).xreadlines():
             if line.find("Build ruleset " + rulesetName) != -1:

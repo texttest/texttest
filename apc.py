@@ -47,17 +47,6 @@ helpOptions = """-rundebug <options>
 
 helpScripts = """apc.CleanTmpFiles          - Removes all temporary files littering the test directories
 
-apc.ImportTest             - Import new test cases and test users.
-                             The general principle is to add entries to the "testsuite.apc" file and then
-                             run this action, typcally 'texttest -a apc -s apc.ImportTest'. The action
-                             will then find the new entries (as they have no corresponding subdirs) and
-                             ask you for either new CARMUSR (for new user) or new subplan directory
-                             (for new tests). Note that CARMTMP is assigned for you. Also for new tests
-                             it is neccessary to have an 'APC_FILES' subdirectory created by Studio which
-                             is to be used as the 'template' for temporary subplandirs as created when
-                             the test is run. The action will look for available subplandirectories under
-                             CARMUSR and present them to you.
-
 apc.PrintAirport           - Prints the target AirportFile location for each user
 
 apc.UpdateCvsIgnore        - Make the .cvsignore file in each test directory identical to 'cvsignore.master'
@@ -92,8 +81,8 @@ def readKPIGroupFileCommon(suite):
     kpiGroupForTest = {}
     kpiGroups = []
     kpiGroupsScale = {}
-    kpiGroupsFileName = suite.makeFileName("kpi_groups")
-    if not os.path.isfile(kpiGroupsFileName):
+    kpiGroupsFileName = suite.getFileName("kpi_groups")
+    if not kpiGroupsFileName:
         return {}, [], {}
     groupFile = open(kpiGroupsFileName)
     groupName = None
@@ -194,13 +183,9 @@ class ApcConfig(optimization.OptimizationConfig):
         dirs = statusFile.split(os.sep)[:-2]
         return os.path.normpath(string.join(dirs, os.sep))
     def getRuleSetName(self, test):
-        fileName = test.makeFileName("options")
-        if os.path.isfile(fileName):
-            optionLine = open(fileName).readline()
-            options = optionLine.split()
-            for option in options:
-                if option.find("crc" + os.sep + "rule_set") != -1:
-                    return option.split(os.sep)[-1]
+        for option in test.getWordsInFile("options"):
+            if option.find("crc" + os.sep + "rule_set") != -1:
+                return option.split(os.sep)[-1]
         return None
     def getTextualInfo(self, test):
         basicInfo = optimization.OptimizationConfig.getTextualInfo(self, test)
@@ -285,7 +270,7 @@ class ViewApcLog(guiplugins.InteractiveTestAction):
     def __repr__(self):
         return "Viewing log of"
     def __call__(self, test):
-        viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
+        viewLogScript = test.makeTmpFileName("view_apc_log", forComparison=0)
         if os.path.isfile(viewLogScript):
             file = open(viewLogScript)
             command = file.readlines()[0].strip()
@@ -339,7 +324,7 @@ class RunApcTestInDebugger(default.RunTest):
         # Get the options that are sent to APCbatch.sh
         opts = test.getWordsInFile("options")
         # Create and show the log file.
-        apcLog = test.makeFileName("apclog", temporary=1)
+        apcLog = test.makeTmpFileName("apclog")
         apcLogFile = open(apcLog, "w")
         apcLogFile.write("")
         apcLogFile.close()
@@ -348,7 +333,7 @@ class RunApcTestInDebugger(default.RunTest):
             process = plugins.BackgroundProcess(command)
             print "Created process : log file viewer :", process.processId
         # Create a script for gdb to run.
-        gdbArgs = test.makeFileName("gdb_args", temporary=1)
+        gdbArgs = test.makeTmpFileName("gdb_args")
         gdbArgsFile = open(gdbArgs, "w")
         gdbArgsFile.write("set pagination off" + os.linesep)
         gdbArgsFile.write(os.path.expandvars("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep))
@@ -362,7 +347,7 @@ class RunApcTestInDebugger(default.RunTest):
             gdbArgsFile.write("end" + os.linesep)
         gdbArgsFile.close()
         # Create an output file. This file is read by LogFileFinder if we use PlotTest.
-        out = test.makeFileName("output", temporary=1)
+        out = test.makeTmpFileName("output")
         outFile = open(out, "w")
         outFile.write("SUBPLAN " + opts[0] + os.linesep)
         outFile.close()
@@ -397,8 +382,8 @@ class RunApcTestInDebugger(default.RunTest):
             os.remove(gdbStart)
             os.remove(gdbWithArgs)
     def runInXEmacs(self, test, binName, gdbArgs):
-        gdbStart = test.makeFileName("gdb_start", temporary=1)
-        gdbWithArgs = test.makeFileName("gdb_w_args", temporary=1)
+        gdbStart = test.makeTmpFileName("gdb_start")
+        gdbWithArgs = test.makeTmpFileName("gdb_w_args")
         gdbStartFile = open(gdbStart, "w")
         gdbStartFile.write("(defun gdbwargs () \"\"" + os.linesep)
         gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
@@ -563,7 +548,7 @@ class MarkApcLogDir(RunWithParallelAction):
         except OSError:
             print "Failed to create apc_tmp_dir link"
             
-        viewLogScript = test.makeFileName("view_apc_log", temporary=1, forComparison=0)
+        viewLogScript = test.makeTmpFileName("view_apc_log", forComparison=0)
         file = open(viewLogScript, "w")
         logFileName = os.path.join(apcTmpDir, "apclog")
         file.write("xon " + gethostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
@@ -605,7 +590,7 @@ class ExtractApcLogs(plugins.Action):
 
         self.describe(test)
         # Extract from the apclog
-        extractToFile = test.makeFileName("Diagnostics/" + saveName, temporary = 1)
+        extractToFile = test.makeTmpFileName("Diagnostics/" + saveName)
         plugins.ensureDirExistsForFile(extractToFile)
         cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + extractToFile
         os.system(cmdLine)
@@ -614,10 +599,10 @@ class ExtractApcLogs(plugins.Action):
             os.remove(extractToFile)
         # Extract mpatrol files, if they are present.
         if os.path.isfile(os.path.join(apcTmpDir, "mpatrol.out")):
-            cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.out" + " > " + test.makeFileName("mpatrol_out", temporary = 1)
+            cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.out" + " > " + test.makeTmpFileName("mpatrol_out")
             os.system(cmdLine)
         if os.path.isfile(os.path.join(apcTmpDir, "mpatrol.log")):
-            cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.log" + " > " + test.makeFileName("mpatrol_log", temporary = 1)
+            cmdLine = "cd " + apcTmpDir + "; " + "cat mpatrol.log" + " > " + test.makeTmpFileName("mpatrol_log")
             os.system(cmdLine)
         # Extract scprob prototype...
         #if os.path.isfile(os.path.join(apcTmpDir, "APC_rot.scprob")):
@@ -629,7 +614,7 @@ class ExtractApcLogs(plugins.Action):
         # with the message "*** Keeping the logfiles in $APC_TEMP_DIR ***"),
         # otherwise the test is flagged failed.
         if os.path.isfile(os.path.join(apcTmpDir, "apc_debug")):
-            errFile = test.makeFileName("script_errors", temporary=1)
+            errFile = test.makeTmpFileName("script_errors")
             if os.path.isfile(errFile):
                 os.remove(errFile)
         # Remove dir
@@ -765,8 +750,8 @@ class MakeProgressReport(optimization.MakeProgressReport):
         curMargin = round(1.0 * curMaxDiff / curMax, 5) * 100.0
         return refMargin, curMargin
     def setUpSuite(self, suite):
-        kpiGroups = suite.makeFileName("kpi_groups")
-        if not os.path.isfile(kpiGroups):
+        kpiGroups = suite.getFileName("kpi_groups")
+        if not kpiGroups:
             return
         groupFile = open(kpiGroups)
         for line in groupFile.readlines():
@@ -1099,105 +1084,6 @@ class MakeProgressReportHTML(MakeProgressReportGraphical):
             if self.writeHTML:
                 self.indexDoc.append(self.htmlImage(groupName + ".png"))
 
-class ApcTestCaseInformation(optimization.TestCaseInformation):
-    def isComplete(self):
-        if not os.path.isdir(self.testPath()):
-            return 0
-        if not os.path.isfile(self.makeFileName("options")):
-            return 0
-        if not os.path.isfile(self.makeFileName("environment")):
-            return 0
-        if not os.path.isfile(self.makeFileName("performance")):
-            return 0
-        return 1
-    def makeImport(self):
-        testPath = self.testPath()
-        createdPath = 0
-        if not os.path.isdir(testPath):
-            os.mkdir(testPath)
-            createdPath = 1
-        optionPath = self.makeFileName("options")
-        envPath = self.makeFileName("environment")
-        statusPath = self.makeFileName("status")
-        perfPath = self.makeFileName("performance")
-        if not os.path.isfile(optionPath):
-            dirName = self.chooseSubPlan()
-            if dirName == None:
-                if createdPath == 1:
-                    os.rmdir(testPath)
-                return 0
-            subPlanDir = os.path.join(dirName, "APC_FILES")
-            ruleSet = self.getRuleSetName(subPlanDir)
-            carmUsrSubPlanDirectory = self.replaceCarmUsr(subPlanDir)
-            newOptions = self.buildOptions(carmUsrSubPlanDirectory, ruleSet)
-            open(optionPath,"w").write(newOptions + os.linesep)
-        else:
-            subPlanDir = self.subPlanFromOptions(optionPath)
-            carmUsrSubPlanDirectory = self.replaceCarmUsr(subPlanDir)
-        if not os.path.isfile(envPath):
-            envContent = self.buildEnvironment(carmUsrSubPlanDirectory)
-            open(envPath,"w").write(envContent + os.linesep)
-        if not os.path.isfile(perfPath):
-            perfContent = self.buildPerformance(subPlanDir)
-            open(perfPath, "w").write(perfContent + os.linesep)
-        return 1
-    def replaceCarmUsr(self, path):
-        carmUser = os.environ["CARMUSR"]
-        if path[0:len(carmUser)] == carmUser:
-            return "${CARMUSR}" + os.path.join("/", path[len(carmUser) : len(path)])
-        return path
-    def subPlanFromOptions(self, optionPath):
-        path = open(optionPath).readline().split()[0]
-        if path[0:10] != "${CARMUSR}":
-            return path
-        if not os.environ.has_key("CARMUSR"):
-            return path
-        carmUsr = os.environ["CARMUSR"]
-        npath = os.path.join(carmUsr, path.replace("${CARMUSR}", "./"))
-        return os.path.normpath(npath)
-
-    def buildOptions(self, path, ruleSet):
-        subPlan = path
-        statusFile = path + os.sep + "run_status"
-        application = self.suite.app.name
-        if application == "cs":
-            application = "FANDANGO"
-        else:
-            application = "APC"
-        ruleSetPath = "${CARMTMP}" + os.sep + os.path.join("crc", "rule_set", application, "PUTS_ARCH_HERE")
-        ruleSetFile = ruleSetPath + os.sep + ruleSet
-        return subPlan + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
-
-    def buildEnvironment(self, carmUsrSubPlanDirectory):
-        lpEtab = carmUsrSubPlanDirectory.split(os.sep)[0:-2]
-        spEtab = carmUsrSubPlanDirectory.split(os.sep)[0:-1]
-        lpEtabLine = "LP_ETAB_DIR:" + os.path.normpath(string.join(lpEtab, "/") + "/etable")
-        spEtabLine = "SP_ETAB_DIR:" + os.path.normpath(string.join(spEtab, "/") + "/etable")
-        return lpEtabLine + os.linesep + spEtabLine
-
-    def buildPerformance(self, subPlanDir):
-        statusPath = self.makeFileName("status")
-        if not os.path.isfile(statusPath):
-            shutil.copyfile(os.path.join(subPlanDir, "status"), statusPath)
-        if os.path.isfile(statusPath):
-            lastLines = os.popen("tail -10 " + statusPath).xreadlines()
-            for line in lastLines:
-                if line[0:5] == "Time:":
-                    sec = line.split(":")[1].split("s")[0]
-                    return "CPU time   :     " + str(int(sec)) + ".0 sec. on onepusu"
-# Give some default that will not end it up in the short queue
-        return "CPU time   :      2500.0 sec. on onepusu"
-        
-
-class ApcTestSuiteInformation(optimization.TestSuiteInformation):
-    def __init__(self, suite, name):
-        optimization.TestSuiteInformation.__init__(self, suite, name)
-    def getEnvContent(self):
-        carmUsrDir = self.chooseCarmDir("CARMUSR")
-        usrContent = "CARMUSR:" + carmUsrDir
-        tmpContent = "CARMTMP:${CARMSYS}" + os.sep + self.makeCarmTmpName()
-        return usrContent + os.linesep + tmpContent
-
 class ImportTestSuite(ravebased.ImportTestSuite):
     def getCarmtmpDirName(self, carmUsr):
         return ravebased.ImportTestSuite.getCarmtmpDirName(self, carmUsr) + ".apc"
@@ -1273,12 +1159,6 @@ class ImportTestCase(optimization.ImportTestCase):
         ruleSetFile = os.path.join(ruleSetPath, ruleSet)
         return path + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
 
-class ImportTest(optimization.ImportTest):
-    def getTestCaseInformation(self, suite, name):
-        return ApcTestCaseInformation(suite, name)
-    def getTestSuiteInformation(self, suite, name):
-        return ApcTestSuiteInformation(suite, name)
-
 class PortApcTest(plugins.Action):
     def __repr__(self):
         return "Porting old"
@@ -1292,7 +1172,7 @@ class PortApcTest(plugins.Action):
             carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDirectory)
             ruleSetName = testInfo.getRuleSetName(subPlanDirectory)
             newOptions = testInfo.buildOptions(carmUsrSubPlanDirectory, ruleSetName)
-            fileName = test.makeFileName("options")
+            fileName = test.getFileName("options")
             shutil.copyfile(fileName, fileName + ".oldts")
             os.remove(fileName)
             optionFile = open(fileName,"w")
@@ -1300,12 +1180,12 @@ class PortApcTest(plugins.Action):
         else:
             subPlanDirectory = opts[0]
             carmUsrSubPlanDirectory = testInfo.replaceCarmUsr(subPlanDirectory)
-        envFileName = test.makeFileName("environment")
+        envFileName = test.getFileName("environment")
         if not os.path.isfile(envFileName):
             hasPorted = 1
             envContent = testInfo.buildEnvironment(carmUsrSubPlanDirectory)
             open(envFileName,"w").write(envContent + os.linesep)
-        perfFileName = test.makeFileName("performance")
+        perfFileName = test.getFileName("performance")
         if not os.path.isfile(perfFileName):
             hasPorted = 1
             perfContent = testInfo.buildPerformance(carmUsrSubPlanDirectory)
@@ -1419,15 +1299,9 @@ class UpdatePerformance(plugins.Action):
         times = optRun.solutions[-1][optimization.timeEntryName]
         return int(times * 60.0)
     def getStatusFile(self, test, version):
-        currentFile = test.makeFileName(self.statusFileName, version)
-        if not os.path.isfile(currentFile):
-            return None
-        return currentFile
+        return test.getFileName(self.statusFileName, version)
     def getPerformanceFile(self, test, version):
-        currentFile = test.makeFileName("performance", version)
-        if not os.path.isfile(currentFile):
-            return None
-        return currentFile
+        return test.getFileName("performance", version)
     def setUpSuite(self, suite):
         pass
     def setUpApplication(self, app):
@@ -1443,8 +1317,8 @@ class CopyEnvironment(plugins.Action):
     def setUpSuite(self, suite):
         if ravebased.isUserSuite(suite):
             self.describe(suite)
-            oldFile = suite.makeFileName("environment")
-            if not os.path.isfile(oldFile):
+            oldFile = suite.getFileName("environment")
+            if not oldFile:
                 return
 
             carmTmp = self.getCarmtmp(oldFile)
@@ -1480,8 +1354,8 @@ class CVSBranchTests(plugins.Action):
     def __call__(self, test):
         interestingFiles = ["status","error","memory","performance","solution","warnings"]
         for file in interestingFiles:
-            fullFileName = test.makeFileName(file)
-            if not os.path.isfile(fullFileName):
+            fullFileName = test.getFileName(file)
+            if not fullFileName:
                 continue
             fullFileNameNewVersion = fullFileName + "." + self.version
             if os.path.isfile(fullFileNameNewVersion):
@@ -1548,8 +1422,8 @@ class CopyMPSFiles(plugins.Action):
         self.cnt += 1
         return os.path.join(self.destination, "primal_heur_" + str(self.cnt) + ".mps")
     def __call__(self, test):
-        fileName = test.makeFileName("mps", temporary = 0)
-        if os.path.isfile(fileName):
+        fileName = test.getFileName("mps")
+        if fileName:
             newFileName = self.getFileName(test)
             print "Copying MPS file for test " + test.name + " to " + newFileName
             shutil.copyfile(fileName, newFileName)
@@ -1561,11 +1435,11 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
         # If we have the possibility to save, we know that the current solution is best
         testdir = self.test.parent.getDirectory(1)
         bestStatusFile = os.path.join(testdir, self.hostCaseName, "best_known_status");
-        currentStatusFile = self.test.makeFileName("status", temporary=1)
+        currentStatusFile = self.test.makeTmpFileName("status")
         shutil.copyfile(currentStatusFile, bestStatusFile)
 
         bestSolFile = os.path.join(testdir, self.hostCaseName, "best_known_solution");
-        currentSolFile = self.test.makeFileName("solution", temporary=1)
+        currentSolFile = self.test.makeTmpFileName("solution")
         shutil.copyfile(currentSolFile, bestSolFile)
         
     def getTitle(self):
@@ -1574,10 +1448,10 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
     def solutionIsBetter(self):
         parentDir = self.test.parent.getDirectory(1)
         bestStatusFile = os.path.join(parentDir, self.hostCaseName, "best_known_status");
-        statusFile = self.test.makeFileName("status", temporary=1)
+        statusFile = self.test.makeTmpFileName("status")
         if not os.path.isfile(statusFile):
             return 0
-        solutionFile = self.test.makeFileName("solution", temporary=1)
+        solutionFile = self.test.makeTmpFileName("solution")
         if not os.path.isfile(solutionFile):
             return 0
         # read solutions

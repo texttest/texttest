@@ -68,8 +68,8 @@ class MatadorConfig(optimization.OptimizationConfig):
         fromOptions = getOption(test, "-r")
         if fromOptions:
             return fromOptions
-        outputFile = test.makeFileName("output")
-        if os.path.isfile(outputFile):
+        outputFile = test.getFileName("output")
+        if outputFile:
             for line in open(outputFile).xreadlines():
                 if line.find("Loading rule set") != -1:
                     finalWord = line.split(" ")[-1]
@@ -153,106 +153,6 @@ class MakeComparisons(comparetest.MakeComparisons):
     def isSeniority(self, test):
         ruleVal = self.getRuleSetting(test, "map_seniority")
         return ruleVal and not ruleVal.startswith("#")
-
-class MatadorTestCaseInformation(optimization.TestCaseInformation):
-    def isComplete(self):
-        if not os.path.isdir(self.testPath()):
-            return 0
-        if not os.path.isfile(self.makeFileName("options")):
-            return 0
-        if not os.path.isfile(self.makeFileName("performance")):
-            return 0
-        return 1
-    def makeImport(self):
-        testPath = self.testPath()
-        optionPath = self.makeFileName("options")
-        perfPath = self.makeFileName("performance")
-        outputPath = self.makeFileName("output")
-        createdPath = 0
-        if not os.path.isdir(testPath):
-            os.mkdir(testPath)
-            createdPath = 1
-        if not os.path.isfile(optionPath):
-            dirName = self.chooseSubPlan()
-            if dirName == None:
-                if createdPath == 1:
-                    os.rmdir(testPath)
-                return 0
-            subPlanDir = os.path.join(dirName, "APC_FILES")
-            ruleSet = self.getRuleSetName(subPlanDir)
-            newOptions = "-s " + self.getOptionPart(dirName) + " -r " + ruleSet
-            open(optionPath,"w").write(newOptions + os.linesep)
-
-            logFile = os.path.join(subPlanDir, "matador.log")
-            if not os.path.isfile(outputPath) and os.path.isfile(logFile):
-                shutil.copyfile(logFile, outputPath)
-        else:
-            relPath = getOption(self.suite, "-s")
-            subPlanDir = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", relPath, "APC_FILES")
-        if not os.path.isfile(perfPath):
-            perfContent = self.buildPerformance(subPlanDir)
-            open(perfPath, "w").write(perfContent + os.linesep)
-        return 1
-    def getOptionPart(self, path):
-        startPath = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN") + os.sep
-        if path[0:len(startPath)] == startPath:
-            return os.path.join(path[len(startPath) : len(path)])
-        return os.path.normpath(path)
-    def buildPerformance(self, subPlanDir):
-        statusPath = os.path.join(subPlanDir, "status")
-        if os.path.isfile(statusPath):
-            lastLines = os.popen("tail -10 " + statusPath).xreadlines()
-            for line in lastLines:
-                if line.find("Total time:") == 0:
-                    try:
-                        timeparts = line.split(":")[-3:]
-                        secs = int(timeparts[0]) * 60 * 60
-                        secs += int(timeparts[1]) * 60
-                        secs += int(timeparts[2])
-                        return "CPU time   :     " + str(secs) + ".0 sec. on heathlands"
-                    except:
-                        pass
-# Give some default that will not end it up in the short queue
-        return "CPU time   :      2500.0 sec. on heathlands"
-
-class MatadorTestSuiteInformation(optimization.TestSuiteInformation):
-    def __init__(self, suite, name):
-        optimization.TestSuiteInformation.__init__(self, suite, name)
-        self.onlyEnvIsLacking = 0
-    def isComplete(self):
-        if not os.path.isdir(self.testPath()):
-            return 0
-        if not os.path.isfile(self.makeFileName("testsuite")):
-            return 0
-        self.onlyEnvIsLacking = 1
-        if not os.path.isfile(self.makeFileName("environment")):
-            return 0
-        return 1
-    def makeImport(self):
-        if optimization.TestSuiteInformation.makeImport(self) == 0:
-            return 0
-        envPath = self.makeFileName("environment")
-        stemEnvPath = self.filePath("environment")
-        if envPath == stemEnvPath:
-            return 1
-        if not os.path.isfile(stemEnvPath):
-            shutil.copyfile(envPath, stemEnvPath)
-        if filecmp.cmp(envPath, stemEnvPath, 0) == 1:
-            os.remove(envPath)
-            if self.onlyEnvIsLacking == 1:
-                return 0
-        return 1
-    
-class ImportTest(optimization.ImportTest):
-    def getTestCaseInformation(self, suite, name):
-        return MatadorTestCaseInformation(suite, name)
-    def getTestSuiteInformation(self, suite, name):
-        return MatadorTestSuiteInformation(suite, name)
-    def setUpSuite(self, suite):
-        if suite.app.name == "cas":
-            optimization.ImportTest.setUpSuite(self, suite)
-        else:
-            self.describe(suite, " failed: Can not import '" + suite.app.name + "' test suites!")
 
 def staticLinkageInCustomerFile(carmUsr):
     resourceFile = os.path.join(carmUsr, "Resources", "CarmResources", "Customer.etab")
@@ -397,8 +297,8 @@ class UpdateXpressVersion(plugins.Action):
         return "Updating XPRESS version for"
     def __call__(self, test):
         self.describe(test)
-        errFile = test.makeFileName("errors")
-        newErrFile = test.makeFileName("new_errors")
+        errFile = test.getFileName("errors")
+        newErrFile = test.getFileName("new_errors")
         writeFile = open(newErrFile, "w")
         for line in open(errFile).xreadlines():
             writeFile.write(line.replace("15.10.04", "15.10.06"))
@@ -577,7 +477,7 @@ class PrintStrings(plugins.Action):
     def __init__(self):
         self.strings = []
     def __call__(self, test):
-        logFile = test.makeFileName("output")
+        logFile = test.getFileName("output")
         for line in open(logFile).readlines():
             line = line.strip()
             if len(line) == 0:
@@ -589,14 +489,6 @@ class PrintStrings(plugins.Action):
                 continue
             self.strings.append(line)
             print line
-
-class SplitPerformance(plugins.Action):
-    def __call__(self, test):
-        source = test.makeFileName("performance.cas.parallel")
-        target = test.makeFileName("performance.cas.12.parallel")
-        if os.path.isfile(source) and not os.path.isfile(target):
-            shutil.copyfile(source, target)
-            os.system("cvs add " + target)
 
 class SelectTests(guiplugins.SelectTests):
     def __init__(self, rootSuites, oldOptionGroup):
@@ -621,7 +513,7 @@ class SelectTests(guiplugins.SelectTests):
         guiplugins.guilog.info("Selected " + str(len(selectedFeatures)) + " features...")
         grepCommand = "grep -E '" + string.join(selectedFeatures, "|") + "'"
         for test in tests:
-            logFile = test.makeFileName("output")
+            logFile = test.getFileName("output")
             commandLine = "tail -100 " + logFile + " | " + grepCommand + " > /dev/null 2>1"
             if os.system(commandLine) == 0:
                 selectedTests.append(test)

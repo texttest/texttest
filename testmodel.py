@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, types, string, plugins, exceptions, log4py, shutil
+import os, sys, types, string, plugins, exceptions, log4py, shutil, fnmatch
 from time import time
 from usecase import ScriptEngine, UseCaseScriptError
 from ndict import seqdict
@@ -18,10 +18,6 @@ class DirectoryCache:
         self.dir = dir
         self.contents = []
         self.refresh()
-    def getFileNames(self, stem, extensions):
-        names = map(lambda ext: stem + "." + ext, extensions)
-        names.append(stem)
-        return names
     def refresh(self):
         self.contents = os.listdir(self.dir)
     def exists(self, fileName):
@@ -31,12 +27,16 @@ class DirectoryCache:
             return fileName in self.contents
     def pathName(self, fileName):
         return os.path.join(self.dir, fileName)
-    def findFile(self, stem, extensions):
-        for fileName in self.getFileNames(stem, extensions):
+    def findFile(self, fileNames):
+        for fileName in fileNames:
             if self.exists(fileName):
                 return self.pathName(fileName)
-    def findAllFiles(self, stem, extensions):
-        fileNames = self.getFileNames(stem, extensions)
+    def findFilesMatching(self, patterns):
+        matchingFiles = []
+        for pattern in patterns:
+            matchingFiles += fnmatch.filter(self.contents, pattern)
+        return map(self.pathName, matchingFiles)
+    def findAllFiles(self, fileNames):
         fileNames.reverse() # assume most-specific first, we want least-specific first here
         existingFiles = filter(self.exists, fileNames)
         return map(self.pathName, existingFiles)
@@ -83,19 +83,23 @@ class Test:
         self.app.configObject.setEnvironment(self)
         if self.parent == None:
             self.setEnvironment("TEXTTEST_CHECKOUT", self.app.checkout)
-    
-        self.environment.readValues("environment", self.dircache, self.app.getVersionFileExtensions(includeAppName=True))
+
+        envFiles = self.app.getVersionExtendedNames("environment")
+        self.environment.readValues(envFiles, self.dircache)
         # Should do this, but not quite yet...
-        # self.properties.readValues("properties", self.dircache, app.getVersionFileExtensions())
+        # self.properties.readValues("properties", self.dircache)
         debugLog.info("Expanding " + self.name)
         childReferenceVars = self.expandEnvironmentReferences(referenceVars)
         self.readChildEnvironment(childReferenceVars)
         self.tearDownEnvironment()
         debugLog.info("End Expanding " + self.name)
     def getWordsInFile(self, stem):
-        file = self.makeFileName(stem)
-        contents = open(file).read().strip()
-        return contents.split()
+        file = self.getFileName(stem)
+        if file:
+            contents = open(file).read().strip()
+            return contents.split()
+        else:
+            return []
     def setEnvironment(self, var, value):
         self.environment[var] = value
     def expandEnvironmentReferences(self, referenceVars = []):
@@ -129,8 +133,6 @@ class Test:
             return self.environment[var]
         elif self.parent:
             return self.parent.getEnvironment(var)
-    def hasFile(self, file):
-        return self.dircache.exists(os.path.basename(file))
     def ownFiles(self):
         localNames = filter(self.app.ownsFile, self.dircache.contents)
         return map(self.dircache.pathName, localNames)
@@ -140,37 +142,28 @@ class Test:
         self.notifyChanged()
     def refreshContents(self):
         pass
-    def makeFileName(self, stem, refVersion = None, temporary=0, forComparison=1, findInTmp=0):
-        root = self.getDirectory(temporary, forComparison)
-        if not forComparison:
-            return os.path.join(root, stem)
-        # Deal with non-terminated stems
-        if stem.find(".") == -1:
-            stem += "." + self.app.name
-        # Deal with non-local stems
-        if stem.find(os.sep) != -1:
-            dirname, stem = os.path.split(stem)
-            root = os.path.join(root, dirname)
-            if not os.path.isdir(root):
-                return os.path.join(root, stem)
-        versions = self.app.getVersionFileExtensions()
+    def getVersionExtendedNames(self, stem, refVersion = None):
         if refVersion:
             refApp = self.app.createCopy(refVersion)
-            versions = refApp.getVersionFileExtensions()
-        
-        debugLog.info("Making file " + stem + " versions : " + repr(versions))
-        # Prioritise finding earlier versions
-        dircache = self.dircache
-        if findInTmp or (not temporary and root != self.dircache.dir):
-            dircache = DirectoryCache(root)
-        existingFile = dircache.findFile(stem, versions)
-        if existingFile:
-            if not temporary:
-                return existingFile
-            else:
-                return os.path.join(root, os.path.basename(existingFile))
+            return refApp.getVersionExtendedNames(stem)
         else:
-            return os.path.join(root, stem)
+            return self.app.getVersionExtendedNames(stem)
+    def makeSubDirectory(self, name):
+        subdir = self.dircache.pathName(name)
+        if os.path.isdir(subdir):
+            return subdir
+        try:
+            os.mkdir(subdir)
+            return subdir
+        except OSError:
+            raise plugins.TextTestError, "Cannot create test sub-directory : " + subdir
+    def getFileNamesMatching(self, pattern):
+        patterns = self.getVersionExtendedNames(pattern)
+        return self.dircache.findFilesMatching(patterns)
+    def getFileName(self, stem, refVersion = None):
+        debugLog.info("Getting file from " + stem)
+        names = self.getVersionExtendedNames(stem, refVersion)
+        return self.dircache.findFile(names)
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars)
     def makePathName(self, fileName):
@@ -265,7 +258,7 @@ class TestCase(Test):
         debugLog.info("Change notified, test " + self.uniqueName + " in state " + state.category)
         self.notifyChanged(state)
     def getStateFile(self):
-        return self.makeFileName("teststate", temporary=1, forComparison=0)
+        return self.makeTmpFileName("teststate", forComparison=0)
     def getFileToLoad(self):
         stateFile = self.getStateFile()
         if not os.path.isfile(stateFile):
@@ -278,6 +271,11 @@ class TestCase(Test):
     def loadState(self, file):
         loaded, state = self.getNewState(file)
         self.changeState(state)
+    def makeTmpFileName(self, stem, forComparison=1):
+        if forComparison:
+            return os.path.join(self.writeDirectory, stem + "." + self.app.name)
+        else:
+            return os.path.join(self.writeDirectory, "framework_tmp", stem)
     def getNewState(self, file):
         if not file:
             return False, plugins.TestState("unrunnable", briefText="no results", \
@@ -312,7 +310,6 @@ class TestSuite(Test):
     def __init__(self, name, dircache, app, parent=None, forTestRuns=0):
         Test.__init__(self, name, dircache, app, parent)
         self.testcases = []
-        self.testCaseFile = self.makeFileName("testsuite")    
     def readContents(self, filters, forTestRuns):
         testNames = self.readTestNames(forTestRuns)
         self.testcases = self.getTestCases(filters, testNames, forTestRuns)
@@ -330,8 +327,11 @@ class TestSuite(Test):
                 return False
         return True
     def readTestNames(self, forTestRuns):
-        names = self.readTestNamesFromFile(self.testCaseFile)
-        debugLog.info("Test suite file " + self.testCaseFile + " had " + str(len(names)) + " tests")
+        testCaseFile = self.getContentFileName()
+        if not testCaseFile:
+            return []
+        names = self.readTestNamesFromFile(testCaseFile)
+        debugLog.info("Test suite file " + testCaseFile + " had " + str(len(names)) + " tests")
         if forTestRuns:
             return names
         # If we're not running tests, we're displaying information and should find all the sub-versions 
@@ -379,10 +379,12 @@ class TestSuite(Test):
         # Don't do this for extra versions, they appear anyway...
         ignoreExts = map(lambda extra: extra.getFullVersion(), self.app.extras)
         return self.dircache.findExtensionFiles(root, compulsoryExts, ignoreExts)
+    def getContentFileName(self):
+        return self.getFileName("testsuite")
     def refreshContents(self):
         # Here we assume that only order can change and suites be removed...
         newList = []
-        for testName in plugins.readList(self.testCaseFile, self.getConfigValue("auto_sort_test_suites")):
+        for testName in self.readTestNamesFromFile(self.getContentFileName()):
             for testcase in self.testcases:
                 if testcase.name == testName:
                     newList.append(testcase)
@@ -406,7 +408,7 @@ class TestSuite(Test):
         return testCaseList
     def createTest(self, testName, filters = [], forTestRuns=0):
         cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
-        if cache.findFile("testsuite." + self.app.name, self.app.getVersionFileExtensions()):
+        if cache.findFile(self.app.getVersionExtendedNames("testsuite")):
             return self.createTestSuite(testName, cache, filters, forTestRuns)
         else:
             return self.createTestCase(testName, cache, filters)
@@ -421,6 +423,15 @@ class TestSuite(Test):
             
         if newSuite.readContents(filters, forTestRuns):
             return newSuite
+    def writeNewTest(self, testName, description):
+        contentFile = self.getContentFileName()
+        if not contentFile:
+            contentFile = self.dircache.pathName("testsuite." + self.app.name)
+        file = open(contentFile, "a")
+        file.write("\n")
+        file.write("# " + description + "\n")
+        file.write(testName + "\n")
+        return self.makeSubDirectory(testName)
     def addTest(self, testName):
         test = self.createTest(testName)
         self.testcases.append(test)
@@ -561,8 +572,8 @@ class Application:
         self.configDir = MultiEntryDictionary()
         self.configDocs = {}
         self.setConfigDefaults()
-        extensions = self.getVersionFileExtensions(baseVersion=False, includeAppName=True)
-        self.configDir.readValues("config", self.dircache, extensions, insert=0)
+        configFiles = self.getVersionExtendedNames("config", baseVersion=False)
+        self.configDir.readValues(configFiles, self.dircache, insert=0)
         self.fullName = self.getConfigValue("full_name")
         debugLog.info("Found application " + repr(self))
         self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), inputOptions)
@@ -571,10 +582,11 @@ class Application:
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
-        extensions = self.getVersionFileExtensions(baseVersion=True, includeAppName=True)
-        self.configDir.readValues("config", self.dircache, extensions, insert=0, errorOnUnknown=1)
+        configFiles = self.getVersionExtendedNames("config", baseVersion=True)
+        self.configDir.readValues(configFiles, self.dircache, insert=0, errorOnUnknown=1)
         personalFile = self.getPersonalConfigFile()
-        self.configDir.readValues(personalFile, insert=0, errorOnUnknown=1)
+        if personalFile:
+            self.configDir.readValuesFromFile(personalFile, insert=0, errorOnUnknown=1)
         self.checkout = self.makeCheckout(inputOptions.checkoutOverride())
         debugLog.info("Checkout set to " + self.checkout)
         self.setCheckoutVariable()
@@ -608,7 +620,9 @@ class Application:
     def getPersonalConfigFile(self):
         personalDir = plugins.getPersonalConfigDir()
         if personalDir:
-            return os.path.join(personalDir, ".texttest")
+            personalFile = os.path.join(personalDir, ".texttest")
+            if os.path.isfile(personalFile):
+                return personalFile
     def setConfigDefaults(self):
         self.setConfigDefault("binary", "", "Full path to the System Under Test")
         self.setConfigDefault("config_module", "default", "Configuration module to use")
@@ -762,17 +776,20 @@ class Application:
             if not version in unsaveableVersions:
                 saveableVersions.append(version)
         return saveableVersions
-    def getVersionFileExtensions(self, baseVersion=True, forSave=False, includeAppName=False):
-        versionsToUse = []
-        if includeAppName:
-            versionsToUse.append(self.name)
-
-        versionsToUse += self.versions
+    def getVersionExtendedNames(self, stem="", baseVersion=True):
+        versionsToUse = [ self.name ] + self.versions
         if baseVersion:
             versionsToUse += self.getConfigValue("base_version")
-        if forSave:
-            versionsToUse = self.filterUnsaveable(versionsToUse)
-            
+        permutedList = self._getVersionExtensions(versionsToUse)
+        if stem:
+            names = map(lambda v: stem + "." + v, permutedList)
+            names.append(stem)
+            return names
+        else:
+            return permutedList
+    def getSaveableVersions(self):
+        versionsToUse = self.versions + self.getConfigValue("base_version")
+        versionsToUse = self.filterUnsaveable(versionsToUse)
         if len(versionsToUse) == 0:
             return []
 
@@ -1029,19 +1046,15 @@ class MultiEntryDictionary(seqdict):
     def __init__(self):
         seqdict.__init__(self)
         self.currDict = self
-    def readValues(self, filename, dircache = None, versions = [], insert=True, errorOnUnknown=False):
+    def readValues(self, fileNames, dircache, insert=True, errorOnUnknown=False):
         self.currDict = self
-        debugLog.info("Reading values for " + filename)
-        for filename in self.findFiles(filename, dircache, versions):
-            debugLog.info("Reading values from file " + os.path.basename(filename))
-            for line in plugins.readList(filename):
-                self.parseConfigLine(line, insert, errorOnUnknown)
-            self.currDict = self
-    def findFiles(self, filename, dircache, versions):
-        if dircache:
-            return dircache.findAllFiles(filename, versions)
-        else:
-            return [ filename ]
+        for filename in dircache.findAllFiles(fileNames):
+            self.readValuesFromFile(filename, insert, errorOnUnknown)
+    def readValuesFromFile(self, filename, insert=True, errorOnUnknown=False):
+        debugLog.info("Reading values from file " + os.path.basename(filename))
+        for line in plugins.readList(filename):
+            self.parseConfigLine(line, insert, errorOnUnknown)
+        self.currDict = self
     def parseConfigLine(self, line, insert, errorOnUnknown):
         if line.startswith("[") and line.endswith("]"):
             self.currDict = self.changeSectionMarker(line[1:-1], errorOnUnknown)
@@ -1057,13 +1070,6 @@ class MultiEntryDictionary(seqdict):
         if errorOnUnknown:
             print "ERROR : config section name '" + name + "' not recognised."
         return self
-    def updateFor(self, filename, extra, ins, errUnk):
-        if len(extra) == 0:
-            return
-        debugLog.debug("Updating " + filename + " for version " + extra) 
-        extraFileName = filename + "." + extra
-        if os.path.isfile(extraFileName):
-            self.readValuesFromFile(extraFileName, insert=ins, errorOnUnknown=errUnk)
     def addLine(self, line, insert, errorOnUnknown, separator = ':'):
         entryName, entry = line.split(separator, 1)
         self.addEntry(entryName, entry, "", insert, errorOnUnknown)

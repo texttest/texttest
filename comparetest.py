@@ -130,7 +130,10 @@ class TestComparison(plugins.TestState):
     def attemptedComparisonsOutput(self):
         baseNames = []
         for comparison in self.allResults:
-            baseNames.append(os.path.basename(comparison.tmpFile))
+            if comparison.newResult():
+                baseNames.append(os.path.basename(comparison.tmpFile))
+            else:
+                baseNames.append(os.path.basename(comparison.stdFile))
         return string.join(baseNames, ",")
     def addComparison(self, comparison):
         info = "Making comparison for " + comparison.stem + " "
@@ -151,10 +154,12 @@ class TestComparison(plugins.TestState):
     def makeComparisons(self, test, makeNew = 0):
         stems = self.getFileStems(test, makeNew)
         for stem in stems:
-            stdFile = test.makeFileName(stem)
-            tmpFile = test.makeFileName(stem, temporary=1, findInTmp=1)
-            self.diag.info("Comparing " + stdFile + "\nwith " + tmpFile) 
-            if os.path.isfile(stdFile) or os.path.isfile(tmpFile):
+            stdFile = test.getFileName(stem)
+            tmpFile = test.makeTmpFileName(stem)
+            self.diag.info("Comparing " + repr(stdFile) + "\nwith " + tmpFile) 
+            if stdFile or os.path.isfile(tmpFile):
+                if not stdFile:
+                    stdFile = os.path.join(test.getDirectory(), stem + "." + test.app.name)
                 comparison = self.createFileComparison(test, stdFile, tmpFile, makeNew)
                 self.addComparison(comparison)
         self.handleSingleDiffWithExcuse(test)
@@ -314,7 +319,7 @@ class FileComparison:
         self.stem = os.path.basename(tmpFile).split('.')[0]
         self.diag = plugins.getDiagnostics("FileComparison")
         filter = RunDependentTextFilter(test, self.stem)
-        filterFileBase = test.makeFileName(os.path.basename(tmpFile), temporary=1, forComparison=0)
+        filterFileBase = test.makeTmpFileName(os.path.basename(tmpFile), forComparison=0)
         self.stdCmpFile = filter.filterFile(standardFile, filterFileBase + "origcmp")
         tmpCmpFileName = filterFileBase + "cmp"
         if makeNew:
@@ -684,7 +689,7 @@ class RemoveObsoleteVersions(plugins.Action):
         return mktemp(basename + "cmp")
     def origFile(self, test, file):
         if file.endswith("cmp"):
-            return test.makeFileName(os.path.basename(file)[:-3], forComparison=0)
+            return test.getFileName(os.path.basename(file)[:-3])
         else:
             return file
     def filterFile(self, test, file):

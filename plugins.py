@@ -309,8 +309,6 @@ def rmtree(dir, attempts=5):
                 time.sleep(1)                
 
 def readList(filename, autosort=0):
-    if not os.path.isfile(filename):
-        return []
     items = []
     for longline in open(filename).readlines():
         line = longline.strip()

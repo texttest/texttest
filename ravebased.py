@@ -61,10 +61,8 @@ def isUserSuite(suite):
 class UserFilter(default.TextFilter):
     option = "u"
     def isUserSuite(self, suite):
-        # Don't use the generic one because we can't guarantee environment has been read yet...
-        envFiles = [ suite.makeFileName("environment", forComparison=0), suite.makeFileName("environment") ]
-        for file in envFiles:
-            if os.path.isfile(file):
+        for file in suite.ownFiles():
+            if os.path.basename(file).startswith("environment"):
                 for line in open(file).xreadlines():
                     if line.startswith("CARMUSR:"):
                         return 1

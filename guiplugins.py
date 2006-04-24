@@ -193,7 +193,7 @@ class SaveTests(SelectionAction):
         SelectionAction.__init__(self, rootTestSuites, "Saving")
         extensions = []
         for app in self.apps:
-            for ext in app.getVersionFileExtensions(forSave = 1):
+            for ext in app.getSaveableVersions():
                 if not ext in extensions:
                     extensions.append(ext)
         # Include the default version always
@@ -367,7 +367,7 @@ class ImportTest(InteractiveTestAction):
         return ""
     def getNewTestName(self):
         # Overwritten in subclasses - occasionally it can be inferred
-        return self.optionGroup.getOptionValue("name")
+        return self.optionGroup.getOptionValue("name").strip()
     def setUpSuite(self, suite):
         testName = self.getNewTestName()
         if len(testName) == 0:
@@ -379,26 +379,13 @@ class ImportTest(InteractiveTestAction):
             if test.name == testName:
                 raise plugins.TextTestError, "A " + self.testType() + " with the name '" + testName + "' already exists, please choose another name"
         guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + repr(suite))
-        testDir = self.createTest(suite, testName, self.optionGroup.getOptionValue("desc"))
+        testDir = suite.writeNewTest(testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
         newTest = suite.addTest(testName)
     def matchesMode(self, dynamic):
         return not dynamic
     def createTestContents(self, suite, testDir):
         pass
-    def createTest(self, suite, testName, description):
-        file = open(suite.testCaseFile, "a")
-        file.write("\n")
-        file.write("# " + description + "\n")
-        file.write(testName + "\n")
-        testDir = suite.makeFileName(testName.strip(), forComparison=0)
-        if os.path.isdir(testDir):
-            return testDir
-        try:
-            os.mkdir(testDir)
-        except OSError:
-            raise plugins.TextTestError, "Cannot create test - problems creating directory named " + testName.strip()
-        return testDir
 
 class RecordTest(InteractiveTestAction):
     def __init__(self, test, oldOptionGroup):
@@ -417,24 +404,23 @@ class RecordTest(InteractiveTestAction):
         self.updateRecordTime(test)
         self.startTextTestProcess(test, "record")
     def updateRecordTime(self, test):
-        file = test.makeFileName("usecase", self.optionGroup.getOptionValue("v"))
+        if self.updateRecordTimeForFile(test, "usecase", "USECASE_RECORD_SCRIPT", "target_record"):
+            return True
+        if self.recordMode == "console" and self.updateRecordTimeForFile(test, "input", "USECASE_RECORD_STDIN", "target"):
+            return True
+        return False
+    def updateRecordTimeForFile(self, test, stem, envVar, prefix):
+        file = test.getFileName(stem, self.optionGroup.getOptionValue("v"))
+        if not file:
+            return False
         newTime = plugins.modifiedTime(file)
         if newTime != self.recordTime:
             self.recordTime = newTime
-            if os.environ.has_key("USECASE_RECORD_SCRIPT"):
+            if os.environ.has_key(envVar):
                 # If we have an "outer" record going on, provide the result as a target recording...
-                target = plugins.addLocalPrefix(os.getenv("USECASE_RECORD_SCRIPT"), "target_record")
+                target = plugins.addLocalPrefix(os.getenv(envVar), prefix)
                 shutil.copyfile(file, target)
             return True
-        if self.recordMode == "console":
-            file = test.makeFileName("input", self.optionGroup.getOptionValue("v"))
-            newTime = plugins.modifiedTime(file)
-            if newTime and newTime != self.recordTime:
-                self.recordTime = newTime
-                if os.environ.has_key("USECASE_RECORD_STDIN"):
-                    target = plugins.addLocalPrefix(os.getenv("USECASE_RECORD_STDIN"), "target")
-                    shutil.copyfile(file, target)
-                return True
         return False
     def startTextTestProcess(self, test, usecase):
         ttOptions = self.getRunOptions(test, usecase)
@@ -630,8 +616,8 @@ class SelectTests(SelectionAction):
             return []
     def findTestCaseList(self, suite):
         testcases = suite.testcases
-        testCaseFiles = glob(suite.makeFileName("testsuite.*", forComparison=0))
-        if len(testCaseFiles) < 2:
+        testCaseFiles = suite.findVersionTestSuiteFiles()
+        if len(testCaseFiles) == 0:
             return testcases
         
         version = self.optionGroup.getOptionValue("vs")
@@ -639,7 +625,7 @@ class SelectTests(SelectionAction):
         if len(fullVersion) > 0 and len(version) > 0:
             version += "." + fullVersion
 
-        versionFile = suite.makeFileName("testsuite", version)
+        versionFile = suite.getFileName("testsuite", version)
         newTestNames = plugins.readList(versionFile)
         newTestList = []
         for testCase in testcases:
@@ -785,9 +771,7 @@ class EnableDiagnostics(InteractiveTestAction):
     def canPerform(self):
         return self.test and self.configFile
     def __call__(self, test):
-        diagDir = test.makeFileName("Diagnostics", forComparison=0)
-        if not os.path.isdir(diagDir):
-            os.mkdir(diagDir)
+        diagDir = test.makeSubDirectory("Diagnostics")
         diagFile = os.path.join(test.app.getDirectory(), self.configFile)
         targetDiagFile = os.path.join(diagDir, self.configFile)
         shutil.copyfile(diagFile, targetDiagFile)
@@ -818,7 +802,8 @@ class RemoveTest(InteractiveTestAction):
         newFileName = os.path.join(suite.app.writeDirectory, "tmptestsuite")
         newFile = plugins.openForWrite(newFileName)
         description = ""
-        for line in open(suite.testCaseFile).xreadlines():
+        contentFileName = suite.getContentFileName()
+        for line in open(contentFileName).xreadlines():
             stripLine = line.strip()
             description += line
             if line.startswith("#") or len(stripLine) == 0:
@@ -830,10 +815,10 @@ class RemoveTest(InteractiveTestAction):
         newFile.close()
         if guilog.get_loglevel() >= LOGLEVEL_NORMAL:
             difftool = suite.getConfigValue("text_diff_program")
-            diffInfo = os.popen(difftool + " " + suite.testCaseFile + " " + newFileName).read()
+            diffInfo = os.popen(difftool + " " + contentFileName + " " + newFileName).read()
             guilog.info("Changes made to testcase file : \n" + diffInfo)
             guilog.info("") # blank line
-        plugins.movefile(newFileName, suite.testCaseFile)
+        plugins.movefile(newFileName, contentFileName)
 
 class CopyTest(ImportTest):
     def __repr__(self):

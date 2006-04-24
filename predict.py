@@ -16,10 +16,10 @@ class CheckLogFilePredictions(plugins.Action):
         self.logFile = None
         self.version = version
     def getLogFile(self, test, stem):
-        logFile = test.makeFileName(stem, self.version, temporary=1)
+        logFile = test.makeTmpFileName(stem)
         if not os.path.isfile(logFile):
-            logFile = test.makeFileName(stem, self.version)
-            if not os.path.isfile(logFile):
+            logFile = test.getFileName(stem, self.version)
+            if not logFile:
                 return None
         return logFile
     def insertError(self, test, errType, briefError, error=""):
@@ -49,7 +49,7 @@ class CheckPredictions(CheckLogFilePredictions):
         return "unknown " + crashType
     def collectErrors(self, test):
         # Hard-coded prediction: check test didn't crash
-        stackTraceFile = test.makeFileName("stacktrace", temporary=1)
+        stackTraceFile = test.makeTmpFileName("stacktrace")
         if os.path.isfile(stackTraceFile):
             errorInfo = open(stackTraceFile).read()
             summary = self.findCrashSummary(errorInfo)

@@ -72,7 +72,7 @@ class CheckForBugs(plugins.Action):
             comparison, list = test.state.findComparison(stem)
             if not comparison:
                 continue
-            fileName = test.makeFileName(stem, temporary=1)
+            fileName = test.makeTmpFileName(stem)
             if os.path.isfile(fileName):
                 for line in open(fileName).xreadlines():
                     for trigger, bugDesc in entryDict.items():
@@ -83,8 +83,8 @@ class CheckForBugs(plugins.Action):
         self.unreadBugs(test)
     def readBugs(self, suite):
         if not self.testBugParserMap.has_key(suite):
-            bugFile = suite.makeFileName("knownbugs")
-            if os.path.isfile(bugFile):
+            bugFile = suite.getFileName("knownbugs")
+            if bugFile:
                 self.diag.info("Reading bugs from file " + bugFile)
                 parser = ConfigParser()
                 # Default behaviour transforms to lower case: we want case-sensitive

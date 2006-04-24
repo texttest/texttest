@@ -134,7 +134,7 @@ class InteractiveResponder(Responder):
                 print "<See also " + tool + " window for details of " + logFile + ">"
                 return plugins.BackgroundProcess(cmdLine)
     def askUser(self, test, allowView, process=None):      
-        versions = test.app.getVersionFileExtensions(forSave=1)
+        versions = test.app.getSaveableVersions()
         options = ""
         for i in range(len(versions)):
             options += "Save Version " + versions[i] + "(" + str(i + 1) + "), "

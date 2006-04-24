@@ -135,19 +135,12 @@ class Config(plugins.Configuration):
                     if os.path.isfile(os.path.join(fullPath, filename)):
                         filterFiles.append(filename)
         return filterFiles
-    def getExtensions(self, app):
-        appExt = "." + app.name        
-        versions = app.getVersionFileExtensions()
-        extensions = map(lambda ver: appExt + "." + ver, versions)
-        extensions.append(appExt)
-        extensions.append("")
-        return extensions
     def makeFilterFileName(self, app, filename):
-        extensions = self.getExtensions(app)
+        fileNames = app.getVersionExtendedNames(filename)
         for directory in app.getConfigValue("test_list_files_directory"):
             fullDir = os.path.join(app.getDirectory(), directory)
-            for extension in extensions:
-                fullPath = os.path.join(fullDir, filename + extension)
+            for fileName in fileNames:
+                fullPath = os.path.join(fullDir, fileName)
                 if os.path.isfile(fullPath):
                     return fullPath
     def getFilterClasses(self):
@@ -284,8 +277,13 @@ class Config(plugins.Configuration):
     def extraReadFiles(self, test):
         knownDataFiles = test.getConfigValue("link_test_path") + test.getConfigValue("copy_test_path") + \
                          test.getConfigValue("partial_copy_test_path")
+        existingDataFiles = []
+        for dataFile in knownDataFiles:
+            fileName = test.getFileName(dataFile)
+            if fileName:
+                existingDataFiles.append(fileName)
         readFiles = seqdict()
-        readFiles[""] = map(lambda file: test.makeFileName(file, forComparison=0), knownDataFiles)
+        readFiles[""] = existingDataFiles
         return readFiles
     def progressText(self, test):
         perc = self.calculatePercentage(test)
@@ -295,9 +293,9 @@ class Config(plugins.Configuration):
             return ""
     def calculatePercentage(self, test):
         logFileStem = test.getConfigValue("log_file")
-        stdFile = test.makeFileName(logFileStem)
-        tmpFile = test.makeFileName(logFileStem, temporary=1)
-        if not os.path.isfile(tmpFile) or not os.path.isfile(stdFile):
+        stdFile = test.getFileName(logFileStem)
+        tmpFile = test.makeTmpFileName(logFileStem)
+        if not os.path.isfile(tmpFile) or not stdFile:
             return 0
         stdSize = os.path.getsize(stdFile)
         tmpSize = os.path.getsize(tmpFile)
@@ -400,8 +398,8 @@ class TestEnvironmentCreator:
     def __init__(self, test, optionMap):
         self.test = test
         self.optionMap = optionMap
-        self.usecaseFile = self.test.makeFileName("usecase")
-        self.inputFile = self.test.makeFileName("input")
+        self.usecaseFile = self.test.getFileName("usecase")
+        self.inputFile = self.test.getFileName("input")
         self.diagDict = self.test.getConfigValue("diagnostics")
         self.diag = plugins.getDiagnostics("Environment Creator")
     def setUp(self):
@@ -444,8 +442,8 @@ class TestEnvironmentCreator:
             self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
             self.test.setEnvironment(envVarName, self.optionMap["trace"])
     def setPermanentDiagnostics(self):
-        diagConfigFile = self.test.makeFileName(self.diagDict["configuration_file"])
-        if self.test.hasFile(diagConfigFile):
+        diagConfigFile = self.test.getFileName(self.diagDict["configuration_file"])
+        if diagConfigFile:
             inVarName = self.diagDict["input_directory_variable"]
             self.addDiagVariable(inVarName, self.test.getDirectory())
         outVarName = self.diagDict.get("write_directory_variable")
@@ -476,10 +474,9 @@ class TestEnvironmentCreator:
         usecaseFile = self.findReplayUseCase()
         if usecaseFile:
             self.setReplay(usecaseFile)
-        if self.test.hasFile(self.usecaseFile) or self.isRecording() or self.test.hasFile(self.inputFile):
+        if self.usecaseFile or self.isRecording() or self.inputFile:
             # Re-record if recorded files are already present or recording explicitly requested
-            recordUseCase = self.test.makeFileName("usecase", temporary=1)
-            self.setRecord(recordUseCase, self.test.makeFileName("input", temporary=1))
+            self.setRecord(self.test.makeTmpFileName("usecase"), self.test.makeTmpFileName("input"))
     def isRecording(self):
         return self.optionMap.has_key("record")
     def findReplayUseCase(self):
@@ -492,7 +489,7 @@ class TestEnvironmentCreator:
             else:
                 # Don't replay when recording - let the user do it...
                 return None
-        elif self.test.hasFile(self.usecaseFile):
+        else:
             return self.usecaseFile
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
@@ -680,8 +677,8 @@ class PrepareWriteDirectory(plugins.Action):
                 return True
         return False
     def getModifiedPaths(self, test, sourcePath):
-        catFile = test.makeFileName("catalogue")
-        if not os.path.isfile(catFile) or self.ignoreCatalogues:
+        catFile = test.getFileName("catalogue")
+        if not catFile or self.ignoreCatalogues:
             # This means we don't know
             return None
         # Catalogue file is actually relative to temporary directory, need to take one level above...
@@ -769,42 +766,39 @@ class CollateFiles(plugins.Action):
 	    if not glob.has_magic(targetStem):
 		continue
 
-	    # generate a list of filenames from previously saved files
-            targetPtn = test.makeFileName(targetStem)
-	    self.diag.info("targetPtn: " + targetPtn)
-	    fileList = map(os.path.basename,glob.glob(targetPtn))
-
-	    # generate a list of filenames for generated files
-            sourcePtn = test.makeFileName(sourcePattern, temporary=1)
-	    # restore suffix (makeFileName automatically adds application name)
-	    sourcePtn = os.path.splitext(sourcePtn)[0] + \
-				os.path.splitext(sourcePattern)[1]
-	    self.diag.info("sourcePtn: " + sourcePtn)
-            for file in glob.glob(sourcePtn):
-                fileList.append(file.replace(test.writeDirectory + os.sep, ""))
-	    fileList.sort()
-
 	    # add each file to newColl using suffix from sourcePtn
-	    for aFile in fileList:
+	    for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
 		self.diag.info("aFile: " + aFile)
-	    	newTarget = os.path.splitext(os.path.basename(aFile))[0]
-	    	if not newTarget in newColl:
-		    ext = os.path.splitext(sourcePtn)[1]
-		    newColl[newTarget] = os.path.splitext(aFile)[0] + ext
+	    	newTargetStem = os.path.splitext(os.path.basename(aFile))[0]
+	    	if not newTargetStem in newColl:
+		    sourceExt = os.path.splitext(sourcePattern)[1]
+		    newColl[newTargetStem] = newTargetStem + sourceExt
 	self.diag.info("coll final:", str(newColl))
 	return newColl
+    def getFilesFromExpansions(self, test, targetStem, sourcePattern):
+        # generate a list of filenames from previously saved files
+        self.diag.info("Collating for " + targetStem)
+        targetFiles = test.getFileNamesMatching(targetStem)
+        fileList = map(os.path.basename, targetFiles)
+
+        # generate a list of filenames for generated files
+        os.chdir(test.writeDirectory)
+        self.diag.info("Adding files for source pattern " + sourcePattern)
+        fileList += glob.glob(sourcePattern)
+        fileList.sort()
+        return fileList
     def __call__(self, test):
         self.removeUnwanted(test)
         self.collate(test)
     def removeUnwanted(self, test):
         for stem in self.discardFiles:
-            filePath = test.makeFileName(stem, temporary=1)
+            filePath = test.makeTmpFileName(stem)
             if os.path.isfile(filePath):
                 os.remove(filePath)
     def collate(self, test):
 	testCollations = self.expandCollations(test, self.collations)
         for targetStem, sourcePattern in testCollations.items():
-            targetFile = test.makeFileName(targetStem, temporary=1)
+            targetFile = test.makeTmpFileName(targetStem)
             fullpath = self.findPath(test, sourcePattern)
             if fullpath:
                 self.diag.info("Extracting " + fullpath + " to " + targetFile) 
@@ -864,8 +858,8 @@ class GrepFilter(TextFilter):
         TextFilter.__init__(self, filterText)
         self.fileStem = fileStem
     def acceptsTestCase(self, test):
-        logFile = test.makeFileName(self.fileStem)
-        if not os.path.isfile(logFile):
+        logFile = test.getFileName(self.fileStem)
+        if not logFile:
             return False
         for line in open(logFile).xreadlines():
             if self.stringContainsText(line):
@@ -980,8 +974,8 @@ class RunTest(plugins.Action):
             self.changeToRunningState(test, process)
         return self.RETRY
     def getOptions(self, test):
-        optionsFile = test.makeFileName("options")
-        if test.hasFile(optionsFile):
+        optionsFile = test.getFileName("options")
+        if optionsFile:
             return " " + os.path.expandvars(open(optionsFile).read().strip())
         else:
             return ""
@@ -1000,15 +994,15 @@ class RunTest(plugins.Action):
             # Replaying in a shell, need everything visible...
             return testCommand
         testCommand += " < " + self.getInputFile(test)
-        outfile = test.makeFileName("output", temporary=1)
+        outfile = test.makeTmpFileName("output")
         testCommand += " > " + outfile
-        errfile = test.makeFileName("errors", temporary=1)
+        errfile = test.makeTmpFileName("errors")
         return self.getStdErrRedirect(testCommand, errfile)
     def getStdErrRedirect(self, command, file):
         return command + " 2> " + file
     def getInputFile(self, test):
-        inputFileName = test.makeFileName("input")
-        if test.hasFile(inputFileName):
+        inputFileName = test.getFileName("input")
+        if inputFileName:
             return inputFileName
         if os.name == "posix":
             return "/dev/null"
@@ -1083,7 +1077,7 @@ class CreateCatalogue(plugins.Action):
         newPaths = self.findAllPaths(test)
         pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, test.writeDirectory)
         processesGained = self.findProcessesGained(test)
-        fileName = test.makeFileName("catalogue", temporary=1)
+        fileName = test.makeTmpFileName("catalogue")
         file = open(fileName, "w")
         if len(pathsLost) == 0 and len(pathsEdited) == 0 and len(pathsGained) == 0:
             file.write("No files or directories were created, edited or deleted.\n")
@@ -1125,7 +1119,7 @@ class CreateCatalogue(plugins.Action):
         if len(searchString) == 0:
             return []
         processes = []
-        logFile = test.makeFileName(test.getConfigValue("log_file"), temporary=1)
+        logFile = test.makeTmpFileName(test.getConfigValue("log_file"))
         if not os.path.isfile(logFile):
             return []
         for line in open(logFile).xreadlines():
@@ -1308,23 +1302,18 @@ class ReconnectTest(plugins.Action):
         if not os.path.isdir(fetchDir):
             return None
 
-        versions = app.getVersionFileExtensions()
-        versions.append("")
+        versions = app.getVersionExtendedNames()
         for versionSuffix in versions:
-            reconnDir = self.findReconnDirWithVersion(fetchDir, app, versionSuffix, userToFind)
+            reconnDir = self.findReconnDirWithVersion(fetchDir, versionSuffix + userToFind, app.writeDirectory)
             if reconnDir:
                 return reconnDir
-    def findReconnDirWithVersion(self, fetchDir, app, versionSuffix, userToFind):
-        if versionSuffix:
-            patternToFind = app.name + "." + versionSuffix + userToFind
-        else:
-            patternToFind = app.name + userToFind
+    def findReconnDirWithVersion(self, fetchDir, pattern, toIgnore):
         fileList = os.listdir(fetchDir)
         fileList.sort()
         fileList.reverse()
         for subDir in fileList:
             fullPath = os.path.join(fetchDir, subDir)
-            if os.path.isdir(fullPath) and subDir.startswith(patternToFind) and not plugins.samefile(fullPath, app.writeDirectory):
+            if os.path.isdir(fullPath) and subDir.startswith(pattern) and not plugins.samefile(fullPath, toIgnore):
                 return fullPath
     def setUpSuite(self, suite):
         self.describe(suite)
@@ -1355,8 +1344,8 @@ class PerformanceFileCreator(plugins.Action):
                 self.diag.info("Real host rejected for performance " + realHost)
                 return 0
         return 1
-    def __call__(self, test, temp=1):
-        return self.makePerformanceFiles(test, temp)
+    def __call__(self, test):
+        return self.makePerformanceFiles(test)
 
 class UNIXPerformanceInfoFinder:
     def __init__(self, diag):
@@ -1364,7 +1353,7 @@ class UNIXPerformanceInfoFinder:
         self.includeSystemTime = 0
     def findTimesUsedBy(self, test):
         # Read the UNIX performance file, allowing us to discount system time.
-        tmpFile = test.makeFileName("unixperf", temporary=1, forComparison=0)
+        tmpFile = test.makeTmpFileName("unixperf", forComparison=0)
         self.diag.info("Reading performance file " + tmpFile)
         if not os.path.isfile(tmpFile):
             return None, None
@@ -1412,7 +1401,7 @@ class MakePerformanceFile(PerformanceFileCreator):
         self.systemPerfInfoFinder.setUpApplication(app)
     def __repr__(self):
         return "Making performance file for"
-    def makePerformanceFiles(self, test, temp):
+    def makePerformanceFiles(self, test):
         # Check that all of the execution machines are also performance machines
         if not self.allMachinesTestPerformance(test, "cputime"):
             return
@@ -1422,7 +1411,7 @@ class MakePerformanceFile(PerformanceFileCreator):
             print "Not writing performance file for", test
             return
         
-        fileToWrite = test.makeFileName("performance", temporary=1)
+        fileToWrite = test.makeTmpFileName("performance")
         self.writeFile(test, cpuTime, realTime, fileToWrite)
     def timeString(self, timeVal):
         return str(round(float(timeVal), 1)).rjust(9)
@@ -1452,21 +1441,26 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         self.entryFiles = app.getConfigValue("performance_logfile")
         self.logFileStem = app.getConfigValue("log_file")
         self.diag.info("Found the following entry finders:" + str(self.entryFinders))
-    def makePerformanceFiles(self, test, temp):
+    def makePerformanceFiles(self, test):
         for fileStem, entryFinder in self.entryFinders.items():
             if not self.allMachinesTestPerformance(test, fileStem):
                 self.diag.info("Not extracting performance file for " + fileStem + ": not on performance machines")
                 continue
             values = []
             for logFileStem in self.findLogFileStems(fileStem):
-                logFilePattern = test.makeFileName(logFileStem, temporary=temp)
-                for fileName in glob.glob(logFilePattern):
+                self.diag.info("Looking for log files matching " + logFileStem)
+                for fileName in self.findLogFiles(test, logFileStem):
                     self.diag.info("Scanning log file for entry: " + entryFinder)
                     values += self.findValues(fileName, entryFinder)
             if len(values) > 0:
-                fileName = test.makeFileName(fileStem, temporary=temp)
+                fileName = self.getFileToWrite(test, fileStem)
+                self.diag.info("Writing performance to file " + fileName)
                 lineToWrite = self.makeLine(values, fileStem)
                 self.saveFile(fileName, lineToWrite)
+    def getFileToWrite(self, test, stem):
+        return test.makeTmpFileName(stem)
+    def findLogFiles(self, test, stem):
+        return glob.glob(test.makeTmpFileName(stem))
     def findLogFileStems(self, fileStem):
         if self.entryFiles.has_key(fileStem):
             return self.entryFiles[fileStem]
@@ -1538,7 +1532,12 @@ class ExtractStandardPerformance(ExtractPerformanceFiles):
         return "update the standard performance files from the standard log files"
     def __call__(self, test):
         self.describe(test)
-        ExtractPerformanceFiles.__call__(self, test, temp=0)
+        ExtractPerformanceFiles.__call__(self, test)
+    def findLogFiles(self, test, stem):
+        return test.getFileNamesMatching(stem)
+    def getFileToWrite(self, test, stem):
+        names = test.getVersionExtendedNames(stem)
+        return os.path.join(test.getDirectory(), names[0])
     def allMachinesTestPerformance(self, test, fileStem):
         # Assume this is OK: the current host is in any case utterly irrelevant
         return 1
@@ -1639,12 +1638,12 @@ class ReplaceText(plugins.Action):
                 dict[currKey] += " " + arg
         return dict
     def __call__(self, test):
-        logFile = test.makeFileName(self.logFile)
-        if not os.path.isfile(logFile):
+        logFile = test.getFileName(self.logFile)
+        if not logFile:
             return
         self.describe(test)
         sys.stdout.flush()
-        newLogFile = test.makeFileName("new_" + self.logFile)
+        newLogFile = logFile + "_new"
         writeFile = open(newLogFile, "w")
         for line in open(logFile).xreadlines():
             writeFile.write(line.replace(self.oldText, self.newText))

@@ -537,7 +537,7 @@ class GenHTML(plugins.Action):
         info = HTMLgen.Paragraph()
 
         # Info from status file
-        logFile = test.makeFileName(test.app.getConfigValue("log_file"), temporary = 0)
+        logFile = test.getFileName(test.app.getConfigValue("log_file"))
         optRun = optimization.OptimizationRun(test.app, ["legs\.", optimization.periodEntryName] ,[] ,logFile)
         if optRun.solutions:
             input = optRun.solutions[0]
@@ -630,7 +630,7 @@ class GenHTML(plugins.Action):
         tableCost = 0
         tableRuleChecks = 0
         tableRuleFailures = 0
-        logFile = test.makeFileName(test.app.getConfigValue("log_file"), temporary = 0)
+        logFile = test.getFileName(test.app.getConfigValue("log_file"))
         ruleFailureItems = ["Rule checks\.", "Failed due to rule violation\."]
         optRun = optimization.OptimizationRun(test.app,  [ optimization.timeEntryName, optimization.activeMethodEntryName, optimization.dateEntryName, optimization.costEntryName], ["uncovered legs\.", "overcovers", "^\ illegal trips"] + self.definingValues + self.interestingValues + ruleFailureItems, logFile)
         if not len(optRun.solutions) == 0:

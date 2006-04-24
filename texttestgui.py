@@ -878,7 +878,7 @@ class ApplicationGUI(RightWindowGUI):
     def getPersonalFiles(self):
         personalFiles = []
         personalFile = self.app.getPersonalConfigFile()
-        if os.path.isfile(personalFile):
+        if personalFile:
             personalFiles.append(personalFile)
         gtkRcFile = getGtkRcFile()
         if gtkRcFile:
@@ -953,10 +953,10 @@ class TestCaseGUI(RightWindowGUI):
         else:
             self.addDynamicFileToModel(compiter, fileComparison, self.getSuccessColour())
     def addDynamicFileToModel(self, iter, comparison, colour):
-        if comparison.missingResult():
-            self.addFileToModel(iter, comparison.stdFile, comparison, colour)
-        else:
+        if comparison.newResult():
             self.addFileToModel(iter, comparison.tmpFile, comparison, colour)
+        else:
+            self.addFileToModel(iter, comparison.stdFile, comparison, colour)
     def addStaticFilesToModel(self, test):
         if test.classId() == "test-case":
             stditer = self.model.insert_before(None, None)
@@ -980,18 +980,19 @@ class TestCaseGUI(RightWindowGUI):
             self.addStaticDiagFilesToModel(test, diagConfigFileName, stditer, defiter)
         self.addStaticDataFilesToModel(test)
     def addStaticDiagFilesToModel(self, test, diagConfigFileName, stditer, defiter):
-        diagDir = test.makeFileName("Diagnostics", forComparison=0)
-        configPath = os.path.join(diagDir, diagConfigFileName)
-        if os.path.isfile(configPath):
-            defdiagiter = self.model.insert_before(defiter, None)
-            self.model.set_value(defdiagiter, 0, "Diagnostics")
-            self.addFilesUnderIter(defdiagiter, [ configPath ])
+        configName = os.path.join("Diagnostics", diagConfigFileName)
+        configPath = test.getFileName(configName)
+        if not configPath:
+            return
+        defdiagiter = self.model.insert_before(defiter, None)
+        self.model.set_value(defdiagiter, 0, "Diagnostics")
+        self.addFilesUnderIter(defdiagiter, [ configPath ])
         diagFiles = []
-        if os.path.isdir(diagDir):
-            for diagFile in os.listdir(diagDir):
-                fullPath = os.path.join(diagDir, diagFile)
-                if os.path.isfile(fullPath) and diagFile != diagConfigFileName:
-                    diagFiles.append(fullPath)
+        diagDir = os.path.dirname(configPath)
+        for diagFile in os.listdir(diagDir):
+            fullPath = os.path.join(diagDir, diagFile)
+            if os.path.isfile(fullPath) and diagFile != diagConfigFileName:
+                diagFiles.append(fullPath)
         if len(diagFiles):
             exiter = self.model.insert_before(stditer, None)
             self.model.set_value(exiter, 0, "Diagnostics")

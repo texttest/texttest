@@ -226,11 +226,11 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         self.subplanFunction = subplanFunction
         self.raveParameters = []
     def setUpSuite(self, suite):
-        self.readRaveParameters(suite.makeFileName("raveparameters"))
+        self.readRaveParameters(suite.getFileName("raveparameters"))
     def tearDownSuite(self, suite):
         self.unreadRaveParameters()
     def partialCopyTestPath(self, test, carmdataSource, carmdataTarget):
-        self.readRaveParameters(test.makeFileName("raveparameters"))
+        self.readRaveParameters(test.getFileName("raveparameters"))
         ravebased.PrepareCarmdataWriteDir.partialCopyTestPath(self, test, carmdataSource, carmdataTarget)
         self.unreadRaveParameters()
     def getModifiedPaths(self, test, carmdataSource):
@@ -284,7 +284,7 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             allOverrides += overrideItems
         return allOverrides
     def readRaveParameters(self, fileName):
-        if not os.path.isfile(fileName):
+        if not fileName:
             self.raveParameters.append([])
         else:
             self.raveParameters.append(open(fileName).readlines())
@@ -413,8 +413,8 @@ class LogFileFinder:
             if logFile and os.path.isfile(logFile):
                 print "Using temporary log file (from " + tmpDir + ") for test " + self.test.name + " version " + str(version)
                 return 1, logFile
-        logFile = self.test.makeFileName(self.logStem, version)
-        if os.path.isfile(logFile):
+        logFile = self.test.getFileName(self.logStem, version)
+        if logFile:
             return 0, logFile
         else:
             raise plugins.TextTestError, "Could not find log file for Optimization Run in test" + repr(self.test)
@@ -426,8 +426,8 @@ class LogFileFinder:
             else:
                 raise plugins.TextTestError, ""
         elif spec == "orig":
-            logFile = self.test.makeFileName(self.logStem, version)
-            if os.path.isfile(logFile):
+            logFile = self.test.getFileName(self.logStem, version)
+            if logFile:
                 return logFile
             else:
                 raise plugins.TextTestError, ""
@@ -468,7 +468,7 @@ class LogFileFinder:
         searchString += userId
         
         if thisRun:
-            fromThisRun = self.test.makeFileName(stem, version, temporary=1)
+            fromThisRun = self.test.makeTmpFileName(stem)
             self.diag.info("Looked for " + fromThisRun)
             if os.path.isfile(fromThisRun): # Temp removed, doesn't work for matador. and fromThisRun.find(searchString) != -1:
                 return fromThisRun, app.writeDirectory
@@ -707,10 +707,16 @@ class TableTest(plugins.Action):
         switches = {}
         switches["nt"] = "Ignore temporary file"
         return switches
+    def getLogFile(self, test):
+        stem = test.app.getConfigValue("log_file")
+        if self.useTmpFiles:
+            return test.makeTmpFileName(stem)
+        else:
+            return test.getFileName(stem)
     def __call__(self, test):
         # Values that should be reported if present, but should not be fatal if not
         extraValues = [ "machine", "Crew Members" ]
-        logFile = test.makeFileName(test.app.getConfigValue("log_file"), temporary = self.useTmpFiles)
+        logFile = self.getLogFile()
         currentRun = OptimizationRun(test.app, self.definingValues, self.interestingValues + extraValues, logFile)
         self.displayTitle(test, currentRun.solutions[0])
         self.display(currentRun)
@@ -775,8 +781,8 @@ class TestReport(plugins.Action):
         refPerf = performance.getTestPerformance(test, self.referenceVersion) / 60
         return currPerf, refPerf
     def getLogFilesForComparison(self, test):
-        currentLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.currentVersion)
-        refLogFile = test.makeFileName(test.app.getConfigValue("log_file"), self.referenceVersion)
+        currentLogFile = test.getFileName(test.app.getConfigValue("log_file"), self.currentVersion)
+        refLogFile = test.getFileName(test.app.getConfigValue("log_file"), self.referenceVersion)
         return currentLogFile, refLogFile
     def getConstantItemsToExtract(self):
         return []
@@ -948,216 +954,6 @@ class MakeProgressReport(TestReport):
         fieldWidth = 15
         titleWidth = 30
         print string.ljust(title, titleWidth) + ": " + string.rjust(str(currEntry), fieldWidth) + string.rjust(str(refEntry), fieldWidth)
-    
-# This is for importing new tests and test suites
-#
-class TestInformation:
-    def __init__(self, suite, name):
-        self.suite = suite
-        self.name = name
-    def isComplete(self):
-        return 1
-    def absPathToCarmSys(self):
-        return os.path.join(self.suite.app.checkout, self.suite.environment["CARMSYS"])
-    def testPath(self):
-        return self.suite.makeFileName(self.name, forComparison=0)
-    def filePath(self, file):
-        return os.path.join(self.suite.getDirectory(), self.name, file)
-    def makeFileName(self, stem, version = None):
-        return self.suite.makeFileName(self.name + os.sep + stem, version)
-    def appSuffix(self):
-        asFileName = self.suite.makeFileName("__tmp__")
-        return asFileName.replace(os.path.join(self.suite.getDirectory(), "__tmp__"), "")
-    def makeCarmTmpName(self):
-        return self.name + "_tmp" + self.appSuffix()
-
-# This is for importing new test suites
-#
-class TestSuiteInformation(TestInformation):
-    def __init__(self, suite, name):
-        TestInformation.__init__(self, suite, name)
-    def isComplete(self):
-        if not os.path.isdir(self.testPath()):
-            return 0
-        if not os.path.isfile(self.makeFileName("testsuite")):
-            return 0
-        if not os.path.isfile(self.makeFileName("environment")):
-            return 0
-        return 1
-    def makeImport(self):
-        if not os.path.isdir(self.testPath()):
-            os.mkdir(self.testPath())
-        suitePath = self.makeFileName("testsuite")
-        if not os.path.isfile(suitePath):
-            suiteContent = "# Tests for user " + self.name + os.linesep + "#"
-            open(suitePath, "w").write(suiteContent + os.linesep)
-        envPath = self.makeFileName("environment")
-        if not os.path.isfile(envPath):
-            envContent = self.getEnvContent()
-            if envContent != None:
-                open(envPath,"w").write(envContent + os.linesep)
-        return 1
-    def postText(self):
-        return ", User: '" + self.name + "'"
-    def getEnvContent(self):
-        carmUsrDir = self.chooseCarmDir("CARMUSR")
-        carmTmpDir = self.chooseCarmDir("CARMTMP")
-        usrContent = "CARMUSR:" + carmUsrDir
-        tmpContent = "CARMTMP:" + carmTmpDir;
-        return usrContent + os.linesep + tmpContent
-    def findCarmVarFrom(self, fileList, envVariableName):
-        for file in fileList:
-            if not os.path.isfile(self.filePath(file)):
-                continue
-            for line in open(self.filePath(file)).xreadlines():
-                if line[0:7] == envVariableName:
-                    return line.split(":")[1].strip()
-        return None
-    def chooseCarmDir(self, envVariableName):
-        dirName = self.findCarmVarFrom(self.findStems("environment"), envVariableName)
-        while dirName == None:
-            print "Please give " + envVariableName + " directory to use for user " + self.userDesc()
-            dirName = sys.stdin.readline().strip();
-            if not os.path.isdir(dirName):
-                print "Not found: '" + dirName + "'"
-                dirName = None
-        return dirName
-    def findStems(self, baseName):
-        stems = []
-        totalName = baseName + self.appSuffix()
-        splitName = totalName.split(".")
-        splits = len(splitName)
-        if splits > 1:
-            stems.append(splitName[0])
-        if splits > 2:
-            stems.append(splitName[0] + "." + splitName[1])
-        return stems;
-    def userDesc(self):
-        return "'" + self.name + "'(" + self.appSuffix() + ")"
-        
-# This is for importing new test cases
-#
-class TestCaseInformation(TestInformation):
-    def isComplete(self):
-        return 1
-    def makeImport(self):
-        return 0
-    def postText(self):
-        return ", Test: '" + self.name + "'"
-    def getRuleSetName(self, absSubPlanDir):
-        problemPath = os.path.join(absSubPlanDir,"problems")
-        if not unixonly.isCompressed(problemPath):
-            problemLines = open(problemPath).xreadlines()
-        else:
-            tmpName = os.tmpnam()
-            shutil.copyfile(problemPath, tmpName + ".Z")
-            os.system("uncompress " + tmpName + ".Z")
-            problemLines = open(tmpName).xreadlines()
-            os.remove(tmpName)
-        for line in problemLines:
-            if line[0:4] == "153;":
-                return line.split(";")[3]
-        return ""
-    def chooseDir(self, dirs, suiteDesc, tryName):
-        answer = -1
-        while answer == -1:
-            num = 0
-            print
-            print "There are", len(dirs), "possible subplans matching '" + tryName + "' in", suiteDesc
-            for dir in dirs:
-                num += 1
-                print str(num) + ".", dir
-            print "Please choose ( 1 -", num, ", or 0 for none of the above): "
-            response = sys.stdin.readline();
-            try:
-                answer = int(response)
-            except:
-                pass
-            if (answer < 0 or answer > num):
-                answer = -1
-        if answer > 0:
-            return dirs[answer - 1]
-        else:
-            return None
-    def findMatchingSubdirs(self, subPlanTree, testName):
-        dirs = os.listdir(subPlanTree)
-        possibleDirs = []
-        while len(dirs) != 0:
-            name = dirs[0]
-            dirs = dirs[1:]
-            fullPath = os.path.join(subPlanTree, name)
-            if os.path.isfile(fullPath):
-                continue
-            if fullPath.find(".aborted.") != -1:
-                continue
-            if os.path.isdir(os.path.join(fullPath, "APC_FILES")):
-                if fullPath.find(testName) != -1:
-                    possibleDirs.append(fullPath)
-            else:
-                try:
-                    subdirs = os.listdir(fullPath)
-                    for subdir in subdirs:
-                        if os.path.isdir(os.path.join(fullPath, subdir)):
-                            dirs.append(os.path.join(name,subdir))
-                except OSError:
-                    continue
-        return possibleDirs
-    def suiteDescription(self):
-        return repr(self.suite.app) + " " + self.suite.classId() + " " + self.suite.name
-    def chooseSubPlan(self):
-        suiteDescription = self.suiteDescription()
-        subPlanTree = os.path.join(self.suite.environment["CARMUSR"], "LOCAL_PLAN")
-        if not os.path.isdir(subPlanTree):
-            if os.path.islink(subPlanTree):
-                print "LOCAL_PLAN directory", subPlanTree, "seems to be a deadlink."
-            else:
-                print "LOCAL_PLAN directory", subPlanTree, "did not exist."
-            return None
-        
-        dirs = []
-        tryName = self.name
-        dirName = None
-        while dirName == None:
-            dirs = self.findMatchingSubdirs(subPlanTree, tryName)
-            if len(dirs) == 0:
-                print "There are no subplans matching '" + tryName + "' in", suiteDescription
-            else:
-                dirName = self.chooseDir(dirs, suiteDescription, tryName);
-            if dirName == None:
-                print "Please input a subplan name (partial name is ok) ?"
-                tryName = sys.stdin.readline().strip();
-        return dirName
-
-# Base class for importing of test cases and test suites,
-# see example usage in apc.py
-#
-class ImportTest(plugins.Action):
-    def __repr__(self):
-        return "Importing into"
-    def getTestCaseInformation(self, suite, name):
-        return TestCaseInformation(suite, name)
-
-    def getTestSuiteInformation(self, suite, name):
-        return TestSuiteInformation(suite, name)
-    
-    def setUpSuite(self, suite):
-        if not os.environ.has_key("CARMSYS"):
-            return
-        for testline in open(suite.testCaseFile).readlines():
-            if testline != '\n' and testline[0] != '#':
-                if ravebased.isUserSuite(suite):
-                    testInfo = self.getTestCaseInformation(suite, testline.strip())
-                else:
-                    testInfo = self.getTestSuiteInformation(suite, testline.strip())
-                if not testInfo.isComplete():
-                    if testInfo.makeImport() == 1:
-                        self.describe(suite, testInfo.postText())
-
-    def makeUser(self, userInfo, carmUsrDir):
-        return 0
-    
-    def testForImportTestCase(self, testInfo):
-        return 0
 
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
@@ -1529,8 +1325,8 @@ class TestGraph:
             foundTmp, logFile = logFileFinder.findFile()
             if foundTmp:
                 self.createPlotLines("this run", logFile, test, None)
-        stdFile = test.makeFileName(logFileStem)
-        if os.path.isfile(stdFile):
+        stdFile = test.getFileName(logFileStem)
+        if stdFile:
             self.createPlotLines("std result", stdFile, test, None)
         for versionItem in plugins.commasplit(self.optionGroup.getOptionValue("v")):
             if versionItem.find(":") == -1:
@@ -1551,8 +1347,8 @@ class TestGraph:
                     date = None
             if version:
                 if date:
-                    originalLogFileName = test.makeFileName(logFileStem, version)
-                    CVSLogFileName = test.makeFileName(logFileStem + "_" + date, version, temporary = 1)
+                    originalLogFileName = test.getFileName(logFileStem, version)
+                    CVSLogFileName = test.makeTmpFileName(logFileStem + "_" + date)
                     # We may already have checked out the file.
                     if not os.path.isfile(CVSLogFileName):
                         try:
@@ -1570,7 +1366,7 @@ class TestGraph:
                         foundTmp, logFile = logFileFinder.findFile(version)
                         if foundTmp:
                             self.createPlotLines(versionName + "run", logFile, test, scaling)
-                    logFile = test.makeFileName(logFileStem, version)
+                    logFile = test.getFileName(logFileStem, version)
                     isExactMatch = logFile.endswith(version)
                     if not onlyExactMatch and not isExactMatch:
                         print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
@@ -1829,7 +1625,7 @@ class PlotLine:
         if scaling:
             timeScaleFactor *= scaling
         self.axisYLabel = item
-        self.plotFileName = test.makeFileName(self.getPlotFileName(lineName, str(item)), temporary=1, forComparison=0)
+        self.plotFileName = test.makeTmpFileName(self.getPlotFileName(lineName, str(item)), forComparison=0)
         self.createGraph(optRun, xItem, item, plotAgainstSolution, timeScaleFactor)
     def getYAxisLabel(self):
         return self.axisYLabel
@@ -2067,9 +1863,8 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
         files = [ logFileStem ]
         files += test.app.getConfigValue("cvs_log_for_files").split(",")
         cvsInfo = ""
+        path = test.getDirectory()
         for file in files:
-            fullName = test.makeFileName(file)
-            path = os.path.abspath(os.path.dirname(fullName))            
             cvsInfo += self.getCVSInfo(path, os.path.basename(fullName))
         raise  plugins.TextTestError, "CVS Logs" + os.linesep + os.linesep + cvsInfo
     def getTitle(self):

@@ -768,11 +768,11 @@ class CollateFiles(plugins.Action):
 
 	    # add each file to newColl using suffix from sourcePtn
 	    for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
-		self.diag.info("aFile: " + aFile)
-	    	newTargetStem = os.path.splitext(os.path.basename(aFile))[0]
+		fullStem = os.path.splitext(aFile)[0]
+                newTargetStem = os.path.basename(fullStem)
 	    	if not newTargetStem in newColl:
 		    sourceExt = os.path.splitext(sourcePattern)[1]
-		    newColl[newTargetStem] = newTargetStem + sourceExt
+		    newColl[newTargetStem] = fullStem + sourceExt
 	self.diag.info("coll final:", str(newColl))
 	return newColl
     def getFilesFromExpansions(self, test, targetStem, sourcePattern):
@@ -780,11 +780,14 @@ class CollateFiles(plugins.Action):
         self.diag.info("Collating for " + targetStem)
         targetFiles = test.getFileNamesMatching(targetStem)
         fileList = map(os.path.basename, targetFiles)
+        self.diag.info("Found files: " + repr(fileList))
 
         # generate a list of filenames for generated files
         os.chdir(test.writeDirectory)
         self.diag.info("Adding files for source pattern " + sourcePattern)
-        fileList += glob.glob(sourcePattern)
+        sourceFiles = glob.glob(sourcePattern)
+        self.diag.info("Found files : " + repr(sourceFiles))
+        fileList += sourceFiles
         fileList.sort()
         return fileList
     def __call__(self, test):

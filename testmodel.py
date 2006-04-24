@@ -32,10 +32,13 @@ class DirectoryCache:
             if self.exists(fileName):
                 return self.pathName(fileName)
     def findFilesMatching(self, patterns):
-        matchingFiles = []
-        for pattern in patterns:
-            matchingFiles += fnmatch.filter(self.contents, pattern)
+        matchingFiles = filter(lambda fileName : self.matchesPattern(fileName, patterns), self.contents)
         return map(self.pathName, matchingFiles)
+    def matchesPattern(self, fileName, patterns):
+        for pattern in patterns:
+            if fnmatch.fnmatch(fileName, pattern):
+                return True
+        return False        
     def findAllFiles(self, fileNames):
         fileNames.reverse() # assume most-specific first, we want least-specific first here
         existingFiles = filter(self.exists, fileNames)

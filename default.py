@@ -347,6 +347,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         app.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
+        app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
         app.setConfigDefault("collate_file", {}, "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("run_dependent_text", { "" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "" : [] }, "Mapping of patterns to extract and sort from result files")
@@ -550,21 +551,48 @@ class PrepareWriteDirectory(plugins.Action):
             self.collatePath(test, configName, collateMethod)
     def collatePath(self, test, configName, collateMethod):
         sourcePath = self.getSourcePath(test, configName)
-        self.diag.info("Path for linking/copying at " + sourcePath)
-        target = os.path.join(test.writeDirectory, os.path.basename(sourcePath))
-        plugins.ensureDirExistsForFile(target)
-        collateMethod(test, sourcePath, target)
+        target = self.getTargetPath(test, configName)
+        self.diag.info("Collating " + configName + " from " + repr(sourcePath) + "\nto " + repr(target))
+        if sourcePath:
+            self.collateExistingPath(test, sourcePath, target, collateMethod)
+            
         envVarToSet = self.findEnvironmentVariable(test, configName)
         if envVarToSet:
+            prevEnv = test.getEnvironment(envVarToSet)
             self.diag.info("Setting env. variable " + envVarToSet + " to " + target)
-            test.environment[envVarToSet] = target
-            test.previousEnv[envVarToSet] = sourcePath
+            test.setEnvironment(envVarToSet, target)
+            if prevEnv:
+                test.previousEnv[envVarToSet] = prevEnv
+    def collateExistingPath(self, test, sourcePath, target, collateMethod):
+        self.diag.info("Path for linking/copying at " + sourcePath)
+        plugins.ensureDirExistsForFile(target)
+        collateMethod(test, sourcePath, target)
+    def getEnvironmentSourcePath(self, configName):
+        pathName = self.getPathFromEnvironment(configName)
+        if os.path.exists(pathName):
+            return pathName
+    def getPathFromEnvironment(self, configName):
+        return os.path.normpath(os.path.expandvars(configName))
+    def getTargetPath(self, test, configName):
+        # handle environment variables
+        localName = os.path.basename(self.getPathFromEnvironment(configName))
+        return os.path.join(test.writeDirectory, localName)
     def getSourcePath(self, test, configName):
         # These can refer to environment variables or to paths within the test structure
         if configName.startswith("$"):
-            return os.path.normpath(os.path.expandvars(configName))
+            return self.getEnvironmentSourcePath(configName)
+
+        pathName = test.makePathName(configName)
+        if pathName:
+            return pathName
         else:
-            return test.makePathName(configName)
+            return self.getSourceFromSearchPath(test, configName)
+    def getSourceFromSearchPath(self, test, configName):
+        searchPathDirs = test.app.getCompositeConfigValue("test_data_searchpath", configName)
+        for dir in searchPathDirs:
+            fullPath = os.path.join(dir, configName)
+            if os.path.exists(fullPath):
+                return fullPath
     def findEnvironmentVariable(self, test, configName):
         self.diag.info("Finding env. var name from " + configName)
         if configName.startswith("$"):

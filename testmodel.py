@@ -170,9 +170,10 @@ class Test:
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars)
     def makePathName(self, fileName):
-        if self.parent is None or self.dircache.exists(fileName):
+        if self.dircache.exists(fileName):
             return self.dircache.pathName(fileName)
-        return self.parent.makePathName(fileName)
+        elif self.parent:
+            return self.parent.makePathName(fileName)
     def notifyCompleted(self):
         debugLog.info("Completion notified, test " + self.name)
         for observer in self.observers:

@@ -98,7 +98,7 @@ class MatadorConfig(optimization.OptimizationConfig):
                 rulesFile = os.path.join(self._getSubPlanDirName(test), "APC_FILES", "rules")
             return self.getRuleSettingFromFile(rulesFile, paramName)
     def getRuleSettingFromFile(self, fileName, paramName):
-        if not os.path.isfile(fileName):
+        if not fileName:
             return
         for line in open(fileName).xreadlines():
             words = line.split()

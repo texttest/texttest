@@ -874,7 +874,9 @@ class ApplicationGUI(RightWindowGUI):
             for file in personalFiles:
                 self.addFileToModel(persiter, file, None, colour)
     def getConfigFiles(self):
-        return filter(self.app.ownsFile, self.app.dircache.findExtensionFiles("config." + self.app.name))
+        configFiles = filter(self.app.ownsFile, self.app.dircache.findExtensionFiles("config." + self.app.name))
+        configFiles.sort()
+        return configFiles
     def getPersonalFiles(self):
         personalFiles = []
         personalFile = self.app.getPersonalConfigFile()

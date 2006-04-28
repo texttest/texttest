@@ -1865,13 +1865,13 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
         cvsInfo = ""
         path = test.getDirectory()
         for file in files:
-            cvsInfo += self.getCVSInfo(path, os.path.basename(fullName))
+            fileName = test.getFileName(file)
+            if fileName:
+                cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
         raise  plugins.TextTestError, "CVS Logs" + os.linesep + os.linesep + cvsInfo
     def getTitle(self):
         return "CVS _Log"
     def getCVSInfo(self, path, file):
-        if not os.path.isfile(path + os.sep + file):
-            return ""
         info = os.path.basename(file) + ":" + os.linesep
         cvsCommand = "cd " + path + ";cvs log -N -rHEAD " + file
         stdin, stdouterr = os.popen4(cvsCommand)

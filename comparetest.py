@@ -332,7 +332,7 @@ class FileComparison:
         if self.tmpCmpFile == self.stdCmpFile or self.stdCmpFile == self.stdFile:
             return 0
         
-        if plugins.modifiedTime(self.tmpCmpFile) < plugins.modifiedTime(self.tmpFile):
+        if self.tmpFile and (plugins.modifiedTime(self.tmpCmpFile) < plugins.modifiedTime(self.tmpFile)):
             return 1
         return not self.newResult() and not self.missingResult() and \
                (plugins.modifiedTime(self.stdCmpFile) <= plugins.modifiedTime(self.stdFile))

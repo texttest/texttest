@@ -440,8 +440,6 @@ class TestCase(Test):
         pickler = Pickler(file)
         pickler.dump(self.state)
         file.close()
-    def getTmpExtension(self):
-        return self.app.configObject.getRunIdentifier()
     def isOutdated(self, filename):
         modTime = plugins.modifiedTime(filename)
         currTime = time()
@@ -638,11 +636,11 @@ class ConfigurationWrapper:
             return self.target.setApplicationDefaults(app)
         except:
             self.raiseException(req = "set defaults")
-    def getRunIdentifier(self, prefix=""):
+    def getWriteDirectoryName(self, app):
         try:
-            return self.target.getRunIdentifier(prefix)
+            return self.target.getWriteDirectoryName(app)
         except:
-            self.raiseException(req = "run id")
+            self.raiseException(req = "writedir name")
     def getPossibleResultFiles(self, app):
         try:
             return self.target.getPossibleResultFiles(app)
@@ -727,7 +725,9 @@ class Application:
         self.diag.info("Found application " + repr(self))
         self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), inputOptions)
         self.cleanMode = self.configObject.getCleanMode()
-        self.writeDirectory = self._getWriteDirectory(inputOptions)
+        self.rootTmpDir = self._getRootTmpDir()
+        self.writeDirectory = self.configObject.getWriteDirectoryName(self)
+        self.diag.info("Locale is " + os.getenv("LANG") + ", write directory at " + self.writeDirectory)
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
@@ -762,13 +762,13 @@ class Application:
     def getPreviousWriteDirInfo(self, userName):
         userId = plugins.tmpString
         if userName:
-            if globalTmpDirectory == os.path.expanduser("~/texttesttmp"):
-                return userName, globalTmpDirectory.replace(userId, userName)
+            if self.rootTmpDir == os.path.expanduser("~/texttesttmp"):
+                return userName, self.rootTmpDir.replace(userId, userName)
             else:
                 # hack for self-tests, don't replace user globally, only locally
-                return userName, globalTmpDirectory
+                return userName, self.rootTmpDir
         else:
-            return userId, globalTmpDirectory
+            return userId, self.rootTmpDir
     def getPersonalConfigFile(self):
         personalDir = plugins.getPersonalConfigDir()
         if personalDir:
@@ -887,26 +887,22 @@ class Application:
             group.addOption("a", "Run Applications whose name contains")
             group.addOption("s", "Run this script")
             group.addOption("d", "Run as if TEXTTEST_HOME was")
-            group.addOption("tmp", "Private: write test-tmp files at")
             group.addSwitch("help", "Print configuration help text on stdout")
     def findOptionGroup(self, option, optionGroups):
         for optionGroup in optionGroups:
             if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):
                 return optionGroup
-        return None
-    def _getWriteDirectory(self, inputOptions):
-        if inputOptions.has_key("tmp"):
-            os.environ["TEXTTEST_TMP"] = inputOptions["tmp"]
+    def _getRootTmpDir(self):
         if not os.environ.has_key("TEXTTEST_TMP"):
             if os.name == "posix":
                 os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
             else:
                 os.environ["TEXTTEST_TMP"] = os.environ["TEMP"]
-        global globalTmpDirectory
-        globalTmpDirectory = os.path.expanduser(os.environ["TEXTTEST_TMP"])
-        self.diag.info("Global tmp directory at " + globalTmpDirectory)
-        localName = self.getTmpIdentifier().replace(":", "")
-        return os.path.join(globalTmpDirectory, localName)
+        return os.path.expanduser(os.environ["TEXTTEST_TMP"])
+    def getStandardWriteDirectoryName(self):
+        timeStr = plugins.startTimeString().replace(":", "")
+        localName = self.name + self.versionSuffix() + plugins.tmpString + timeStr
+        return os.path.join(self.rootTmpDir, localName)
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:
@@ -1002,8 +998,6 @@ class Application:
                 previousWriteDir = os.path.join(rootDir, file)
                 print "Removing previous write directory", previousWriteDir
                 plugins.rmtree(previousWriteDir, attempts=3)
-    def getTmpIdentifier(self):
-        return self.configObject.getRunIdentifier(self.name + self.versionSuffix())
     def getActionSequence(self):
         return self.configObject.getActionSequence()
     def printHelpText(self):

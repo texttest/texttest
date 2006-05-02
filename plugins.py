@@ -91,8 +91,8 @@ class Configuration:
         return []
     def getCleanMode(self):
         return self.CLEAN_SELF
-    def getRunIdentifier(self, prefix=""):
-        return prefix + tmpString + startTimeString()
+    def getWriteDirectoryName(self, app):
+        return app.getStandardWriteDirectoryName()
     def getRunOptions(self):
         return ""
     def useExtraVersions(self):

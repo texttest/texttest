@@ -80,12 +80,13 @@ class Config(plugins.Configuration):
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
-    def getRunIdentifier(self, prefix):
-        basicId = plugins.Configuration.getRunIdentifier(self, prefix)
-        if prefix and self.useStaticGUI():
-            return "static_gui." + basicId
+    def getWriteDirectoryName(self, app):
+        defaultName = plugins.Configuration.getWriteDirectoryName(self, app)
+        if self.useStaticGUI():
+            dirname, local = os.path.split(defaultName)
+            return os.path.join(dirname, "static_gui." + local)
         else:
-            return basicId
+            return defaultName
     def addGuiResponder(self, classes):
         try:
             from texttestgui import TextTestGUI

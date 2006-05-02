@@ -97,11 +97,11 @@ class QueueSystemConfig(default.Config):
         return "-l"
     def slaveRun(self):
         return self.optionMap.has_key("slave")
-    def getRunIdentifier(self, prefix):
+    def getWriteDirectoryName(self, app):
         if self.slaveRun():
-            return prefix + self.optionMap["slave"]
+            return self.optionMap["slave"]
         else:
-            return default.Config.getRunIdentifier(self, prefix)
+            return default.Config.getWriteDirectoryName(self, app)
     def useTextResponder(self):
         if self.slaveRun():
             return 0
@@ -179,7 +179,7 @@ class SubmissionRules:
             return "1"
     def getJobName(self):
         jobName = repr(self.test.app).replace(" ", "_") + self.test.app.versionSuffix() + self.test.getRelPath()
-        return self.test.getTmpExtension() + jobName
+        return plugins.tmpString + plugins.startTimeString() + jobName
     def getSubmitSuffix(self, name):
         queue = self.findQueue()
         if queue:
@@ -386,13 +386,12 @@ class SubmitTest(plugins.Action):
     def getSlaveCommand(self, test):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
-        tmpDir, local = os.path.split(test.app.writeDirectory)
         commandLine = "exec python " + sys.argv[0] + " " + test.app.getRunOptions() + " -tp " + test.getRelPath() \
-                      + self.getSlaveArgs(test) + " -tmp " + tmpDir + " " + self.runOptions
+                      + self.getSlaveArgs(test) + " " + self.runOptions
         return "exec " + self.loginShell + " -c \"" + commandLine + "\""
     def getSlaveArgs(self, test):
         host, port = QueueSystemServer.instance.getServerAddress()
-        return " -" + self.slaveType() + " " + test.getTmpExtension() + " -servaddr " + host + ":" + str(port)
+        return " -" + self.slaveType() + " " + test.app.writeDirectory + " -servaddr " + host + ":" + str(port)
     def tryStartServer(self):
         if not QueueSystemServer.instance:
             QueueSystemServer.instance = QueueSystemServer()

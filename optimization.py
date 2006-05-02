@@ -1106,6 +1106,7 @@ class PlotSubplans(plugins.Action):
                     testTmpPath = os.path.join("dummyUser", testName)
                     os.makedirs(testTmpPath)
                     testFullPath = os.path.join(app.getDirectory(), testTmpPath)
+                    os.makedirs(testFullPath)
                     newTest = testmodel.TestCase(testName, testmodel.DirectoryCache(testFullPath), \
                                                  app, parent=None)
                     logFilePath = os.path.join(subplan, "APC_FILES", app.getConfigValue("log_file"))

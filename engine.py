@@ -391,6 +391,7 @@ class TextTest:
         for app in self.allApps:
             for respClass in app.configObject.getResponderClasses():
                 if not respClass in responderClasses:
+                    self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.append(respClass)
         # Make sure we send application events when tests change state
         responderClasses.append(testmodel.ApplicationEventResponder)

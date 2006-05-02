@@ -61,11 +61,10 @@ def isUserSuite(suite):
 class UserFilter(default.TextFilter):
     option = "u"
     def isUserSuite(self, suite):
-        for file in suite.ownFiles():
-            if os.path.basename(file).startswith("environment"):
-                for line in open(file).xreadlines():
-                    if line.startswith("CARMUSR:"):
-                        return 1
+        for file in suite.findAllStdFiles("environment"):
+            for line in open(file).xreadlines():
+                if line.startswith("CARMUSR:"):
+                    return 1
         return 0
     def acceptsTestSuite(self, suite):
         if self.isUserSuite(suite):
@@ -292,13 +291,26 @@ class Config(CarmenConfig):
                 readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", ruleset) ]
             test.tearDownEnvironment(parents=1)
         elif test.environment.has_key("CARMUSR"):
-            customerFile = os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab")
-            impFile = os.path.join(test.environment["CARMUSR"], "data", "config", "CarmResources", "Implementation.etab")
-            readDirs["Resources"] = [ customerFile, impFile ]
+            files = self.getResourceFiles(test)
+            if len(files):
+                readDirs["Resources"] = files
         elif test.environment.has_key("CARMSYS"):
-            readDirs["RAVE module"] = [ os.path.join(test.environment["CARMSYS"], \
-                                        "carmusr_default", "crc", "modules", getBasicRaveName(test)) ]
+            raveModule = self.getRaveModule(test)
+            if os.path.isfile(raveModule):
+                readDirs["RAVE module"] = [ raveModule ]
         return readDirs
+    def getResourceFiles(self, test):
+        files = []
+        customerFile = os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab")
+        if os.path.isfile(customerFile):
+            files.append(customerFile)
+        impFile = os.path.join(test.environment["CARMUSR"], "data", "config", "CarmResources", "Implementation.etab")
+        if os.path.isfile(impFile):
+            files.append(impFile)
+        return files
+    def getRaveModule(self, test):
+        return os.path.join(test.environment["CARMSYS"], \
+                            "carmusr_default", "crc", "modules", getBasicRaveName(test))
     def filesFromSubplan(self, test, subplanDir):
         return []
     def isSlowdownJob(self, user, jobName):

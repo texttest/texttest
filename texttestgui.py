@@ -515,7 +515,7 @@ class TextTestGUI(ThreadedResponder):
         if test.classId() == "test-app":
             self.rightWindowGUI = ApplicationGUI(test, self.selectionActionGUI)
         else:
-            test.dircache.refresh()
+            test.refreshFiles()
             if checkUpToDate and test.state.isComplete() and test.state.needsRecalculation():
                 cmpAction = comparetest.MakeComparisons()
                 if cmpAction.defaultComparisonClass:
@@ -874,7 +874,7 @@ class ApplicationGUI(RightWindowGUI):
             for file in personalFiles:
                 self.addFileToModel(persiter, file, None, colour)
     def getConfigFiles(self):
-        configFiles = filter(self.app.ownsFile, self.app.dircache.findExtensionFiles("config." + self.app.name))
+        configFiles = self.app.dircache.findAllFiles("config", [ self.app.name ])
         configFiles.sort()
         return configFiles
     def getPersonalFiles(self):
@@ -909,145 +909,64 @@ class TestCaseGUI(RightWindowGUI):
                 pass
         else:
             self.addStaticFilesToModel(self.test)
-    def createHeader(self, list, title):
-        if len(list) > 0:
-            iter = self.model.insert_before(None, None)
-            self.model.set_value(iter, 0, title)
-            return iter
     def addDynamicFilesToModel(self, test):
         self.testComparison = test.state
         if not test.state.isComplete():
             self.testComparison = comparetest.TestComparison(test.state, test.app)
-            self.testComparison.makeComparisons(test, makeNew = 1)
-        compiter = self.createHeader(self.testComparison.correctResults + self.testComparison.changedResults, "Comparison Files")
-        newiter = self.createHeader(self.testComparison.newResults, "New Files")
-        missingiter = self.createHeader(self.testComparison.missingResults, "Missing Files")
-        diagComps = []
-        hasNewDiags, hasOldDiags = 0, 0
-        for fileComparison in self.testComparison.allResults:
-            if fileComparison.isDiagnostic():
-                if fileComparison.newResult():
-                    hasNewDiags = 1
-                else:
-                    hasOldDiags = 1
-                diagComps.append(fileComparison)
-            else:
-                self.addDynamicComparisonToModel(newiter, compiter, missingiter, fileComparison)
+            self.testComparison.makeComparisons(test, testInProgress=1)
 
-        diagcompiter, diagnewiter = None, None
-        if hasOldDiags:
-            guilog.info("Adding subtree for diagnostic comparisons") 
-            diagcompiter = self.model.insert_before(compiter, None)
-            self.model.set_value(diagcompiter, 0, "Diagnostics")
-        if hasNewDiags:
-            guilog.info("Adding subtree for new diagnostic files") 
-            diagnewiter = self.model.insert_before(newiter, None)
-            self.model.set_value(diagnewiter, 0, "Diagnostics")
-        for diagComp in diagComps:
-            self.addDynamicComparisonToModel(diagnewiter, diagcompiter, missingiter, diagComp)
-    def addDynamicComparisonToModel(self, newiter, compiter, missingiter, fileComparison):
-        if fileComparison.newResult():
-            self.addDynamicFileToModel(newiter, fileComparison, self.getFailureColour())
-        elif fileComparison.missingResult():
-            self.addDynamicFileToModel(missingiter, fileComparison, self.getFailureColour())
-        elif fileComparison.hasDifferences():
-            self.addDynamicFileToModel(compiter, fileComparison, self.getFailureColour())
-        else:
-            self.addDynamicFileToModel(compiter, fileComparison, self.getSuccessColour())
-    def addDynamicFileToModel(self, iter, comparison, colour):
-        if comparison.newResult():
-            self.addFileToModel(iter, comparison.tmpFile, comparison, colour)
-        else:
-            self.addFileToModel(iter, comparison.stdFile, comparison, colour)
-    def addStaticFilesToModel(self, test):
-        if test.classId() == "test-case":
-            stditer = self.model.insert_before(None, None)
-            self.model.set_value(stditer, 0, "Standard Files")
-        defiter = self.model.insert_before(None, None)
-        self.model.set_value(defiter, 0, "Definition Files")
-        stdFiles = []
-        defFiles = []
-        diagConfigFileName = self.getDiagDefinitionFile(test.app)
-        for file in test.dircache.contents:
-            if test.app.ownsFile(file):
-                if self.isDefinitionFile(file, test.app):
-                    defFiles.append(file)
-                elif test.classId() == "test-case":
-                    stdFiles.append(file)
-            elif file == diagConfigFileName:
-                defFiles.append(file)
-        self.addFilesUnderIter(defiter, defFiles, test.getDirectory())
-        if len(stdFiles):
-            self.addFilesUnderIter(stditer, stdFiles, test.getDirectory())
-            self.addStaticDiagFilesToModel(test, diagConfigFileName, stditer, defiter)
-        self.addStaticDataFilesToModel(test)
-    def addStaticDiagFilesToModel(self, test, diagConfigFileName, stditer, defiter):
-        configName = os.path.join("Diagnostics", diagConfigFileName)
-        configPath = test.getFileName(configName)
-        if not configPath:
+        self.addDynamicComparisons(self.testComparison.correctResults + self.testComparison.changedResults, "Comparison Files")
+        self.addDynamicComparisons(self.testComparison.newResults, "New Files")
+        self.addDynamicComparisons(self.testComparison.missingResults, "Missing Files")
+    def addDynamicComparisons(self, compList, title):
+        if len(compList) == 0:
             return
-        defdiagiter = self.model.insert_before(defiter, None)
-        self.model.set_value(defdiagiter, 0, "Diagnostics")
-        self.addFilesUnderIter(defdiagiter, [ configPath ])
-        diagFiles = []
-        diagDir = os.path.dirname(configPath)
-        for diagFile in os.listdir(diagDir):
-            fullPath = os.path.join(diagDir, diagFile)
-            if os.path.isfile(fullPath) and diagFile != diagConfigFileName:
-                diagFiles.append(fullPath)
-        if len(diagFiles):
-            exiter = self.model.insert_before(stditer, None)
-            self.model.set_value(exiter, 0, "Diagnostics")
-            self.addFilesUnderIter(exiter, diagFiles)
-    def getDataFileList(self, test):
-        dataFileList = []
-        filesToSearch = test.app.configObject.extraReadFiles(test).items()
-        for name, filelist in filesToSearch:
-            existingFileList = filter(lambda file: os.path.exists(file), filelist)
-            if len(existingFileList) > 0:
-                dataFileList.append((name, existingFileList))
-        return dataFileList
-    def addStaticDataFilesToModel(self, test):
-        dataFileList = self.getDataFileList(test)
-        if len(dataFileList) == 0:
-            return
-        datiter = self.model.insert_before(None, None)
-        self.model.set_value(datiter, 0, "Data Files")            
-        for name, filelist in dataFileList:
-            if len(name) > 0:
-                exiter = self.model.insert_before(datiter, None)
-                self.model.set_value(exiter, 0, name)
-                self.addFilesUnderIter(exiter, filelist)
-            else:
-                self.addFilesUnderIter(datiter, filelist)
-    def getDiagDefinitionFile(self, app):
-        diagDict = app.getConfigValue("diagnostics")
-        if diagDict.has_key("configuration_file"):
-            return diagDict["configuration_file"]
-        return ""
-    def addFilesUnderIter(self, iter, files, dir = None):
-        files.sort()
-        colour = self.colours["static"]
-        if self.dynamic:
-            colour = self.colours["not_started"]
-        dirs = []
+        iter = self.model.insert_before(None, None)
+        self.model.set_value(iter, 0, title)
+        filelist = []
+        fileCompMap = {}
+        for comp in compList:
+            file = comp.getDisplayFileName()
+            fileCompMap[file] = comp
+            filelist.append(file)
+        filelist.sort()
+        self.addStandardFilesUnderIter(iter, filelist, fileCompMap)
+    def addStandardFilesUnderIter(self, iter, files, compMap = {}):
+        for relDir, relDirFiles in self.classifyByRelDir(files).items():
+            iterToUse = iter
+            if relDir:
+                iterToUse = self.addFileToModel(iter, relDir, None, self.getStaticColour())
+            for file in relDirFiles:
+                comparison = compMap.get(file)
+                colour = self.getComparisonColour(comparison)
+                self.addFileToModel(iterToUse, file, comparison, colour)
+    def classifyByRelDir(self, files):
+        dict = {}
         for file in files:
-            if file == "CVS":
-                continue
-            if dir:
-                fullPath = os.path.join(dir, file)
-            else:
-                fullPath = file
-            if os.path.isdir(fullPath):
-                dirs.append(fullPath)
-            else:
-                self.addFileToModel(iter, fullPath, None, colour)
-        for subdir in dirs:
-            newiter = self.addFileToModel(iter, subdir, None, colour)
-            self.addFilesUnderIter(newiter, os.listdir(subdir), subdir)
-    def isDefinitionFile(self, file, app):
-        stem = file.split(".")[0]
-        return stem in app.getConfigValue("definition_file_stems")
+            relDir = self.getRelDir(file)
+            if not dict.has_key(relDir):
+                dict[relDir] = []
+            dict[relDir].append(file)
+        return dict
+    def getRelDir(self, file):
+        relPath = self.test.getTestRelPath(file)
+        if relPath.find(os.sep) != -1:
+            dir, local = os.path.split(relPath)
+            return dir
+        else:
+            return ""
+    def getComparisonColour(self, fileComp):
+        if not fileComp:
+            return self.getStaticColour()
+        if fileComp.hasSucceeded():
+            return self.getSuccessColour()
+        else:
+            return self.getFailureColour()
+    def getStaticColour(self):
+        if self.dynamic:
+            return self.colours["not_started"]
+        else:
+            return self.colours["static"]
     def getSuccessColour(self):
         if self.test.state.isComplete():
             return self.colours["success"]
@@ -1058,6 +977,48 @@ class TestCaseGUI(RightWindowGUI):
             return self.colours["failure"]
         else:
             return self.colours["running"]
+    def addStaticFilesToModel(self, test):
+        stdFiles, defFiles = test.listStandardFiles(allVersions=True)
+        if test.classId() == "test-case":
+            stditer = self.model.insert_before(None, None)
+            self.model.set_value(stditer, 0, "Standard Files")
+            if len(stdFiles):
+                self.addStandardFilesUnderIter(stditer, stdFiles)
+
+        defiter = self.model.insert_before(None, None)
+        self.model.set_value(defiter, 0, "Definition Files")
+        self.addStandardFilesUnderIter(defiter, defFiles)
+        self.addStaticDataFilesToModel(test)
+    def getDataFileList(self, test):
+        return test.app.configObject.extraReadFiles(test).items()
+    def addStaticDataFilesToModel(self, test):
+        dataFileList = self.getDataFileList(test)
+        if len(dataFileList) == 0:
+            return
+        datiter = self.model.insert_before(None, None)
+        self.model.set_value(datiter, 0, "Data Files")            
+        for name, filelist in dataFileList:
+            if len(name) > 0:
+                exiter = self.model.insert_before(datiter, None)
+                self.model.set_value(exiter, 0, name)
+                self.addDataFilesUnderIter(exiter, filelist)
+            else:
+                self.addDataFilesUnderIter(datiter, filelist)
+    def addDataFilesUnderIter(self, iter, files):
+        files.sort()
+        colour = self.getStaticColour()
+        dirs = []
+        for file in files:
+            if os.path.basename(file) == "CVS":
+                continue
+            if os.path.isdir(file):
+                dirs.append(file)
+            else:
+                self.addFileToModel(iter, file, None, colour)
+        for subdir in dirs:
+            newiter = self.addFileToModel(iter, subdir, None, colour)
+            fileList = map(lambda file: os.path.join(subdir, file), os.listdir(subdir))
+            self.addDataFilesUnderIter(newiter, fileList)
     def getTestInfo(self, test):
         if not test or test.classId() != "test-case":
             return ""

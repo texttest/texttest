@@ -268,9 +268,9 @@ class SaveTests(SelectionAction):
             testComparison = test.state
             if testComparison:
                 if singleFile:
-                    testComparison.saveSingle(singleFile, self.getExactness(), version)
+                    testComparison.saveSingle(singleFile, test, self.getExactness(), version)
                 else:
-                    testComparison.save(self.getExactness(), version, overwriteSuccess)
+                    testComparison.save(test, self.getExactness(), version, overwriteSuccess)
                 test.filesChanged()
 
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
@@ -440,7 +440,7 @@ class RecordTest(InteractiveTestAction):
     def textTestCompleted(self, test, usecase):
         scriptEngine.applicationEvent(usecase + " texttest to complete")
         # Refresh the files before changed the data
-        test.dircache.refresh()
+        test.refreshFiles()
         if usecase == "record":
             self.setTestRecorded(test, usecase)
         else:
@@ -599,12 +599,12 @@ class SelectTests(SelectionAction):
             return [ suite ]
         if not suite.isAcceptedByAll(filters):
             return []
-        try:
+        if suite.classId() == "test-suite":
             tests = []
             for subSuite in self.findTestCaseList(suite):
                 tests += self.getTestsFromSuite(subSuite, filters, strategy, selected)
             return tests
-        except AttributeError:
+        else:
             if strategy == 0 or strategy == 2:
                 return [ suite ]
             elif strategy == 1: # Refine - only add if already selected
@@ -616,8 +616,8 @@ class SelectTests(SelectionAction):
             return []
     def findTestCaseList(self, suite):
         testcases = suite.testcases
-        testCaseFiles = suite.findVersionTestSuiteFiles()
-        if len(testCaseFiles) == 0:
+        testCaseFiles = suite.findTestSuiteFiles()
+        if len(testCaseFiles) == 1:
             return testcases
         
         version = self.optionGroup.getOptionValue("vs")
@@ -843,7 +843,8 @@ class CopyTest(ImportTest):
         suite = test.parent
         self.setUpSuite(suite)
     def createTestContents(self, suite, testDir):
-        for sourceFile in self.test.ownFiles():
+        stdFiles, defFiles = self.test.listStandardFiles(allVersions=True)
+        for sourceFile in stdFiles + defFiles:
             targetFile = os.path.join(testDir, os.path.basename(sourceFile))
             shutil.copyfile(sourceFile, targetFile)
     

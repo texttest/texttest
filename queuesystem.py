@@ -311,7 +311,7 @@ class QueueSystemServer:
         jobName = submissionRules.getJobName()
         self.submitDiag.info("Creating job " + jobName + " with command : " + fullCommand)
         # Change directory to the appropriate test dir
-        os.chdir(submissionRules.test.writeDirectory)
+        submissionRules.test.grabWorkingDirectory()
         stdin, stdout, stderr = os.popen3(fullCommand)
         errorMessage = plugins.retryOnInterrupt(queueSystem.findSubmitError, stderr)
         if errorMessage:
@@ -464,7 +464,7 @@ class KillTestSubmission(plugins.Action):
         test.changeState(plugins.TestState("unrunnable", briefText=failReason, \
                                            freeText=fullText, completed=1))
     def getSlaveFailure(self, test):
-        slaveErrFile = test.makeTmpFileName("slaveerrs", forComparison=0)
+        slaveErrFile = test.makeTmpFileName("slaveerrs", forFramework=1)
         if os.path.isfile(slaveErrFile):
             errStr = open(slaveErrFile).read()
             if errStr and errStr.find("Traceback") != -1:

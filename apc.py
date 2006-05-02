@@ -193,7 +193,7 @@ class ApcConfig(optimization.OptimizationConfig):
             return basicInfo + "\n" + self.getRunStatusInfo(test)
         return basicInfo
     def getRunStatusInfo(self, test):
-        runStatusHeadFile = os.path.join(test.writeDirectory, "APC_FILES", "run_status_head")
+        runStatusHeadFile = test.makeTmpFileName("APC_FILES/run_status_head")
         if os.path.isfile(runStatusHeadFile):
             try:
                 return open(runStatusHeadFile).read()
@@ -270,7 +270,7 @@ class ViewApcLog(guiplugins.InteractiveTestAction):
     def __repr__(self):
         return "Viewing log of"
     def __call__(self, test):
-        viewLogScript = test.makeTmpFileName("view_apc_log", forComparison=0)
+        viewLogScript = test.makeTmpFileName("view_apc_log", forFramework=1)
         if os.path.isfile(viewLogScript):
             file = open(viewLogScript)
             command = file.readlines()[0].strip()
@@ -489,7 +489,7 @@ class FetchApcCore(unixonly.CollateFiles):
                 return 1
         return None
     def extractCoreFor(self, test):
-        scriptErrorsFileName = os.path.join(test.writeDirectory, "APC_FILES", "run_status_script_error")
+        scriptErrorsFileName = test.makeTmpFileName("APC_FILES/run_status_script_error")
         self.diag.info(scriptErrorsFileName)
         if not os.path.isfile(scriptErrorsFileName):
             return 0
@@ -500,7 +500,7 @@ class FetchApcCore(unixonly.CollateFiles):
             return 0
         self.diag.info("APC log files are kept.")
         #Find out APC tmp directory.
-        debugFile = os.path.join(test.writeDirectory, "apc_tmp_dir", "apc_debug")
+        debugFile = test.makeTmpFileName("apc_tmp_dir/apc_debug")
         # Check if there is a apc_debug file.
         if os.path.isfile(debugFile):
             self.diag.info("apc_debug file is found. Aborting.")
@@ -521,7 +521,7 @@ class MarkApcLogDir(RunWithParallelAction):
         return "/tmp"
     def getApcLogDir(self, test, processId = None):
         # Logfile dir
-        subplanPath = os.path.realpath(os.path.join(test.writeDirectory, "APC_FILES"))
+        subplanPath = os.path.realpath(test.makeTmpFileName("APC_FILES", forComparison=0))
         subplanName, apcFiles = os.path.split(subplanPath)
         baseSubPlan = os.path.basename(subplanName)
         apcHostTmp = self.getApcHostTmp()
@@ -542,13 +542,13 @@ class MarkApcLogDir(RunWithParallelAction):
         if apcLogDir:
             self.makeLinks(test, apcLogDir)
     def makeLinks(self, test, apcTmpDir):
-        linkTarget = os.path.join(test.writeDirectory, "apc_tmp_dir")
+        linkTarget = test.makeTmpFileName("apc_tmp_dir", forComparison=0)
         try:
             os.symlink(apcTmpDir, linkTarget)
         except OSError:
             print "Failed to create apc_tmp_dir link"
             
-        viewLogScript = test.makeTmpFileName("view_apc_log", forComparison=0)
+        viewLogScript = test.makeTmpFileName("view_apc_log", forFramework=1)
         file = open(viewLogScript, "w")
         logFileName = os.path.join(apcTmpDir, "apclog")
         file.write("xon " + gethostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''")
@@ -573,7 +573,7 @@ class ExtractApcLogs(plugins.Action):
             print "No argument given, using default value for extract_logs"
             self.args = "default"
     def __call__(self, test):
-        apcTmpDir = os.path.join(test.writeDirectory, "apc_tmp_dir")
+        apcTmpDir = test.makeTmpFileName("apc_tmp_dir", forComparison=0)
         if not os.path.isdir(apcTmpDir):
             return
         self.diag.info("Extracting from APC tmp directory " + apcTmpDir)
@@ -590,7 +590,8 @@ class ExtractApcLogs(plugins.Action):
 
         self.describe(test)
         # Extract from the apclog
-        extractToFile = test.makeTmpFileName("Diagnostics/" + saveName)
+        test.readSubDirectory("Diagnostics")
+        extractToFile = test.makeTmpFileName("Diagnostics/" + saveName + ".apc")
         plugins.ensureDirExistsForFile(extractToFile)
         cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + extractToFile
         os.system(cmdLine)

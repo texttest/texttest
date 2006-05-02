@@ -45,20 +45,18 @@ def parseTimeExpression(timeExpression):
         return ">", plugins.getNumberOfSeconds(timeExpression[1:])  
 
 class PerformanceTestComparison(comparetest.TestComparison):
-    def getOptionalStems(self, test):
-        # All of these things should not be warned for if missing...
-        return comparetest.TestComparison.getOptionalStems(self, test) + \
-               self.getPerformanceStems(test)
     def getPerformanceStems(self, test):
         return [ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys()
-    def createFileComparison(self, test, standardFile, tmpFile, makeNew = 0):
-        baseName = os.path.basename(standardFile)        
-        stem, ext = baseName.split(".", 1)
+    def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress):
         if stem in self.getPerformanceStems(test):
-            descriptors = self.findDescriptors(stem)
-            return PerformanceFileComparison(test, standardFile, tmpFile, descriptors, makeNew)
+            if tmpFile:
+                descriptors = self.findDescriptors(stem)
+                return PerformanceFileComparison(test, stem, standardFile, tmpFile, descriptors, testInProgress)
+            else:
+                # Don't care if performance is missing
+                return None
         else:
-            return comparetest.TestComparison.createFileComparison(self, test, standardFile, tmpFile, makeNew)
+            return comparetest.TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)
     def findDescriptors(self, stem):
         descriptors = {}
         if stem == "memory":
@@ -80,14 +78,14 @@ class PerformanceTestComparison(comparetest.TestComparison):
         return descriptors
 
 class PerformanceFileComparison(comparetest.FileComparison):
-    def __init__(self, test, standardFile, tmpFile, descriptors, makeNew):
+    def __init__(self, test, stem, standardFile, tmpFile, descriptors, testInProgress):
         self.descriptors = descriptors
         self.diag = plugins.getDiagnostics("performance")
         self.processCount = len(test.state.executionHosts)
         self.diag.info("Checking test " + test.name + " process count " + str(self.processCount))
-        comparetest.FileComparison.__init__(self, test, standardFile, tmpFile, makeNew)
+        comparetest.FileComparison.__init__(self, test, stem, standardFile, tmpFile, testInProgress)
     def _cacheValues(self, app):
-        if (os.path.exists(self.stdCmpFile)):
+        if self.stdCmpFile:
             self.oldPerformance = getPerformance(self.stdCmpFile)
             self.newPerformance = getPerformance(self.tmpCmpFile)
             self.diag.info("Performance is " + str(self.oldPerformance) + " and " + str(self.newPerformance))

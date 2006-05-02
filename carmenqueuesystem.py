@@ -326,7 +326,7 @@ class RunWithParallelAction(plugins.Action):
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, execProcess, parentProcess):
         self.describe(test, ", profiling process '" + execProcess.getName() + "'")
-        os.chdir(test.writeDirectory)
+        test.grabWorkingDirectory()
         runLine = "/users/lennart/bin/gprofile " + str(execProcess.processId) + " >& gprof.output"
         os.system(runLine)
     def handleNoTimeAvailable(self, test):
@@ -337,7 +337,7 @@ class ProcessProfilerResults(plugins.Action):
         processLine = "/users/lennart/bin/process_gprof -t 0.5 prof.*" + " > " + test.makeTmpFileName("lprof")
         os.system(processLine)
         # Compress and save the raw data.
-        cmdLine = "gzip prof.[0-9]*;mv prof.[0-9]*.gz " + test.makeTmpFileName("prof", forComparison=0)
+        cmdLine = "gzip prof.[0-9]*;mv prof.[0-9]*.gz " + test.makeTmpFileName("prof", forFramework=1)
         os.system(cmdLine)
     def __repr__(self):
         return "Profiling"    

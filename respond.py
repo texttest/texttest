@@ -110,7 +110,7 @@ class InteractiveResponder(Responder):
         if self.overwriteSuccess:
             saveDesc += "(overwriting succeeded files also)"
         print test.getIndent() + "Saving " + repr(test) + saveDesc
-        test.state.save(exact, version, self.overwriteSuccess)
+        test.state.save(test, exact, version, self.overwriteSuccess)
     def useInteractiveResponse(self, test):
         return test.state.hasFailed() and test.state.hasResults() and not self.overwriteFailure
     def presentInteractiveDialog(self, test):            
@@ -118,18 +118,25 @@ class InteractiveResponder(Responder):
         if performView:
             process = self.viewTest(test)
             self.askUser(test, allowView=0, process=process)
+    def getViewCmdInfo(self, test, comparison):
+        if comparison.missingResult():
+            # Don't fire up GUI tools for missing results...
+            return None, None
+        if comparison.newResult():
+            tool = test.getConfigValue("view_program")
+            cmdLine = tool + " " + comparison.tmpCmpFile + plugins.nullRedirect()
+        else:
+            tool = test.getConfigValue("diff_program")
+            cmdLine = tool + " " + comparison.stdCmpFile + " " +\
+                      comparison.tmpCmpFile + plugins.nullRedirect()
+        return tool, cmdLine        
     def viewTest(self, test):
         outputText = test.state.freeText
         sys.stdout.write(outputText)
         logFile = test.getConfigValue("log_file")
         logFileComparison, list = test.state.findComparison(logFile)
         if logFileComparison:
-            tool = test.getConfigValue("diff_program")
-            cmdLine = tool + " " + logFileComparison.stdCmpFile + " " +\
-                      logFileComparison.tmpCmpFile + plugins.nullRedirect()
-            if logFileComparison.newResult():
-                tool = test.getConfigValue("view_program")
-                cmdLine = tool + " " + logFileComparison.tmpCmpFile + plugins.nullRedirect()
+            tool, cmdLine = self.getViewCmdInfo(test, logFileComparison)
             if tool:
                 print "<See also " + tool + " window for details of " + logFile + ">"
                 return plugins.BackgroundProcess(cmdLine)

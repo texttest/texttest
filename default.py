@@ -107,8 +107,7 @@ class Config(plugins.Configuration):
         
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
-        useDiagnostics = self.optionMap.has_key("diag")
-        return [ self.getWriteDirectoryPreparer(ignoreCatalogues, useDiagnostics), catalogueCreator, \
+        return [ self.getWriteDirectoryPreparer(ignoreCatalogues), catalogueCreator, \
                  self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
@@ -190,8 +189,8 @@ class Config(plugins.Configuration):
             return None
         else:
             return self._getWriteDirectoryMaker()
-    def getWriteDirectoryPreparer(self, ignoreCatalogues, useDiagnostics):
-        return PrepareWriteDirectory(ignoreCatalogues, useDiagnostics)
+    def getWriteDirectoryPreparer(self, ignoreCatalogues):
+        return PrepareWriteDirectory(ignoreCatalogues)
     def _getWriteDirectoryMaker(self):
         return MakeWriteDirectory()
     def tryGetTestRunner(self):
@@ -406,11 +405,8 @@ class TestEnvironmentCreator:
     def setUp(self):
         self.setDisplayEnvironment()
         self.setDiagEnvironment()
-        # Always include the working directory of the test in PATH, to pick up linked
-        # executables. Allow for expansion of references...
         if self.testCase():
             self.setUseCaseEnvironment()
-            self.test.setEnvironment("PATH", self.test.writeDirectory + os.pathsep + "$PATH")
     def topLevel(self):
         return self.test.parent is None
     def testCase(self):
@@ -433,29 +429,35 @@ class TestEnvironmentCreator:
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
             self.setTraceDiagnostics()
-        if self.optionMap.has_key("diag"):
+        configFile = self.diagDict.get("configuration_file")
+        if configFile and self.test.parent is None:
+            self.diag.info("Adding definition file stem " + configFile)
+            self.test.app.addConfigEntry("definition_file_stems", configFile)
+        # Read the temporary diagnostics in the static GUI also
+        if self.optionMap.has_key("diag") or self.optionMap.has_key("gx"):
             self.setTemporaryDiagnostics()
         elif self.diagDict.has_key("input_directory_variable"):
-            self.setPermanentDiagnostics()
+            self.setPermanentDiagnostics(configFile)
     def setTraceDiagnostics(self):
         if self.topLevel:
-            envVarName = self.diagDict["trace_level_variable"]
+            envVarName = self.diagDict.get("trace_level_variable")
             self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
             self.test.setEnvironment(envVarName, self.optionMap["trace"])
-    def setPermanentDiagnostics(self):
-        diagConfigFile = self.test.getFileName(self.diagDict["configuration_file"])
+    def setPermanentDiagnostics(self, configFile):
+        diagConfigFile = self.test.getFileName(configFile)
         if diagConfigFile:
-            inVarName = self.diagDict["input_directory_variable"]
+            inVarName = self.diagDict.get("input_directory_variable")
             self.addDiagVariable(inVarName, self.test.getDirectory())
         outVarName = self.diagDict.get("write_directory_variable")
         if outVarName and self.testCase():
             self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
     def setTemporaryDiagnostics(self):
         if self.testCase():
-            inVarName = self.diagDict["input_directory_variable"]
+            inVarName = self.diagDict.get("input_directory_variable")
             self.addDiagVariable(inVarName, os.path.join(self.test.getDirectory(temporary=0), "Diagnostics"))
-            outVarName = self.diagDict["write_directory_variable"]
+            outVarName = self.diagDict.get("write_directory_variable")
             self.addDiagVariable(outVarName, os.path.join(self.test.getDirectory(temporary=1), "Diagnostics"))
+            self.test.readSubDirectory("Diagnostics")
     def addDiagVariable(self, entryName, entry):
         # Diagnostics are usually controlled from the environment, but in Java they have to work with properties...
         if self.diagDict.has_key("properties_file"):
@@ -463,7 +465,7 @@ class TestEnvironmentCreator:
             if not self.test.properties.has_key(propFile):
                 self.test.properties.addEntry(propFile, {}, insert=1)
             self.test.properties.addEntry(entryName, entry.replace(os.sep, "/"), sectionName = propFile, insert=1)
-        else:
+        elif entryName:
             self.test.setEnvironment(entryName, entry)
     def setUseCaseEnvironment(self):
         # Here we assume the application uses either PyUseCase or JUseCase
@@ -522,19 +524,17 @@ class TestEnvironmentCreator:
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
-        fullPathToMake = os.path.join(test.writeDirectory, "framework_tmp")
-        plugins.ensureDirectoryExists(fullPathToMake)
-        os.chdir(test.writeDirectory)
+        test.makeWriteDirectories()
+        test.grabWorkingDirectory()
     def __repr__(self):
         return "Make write directory for"
     def setUpApplication(self, app):
         app.makeWriteDirectory()
 
 class PrepareWriteDirectory(plugins.Action):
-    def __init__(self, ignoreCatalogues, useDiagnostics):
+    def __init__(self, ignoreCatalogues):
         self.diag = plugins.getDiagnostics("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
-        self.useDiagnostics = useDiagnostics
         if self.ignoreCatalogues:
             self.diag.info("Ignoring all information in catalogue files")
     def __repr__(self):
@@ -544,8 +544,6 @@ class PrepareWriteDirectory(plugins.Action):
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
         self.collatePaths(test, "link_test_path", self.linkTestPath)
         self.createPropertiesFiles(test)
-        if self.useDiagnostics:
-            plugins.ensureDirectoryExists(os.path.join(test.writeDirectory, "Diagnostics"))
     def collatePaths(self, test, configListName, collateMethod):
         for configName in test.getConfigValue(configListName, expandVars=False):
             self.collatePath(test, configName, collateMethod)
@@ -576,7 +574,7 @@ class PrepareWriteDirectory(plugins.Action):
     def getTargetPath(self, test, configName):
         # handle environment variables
         localName = os.path.basename(self.getPathFromEnvironment(configName))
-        return os.path.join(test.writeDirectory, localName)
+        return test.makeTmpFileName(localName, forComparison=0)
     def getSourcePath(self, test, configName):
         # These can refer to environment variables or to paths within the test structure
         if configName.startswith("$"):
@@ -666,7 +664,7 @@ class PrepareWriteDirectory(plugins.Action):
             # Link everywhere new files appear from the write directory for ease of collection
             for writeDir in writeDirs:
                 self.diag.info("Creating bypass link to " + writeDir)
-                linkTarget = os.path.join(test.writeDirectory, os.path.basename(writeDir))
+                linkTarget = test.makeTmpFileName(os.path.basename(writeDir), forComparison=0)
                 if linkTarget != writeDir and not os.path.exists(linkTarget):
                     # Don't link locally - and it's possible to have the same name twice under different paths
                     os.symlink(writeDir, linkTarget)
@@ -740,7 +738,7 @@ class PrepareWriteDirectory(plugins.Action):
         return fileName, indent
     def createPropertiesFiles(self, test):
         for var, value in test.properties.items():
-            propFileName = os.path.join(test.writeDirectory, var + ".properties")
+            propFileName = test.makeTmpFileName(var + ".properties", forComparison=0)
             self.diag.info("Writing " + propFileName + " for " + var + " : " + repr(value))
             file = open(propFileName, "w")
             for subVar, subValue in value.items():
@@ -811,7 +809,7 @@ class CollateFiles(plugins.Action):
         self.diag.info("Found files: " + repr(fileList))
 
         # generate a list of filenames for generated files
-        os.chdir(test.writeDirectory)
+        test.grabWorkingDirectory()
         self.diag.info("Adding files for source pattern " + sourcePattern)
         sourceFiles = glob.glob(sourcePattern)
         self.diag.info("Found files : " + repr(sourceFiles))
@@ -837,7 +835,7 @@ class CollateFiles(plugins.Action):
                 self.transformToText(targetFile, test)
     def findPath(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
-        pattern = os.path.join(test.writeDirectory, sourcePattern)
+        pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
         paths = glob.glob(pattern)
         for path in paths:
             if os.path.isfile(path):
@@ -962,7 +960,7 @@ class RunTest(plugins.Action):
         return "Running"
     def __call__(self, test, inChild=0):
         # Change to the directory so any incidental files can be found easily
-        os.chdir(test.writeDirectory)
+        test.grabWorkingDirectory()
         return self.runTest(test, inChild)
     def getExecutionMachines(self, test):
         return [ gethostname() ]
@@ -1106,7 +1104,7 @@ class CreateCatalogue(plugins.Action):
     def createCatalogueChangeFile(self, test):
         oldPaths = self.catalogues[test]
         newPaths = self.findAllPaths(test)
-        pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, test.writeDirectory)
+        pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, test.getDirectory(temporary=1))
         processesGained = self.findProcessesGained(test)
         fileName = test.makeTmpFileName("catalogue")
         file = open(fileName, "w")
@@ -1165,31 +1163,32 @@ class CreateCatalogue(plugins.Action):
         return processes
     def findAllPaths(self, test):
         allPaths = seqdict()
-        if os.path.isdir(test.writeDirectory):
-            # Don't list the framework's own temporary files
-            pathsToIgnore = [ "framework_tmp", "file_edits", "Diagnostics" ]
-            self.listDirectory(test.app, test.writeDirectory, allPaths, pathsToIgnore)
+        subDirs = []
+        for path in test.listUnownedTmpPaths():
+            self.categorisePath(path, allPaths, subDirs)
+        for subDir in subDirs:
+            self.listDirectory(subDir, allPaths)
         return allPaths
-    def listDirectory(self, app, dir, allPaths, pathsToIgnore=[]):
+    def categorisePath(self, path, allPaths, subDirs):
         # Never list special directories (CVS is the one we know about...)
-        pathsToIgnore.append("CVS")
+        if os.path.basename(path) == "CVS":
+            return 
+        editInfo = self.getEditInfo(path)
+        self.diag.info("Path " + path + " edit info " + str(editInfo))
+        allPaths[path] = editInfo
+        # important not to follow soft links in catalogues...
+        if os.path.isdir(path) and not os.path.islink(path):
+            subDirs.append(path)
+    def listDirectory(self, dir, allPaths):
         subDirs = []
         availPaths = os.listdir(dir)
         availPaths.sort()
         for writeFile in availPaths:
-            if writeFile in pathsToIgnore:
-                continue
             fullPath = os.path.join(dir, writeFile)
-            # important not to follow soft links in catalogues...
-            if os.path.isdir(fullPath) and not os.path.islink(fullPath):
-                subDirs.append(fullPath)
-            if not app.ownsFile(writeFile, unknown=0):
-                editInfo = self.getEditInfo(fullPath)
-                self.diag.info("Path " + fullPath + " edit info " + str(editInfo))
-                allPaths[fullPath] = editInfo
+            self.categorisePath(fullPath, allPaths, subDirs)
                 
         for subDir in subDirs:
-            self.listDirectory(app, subDir, allPaths)
+            self.listDirectory(subDir, allPaths)
     def getEditInfo(self, fullPath):
         # Check modified times for files and directories, targets for links
         if os.path.islink(fullPath):
@@ -1277,14 +1276,14 @@ class ReconnectTest(plugins.Action):
         if self.fullRecalculate:
             self.copyFiles(reconnLocation, test)
         else:
-            test.writeDirectory = reconnLocation
+            test.setWriteDirectory(reconnLocation)
     def copyFiles(self, reconnLocation, test):
         if not self.canReconnectTo(reconnLocation):
             return
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
             if os.path.isfile(fullPath):
-                shutil.copyfile(fullPath, os.path.join(test.writeDirectory, file))
+                shutil.copyfile(fullPath, test.makeTmpFileName(file, forComparison=0))
         testStateFile = os.path.join(reconnLocation, "framework_tmp", "teststate")
         if os.path.isfile(testStateFile):
             shutil.copyfile(testStateFile, test.getStateFile())
@@ -1384,7 +1383,7 @@ class UNIXPerformanceInfoFinder:
         self.includeSystemTime = 0
     def findTimesUsedBy(self, test):
         # Read the UNIX performance file, allowing us to discount system time.
-        tmpFile = test.makeTmpFileName("unixperf", forComparison=0)
+        tmpFile = test.makeTmpFileName("unixperf", forFramework=1)
         self.diag.info("Reading performance file " + tmpFile)
         if not os.path.isfile(tmpFile):
             return None, None
@@ -1565,9 +1564,12 @@ class ExtractStandardPerformance(ExtractPerformanceFiles):
         self.describe(test)
         ExtractPerformanceFiles.__call__(self, test)
     def findLogFiles(self, test, stem):
-        return test.getFileNamesMatching(stem)
+        if glob.has_magic(stem):
+            return test.getFileNamesMatching(stem)
+        else:
+            return [ test.getFileName(stem) ]
     def getFileToWrite(self, test, stem):
-        names = test.getVersionExtendedNames(stem)
+        names = test.app.getVersionExtendedNames(stem)
         return os.path.join(test.getDirectory(), names[0])
     def allMachinesTestPerformance(self, test, fileStem):
         # Assume this is OK: the current host is in any case utterly irrelevant

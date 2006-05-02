@@ -101,7 +101,7 @@ class MatadorConfig(optimization.OptimizationConfig):
         if not fileName:
             return
         for line in open(fileName).xreadlines():
-            words = line.split()
+            words = line.split(" ")
             if len(words) < 2:
                 continue
             if words[0].endswith(paramName):

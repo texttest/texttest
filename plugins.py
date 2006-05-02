@@ -234,6 +234,16 @@ def abspath(relpath):
     else:
         return os.path.abspath(relpath)
 
+def relpath(fullpath, parentdir):
+    relPath = fullpath.replace(parentdir, "")
+    if relPath == fullpath:
+        # unrelated
+        return None
+    if relPath.startswith(os.sep):
+        return relPath[1:]
+    else:
+        return relPath
+
 def nullRedirect():
     if os.name == "posix":  
         return " > /dev/null 2>&1"

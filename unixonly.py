@@ -18,9 +18,9 @@ class RunTest(default.RunTest):
         testCommand = default.RunTest.getExecuteCommand(self, test)
 
         # put the command in a file to avoid quoting problems,
-        cmdFile = test.makeTmpFileName("cmd", forComparison=0)
+        cmdFile = test.makeTmpFileName("cmd", forFramework=1)
         self.buildCommandFile(test, cmdFile, testCommand)
-        unixPerfFile = test.makeTmpFileName("unixperf", forComparison=0)
+        unixPerfFile = test.makeTmpFileName("unixperf", forFramework=1)
         timedTestCommand = '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
         return timedTestCommand
     def buildCommandFile(self, test, cmdFile, testCommand):

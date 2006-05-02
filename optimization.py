@@ -190,8 +190,8 @@ class OptimizationConfig(ravebased.Config):
     def defaultBuildRules(self):
         # Assume we always want to build at least some rules, by default...
         return 1
-    def getWriteDirectoryPreparer(self, ignoreCatalogues, useDiagnostics):
-        return PrepareCarmdataWriteDir(ignoreCatalogues, useDiagnostics, self._getSubPlanDirName)
+    def getWriteDirectoryPreparer(self, ignoreCatalogues):
+        return PrepareCarmdataWriteDir(ignoreCatalogues, self._getSubPlanDirName)
     def filesFromSubplan(self, test, subplanDir):
         rulesFile = os.path.join(subplanDir, "APC_FILES", "rules")
         if not os.path.isfile(rulesFile):
@@ -221,8 +221,8 @@ class OptimizationConfig(ravebased.Config):
 # Insert the contents of all raveparameters into the temporary rules file
 # Also assume the subplan will be changed, but nothing else.
 class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
-    def __init__(self, ignoreCatalogues, useDiagnostics, subplanFunction):
-        ravebased.PrepareCarmdataWriteDir.__init__(self, ignoreCatalogues, useDiagnostics)
+    def __init__(self, ignoreCatalogues, subplanFunction):
+        ravebased.PrepareCarmdataWriteDir.__init__(self, ignoreCatalogues)
         self.subplanFunction = subplanFunction
         self.raveParameters = []
     def setUpSuite(self, suite):
@@ -1103,9 +1103,10 @@ class PlotSubplans(plugins.Action):
                 if re.findall(regexp, file):
                     subplan = os.path.join(dirName, file)
                     testName = file
-                    testPath = os.path.join("dummyUser", testName)
-                    os.makedirs(testPath)
-                    newTest = testmodel.TestCase(testName, testmodel.DirectoryCache(testPath), \
+                    testTmpPath = os.path.join("dummyUser", testName)
+                    os.makedirs(testTmpPath)
+                    testFullPath = os.path.join(app.getDirectory(), testTmpPath)
+                    newTest = testmodel.TestCase(testName, testmodel.DirectoryCache(testFullPath), \
                                                  app, parent=None)
                     logFilePath = os.path.join(subplan, "APC_FILES", app.getConfigValue("log_file"))
                     testGraph.createPlotLines(str(version), logFilePath, newTest, None)
@@ -1625,7 +1626,7 @@ class PlotLine:
         if scaling:
             timeScaleFactor *= scaling
         self.axisYLabel = item
-        self.plotFileName = test.makeTmpFileName(self.getPlotFileName(lineName, str(item)), forComparison=0)
+        self.plotFileName = test.makeTmpFileName(self.getPlotFileName(lineName, str(item)), forFramework=1)
         self.createGraph(optRun, xItem, item, plotAgainstSolution, timeScaleFactor)
     def getYAxisLabel(self):
         return self.axisYLabel

@@ -200,6 +200,8 @@ class ActionRunner:
         self.diag = plugins.getDiagnostics("Action Runner")
     def addTestActions(self, testSuite, actionSequence):
         self.diag.info("Processing test suite of size " + str(testSuite.size()) + " for app " + testSuite.app.name)
+        for action in actionSequence:
+            self.diag.info("Action sequence contains : " + str(action))
         appRunner = ApplicationRunner(testSuite, actionSequence, self.diag)
         self.appRunners.append(appRunner)
         for test in testSuite.testCaseList():
@@ -343,7 +345,7 @@ class TextTest:
         selectedAppDict = self.inputOptions.findSelectedAppNames()
         self.diag.info("Selecting apps in " + dirName + " according to dictionary :" + repr(selectedAppDict))
         dircache = testmodel.DirectoryCache(dirName)
-        for f in dircache.findExtensionFiles("config."):
+        for f in dircache.findAllFiles("config"):
             components = os.path.basename(f).split('.')
             if len(components) != 2:
                 continue
@@ -368,13 +370,7 @@ class TextTest:
         appList = []
         app = self.createApplication(appName, dircache, version)
         appList.append(app)
-        if not app.configObject.useExtraVersions():
-            return appList
-        extraVersions = app.getConfigValue("extra_version")
-        for appVersion in app.versions:
-            if appVersion in extraVersions:
-                return appList
-        for extraVersion in extraVersions:
+        for extraVersion in app.getExtraVersions():
             aggVersion = extraVersion
             if len(version) > 0:
                 aggVersion = version + "." + extraVersion

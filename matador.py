@@ -87,16 +87,16 @@ class MatadorConfig(optimization.OptimizationConfig):
             return [ ("Script", self.getScriptPath(scriptFile)) ]
         else:
             return []
-    def getRuleSetting(self, test, paramName, rulesFile=None):
+    def getRuleSetting(self, test, paramName):
         raveParamName = "raveparameters." + test.app.name + test.app.versionSuffix()
         raveParamFile = test.makePathName(raveParamName)
         setting = self.getRuleSettingFromFile(raveParamFile, paramName)
         if setting:
             return setting
         else:
-            if not rulesFile:
-                rulesFile = os.path.join(self._getSubPlanDirName(test), "APC_FILES", "rules")
-            return self.getRuleSettingFromFile(rulesFile, paramName)
+            rulesFile = os.path.join(self._getSubPlanDirName(test), "APC_FILES", "rules")
+            if os.path.isfile(rulesFile):
+                return self.getRuleSettingFromFile(rulesFile, paramName)
     def getRuleSettingFromFile(self, fileName, paramName):
         if not fileName:
             return

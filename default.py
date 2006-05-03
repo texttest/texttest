@@ -796,11 +796,11 @@ class CollateFiles(plugins.Action):
 	    # add each file to newColl using suffix from sourcePtn
 	    for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
 		fullStem = os.path.splitext(aFile)[0]
-                newTargetStem = os.path.basename(fullStem)
+                newTargetStem = os.path.basename(fullStem).replace(".", "_")
 	    	if not newTargetStem in newColl:
 		    sourceExt = os.path.splitext(sourcePattern)[1]
+                    self.diag.info("New collation to " + newTargetStem + " : from " + fullStem + " with extension " + sourceExt)
 		    newColl[newTargetStem] = fullStem + sourceExt
-	self.diag.info("coll final:", str(newColl))
 	return newColl
     def getFilesFromExpansions(self, test, targetStem, sourcePattern):
         # generate a list of filenames from previously saved files

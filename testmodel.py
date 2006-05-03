@@ -810,6 +810,7 @@ class Application:
         self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
         self.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
         self.setConfigDefault("window_size", { "" : [] }, "To set the initial size of the dynamic/static GUI.")
+        self.setConfigDefault("version_priority", { "default": 99 }) 
         self.setConfigDefault("test_progress", { "" : [] }, "Options for showing/customizing test progress report.")
         self.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         self.setConfigDefault("definition_file_stems", [ "environment", "testsuite" ], \
@@ -943,9 +944,21 @@ class Application:
     def getFileExtensions(self):
         return [ self.name ] + self.getConfigValue("base_version") + self.versions
     def compareVersionLists(self, vlist1, vlist2):
+        priority1 = self.getVersionListPriority(vlist1)
+        priority2 = self.getVersionListPriority(vlist2)
+        if priority1 != priority2:
+            # Low number implies higher priority...
+            return cmp(priority2, priority1)
         versionCount1 = len(vlist1)
         versionCount2 = len(vlist2)
         return cmp(versionCount1, versionCount2)
+    def getVersionListPriority(self, vlist):
+        if len(vlist) == 0:
+            return 99
+        else:
+            return min(map(self.getVersionPriority, vlist))
+    def getVersionPriority(self, version):
+        return self.getCompositeConfigValue("version_priority", version)
     def getVersionExtendedNames(self, stem=""):
         versionsToUse = self.getFileExtensions()
         permutedList = self._getVersionExtensions(versionsToUse)
@@ -1218,7 +1231,7 @@ class MultiEntryDictionary(seqdict):
         return self
     def addLine(self, line, insert, errorOnUnknown, separator = ':'):
         entryName, entry = line.split(separator, 1)
-        self.addEntry(entryName, entry, "", insert, errorOnUnknown)
+        self.addEntry(os.path.expandvars(entryName), entry, "", insert, errorOnUnknown)
     def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
         if sectionName:
             self.currDict = self[sectionName]

@@ -1335,8 +1335,10 @@ class ReconnectTest(plugins.Action):
 
         versions = app.getVersionExtendedNames()
         for versionSuffix in versions:
+            self.diag.info("Considering directories with suffix " + versionSuffix)
             reconnDir = self.findReconnDirWithVersion(fetchDir, versionSuffix + userToFind, app.writeDirectory)
             if reconnDir:
+                self.diag.info("Using " + reconnDir)
                 return reconnDir
     def findReconnDirWithVersion(self, fetchDir, pattern, toIgnore):
         fileList = os.listdir(fetchDir)

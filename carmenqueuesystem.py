@@ -48,11 +48,14 @@ def getArchitecture(app):
             return version
     return app.getConfigValue("default_architecture")
 
-def getMajorReleaseId(app):
+def getMajorReleaseVersion(app):
     for version in app.versions:
         if version in majorReleases:
-            return fullVersionName(version)
-    return fullVersionName(app.getConfigValue("default_major_release"))
+            return version
+    return app.getConfigValue("default_major_release")
+
+def getMajorReleaseId(app):
+    return fullVersionName(getMajorReleaseVersion(app))
 
 def fullVersionName(version):
     if version == "master":
@@ -237,17 +240,22 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("default_major_release", "master")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10)
         app.setConfigDefault("maximum_cputime_for_chunking", 0.0)
+        for var, value in self.getCarmenEnvironment(app):
+            os.environ[var] = value
     def defaultLoginShell(self):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"
     def setEnvironment(self, test):
         queuesystem.QueueSystemConfig.setEnvironment(self, test)
         if test.parent is None:
-            test.setEnvironment("ARCHITECTURE", getArchitecture(test.app))
-            test.setEnvironment("MAJOR_RELEASE_ID", getMajorReleaseId(test.app))
-            versions = test.app.versions
-            if "sparc_64" in versions or "x86_64_linux" in versions:
-                test.setEnvironment("BITMODE", "64")
+            for var, value in self.getCarmenEnvironment(test.app):
+                test.setEnvironment(var, value)
+    def getCarmenEnvironment(self, app):
+        envVars = [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_VERSION", getMajorReleaseVersion(app)), \
+                  ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]
+        if "sparc_64" in app.versions or "x86_64_linux" in app.versions:
+            envVars.append(("BITMODE", "64"))
+        return envVars
     
 class RunWithParallelAction(plugins.Action):
     def __init__(self, baseRunner, isExecutable):

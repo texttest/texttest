@@ -302,19 +302,19 @@ class ViewFile(InteractiveTestAction):
         else:
             return comparison.stdCmpFile
     def followFile(self, fileName):
-        baseName = os.path.basename(fileName)
-        title = self.test.name + " (" + baseName + ")"
         followProgram = self.test.app.getConfigValue("follow_program")
         if not plugins.canExecute(followProgram.split()[0]):
             raise plugins.TextTestError, "Cannot find file-following program '" + followProgram + \
                   "'\nPlease install it somewhere on your PATH or point the follow_program setting at a different tool"
+        guilog.info("Following file " + fileName + " using '" + followProgram + "'")
         description = followProgram + " " + self.getRelativeFilename(fileName)
-        guilog.info("Following file " + title + " using '" + followProgram + "'")
+        baseName = os.path.basename(fileName)
+        title = self.test.name + " (" + baseName + ")"
         process = self.startExternalProgram(followProgram + " " + fileName, description=description, shellTitle=title)
         scriptEngine.monitorProcess("follows progress of test files", process)
     def view(self, comparison, fileName):
         if self.optionGroup.getSwitchValue("f"):
-            return self.followFile(fileName)
+            return self.followFile(comparison.tmpFile)
         if not comparison:
             baseName = os.path.basename(fileName)
             refresh = int(baseName.startswith("testsuite.") or baseName.startswith("options."))

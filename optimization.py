@@ -336,8 +336,9 @@ class OptimizationTestComparison(performance.PerformanceTestComparison):
             return category, details.replace("solution different", changeDesc)
         except:
             return category, details
-    def getOptionalStems(self, test):
-        return performance.PerformanceTestComparison.getOptionalStems(self, test) + [ "error" ]
+    def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress):
+        if stem != "error" or tmpFile:
+            return performance.PerformanceTestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)
     def getCost(self, file):
         if not os.path.isfile(file):
             raise plugins.TextTestError, "File has been deleted in the meantime..."

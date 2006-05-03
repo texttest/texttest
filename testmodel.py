@@ -951,7 +951,19 @@ class Application:
             return cmp(priority2, priority1)
         versionCount1 = len(vlist1)
         versionCount2 = len(vlist2)
-        return cmp(versionCount1, versionCount2)
+        if versionCount1 != versionCount2:
+            # More versions implies higher priority
+            return cmp(versionCount1, versionCount2)
+        baseCount1 = self.getBaseVersionCount(vlist1)
+        baseCount2 = self.getBaseVersionCount(vlist2)
+        # Less base versions implies higher priority
+        return cmp(baseCount2, baseCount1)
+    def getBaseVersionCount(self, vlist):
+        count = 0
+        for ver in self.getConfigValue("base_version"):
+            if ver in vlist:
+                count += 1
+        return count
     def getVersionListPriority(self, vlist):
         if len(vlist) == 0:
             return 99

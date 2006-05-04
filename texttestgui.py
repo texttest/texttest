@@ -388,15 +388,23 @@ class TextTestGUI(ThreadedResponder):
         # May have already closed down or not started yet, don't crash if so
         if not self.selection or not self.selection.get_tree_view():
             return
-        if test.classId() == "test-case":            
-            # Working around python bug 853411: main thread must do all forking
-            if state:
-                state.notifyInMainThread()
-                self.redrawTest(test, state)
-            else:
-                self.redrawTest(test, test.state)
+
+        self.notifyTreeView(test, state)
+        self.notifyTestView(test)
+    def notifyTreeView(self, test, state):
+        if test.classId() == "test-suite":
+            return self.redrawSuite(test)
+
+        if not self.dynamic:
+            # In the static GUI there is nothing to update in the tree view window for test cases
+            return
+        # Working around python bug 853411: main thread must do all forking
+        if state:
+            state.notifyInMainThread()
+            self.redrawTest(test, state)
         else:
-            self.redrawSuite(test)
+            self.redrawTest(test, test.state)
+    def notifyTestView(self, test):
         if self.rightWindowGUI and self.rightWindowGUI.object is test:
             self.recreateTestView(test)
     # We assume that test-cases have changed state, while test suites have changed contents

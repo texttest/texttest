@@ -727,10 +727,12 @@ class RunTests(SelectionAction):
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
         commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
-        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,), description = description)
+        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,selTestCases), description = description)
     def isTestCase(self, test):
         return isinstance(test, TestCase)
-    def checkTestRun(self, errFile):
+    def checkTestRun(self, errFile, selTestCases):
+        for test in selTestCases:
+            test.filesChanged()
         scriptEngine.applicationEvent("dynamic GUI to be closed")
         if os.path.isfile(errFile):
             errText = open(errFile).read()

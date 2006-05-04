@@ -125,16 +125,6 @@ class PerformanceFileComparison(comparetest.FileComparison):
         longEnough = self.newPerformance > self.getConfigSetting(app, configDescriptor, "performance_test_minimum")
         varianceEnough = self.percentageChange > self.getConfigSetting(app, configDescriptor, "performance_variation_%")
         return longEnough and varianceEnough
-    def checkExternalExcuses(self, app):
-        if self.getType() != "slower":
-            return 0
-        for line in open(self.tmpCmpFile).xreadlines():
-            if line.find("SLOWING DOWN") != -1:
-                if self.percentageChange <= float(app.getConfigValue("cputime_slowdown_variation_%")):
-                    # We mark it as OK now...
-                    self.differenceId = 0
-                    return 1
-        return 0
     def calculatePercentageIncrease(self):
         largest = max(self.oldPerformance, self.newPerformance)
         smallest = min(self.oldPerformance, self.newPerformance)

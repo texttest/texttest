@@ -357,7 +357,6 @@ class Config(plugins.Configuration):
         app.setConfigDefault("internal_compulsory_text", [], "List of text to be considered as an internal error, if not present")
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
-        app.setConfigDefault("cputime_slowdown_variation_%", 30, "CPU time tolerance allowed when interference detected")
         app.setConfigDefault("performance_logfile", { "default" : [] }, "Which result file to collect performance data from")
         app.setConfigDefault("performance_logfile_extractor", {}, "What string to look for when collecting performance data")
         app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \

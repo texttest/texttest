@@ -167,19 +167,12 @@ class TestComparison(plugins.TestState):
             comparison = self.createFileComparison(test, tmpStem, stdFile, tmpFile, testInProgress)
             if comparison:
                 self.addComparison(comparison)
-                self.handleSingleDiffWithExcuse(test)
         if not testInProgress: # not interested in missing files here
             for stdStem, stdFile in stdFiles.items():
                 if not tmpFiles.has_key(stdStem) and not stdFile in defFiles:
                     comparison = self.createFileComparison(test, stdStem, stdFile, None, testInProgress)
                     if comparison:
                         self.addComparison(comparison)
-    def handleSingleDiffWithExcuse(self, test):
-        if len(self.changedResults) == 1 and self.changedResults[0].checkExternalExcuses(test.app):
-            # If the only difference has an excuse, remove it...
-            fileComparison = self.changedResults[0]
-            del self.changedResults[0]
-            self.correctResults.append(fileComparison)
     def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress = 0):
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress)
     def saveSingle(self, stem, saveDir, exact = 1, versionString = ""):
@@ -316,9 +309,6 @@ class FileComparison:
                 self.severity = failureSeverityDict[key]
     def __repr__(self):
         return self.stem
-    def checkExternalExcuses(self, app):
-        # No excuses here...
-        return 0
     def modifiedDates(self):
         files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
         return string.join(map(self.modifiedDate, files), " : ")

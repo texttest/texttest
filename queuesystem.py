@@ -138,7 +138,7 @@ class QueueSystemConfig(default.Config):
         return SubmissionRules(self.optionMap, test)
     def getPerformanceFileMaker(self):
         if self.slaveRun():
-            return MakePerformanceFile(self.getMachineInfoFinder(), self.isSlowdownJob)
+            return MakePerformanceFile(self.getMachineInfoFinder())
         else:
             return default.Config.getPerformanceFileMaker(self)
     def getMachineInfoFinder(self):
@@ -149,8 +149,6 @@ class QueueSystemConfig(default.Config):
     def defaultLoginShell(self):
         # For UNIX
         return "sh"
-    def isSlowdownJob(self, jobUser, jobName):
-        return 0
     def printHelpDescription(self):
         print """The queuesystem configuration is a published configuration, 
                documented online at http://www.texttest.org/TextTest/docs/queuesystem"""
@@ -556,9 +554,6 @@ class MachineInfoFinder(default.MachineInfoFinder):
         self.queueMachineInfo = _MachineInfo()
 
 class MakePerformanceFile(default.MakePerformanceFile):
-    def __init__(self, machineInfoFinder, isSlowdownJob):
-        default.MakePerformanceFile.__init__(self, machineInfoFinder)
-        self.isSlowdownJob = isSlowdownJob
     def writeMachineInformation(self, file, test):
         # Try and write some information about what's happening on the machine
         for machine in test.state.executionHosts:
@@ -572,15 +567,11 @@ class MakePerformanceFile(default.MakePerformanceFile):
             return self._findRunningJobs(machine)
     def _findRunningJobs(self, machine):
         # On a multi-processor machine performance can be affected by jobs on other processors,
-        # as for example a process can hog the memory bus. Allow subclasses to define how to
-        # stop these "slowdown jobs" to avoid false performance failures. Even if they aren't defined
-        # as such, print them anyway so the user can judge for himself...
+        # as for example a process can hog the memory bus. Describe these so the user can judge
+        # for himself if performance is likely to be affected...
         jobsFromQueue = self.machineInfoFinder.queueMachineInfo.findRunningJobs(machine)
         jobs = []
         for user, jobName in jobsFromQueue:
-            descriptor = "Also on "
-            if self.isSlowdownJob(user, jobName):
-                descriptor = "Suspected of SLOWING DOWN "
-            jobs.append(descriptor + machine + " : " + user + "'s job '" + jobName + "'")
+            jobs.append("Also on " + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
         

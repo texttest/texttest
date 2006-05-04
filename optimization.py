@@ -1832,6 +1832,9 @@ class SelectorWeekend(testoverview.Selector):
         return "Weekend"
     
 class StartStudio(guiplugins.InteractiveTestAction):
+    def __init__(self, test, oldOptionGroup):
+        guiplugins.InteractiveTestAction.__init__(self, test, "Studio")
+        self.addOption(oldOptionGroup, "sys", "Studio CARMSYS to use", test.getEnvironment("CARMSYS"))
     def __repr__(self):
         return "Studio"
     def getTitle(self):
@@ -1842,6 +1845,7 @@ class StartStudio(guiplugins.InteractiveTestAction):
         return not dynamic
     def __call__(self, test):
         test.setUpEnvironment(parents=1)
+        os.environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
         print "CARMSYS:", os.environ["CARMSYS"]
         print "CARMUSR:", os.environ["CARMUSR"]
         print "CARMTMP:", os.environ["CARMTMP"]

@@ -179,7 +179,7 @@ class SubmissionRules:
         path = self.test.getRelPath()
         parts = path.split("/")
         parts.reverse()
-        return string.join(parts, ".") + "-Test-" + repr(self.test.app).replace(" ", "_") + self.test.app.versionSuffix()
+        return "Test-" + string.join(parts, ".") + "-" + repr(self.test.app).replace(" ", "_") + self.test.app.versionSuffix()
     def getSubmitSuffix(self, name):
         queue = self.findQueue()
         if queue:

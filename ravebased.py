@@ -105,7 +105,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName
-        basicName = self.getRuleSetName(self.test) + "." + self.getUserParentName(self.test) + "-Rules-" + getBasicRaveName(self.test)
+        basicName = "Rules-" + self.getRuleSetName(self.test) + "." + self.getUserParentName(self.test) + "-" + getBasicRaveName(self.test)
         if self.namesCreated.has_key(basicName):
             carmtmp = self.namesCreated[basicName]
             if carmtmp == os.environ["CARMTMP"]:

@@ -105,7 +105,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName
-        basicName = getBasicRaveName(self.test) + "." + self.getUserParentName(self.test) + "." + self.getRuleSetName(self.test)
+        basicName = self.getRuleSetName(self.test) + "." + self.getUserParentName(self.test) + "-Rules-" + getBasicRaveName(self.test)
         if self.namesCreated.has_key(basicName):
             carmtmp = self.namesCreated[basicName]
             if carmtmp == os.environ["CARMTMP"]:
@@ -313,15 +313,6 @@ class Config(CarmenConfig):
                             "carmusr_default", "crc", "modules", getBasicRaveName(test))
     def filesFromSubplan(self, test, subplanDir):
         return []
-    def isSlowdownJob(self, user, jobName):
-        # APC is observed to slow down the other job on its machine by up to 20%. Detect it
-        apcDevelopers = [ "curt", "lennart", "johani", "rastjo", "tomasg", "fredrik", "henrike" ]
-        if user in apcDevelopers:
-            return 1
-
-        # Detect TextTest APC jobs and XPRESS tests
-        parts = jobName.split(os.sep)
-        return parts[0].find("APC") != -1 or parts[0].find("MpsSolver") != -1
     def printHelpOptions(self):
         CarmenConfig.printHelpOptions(self)
         print helpOptions

@@ -178,8 +178,10 @@ class SubmissionRules:
         else:
             return "1"
     def getJobName(self):
-        jobName = repr(self.test.app).replace(" ", "_") + self.test.app.versionSuffix() + self.test.getRelPath()
-        return plugins.tmpString + plugins.startTimeString() + jobName
+        path = self.test.getRelPath()
+        parts = path.split("/")
+        parts.reverse()
+        return string.join(parts, ".") + "-Test-" + repr(self.test.app).replace(" ", "_") + self.test.app.versionSuffix()
     def getSubmitSuffix(self, name):
         queue = self.findQueue()
         if queue:

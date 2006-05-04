@@ -6,9 +6,7 @@ from time import sleep
 # Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem:
     def getSubmitCommand(self, submissionRules):
-        # Sungrid doesn't like : or / in job names
-        jobName = submissionRules.getJobName()
-        qsubArgs = "-N " + jobName.replace(":", "").replace("/", ".")
+        qsubArgs = "-N " + submissionRules.getJobName()
         if submissionRules.processesNeeded != "1":
             qsubArgs += " -pe " + submissionRules.getParallelEnvironment() + " " + \
                         submissionRules.processesNeeded

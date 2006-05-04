@@ -352,10 +352,12 @@ class FileComparison:
         else:
             return 0
     def updatePaths(self, oldAbsPath, newAbsPath):
-        self.stdFile = self.stdFile.replace(oldAbsPath, newAbsPath)
-        self.stdCmpFile = self.stdCmpFile.replace(oldAbsPath, newAbsPath)
-        self.tmpCmpFile = self.tmpCmpFile.replace(oldAbsPath, newAbsPath)
-        self.tmpFile = self.tmpFile.replace(oldAbsPath, newAbsPath)
+        if self.stdFile:
+            self.stdFile = self.stdFile.replace(oldAbsPath, newAbsPath)
+            self.stdCmpFile = self.stdCmpFile.replace(oldAbsPath, newAbsPath)
+        if self.tmpFile:
+            self.tmpCmpFile = self.tmpCmpFile.replace(oldAbsPath, newAbsPath)
+            self.tmpFile = self.tmpFile.replace(oldAbsPath, newAbsPath)
     def saveTmpFile(self, test, exact, versionString):
         self.stdFile = test.getSaveFileName(self.tmpFile, versionString)
         if os.path.isfile(self.stdFile):

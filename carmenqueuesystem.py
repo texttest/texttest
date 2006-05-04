@@ -57,6 +57,12 @@ def getMajorReleaseVersion(app):
 def getMajorReleaseId(app):
     return fullVersionName(getMajorReleaseVersion(app))
 
+def getBitMode(app):
+    if "sparc_64" in app.versions or "x86_64_linux" in app.versions:
+        return "64"
+    else:
+        return "32"
+
 def fullVersionName(version):
     if version == "master":
         return version
@@ -251,11 +257,8 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             for var, value in self.getCarmenEnvironment(test.app):
                 test.setEnvironment(var, value)
     def getCarmenEnvironment(self, app):
-        envVars = [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_VERSION", getMajorReleaseVersion(app)), \
-                  ("MAJOR_RELEASE_ID", getMajorReleaseId(app)) ]
-        if "sparc_64" in app.versions or "x86_64_linux" in app.versions:
-            envVars.append(("BITMODE", "64"))
-        return envVars
+        return [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_VERSION", getMajorReleaseVersion(app)), \
+                 ("MAJOR_RELEASE_ID", getMajorReleaseId(app)), ("BITMODE", getBitMode(app)) ]
     
 class RunWithParallelAction(plugins.Action):
     def __init__(self, baseRunner, isExecutable):

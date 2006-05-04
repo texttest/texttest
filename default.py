@@ -126,23 +126,20 @@ class Config(plugins.Configuration):
         return files
     def getPossibleFilterFiles(self, app):
         filterFiles = []
-        for directory in app.getConfigValue("test_list_files_directory"):
-            fullPath = os.path.join(app.getDirectory(), directory)
-            if os.path.exists(fullPath):
-                filenames = os.listdir(fullPath)
-                filenames.sort()
-                for filename in filenames:
-                    if os.path.isfile(os.path.join(fullPath, filename)):
-                        filterFiles.append(filename)
+        for directory in self.getFilterDirs(app):
+            filenames = os.listdir(directory)
+            filenames.sort()
+            for filename in filenames:
+                if os.path.isfile(os.path.join(directory, filename)):
+                    filterFiles.append(filename)
         return filterFiles
     def makeFilterFileName(self, app, filename):
-        fileNames = app.getVersionExtendedNames(filename)
-        for directory in app.getConfigValue("test_list_files_directory"):
-            fullDir = os.path.join(app.getDirectory(), directory)
-            for fileName in fileNames:
-                fullPath = os.path.join(fullDir, fileName)
-                if os.path.isfile(fullPath):
-                    return fullPath
+        filterDirs = self.getFilterDirs(app)
+        return app.getFileName(filterDirs, filename)
+    def getFilterDirs(self, app):
+        rawDirs = app.getConfigValue("test_list_files_directory")
+        allDirs = map(lambda dir: os.path.join(app.getDirectory(), dir), rawDirs)
+        return filter(os.path.isdir, allDirs)
     def getFilterClasses(self):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  batch.BatchFilter, performance.TimeFilter ]
@@ -348,6 +345,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
+        app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
         app.setConfigDefault("collate_file", {}, "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("run_dependent_text", { "" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "" : [] }, "Mapping of patterns to extract and sort from result files")
@@ -1329,24 +1327,15 @@ class ReconnectTest(plugins.Action):
             raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + userToFind + " under " + fetchDir
     def findReconnDirectory(self, fetchDir, app, userToFind):
         self.diag.info("Looking for reconnection in " + fetchDir + " for " + userToFind)
-        if not os.path.isdir(fetchDir):
-            return None
-
-        versions = app.getVersionExtendedNames()
-        for versionSuffix in versions:
-            self.diag.info("Considering directories with suffix " + versionSuffix)
-            reconnDir = self.findReconnDirWithVersion(fetchDir, versionSuffix + userToFind, app.writeDirectory)
-            if reconnDir:
-                self.diag.info("Using " + reconnDir)
-                return reconnDir
-    def findReconnDirWithVersion(self, fetchDir, pattern, toIgnore):
-        fileList = os.listdir(fetchDir)
-        fileList.sort()
-        fileList.reverse()
-        for subDir in fileList:
-            fullPath = os.path.join(fetchDir, subDir)
-            if os.path.isdir(fullPath) and subDir.startswith(pattern) and not plugins.samefile(fullPath, toIgnore):
-                return fullPath
+        if os.path.isdir(fetchDir):
+            return app.getFileName([ fetchDir ], userToFind, self.getVersionList)
+    def getVersionList(self, fileName, userToFind):
+        # Show the framework how to find the version list given a file name
+        # If it doesn't match, return None
+        parts = fileName.split(userToFind)
+        if len(parts) < 2:
+            return
+        return parts[0].split(".")
     def setUpSuite(self, suite):
         self.describe(suite)
 
@@ -1571,8 +1560,8 @@ class ExtractStandardPerformance(ExtractPerformanceFiles):
         else:
             return [ test.getFileName(stem) ]
     def getFileToWrite(self, test, stem):
-        names = test.app.getVersionExtendedNames(stem)
-        return os.path.join(test.getDirectory(), names[0])
+        name = stem + "." + test.app.name + test.app.versionSuffix()
+        return os.path.join(test.getDirectory(), name)
     def allMachinesTestPerformance(self, test, fileStem):
         # Assume this is OK: the current host is in any case utterly irrelevant
         return 1

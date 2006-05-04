@@ -42,21 +42,32 @@ class DirectoryCache:
     def splitStem(self, fileName):
         parts = fileName.split(".")
         return parts[0], parts[1:]
-    def findVersionLists(self, stem):
+    def findVersionList(self, fileName, stem):
+        if fileName == stem:
+            return []
+        fileStem, versions = self.splitStem(fileName)
+        if stem == fileStem:
+            return versions
+    def findVersionListMethod(self, versionListMethod):
+        if versionListMethod:
+            return versionListMethod
+        else:
+            return self.findVersionList
+    def findVersionLists(self, stem, versionListMethod=None):
+        methodToUse = self.findVersionListMethod(versionListMethod)
         versionLists = []
+        versionInfo = {}
         for fileName in self.contents:
-            if fileName == stem:
-                versionLists.append([])
-                continue
-            fileStem, versions = self.splitStem(fileName)
-            if stem == fileStem:
+            versions = methodToUse(fileName, stem)
+            if not versions is None:
                 versionLists.append(versions)
-        return versionLists
-    def findAndSortFiles(self, stem, allowed, priorityFunction):
-        versionLists = self.findVersionLists(stem)
+                versionInfo[string.join(versions, ".")] = fileName
+        return versionLists, versionInfo
+    def findAndSortFiles(self, stem, allowed, priorityFunction, versionListMethod=None):
+        versionLists, versionInfo = self.findVersionLists(stem, versionListMethod)
         versionLists = filter(lambda vlist: self.allVersionsAllowed(vlist, allowed), versionLists)
         versionLists.sort(priorityFunction)
-        return map(lambda vlist: self.pathNameFromVersions(stem, vlist), versionLists)
+        return map(lambda vlist: self.pathName(versionInfo[string.join(vlist, ".")]), versionLists)
     def findAllStems(self):
         stems = []
         for file in self.contents:
@@ -65,10 +76,10 @@ class DirectoryCache:
                 stems.append(stem)
         return stems
     def findAllFiles(self, stem, compulsory = [], forbidden = []):
-        versionLists = self.findVersionLists(stem)
+        versionLists, versionInfo = self.findVersionLists(stem)
         if len(compulsory) or len(forbidden):
             versionLists = filter(lambda vlist: self.matchVersions(vlist, compulsory, forbidden), versionLists)
-        return map(lambda vlist: self.pathNameFromVersions(stem, vlist), versionLists)
+        return map(lambda vlist: self.pathName(versionInfo[string.join(vlist, ".")]), versionLists)
     def allVersionsAllowed(self, vlist, allowed):
         for version in vlist:
             if not version in allowed:
@@ -189,7 +200,7 @@ class Test:
         return stems
     def listStandardFiles(self, allVersions):
         resultFiles, defFiles = [],[]
-        allowedExtensions = self.getFileExtensions()
+        allowedExtensions = self.app.getFileExtensions()
         self.diagnose("Looking for all standard files")
         for stem in self.defFileStems():
             defFiles += self.listStdFilesWithStem(stem, allowedExtensions, allVersions)
@@ -224,12 +235,6 @@ class Test:
         self.notifyChanged()
     def refreshContents(self):
         pass
-    def getFileExtensions(self, refVersion = None):
-        if refVersion:
-            refApp = self.app.createCopy(refVersion)
-            return refApp.getFileExtensions()
-        else:
-            return self.app.getFileExtensions()
     def makeSubDirectory(self, name):
         subdir = self.dircaches[0].pathName(name)
         if os.path.isdir(subdir):
@@ -244,18 +249,14 @@ class Test:
         # Don't do this for test suites...
         pass
     def getFileNamesMatching(self, pattern):
-        allowedExtensions = self.getFileExtensions()
+        allowedExtensions = self.app.getFileExtensions()
         allFiles = []
         for dircache in self.dircaches:
             allFiles += dircache.findFilesMatching(pattern, allowedExtensions)
         return allFiles
     def getFileName(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
-        allowedExtensions = self.getFileExtensions(refVersion)
-        for dircache in self.dircaches:
-            allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.app.compareVersionLists)
-            if len(allFiles):
-                return allFiles[-1]
+        return self.app._getFileName(self.dircaches, stem, refVersion)
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars)
     def makePathName(self, fileName):
@@ -755,8 +756,21 @@ class Application:
         allowedExtensions = self.getFileExtensions()
         allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists)
         return multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
-    def createCopy(self, version):
-        return Application(self.name, self.dircache, version, self.inputOptions)
+    def getFileName(self, dirList, stem, versionListMethod=None):
+        dircaches = map(lambda dir: DirectoryCache(dir), dirList)
+        return self._getFileName(dircaches, stem, versionListMethod=versionListMethod)
+    def _getFileName(self, dircaches, stem, refVersion=None, versionListMethod=None):
+        allowedExtensions = self.getFileExtensionsForVersion(refVersion)
+        for dircache in dircaches:
+            allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists, versionListMethod)
+            if len(allFiles):
+                return allFiles[-1]
+    def getFileExtensionsForVersion(self, refVersion = None):
+        if refVersion:
+            refApp = Application(self.name, self.dircache, refVersion, self.inputOptions)
+            return refApp.getFileExtensions()
+        else:
+            return self.getFileExtensions()
     def setCheckoutVariable(self):
         os.environ["TEXTTEST_CHECKOUT"] = self.checkout
     def getPreviousWriteDirInfo(self, userName):
@@ -815,7 +829,6 @@ class Application:
         self.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         self.setConfigDefault("definition_file_stems", [ "environment", "testsuite" ], \
                               "files to be shown as definition files by the static GUI")
-        self.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
         self.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
         self.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
         self.setConfigDefault("diff_program", "tkdiff", "External program to use for graphical file comparison")
@@ -971,15 +984,6 @@ class Application:
             return min(map(self.getVersionPriority, vlist))
     def getVersionPriority(self, version):
         return self.getCompositeConfigValue("version_priority", version)
-    def getVersionExtendedNames(self, stem=""):
-        versionsToUse = self.getFileExtensions()
-        permutedList = self._getVersionExtensions(versionsToUse)
-        if stem:
-            names = map(lambda v: stem + "." + v, permutedList)
-            names.append(stem)
-            return names
-        else:
-            return permutedList
     def getSaveableVersions(self):
         versionsToUse = self.versions + self.getConfigValue("base_version")
         versionsToUse = self.filterUnsaveable(versionsToUse)

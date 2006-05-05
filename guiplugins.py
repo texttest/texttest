@@ -430,7 +430,7 @@ class RecordTest(InteractiveTestAction):
             test.app.makeWriteDirectory()
         logFile = self.getLogFile(test, usecase, "run")
         errFile = self.getLogFile(test, usecase)
-        commandLine +=  " > " + logFile + " 2> " + errFile
+        commandLine +=  " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
         process = self.startExtProgramNewUsecase(commandLine, usecase, \
                                                  exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase))
     def getLogFile(self, test, usecase, type="errors"):
@@ -730,7 +730,7 @@ class RunTests(SelectionAction):
         errFile = os.path.join(self.apps[0].writeDirectory, "dynamic_errors" + str(self.runNumber) + ".log")
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
-        commandLine = self.getTextTestName() + " " + ttOptions + " > " + logFile + " 2> " + errFile
+        commandLine = self.getTextTestName() + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
         self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,selTestCases), description = description)
     def isTestCase(self, test):
         return isinstance(test, TestCase)

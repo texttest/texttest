@@ -244,11 +244,18 @@ def relpath(fullpath, parentdir):
     else:
         return relPath
 
-def nullRedirect():
-    if os.name == "posix":  
-        return " > /dev/null 2>&1"
+def nullFileName():
+    if os.name == "posix":
+        return "/dev/null"
     else:
-        return " > nul 2> nul"
+        return "nul"
+
+def nullRedirect():
+    stdoutRedirect = " > " + nullFileName() 
+    if os.name == "posix":  
+        return stdoutRedirect + " 2>&1"
+    else:
+        return stdoutRedirect + " 2> nul"
 
 def canExecute(program):
     if os.name == "posix":

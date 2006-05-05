@@ -590,9 +590,13 @@ class SelectTests(SelectionAction):
             newTests = self.getTestsFromSuite(suite, filters, strategy, selected)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
-        commandLines = self.optionGroup.getCommandLines()
-        return selectedTests, string.join(commandLines)
+        if strategy == 0:
+            commandLines = self.optionGroup.getCommandLines()
+            return selectedTests, string.join(commandLines)
+        else:
+            return selectedTests, ""
     def getTestsFromSuite(self, suite, filters, strategy, selected):
+        # Strategies: 0 - discard, 1 - refine, 2 - extend, 3 - exclude
         # If we want to extend selection, we include test if it was previsouly selected,
         # even if it doesn't fit the current criterion
         if strategy == 2 and suite.classId() == "test-case" and selected.has_key(suite):

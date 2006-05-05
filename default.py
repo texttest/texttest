@@ -1241,18 +1241,18 @@ class CountTest(plugins.Action):
         self.appCount = {}
     def __del__(self):
         for app, count in self.appCount.items():
-            print "Application", app, "has", count, "tests"
+            print app, "has", count, "tests"
     def scriptDoc(self):
         return "report on the number of tests selected, by application"
     def __repr__(self):
         return "Counting"
     def __call__(self, test):
         self.describe(test)
-        self.appCount[repr(test.app)] += 1
+        self.appCount[test.app.description()] += 1
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
-        self.appCount[repr(app)] = 0
+        self.appCount[app.description()] = 0
 
 class ReconnectTest(plugins.Action):
     def __init__(self, fetchUser, fullRecalculate):

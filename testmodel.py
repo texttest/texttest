@@ -557,7 +557,8 @@ class TestSuite(Test):
         return testCaseList
     def createTest(self, testName, filters = [], forTestRuns=0):
         cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
-        if cache.exists("testsuite." + self.app.name):
+        allFiles = cache.findAllFiles("testsuite", compulsory = [ self.app.name ])
+        if len(allFiles) > 0:
             return self.createTestSuite(testName, cache, filters, forTestRuns)
         else:
             return self.createTestCase(testName, cache, filters)

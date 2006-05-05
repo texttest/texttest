@@ -412,7 +412,6 @@ class TextTest:
             
             appSuites[app] = testSuite
             uniqueNameFinder.addSuite(testSuite)
-            print "Using", app.description() + ", checkout", app.checkout
         return appSuites
     def deleteTempFiles(self, appSuites):
         for app, testSuite in appSuites.items():
@@ -428,6 +427,7 @@ class TextTest:
         for app, testSuite in appSuites.items():
             if testSuite.size() == 0:
                 continue
+            print "Using", app.description() + ", checkout", app.checkout
             try:
                 actionSequence = self.inputOptions.getActionSequence(app)
                 actionRunner.addTestActions(testSuite, actionSequence)

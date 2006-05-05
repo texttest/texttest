@@ -717,13 +717,13 @@ class Application:
         self.versions = version.split(".")
         if self.versions[0] == "":
             self.versions = []
+        self.diag = plugins.getDiagnostics("application")
         self.inputOptions = inputOptions
         self.configDir = MultiEntryDictionary()
         self.configDocs = {}
         self.setConfigDefaults()
         self.readValues(self.configDir, "config", self.dircache, insert=0)
         self.fullName = self.getConfigValue("full_name")
-        self.diag = plugins.getDiagnostics("application")
         self.diag.info("Found application " + repr(self))
         self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), inputOptions)
         self.cleanMode = self.configObject.getCleanMode()
@@ -756,6 +756,7 @@ class Application:
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):
         allowedExtensions = self.getFileExtensions()
         allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists)
+        self.diag.info("Reading values for " + stem + " from files : " + string.join(allFiles, "\n"))
         return multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
     def getFileName(self, dirList, stem, versionListMethod=None):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)

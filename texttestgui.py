@@ -615,20 +615,32 @@ class InteractiveActionGUI:
         vbox.show()
         vboxWindow.show()
         return vboxWindow, displayDesc
+    def createComboBox(self, option):
+        if "ComboBoxEntry" in dir(gtk):
+            # PyGTK 2.4 and above
+            combobox = gtk.combo_box_entry_new_text()
+            entry = combobox.child
+            option.setPossibleValuesAppendMethod(combobox.append_text)
+            return combobox, entry
+        else:
+            # PyGTK 2.0. Remove one day when we don't have to support RHEL3 any more.
+            combobox = gtk.Combo()
+            entry = combobox.entry
+            option.setPossibleValuesUpdateMethod(combobox.set_popdown_strings)
+            return combobox, entry
+    def createOptionWidget(self, option):
+        if len(option.possibleValues) > 1:
+            return self.createComboBox(option)
+        else:
+            entry = gtk.Entry()
+            return entry, entry
     def createOptionBox(self, option):
         hbox = gtk.HBox()
         label = gtk.Label(option.name + "  ")
         hbox.pack_start(label, expand=False, fill=True)
-        if len(option.possibleValues) > 1:
-            combobox = gtk.Combo()
-            entry = combobox.entry
-            option.setPossibleValuesUpdateMethod(combobox.set_popdown_strings)
-            hbox.pack_start(combobox, expand=True, fill=True)
-            combobox.show()
-        else:
-            entry = gtk.Entry()
-            entry.show()
-            hbox.pack_start(entry, expand=True, fill=True)
+        widget, entry = self.createOptionWidget(option)
+        hbox.pack_start(widget, expand=True, fill=True)
+        widget.show()
         entry.set_text(option.getValue())
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
         option.setMethods(entry.get_text, entry.set_text)

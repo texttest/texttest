@@ -37,10 +37,10 @@ class ProcessTerminationMonitor:
             if not process.hasTerminated():
                 for processToCheck in processesToCheck:
                     if plugins.isRegularExpression(processToCheck):
-                        if plugins.findRegularExpression(processToCheck, repr(process)):
+                        if plugins.findRegularExpression(processToCheck, process.description):
                             running.append("PID " + str(process.processId) + " : " + process.description)
                             break
-                    elif processToCheck.lower() == "all" or repr(process).find(processToCheck) != -1:
+                    elif processToCheck.lower() == "all" or process.description.find(processToCheck) != -1:
                             running.append("PID " + str(process.processId) + " : " + process.description)
                             break
 
@@ -49,7 +49,7 @@ class ProcessTerminationMonitor:
         # Don't leak processes
         for process in self.processes:
             if not process.hasTerminated():
-                guilog.info("Killing '" + repr(process) + "' interactive process")
+                guilog.info("Killing '" + process.description.split()[0] + "' interactive process")
                 process.killAll()
 
 processTerminationMonitor = ProcessTerminationMonitor()
@@ -169,7 +169,10 @@ class InteractiveTestAction(plugins.Action,InteractiveAction):
         if not plugins.canExecute(viewProgram):
             raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
                   "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
-        return viewProgram + " " + fileName + plugins.nullRedirect(), viewProgram
+        cmd = viewProgram + " " + fileName + plugins.nullRedirect()
+        if os.name == "posix":
+            cmd = "exec " + cmd # best to avoid shell messages etc.
+        return cmd, viewProgram
     def getRelativeFilename(self, filename):
         # Trim the absolute filename to be relative to the application home dir
         # (TEXTTEST_HOME is more difficult to obtain, see testmodel.OptionFinder.getDirectoryName)

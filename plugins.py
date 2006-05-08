@@ -738,12 +738,20 @@ class TextOption(Option):
         Option.__init__(self, name, value)
         self.possibleValues = possibleValues
         self.possValUpdateMethod = None
+        self.possValAppendMethod = None
     def setPossibleValuesUpdateMethod(self, method):
         self.possValUpdateMethod = method
         method(self.possibleValues)
+    def setPossibleValuesAppendMethod(self, method):
+        self.possValAppendMethod = method
+        for value in self.possibleValues:
+            method(value)
     def addPossibleValue(self, value):
         self.possibleValues.append(value)
-        self.possValUpdateMethod(self.possibleValues)
+        if self.possValUpdateMethod:
+            self.possValUpdateMethod(self.possibleValues)
+        else:
+            self.possValAppendMethod(value)
 
 class Switch(Option):
     def __init__(self, name, defaultValue, options):

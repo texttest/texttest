@@ -729,7 +729,7 @@ class Application:
         self.cleanMode = self.configObject.getCleanMode()
         self.rootTmpDir = self._getRootTmpDir()
         self.writeDirectory = self.configObject.getWriteDirectoryName(self)
-        self.diag.info("Locale is " + os.getenv("LANG") + ", write directory at " + self.writeDirectory)
+        self.diag.info("Write directory at " + self.writeDirectory)
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()

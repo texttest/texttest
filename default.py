@@ -116,7 +116,11 @@ class Config(plugins.Configuration):
         files = [ "output", "errors" ]
         if app.getConfigValue("create_catalogues") == "true":
             files.append("catalogue")
-        files += app.getConfigValue("collate_file").keys()
+        collateKeys = app.getConfigValue("collate_file").keys()
+        if "stacktrace" in collateKeys:
+            collateKeys.remove("stacktrace")
+        collateKeys.sort()
+        files += collateKeys
         files += app.getConfigValue("performance_logfile_extractor").keys()
         if len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0:
             files.append("performance")
@@ -223,12 +227,7 @@ class Config(plugins.Configuration):
     def getCatalogueCreator(self):
         return CreateCatalogue()
     def getTestCollator(self):
-        if os.name == "posix":
-            # Handle UNIX compression and collect core files
-            from unixonly import CollateFiles as UNIXCollateFiles
-            return UNIXCollateFiles(self.optionMap.has_key("keeptmp"))
-        else:
-            return CollateFiles()
+        return CollateFiles()
     def getPerformanceExtractor(self):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def getPerformanceFileMaker(self):
@@ -330,6 +329,16 @@ class Config(plugins.Configuration):
             return colourFinder.getDefaultDict()
         except:
             return {}
+    def getDefaultCollations(self):
+        if os.name == "posix":
+            return { "stacktrace" : "core*" }
+        else:
+            return {}
+    def getDefaultCollateScripts(self):
+        if os.name == "posix":
+            return { "stacktrace" : "interpretcore.py" }
+        else:
+            return {}
     def setApplicationDefaults(self, app):
         app.setConfigDefault("log_file", "output", "Result file to search, by default")
         app.setConfigDefault("failure_severity", self.defaultSeverities(), \
@@ -346,7 +355,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
-        app.setConfigDefault("collate_file", {}, "Mapping of result file names to paths to collect them from")
+        app.setConfigDefault("collate_file", self.getDefaultCollations(), "Mapping of result file names to paths to collect them from")
+        app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")
         app.setConfigDefault("run_dependent_text", { "" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "" : [] }, "Mapping of patterns to extract and sort from result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
@@ -778,6 +788,7 @@ class CollateFiles(plugins.Action):
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
         self.discardFiles = app.getConfigValue("discard_file")
+        self.collateScripts = app.getConfigValue("collate_script")
     def expandCollations(self, test, coll):
 	newColl = {}
 	# copy items specified without "*" in targetStem
@@ -828,9 +839,8 @@ class CollateFiles(plugins.Action):
             targetFile = test.makeTmpFileName(targetStem)
             fullpath = self.findPath(test, sourcePattern)
             if fullpath:
-                self.diag.info("Extracting " + fullpath + " to " + targetFile) 
+                self.diag.info("Extracting " + fullpath + " to " + targetFile)
                 self.extract(fullpath, targetFile)
-                self.transformToText(targetFile, test)
     def findPath(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
@@ -838,11 +848,21 @@ class CollateFiles(plugins.Action):
         for path in paths:
             if os.path.isfile(path):
                 return path
-    def transformToText(self, path, test):
-        # By default assume it is text
-        pass
-    def extract(self, sourcePath, targetFile):
-        shutil.copyfile(sourcePath, targetFile)
+    def findExtractionScript(self, sourceFile, targetFile):
+        stem = os.path.splitext(os.path.basename(targetFile))[0]
+        script = self.collateScripts.get(stem)
+        if script:
+            return script
+        elif os.name == "posix":
+            from unixonly import isCompressed
+            if isCompressed(sourceFile):
+                return "zcat"
+    def extract(self, sourceFile, targetFile):
+        extractionScript = self.findExtractionScript(sourceFile, targetFile)
+        if extractionScript:
+            os.system(extractionScript + " " + sourceFile + " > " + targetFile)
+        else:
+            shutil.copyfile(sourceFile, targetFile)
     
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):

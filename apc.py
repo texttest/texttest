@@ -171,7 +171,7 @@ class ApcConfig(optimization.OptimizationConfig):
         return processData.startswith(rulesetName) or rulesetName.startswith(processData)
     def getFileCollator(self):
         subActions = []
-        subActions.append(FetchApcCore(self.optionMap.has_key("keeptmp")))
+        subActions.append(FetchApcCore())
         if self.slaveRun():
             useExtractLogs = self.optionValue("extractlogs")
             if useExtractLogs == "":
@@ -220,6 +220,8 @@ class ApcConfig(optimization.OptimizationConfig):
         app.setConfigDefault("link_libs", "")
         app.setConfigDefault("extract_logs", {})
         app.setConfigDefault("apcinfo", {})
+    def getDefaultCollations(self):
+        return { "stacktrace" : "apc_tmp_dir/core*" }
 
 def verifyAirportFile(arch):
     diag = plugins.getDiagnostics("APC airport")
@@ -480,16 +482,17 @@ class ApcCompileRules(ravebased.CompileRules):
     def modifiedTime(self, filename):
         return os.stat(filename)[stat.ST_MTIME]
                           
-class FetchApcCore(unixonly.CollateFiles):
-    def getCorePattern(self):
-        return "apc_tmp_dir/core*"
+class FetchApcCore(default.CollateFiles):
+    def extract(self, sourceFile, targetFile):
+        if not os.path.basename(targetFile).startswith("stacktrace") or self.extractCore():
+            default.CollateFiles.extract(self, sourceFile, targetFile)
     def isApcLogFileKept(self, errorFileName):
         for line in open(errorFileName).xreadlines():
             if line.find("*** Keeping the logfiles in") != -1:
-                return 1
-        return None
-    def extractCoreFor(self, test):
-        scriptErrorsFileName = test.makeTmpFileName("APC_FILES/run_status_script_error")
+                return True
+        return False
+    def extractCore(self):
+        scriptErrorsFileName = "APC_FILES/run_status_script_error"
         self.diag.info(scriptErrorsFileName)
         if not os.path.isfile(scriptErrorsFileName):
             return 0
@@ -500,14 +503,12 @@ class FetchApcCore(unixonly.CollateFiles):
             return 0
         self.diag.info("APC log files are kept.")
         #Find out APC tmp directory.
-        debugFile = test.makeTmpFileName("apc_tmp_dir/apc_debug")
+        debugFile = "apc_tmp_dir/apc_debug"
         # Check if there is a apc_debug file.
         if os.path.isfile(debugFile):
             self.diag.info("apc_debug file is found. Aborting.")
             return 0
         return 1
-    def getBinaryFromCore(self, path, test):
-        return os.path.expandvars(test.getWordsInFile("options")[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
 
 class MarkApcLogDir(RunWithParallelAction):
     def __init__(self, baseRunner, isExecutable, keepLogs):

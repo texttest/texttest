@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, filecmp, string, plugins, copy
+import os, sys, filecmp, string, plugins, copy
 
 plugins.addCategory("badPredict", "internal errors", "had internal errors")
 plugins.addCategory("crash", "CRASHED")
@@ -37,25 +37,16 @@ class CheckPredictions(CheckLogFilePredictions):
         return "Checking predictions for"
     def __call__(self, test):
         self.collectErrors(test)
-    def findCrashSummary(self, errInfo):
-        prevLine = ""
-        crashType = "CRASH"
-        for line in errInfo.split("\n"):
-            if line.find("Program terminated with") != -1:
-                crashType = line.split(",")[-1].strip().replace(".", "")
-            if prevLine.find("Stack trace from") != -1:
-                return crashType + " in " + line.strip()
-            prevLine = line
-        return "unknown " + crashType
+    def parseStackTrace(self, stackTraceFile):
+        lines = open(stackTraceFile).readlines()
+        return lines[0].strip(), string.join(lines[2:], "")
     def collectErrors(self, test):
         # Hard-coded prediction: check test didn't crash
         stackTraceFile = test.makeTmpFileName("stacktrace")
         if os.path.isfile(stackTraceFile):
-            errorInfo = open(stackTraceFile).read()
-            summary = self.findCrashSummary(errorInfo)
-            if summary.startswith("unknown") and len(errorInfo) > 50000:
-                errorInfo = "Stack trace contained over 50000 characters, suspecting binary output problems..."
-            self.insertError(test, "crash", summary, errorInfo)
+            summary, errorInfo = self.parseStackTrace(stackTraceFile)
+            if not summary.startswith("CPU"):
+                self.insertError(test, "crash", summary, errorInfo)
             os.remove(stackTraceFile)
             return 1
 

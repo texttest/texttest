@@ -14,11 +14,24 @@ def interpretCore(corefile):
 
     return writeStackTrace(corefile, binary)
 
-def getBinary(corefile):
+def getLocalName(corefile):
+    data = os.popen("file " + corefile).readline()
+    parts = data.split("'")
+    if len(parts) == 3:
+        return parts[1]
+
+def getLastFileName(corefile):
     # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
     # Unfortunately running gdb is not the answer, because it truncates the data...
-    finalWord = os.popen("csh -c 'echo `tail -c 1024 " + corefile + "`' 2> /dev/null").read().split(" ")[-1].strip()
-    binary = finalWord.split("\n")[-1]
+    localName = getLocalName(corefile)
+    if not localName:
+        return
+    possibleNames = os.popen("strings " + corefile + " | grep '^/.*" + localName + "$'").readlines()
+    if len(possibleNames):
+        return possibleNames[-1].strip()
+    
+def getBinary(corefile):
+    binary = getLastFileName(corefile)
     if os.path.isfile(binary):
         return binary
     dirname, local = os.path.split(binary)
@@ -45,7 +58,11 @@ def findCoreInfo(stdout):
         if line[0] == "#" and line != prevLine:
             startPos = line.find("in ") + 3
             endPos = line.rfind("(")
-            stackLines.append(line[startPos:endPos])
+            methodName = line[startPos:endPos]
+            pointerPos = methodName.find("+0")
+            if pointerPos != -1:
+                methodName = methodName[:pointerPos]
+            stackLines.append(methodName)
         prevLine = line
     return summaryLine, stackLines    
 
@@ -81,7 +98,13 @@ if len(sys.argv) != 2:
     print "Usage: interpretcore.py <corefile>"
 else:
     corefile = sys.argv[1]
+    compression = corefile.endswith(".Z")
+    if compression:
+        os.system("uncompress " + corefile)
+        corefile = corefile[:-2]
     summary, details = interpretCore(corefile)
     print summary
     print "-" * len(summary)
     print details
+    if compression:
+        os.system("compress " + corefile)

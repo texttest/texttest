@@ -28,9 +28,6 @@ class DirectoryCache:
             return fileName in self.contents
     def pathName(self, fileName):
         return os.path.join(self.dir, fileName)
-    def pathNameFromVersions(self, stem, vlist):
-        parts = [ stem ] + vlist
-        return self.pathName(string.join(parts, "."))
     def findFilesMatching(self, pattern, allowedExtensions):
         matchingFiles = filter(lambda fileName : self.matchesPattern(fileName, pattern, allowedExtensions), self.contents)
         return map(self.pathName, matchingFiles)

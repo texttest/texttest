@@ -124,13 +124,13 @@ class Config(plugins.Configuration):
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
     def getTestProcessor(self):
-        if self.isReconnectingFast():
-            return self.getFileExtractor()
+        if self.isReconnecting():
+            return self.getTestEvaluator()
         
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         return [ self.getWriteDirectoryPreparer(ignoreCatalogues), catalogueCreator, \
-                 self.tryGetTestRunner(), catalogueCreator, self.getTestEvaluator() ]
+                 self.getTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
     def getPossibleResultFiles(self, app):
@@ -208,7 +208,7 @@ class Config(plugins.Configuration):
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
-        if self.isReconnectingFast():
+        if self.isReconnecting():
             return None
         else:
             return self._getWriteDirectoryMaker()
@@ -216,11 +216,6 @@ class Config(plugins.Configuration):
         return PrepareWriteDirectory(ignoreCatalogues)
     def _getWriteDirectoryMaker(self):
         return MakeWriteDirectory()
-    def tryGetTestRunner(self):
-        if self.isReconnecting():
-            return None
-        else:
-            return self.getTestRunner()
     def getTestRunner(self):
         if os.name == "posix":
             # Use Xvfb to suppress GUIs, cmd files to prevent shell-quote problems,
@@ -232,8 +227,11 @@ class Config(plugins.Configuration):
     def isReconnectingFast(self):
         return self.isReconnecting() and not self.optionMap.has_key("reconnfull")
     def getTestEvaluator(self):
-        return [ self.getFileExtractor(), self.getTestPredictionChecker(), \
-                 self.getTestComparator(), self.getFailureExplainer() ]
+        if self.isReconnectingFast():
+            return self.getFileExtractor()
+        else:
+            return [ self.getFileExtractor(), self.getTestPredictionChecker(), \
+                     self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull"))
@@ -1320,13 +1318,17 @@ class ReconnectTest(plugins.Action):
     def copyFiles(self, reconnLocation, test):
         if not self.canReconnectTo(reconnLocation):
             return
+
+        test.makeWriteDirectories()
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
-            if os.path.isfile(fullPath):
-                shutil.copyfile(fullPath, test.makeTmpFileName(file, forComparison=0))
+            self.copyFile(fullPath, test.makeTmpFileName(file, forComparison=0))
+
         testStateFile = os.path.join(reconnLocation, "framework_tmp", "teststate")
-        if os.path.isfile(testStateFile):
-            shutil.copyfile(testStateFile, test.getStateFile())
+        self.copyFile(testStateFile, test.getStateFile())
+    def copyFile(self, sourcePath, targetPath):
+        if os.path.isfile(sourcePath):
+            shutil.copyfile(sourcePath, targetPath)
     def loadStoredState(self, test):
         loaded, newState = test.getStoredStateInfo()
         if self.fullRecalculate:
@@ -1350,6 +1352,8 @@ class ReconnectTest(plugins.Action):
         self.describe(test, " (state " + test.state.category + ")")
     def hasFiles(self, test):
         dir = test.getDirectory(temporary=1)
+        if not os.path.isdir(dir):
+            return False
         for file in os.listdir(dir):
             fullPath = os.path.join(dir, file)
             if os.path.isfile(fullPath):

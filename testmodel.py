@@ -765,6 +765,7 @@ class Application:
         allowedExtensions = self.getFileExtensionsForVersion(refVersion)
         for dircache in dircaches:
             allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists, versionListMethod)
+            self.diag.info("Files for stem " + stem + " found " + repr(allFiles))
             if len(allFiles):
                 return allFiles[-1]
     def getFileExtensionsForVersion(self, refVersion = None):

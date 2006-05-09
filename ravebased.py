@@ -186,10 +186,10 @@ class Config(CarmenConfig):
         return CarmenConfig.useExtraVersions(self) and not self.raveSlave()
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true"
-    def getResponderClasses(self):
+    def getResponderClasses(self, allApps):
         if self.raveSlave():
             return [ queuesystem.SocketResponder ]
-        baseResponders = CarmenConfig.getResponderClasses(self)
+        baseResponders = CarmenConfig.getResponderClasses(self, allApps)
         if self.optionMap.has_key("build"):
             baseResponders.append(RemoteBuildResponder)
         if self.useQueueSystem():

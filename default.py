@@ -43,6 +43,7 @@ class Config(plugins.Configuration):
                 # Only relevant without the GUI
                 group.addSwitch("g", "use dynamic GUI", 1)
                 group.addSwitch("gx", "use static GUI")
+                group.addSwitch("con", "use console interface")
                 group.addSwitch("o", "Overwrite all failures")
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
@@ -63,10 +64,30 @@ class Config(plugins.Configuration):
         return self.optionMap.has_key("g") or self.useStaticGUI()
     def useStaticGUI(self):
         return self.optionMap.has_key("gx")
-    def getResponderClasses(self):
+    def useConsole(self):
+        return self.optionMap.has_key("con")
+    def getDefaultInterface(self, allApps):
+        defaultIntf = None
+        for app in allApps:
+            appIntf = app.getConfigValue("default_interface")
+            if defaultIntf and appIntf != defaultIntf:
+                raise plugins.TextTestError, "Conflicting default interfaces for different applications - " + \
+                      appIntf + " and " + defaultIntf
+            defaultIntf = appIntf
+        return defaultIntf
+    def setDefaultInterface(self, allApps):
+        mapping = { "static_gui" : "gx", "dynamic_gui": "g", "console": "con" }
+        defaultInterface = self.getDefaultInterface(allApps)
+        if mapping.has_key(defaultInterface):
+            self.optionMap[mapping[defaultInterface]] = ""
+        else:
+            raise plugins.TextTestError, "Invalid value for default_interface '" + defaultInterface + "'"
+    def hasExplicitInterface(self):
+        return self.useGUI() or self.batchMode() or self.useConsole() or self.optionMap.has_key("o")
+    def getResponderClasses(self, allApps):
         classes = []
-##        if not self.isReconnecting():
-##            actions.append(CollectFailureData())
+        if not self.hasExplicitInterface():
+            self.setDefaultInterface(allApps)
         # Put the GUI first ... first one gets the script engine - see respond module :)
         if self.useGUI():
             self.addGuiResponder(classes)
@@ -388,6 +409,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         # Sample to show that values are lists
         app.setConfigDefault("batch_version", { "default" : [] }, "Which versions are allowed as batch mode runs")
+        app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
         app.addConfigEntry("definition_file_stems", "options")
         app.addConfigEntry("definition_file_stems", "usecase")
         app.addConfigEntry("definition_file_stems", "input")

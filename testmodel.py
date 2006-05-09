@@ -673,9 +673,9 @@ class ConfigurationWrapper:
         for action in actionSequenceFromConfig:
             self.addActionToList(action, actionSequence)
         return actionSequence
-    def getResponderClasses(self):
+    def getResponderClasses(self, allApps):
         try:
-            return self.target.getResponderClasses()
+            return self.target.getResponderClasses(allApps)
         except:
             self.raiseException(req = "responder classes")
     def addActionToList(self, action, actionSequence):

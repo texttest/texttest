@@ -81,7 +81,7 @@ class Configuration:
         pass
     def getActionSequence(self):
         return []
-    def getResponderClasses(self):
+    def getResponderClasses(self, allApps):
         return []
     def getFilterList(self, app):
         return []

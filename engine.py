@@ -389,7 +389,7 @@ class TextTest:
             return
         responderClasses = []
         for app in self.allApps:
-            for respClass in app.configObject.getResponderClasses():
+            for respClass in app.configObject.getResponderClasses(self.allApps):
                 if not respClass in responderClasses:
                     self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.append(respClass)

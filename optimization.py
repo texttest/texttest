@@ -178,11 +178,11 @@ class OptimizationConfig(ravebased.Config):
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
         return ravebased.Config.getActionSequence(self)
-    def getResponderClasses(self):
+    def getResponderClasses(self, allApps):
         if self.optionMap.has_key("plot"):
             return [ GraphPlotResponder ]
         else:
-            return ravebased.Config.getResponderClasses(self)
+            return ravebased.Config.getResponderClasses(self, allApps)
     def getTestComparator(self):
         return comparetest.MakeComparisons(OptimizationTestComparison)
     def getProgressReportBuilder(self):

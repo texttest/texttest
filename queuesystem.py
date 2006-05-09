@@ -121,11 +121,11 @@ class QueueSystemConfig(default.Config):
 
         submitter = SubmitTest(self.getSubmissionRules, self.optionMap)
         return [ submitter, WaitForCompletion() ]
-    def getResponderClasses(self):
+    def getResponderClasses(self, allApps):
         if self.slaveRun():
             return [ SocketResponder ]
         else:
-            return default.Config.getResponderClasses(self)
+            return default.Config.getResponderClasses(self, allApps)
     def getTestRunner(self):
         if self.slaveRun():
             return RunTestInSlave()

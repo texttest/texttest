@@ -365,7 +365,7 @@ class ImportTest(InteractiveTestAction):
     def getTabTitle(self):
         return "Adding " + self.testType()
     def getTitle(self):
-        return "Add _" + self.testType()
+        return "Add " + self.testType()
     def testType(self):
         return ""
     def getNewTestName(self):

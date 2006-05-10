@@ -102,11 +102,6 @@ class QueueSystemConfig(default.Config):
             return self.optionMap["slave"]
         else:
             return default.Config.getWriteDirectoryName(self, app)
-    def useTextResponder(self):
-        if self.slaveRun():
-            return 0
-        else:
-            return default.Config.useTextResponder(self)
     def useExtraVersions(self):
         return not self.slaveRun()
     def getCleanMode(self):

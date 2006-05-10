@@ -438,11 +438,6 @@ class TestCase(Test):
         pickler = Pickler(file)
         pickler.dump(self.state)
         file.close()
-    def isOutdated(self, filename):
-        modTime = plugins.modifiedTime(filename)
-        currTime = time()
-        threeDaysInSeconds = 60 * 60 * 24 * 3
-        return currTime - modTime > threeDaysInSeconds
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
             

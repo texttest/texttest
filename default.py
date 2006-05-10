@@ -115,9 +115,6 @@ class Config(plugins.Configuration):
         except:
             print "Cannot use GUI: caught exception:"
             plugins.printException()
-    def useTextResponder(self):
-        return not self.optionMap.useGUI()
-
     def _getActionSequence(self, makeDirs):
         actions = [ self.getTestProcessor() ]
         if makeDirs:
@@ -772,33 +769,6 @@ class PrepareWriteDirectory(plugins.Action):
             for subVar, subValue in value.items():
                 # Don't write windows separators, they get confused with escape characters...
                 file.write(subVar + " = " + subValue.replace(os.sep, "/") + "\n")
-
-class CollectFailureData(plugins.Action):
-    def __init__(self):
-        self.hardFailures = []
-        self.softFailures = []
-    def __call__(self, test):
-        category, details = test.state.getTypeBreakdown()
-        if category != "success":
-            self.hardFailures.append(test.getRelPath())
-        elif len(details) > 0:
-            self.softFailures.append(test.getRelPath())
-    def getCleanUpAction(self):
-        return CreateSelectionFiles(self)
-
-class CreateSelectionFiles(plugins.Action):
-    def __init__(self, collector):
-        self.collector = collector
-    def setUpApplication(self, app):
-        self.writeList(app, "hard_failures", self.collector.hardFailures)
-        self.writeList(app, "soft_failures", self.collector.softFailures)
-    def writeList(self, app, fileName, list):
-        if len(list) == 0:
-            return
-        fullPath = os.path.join(app.writeDirectory, fileName)
-        file = open(fullPath, "w")
-        file.write("-tp " + string.join(list, ",") + "\n")
-        file.close()
     
 class CollateFiles(plugins.Action):
     def __init__(self):

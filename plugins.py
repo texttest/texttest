@@ -244,6 +244,9 @@ def relpath(fullpath, parentdir):
     else:
         return relPath
 
+def getTextTestName():
+    return os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0])
+
 def nullFileName():
     if os.name == "posix":
         return "/dev/null"

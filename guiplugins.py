@@ -130,8 +130,6 @@ class InteractiveAction:
         if repScript:
             os.environ["USECASE_REPLAY_SCRIPT"] = repScript
         return process
-    def getTextTestName(self):
-        return sys.argv[0]
     def describe(self, testObj, postText = ""):
         guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
 
@@ -426,7 +424,7 @@ class RecordTest(InteractiveTestAction):
     def startTextTestProcess(self, test, usecase):
         ttOptions = self.getRunOptions(test, usecase)
         guilog.info("Starting " + usecase + " run of TextTest with arguments " + ttOptions)
-        commandLine = self.getTextTestName() + " " + ttOptions
+        commandLine = plugins.getTextTestName() + " " + ttOptions
         if not os.path.isfile(test.app.writeDirectory):
             test.app.makeWriteDirectory()
         logFile = self.getLogFile(test, usecase, "run")
@@ -723,7 +721,7 @@ class RunTests(SelectionAction):
         errFile = os.path.join(self.apps[0].writeDirectory, "dynamic_errors" + str(self.runNumber) + ".log")
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
-        commandLine = self.getTextTestName() + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
+        commandLine = plugins.getTextTestName() + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
         self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,selTestCases), description = description)
     def isTestCase(self, test):
         return isinstance(test, TestCase)

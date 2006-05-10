@@ -505,23 +505,22 @@ class TextTestGUI(ThreadedResponder):
     def viewTestAtIter(self, iter):
         test = self.model.get_value(iter, 2)
         guilog.info("Viewing test " + repr(test))
-        self.recreateTestView(test, checkUpToDate=1)
-    def recreateTestView(self, test, checkUpToDate=0):
+        if test.classId() == "test-case":
+            self.checkUpToDate(test)
+        self.recreateTestView(test)
+    def checkUpToDate(self, test):
+        if test.state.isComplete() and test.state.needsRecalculation():
+            cmpAction = comparetest.MakeComparisons()
+            if cmpAction.defaultComparisonClass:
+                guilog.info("Recalculating result info for test: result file changed since created")
+                # Not present for fast reconnect, don't crash...
+                cmpAction.setUpApplication(test.app)
+                cmpAction(test)
+    def recreateTestView(self, test):
         if self.rightWindowGUI:
             self.contents.remove(self.rightWindowGUI.getWindow())
             self.rightWindowGUI = None
-        if test.classId() == "test-app":
-            self.rightWindowGUI = ApplicationGUI(test, self.selectionActionGUI)
-        else:
-            test.refreshFiles()
-            if checkUpToDate and test.state.isComplete() and test.state.needsRecalculation():
-                cmpAction = comparetest.MakeComparisons()
-                if cmpAction.defaultComparisonClass:
-                    guilog.info("Recalculating result info for test: result file changed since created")
-                    # Not present for fast reconnect, don't crash...
-                    cmpAction.setUpApplication(test.app)
-                    cmpAction(test)
-            self.rightWindowGUI = TestCaseGUI(test, self.dynamic, self.selectionActionGUI)
+        self.rightWindowGUI = RightWindowGUI(test, self.dynamic, self.selectionActionGUI)
         if self.contents:
             self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=True, fill=True)
             self.contents.show()
@@ -752,16 +751,20 @@ class RightWindowGUI:
     def __init__(self, object, dynamic, selectionActionGUI):
         self.object = object
         self.dynamic = dynamic
-        self.fileViewAction = guiplugins.interactiveActionHandler.getInstance(object, guiplugins.ViewFile)
-        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
-        self.addFilesToModel()
-        view = self.createView()
+        self.selectionActionGUI = selectionActionGUI
+        self.fileViewGUI = self.createFileViewGUI(object)
+        
+        view = self.fileViewGUI.createView()
         hardcodedPages = self.getHardcodedNotebookPages()
         self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(), object)
-        self.selectionActionGUI = selectionActionGUI
         self.notebook = self.createNotebook(hardcodedPages, selectionActionGUI)
         self.describeNotebook(self.notebook, None, 0)
         self.window = self.createWindow(view, self.notebook)
+    def createFileViewGUI(self, object):
+        if object.classId() == "test-app":
+            return ApplicationFileGUI(object, self.dynamic)
+        else:
+            return TestFileGUI(object, self.dynamic)
     def describeNotebook(self, notebook, pagePtr, pageNum, *args):
         outerPageNum, innerPageNum = self.getPageNumbers(notebook, pageNum)
         currentPage, currentPageText = self.getPageText(self.notebook, outerPageNum)
@@ -791,38 +794,9 @@ class RightWindowGUI:
             return self.intvActionGUI.getPageDescription(currentPageText, subPageText)
     def getWindow(self):
         return self.window
-    def createView(self):
-        view = gtk.TreeView(self.model)
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn(self.object.name.replace("_", "__"), renderer, text=0, background=1)
-        column.set_cell_data_func(renderer, renderParentsBold)
-        view.append_column(column)
-        if self.dynamic:
-            perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)
-            view.append_column(perfColumn)
-        view.expand_all()
-        indexer = TreeModelIndexer(self.model, column, 0)
-        scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, indexer)
-        view.show()
-        return view
     def makeActionInstances(self):
-        # The file view action is a special one that we "hardcode" so we can find it...
-        return [ self.fileViewAction ] + guiplugins.interactiveActionHandler.getInstances(self.object, self.dynamic)
-    def addFileToModel(self, iter, name, comp, colour):
-        fciter = self.model.insert_before(iter, None)
-        baseName = os.path.basename(name)
-        heading = self.model.get_value(iter, 0)
-        self.model.set_value(fciter, 0, baseName)
-        self.model.set_value(fciter, 1, colour)
-        self.model.set_value(fciter, 2, name)
-        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour)
-        if comp:
-            self.model.set_value(fciter, 3, comp)
-            details = comp.getDetails()
-            if len(details) > 0:
-                self.model.set_value(fciter, 4, details)
-                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
-        return fciter
+        # File view GUI also has a tab, provide that also...
+        return [ self.fileViewGUI.fileViewAction ] + guiplugins.interactiveActionHandler.getInstances(self.object, self.dynamic)
     def createNotebook(self, hardcodedPages, selectionActionGUI):
         testCasePageDir = self.intvActionGUI.createOptionGroupPages()
         pageDir = selectionActionGUI.createOptionGroupPages()
@@ -843,7 +817,32 @@ class RightWindowGUI:
         notebook.show()
         return notebook
     def getHardcodedNotebookPages(self):
-        return []
+        testInfo = self.getTestInfo(self.object)
+        if testInfo:
+            textview = self.createTextView(testInfo)
+            return [(textview, "Text Info")]
+        else:
+            return []
+    def getTestInfo(self, test):
+        if not test or test.classId() != "test-case":
+            return ""
+        return test.app.configObject.getTextualInfo(test)
+    def createTextView(self, testInfo):
+        textViewWindow = gtk.ScrolledWindow()
+        textview = gtk.TextView()
+        textview.set_wrap_mode(gtk.WRAP_WORD)
+        textbuffer = textview.get_buffer()
+        if len(testInfo):
+            guilog.info("---------- Text Info Window ----------")
+            guilog.info(testInfo)
+            guilog.info("--------------------------------------")
+        # Need to convert to utf-8 for display...
+        unicodeInfo = unicode(testInfo, "utf-8", errors="replace")
+        textbuffer.set_text(unicodeInfo.encode("utf-8"))
+        textViewWindow.add(textview)
+        textview.show()
+        textViewWindow.show()
+        return textViewWindow
     def createWindow(self, view, notebook):
         fileWin = gtk.ScrolledWindow()
         fileWin.add(view)
@@ -854,6 +853,43 @@ class RightWindowGUI:
         fileWin.show()
         vbox.show()    
         return vbox
+    
+class FileViewGUI:
+    def __init__(self, object, dynamic):
+        self.fileViewAction = guiplugins.interactiveActionHandler.getInstance(object, guiplugins.ViewFile)
+        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
+                                   gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
+        self.name = object.name.replace("_", "__")
+        self.dynamic = dynamic
+    def addFileToModel(self, iter, name, comp, colour):
+        fciter = self.model.insert_before(iter, None)
+        baseName = os.path.basename(name)
+        heading = self.model.get_value(iter, 0)
+        self.model.set_value(fciter, 0, baseName)
+        self.model.set_value(fciter, 1, colour)
+        self.model.set_value(fciter, 2, name)
+        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour)
+        if comp:
+            self.model.set_value(fciter, 3, comp)
+            details = comp.getDetails()
+            if len(details) > 0:
+                self.model.set_value(fciter, 4, details)
+                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
+        return fciter
+    def createView(self):
+        view = gtk.TreeView(self.model)
+        renderer = gtk.CellRendererText()
+        column = gtk.TreeViewColumn(self.name, renderer, text=0, background=1)
+        column.set_cell_data_func(renderer, renderParentsBold)
+        view.append_column(column)
+        if self.dynamic:
+            perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)
+            view.append_column(perfColumn)
+        view.expand_all()
+        indexer = TreeModelIndexer(self.model, column, 0)
+        scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, indexer)
+        view.show()
+        return view    
     def displayDifferences(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
@@ -865,11 +901,12 @@ class RightWindowGUI:
             self.fileViewAction.view(comparison, fileName)
         except plugins.TextTestError, e:
             showError(str(e))
-    
-class ApplicationGUI(RightWindowGUI):
-    def __init__(self, app, selectionActionGUI):
+
+class ApplicationFileGUI(FileViewGUI):
+    def __init__(self, app, dynamic):
+        FileViewGUI.__init__(self, app, dynamic)
         self.app = app
-        RightWindowGUI.__init__(self, app, 1, selectionActionGUI)
+        self.addFilesToModel()
     def addFilesToModel(self):
         confiter = self.model.insert_before(None, None)
         self.model.set_value(confiter, 0, "Application Files")
@@ -897,28 +934,23 @@ class ApplicationGUI(RightWindowGUI):
             personalFiles.append(gtkRcFile)
         return personalFiles
     
-class TestCaseGUI(RightWindowGUI):
-    def __init__(self, test, dynamic, selectionActionGUI):
+class TestFileGUI(FileViewGUI):
+    def __init__(self, test, dynamic):
+        FileViewGUI.__init__(self, test, dynamic)
         self.test = test
         self.colours = test.getConfigValue("file_colours")
-        RightWindowGUI.__init__(self, test, dynamic, selectionActionGUI)
+        test.refreshFiles()
         self.testComparison = None
-    def getHardcodedNotebookPages(self):
-        testInfo = self.getTestInfo(self.test)
-        if testInfo:
-            textview = self.createTextView(testInfo)
-            return [(textview, "Text Info")]
-        else:
-            return []
-    def addFilesToModel(self):
-        if self.test.state.hasStarted():
+        self.addFilesToModel(test)
+    def addFilesToModel(self, test):
+        if test.state.hasStarted():
             try:
-                self.addDynamicFilesToModel(self.test)
+                self.addDynamicFilesToModel(test)
             except AttributeError:
                 # The above code assumes we have failed on comparison: if not, don't display things
                 pass
         else:
-            self.addStaticFilesToModel(self.test)
+            self.addStaticFilesToModel(test)
     def addDynamicFilesToModel(self, test):
         self.testComparison = test.state
         if not test.state.isComplete():
@@ -1021,26 +1053,6 @@ class TestCaseGUI(RightWindowGUI):
             newiter = self.addFileToModel(iter, subdir, None, colour)
             fileList = map(lambda file: os.path.join(subdir, file), os.listdir(subdir))
             self.addDataFilesUnderIter(newiter, fileList)
-    def getTestInfo(self, test):
-        if not test or test.classId() != "test-case":
-            return ""
-        return test.app.configObject.getTextualInfo(test)
-    def createTextView(self, testInfo):
-        textViewWindow = gtk.ScrolledWindow()
-        textview = gtk.TextView()
-        textview.set_wrap_mode(gtk.WRAP_WORD)
-        textbuffer = textview.get_buffer()
-        if len(testInfo):
-            guilog.info("---------- Text Info Window ----------")
-            guilog.info(testInfo)
-            guilog.info("--------------------------------------")
-        # Need to convert to utf-8 for display...
-        unicodeInfo = unicode(testInfo, "utf-8", errors="replace")
-        textbuffer.set_text(unicodeInfo.encode("utf-8"))
-        textViewWindow.add(textview)
-        textview.show()
-        textViewWindow.show()
-        return textViewWindow
     
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):

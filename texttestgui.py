@@ -125,8 +125,6 @@ class TextTestGUI(ThreadedResponder):
         self.scriptEngine = scriptEngine
     def needsTestRuns(self):
         return self.dynamic
-    def readAllVersions(self):
-        return not self.dynamic
     def createTopWindow(self):
         # Create toplevel window to show it all.
         win = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -301,14 +299,6 @@ class TextTestGUI(ThreadedResponder):
         vbox.pack_start(treeWindow, expand=True, fill=True)
         vbox.show()
         return vbox
-    def createDisplayWindows(self):
-        hbox = gtk.HBox()
-        treeWin = self.createTreeWindow()
-        detailWin = self.createDetailWindow()
-        hbox.pack_start(treeWin, expand=True, fill=True)
-        hbox.pack_start(detailWin, expand=True, fill=True)
-        hbox.show()
-        return hbox
     def createTreeWindow(self):
         view = gtk.TreeView(self.model)
         self.selection = view.get_selection()
@@ -978,25 +968,17 @@ class TestCaseGUI(RightWindowGUI):
     def getComparisonColour(self, fileComp):
         if not fileComp:
             return self.getStaticColour()
+        if not self.test.state.isComplete():
+            return self.colours["running"]
         if fileComp.hasSucceeded():
-            return self.getSuccessColour()
+            return self.colours["success"]
         else:
-            return self.getFailureColour()
+            return self.colours["failure"]
     def getStaticColour(self):
         if self.dynamic:
             return self.colours["not_started"]
         else:
             return self.colours["static"]
-    def getSuccessColour(self):
-        if self.test.state.isComplete():
-            return self.colours["success"]
-        else:
-            return self.colours["running"]
-    def getFailureColour(self):
-        if self.test.state.isComplete():
-            return self.colours["failure"]
-        else:
-            return self.colours["running"]
     def addStaticFilesToModel(self, test):
         stdFiles, defFiles = test.listStandardFiles(allVersions=True)
         if test.classId() == "test-case":

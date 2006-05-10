@@ -60,6 +60,8 @@ class InteractiveAction:
         if optionName:
             self.optionGroup = plugins.OptionGroup(optionName, self.getConfigValue("gui_entry_overrides"), \
                                                    self.getConfigValue("gui_entry_options"))
+    def __repr__(self):
+        return self.optionGroup.name
     def getConfigValue(self, entryName):
         pass
     def getOptionGroups(self):
@@ -207,8 +209,6 @@ class SaveTests(SelectionAction):
             self.addSwitch(oldOptionGroup, "ex", "Save: ", 1, ["Average performance", "Exact performance"])
         allStems = self.findAllStems()
         self.addOption(oldOptionGroup, "sinf", "Save single file", possibleValues=allStems)
-    def __repr__(self):
-        return "Saving"
     def isFrequentUse(self):
         return True
     def getTitle(self):
@@ -290,8 +290,6 @@ class ViewFile(InteractiveTestAction):
         except AttributeError:
             # Will get given applications too, don't need options there
             pass
-    def __repr__(self):
-        return "Viewing file"
     def canPerform(self):
         return False
     def tmpFile(self, comparison):
@@ -481,8 +479,6 @@ class RecordTest(InteractiveTestAction):
             return "-o"
     def matchesMode(self, dynamic):
         return not dynamic
-    def __repr__(self):
-        return "Recording"
     def getTitle(self):
         return "Record _Use-Case"
     
@@ -560,8 +556,6 @@ class SelectTests(SelectionAction):
         for group in self.apps[0].optionGroups:
             if group.name.startswith("Select"):
                 self.optionGroup = group
-    def __repr__(self):
-        return "Selecting"
     def getTitle(self):
         return "_Select"
     def getSecondaryTitle(self):
@@ -662,8 +656,6 @@ class SaveSelection(SelectionAction):
         for group in self.apps[0].optionGroups:
             if group.name.startswith("Select"):
                 self.selectionGroup = group
-    def __repr__(self):
-        return "Saving"
     def getTitle(self):
         return "S_ave Selection"
     def getScriptTitle(self, tab):
@@ -711,8 +703,6 @@ class RunTests(SelectionAction):
                 self.optionGroups.append(group)
     def getOptionGroups(self):
         return self.optionGroups
-    def __repr__(self):
-        return "Running"
     def getTitle(self):
         return "_Run Tests"
     def getScriptTitle(self, tab):
@@ -769,8 +759,6 @@ class EnableDiagnostics(InteractiveTestAction):
         self.configFile = None
         if configDir.has_key("configuration_file"):
             self.configFile = configDir["configuration_file"]
-    def __repr__(self):
-        return "Diagnostics"
     def getTitle(self):
         return "New _Diagnostics"
     def getScriptTitle(self, tab):
@@ -830,8 +818,6 @@ class RemoveTest(InteractiveTestAction):
         plugins.movefile(newFileName, contentFileName)
 
 class CopyTest(ImportTest):
-    def __repr__(self):
-        return "Copy"
     def testType(self):
         return "Test"
     def getTabTitle(self):

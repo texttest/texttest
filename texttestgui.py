@@ -357,7 +357,10 @@ class TextTestGUI(ThreadedResponder):
     def createDefaultRightGUI(self):
         rootSuite = self.rootSuites[0]
         guilog.info("Viewing test " + repr(rootSuite))
-        self.recreateTestView(rootSuite)
+        self.rightWindowGUI = RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI)
+        if self.contents:
+            self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=True, fill=True)
+            self.contents.show()
     def pickUpChange(self):
         response = self.processChangesMainThread()
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
@@ -380,7 +383,7 @@ class TextTestGUI(ThreadedResponder):
             return
 
         self.notifyTreeView(test, state)
-        self.notifyTestView(test)
+        self.rightWindowGUI.notifyChange(test)
     def notifyTreeView(self, test, state):
         if test.classId() == "test-suite":
             return self.redrawSuite(test)
@@ -394,9 +397,6 @@ class TextTestGUI(ThreadedResponder):
             self.redrawTest(test, state)
         else:
             self.redrawTest(test, test.state)
-    def notifyTestView(self, test):
-        if self.rightWindowGUI and self.rightWindowGUI.currentObject is test:
-            self.recreateTestView(test)
     # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test, state):
         iter = self.itermap[test]
@@ -418,11 +418,7 @@ class TextTestGUI(ThreadedResponder):
         if self.itermap.has_key(maybeNewTest):
             # There wasn't a new test: assume something disappeared or changed order and regenerate the model...
             self.recreateSuiteModel(suite, suiteIter)
-            # If we're viewing a test that isn't there any more, view the suite instead!
-            if self.rightWindowGUI.currentObject.classId() == "test-case":
-                viewedTest = self.rightWindowGUI.currentObject
-                if not os.path.isdir(viewedTest.getDirectory()):
-                    self.recreateTestView(suite)
+            self.rightWindowGUI.checkForDeletion()
         else:
             self.addNewTestToModel(suiteIter, maybeNewTest, suiteIter)
         self.selection.get_tree_view().grab_focus()
@@ -477,7 +473,7 @@ class TextTestGUI(ThreadedResponder):
         self.itermap[newTest] = storeIter
         self.selectionActionGUI.addNewTest(newTest, storeIter)
         guilog.info("Viewing new test " + newTest.name)
-        self.recreateTestView(newTest)
+        self.rightWindowGUI.view(newTest)
         self.expandSuite(suiteIter)
         self.selectOnlyRow(iter)
     def expandSuite(self, iter):
@@ -507,7 +503,7 @@ class TextTestGUI(ThreadedResponder):
         guilog.info("Viewing test " + repr(test))
         if test.classId() == "test-case":
             self.checkUpToDate(test)
-        self.recreateTestView(test)
+        self.rightWindowGUI.view(test)
     def checkUpToDate(self, test):
         if test.state.isComplete() and test.state.needsRecalculation():
             cmpAction = comparetest.MakeComparisons()
@@ -516,15 +512,7 @@ class TextTestGUI(ThreadedResponder):
                 # Not present for fast reconnect, don't crash...
                 cmpAction.setUpApplication(test.app)
                 cmpAction(test)
-    def recreateTestView(self, test):
-        if self.rightWindowGUI:
-            self.contents.remove(self.rightWindowGUI.getWindow())
-            self.rightWindowGUI = None
-        self.rightWindowGUI = RightWindowGUI(test, self.dynamic, self.selectionActionGUI)
-        if self.contents:
-            self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=True, fill=True)
-            self.contents.show()
-
+    
 class InteractiveActionGUI:
     def __init__(self, actions, test = None):
         self.actions = actions
@@ -750,12 +738,25 @@ class SelectionActionGUI(InteractiveActionGUI):
 class RightWindowGUI:
     def __init__(self, object, dynamic, selectionActionGUI):
         self.dynamic = dynamic
-        self.currentObject = object
         self.selectionActionGUI = selectionActionGUI
+        self.window = gtk.VBox()
+        self.view(object)
+    def notifyChange(self, object):
+        if self.currentObject is object:
+            self.view(object)
+    def view(self, object):
+        for child in self.window.get_children():
+            self.window.remove(child)
+        self.currentObject = object
         buttonBar, fileView, self.objectPages = self.makeObjectDependentContents(object)
-        self.notebook = self.createNotebook(self.objectPages, selectionActionGUI)
+        self.notebook = self.createNotebook(self.objectPages, self.selectionActionGUI)
         self.describeNotebook(self.notebook, None, 0)
-        self.window = self.createWindow(buttonBar, fileView, self.notebook)
+        self.fillWindow(buttonBar, fileView, self.notebook)
+    def checkForDeletion(self):
+        # If we're viewing a test that isn't there any more, view the suite instead!
+        if self.currentObject.classId() == "test-case":
+            if not os.path.isdir(self.currentObject.getDirectory()):
+                self.view(self.currentObject.parent)
     def makeObjectDependentContents(self, object):
         self.fileViewGUI = self.createFileViewGUI(object)
         buttonBar, self.objectPages = self.makeActionElements(object)
@@ -765,13 +766,12 @@ class RightWindowGUI:
         self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), object)
         objectPages = self.getObjectNotebookPages(object, self.intvActionGUI)
         return self.intvActionGUI.buttons, objectPages    
-    def createWindow(self, buttonBar, fileView, notebook):
-        vbox = gtk.VBox()
-        vbox.pack_start(buttonBar, expand=False, fill=False)
-        vbox.pack_start(fileView, expand=True, fill=True)
-        vbox.pack_start(notebook, expand=True, fill=True)
-        vbox.show()    
-        return vbox
+    def fillWindow(self, buttonBar, fileView, notebook):
+        self.window.pack_start(buttonBar, expand=False, fill=False)
+        self.window.pack_start(fileView, expand=True, fill=True)
+        self.window.pack_start(notebook, expand=True, fill=True)
+        self.window.show()    
+        return self.window
     def createFileViewGUI(self, object):
         if object.classId() == "test-app":
             return ApplicationFileGUI(object, self.dynamic)

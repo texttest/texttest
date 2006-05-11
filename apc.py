@@ -592,7 +592,7 @@ class ExtractApcLogs(plugins.Action):
         self.describe(test)
         # Extract from the apclog
         test.readSubDirectory("Diagnostics")
-        extractToFile = test.makeTmpFileName("Diagnostics/" + saveName + ".apc")
+        extractToFile = test.makeTmpFileName("Diagnostics/" + saveName + "." + test.app.name)
         plugins.ensureDirExistsForFile(extractToFile)
         cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + extractToFile
         os.system(cmdLine)

@@ -54,16 +54,15 @@ class Config(plugins.Configuration):
             elif group.name.startswith("Side"):
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
     def getActionSequence(self):
-        if self.useStaticGUI():
-            return []
         if self.optionMap.has_key("coll"):
             return [ batch.CollectFiles(), batch.GenerateHistoricalReport([ self.optionValue("b") ]) ]
 
         return self._getActionSequence(makeDirs=1)
     def useGUI(self):
-        return self.optionMap.has_key("g") or self.useStaticGUI()
-    def useStaticGUI(self):
-        return self.optionMap.has_key("gx")
+        return self.optionMap.has_key("g") or self.optionMap.has_key("gx")
+    def useStaticGUI(self, app):
+        return self.optionMap.has_key("gx") or \
+               (not self.hasExplicitInterface() and app.getConfigValue("default_interface") == "static_gui")
     def useConsole(self):
         return self.optionMap.has_key("con")
     def getDefaultInterface(self, allApps):
@@ -103,7 +102,7 @@ class Config(plugins.Configuration):
                len(app.getConfigValue("partial_copy_test_path")) > 0
     def getWriteDirectoryName(self, app):
         defaultName = plugins.Configuration.getWriteDirectoryName(self, app)
-        if self.useStaticGUI():
+        if self.useStaticGUI(app):
             dirname, local = os.path.split(defaultName)
             return os.path.join(dirname, "static_gui." + local)
         else:

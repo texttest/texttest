@@ -425,8 +425,7 @@ class RecordTest(InteractiveTestAction):
         ttOptions = self.getRunOptions(test, usecase)
         guilog.info("Starting " + usecase + " run of TextTest with arguments " + ttOptions)
         commandLine = plugins.getTextTestName() + " " + ttOptions
-        if not os.path.isfile(test.app.writeDirectory):
-            test.app.makeWriteDirectory()
+        test.app.makeWriteDirectory()
         logFile = self.getLogFile(test, usecase, "run")
         errFile = self.getLogFile(test, usecase)
         commandLine +=  " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile

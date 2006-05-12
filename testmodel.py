@@ -720,8 +720,6 @@ class Application:
         self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), inputOptions)
         self.cleanMode = self.configObject.getCleanMode()
         self.rootTmpDir = self._getRootTmpDir()
-        self.writeDirectory = self.configObject.getWriteDirectoryName(self)
-        self.diag.info("Write directory at " + self.writeDirectory)
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
@@ -729,6 +727,8 @@ class Application:
         personalFile = self.getPersonalConfigFile()
         if personalFile:
             self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
+        self.writeDirectory = self.configObject.getWriteDirectoryName(self)
+        self.diag.info("Write directory at " + self.writeDirectory)
         self.checkout = self.makeCheckout(inputOptions.checkoutOverride())
         self.diag.info("Checkout set to " + self.checkout)
         self.setCheckoutVariable()

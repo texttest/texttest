@@ -141,8 +141,8 @@ class TextTestGUI(ThreadedResponder):
             if not suite.app.fullName in names:
                 names.append(suite.app.fullName)
         return string.join(names, ",")
-    def fillTopWindow(self, topWindow, testWins):
-        mainWindow = self.createWindowContents(testWins)
+    def fillTopWindow(self, topWindow, testWins, rightWindow):
+        mainWindow = self.createWindowContents(testWins, rightWindow)
         shortcutBar = scriptEngine.createShortcutBar()
 
         vbox = gtk.VBox()
@@ -282,9 +282,8 @@ class TextTestGUI(ThreadedResponder):
         if self.dynamic:
             self.model.set_value(iter, 4, details)
             self.model.set_value(iter, 5, colour2)
-    def createWindowContents(self, testWins):
+    def createWindowContents(self, testWins, testCaseWin):
         self.contents = gtk.HBox(homogeneous=True)
-        testCaseWin = self.rightWindowGUI.getWindow()
         self.contents.pack_start(testWins, expand=True, fill=True)
         self.contents.pack_start(testCaseWin, expand=True, fill=True)
         self.contents.show()
@@ -343,8 +342,8 @@ class TextTestGUI(ThreadedResponder):
         self.selectionActionGUI = self.createSelectionActionGUI(topWindow, actionThread)
         self.createIterMap()
         testWins = self.createTestWindows(treeWindow)
-        self.createDefaultRightGUI()
-        self.fillTopWindow(topWindow, testWins)
+        self.rightWindowGUI = self.createDefaultRightGUI()
+        self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
         treeWindow.grab_focus() # To avoid the Quit button getting the initial focus, causing unwanted quit event
     def runWithActionThread(self, actionThread):
         self.setUpGui(actionThread)
@@ -357,10 +356,7 @@ class TextTestGUI(ThreadedResponder):
     def createDefaultRightGUI(self):
         rootSuite = self.rootSuites[0]
         guilog.info("Viewing test " + repr(rootSuite))
-        self.rightWindowGUI = RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI)
-        if self.contents:
-            self.contents.pack_start(self.rightWindowGUI.getWindow(), expand=True, fill=True)
-            self.contents.show()
+        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI)
     def pickUpChange(self):
         response = self.processChangesMainThread()
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
@@ -740,44 +736,66 @@ class RightWindowGUI:
         self.dynamic = dynamic
         self.selectionActionGUI = selectionActionGUI
         self.window = gtk.VBox()
-        self.view(object)
-    def notifyChange(self, object):
-        if self.currentObject is object:
-            self.view(object)
-    def view(self, object):
-        for child in self.window.get_children():
-            self.window.remove(child)
         self.currentObject = object
-        buttonBar, fileView, self.objectPages = self.makeObjectDependentContents(object)
-        self.notebook = self.createNotebook(self.objectPages, self.selectionActionGUI)
-        self.describeNotebook(self.notebook, None, 0)
-        self.fillWindow(buttonBar, fileView, self.notebook)
+        buttonBar, fileView, objectPages = self.makeObjectDependentContents(object)
+        self.notebook = self.createNotebook(objectPages, self.selectionActionGUI)
+        self.oldObjectPageNames = self.makeDictionary(objectPages).keys()
+        self.describeNotebook(self.notebook, pageNum=0)
+        self.window.pack_end(self.notebook, expand=True, fill=True)
+        self.fillWindow(buttonBar, fileView)
+        self.diag = plugins.getDiagnostics("GUI notebook")
+    def makeDictionary(self, objectPages):
+        dict = seqdict()
+        for page, name in objectPages:
+            dict[name] = page
+        return dict
+    def notifyChange(self, object):
+        # Test has changed state, regenerate if we're currently viewing it
+        if self.currentObject is object:
+            self.view(object, resetNotebook=False)
+    def view(self, object, resetNotebook=True):
+        # Triggered by user double-clicking the test, called from notifyChange
+        for child in self.window.get_children():
+            if not child is self.notebook:
+                self.window.remove(child)
+        self.currentObject = object
+        buttonBar, fileView, objectPages = self.makeObjectDependentContents(object)
+        self.updateNotebook(objectPages, resetNotebook)
+        self.fillWindow(buttonBar, fileView)
     def checkForDeletion(self):
-        # If we're viewing a test that isn't there any more, view the suite instead!
+        # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
         if self.currentObject.classId() == "test-case":
             if not os.path.isdir(self.currentObject.getDirectory()):
                 self.view(self.currentObject.parent)
     def makeObjectDependentContents(self, object):
         self.fileViewGUI = self.createFileViewGUI(object)
-        buttonBar, self.objectPages = self.makeActionElements(object)
+        buttonBar, objectPages = self.makeActionElements(object)
         fileView = self.fileViewGUI.createView()
-        return buttonBar, fileView, self.objectPages
+        return buttonBar, fileView, objectPages
     def makeActionElements(self, object):
         self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), object)
         objectPages = self.getObjectNotebookPages(object, self.intvActionGUI)
         return self.intvActionGUI.buttons, objectPages    
-    def fillWindow(self, buttonBar, fileView, notebook):
-        self.window.pack_start(buttonBar, expand=False, fill=False)
-        self.window.pack_start(fileView, expand=True, fill=True)
-        self.window.pack_start(notebook, expand=True, fill=True)
+    def fillWindow(self, buttonBar, fileView):
+        self.window.pack_end(fileView, expand=True, fill=True)
+        self.window.pack_end(buttonBar, expand=False, fill=False)
         self.window.show()    
-        return self.window
     def createFileViewGUI(self, object):
         if object.classId() == "test-app":
             return ApplicationFileGUI(object, self.dynamic)
         else:
             return TestFileGUI(object, self.dynamic)
-    def describeNotebook(self, notebook, pagePtr, pageNum, *args):
+    def describePageSwitch(self, notebook, pagePtr, pageNum, *args):
+        self.describeNotebook(notebook, pageNum)
+    def isVisible(self, notebook):
+        if notebook is self.notebook:
+            return True
+        pageNum = self.notebook.get_current_page()
+        page = self.notebook.get_nth_page(pageNum)
+        return page is notebook
+    def describeNotebook(self, notebook, pageNum=None):
+        if not self.isVisible(notebook):
+            return
         outerPageNum, innerPageNum = self.getPageNumbers(notebook, pageNum)
         currentPage, currentPageText = self.getPageText(self.notebook, outerPageNum)
         subPageText = ""
@@ -797,7 +815,10 @@ class RightWindowGUI:
         if pageNum is None:
             pageNum = notebook.get_current_page()
         page = notebook.get_nth_page(pageNum)
-        return page, notebook.get_tab_label_text(page)
+        if page:
+            return page, notebook.get_tab_label_text(page)
+        else:
+            return None, ""
     def getPageDescription(self, currentPageText, subPageText):
         if currentPageText == "Text Info" or subPageText == "Text Info":
             if len(self.testInfo):
@@ -826,13 +847,87 @@ class RightWindowGUI:
                 if len(tabPages) > 0:
                     tabNotebook = scriptEngine.createNotebook("view sub-options for " + groupTab + " :", tabPages)
                     tabNotebook.show()
-                    tabNotebook.connect("switch-page", self.describeNotebook)
+                    tabNotebook.connect("switch-page", self.describePageSwitch)
                     pages.append((tabNotebook, groupTab))
                 
         notebook = scriptEngine.createNotebook("view options for", pages)
-        notebook.connect("switch-page", self.describeNotebook)
+        notebook.connect("switch-page", self.describePageSwitch)
         notebook.show()
         return notebook
+    def findTestNotebook(self):
+        page = self.findNotebookPage(self.notebook, "Test")
+        if page:
+            return page
+        else:
+            return self.notebook
+    def findNotebookPage(self, notebook, name):
+        for child in notebook.get_children():
+            text = notebook.get_tab_label_text(child)
+            if text == name:
+                return child
+    def findChanges(self, newList, oldList):
+        created, updated, removed = [], [], []
+        for item in newList:
+            if item in oldList:
+                updated.append(item)
+            else:
+                created.append(item)
+        for item in oldList:
+            if not item in newList:
+                removed.append(item)
+        return created, updated, removed
+    def updateNotebook(self, newObjectPages, reset):
+        notebook = self.findTestNotebook()
+        newPageDir = self.makeDictionary(newObjectPages)
+        newObjectPageNames = newPageDir.keys()
+        self.diag.info("Updating notebook for " + repr(newObjectPageNames) + " from " + repr(self.oldObjectPageNames))
+        currentPage, currentPageName = self.getPageText(notebook)
+        pageNamesCreated, pageNamesUpdated, pageNamesRemoved = self.findChanges(newObjectPageNames, self.oldObjectPageNames)
+        self.prependNewPages(notebook, pageNamesCreated, newPageDir)
+        self.updatePages(notebook, pageNamesUpdated, newPageDir)
+        # Must reset if we're viewing a removed page
+        reset |= currentPageName in pageNamesRemoved
+        # If Text Info is new, it's generally interesting, reset the notebook to view it
+        reset |= "Text Info" in pageNamesCreated
+        newCurrentPageNum = self.findNewCurrentPageNum(newObjectPageNames, pageNamesRemoved)
+        if reset and notebook.get_current_page() != newCurrentPageNum:
+            self.diag.info("Resetting for current page " + currentPageName)
+            notebook.set_current_page(newCurrentPageNum)
+        elif currentPageName in pageNamesUpdated:
+            # describe the current page, we reloaded it...
+            self.describeNotebook(notebook)
+        self.removePages(notebook, pageNamesRemoved)
+        self.oldObjectPageNames = newObjectPageNames
+    def findNewCurrentPageNum(self, newPageNames, pageNamesRemoved):
+        for index in range(len(newPageNames)):
+            name = newPageNames[index]
+            if not name in pageNamesRemoved:
+                return index
+        return 0
+    def prependNewPages(self, notebook, pageNamesCreated, newPageDir):
+        # Prepend the pages, hence in reverse order...
+        pageNamesCreated.reverse()
+        for name in pageNamesCreated:
+            self.diag.info("Adding new page " + name)
+            newPage = newPageDir[name]
+            label = gtk.Label(name)
+            notebook.prepend_page(newPage, label)
+    def updatePages(self, notebook, pageNamesUpdated, newPageDir):
+        for name in pageNamesUpdated:
+            self.diag.info("Replacing contents of page " + name)
+            # Both page and oldPage are gtk.ScrolledWindow classes
+            oldPage = self.findNotebookPage(notebook, name)
+            oldPage.remove(oldPage.get_child())
+            newPage = newPageDir[name]
+            newContents = newPage.get_child()
+            newPage.remove(newContents)
+            oldPage.add(newContents)
+            oldPage.show()                
+    def removePages(self, notebook, pageNamesRemoved):     
+        for name in pageNamesRemoved:
+            self.diag.info("Removing page " + name)
+            oldPage = self.findNotebookPage(notebook, name)
+            notebook.remove(oldPage)
     def getObjectNotebookPages(self, object, intvActionGUI):
         testCasePageDir = intvActionGUI.createOptionGroupPages()["Test"]
         self.testInfo = self.getTestInfo(object)

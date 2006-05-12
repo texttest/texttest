@@ -167,7 +167,11 @@ class TextTestGUI(ThreadedResponder):
         vbox.show()
         topWindow.add(vbox)
         topWindow.show()
-        topWindow.resize(self.getWindowWidth(), self.getWindowHeight())
+        width = self.getWindowWidth()
+        height = self.getWindowHeight()
+        topWindow.resize(width, height)
+        self.contents.set_position(self.contents.allocation.width / 2)
+        self.rightWindowGUI.notifySizeChange(width, height)
     def getWindowHeight(self):
         defaultHeight = (gtk.gdk.screen_height() * 5) / 6
         height = defaultHeight
@@ -283,9 +287,9 @@ class TextTestGUI(ThreadedResponder):
             self.model.set_value(iter, 4, details)
             self.model.set_value(iter, 5, colour2)
     def createWindowContents(self, testWins, testCaseWin):
-        self.contents = gtk.HBox(homogeneous=True)
-        self.contents.pack_start(testWins, expand=True, fill=True)
-        self.contents.pack_start(testCaseWin, expand=True, fill=True)
+        self.contents = gtk.HPaned()
+        self.contents.pack1(testWins, resize=True)
+        self.contents.pack2(testCaseWin, resize=True)
         self.contents.show()
         return self.contents
     def createSelectionActionGUI(self, topWindow, actionThread):
@@ -322,9 +326,13 @@ class TextTestGUI(ThreadedResponder):
 
         # Create scrollbars around the view.
         scrolled = gtk.ScrolledWindow()
+        scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         scrolled.add(view)
-        scrolled.show()
-        return scrolled
+        framed = gtk.Frame()
+        framed.set_shadow_type(gtk.SHADOW_IN)
+        framed.add(scrolled)        
+        framed.show_all()
+        return framed
     def selectionChanged(self, selection):
         self.nofSelectedTests = 0
         self.selection.selected_foreach(self.countSelected)
@@ -567,6 +575,7 @@ class InteractiveActionGUI:
         return pages
     def createDisplay(self, optionGroup, hasButton, instance):
         vboxWindow = gtk.ScrolledWindow()
+        vboxWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         vbox = gtk.VBox()
         displayDesc = ""
         for option in optionGroup.options.values():
@@ -736,12 +745,19 @@ class RightWindowGUI:
         self.dynamic = dynamic
         self.selectionActionGUI = selectionActionGUI
         self.window = gtk.VBox()
+        self.vpaned = gtk.VPaned()
+        self.topFrame = gtk.Frame()
+        self.topFrame.set_shadow_type(gtk.SHADOW_IN)
+        self.bottomFrame = gtk.Frame()
+        self.bottomFrame.set_shadow_type(gtk.SHADOW_IN)
+        self.vpaned.pack1(self.topFrame, resize=True)
+        self.vpaned.pack2(self.bottomFrame, resize=True)
         self.currentObject = object
         buttonBar, fileView, objectPages = self.makeObjectDependentContents(object)
         self.notebook = self.createNotebook(objectPages, self.selectionActionGUI)
         self.oldObjectPageNames = self.makeDictionary(objectPages).keys()
         self.describeNotebook(self.notebook, pageNum=0)
-        self.window.pack_end(self.notebook, expand=True, fill=True)
+        self.bottomFrame.add(self.notebook)
         self.fillWindow(buttonBar, fileView)
         self.diag = plugins.getDiagnostics("GUI notebook")
     def makeDictionary(self, objectPages):
@@ -749,6 +765,8 @@ class RightWindowGUI:
         for page, name in objectPages:
             dict[name] = page
         return dict
+    def notifySizeChange(self, width, height):
+        self.vpaned.set_position(self.vpaned.allocation.height * 0.46)        
     def notifyChange(self, object):
         # Test has changed state, regenerate if we're currently viewing it
         if self.currentObject is object:
@@ -758,6 +776,10 @@ class RightWindowGUI:
         for child in self.window.get_children():
             if not child is self.notebook:
                 self.window.remove(child)
+        if not self.topFrame.get_child() is self.notebook:
+            self.topFrame.remove(self.topFrame.get_child())
+        if not self.bottomFrame.get_child() is self.notebook:
+            self.bottomFrame.remove(self.bottomFrame.get_child())
         self.currentObject = object
         buttonBar, fileView, objectPages = self.makeObjectDependentContents(object)
         self.updateNotebook(objectPages, resetNotebook)
@@ -777,9 +799,11 @@ class RightWindowGUI:
         objectPages = self.getObjectNotebookPages(object, self.intvActionGUI)
         return self.intvActionGUI.buttons, objectPages    
     def fillWindow(self, buttonBar, fileView):
-        self.window.pack_end(fileView, expand=True, fill=True)
-        self.window.pack_end(buttonBar, expand=False, fill=False)
-        self.window.show()    
+        self.window.pack_start(buttonBar, expand=False, fill=False)
+        self.topFrame.add(fileView)
+        self.window.pack_start(self.vpaned, expand=True, fill=True)
+        self.vpaned.show_all()
+        self.window.show_all()    
     def createFileViewGUI(self, object):
         if object.classId() == "test-app":
             return ApplicationFileGUI(object, self.dynamic)
@@ -941,6 +965,7 @@ class RightWindowGUI:
         return test.app.configObject.getTextualInfo(test)
     def createTextView(self, testInfo):
         textViewWindow = gtk.ScrolledWindow()
+        textViewWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         textview = gtk.TextView()
         textview.set_wrap_mode(gtk.WRAP_WORD)
         textbuffer = textview.get_buffer()
@@ -980,6 +1005,7 @@ class FileViewGUI:
         # defined in subclasses
         self.addFilesToModel()
         fileWin = gtk.ScrolledWindow()
+        fileWin.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         view = gtk.TreeView(self.model)
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn(self.name, renderer, text=0, background=1)

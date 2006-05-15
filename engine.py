@@ -8,18 +8,18 @@ from ndict import seqdict
 plugins.addCategory("unrunnable", "unrunnable", "could not be run")
 
 class TestRunner:
-    def __init__(self, test, actionSequence, appRunner, diag):
+    def __init__(self, test, appRunner, diag):
         self.test = test
         self.diag = diag
         self.interrupted = 0
         self.actionSequence = []
         self.appRunner = appRunner
-        self.setActionSequence(actionSequence)
-    def switchToCleanup(self, fetchResults):
+        self.setActionSequence(appRunner.actionSequence)
+    def switchToCleanup(self):
         self.interrupted = 0
         newActionSequence = []
         for action in self.actionSequence:
-            newActionSequence += action.getInterruptActions(fetchResults)
+            newActionSequence += self.appRunner.cleanUpActions[action]
         self.actionSequence = newActionSequence
     def setActionSequence(self, actionSequence):
         self.actionSequence = []
@@ -143,7 +143,15 @@ class ApplicationRunner:
         self.suitesSetUp = {}
         self.suitesToSetUp = {}
         self.diag = diag
+        self.cleanUpActions = {}
         self.setUpApplications(self.actionSequence)
+    def switchToCleanup(self, fetchResults):
+        newActionSequence = []
+        for action in self.actionSequence:
+            cleanUpActions = action.getInterruptActions(fetchResults)
+            self.cleanUpActions[action] = cleanUpActions
+            newActionSequence += cleanUpActions
+        self.actionSequence = newActionSequence
     def setUpApplications(self, sequence):
         self.testSuite.setUpEnvironment()
         for action in sequence:
@@ -206,15 +214,17 @@ class ActionRunner:
         self.appRunners.append(appRunner)
         for test in testSuite.testCaseList():
             self.diag.info("Adding test runner for test " + test.getRelPath())
-            testRunner = TestRunner(test, actionSequence, appRunner, self.diag)
+            testRunner = TestRunner(test, appRunner, self.diag)
             self.testQueue.append(testRunner)
             self.allTests.append(testRunner)
     def isEmpty(self):
         return len(self.appRunners) == 0
     def switchToCleanup(self, fetchResults):
+        for appRunner in self.appRunners:
+            appRunner.switchToCleanup(fetchResults)
         for testRunner in self.testQueue:
             self.diag.info("Running cleanup actions for test " + testRunner.test.getRelPath())
-            testRunner.switchToCleanup(fetchResults)
+            testRunner.switchToCleanup()
         self.interrupted = 0
     def run(self):
         try:

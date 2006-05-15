@@ -21,7 +21,7 @@ def showError(message):
     label.show()
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show()
-
+        
 class DoubleCheckDialog:
     def __init__(self, message, yesMethod, yesMethodArgs=()):
         self.dialog = gtk.Dialog("TextTest Query", flags=gtk.DIALOG_MODAL)
@@ -112,6 +112,7 @@ class TextTestGUI(ThreadedResponder):
         self.totalNofTests = 0
         self.nofFailedSetupTests = 0
         self.progressMonitor = None
+        self.toolTips = gtk.Tooltips()
         self.rootSuites = []
     def readGtkRCFile(self):
         file = getGtkRcFile()
@@ -288,10 +289,15 @@ class TextTestGUI(ThreadedResponder):
             self.model.set_value(iter, 5, colour2)
     def createWindowContents(self, testWins, testCaseWin):
         self.contents = gtk.HPaned()
+        self.contents.connect('notify', self.paneHasChanged)
         self.contents.pack1(testWins, resize=True)
         self.contents.pack2(testCaseWin, resize=True)
         self.contents.show()
         return self.contents
+    def paneHasChanged(self, pane, gparamspec):
+        pos = pane.get_position()
+        size = pane.allocation.width
+        self.toolTips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + " (" + str(100 * pos / size) + "% from the left edge)")
     def createSelectionActionGUI(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
@@ -746,6 +752,8 @@ class RightWindowGUI:
         self.selectionActionGUI = selectionActionGUI
         self.window = gtk.VBox()
         self.vpaned = gtk.VPaned()
+        self.vpaned.connect('notify', self.paneHasChanged)
+        self.panedTooltips = gtk.Tooltips()
         self.topFrame = gtk.Frame()
         self.topFrame.set_shadow_type(gtk.SHADOW_IN)
         self.bottomFrame = gtk.Frame()
@@ -760,6 +768,10 @@ class RightWindowGUI:
         self.bottomFrame.add(self.notebook)
         self.fillWindow(buttonBar, fileView)
         self.diag = plugins.getDiagnostics("GUI notebook")
+    def paneHasChanged(self, pane, gparamspec):
+        pos = pane.get_position()
+        size = pane.allocation.height
+        self.panedTooltips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + " (" + str(100 * pos / size) + "% from the top)")
     def makeDictionary(self, objectPages):
         dict = seqdict()
         for page, name in objectPages:

@@ -261,13 +261,14 @@ def nullRedirect():
         return stdoutRedirect + " 2> nul"
 
 def canExecute(program):
-    if os.name == "posix":
-        return os.system("which " + program + " > /dev/null 2>&1") == 0
-    for dir in os.environ["PATH"].split(";"):
-        fullPath = os.path.join(dir, program + ".exe")
+    localName = program
+    if os.name == "nt":
+        localName += ".exe"
+    for dir in os.environ["PATH"].split(os.pathsep):
+        fullPath = os.path.join(dir, localName)
         if os.path.isfile(fullPath):
-            return 1
-    return 0        
+            return True
+    return False
 
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):

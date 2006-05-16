@@ -1265,9 +1265,11 @@ class RadioGroupIndexer:
 class GUIStatusMonitor:
     def __init__(self):
         self.statusBar = gtk.Statusbar()
+        self.diag = plugins.getDiagnostics("GUI status monitor")
         self.output("TextTest started at " + plugins.localtime() + ".")
 
     def output(self, message):
+        self.diag.info("Changing GUI status to: '" + message + "'")
         self.statusBar.push(0, message)
         
     def createStatusbar(self):

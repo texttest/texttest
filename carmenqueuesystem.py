@@ -100,7 +100,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         CarmenSubmissionRules.__init__(self, optionMap, test)
         self.nightjob = nightjob
         self.archResources = {}
-        self.archResources["i386_linux.carmen_11"]   = "osversion=\"RHEL3\",carmarch=\"i386_linux\""
+        self.archResources["i386_linux.carmen_11"]   = "carmarch=\"i386_linux\""
         self.archResources["i386_linux.carmen_12"]   = "carmrun12=1,carmbuildmaster=1,carmarch=\"*linux*\""
         self.archResources["i386_linux.master"]      = "carmrunmaster=1,carmarch=\"*linux*\""
         self.archResources["x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\""

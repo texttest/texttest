@@ -80,10 +80,10 @@ class PerformanceTestComparison(comparetest.TestComparison):
 class PerformanceFileComparison(comparetest.FileComparison):
     def __init__(self, test, stem, standardFile, tmpFile, descriptors, testInProgress):
         self.descriptors = descriptors
-        self.diag = plugins.getDiagnostics("performance")
-        self.processCount = len(test.state.executionHosts)
-        self.diag.info("Checking test " + test.name + " process count " + str(self.processCount))
+        # Don't allow process count of 0, which screws things up...
+        self.processCount = max(len(test.state.executionHosts), 1)
         comparetest.FileComparison.__init__(self, test, stem, standardFile, tmpFile, testInProgress)
+        self.diag.info("Checking test " + test.name + " process count " + str(self.processCount))
     def _cacheValues(self, app):
         if self.stdCmpFile:
             self.oldPerformance = getPerformance(self.stdCmpFile)

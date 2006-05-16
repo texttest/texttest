@@ -261,7 +261,7 @@ def nullRedirect():
         return stdoutRedirect + " 2> nul"
 
 def canExecute(program):
-    localName = program
+    localName = program.split()[0]
     if os.name == "nt":
         localName += ".exe"
     for dir in os.environ["PATH"].split(os.pathsep):

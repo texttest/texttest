@@ -302,7 +302,7 @@ class ViewFile(InteractiveTestAction):
             return comparison.stdCmpFile
     def followFile(self, fileName):
         followProgram = self.test.app.getConfigValue("follow_program")
-        if not plugins.canExecute(followProgram.split()[0]):
+        if not plugins.canExecute(followProgram):
             raise plugins.TextTestError, "Cannot find file-following program '" + followProgram + \
                   "'\nPlease install it somewhere on your PATH or point the follow_program setting at a different tool"
         guilog.info("Following file " + fileName + " using '" + followProgram + "'")

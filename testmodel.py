@@ -819,7 +819,7 @@ class Application:
         self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
         self.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
         self.setConfigDefault("window_size", { "" : [] }, "To set the initial size of the dynamic/static GUI.")
-        self.setConfigDefault("version_priority", { "default": 99 }) 
+        self.setConfigDefault("version_priority", { "default": 99 }, "Mapping of version names to a priority order in case of conflict.") 
         self.setConfigDefault("test_progress", { "" : [] }, "Options for showing/customizing test progress report.")
         self.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         self.setConfigDefault("definition_file_stems", [ "environment", "testsuite" ], \

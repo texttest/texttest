@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, string, types
+import plugins, os, sys, shutil, string, types, time
 from testmodel import TestCase, Application
 from threading import Thread
 from glob import glob
@@ -75,6 +75,16 @@ class InteractiveAction:
         pass
     def getSecondaryTitle(self):
         return self.getTitle()
+    def messageBeforePerform(self, selTests, selCmd, test = None):
+        if test != None:
+            return "Performing '" + self.getSecondaryTitle() + "' on " + repr(test) + " ..."
+        else:
+            return "Performing '" + self.getSecondaryTitle() + "' ..."
+    def messageAfterPerform(self, selTests, selCmd, test = None):
+        if test != None:
+            return "Done performing '" + self.getSecondaryTitle() + "' on " + repr(test) + "."
+        else:
+            return "Done performing '" + self.getSecondaryTitle() + "'."
     def isFrequentUse(self):
         # Decides how accessible to make it...
         return False
@@ -213,6 +223,10 @@ class SaveTests(SelectionAction):
         return "_Save"
     def getSecondaryTitle(self):
         return "Save"
+    def messageBeforePerform(self, selTests, selCmd, test = None):
+        return "Saving " + str(len(selTests)) + " tests ..."
+    def messageAfterPerform(self, selTests, selCmd, test = None):
+        return "Saved " + str(len(selTests)) + " tests."
     def matchesMode(self, dynamic):
         return dynamic
     def getDefaultSaveOption(self):
@@ -561,6 +575,11 @@ class SelectTests(SelectionAction):
         return "Select indicated tests"
     def getGroupTabTitle(self):
         return "Selection"
+    def messageBeforePerform(self, selTests, selCmd, test = None):
+        return "Selecting tests ..."
+    def messageAfterPerform(self, selTests, selCmd, test = None):
+        return None    
+    # No messageAfterPerform necessary - we update the status bar when the selction changes inside TextTestGUI
     def matchesMode(self, dynamic):
         return not dynamic
     def isFrequentUse(self):
@@ -636,6 +655,10 @@ class ResetGroups(SelectionAction):
         SelectionAction.__init__(self, rootSuites)
     def getTitle(self):
         return "R_eset"
+    def messageBeforePerform(self, selTests, selCmd, test = None):
+        return "Resetting options ..."
+    def messageAfterPerform(self, selTests, selCmd, test = None):
+        return "All options reset to default values."
     def matchesMode(self, dynamic):
         return not dynamic
     def getScriptTitle(self, tab):
@@ -706,6 +729,10 @@ class RunTests(SelectionAction):
         return "Run selected tests"
     def getGroupTabTitle(self):
         return "Running"
+    def messageBeforePerform(self, selTests, selCmd, test = None):
+        return "Starting tests at " + plugins.localtime() + " ..."
+    def messageAfterPerform(self, selTests, selCmd, test = None):
+        return "Started " + str(len(selTests)) + " tests at " + plugins.localtime() + "."
     def matchesMode(self, dynamic):
         return not dynamic
     def isFrequentUse(self):

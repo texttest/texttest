@@ -114,6 +114,7 @@ class TextTestGUI(ThreadedResponder):
         self.progressMonitor = None
         self.toolTips = gtk.Tooltips()
         self.rootSuites = []
+        self.status = GUIStatusMonitor()
     def readGtkRCFile(self):
         file = getGtkRcFile()
         if file:
@@ -155,7 +156,7 @@ class TextTestGUI(ThreadedResponder):
             for app in self.rootSuites:
                 testProgressOptions = app.getConfigValue("test_progress")
                 if testProgressOptions.has_key("show") and testProgressOptions["show"][0] == "1":
-                    self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.nofFailedSetupTests, self.rootSuites)
+                    self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.nofFailedSetupTests, self.rootSuites, self.status)
                     progressBar = self.progressMonitor.createProgressBar()
                     progressBar.show()
                     vbox.pack_start(progressBar, expand=False, fill=True)
@@ -165,6 +166,7 @@ class TextTestGUI(ThreadedResponder):
         if shortcutBar:
             vbox.pack_start(shortcutBar, expand=False, fill=False)
             shortcutBar.show()
+        vbox.pack_start(self.status.createStatusbar(), expand=False, fill=False)
         vbox.show()
         topWindow.add(vbox)
         topWindow.show()
@@ -301,7 +303,7 @@ class TextTestGUI(ThreadedResponder):
     def createSelectionActionGUI(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
-        return SelectionActionGUI(actions, self.selection)
+        return SelectionActionGUI(actions, self.selection, self.status)
     def createTestWindows(self, treeWindow):
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
@@ -344,6 +346,7 @@ class TextTestGUI(ThreadedResponder):
         self.selection.selected_foreach(self.countSelected)
         self.testsColumn.set_title("Tests: " + str(self.nofSelectedTests) + " selected")
         guilog.info(str(self.nofSelectedTests) + " tests selected")
+        self.status.output("Selected " + str(self.nofSelectedTests) + " tests.")
     def countSelected(self, model, path, iter):
         if self.model.get_value(iter, 2).classId() == "test-case":
             self.nofSelectedTests = self.nofSelectedTests + 1
@@ -370,7 +373,7 @@ class TextTestGUI(ThreadedResponder):
     def createDefaultRightGUI(self):
         rootSuite = self.rootSuites[0]
         guilog.info("Viewing test " + repr(rootSuite))
-        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI)
+        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.status)
     def pickUpChange(self):
         response = self.processChangesMainThread()
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
@@ -409,6 +412,8 @@ class TextTestGUI(ThreadedResponder):
             self.redrawTest(test, test.state)
     # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test, state):
+        self.status.output("Updating state of test " + test.uniqueName + " to '" + repr(state) + "' ...")
+
         iter = self.itermap[test]
         self.updateStateInModel(test, iter, state)
         guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
@@ -475,6 +480,8 @@ class TextTestGUI(ThreadedResponder):
         guilog.info("All " + str(nofChildren) + " tests successful in suite " + repr(self.model.get_value(iter, 2)) + ", collapsing row.")
         self.model.set_value(iter, 4, "All " + str(nofChildren) + " tests successful")
         self.model.set_value(iter, 5, successColor) 
+
+        self.status.output("All tests in suite " + self.model.get_value(iter, 2).uniqueName + " successful, collapsing ...")
         self.selection.get_tree_view().collapse_row(self.model.get_path(iter))
         self.collapseIfAllComplete(self.model.iter_parent(iter))
     def addNewTestToModel(self, suite, newTest, suiteIter):
@@ -524,12 +531,13 @@ class TextTestGUI(ThreadedResponder):
                 cmpAction(test)
     
 class InteractiveActionGUI:
-    def __init__(self, actions, test = None):
+    def __init__(self, actions, status, test = None):
         self.actions = actions
         self.test = test
         self.buttons = self.makeButtons()
         self.pageDescriptions = { "Test" : {} }
         self.indexers = [] # Utility list for getting the values from multi-valued radio button groups :-(
+        self.status = status
     def makeButtons(self):
         executeButtons = gtk.HBox()
         buttonInstances = filter(lambda instance : instance.inToolBar(), self.actions)
@@ -692,11 +700,17 @@ class InteractiveActionGUI:
                 text += " (checked)"
         return text
     def performInteractiveAction(self, action):
+        message = action.messageAfterPerform(None, None, self.test)
+        if message != None:
+            self.status.output(message)
         self.test.callAction(action)
+        message = action.messageAfterPerform(None, None, self.test)
+        if message != None:
+            self.status.output(message)
 
 class SelectionActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, selection):
-        InteractiveActionGUI.__init__(self, actions)
+    def __init__(self, actions, selection, status):
+        InteractiveActionGUI.__init__(self, actions, status)
         self.selection = selection
         self.lastSelectionTests = []
         self.lastSelectionCmd = ""
@@ -714,11 +728,20 @@ class SelectionActionGUI(InteractiveActionGUI):
         # Selection with versions doesn't work from the command line right now, work around...
         if selTests == self.lastSelectionTests and self.lastSelectionCmd and self.lastSelectionCmd.find("-vs") == -1:
             selCmd = self.lastSelectionCmd
+
+        self.status.output(action.messageBeforePerform(selTests, selCmd))
         returnVal = action.performOn(selTests, selCmd)
         if returnVal:
             # selection changed by action
             self.lastSelectionTests, self.lastSelectionCmd = returnVal
             self.selectInGUI()
+            message = action.messageAfterPerform(self.lastSelectionTests, self.lastSelectionCmd)
+            if message != None:
+                self.status.output(message)
+        elif not isinstance(action, QuitGUI):
+            message = action.messageAfterPerform(selTests, selCmd)
+            if message != None:
+                self.status.output(message)
     def getSelectedTests(self):
         tests = []
         self.selection.selected_foreach(self.addSelTest, tests)
@@ -747,9 +770,10 @@ class SelectionActionGUI(InteractiveActionGUI):
             firstTest.append(path)    
 
 class RightWindowGUI:
-    def __init__(self, object, dynamic, selectionActionGUI):
+    def __init__(self, object, dynamic, selectionActionGUI, status):
         self.dynamic = dynamic
         self.selectionActionGUI = selectionActionGUI
+        self.status = status
         self.window = gtk.VBox()
         self.vpaned = gtk.VPaned()
         self.vpaned.connect('notify', self.paneHasChanged)
@@ -807,7 +831,7 @@ class RightWindowGUI:
         fileView = self.fileViewGUI.createView()
         return buttonBar, fileView, objectPages
     def makeActionElements(self, object):
-        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), object)
+        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), self.status, object)
         objectPages = self.getObjectNotebookPages(object, self.intvActionGUI)
         return self.intvActionGUI.buttons, objectPages    
     def fillWindow(self, buttonBar, fileView):
@@ -1234,11 +1258,30 @@ class RadioGroupIndexer:
     def setActiveIndex(self, index):
         self.buttons[index].set_active(True)
         
+#
+# A simple wrapper class around a gtk.StatusBar, simplifying
+# logging messages/changing the status bar implementation.
+# 
+class GUIStatusMonitor:
+    def __init__(self):
+        self.statusBar = gtk.Statusbar()
+        self.output("TextTest started at " + plugins.localtime() + ".")
+
+    def output(self, message):
+        self.statusBar.push(0, message)
+        
+    def createStatusbar(self):
+        self.statusBar.show()
+        self.statusBarEventBox = gtk.EventBox()
+        self.statusBarEventBox.add(self.statusBar)
+        self.statusBarEventBox.show()
+        return self.statusBarEventBox
+                   
 
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor:
-    def __init__(self, totalNofTests, nofFailedSetupTests, applications):
+    def __init__(self, totalNofTests, nofFailedSetupTests, applications, status):
         # If we get here, we know that we want to show progress
         self.completedTests = {}
         self.totalNofTests = totalNofTests
@@ -1266,6 +1309,7 @@ class TestProgressMonitor:
         
         # Where we print the progress report
         self.tooltips = gtk.Tooltips()
+        self.status = status
         
         # Read custom error types from configuration
         self.customErrorTypes = {}
@@ -1418,9 +1462,9 @@ class TestProgressMonitor:
 
         if self.nofCompletedTests >= self.totalNofTests:
             if self.nofFailedTests != 0:
-                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed (" + str(self.nofFailedTests) + " tests failed)")
+                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed at " + plugins.localtime() + " (" + str(self.nofFailedTests) + " tests failed)")
             else:
-                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed")
+                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed at " + plugins.localtime())
             self.progressBar.set_fraction(1.0)
         else:
             if self.nofFailedTests != 0:
@@ -1430,6 +1474,7 @@ class TestProgressMonitor:
             self.progressBar.set_fraction(float(self.nofCompletedTests) / float(self.totalNofTests))
 
         report = self.getReport()
-        if self.nofRunningTests == 0 and self.nofPendingTests == 0:
+        if self.nofRunningTests == 0 and self.nofPendingTests == 0 and len(self.completedTests) > 0:
+            self.status.output("All tests completed at " + plugins.localtime() + ".")
             guilog.info(report)
         self.tooltips.set_tip(self.progressBarEventBox, report)        

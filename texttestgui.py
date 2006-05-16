@@ -171,7 +171,7 @@ class TextTestGUI(ThreadedResponder):
         width = self.getWindowWidth()
         height = self.getWindowHeight()
         topWindow.resize(width, height)
-        self.contents.set_position(self.contents.allocation.width / 2)
+        self.contents.set_position(int(self.contents.allocation.width / 2))
         self.rightWindowGUI.notifySizeChange(width, height)
     def getWindowHeight(self):
         defaultHeight = (gtk.gdk.screen_height() * 5) / 6
@@ -778,7 +778,7 @@ class RightWindowGUI:
             dict[name] = page
         return dict
     def notifySizeChange(self, width, height):
-        self.vpaned.set_position(self.vpaned.allocation.height * 0.46)        
+        self.vpaned.set_position(int(self.vpaned.allocation.height * 0.46))        
     def notifyChange(self, object):
         # Test has changed state, regenerate if we're currently viewing it
         if self.currentObject is object:
@@ -1370,7 +1370,7 @@ class TestProgressMonitor:
         # Put the custom error types here, before the different count
         for (type, count) in self.customErrorTypes.items():
             summary += "%s %s\n" % (plugins.adjustText(str(count), extraIndentation, "right"), self.customErrorMessages[type])
-        summary += "%s produced different result\n" % plugins.adjustText(str(self.nofDifferentTests), extraIndentation, "right")
+        summary += "%s produced different output\n" % plugins.adjustText(str(self.nofDifferentTests), extraIndentation, "right")
         summary += "%s were missing file(s)\n" % plugins.adjustText(str(self.nofMissingFilesTests), extraIndentation, "right")
         summary += "%s produced new file(s)\n" % plugins.adjustText(str(self.nofNewFilesTests), extraIndentation, "right")
         summary += "%s encountered a known bug\n" % plugins.adjustText(str(self.nofKnownBugsTests), extraIndentation, "right")

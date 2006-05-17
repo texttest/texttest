@@ -346,7 +346,6 @@ class TextTestGUI(ThreadedResponder):
         self.selection.selected_foreach(self.countSelected)
         self.testsColumn.set_title("Tests: " + str(self.nofSelectedTests) + " selected")
         guilog.info(str(self.nofSelectedTests) + " tests selected")
-        self.status.output("Selected " + str(self.nofSelectedTests) + " tests.")
     def countSelected(self, model, path, iter):
         if self.model.get_value(iter, 2).classId() == "test-case":
             self.nofSelectedTests = self.nofSelectedTests + 1
@@ -412,8 +411,6 @@ class TextTestGUI(ThreadedResponder):
             self.redrawTest(test, test.state)
     # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test, state):
-        self.status.output("Updating state of test " + test.uniqueName + " to '" + repr(state) + "' ...")
-
         iter = self.itermap[test]
         self.updateStateInModel(test, iter, state)
         guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
@@ -481,7 +478,6 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 4, "All " + str(nofChildren) + " tests successful")
         self.model.set_value(iter, 5, successColor) 
 
-        self.status.output("All tests in suite " + self.model.get_value(iter, 2).uniqueName + " successful, collapsing ...")
         self.selection.get_tree_view().collapse_row(self.model.get_path(iter))
         self.collapseIfAllComplete(self.model.iter_parent(iter))
     def addNewTestToModel(self, suite, newTest, suiteIter):
@@ -1477,6 +1473,5 @@ class TestProgressMonitor:
 
         report = self.getReport()
         if self.nofRunningTests == 0 and self.nofPendingTests == 0 and len(self.completedTests) > 0:
-            self.status.output("All tests completed at " + plugins.localtime() + ".")
             guilog.info(report)
         self.tooltips.set_tip(self.progressBarEventBox, report)        

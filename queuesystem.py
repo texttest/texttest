@@ -126,6 +126,8 @@ class QueueSystemConfig(default.Config):
             return RunTestInSlave()
         else:
             return default.Config.getTestRunner(self)
+    def runsTests(self):
+        return default.Config.runsTests(self) and not self.slaveRun()
     def showExecHostsInFailures(self):
         # Always show execution hosts, many different ones are used
         return 1

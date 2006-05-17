@@ -57,7 +57,8 @@ class VirtualDisplayFinder:
             return
         # On Linux fourth column of ps output is pid
         pidStr = line.split()[3]
-        os.system(self.getSysCommand(server, "kill -9 " + pidStr))
+        print "Trying to kill unusable Xvfb process", pidStr, "on machine " + server
+        os.system(self.getSysCommand(server, "kill -9 " + pidStr, background=0))
     def getSysCommand(self, server, command, background=1):
         if server == gethostname():
             if background:
@@ -69,7 +70,7 @@ class VirtualDisplayFinder:
                 command = "'" + command + " >& /dev/null &' < /dev/null >& /dev/null &"
             else:
                 command = "'" + command + "'"
-            return "remsh " + server + " " + command
+            return "rsh " + server + " " + command
     def startServer(self, server):
         print "Starting Xvfb on machine", server
         os.system(self.getSysCommand(server, "Xvfb :42"))
@@ -82,6 +83,7 @@ class VirtualDisplayFinder:
         os.system(self.getSysCommand(server, "xterm -display " + serverName + " -e xhost +"))
         return serverName
     def getPsOutput(self, server, ownProcesses):
+        self.diag.info("Getting ps output from " + server)
         psCommand = self.getSysCommand(server, "ps -efl | grep Xvfb | grep -v grep", background=0)
         lines = os.popen(psCommand).readlines()
         for line in lines:

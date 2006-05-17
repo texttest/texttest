@@ -264,7 +264,9 @@ class Config(plugins.Configuration):
             return respond.SaveState
     def setEnvironment(self, test):
         testEnvironmentCreator = TestEnvironmentCreator(test, self.optionMap)
-        testEnvironmentCreator.setUp()
+        testEnvironmentCreator.setUp(self.runsTests())
+    def runsTests(self):
+        return not self.optionMap.has_key("gx")
     def getTextResponder(self):
         return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes
@@ -426,8 +428,9 @@ class TestEnvironmentCreator:
         self.inputFile = self.test.getFileName("input")
         self.diagDict = self.test.getConfigValue("diagnostics")
         self.diag = plugins.getDiagnostics("Environment Creator")
-    def setUp(self):
-        self.setDisplayEnvironment()
+    def setUp(self, runsTests):
+        if self.setVirtualDisplay(runsTests):
+            self.setDisplayEnvironment()
         self.setDiagEnvironment()
         if self.testCase():
             self.setUseCaseEnvironment()
@@ -436,20 +439,17 @@ class TestEnvironmentCreator:
     def testCase(self):
         return self.test.classId() == "test-case"
     def setDisplayEnvironment(self):
-        if self.setVirtualDisplay():
-            from unixonly import VirtualDisplayFinder
-            finder = VirtualDisplayFinder(self.test.app)
-            display = finder.getDisplay()
-            if display:
-                self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", display)
-                print "Tests will run with DISPLAY variable set to", display
-    def setVirtualDisplay(self):
-        # Set a virtual DISPLAY for the top level test on UNIX, if tests are going to be run (not static GUI)
-        # Don't set it if we've already got it, we've requested a slow motion replay or we're trying to record
-        # a new usecase.
-        return os.name == "posix" and self.topLevel() and not self.optionMap.has_key("gx") and \
-               not os.environ.has_key("TEXTTEST_VIRTUAL_DISPLAY") and not self.optionMap.has_key("actrep") \
-               and not self.isRecording()
+        from unixonly import VirtualDisplayFinder
+        finder = VirtualDisplayFinder(self.test.app)
+        display = finder.getDisplay()
+        if display:
+            self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", display)
+            print "Tests will run with DISPLAY variable set to", display
+    def setVirtualDisplay(self, runsTests):
+        # Set a virtual DISPLAY for the top level test on UNIX, if tests are going to be run
+        # Don't set it if we've requested a slow motion replay or we're trying to record a new usecase.
+        return runsTests and os.name == "posix" and self.topLevel() and \
+               not self.optionMap.has_key("actrep") and not self.isRecording()
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
             self.setTraceDiagnostics()

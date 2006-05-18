@@ -125,9 +125,9 @@ class VirtualDisplayFinder:
         else:
             return "", errors
     def getConnectionErrors(self, serverName):
-        testCommandLine = self.getSysCommand(gethostname(), "xterm -display " + serverName + " -e echo test", background=0)
+        testCommandLine = "xdpyinfo -display " + serverName + " > /dev/null"
         self.diag.info("Testing with command '" + testCommandLine + "'")
-        (cin, cout, cerr) = os.popen3(testCommandLine)
+        cin, cerr = os.popen4(testCommandLine)
         return cerr.read()
    
 def isCompressed(path):

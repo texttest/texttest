@@ -133,20 +133,22 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         else:
             return "idle"
     def findPriority(self):
-        cpuTime = performance.getTestPerformance(self.test)
-        if cpuTime == -1:
-            # We don't know yet...
-            return 0
-        shortQueueSeconds = self.getShortQueueSeconds()
-        if cpuTime < shortQueueSeconds:
-            return -cpuTime
-        else:
-            priority = -600 -cpuTime / 100
-            # don't return less than minimum priority
-            if priority > -1023:
-                return priority
-            else:
-                return -1023
+        # disabling mechanism as it doesn't work in SGE right now
+        return 0
+##        cpuTime = performance.getTestPerformance(self.test)
+##        if cpuTime == -1:
+##            # We don't know yet...
+##            return 0
+##        shortQueueSeconds = self.getShortQueueSeconds()
+##        if cpuTime < shortQueueSeconds:
+##            return -cpuTime
+##        else:
+##            priority = -600 -cpuTime / 100
+##            # don't return less than minimum priority
+##            if priority > -1023:
+##                return priority
+##            else:
+##                return -1023
     def getMajorReleaseResource(self):
         majorRelease = getMajorReleaseId(self.test.app)
         if majorRelease != "carmen_9":

@@ -321,6 +321,9 @@ class RunApcTestInDebugger(default.RunTest):
                 print "Ignoring unknown option " + opt
     def __repr__(self):
         return "Debugging"
+    def __del__(self):
+        # .nfs lock files are left if we don't kill the less process.
+        self.process.killAll()
     def __call__(self, test):
         self.describe(test)
         # Get the options that are sent to APCbatch.sh
@@ -332,8 +335,8 @@ class RunApcTestInDebugger(default.RunTest):
         apcLogFile.close()
         if self.showLogFile:
             command = "xterm -bg white -fg black -T " + "APCLOG-" + test.name + "" + " -e 'less +F " + apcLog + "'"
-            process = plugins.BackgroundProcess(command)
-            print "Created process : log file viewer :", process.processId
+            self.process = plugins.BackgroundProcess(command)
+            print "Created process : log file viewer :", self.process.processId
         # Create a script for gdb to run.
         gdbArgs = test.makeTmpFileName("gdb_args")
         gdbArgsFile = open(gdbArgs, "w")

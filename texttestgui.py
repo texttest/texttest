@@ -977,7 +977,11 @@ class RightWindowGUI:
             newPage = newPageDir[name]
             newContents = newPage.get_child()
             newPage.remove(newContents)
-            oldPage.add(newContents)
+            if isinstance(newContents, gtk.TextView):
+                oldPage.add(newContents)
+            else:
+                # need viewport for gtk.VBox objects
+                oldPage.add_with_viewport(newContents)
             oldPage.show()                
     def removePages(self, notebook, pageNamesRemoved):     
         for name in pageNamesRemoved:

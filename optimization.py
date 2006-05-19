@@ -1856,7 +1856,7 @@ class StartStudio(guiplugins.InteractiveTestAction):
         studio = os.path.join(os.environ["CARMSYS"], "bin", "studio")
         if not os.path.isfile(studio):
             raise plugins.TextTestError, "Cannot start studio, no file at " + studio
-        commandLine = studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
+        commandLine = "exec " + studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
                         "\",0)'" + plugins.nullRedirect() 
         process = self.startExternalProgram(commandLine)
         guiplugins.scriptEngine.monitorProcess("runs studio", process)

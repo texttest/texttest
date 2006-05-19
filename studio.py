@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.28 2006/05/02 07:40:22 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.29 2006/05/19 14:51:49 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -191,6 +191,6 @@ class ViewFile(guiplugins.ViewFile):
         if not os.path.isfile(viewProgram):
             raise plugins.TextTestError, "Could not find macro editor at " + viewProgram
         envStr = "env 'CARMSYS=" + carmSys + "' 'CARMUSR=" + carmUsr + "' "
-        commandLine = envStr + "python " + viewProgram + " -v " + fileName + plugins.nullRedirect()
+        commandLine = envStr + "exec python " + viewProgram + " -v " + fileName + plugins.nullRedirect()
         return commandLine, "macro editor"
     

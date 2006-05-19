@@ -47,6 +47,10 @@ class CheckPredictions(CheckLogFilePredictions):
             summary, errorInfo = self.parseStackTrace(stackTraceFile)
             if not summary.startswith("CPU"):
                 self.insertError(test, "crash", summary, errorInfo)
+            else:
+                test.changeState(plugins.TestState("killed", briefText="CPULIMIT", \
+                                                   freeText="Test exceeded maximum cpu time allowed\n", \
+                                                   started=1, executionHosts=test.state.executionHosts))
             os.remove(stackTraceFile)
             return 1
 

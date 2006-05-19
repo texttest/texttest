@@ -316,7 +316,10 @@ class FileComparison:
         if not file:
             return "---"
         modTime = plugins.modifiedTime(file)
-        return time.strftime("%d%b%H:%M:%S", time.localtime(modTime))
+        if modTime:
+            return time.strftime("%d%b%H:%M:%S", time.localtime(modTime))
+        else:
+            return "---"
     def needsRecalculation(self):
         # A test that has been saved doesn't need recalculating
         if self.tmpCmpFile == self.stdCmpFile or self.stdCmpFile == self.stdFile:

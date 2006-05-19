@@ -542,8 +542,8 @@ class GenHTML(plugins.Action):
         if optRun.solutions:
             input = optRun.solutions[0]
             period_start, period_end = input[optimization.periodEntryName]
-            date_start = time.mktime(time.strptime(period_start, "%Y%m%d"))
-            date_end = time.mktime(time.strptime(period_end, "%Y%m%d"))
+            date_start = time.mktime(time.strptime(period_start.strip(), "%Y%m%d"))
+            date_end = time.mktime(time.strptime(period_end.strip(), "%Y%m%d"))
             
             if date_start == date_end:
                 info.append("Daily")

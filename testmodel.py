@@ -1073,7 +1073,7 @@ class Application:
         # A certain amount of duplication here - hard to see how to avoid it
         # without compromising performance though...
         defValue = dict.get("default")
-        if defValue:
+        if defValue is not None:
             if type(defValue) == types.ListType:
                 listVal += defValue
             else:

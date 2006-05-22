@@ -216,6 +216,31 @@ class Test:
                 if len(allFiles):
                     files.append(allFiles[-1])
         return files
+    def listDataFiles(self):
+        knownDataFiles = self.getConfigValue("link_test_path") + self.getConfigValue("copy_test_path") + \
+                         self.getConfigValue("partial_copy_test_path")
+        existingDataFiles = []
+        for dataFile in knownDataFiles:
+            fileName = self.getFileName(dataFile)
+            if fileName:
+                existingDataFiles += self.listDataFilesFrom([ fileName ])
+        return existingDataFiles
+    def listDataFilesFrom(self, files):
+        files.sort()
+        dataFiles = []
+        dirs = []
+        for file in files:
+            if os.path.basename(file) == "CVS":
+                continue
+            if os.path.isdir(file):
+                dirs.append(file)
+            else:
+                dataFiles.append(file)
+        for subdir in dirs:
+            dataFiles.append(subdir)
+            fileList = map(lambda file: os.path.join(subdir, file), os.listdir(subdir))
+            dataFiles += self.listDataFilesFrom(fileList)
+        return dataFiles
     def findAllStdFiles(self, stem):
         allFiles = []
         for dircache in self.dircaches:
@@ -811,6 +836,11 @@ class Application:
         self.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         self.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
+        # various varieties of test data
+        self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
+        self.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
+        self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
+        
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("slow_motion_replay_speed", 0, "How long in seconds to wait between each GUI action")
         # External viewing tools

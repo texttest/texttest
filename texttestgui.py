@@ -1188,36 +1188,31 @@ class TestFileGUI(FileViewGUI):
         self.model.set_value(defiter, 0, "Definition Files")
         self.addStandardFilesUnderIter(defiter, defFiles)
         self.addStaticDataFilesToModel(test)
-    def getDataFileList(self, test):
+    def getDisplayDataFiles(self, test):
         return test.app.configObject.extraReadFiles(test).items()
     def addStaticDataFilesToModel(self, test):
-        dataFileList = self.getDataFileList(test)
-        if len(dataFileList) == 0:
+        dataFiles = test.listDataFiles()
+        displayDataFiles = self.getDisplayDataFiles(test)
+        if len(dataFiles) == 0 and len(displayDataFiles) == 0:
             return
         datiter = self.model.insert_before(None, None)
-        self.model.set_value(datiter, 0, "Data Files")            
-        for name, filelist in dataFileList:
-            if len(name) > 0:
-                exiter = self.model.insert_before(datiter, None)
-                self.model.set_value(exiter, 0, name)
-                self.addDataFilesUnderIter(exiter, filelist)
-            else:
-                self.addDataFilesUnderIter(datiter, filelist)
-    def addDataFilesUnderIter(self, iter, files):
-        files.sort()
+        self.model.set_value(datiter, 0, "Data Files")
         colour = self.getStaticColour()
-        dirs = []
+        self.addDataFilesUnderIter(test, datiter, dataFiles, colour)
+        for name, filelist in displayDataFiles:
+            exiter = self.model.insert_before(datiter, None)
+            self.model.set_value(exiter, 0, name)
+            for file in filelist:
+                self.addFileToModel(exiter, file, None, colour)
+    def addDataFilesUnderIter(self, test, iter, files, colour):
+        dirIters = { test.getDirectory() : iter }
+        parentIter = iter
         for file in files:
-            if os.path.basename(file) == "CVS":
-                continue
+            parent, local = os.path.split(file)
+            parentIter = dirIters[parent]
+            newiter = self.addFileToModel(parentIter, file, None, colour)
             if os.path.isdir(file):
-                dirs.append(file)
-            else:
-                self.addFileToModel(iter, file, None, colour)
-        for subdir in dirs:
-            newiter = self.addFileToModel(iter, subdir, None, colour)
-            fileList = map(lambda file: os.path.join(subdir, file), os.listdir(subdir))
-            self.addDataFilesUnderIter(newiter, fileList)
+                dirIters[file] = newiter
     
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):

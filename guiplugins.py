@@ -880,6 +880,13 @@ class CopyTest(ImportTest):
             if dirname == self.test.getDirectory():
                 targetFile = os.path.join(testDir, local)
                 shutil.copyfile(sourceFile, targetFile)
+        dataFiles = self.test.listDataFiles()
+        for sourcePath in dataFiles:
+            if os.path.isdir(sourcePath):
+                continue
+            targetPath = sourcePath.replace(self.test.getDirectory(), testDir)
+            plugins.ensureDirExistsForFile(targetPath)
+            shutil.copyfile(sourcePath, targetPath)
     
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:

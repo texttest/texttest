@@ -287,17 +287,6 @@ class Config(plugins.Configuration):
         if not test.state.isComplete():
             info += self.progressText(test)
         return info
-    def extraReadFiles(self, test):
-        knownDataFiles = test.getConfigValue("link_test_path") + test.getConfigValue("copy_test_path") + \
-                         test.getConfigValue("partial_copy_test_path")
-        existingDataFiles = []
-        for dataFile in knownDataFiles:
-            fileName = test.getFileName(dataFile)
-            if fileName:
-                existingDataFiles.append(fileName)
-        readFiles = seqdict()
-        readFiles[""] = existingDataFiles
-        return readFiles
     def progressText(self, test):
         perc = self.calculatePercentage(test)
         if perc > 0:
@@ -366,9 +355,6 @@ class Config(plugins.Configuration):
         app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
         app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
         app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
-        app.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
-        app.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
-        app.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         app.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")

@@ -5,7 +5,6 @@ import os, filecmp, string, sys, plugins, time
 from ndict import seqdict
 from predict import FailedPrediction
 from shutil import copyfile
-from fnmatch import fnmatch
 from tempfile import mktemp
 from re import sub
 
@@ -302,11 +301,7 @@ class FileComparison:
         self._cacheValues(test.app)
     def _cacheValues(self, app):
         self.differenceId = self._hasDifferences(app)
-        self.severity = 99
-        failureSeverityDict = app.getConfigValue("failure_severity")
-        for key in failureSeverityDict.keys():
-            if fnmatch(self.stem, key):
-                self.severity = failureSeverityDict[key]
+        self.severity = app.getCompositeConfigValue("failure_severity", self.stem)
     def __repr__(self):
         return self.stem
     def modifiedDates(self):
@@ -388,14 +383,12 @@ class FileComparison:
 class RunDependentTextFilter:
     def __init__(self, test, stem):
         self.diag = plugins.getDiagnostics("Run Dependent Text")
-        self.contentFilters = []
+        regexp = self.getWriteDirRegexp(test)
+        runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
+        self.contentFilters = [ LineFilter(text, regexp, self.diag) for text in runDepTexts ]
         self.orderFilters = seqdict()
-        dict = test.getConfigValue("run_dependent_text")
-        for text in self.findConfigTexts(dict, stem):
-            self.contentFilters.append(LineFilter(text, self.getWriteDirRegexp(test), self.diag))
-        dict = test.getConfigValue("unordered_text")
-        for text in self.findConfigTexts(dict, stem):
-            orderFilter = LineFilter(text, self.getWriteDirRegexp(test), self.diag)
+        for text in test.getCompositeConfigValue("unordered_text", stem):
+            orderFilter = LineFilter(text, regexp, self.diag)
             self.orderFilters[orderFilter] = []
         self.osChange = self.changedOs(test.app)
     def changedOs(self, app):
@@ -405,12 +398,6 @@ class RunDependentTextFilter:
         return os.name != homeOs
     def hasFilters(self):
         return len(self.contentFilters) > 0 or len(self.orderFilters) > 0
-    def findConfigTexts(self, dict, stem):
-        texts = []
-        for key in dict.keys():
-            if fnmatch(stem, key):
-                texts += dict[key]
-        return texts
     def shouldFilter(self, fileName, newFileName):
         if not fileName:
             return 0

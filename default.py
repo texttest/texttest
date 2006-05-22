@@ -336,6 +336,7 @@ class Config(plugins.Configuration):
         severities["performance"] = 2
         severities["usecase"] = 2
         severities["catalogue"] = 2
+        severities["default"] = 99
         return severities
     def getDefaultMailAddress(self):
         user = os.getenv("USER", "$USER")
@@ -374,8 +375,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
         app.setConfigDefault("collate_file", self.getDefaultCollations(), "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")
-        app.setConfigDefault("run_dependent_text", { "" : [] }, "Mapping of patterns to remove from result files")
-        app.setConfigDefault("unordered_text", { "" : [] }, "Mapping of patterns to extract and sort from result files")
+        app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
+        app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
         app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")
         app.setConfigDefault("internal_error_text", [], "List of text to be considered as an internal error, if present")
@@ -610,7 +611,7 @@ class PrepareWriteDirectory(plugins.Action):
         else:
             return self.getSourceFromSearchPath(test, configName)
     def getSourceFromSearchPath(self, test, configName):
-        searchPathDirs = test.app.getCompositeConfigValue("test_data_searchpath", configName)
+        searchPathDirs = test.getCompositeConfigValue("test_data_searchpath", configName)
         for dir in searchPathDirs:
             fullPath = os.path.join(dir, configName)
             if os.path.exists(fullPath):

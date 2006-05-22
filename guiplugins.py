@@ -175,7 +175,8 @@ class InteractiveTestAction(plugins.Action,InteractiveAction):
     def getConfigValue(self, entryName):
         return self.test.getConfigValue(entryName)
     def getViewCommand(self, fileName):
-        viewProgram = self.test.getConfigValue("view_program")
+        stem = os.path.basename(fileName).split(".")[0]
+        viewProgram = self.test.getCompositeConfigValue("view_program", stem)
         if not plugins.canExecute(viewProgram):
             raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
                   "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
@@ -195,7 +196,7 @@ class InteractiveTestAction(plugins.Action,InteractiveAction):
         if refresh:
             exitHandler = self.test.filesChanged
         commandLine, descriptor = self.getViewCommand(fileName)
-        description = self.test.getConfigValue("view_program") + " " + self.getRelativeFilename(fileName)
+        description = descriptor + " " + self.getRelativeFilename(fileName)
         guilog.info("Viewing file " + fileName.replace(os.sep, "/") + " using '" + descriptor + "', refresh set to " + str(refresh))
         process = self.startExternalProgram(commandLine, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])

@@ -342,7 +342,7 @@ def getRaveNames(test):
     if len(raveNameDir) == 1:
         return raveNameDir["default"]
     else:
-        return test.app.getCompositeConfigValue("rave_name", getProductName(test))
+        return test.getCompositeConfigValue("rave_name", getProductName(test))
 
 def getBasicRaveName(test):
     return test.getConfigValue("rave_name")["default"][0]

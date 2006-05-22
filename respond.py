@@ -121,7 +121,7 @@ class InteractiveResponder(Responder):
             # Don't fire up GUI tools for missing results...
             return None, None
         if comparison.newResult():
-            tool = test.getConfigValue("view_program")
+            tool = test.getCompositeConfigValue("view_program", comparison.stem)
             cmdLine = tool + " " + comparison.tmpCmpFile + plugins.nullRedirect()
         else:
             tool = test.getConfigValue("diff_program")

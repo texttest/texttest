@@ -1902,25 +1902,5 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
                     info += line
             info += os.linesep
         return info
-        
-class ViewFile(guiplugins.ViewFile):
-    def __init__(self, test, oldOptionGroup):
-        guiplugins.ViewFile.__init__(self, test, oldOptionGroup)
-        self.dotView = 0
-    def view(self, comparison, filePath):
-        self.dotView = 0
-        fileName = os.path.basename(filePath)
-        if not fileName.startswith("pathdotgraph_"):
-            return guiplugins.ViewFile.view(self, comparison, filePath)
-        else:
-            self.dotView = 1
-            return self.viewFile(filePath, refresh=0)
-    
-    def getViewCommand(self, fileName):
-        if not self.dotView:
-            return guiplugins.ViewFile.getViewCommand(self, fileName)
-        viewProgram = "/users/johana/bin/dotfileview.sh"
-        return viewProgram + " " + fileName + plugins.nullRedirect(), "DOTview"
-    
 
 guiplugins.interactiveActionHandler.testClasses += [ CVSLogInGUI ]

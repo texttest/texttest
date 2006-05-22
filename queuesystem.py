@@ -192,7 +192,7 @@ class SubmissionRules:
         if len(self.envResource):
             resourceList.append(self.envResource)
         if self.forceOnPerformanceMachines():
-            resources = self.test.app.getCompositeConfigValue("performance_test_resource", "cputime")
+            resources = self.test.getCompositeConfigValue("performance_test_resource", "cputime")
             for resource in resources:
                 resourceList.append(resource)
         return resourceList
@@ -211,7 +211,7 @@ class SubmissionRules:
     def findMachineList(self):
         if not self.forceOnPerformanceMachines():
             return []
-        performanceMachines = self.test.app.getCompositeConfigValue("performance_test_machine", "cputime")
+        performanceMachines = self.test.getCompositeConfigValue("performance_test_machine", "cputime")
         if len(performanceMachines) == 0 or performanceMachines[0] == "none":
             return []
 
@@ -528,7 +528,7 @@ class WaitForKill(plugins.Action):
             
 class MachineInfoFinder(default.MachineInfoFinder):
     def __init__(self):
-        self.queueMachineInfo = None        
+        self.queueMachineInfo = None
     def findPerformanceMachines(self, app, fileStem):
         perfMachines = []
         resources = app.getCompositeConfigValue("performance_test_resource", fileStem)

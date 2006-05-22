@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-import os, sys, types, string, plugins, exceptions, log4py, shutil, fnmatch
+import os, sys, types, string, plugins, exceptions, log4py, shutil
 from time import time
+from fnmatch import fnmatch
 from usecase import ScriptEngine, UseCaseScriptError
 from ndict import seqdict
 from copy import copy
@@ -32,7 +33,7 @@ class DirectoryCache:
         matchingFiles = filter(lambda fileName : self.matchesPattern(fileName, pattern, allowedExtensions), self.contents)
         return map(self.pathName, matchingFiles)
     def matchesPattern(self, fileName, pattern, allowedExtensions):
-        if not fnmatch.fnmatch(fileName, pattern):
+        if not fnmatch(fileName, pattern):
             return False
         stem, versions = self.splitStem(fileName)
         return self.matchVersions(versions, allowedExtensions)
@@ -256,6 +257,8 @@ class Test:
         return self.app._getFileName(self.dircaches, stem, refVersion)
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars)
+    def getCompositeConfigValue(self, key, subKey):
+        return self.app.getCompositeConfigValue(key, subKey)
     def makePathName(self, fileName):
         for dircache in self.dircaches:
             if dircache.exists(fileName):
@@ -827,14 +830,19 @@ class Application:
         self.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
         self.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
         self.setConfigDefault("diff_program", "tkdiff", "External program to use for graphical file comparison")
-        viewDoc = "External program to use for viewing and editing text files"
-        follDoc = "External program to use for following progress of a file"
+        self.setConfigDefault("view_program", { "default": self.defaultViewProgram() },  \
+                              "External program(s) to use for viewing and editing text files")
+        self.setConfigDefault("follow_program", self.defaultFollowProgram(), "External program to use for following progress of a file")
+    def defaultViewProgram(self):
         if os.name == "posix":
-            self.setConfigDefault("view_program", "xemacs", viewDoc)
-            self.setConfigDefault("follow_program", "tail -f", follDoc)
-        elif os.name == "dos" or os.name == "nt":
-            self.setConfigDefault("view_program", "notepad", viewDoc)
-            self.setConfigDefault("follow_program", "baretail", follDoc)
+            return "xemacs"
+        else:
+            return "notepad"
+    def defaultFollowProgram(self):
+        if os.name == "posix":
+            return "tail -f"
+        else:
+            return "baretail"
     def getGuiColourDictionary(self):
         dict = {}
         dict["success"] = "green"
@@ -1055,14 +1063,22 @@ class Application:
             return value
     def getCompositeConfigValue(self, key, subKey):
         dict = self.getConfigValue(key)
-        if dict.has_key(subKey):
-            retVal = dict[subKey]
-            if type(retVal) == types.ListType:
-                return retVal + dict["default"]
+        listVal = []
+        for currSubKey, currValue in dict.items():
+            if fnmatch(subKey, currSubKey):
+                if type(currValue) == types.ListType:
+                    listVal += currValue
+                else:
+                    return currValue
+        # A certain amount of duplication here - hard to see how to avoid it
+        # without compromising performance though...
+        defValue = dict.get("default")
+        if defValue:
+            if type(defValue) == types.ListType:
+                listVal += defValue
             else:
-                return retVal
-        elif dict.has_key("default"):
-            return dict["default"]
+                return defValue
+        return listVal
     def addConfigEntry(self, key, value, sectionName = ""):
         self.configDir.addEntry(key, value, sectionName)
     def setConfigDefault(self, key, value, docString = ""):

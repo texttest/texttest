@@ -876,8 +876,10 @@ class CopyTest(ImportTest):
     def createTestContents(self, suite, testDir):
         stdFiles, defFiles = self.test.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
-            targetFile = os.path.join(testDir, os.path.basename(sourceFile))
-            shutil.copyfile(sourceFile, targetFile)
+            dirname, local = os.path.split(sourceFile)
+            if dirname == self.test.getDirectory():
+                targetFile = os.path.join(testDir, local)
+                shutil.copyfile(sourceFile, targetFile)
     
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:

@@ -101,8 +101,8 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         self.nightjob = nightjob
         self.archResources = {}
         self.archResources["i386_linux.carmen_11"]   = "carmarch=\"*linux*\""
-        self.archResources["i386_linux.carmen_12"]   = "carmrun12=1,carmbuildmaster=1,carmarch=\"*linux*\""
-        self.archResources["i386_linux.master"]      = "carmrunmaster=1,carmarch=\"*linux*\""
+        self.archResources["i386_linux.carmen_12"]   = "carmrun12=1,osversion=RHEL4,carmarch=\"*x86_64_linux*\""
+        self.archResources["i386_linux.master"]      = "carmrunmaster=1,osversion=RHEL4,carmarch=\"*x86_64_linux*\""
         self.archResources["x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\""
         self.archResources["boost.x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\",carmarch=\"x86_64_linux\""
         self.archResources["x86_64_linux.master"]    = "osversion=\"RHEL4\",carmarch=\"x86_64_linux\""
@@ -111,8 +111,8 @@ class SgeSubmissionRules(CarmenSubmissionRules):
  #                              R3-Pent_32 R3-Xeon_32  R3-Opteron_32 R3-Opteron_64 R4-Xeon_32 R4-Opteron_64
  #
  # i386_linux.carmen_11           X          X           X                                      x
- # i386_linux.carmen_12           x          X           X                                      X
- # i386_linux.master              x          x           X                           X?         X
+ # i386_linux.carmen_12                                                                         X
+ # i386_linux.master                                                                 X?         X
  # x86_64_linux.carmen_12                                X             X                        X
  # boost.x86_64_linux.carmen_12                                        X                        X
  # x86_64_linux.master                                                                          X

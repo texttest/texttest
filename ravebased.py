@@ -77,9 +77,9 @@ class UserFilter(default.TextFilter):
  #                              R3-Pent_32 R3-Xeon_32  R3-Opteron_32 R3-Opteron_64 R4-Xeon_32 R4-Opteron_64
  #
  # i386_linux.carmen_11           X          X           X                                      x
- # i386_linux.carmen_12           x          X           X                                      X
- # i386_linux.master              x          x           X                           X?         X
- # x86_64_linux.carmen_12                                              X                        X
+ # i386_linux.carmen_12                                                                         X
+ # i386_linux.master                                                                            X
+ # x86_64_linux.carmen_12                                                                       X
  # x86_64_linux.master                                                                          X
  #
 
@@ -99,8 +99,8 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):
             self.normalSubmissionRules.envResource = os.environ["QUEUE_SYSTEM_RESOURCE_RAVE"]
         self.raveArchResources = {}
-        self.raveArchResources["i386_linux.carmen_12"]   = "osversion=\"RHEL3\",carmarch=\"*i386_linux*\""
-        self.raveArchResources["i386_linux.master"]      = "osversion=\"RHEL3\",carmarch=\"*i386_linux*\""
+        self.raveArchResources["i386_linux.carmen_12"]   = "osversion=\"RHEL4\",carmarch=\"*x86_64_linux*\""
+        self.raveArchResources["i386_linux.master"]      = "osversion=\"RHEL4\",carmarch=\"*x86_64_linux*\""
         self.raveArchResources["x86_64_linux.carmen_12"] = "osversion=\"RHEL3\",carmarch=\"*x86_64_linux*\""
     def getJobName(self):
         if self.testRuleName:
@@ -134,6 +134,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         
         archDesc = getArchitecture(self.test.app) + "." + getMajorReleaseId(self.test.app)
         if self.raveArchResources.has_key(archDesc):
+            normalResources = self.normalSubmissionRules.findResourceList()
             normalResources.append(self.raveArchResources[archDesc])
         else:
             archRes = "carmarch=\"*" + getArchitecture(self.test.app) + "*\""

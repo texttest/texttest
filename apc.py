@@ -200,7 +200,7 @@ class ApcConfig(optimization.OptimizationConfig):
             except (OSError,IOError):
                 return "Error opening/reading " + runStatusHeadFile                 
         else:
-            return "Run status file is not avaliable yet."
+            return "Run status file is not available yet."
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)

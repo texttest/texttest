@@ -547,23 +547,19 @@ class CompileRules(plugins.Action):
         else:
             return self.modeString
     def performCompile(self, test, ruleset, commandLine):
+        # We don't have a write directory here if running remotely and creating one tends to cause the Eqw problem
+        # Instead we write a temporary file and send the contents over the wires.
         compTmp = mktemp()
         self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.getcwd())
         fullCommand = commandLine + " > " + compTmp + " 2>&1"
         test.changeState(RunningRuleCompilation(test.state))
         retStatus = os.system(fullCommand)
+        raveInfo = open(compTmp).read()
         if retStatus:
-            briefText, fullText = self.getErrorMessage(test, ruleset, compTmp)
-            test.changeState(RuleBuildFailed(briefText, fullText))
+            test.changeState(RuleBuildFailed("Ruleset build failed", raveInfo))
         else:
-            test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + ruleset + " succesfully compiled"))
-        os.remove(compTmp)
-    def getErrorMessage(self, test, ruleset, compTmp):
-        maxLength = test.getConfigValue("lines_of_crc_compile")
-        maxWidth = test.getConfigValue("max_width_text_difference")
-        previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
-        errContents = previewGenerator.getPreview(open(compTmp))
-        return "Ruleset build failed", "Failed to build ruleset " + ruleset + os.linesep + errContents 
+            test.changeState(plugins.TestState("ruleset_compiled", raveInfo))
+        os.remove(compTmp) 
     def setUpSuite(self, suite):
         if suite.parent is None or isUserSuite(suite):
             self.describe(suite)
@@ -577,8 +573,8 @@ class RuleBuildKilled(queuesystem.KillTestInSlave):
         short, long = self.getKillInfo(test)
         briefText = "Ruleset build " + short
         freeText = "Ruleset compilation " + long
-        test.changeState(RuleBuildFailed(briefText, freeText))
-
+        test.changeState(RuleBuildFailed(briefText, freeText))    
+    
 class SynchroniseState(plugins.Action):
     def getCompilingTestState(self, test):
         try:
@@ -642,6 +638,7 @@ class WaitForRuleCompile(queuesystem.WaitForCompletion):
             return
         if not test.state.isComplete() and test.state.category != "ruleset_compiled":
             return self.WAIT | self.RETRY
+        self.handleCompilerOutput(test)
         self.describe(test, self.getResultText(test))
     def getResultText(self, test):
         text = " (ruleset " + self.getRuleSetName(test) + " "
@@ -655,6 +652,22 @@ class WaitForRuleCompile(queuesystem.WaitForCompletion):
         if fetchResults:
             actions.append(queuesystem.WaitForKill())
         return actions
+    def handleCompilerOutput(self, test):
+        if test.state.freeText.find("\n") == -1:
+            # This will be the case for "synchronised" jobs
+            return
+        fileToWrite = test.makeTmpFileName("crc_compile_output", forFramework=1)
+        writeFile = open(fileToWrite, "w")
+        writeFile.write(test.state.freeText)
+        writeFile.close()
+        if test.state.isComplete():
+            newText = "Failed to build ruleset " + self.getRuleSetName(test) + "\n"
+            # For final reports, abbreviate the free text to avoid newsgroup bounces etc.
+            maxLength = test.getConfigValue("lines_of_crc_compile")
+            maxWidth = test.getConfigValue("max_width_text_difference")
+            previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
+            newText += previewGenerator.getPreview(open(fileToWrite))
+            test.state.freeText = newText
 
 class KillRuleBuildSubmission(queuesystem.KillTestSubmission):
     def __repr__(self):

@@ -702,8 +702,6 @@ class PrepareWriteDirectory(plugins.Action):
             writeDirs.append(targetPath)
         return writeDirs
     def handleReadOnly(self, sourceFile, targetFile):
-        if os.path.basename(sourceFile) == "CVS":
-            return
         try:
             self.copylink(sourceFile, targetFile)
         except OSError:
@@ -1157,32 +1155,11 @@ class CreateCatalogue(plugins.Action):
         return processes
     def findAllPaths(self, test):
         allPaths = seqdict()
-        subDirs = []
         for path in test.listUnownedTmpPaths():
-            self.categorisePath(path, allPaths, subDirs)
-        for subDir in subDirs:
-            self.listDirectory(subDir, allPaths)
+            editInfo = self.getEditInfo(path)
+            self.diag.info("Path " + path + " edit info " + str(editInfo))
+            allPaths[path] = editInfo
         return allPaths
-    def categorisePath(self, path, allPaths, subDirs):
-        # Never list special directories (CVS is the one we know about...)
-        if os.path.basename(path) == "CVS":
-            return 
-        editInfo = self.getEditInfo(path)
-        self.diag.info("Path " + path + " edit info " + str(editInfo))
-        allPaths[path] = editInfo
-        # important not to follow soft links in catalogues...
-        if os.path.isdir(path) and not os.path.islink(path):
-            subDirs.append(path)
-    def listDirectory(self, dir, allPaths):
-        subDirs = []
-        availPaths = os.listdir(dir)
-        availPaths.sort()
-        for writeFile in availPaths:
-            fullPath = os.path.join(dir, writeFile)
-            self.categorisePath(fullPath, allPaths, subDirs)
-                
-        for subDir in subDirs:
-            self.listDirectory(subDir, allPaths)
     def getEditInfo(self, fullPath):
         # Check modified times for files and directories, targets for links
         if os.path.islink(fullPath):

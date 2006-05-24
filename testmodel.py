@@ -223,24 +223,33 @@ class Test:
         for dataFile in knownDataFiles:
             fileName = self.getFileName(dataFile)
             if fileName:
-                existingDataFiles += self.listDataFilesFrom([ fileName ])
+                existingDataFiles += self.listFiles(fileName, dataFile)
         return existingDataFiles
-    def listDataFilesFrom(self, files):
+    def listFiles(self, fileName, dataFile):
+        filesToIgnore = self.getCompositeConfigValue("test_data_ignore", dataFile)
+        return self.listFilesFrom([ fileName ], filesToIgnore)
+    def listFilesFrom(self, files, filesToIgnore):
         files.sort()
         dataFiles = []
         dirs = []
+        self.diag.info("Listing files from " + repr(files) + ", ignoring " + repr(filesToIgnore))
         for file in files:
-            if os.path.basename(file) == "CVS":
+            if self.fileMatches(os.path.basename(file), filesToIgnore):
                 continue
-            if os.path.isdir(file):
+            if os.path.isdir(file) and not os.path.islink(file):
                 dirs.append(file)
             else:
                 dataFiles.append(file)
         for subdir in dirs:
             dataFiles.append(subdir)
             fileList = map(lambda file: os.path.join(subdir, file), os.listdir(subdir))
-            dataFiles += self.listDataFilesFrom(fileList)
+            dataFiles += self.listFilesFrom(fileList, filesToIgnore)
         return dataFiles
+    def fileMatches(self, file, filesToIgnore):
+        for ignFile in filesToIgnore:
+            if fnmatch(file, ignFile):
+                return True
+        return False
     def findAllStdFiles(self, stem):
         allFiles = []
         for dircache in self.dircaches:
@@ -424,7 +433,7 @@ class TestCase(Test):
                 continue
             fullPath = os.path.join(self.writeDirectories[0], file)
             if not fullPath in self.writeDirectories:
-                paths.append(fullPath)
+                paths += self.listFiles(fullPath, file)
         return paths
     def grabWorkingDirectory(self):
         os.chdir(self.writeDirectories[0])
@@ -840,7 +849,7 @@ class Application:
         self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
         self.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
-        
+        self.setConfigDefault("test_data_ignore", { "default" : [] }, "Elements under test data structures which should not be viewed or change-monitored")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("slow_motion_replay_speed", 0, "How long in seconds to wait between each GUI action")
         # External viewing tools

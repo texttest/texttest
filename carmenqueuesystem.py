@@ -246,6 +246,8 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("default_major_release", "master")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10)
         app.setConfigDefault("maximum_cputime_for_chunking", 0.0)
+        # plenty of people use CVS at Carmen, best to ignore it in data
+        app.addConfigEntry("default", "CVS", "test_data_ignore")
         for var, value in self.getCarmenEnvironment(app):
             os.environ[var] = value
     def defaultLoginShell(self):
@@ -319,7 +321,7 @@ class RunWithParallelAction(plugins.Action):
         executableProcessName = childProcesses[-1].getName()
         parentProcessName = childProcesses[-2].getName()
         if self.isExecutable(executableProcessName, parentProcessName, test):
-            self.diag.info("Chose process as executable : " + executableProcessName)
+            self.diag.info("Chose process as executable : " + executableProcessName + " parent process " + parentProcessName)
             return childProcesses[-1], childProcesses[-2]
         else:
             self.diag.info("Rejected process as executable : " + executableProcessName)

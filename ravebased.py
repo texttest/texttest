@@ -94,14 +94,11 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         # Ignore all command line options, but take account of environment etc...
         self.normalSubmissionRules.optionMap = {}
         self.normalSubmissionRules.presetPerfCategory = "short"
+        self.normalSubmissionRules.majRelResourceType = "build"
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY_RAVE"):
             self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):
             self.normalSubmissionRules.envResource = os.environ["QUEUE_SYSTEM_RESOURCE_RAVE"]
-        self.raveArchResources = {}
-        self.raveArchResources["i386_linux.carmen_12"]   = "osversion=\"RHEL4\",carmarch=\"*x86_64_linux*\""
-        self.raveArchResources["i386_linux.master"]      = "osversion=\"RHEL4\",carmarch=\"*x86_64_linux*\""
-        self.raveArchResources["x86_64_linux.carmen_12"] = "osversion=\"RHEL3\",carmarch=\"*x86_64_linux*\""
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName
@@ -124,26 +121,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
     def useSge(self):
         return isinstance(self.normalSubmissionRules, SgeSubmissionRules)
     def findResourceList(self):
-        normalResources = self.normalSubmissionRules.findResourceList()
-        majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
-        if majRelResource:
-            normalResources.append(majRelResource)
-        # architecture resources for SGE
-        if not self.useSge():
-            return normalResources
-        
-        archDesc = getArchitecture(self.test.app) + "." + getMajorReleaseId(self.test.app)
-        if self.raveArchResources.has_key(archDesc):
-            normalResources = self.normalSubmissionRules.findResourceList()
-            normalResources.append(self.raveArchResources[archDesc])
-        else:
-            archRes = "carmarch=\"*" + getArchitecture(self.test.app) + "*\""
-            for res in normalResources:
-                if res.find(archRes) != -1:
-                    return normalResources
-            # Must always use the correct architecture
-            normalResources.append(archRes)
-        return normalResources
+        return self.normalSubmissionRules.findResourceList()
     def getSubmitSuffix(self, name):
         tx = self.normalSubmissionRules.getSubmitSuffix(name)
         sPos = tx.find(", requesting")

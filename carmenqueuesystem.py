@@ -99,25 +99,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
     def __init__(self, optionMap, test, nightjob=False):
         CarmenSubmissionRules.__init__(self, optionMap, test)
         self.nightjob = nightjob
-        self.archResources = {}
-        self.archResources["i386_linux.carmen_11"]   = "carmarch=\"*linux*\""
-        self.archResources["i386_linux.carmen_12"]   = "carmrun12=1,osversion=RHEL4,carmarch=\"*x86_64_linux*\""
-        self.archResources["i386_linux.master"]      = "carmrunmaster=1,osversion=RHEL4,carmarch=\"*x86_64_linux*\""
-        self.archResources["x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\""
-        self.archResources["boost.x86_64_linux.carmen_12"] = "carmrun12=1,model=\"Opteron*\",carmarch=\"x86_64_linux\""
-        self.archResources["x86_64_linux.master"]    = "osversion=\"RHEL4\",carmarch=\"x86_64_linux\""
-        
- #
- #                              R3-Pent_32 R3-Xeon_32  R3-Opteron_32 R3-Opteron_64 R4-Xeon_32 R4-Opteron_64
- #
- # i386_linux.carmen_11           X          X           X                                      x
- # i386_linux.carmen_12                                                                         X
- # i386_linux.master                                                                 X?         X
- # x86_64_linux.carmen_12                                X             X                        X
- # boost.x86_64_linux.carmen_12                                        X                        X
- # x86_64_linux.master                                                                          X
- #
-        
+        self.majRelResourceType = "run"
     def findQueue(self):
         # Carmen's queues are all 'hidden', requesting them directly is not allowed.
         # They must be requested by their 'queue resources', that have the same names...
@@ -149,23 +131,33 @@ class SgeSubmissionRules(CarmenSubmissionRules):
             else:
                 return -1023
     def getMajorReleaseResource(self):
-        majorRelease = getMajorReleaseId(self.test.app)
-        if majorRelease != "carmen_9":
+        majorRelease = getMajorReleaseVersion(self.test.app)
+        if majorRelease == "9":
             # Can't build on these machines anyway - texttest won't work!
-            return "carmbuild" + majorRelease.replace("carmen_", "") + "=1"
+            return ""
+        if self.majRelResourceType == "build":
+            # Can't use carmbuild resources anyway... they refer to CARMSYS builds currently
+            return self.getBuildResource(majorRelease)
+        else:
+            # The right answer
+            return "carm" + self.majRelResourceType + majorRelease + "=1"
+    def getBuildResource(self, majorRelease):
+        if majorRelease == "master" or majorRelease == "12" and self.archToUse.find("linux") != -1:
+            # Force rave compilations on 
+            return "osversion=RHEL4"
         else:
             return ""
     def findConcreteResources(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
-        archDesc = getArchitecture(self.test.app) + "." + getMajorReleaseId(self.test.app)
-        if "boost" in self.test.app.versions  and self.archResources.has_key("boost." + archDesc):
-            resources.append(self.archResources["boost." + archDesc])
-        elif self.archResources.has_key(archDesc):
-            resources.append(self.archResources[archDesc])
-        else:
-            resources.append("carmarch=\"*" + self.archToUse + "*\"")
+        resources.append("carmarch=\"*" + self.getArchResource() + "*\"")
+        resources.append(self.getMajorReleaseResource())
         return resources
+    def getArchResource(self):
+        if self.archToUse == "i386_linux":
+            return "linux"
+        else:
+            return self.archToUse
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]
     def getSubmitSuffix(self, name):

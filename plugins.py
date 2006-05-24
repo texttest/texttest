@@ -714,7 +714,11 @@ class BackgroundProcess(Process):
             self.exitHandler(*self.exitHandlerArgs)
     def waitForTermination(self):
         if self.processHandle != None:
-            os.waitpid(self.processHandle, 0)
+            try:
+                os.waitpid(self.processHandle, 0)
+            except OSError:
+                # if it's not there to wait for, don't throw...
+                pass
     def hasTerminated(self):
         if self.processId == None:
             return 1

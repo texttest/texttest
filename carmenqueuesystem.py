@@ -142,7 +142,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
             # The right answer
             return "carm" + self.majRelResourceType + majorRelease + "=1"
     def getBuildResource(self, majorRelease):
-        if majorRelease == "master" or majorRelease == "12" and self.archToUse.find("linux") != -1:
+        if (majorRelease == "master" or majorRelease == "12") and self.archToUse.find("linux") != -1:
             # Force rave compilations on 
             return "osversion=RHEL4"
         else:

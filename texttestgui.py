@@ -1281,6 +1281,7 @@ class TestProgressMonitor:
     def __init__(self, totalNofTests, nofFailedSetupTests, applications, status):
         # If we get here, we know that we want to show progress
         self.completedTests = {}
+        self.completionTime = ""
         self.totalNofTests = totalNofTests
         self.nofFailedSetupTests = nofFailedSetupTests
         self.nofCompletedTests = nofFailedSetupTests
@@ -1458,10 +1459,12 @@ class TestProgressMonitor:
             self.nofRunningTests = 0
 
         if self.nofCompletedTests >= self.totalNofTests:
+            if self.completionTime == "":
+                self.completionTime = plugins.localtime()
             if self.nofFailedTests != 0:
-                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed at " + plugins.localtime() + " (" + str(self.nofFailedTests) + " tests failed)")
+                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed at " + self.completionTime + " (" + str(self.nofFailedTests) + " tests failed)")
             else:
-                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed at " + plugins.localtime())
+                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed at " + self.completionTime)
             self.progressBar.set_fraction(1.0)
         else:
             if self.nofFailedTests != 0:

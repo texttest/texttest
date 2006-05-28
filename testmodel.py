@@ -23,7 +23,7 @@ class DirectoryCache:
         self.contents = os.listdir(self.dir)
         self.contents.sort()
     def exists(self, fileName):
-        if fileName.find(os.sep) != -1:
+        if fileName.find("/") != -1:
             return os.path.exists(self.pathName(fileName))
         else:
             return fileName in self.contents
@@ -410,6 +410,7 @@ class TestCase(Test):
         tmpDir = self.getDirectory(temporary=1)
         return plugins.relpath(file, tmpDir)
     def getSaveFileName(self, tmpFile, versionString):
+        self.diagnose("save file from " + tmpFile + " - " + self.getDirectory(temporary=1))
         relPath = plugins.relpath(tmpFile, self.getDirectory(temporary=1))
         stdFile = os.path.join(self.getDirectory(), relPath)
         if len(versionString):
@@ -1135,7 +1136,7 @@ class Application:
             return self.makeAbsoluteCheckout(checkoutLocations, checkout)
         else:
             # Assume relative checkouts are relative to the root directory...
-            return self.dircache.pathName(checkout)
+            return os.path.normpath(self.dircache.pathName(checkout))
     def makeAbsoluteCheckout(self, locations, checkout):
         for location in locations:
             fullCheckout = self.absCheckout(location, checkout)

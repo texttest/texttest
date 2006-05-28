@@ -24,9 +24,10 @@ class KnownBug(FailedPrediction):
             return "bugcli"
         # Windows requires file extensions, but unknown what it needs for bugcli :)
         for dir in os.environ["PATH"].split(";"):
-            for file in os.listdir(dir):
-                if file.startswith("bugcli."):
-                    return file
+            if os.path.isdir(dir):
+                for file in os.listdir(dir):
+                    if file.startswith("bugcli."):
+                        return file
         return "bugcli"
     def isNumber(self, desc):
         for letter in desc:

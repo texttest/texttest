@@ -238,8 +238,9 @@ def abspath(relpath):
         return os.path.abspath(relpath)
 
 def relpath(fullpath, parentdir):
-    relPath = fullpath.replace(parentdir, "")
-    if relPath == fullpath:
+    normFull = os.path.normpath(fullpath)
+    relPath = normFull.replace(os.path.normpath(parentdir), "")
+    if relPath == normFull:
         # unrelated
         return None
     if relPath.startswith(os.sep):
@@ -603,25 +604,38 @@ class WindowsProcessHandler:
         except ValueError:
             return
     def getPsWords(self, processId):
-        stdout = os.popen("pslist " + str(processId))
-        for line in stdout.readlines():
+        try:
+            stdin, stdout = os.popen4("pslist " + str(processId))
+        except WindowsError:
+            # don't really know what this means but seems like we should wait and try again...
+            time.sleep(0.1)
+            return self.getPsWords(processId)
+        lines = stdout.readlines()
+        for line in lines:
             words = line.split()
             if len(words) < 2:
                 continue
             if words[1] == str(processId):
                 return words
-        return words
+        fullStr = string.join(lines, "\n")
+        if fullStr.find("used by another process") != -1:
+            # don't really know what this means but seems like we should wait and try again...
+            time.sleep(0.1)
+            return self.getPsWords(processId)
+        sys.stderr.write("Unexpected output from pslist for " + str(processId) + ": \n" + repr(lines) + "\n")
+        return []
     def hasTerminated(self, processId, childProcess=0):
         words = self.getPsWords(processId)
         if len(words) > 2:
             return words[2] == "was"
         else:
-            sys.stderr.write("Unexpected output from pslist for " + str(processId) + ": \n" + repr(words) + "\n")
             return 1
     def getCpuTime(self, processId):
         if not self.diag:
             self.diag = getDiagnostics("Windows Processes")
         words = self.getPsWords(processId)
+        if len(words) < 7:
+            return None
         cpuEntry = words[6]
         self.diag.info("Cpu time for " + str(processId) + " is " + cpuEntry)
         try:
@@ -834,7 +848,7 @@ class OptionGroup:
         commandLines = []
         for key, option in self.options.items():
             if len(option.getValue()):
-                commandLines.append("-" + key + " '" + option.getValue() + "'")
+                commandLines.append("-" + key + " \"" + option.getValue() + "\"")
         for key, switch in self.switches.items():
             if switch.getValue():
                 commandLines.append("-" + key)

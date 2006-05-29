@@ -900,6 +900,8 @@ class Application:
         interDoc = "Program to use as interpreter for the SUT"
         if binary.endswith(".py"):
             self.setConfigDefault("interpreter", "python", interDoc)
+        elif binary.endswith(".jar"):
+            self.setConfigDefault("interpreter", "java -jar", interDoc)
         else:
             self.setConfigDefault("interpreter", "", interDoc)
     def createOptionGroup(self, name):
@@ -1149,8 +1151,12 @@ class Application:
         binary = self.getConfigValue("binary")
         if not binary:
             raise plugins.TextTestError, "config file entry 'binary' not defined"
-        if not os.path.isfile(binary):
+        if self.binaryShouldBeFile(binary) and not os.path.isfile(binary):
             raise plugins.TextTestError, binary + " has not been built."
+    def binaryShouldBeFile(self, binary):
+        # For finding java classes, don't warn if they don't exist as files...
+        interpreter = self.getConfigValue("interpreter")
+        return not interpreter.startswith("java") or binary.endswith(".jar") 
             
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):

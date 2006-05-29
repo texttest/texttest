@@ -150,17 +150,12 @@ class TextTestGUI(ThreadedResponder):
         vbox = gtk.VBox()
         vbox.pack_start(self.selectionActionGUI.buttons, expand=False, fill=False)
                 
-        # Should we monitor progress? Must be checked after
-        # addSuiteWithParents has counted all tests ...
-        if self.dynamic:
-            for app in self.rootSuites:
-                testProgressOptions = app.getConfigValue("test_progress")
-                if testProgressOptions.has_key("show") and testProgressOptions["show"][0] == "1":
-                    self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.nofFailedSetupTests, self.rootSuites, self.status)
-                    progressBar = self.progressMonitor.createProgressBar()
-                    progressBar.show()
-                    vbox.pack_start(progressBar, expand=False, fill=True)
-                    break
+        # Must be created after addSuiteWithParents has counted all tests ...
+        if self.dynamic:            
+            self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.nofFailedSetupTests, self.rootSuites, self.status)
+            progressBar = self.progressMonitor.createProgressBar()
+            progressBar.show()
+            vbox.pack_start(progressBar, expand=False, fill=True)
 
         vbox.pack_start(mainWindow, expand=True, fill=True)
         if shortcutBar:
@@ -394,8 +389,16 @@ class TextTestGUI(ThreadedResponder):
         if not self.selection or not self.selection.get_tree_view():
             return
 
+        if state:
+            # Working around python bug 853411: main thread must do all forking
+            state.notifyInMainThread()
+        else:
+            state = test.state
+
         self.notifyTreeView(test, state)
         self.rightWindowGUI.notifyChange(test)
+        if self.progressMonitor:
+            self.progressMonitor.notifyChange(test, state)
     def notifyTreeView(self, test, state):
         if test.classId() == "test-suite":
             return self.redrawSuite(test)
@@ -403,12 +406,7 @@ class TextTestGUI(ThreadedResponder):
         if not self.dynamic:
             # In the static GUI there is nothing to update in the tree view window for test cases
             return
-        # Working around python bug 853411: main thread must do all forking
-        if state:
-            state.notifyInMainThread()
-            self.redrawTest(test, state)
-        else:
-            self.redrawTest(test, test.state)
+        self.redrawTest(test, state)
     # We assume that test-cases have changed state, while test suites have changed contents
     def redrawTest(self, test, state):
         iter = self.itermap[test]
@@ -418,8 +416,6 @@ class TextTestGUI(ThreadedResponder):
         if self.dynamic and secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 5) + ")")
 
-        if self.progressMonitor != None and test.classId() == "test-case":
-            self.progressMonitor.update(test, state)
         if state.isComplete() and test.getConfigValue("auto_collapse_successful") == 1:
             self.collapseIfAllComplete(self.model.iter_parent(iter))               
     def redrawSuite(self, suite):
@@ -1306,7 +1302,7 @@ class TestProgressMonitor:
         self.nofKnownBugsTests = 0
         
         # Where we print the progress report
-        self.tooltips = gtk.Tooltips()
+        self.tooltips = None
         self.status = status
         
         # Read custom error types from configuration
@@ -1318,6 +1314,8 @@ class TestProgressMonitor:
         self.customCrashMessages = {}
         for app in applications:
             testProgressOptions = app.getConfigValue("test_progress")
+            if self.tooltips is None and testProgressOptions.has_key("show") and testProgressOptions["show"][0] == "1":
+                self.tooltips = gtk.Tooltips()
             if testProgressOptions.has_key("custom_errors"):
                 for t in testProgressOptions["custom_errors"]:
                     self.collectTypeAndMessage(t, self.customErrorTypes, self.customErrorMessages)
@@ -1345,9 +1343,9 @@ class TestProgressMonitor:
         self.progressBar.show()
         self.progressBarEventBox = gtk.EventBox()
         self.progressBarEventBox.add(self.progressBar)
-        self.tooltips.set_tip(self.progressBarEventBox, "Nothing has happened.")
-        return self.progressBarEventBox
-            
+        if self.tooltips:
+            self.tooltips.set_tip(self.progressBarEventBox, "Nothing has happened.")
+        return self.progressBarEventBox    
     def adjustCount(self, count, increase):
         if increase:
             return count + 1
@@ -1355,43 +1353,43 @@ class TestProgressMonitor:
             return count - 1
 
     def analyzeFailure(self, category, increase = True):
-        if category[1].find("no results") != -1:
-            self.nofNoResultTests = self.adjustCount(self.nofNoResultTests, increase)                 
-        if category[1].find("slower") != -1:
-            self.nofSlowerTests = self.adjustCount(self.nofSlowerTests, increase)
-        if category[1].find("faster") != -1:
-            self.nofFasterTests = self.adjustCount(self.nofFasterTests, increase)
-        if category[1].find("smaller") != -1:
-            self.nofSmallerTests = self.adjustCount(self.nofSmallerTests, increase)
-        if category[1].find("larger") != -1:
-            self.nofLargerTests = self.adjustCount(self.nofLargerTests, increase)                    
-        if category[1].find("new") != -1:
-            self.nofNewFilesTests = self.adjustCount(self.nofNewFilesTests, increase)                    
-        if category[1].find("missing") != -1:
-            self.nofMissingFilesTests = self.adjustCount(self.nofMissingFilesTests, increase)                    
-        for (type, count) in self.customErrorTypes.items():
-            if category[1].find(type) != -1:
-                self.customErrorTypes[type] = self.adjustCount(self.customErrorTypes[type], increase)                    
-        if category[1].find("different") != -1:
-            self.nofDifferentTests = self.adjustCount(self.nofDifferentTests, increase)                    
-        if category[1].find("unreported bug") != -1:
-            self.nofUnreportedBugsTests = self.adjustCount(self.nofUnreportedBugsTests, increase)                    
-        elif category[1].find("bug") != -1:
-            self.nofKnownBugsTests = self.adjustCount(self.nofKnownBugsTests, increase) 
-        if category[1].find("killed") != -1:
-            self.nofKilledTests = self.adjustCount(self.nofKilledTests, increase)                    
-        if category[0] == "crash":
-            self.nofCrashedTests = self.adjustCount(self.nofCrashedTests, increase)
-            for (type, count) in self.customCrashTypes.items():
-                if category[1].find(type) != -1:
-                    self.customCrashTypes[type] = self.adjustCount(self.customCrashTypes[type], increase)    
-        if category[0] == "unrunnable":
-            self.nofUnrunnableTests = self.adjustCount(self.nofUnrunnableTests, increase)            
-            for (type, count) in self.customUnrunnableTypes.items():
-                if category[1].find(type) != -1:
-                    self.customUnrunnableTypes[type] = self.adjustCount(self.customUnrunnableTypes[type], increase)                    
         self.nofFailedTests = self.adjustCount(self.nofFailedTests, increase)
-
+        if self.tooltips:
+            if category[1].find("no results") != -1:
+                self.nofNoResultTests = self.adjustCount(self.nofNoResultTests, increase)                 
+            if category[1].find("slower") != -1:
+                self.nofSlowerTests = self.adjustCount(self.nofSlowerTests, increase)
+            if category[1].find("faster") != -1:
+                self.nofFasterTests = self.adjustCount(self.nofFasterTests, increase)
+            if category[1].find("smaller") != -1:
+                self.nofSmallerTests = self.adjustCount(self.nofSmallerTests, increase)
+            if category[1].find("larger") != -1:
+                self.nofLargerTests = self.adjustCount(self.nofLargerTests, increase)                    
+            if category[1].find("new") != -1:
+                self.nofNewFilesTests = self.adjustCount(self.nofNewFilesTests, increase)                    
+            if category[1].find("missing") != -1:
+                self.nofMissingFilesTests = self.adjustCount(self.nofMissingFilesTests, increase)                    
+            for (type, count) in self.customErrorTypes.items():
+                if category[1].find(type) != -1:
+                    self.customErrorTypes[type] = self.adjustCount(self.customErrorTypes[type], increase)                    
+            if category[1].find("different") != -1:
+                self.nofDifferentTests = self.adjustCount(self.nofDifferentTests, increase)                    
+            if category[1].find("unreported bug") != -1:
+                self.nofUnreportedBugsTests = self.adjustCount(self.nofUnreportedBugsTests, increase)                    
+            elif category[1].find("bug") != -1:
+                self.nofKnownBugsTests = self.adjustCount(self.nofKnownBugsTests, increase) 
+            if category[1].find("killed") != -1:
+                self.nofKilledTests = self.adjustCount(self.nofKilledTests, increase)                    
+            if category[0] == "crash":
+                self.nofCrashedTests = self.adjustCount(self.nofCrashedTests, increase)
+                for (type, count) in self.customCrashTypes.items():
+                    if category[1].find(type) != -1:
+                        self.customCrashTypes[type] = self.adjustCount(self.customCrashTypes[type], increase)    
+            if category[0] == "unrunnable":
+                self.nofUnrunnableTests = self.adjustCount(self.nofUnrunnableTests, increase)            
+                for (type, count) in self.customUnrunnableTypes.items():
+                    if category[1].find(type) != -1:
+                        self.customUnrunnableTypes[type] = self.adjustCount(self.customUnrunnableTypes[type], increase)                    
     def getReport(self):
         indentation = 5
         extraIndentation = 9
@@ -1431,7 +1429,7 @@ class TestProgressMonitor:
 
         return summary
 
-    def update(self, test, state):
+    def notifyChange(self, test, state):
         if state.isComplete():
             if self.completedTests.has_key(test):
                 # First decrease counts from last time ...
@@ -1473,7 +1471,8 @@ class TestProgressMonitor:
                 self.progressBar.set_text(str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed")
             self.progressBar.set_fraction(float(self.nofCompletedTests) / float(self.totalNofTests))
 
-        report = self.getReport()
-        if self.nofRunningTests == 0 and self.nofPendingTests == 0 and len(self.completedTests) > 0:
-            guilog.info(report)
-        self.tooltips.set_tip(self.progressBarEventBox, report)        
+        if self.tooltips:
+            report = self.getReport()
+            if self.nofRunningTests == 0 and self.nofPendingTests == 0 and len(self.completedTests) > 0:
+                guilog.info(report)
+            self.tooltips.set_tip(self.progressBarEventBox, report)        

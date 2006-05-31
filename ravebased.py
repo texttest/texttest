@@ -50,7 +50,7 @@ import queuesystem, default, os, string, shutil, plugins, sys, signal, stat, gui
 from socket import gethostname
 from tempfile import mktemp
 from respond import Responder
-from carmenqueuesystem import getArchitecture, CarmenConfig, getMajorReleaseId, SgeSubmissionRules
+from carmenqueuesystem import getArchitecture, CarmenConfig, SgeSubmissionRules
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -94,7 +94,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         # Ignore all command line options, but take account of environment etc...
         self.normalSubmissionRules.optionMap = {}
         self.normalSubmissionRules.presetPerfCategory = "short"
-        self.normalSubmissionRules.majRelResourceType = "build"
+        self.normalSubmissionRules.majRelResourceType = "ttrules"
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY_RAVE"):
             self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):

@@ -40,7 +40,7 @@ def getConfig(optionMap):
     return CarmenConfig(optionMap)
 
 architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris", "ia64_hpux", "x86_64_linux" ]
-majorReleases = [ "8", "9", "10", "11", "12", "master" ]
+majorReleases = [ "11", "12", "master" ]
 
 def getArchitecture(app):
     for version in app.versions:
@@ -64,7 +64,7 @@ def getBitMode(app):
         return "32"
 
 def fullVersionName(version):
-    if version == "master":
+    if version == "master" or version == "none":
         return version
     else:
         return "carmen_" + version
@@ -99,7 +99,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
     def __init__(self, optionMap, test, nightjob=False):
         CarmenSubmissionRules.__init__(self, optionMap, test)
         self.nightjob = nightjob
-        self.majRelResourceType = "run"
+        self.majRelResourceType = "carmrun"
     def findQueue(self):
         # Carmen's queues are all 'hidden', requesting them directly is not allowed.
         # They must be requested by their 'queue resources', that have the same names...
@@ -131,33 +131,19 @@ class SgeSubmissionRules(CarmenSubmissionRules):
             else:
                 return -1023
     def getMajorReleaseResource(self):
-        majorRelease = getMajorReleaseVersion(self.test.app)
-        if majorRelease == "9":
-            # Can't build on these machines anyway - texttest won't work!
+        majRelease = getMajorReleaseVersion(self.test.app)
+        if majRelease == "none":
             return ""
-        if self.majRelResourceType == "build":
-            # Can't use carmbuild resources anyway... they refer to CARMSYS builds currently
-            return self.getBuildResource(majorRelease)
         else:
-            # The right answer
-            return "carm" + self.majRelResourceType + majorRelease + "=1"
-    def getBuildResource(self, majorRelease):
-        if (majorRelease == "master" or majorRelease == "12") and self.archToUse.find("linux") != -1:
-            # Force rave compilations on 
-            return "osversion=RHEL4"
-        else:
-            return ""
+            return self.majRelResourceType + majRelease + "=1"
     def findConcreteResources(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
-        resources.append("carmarch=\"*" + self.getArchResource() + "*\"")
-        resources.append(self.getMajorReleaseResource())
+        resources.append("carmrunarch=\"*" + self.archToUse + "*\"")
+        majRelResource = self.getMajorReleaseResource()
+        if majRelResource:
+            resources.append(majRelResource)
         return resources
-    def getArchResource(self):
-        if self.archToUse == "i386_linux":
-            return "linux"
-        else:
-            return self.archToUse
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]
     def getSubmitSuffix(self, name):
@@ -251,8 +237,12 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             for var, value in self.getCarmenEnvironment(test.app):
                 test.setEnvironment(var, value)
     def getCarmenEnvironment(self, app):
-        return [ ("ARCHITECTURE", getArchitecture(app)), ("MAJOR_RELEASE_VERSION", getMajorReleaseVersion(app)), \
-                 ("MAJOR_RELEASE_ID", getMajorReleaseId(app)), ("BITMODE", getBitMode(app)) ]
+        envVars = [ ("ARCHITECTURE", getArchitecture(app)), ("BITMODE", getBitMode(app)) ]
+        majReleaseVersion = getMajorReleaseVersion(app)
+        if majReleaseVersion != "none":
+            envVars += [ ("MAJOR_RELEASE_VERSION", majReleaseVersion), \
+                         ("MAJOR_RELEASE_ID", fullVersionName(majReleaseVersion)) ]
+        return envVars
     
 class RunWithParallelAction(plugins.Action):
     def __init__(self, baseRunner, isExecutable):

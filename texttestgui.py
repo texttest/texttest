@@ -580,8 +580,6 @@ class InteractiveActionGUI:
                     pages[instanceTab].append((display, optionGroup.name))
         return pages
     def createDisplay(self, optionGroup, hasButton, instance):
-        vboxWindow = gtk.ScrolledWindow()
-        vboxWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         vbox = gtk.VBox()
         displayDesc = ""
         for option in optionGroup.options.values():
@@ -599,10 +597,8 @@ class InteractiveActionGUI:
             buttonbox.show()
             vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
             displayDesc += "Viewing button with title '" + instance.getTitle() + "'"
-        vboxWindow.add_with_viewport(vbox)
         vbox.show()
-        vboxWindow.show()
-        return vboxWindow, displayDesc
+        return vbox, displayDesc
     def createComboBox(self, option):
         if "ComboBoxEntry" in dir(gtk):
             # PyGTK 2.4 and above
@@ -778,12 +774,12 @@ class RightWindowGUI:
         self.vpaned.pack2(self.bottomFrame, resize=True)
         self.currentObject = object
         buttonBar, fileView, objectPages = self.makeObjectDependentContents(object)
+        self.diag = plugins.getDiagnostics("GUI notebook")
         self.notebook = self.createNotebook(objectPages, self.selectionActionGUI)
         self.oldObjectPageNames = self.makeDictionary(objectPages).keys()
         self.describeNotebook(self.notebook, pageNum=0)
         self.bottomFrame.add(self.notebook)
         self.fillWindow(buttonBar, fileView)
-        self.diag = plugins.getDiagnostics("GUI notebook")
     def paneHasChanged(self, pane, gparamspec):
         pos = pane.get_position()
         size = pane.allocation.height
@@ -892,12 +888,13 @@ class RightWindowGUI:
         pageDir = selectionActionGUI.createOptionGroupPages()
         pageDir["Test"] = objectPages + pageDir["Test"]
         if len(pageDir) == 1:
-            pages = pageDir["Test"]
+            pages = self.addScrollBars(pageDir["Test"])
         else:
             pages = []
             for groupTab, tabPages in pageDir.items():
                 if len(tabPages) > 0:
-                    tabNotebook = scriptEngine.createNotebook("view sub-options for " + groupTab + " :", tabPages)
+                    scriptTitle = "view sub-options for " + groupTab + " :"
+                    tabNotebook = scriptEngine.createNotebook(scriptTitle, self.addScrollBars(tabPages))
                     tabNotebook.show()
                     tabNotebook.connect("switch-page", self.describePageSwitch)
                     pages.append((tabNotebook, groupTab))
@@ -906,6 +903,25 @@ class RightWindowGUI:
         notebook.connect("switch-page", self.describePageSwitch)
         notebook.show()
         return notebook
+    def addScrollBars(self, pages):
+        newPages = []
+        for widget, name in pages:
+            window = self.makeScrolledWindow(widget)
+            newPages.append((window, name))
+        return newPages
+    def makeScrolledWindow(self, widget):
+        window = gtk.ScrolledWindow()
+        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        self.addToScrolledWindow(window, widget)
+        window.show()
+        return window
+    def addToScrolledWindow(self, window, widget):
+        if isinstance(widget, gtk.TextView):
+            window.add(widget)
+        elif isinstance(widget, gtk.VBox):
+            window.add_with_viewport(widget)
+        else:
+            raise plugins.TextTestError, "Could not decide how to add scrollbars to " + repr(widget)
     def findTestNotebook(self):
         page = self.findNotebookPage(self.notebook, "Test")
         if page:
@@ -945,6 +961,7 @@ class RightWindowGUI:
         if reset and notebook.get_current_page() != newCurrentPageNum:
             self.diag.info("Resetting for current page " + currentPageName)
             notebook.set_current_page(newCurrentPageNum)
+            self.diag.info("Resetting done.")
         elif currentPageName in pageNamesUpdated:
             # describe the current page, we reloaded it...
             self.describeNotebook(notebook)
@@ -961,24 +978,25 @@ class RightWindowGUI:
         pageNamesCreated.reverse()
         for name in pageNamesCreated:
             self.diag.info("Adding new page " + name)
-            newPage = newPageDir[name]
+            newPage = self.makeScrolledWindow(newPageDir[name])
             label = gtk.Label(name)
             notebook.prepend_page(newPage, label)
     def updatePages(self, notebook, pageNamesUpdated, newPageDir):
         for name in pageNamesUpdated:
             self.diag.info("Replacing contents of page " + name)
-            # Both page and oldPage are gtk.ScrolledWindow classes
+            # oldPage is a gtk.ScrolledWindow object, newPage either a gtk.VBox or a gtk.TextView
             oldPage = self.findNotebookPage(notebook, name)
-            oldPage.remove(oldPage.get_child())
-            newPage = newPageDir[name]
-            newContents = newPage.get_child()
-            newPage.remove(newContents)
-            if isinstance(newContents, gtk.TextView):
-                oldPage.add(newContents)
-            else:
-                # need viewport for gtk.VBox objects
-                oldPage.add_with_viewport(newContents)
-            oldPage.show()                
+            newContents = newPageDir[name]
+            self.replaceContents(oldPage, newContents)
+    def replaceContents(self, oldPage, newContents):
+        oldContents = oldPage.get_child()
+        if isinstance(oldContents, gtk.Viewport):
+            oldPage = oldContents
+            oldContents = oldContents.get_child()
+        self.diag.info("Removing old contents " + repr(oldContents))
+        oldPage.remove(oldContents)
+        oldPage.add(newContents)
+        oldPage.show()                
     def removePages(self, notebook, pageNamesRemoved):     
         for name in pageNamesRemoved:
             self.diag.info("Removing page " + name)
@@ -996,18 +1014,14 @@ class RightWindowGUI:
             return ""
         return test.app.configObject.getTextualInfo(test)
     def createTextView(self, testInfo):
-        textViewWindow = gtk.ScrolledWindow()
-        textViewWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         textview = gtk.TextView()
         textview.set_wrap_mode(gtk.WRAP_WORD)
         textbuffer = textview.get_buffer()
         # Need to convert to utf-8 for display...
         unicodeInfo = unicode(testInfo, "utf-8", errors="replace")
         textbuffer.set_text(unicodeInfo.encode("utf-8"))
-        textViewWindow.add(textview)
         textview.show()
-        textViewWindow.show()
-        return textViewWindow
+        return textview
     
 class FileViewGUI:
     def __init__(self, object, dynamic):

@@ -58,7 +58,8 @@ def getMajorReleaseId(app):
     return fullVersionName(getMajorReleaseVersion(app))
 
 def getBitMode(app):
-    if "sparc_64" in app.versions or "x86_64_linux" in app.versions:
+    arch = getArchitecture(app)
+    if arch.find("64") != -1:
         return "64"
     else:
         return "32"

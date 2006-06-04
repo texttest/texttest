@@ -1592,7 +1592,9 @@ class DocumentOptions(plugins.Action):
 class DocumentConfig(plugins.Action):
     def setUpApplication(self, app):
         for key, value in app.configDir.items():
-            print key + "|" + str(value) + "|" + app.configDocs[key]
+            docOutput = app.configDocs[key]
+            if not docOutput.startswith("Private"):
+                print key + "|" + str(value) + "|" + docOutput  
 
 class DocumentScripts(plugins.Action):
     def setUpApplication(self, app):

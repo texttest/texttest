@@ -820,13 +820,12 @@ class BuildCode(plugins.Action):
             makeTargets = string.join(optParts[1:])
         return (relPath, makeTargets)
     def getMachine(self, app, arch):
-        version9 = "9" in app.versions
         version12 = "12" in app.versions
         if arch == "i386_linux":
-            if version9:
-                return "xanxere"
-            else:
+            if version12:
                 return "taylor"
+            else:
+                return "abbeville"
         if arch == "sparc":
             return "turin"
         if arch == "sparc_64":
@@ -834,10 +833,7 @@ class BuildCode(plugins.Action):
         if arch == "parisc_2_0":
             return "ramechap"
         if arch == "powerpc":
-            if version9:
-                return "morlaix"
-            else:
-                return "tororo"
+            return "tororo"
         if arch == "ia64_hpux":
             return "wakeman"
         if arch == "x86_64_linux":

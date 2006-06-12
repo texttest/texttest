@@ -761,29 +761,32 @@ class CollateFiles(plugins.Action):
         self.diag = plugins.getDiagnostics("Collate Files")
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
+        for key in self.collations.keys():
+            if key.find(".") != -1:
+                raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' characters are not allowed"
         self.discardFiles = app.getConfigValue("discard_file")
         self.collateScripts = app.getConfigValue("collate_script")
     def expandCollations(self, test, coll):
-	newColl = {}
-	# copy items specified without "*" in targetStem
-	self.diag.info("coll initial:", str(coll))
+        newColl = {}
+        # copy items specified without "*" in targetStem
+        self.diag.info("coll initial:", str(coll))
         for targetStem, sourcePattern in coll.items():
-	    if not glob.has_magic(targetStem):
-	    	newColl[targetStem] = sourcePattern
-	# add files generated from items in targetStem containing "*"
+            if not glob.has_magic(targetStem):
+                newColl[targetStem] = sourcePattern
+        # add files generated from items in targetStem containing "*"
         for targetStem, sourcePattern in coll.items():
-	    if not glob.has_magic(targetStem):
-		continue
+            if not glob.has_magic(targetStem):
+                continue
 
-	    # add each file to newColl using suffix from sourcePtn
-	    for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
-		fullStem = os.path.splitext(aFile)[0]
+            # add each file to newColl using suffix from sourcePtn
+            for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
+                fullStem = os.path.splitext(aFile)[0]
                 newTargetStem = os.path.basename(fullStem).replace(".", "_")
-	    	if not newTargetStem in newColl:
-		    sourceExt = os.path.splitext(sourcePattern)[1]
+                if not newTargetStem in newColl:
+                    sourceExt = os.path.splitext(sourcePattern)[1]
                     self.diag.info("New collation to " + newTargetStem + " : from " + fullStem + " with extension " + sourceExt)
-		    newColl[newTargetStem] = fullStem + sourceExt
-	return newColl
+                    newColl[newTargetStem] = fullStem + sourceExt
+        return newColl
     def getFilesFromExpansions(self, test, targetStem, sourcePattern):
         # generate a list of filenames from previously saved files
         self.diag.info("Collating for " + targetStem)

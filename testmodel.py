@@ -305,6 +305,7 @@ class Test:
             observer.notifyLifecycleChange(self, "complete")
             observer.notifyComplete(self)
     def notifyChanged(self, state=None):
+        self.diagnose("Change notified, state " + repr(state))
         for observer in self.observers:
             if observer.notifyChange(self, state):
                 # threaded observers can transfer the change to another thread for later propagation
@@ -483,6 +484,9 @@ class TestSuite(Test):
     def __init__(self, name, dircache, app, parent=None, forTestRuns=0):
         Test.__init__(self, name, dircache, app, parent)
         self.testcases = []
+        contentFile = self.getContentFileName()
+        if not contentFile:
+            self.createContentFile()
     def readContents(self, filters, forTestRuns):
         testNames = self.readTestNames(forTestRuns)
         self.testcases = self.getTestCases(filters, testNames, forTestRuns)
@@ -546,10 +550,7 @@ class TestSuite(Test):
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
     def findTestSuiteFiles(self, forTestRuns=0):
-        allFiles = []
-        contentFile = self.getContentFileName()
-        if contentFile:
-            allFiles.append(contentFile)
+        allFiles = [ self.getContentFileName() ]
         if forTestRuns:
             return allFiles
         compulsoryExts = [ self.app.name ] + self.app.versions
@@ -558,11 +559,20 @@ class TestSuite(Test):
         self.diagnose("Finding test suite files, using all versions in " + repr(compulsoryExts) + " and none in " + repr(ignoreExts))
         for dircache in self.dircaches:
             for newFile in dircache.findAllFiles("testsuite", compulsoryExts, ignoreExts):
-                if newFile != contentFile:
+                if newFile != allFiles[0]: # the content file
                     allFiles.append(newFile)
         return allFiles
     def getContentFileName(self):
         return self.getFileName("testsuite")
+    def createContentFile(self):
+        contentFile = self.getContentFileName()
+        if contentFile:
+            return
+        contentFile = self.dircaches[0].pathName("testsuite." + self.app.name)
+        file = open(contentFile, "w")
+        file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
+        file.close()
+        self.dircaches[0].refresh()
     def refreshContents(self):
         # Here we assume that only order can change and suites be removed...
         newList = []
@@ -604,16 +614,18 @@ class TestSuite(Test):
         if newSuite.readContents(filters, forTestRuns):
             return newSuite
     def writeNewTest(self, testName, description):
-        contentFile = self.getContentFileName()
-        if not contentFile:
-            contentFile = self.dircaches[0].pathName("testsuite." + self.app.name)
-        file = open(contentFile, "a")
+        file = open(self.getContentFileName(), "a")
         file.write("\n")
         file.write("# " + description + "\n")
         file.write(testName + "\n")
         return self.makeSubDirectory(testName)
-    def addTest(self, testName):
-        test = self.createTest(testName)
+    def addTestCase(self, testName):
+        return self.addTest(testName, TestCase)
+    def addTestSuite(self, testName):
+        return self.addTest(testName, TestSuite)
+    def addTest(self, testName, className):
+        cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
+        test = className(testName, cache, self.app, self)
         self.testcases.append(test)
         test.readEnvironment()
         self.notifyChanged()

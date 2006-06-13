@@ -419,18 +419,21 @@ class TextTestGUI(ThreadedResponder):
         if state.isComplete() and test.getConfigValue("auto_collapse_successful") == 1:
             self.collapseIfAllComplete(self.model.iter_parent(iter))               
     def redrawSuite(self, suite):
-        if len(suite.testcases) == 0:
-            return
-        maybeNewTest = suite.testcases[-1]
+        testJustAdded = self.findTestJustAdded(suite)
         suiteIter = self.itermap[suite]
-        if self.itermap.has_key(maybeNewTest):
+        if testJustAdded:
+            self.addNewTestToModel(suiteIter, testJustAdded, suiteIter)
+        else:
             # There wasn't a new test: assume something disappeared or changed order and regenerate the model...
             self.recreateSuiteModel(suite, suiteIter)
             self.rightWindowGUI.checkForDeletion()
-        else:
-            self.addNewTestToModel(suiteIter, maybeNewTest, suiteIter)
         self.selection.get_tree_view().grab_focus()
-        
+    def findTestJustAdded(self, suite):
+        if len(suite.testcases) == 0:
+            return
+        maybeNewTest = suite.testcases[-1]
+        if not self.itermap.has_key(maybeNewTest):
+            return maybeNewTest
     def collapseIfAllComplete(self, iter):
         # Collapse if all child tests are complete and successful
         if iter == None or not self.model.iter_has_child(iter): 
@@ -491,8 +494,12 @@ class TextTestGUI(ThreadedResponder):
         self.selection.unselect_all()
         self.selection.select_iter(iter)
     def recreateSuiteModel(self, suite, suiteIter):
+        oldSize = self.model.iter_n_children(suiteIter)
+        if oldSize == 0 and len(suite.testcases) == 0:
+            return
+        
         iter = self.model.iter_children(suiteIter)
-        for i in range(self.model.iter_n_children(suiteIter)):
+        for i in range(oldSize):
             self.model.remove(iter)
         for test in suite.testcases:
             self.removeIter(test)

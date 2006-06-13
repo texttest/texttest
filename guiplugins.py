@@ -406,7 +406,6 @@ class ImportTest(InteractiveTestAction):
         guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + repr(suite))
         testDir = suite.writeNewTest(testName, self.optionGroup.getOptionValue("desc"))
         self.createTestContents(suite, testDir)
-        newTest = suite.addTest(testName)
     def matchesMode(self, dynamic):
         return not dynamic
     def createTestContents(self, suite, testDir):
@@ -518,6 +517,7 @@ class ImportTestCase(ImportTest):
         self.writeDefinitionFiles(suite, testDir)
         self.writeEnvironmentFile(suite, testDir)
         self.writeResultsFiles(suite, testDir)
+        suite.addTestCase(os.path.basename(testDir))
     def getWriteFileName(self, name, suite, testDir):
         fileName = os.path.join(testDir, name + "." + suite.app.name)
         if os.path.isfile(fileName):
@@ -559,12 +559,8 @@ class ImportTestSuite(ImportTest):
     def testType(self):
         return "Suite"
     def createTestContents(self, suite, testDir):
-        self.writeTestcasesFile(suite, testDir)
         self.writeEnvironmentFiles(suite, testDir)
-    def writeTestcasesFile(self, suite, testDir):
-        testCasesFile = os.path.join(testDir, "testsuite." + suite.app.name)        
-        file = open(testCasesFile, "w")
-        file.write("# Ordered list of tests in test suite. Add as appropriate" + "\n" + "\n")
+        suite.addTestSuite(os.path.basename(testDir))
     def addEnvironmentFileOptions(self, oldOptionGroup):
         self.addSwitch(oldOptionGroup, "env", "Add environment file")
     def writeEnvironmentFiles(self, suite, testDir):
@@ -887,6 +883,7 @@ class CopyTest(ImportTest):
             targetPath = sourcePath.replace(self.test.getDirectory(), testDir)
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copyfile(sourcePath, targetPath)
+        suite.addTestCase(os.path.basename(testDir))
     
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:

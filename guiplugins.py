@@ -180,7 +180,7 @@ class InteractiveTestAction(plugins.Action,InteractiveAction):
         if not plugins.canExecute(viewProgram):
             raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
                   "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
-        cmd = viewProgram + " " + fileName + plugins.nullRedirect()
+        cmd = viewProgram + " \"" + fileName + "\"" + plugins.nullRedirect()
         if os.name == "posix":
             cmd = "exec " + cmd # best to avoid shell messages etc.
         return cmd, viewProgram

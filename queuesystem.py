@@ -437,9 +437,13 @@ class KillTestSubmission(plugins.Action):
             return
 
         self.describeJob(test, jobId, jobName)
-        if not self.jobStarted(test):
-            if jobExisted:
+        startNotified = self.jobStarted(test)
+        if jobExisted:
+            if not startNotified:
                 self.setKilledPending(test)
+        else:
+            if startNotified:
+                self.setSlaveLost(test)
             else:
                 self.setSlaveFailed(test)
     def jobStarted(self, test):
@@ -454,6 +458,14 @@ class KillTestSubmission(plugins.Action):
         freeText = "Test job was killed (while still pending in " + queueSystemName(test.app) +\
                    ") at " + timeStr
         test.changeState(plugins.TestState("killed", briefText=briefText, freeText=freeText, completed=1))
+    def setSlaveLost(self, test):
+        failReason = "no report, possibly killed with SIGKILL"
+        name = queueSystemName(test.app)
+        fullText = "Full accounting info from " + name + " follows:\n" + \
+                   QueueSystemServer.instance.getJobFailureInfo(test)
+        fullText = failReason + "\n" + fullText
+        test.changeState(plugins.TestState("killed", briefText=failReason, \
+                                           freeText=fullText, completed=1))
     def setSlaveFailed(self, test):
         failReason, fullText = self.getSlaveFailure(test)
         fullText = failReason + "\n" + fullText

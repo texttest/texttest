@@ -40,7 +40,7 @@ class QueueSystem:
             return resultOutput
     def killJob(self, jobId):
         resultOutput = os.popen("bkill -s USR1 " + jobId + " 2>&1").read()
-        return resultOutput.find("is being terminated") != -1 
+        return resultOutput.find("is being terminated") != -1 or resultOutput.find("is being signaled") != -1
     def getJobId(self, line):
         word = line.split()[1]
         return word[1:-1]

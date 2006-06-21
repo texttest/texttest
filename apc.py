@@ -577,6 +577,9 @@ class ExtractApcLogs(plugins.Action):
             print "No argument given, using default value for extract_logs"
             self.args = "default"
     def __call__(self, test):
+        if os.getenv("DONTEXTRACTAPCLOG"):
+            self.diag.info("Environment DONTEXTRACTAPCLOG is set, not extracting.")
+            return
         apcTmpDir = test.makeTmpFileName("apc_tmp_dir", forComparison=0)
         if not os.path.isdir(apcTmpDir):
             return

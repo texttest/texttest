@@ -945,10 +945,7 @@ class Application:
     def getPossibleResultFiles(self):
         return self.configObject.getPossibleResultFiles(self)
     def addToOptionGroup(self, group):
-        if group.name.startswith("Select"):
-            group.addOption("vs", "Tests for version", self.getFullVersion())
-            group.addSwitch("current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"])
-        elif group.name.startswith("What"):
+        if group.name.startswith("What"):
             group.addOption("c", "Use checkout", self.checkout)
             group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("Side"):

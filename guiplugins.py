@@ -571,10 +571,16 @@ class ImportTestSuite(ImportTest):
     
 class SelectTests(SelectionAction):
     def __init__(self, rootSuites, oldOptionGroup):
-        SelectionAction.__init__(self, rootSuites)
+        SelectionAction.__init__(self, rootSuites, "Select Tests")
+        self.addOption(oldOptionGroup, "vs", "Tests for version", self.apps[0].getFullVersion())
+        self.addSwitch(oldOptionGroup, "current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"])
+        self.appSelectGroup = self.findSelectGroup()
+        self.optionGroup.options += self.appSelectGroup.options
+        self.optionGroup.switches += self.appSelectGroup.switches
+    def findSelectGroup(self):
         for group in self.apps[0].optionGroups:
             if group.name.startswith("Select"):
-                self.optionGroup = group
+                return group
     def getTitle(self):
         return "_Select"
     def getSecondaryTitle(self):
@@ -593,7 +599,7 @@ class SelectTests(SelectionAction):
     def isFrequentUse(self):
         return True
     def getFilterList(self, app):
-        app.configObject.updateOptions(self.optionGroup)
+        app.configObject.updateOptions(self.appSelectGroup)
         return app.configObject.getFilterList(app)
     def performOn(self, selTests, selCmd):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude

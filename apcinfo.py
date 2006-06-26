@@ -350,6 +350,10 @@ class GenHTML(plugins.Action):
         self.chartRavedoc.append(HTMLgen.Href('testindex.html', 'To test set page'))
  
     def __del__(self):
+        # Don't write anything for 0 tests, not interesting
+        if self.numberOfTests == 0:
+            return
+        
         # Write the main page.
         self.idoc.append(HTMLgen.Text("Number of tests: " + str(self.numberOfTests)))
         self.idoc.append(HTMLgen.BR())
@@ -392,7 +396,7 @@ class GenHTML(plugins.Action):
         chart = self.lprof.profileBarChart(self.lprof.hatedFunctions, 1)
         hatedFcnsDoc.append(chart)
         hatedFcnsDoc.write(self.hatedFcnsFile)
-
+        
     def __repr__(self):
         return "Generating HTML info for"
 
@@ -749,7 +753,9 @@ class PlotKPIGroupsAndGeneratePage(apc.PlotKPIGroups):
         apc.PlotKPIGroups.__del__(self)
         self.onlyAverage = 1
         apc.PlotKPIGroups.__del__(self)
-        # Now generate a simple HTML doc.
+        # Now generate a simple HTML doc, if there is anything to document.
+        if len(self.groupsToPlot) == 0:
+            return
         doc = HTMLgen.SimpleDocument(title="")
         introFile = os.path.join(self.dir, "intro.html")
         if os.path.isfile(introFile):

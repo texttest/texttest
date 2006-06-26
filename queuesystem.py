@@ -26,15 +26,17 @@ class RunTestInSlave(unixonly.RunTest):
         if not inChild:
             self.changeToRunningState(test, None)
         os.system(command)
+    def getBriefText(self, execMachines):
+        return "RUN (" + string.join(execMachines, ",") + ")"
+    def getInterruptActions(self, fetchResults):
+        return [ KillTestInSlave() ]
+
+class FindExecutionHosts(default.FindExecutionHosts):
     def getExecutionMachines(self, test):
         moduleName = queueSystemName(test.app).lower()
         command = "from " + moduleName + " import getExecutionMachines as _getExecutionMachines"
         exec command
         return _getExecutionMachines()
-    def getBriefText(self, execMachines):
-        return "RUN (" + string.join(execMachines, ",") + ")"
-    def getInterruptActions(self, fetchResults):
-        return [ KillTestInSlave() ]
 
 class KillTestInSlave(default.KillTest):
     def getBriefText(self, test, origBriefText):
@@ -116,6 +118,11 @@ class QueueSystemConfig(default.Config):
 
         submitter = SubmitTest(self.getSubmissionRules, self.optionMap)
         return [ submitter, WaitForCompletion() ]
+    def getExecHostFinder(self):
+        if self.slaveRun():
+            return FindExecutionHosts()
+        else:
+            return default.Config.getExecHostFinder(self)
     def getResponderClasses(self, allApps):
         if self.slaveRun():
             return [ SocketResponder ]

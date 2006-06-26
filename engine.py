@@ -40,7 +40,10 @@ class TestRunner:
             exceptionText = plugins.printException()
             self.failTest(exceptionText)
     def failTest(self, excString):
-        self.test.changeState(plugins.TestState("unrunnable", briefText="UNRUNNABLE", freeText=excString, completed=1))
+        execHosts = self.test.state.executionHosts
+        failState = plugins.TestState("unrunnable", briefText="UNRUNNABLE", freeText=excString, \
+                                      executionHosts=execHosts, completed=1)
+        self.test.changeState(failState)
     def performActions(self, previousTestRunner, runToCompletion):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
         for suite in tearDownSuites:

@@ -125,8 +125,8 @@ class Config(plugins.Configuration):
         
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
-        return [ self.getWriteDirectoryPreparer(ignoreCatalogues), catalogueCreator, \
-                 self.getTestRunner(), catalogueCreator, self.getTestEvaluator() ]
+        return [ self.getExecHostFinder(), self.getWriteDirectoryPreparer(ignoreCatalogues),
+                 catalogueCreator, self.getTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
     def getPossibleResultFiles(self, app):
@@ -208,6 +208,8 @@ class Config(plugins.Configuration):
             return None
         else:
             return self._getWriteDirectoryMaker()
+    def getExecHostFinder(self):
+        return FindExecutionHosts()
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return PrepareWriteDirectory(ignoreCatalogues)
     def _getWriteDirectoryMaker(self):
@@ -904,8 +906,8 @@ class RejectFilter(plugins.Filter):
 # Workaround for python bug 853411: tell main thread to start the process
 # if we aren't it...
 class Pending(plugins.TestState):
-    def __init__(self, process):
-        plugins.TestState.__init__(self, "pending")
+    def __init__(self, process, execHosts):
+        plugins.TestState.__init__(self, "pending", executionHosts=execHosts)
         self.process = process
         if currentThread().getName() == "MainThread":
             self.notifyInMainThread()
@@ -957,10 +959,8 @@ class RunTest(plugins.Action):
         # Change to the directory so any incidental files can be found easily
         test.grabWorkingDirectory()
         return self.runTest(test, inChild)
-    def getExecutionMachines(self, test):
-        return [ gethostname() ]
     def changeToRunningState(self, test, process):
-        execMachines = self.getExecutionMachines(test)
+        execMachines = test.state.executionHosts
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
         briefText = self.getBriefText(execMachines)
         freeText = "Running on " + string.join(execMachines, ",")
@@ -991,7 +991,7 @@ class RunTest(plugins.Action):
         self.diag.info("Running test with command : " + testCommand)
         process = plugins.BackgroundProcess(testCommand, testRun=1, shellTitle=self.shellTitle, holdShell=self.holdShell)
         # Working around Python bug
-        test.changeState(Pending(process))
+        test.changeState(Pending(process, test.state.executionHosts))
         self.diag.info("Waiting for process start...")
         process.waitForStart()
         if not inChild:
@@ -1081,6 +1081,12 @@ class KillTest(plugins.Action):
             return "terminated by " + briefText
         else:
             return briefText
+
+class FindExecutionHosts(plugins.Action):
+    def __call__(self, test):
+        test.state.executionHosts = self.getExecutionMachines(test)
+    def getExecutionMachines(self, test):
+        return [ gethostname() ]
 
 class CreateCatalogue(plugins.Action):
     def __init__(self):

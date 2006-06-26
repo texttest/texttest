@@ -140,13 +140,13 @@ class TestRunner:
         return suites
 
 class ApplicationRunner:
-    def __init__(self, testSuite, actionSequence, diag):
+    def __init__(self, testSuite, script, diag):
         self.testSuite = testSuite
-        self.actionSequence = actionSequence
         self.suitesSetUp = {}
         self.suitesToSetUp = {}
         self.diag = diag
         self.cleanUpActions = {}
+        self.actionSequence = self.getActionSequence(script)
         self.setUpApplications(self.actionSequence)
     def switchToCleanup(self, fetchResults):
         newActionSequence = []
@@ -199,6 +199,40 @@ class ApplicationRunner:
             action.tearDownSuite(suite)
         suite.tearDownEnvironment()
         self.suitesSetUp[suite] = []
+    def getActionSequence(self, script):
+        if not script:
+            return self.testSuite.app.getActionSequence()
+            
+        actionCom = script.split(" ")[0]
+        actionArgs = script.split(" ")[1:]
+        actionOption = actionCom.split(".")
+        if len(actionOption) != 2:
+            return self.getNonPython(script)
+                
+        module, pclass = actionOption
+        importCommand = "from " + module + " import " + pclass + " as _pclass"
+        try:
+            exec importCommand
+        except:
+            if os.path.isfile(script):
+                return self.getNonPython(script)
+            else:
+                sys.stderr.write("Import failed, looked at " + repr(sys.path) + "\n")
+                plugins.printException()
+                raise testmodel.BadConfigError, "Could not import script " + pclass + " from module " + module
+
+        # Assume if we succeed in importing then a python module is intended.
+        try:
+            if len(actionArgs) > 0:
+                return [ _pclass(actionArgs) ]
+            else:
+                return [ _pclass() ]
+        except:
+            plugins.printException()
+            raise testmodel.BadConfigError, "Could not instantiate script action " + repr(actionCom) +\
+                  " with arguments " + repr(actionArgs) 
+    def getNonPython(self, script):
+        return [ plugins.NonPythonAction(script) ]
 
 class ActionRunner:
     def __init__(self):
@@ -209,11 +243,9 @@ class ActionRunner:
         self.testQueue = []
         self.appRunners = []
         self.diag = plugins.getDiagnostics("Action Runner")
-    def addTestActions(self, testSuite, actionSequence):
+    def addTestActions(self, testSuite, script):
         self.diag.info("Processing test suite of size " + str(testSuite.size()) + " for app " + testSuite.app.name)
-        for action in actionSequence:
-            self.diag.info("Action sequence contains : " + str(action))
-        appRunner = ApplicationRunner(testSuite, actionSequence, self.diag)
+        appRunner = ApplicationRunner(testSuite, script, self.diag)
         self.appRunners.append(appRunner)
         for test in testSuite.testCaseList():
             self.diag.info("Adding test runner for test " + test.getRelPath())
@@ -314,8 +346,6 @@ class UniqueNameFinder:
         self.diag.info("Setting unique name for test " + test.name + " to " + name)
         self.name2test[name] = test
         test.uniqueName = name
-
-        
 
 class TextTest:
     def __init__(self):
@@ -436,14 +466,15 @@ class TextTest:
                 responder.addSuite(testSuite)
     def createActionRunner(self, appSuites):
         actionRunner = ActionRunner()
-        self.checkForNoTests(appSuites)
+        script = self.inputOptions.runScript()
+        if not script:
+            self.checkForNoTests(appSuites)
         for app, testSuite in appSuites.items():
-            if testSuite.size() == 0:
+            if not script and testSuite.size() == 0:
                 continue
             print "Using", app.description() + ", checkout", app.checkout
             try:
-                actionSequence = self.inputOptions.getActionSequence(app)
-                actionRunner.addTestActions(testSuite, actionSequence)
+                actionRunner.addTestActions(testSuite, script)
             except testmodel.BadConfigError:
                 sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + "\n")
         return actionRunner

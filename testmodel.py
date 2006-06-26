@@ -1236,7 +1236,7 @@ class OptionFinder(plugins.OptionFinder):
     def helpMode(self):
         return self.has_key("help")
     def runScript(self):
-        return self.has_key("s")
+        return self.get("s")
     def _getDiagnosticFile(self):
         if not os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
             os.environ["TEXTTEST_DIAGNOSTICS"] = os.path.join(self.directoryName, "Diagnostics")
@@ -1248,40 +1248,7 @@ class OptionFinder(plugins.OptionFinder):
             return os.environ["TEXTTEST_HOME"]
         else:
             return os.getcwd()
-    def getActionSequence(self, app):        
-        if not self.runScript():
-            return app.getActionSequence()
-            
-        actionCom = self["s"].split(" ")[0]
-        actionArgs = self["s"].split(" ")[1:]
-        actionOption = actionCom.split(".")
-        if len(actionOption) != 2:
-            return self.getNonPython()
-                
-        module, pclass = actionOption
-        importCommand = "from " + module + " import " + pclass + " as _pclass"
-        try:
-            exec importCommand
-        except:
-            if os.path.isfile(self["s"]):
-                return self.getNonPython()
-            else:
-                sys.stderr.write("Import failed, looked at " + repr(sys.path) + "\n")
-                plugins.printException()
-                raise BadConfigError, "Could not import script " + pclass + " from module " + module
-
-        # Assume if we succeed in importing then a python module is intended.
-        try:
-            if len(actionArgs) > 0:
-                return [ _pclass(actionArgs) ]
-            else:
-                return [ _pclass() ]
-        except:
-            plugins.printException()
-            raise BadConfigError, "Could not instantiate script action " + repr(actionCom) + " with arguments " + repr(actionArgs) 
-    def getNonPython(self):
-        return [ plugins.NonPythonAction(self["s"]) ]
-
+    
 # Compulsory responder to generate application events. Always present. See respond module
 class ApplicationEventResponder(Responder):
     def notifyLifecycleChange(self, test, changeDesc):

@@ -580,7 +580,7 @@ class PrepareWriteDirectory(plugins.Action):
         collateMethod(test, sourcePath, target)
     def getEnvironmentSourcePath(self, configName):
         pathName = self.getPathFromEnvironment(configName)
-        if os.path.exists(pathName):
+        if pathName != configName:
             return pathName
     def getPathFromEnvironment(self, configName):
         return os.path.normpath(os.path.expandvars(configName))
@@ -590,18 +590,25 @@ class PrepareWriteDirectory(plugins.Action):
         return test.makeTmpFileName(localName, forComparison=0)
     def getSourcePath(self, test, configName):
         # These can refer to environment variables or to paths within the test structure
-        if configName.startswith("$"):
-            return self.getEnvironmentSourcePath(configName)
-
-        pathName = test.makePathName(configName)
+        fileName = self.getSourceFileName(configName)
+        if not fileName or os.path.isabs(fileName):
+            return fileName
+        
+        pathName = test.makePathName(fileName)
         if pathName:
             return pathName
         else:
-            return self.getSourceFromSearchPath(test, configName)
-    def getSourceFromSearchPath(self, test, configName):
+            return self.getSourceFromSearchPath(test, fileName, configName)
+    def getSourceFileName(self, configName):
+        if configName.startswith("$"):
+            return self.getEnvironmentSourcePath(configName)
+        else:
+            return configName
+    def getSourceFromSearchPath(self, test, fileName, configName):
+        self.diag.info("Searching for " + fileName + " in search path...")
         searchPathDirs = test.getCompositeConfigValue("test_data_searchpath", configName)
         for dir in searchPathDirs:
-            fullPath = os.path.join(dir, configName)
+            fullPath = os.path.join(dir, fileName)
             if os.path.exists(fullPath):
                 return fullPath
     def findEnvironmentVariable(self, test, configName):

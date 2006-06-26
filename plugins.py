@@ -788,6 +788,11 @@ class Switch(Option):
             self.resetMethod(1)
         else:
             Option.reset(self)
+    def description(self):
+        description = self.name
+        if len(self.options) > 0:
+            description += self.options[-1]
+        return description
 
 class OptionGroup:
     def __init__(self, name, defaultDict, possibleValueDict):

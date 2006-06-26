@@ -1571,7 +1571,7 @@ class DocumentOptions(plugins.Action):
                 keyOutput, docOutput = self.optionOutput(key, group, group.options[key].name)
                 self.display(keyOutput, self.groupOutput(group), docOutput)
             if group.switches.has_key(key):    
-                self.display("-" + key, self.groupOutput(group), group.switches[key].name)
+                self.display("-" + key, self.groupOutput(group), group.switches[key].description())
     def display(self, keyOutput, groupOutput, docOutput):
         if not docOutput.startswith("Private"):
             print keyOutput + ";" + groupOutput + ";" + docOutput.replace("SGE", "SGE/LSF")

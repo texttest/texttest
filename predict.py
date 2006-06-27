@@ -45,7 +45,7 @@ class CheckPredictions(CheckLogFilePredictions):
         stackTraceFile = test.makeTmpFileName("stacktrace")
         if os.path.isfile(stackTraceFile):
             summary, errorInfo = self.parseStackTrace(stackTraceFile)
-            if not summary.startswith("CPU"):
+            if not summary.startswith("CPU") and not summary.startswith("Cpu"):
                 self.insertError(test, "crash", summary, errorInfo)
             else:
                 test.changeState(plugins.TestState("killed", briefText="CPULIMIT", \

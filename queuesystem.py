@@ -283,7 +283,9 @@ class SlaveServer(TCPServer):
             return True
     def storeClient(self, test, clientInfo):
         self.testClientInfo[test] = clientInfo
-    
+    def handle_error(self, request, client_address):
+        print "Slave server caught an exception, ignoring..."
+        
 class QueueSystemServer:
     instance = None
     def __init__(self):

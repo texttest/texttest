@@ -310,7 +310,7 @@ def samefile(writeDir, currDir):
         return os.path.normpath(writeDir) == os.path.normpath(currDir)
 
 # Version of rmtree not prone to crashing if directory in use or externally removed
-def rmtree(dir, attempts=5):
+def rmtree(dir, attempts=10):
     if not os.path.isdir(dir):
         print "Write directory", dir, "externally removed"
         return

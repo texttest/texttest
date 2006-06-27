@@ -1253,7 +1253,8 @@ class ApplicationEventResponder(Responder):
     def notifyLifecycleChange(self, test, changeDesc):
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName
-        self.scriptEngine.applicationEvent(eventName, category, timeDelay=1)
+        timeDelay = int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
+        self.scriptEngine.applicationEvent(eventName, category, timeDelay)
             
 class MultiEntryDictionary(seqdict):
     def __init__(self):

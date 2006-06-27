@@ -254,7 +254,9 @@ class Test:
         allFiles = []
         for dircache in self.dircaches:
             if stem == "environment":
-                allFiles += dircache.findAllFiles(stem, forbidden=self.app.findOtherAppNames())
+                otherApps = self.app.findOtherAppNames()
+                self.diagnose("Finding environment files, excluding " + repr(otherApps))
+                allFiles += dircache.findAllFiles(stem, forbidden=otherApps)
             else:
                 allFiles += dircache.findAllFiles(stem, compulsory=[ self.app.name ])
         return allFiles

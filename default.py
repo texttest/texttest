@@ -605,11 +605,15 @@ class PrepareWriteDirectory(plugins.Action):
         else:
             return configName
     def getSourceFromSearchPath(self, test, fileName, configName):
-        self.diag.info("Searching for " + fileName + " in search path...")
-        searchPathDirs = test.getCompositeConfigValue("test_data_searchpath", configName)
+        self.diag.info("Searching for " + fileName + " in search path corresponding to " + configName)
+        # Need to get both expanded and unexpanded varieties to be sure...
+        searchPathDirs = test.getCompositeConfigValue("test_data_searchpath", configName) + \
+                         test.getCompositeConfigValue("test_data_searchpath", fileName)
         for dir in searchPathDirs:
             fullPath = os.path.join(dir, fileName)
+            self.diag.info("Trying " + fullPath)
             if os.path.exists(fullPath):
+                self.diag.info("Found!")
                 return fullPath
     def findEnvironmentVariable(self, test, configName):
         self.diag.info("Finding env. var name from " + configName)

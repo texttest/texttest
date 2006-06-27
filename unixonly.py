@@ -88,12 +88,12 @@ class VirtualDisplayFinder:
     def getSysCommand(self, server, command, background=1):
         if server == gethostname():
             if background:
-                return command + " >& /dev/null &"
+                return command + plugins.nullRedirect() + " &"
             else:
                 return command
         else:
             if background:
-                command = "'" + command + " >& /dev/null &' < /dev/null >& /dev/null &"
+                command = "'" + command + plugins.nullRedirect() + " &' < /dev/null" + plugins.nullRedirect() + " &"
             else:
                 command = "'" + command + "'"
             return "rsh " + server + " " + command

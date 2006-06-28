@@ -1611,9 +1611,12 @@ class DocumentOptions(plugins.Action):
 
 class DocumentConfig(plugins.Action):
     def setUpApplication(self, app):
-        for key, value in app.configDir.items():
+        entries = app.configDir.keys()
+        entries.sort()
+        for key in entries:
             docOutput = app.configDocs[key]
             if not docOutput.startswith("Private"):
+                value = app.configDir[key]
                 print key + "|" + str(value) + "|" + docOutput  
 
 class DocumentScripts(plugins.Action):

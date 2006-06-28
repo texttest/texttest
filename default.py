@@ -320,15 +320,6 @@ class Config(plugins.Configuration):
         print "\nPython scripts: (as given to -s <module>.<class> [args])"
         print "--------------------------------------------------------"
         self.printHelpScripts()
-    def defaultSeverities(self):
-        severities = {}
-        severities["errors"] = 1
-        severities["output"] = 1
-        severities["performance"] = 2
-        severities["usecase"] = 2
-        severities["catalogue"] = 2
-        severities["default"] = 99
-        return severities
     def getDefaultMailAddress(self):
         user = os.getenv("USER", "$USER")
         return user + "@localhost"
@@ -338,51 +329,7 @@ class Config(plugins.Configuration):
             return colourFinder.getDefaultDict()
         except:
             return {}
-    def getDefaultCollations(self):
-        if os.name == "posix":
-            return { "stacktrace" : "core*" }
-        else:
-            return {}
-    def getDefaultCollateScripts(self):
-        if os.name == "posix":
-            return { "stacktrace" : "interpretcore.py" }
-        else:
-            return {}
-    def setApplicationDefaults(self, app):
-        app.setConfigDefault("log_file", "output", "Result file to search, by default")
-        app.setConfigDefault("failure_severity", self.defaultSeverities(), \
-                             "Mapping of result files to how serious diffs in them are")
-        app.setConfigDefault("text_diff_program", "diff", \
-                             "External program to use for textual comparison of files")
-        app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
-        app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
-        app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
-        app.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
-        app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
-        app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
-        app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
-        app.setConfigDefault("collate_file", self.getDefaultCollations(), "Mapping of result file names to paths to collect them from")
-        app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")
-        app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
-        app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
-        app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
-        app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")
-        app.setConfigDefault("internal_error_text", [], "List of text to be considered as an internal error, if present")
-        app.setConfigDefault("internal_compulsory_text", [], "List of text to be considered as an internal error, if not present")
-        # Performance values
-        app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
-        app.setConfigDefault("performance_logfile", { "default" : [] }, "Which result file to collect performance data from")
-        app.setConfigDefault("performance_logfile_extractor", {}, "What string to look for when collecting performance data")
-        app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \
-                             "List of machines where performance can be collected")
-        app.setConfigDefault("performance_variation_%", { "default" : 10 }, "How much variation in performance is allowed")
-        app.setConfigDefault("performance_test_minimum", { "default" : 0 }, \
-                             "Minimum time/memory to be consumed before data is collected")
-        app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
-        app.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
-        app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
-        app.addConfigEntry("pending", "white", "test_colours")
-        app.addConfigEntry("definition_file_stems", "knownbugs")
+    def setBatchDefaults(self, app):
         # Batch values. Maps from session name to values
         app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
         app.setConfigDefault("batch_result_repository", { "default" : "" }, "Directory to store historical batch results under")
@@ -394,19 +341,125 @@ class Config(plugins.Configuration):
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         # Sample to show that values are lists
         app.setConfigDefault("batch_version", { "default" : [] }, "Which versions are allowed as batch mode runs")
-        app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
-        app.addConfigEntry("definition_file_stems", "options")
-        app.addConfigEntry("definition_file_stems", "usecase")
-        app.addConfigEntry("definition_file_stems", "input")
         # Use batch session as a base version
         batchSession = self.optionValue("b")
         if batchSession:
             app.addConfigEntry("base_version", batchSession)
-        if not plugins.TestState.showExecHosts:
-            plugins.TestState.showExecHosts = self.showExecHostsInFailures()
+    def setPerformanceDefaults(self, app):
+        # Performance values
+        app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
+        app.setConfigDefault("performance_logfile", { "default" : [] }, "Which result file to collect performance data from")
+        app.setConfigDefault("performance_logfile_extractor", {}, "What string to look for when collecting performance data")
+        app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \
+                             "List of machines where performance can be collected")
+        app.setConfigDefault("performance_variation_%", { "default" : 10 }, "How much variation in performance is allowed")
+        app.setConfigDefault("performance_test_minimum", { "default" : 0 }, \
+                             "Minimum time/memory to be consumed before data is collected")
+    def setUsecaseDefaults(self, app):
+        app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
+        app.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
+        app.setConfigDefault("slow_motion_replay_speed", 3, "How long in seconds to wait between each GUI action")
         if os.name == "posix":
             app.setConfigDefault("virtual_display_machine", [], \
                                  "(UNIX) List of machines to run virtual display server (Xvfb) on")
+    def defaultSeverities(self):
+        severities = {}
+        severities["errors"] = 1
+        severities["output"] = 1
+        severities["performance"] = 2
+        severities["usecase"] = 2
+        severities["catalogue"] = 2
+        severities["default"] = 99
+        return severities
+    def getDefaultCollations(self):
+        if os.name == "posix":
+            return { "stacktrace" : "core*" }
+        else:
+            return {}
+    def getDefaultCollateScripts(self):
+        if os.name == "posix":
+            return { "stacktrace" : "interpretcore.py" }
+        else:
+            return {}
+    def setComparisonDefaults(self, app):
+        app.setConfigDefault("log_file", "output", "Result file to search, by default")
+        app.setConfigDefault("failure_severity", self.defaultSeverities(), \
+                             "Mapping of result files to how serious diffs in them are")
+
+        app.setConfigDefault("collate_file", self.getDefaultCollations(), "Mapping of result file names to paths to collect them from")
+        app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")
+        app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
+        app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
+        app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
+        app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")
+        app.setConfigDefault("internal_error_text", [], "List of text to be considered as an internal error, if present")
+        app.setConfigDefault("internal_compulsory_text", [], "List of text to be considered as an internal error, if not present")
+        
+        app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
+        app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
+    def defaultViewProgram(self):
+        if os.name == "posix":
+            return "emacs"
+        else:
+            return "notepad"
+    def defaultFollowProgram(self):
+        if os.name == "posix":
+            return "tail -f"
+        else:
+            return "baretail"
+    def setExternalToolDefaults(self, app):
+        app.setConfigDefault("text_diff_program", "diff", \
+                             "External program to use for textual comparison of files")
+        app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
+        app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
+        app.setConfigDefault("diff_program", "tkdiff", "External program to use for graphical file comparison")
+        app.setConfigDefault("view_program", { "default": self.defaultViewProgram() },  \
+                              "External program(s) to use for viewing and editing text files")
+        app.setConfigDefault("follow_program", self.defaultFollowProgram(), "External program to use for following progress of a file")
+    def getGuiColourDictionary(self):
+        dict = {}
+        dict["success"] = "green"
+        dict["failure"] = "red"
+        dict["running"] = "yellow"
+        dict["not_started"] = "white"
+        dict["pending"] = "white"
+        dict["static"] = "pale green"
+        dict["app_static"] = "purple"
+        return dict
+    def setInterfaceDefaults(self, app):
+        app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
+        # Do this here rather than from the GUI: if applications can be run with the GUI
+        # anywhere it needs to be set up
+        app.setConfigDefault("add_shortcut_bar", 1, "Whether or not TextTest's shortcut bar will appear")
+        app.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
+        app.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
+        app.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
+        app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
+        app.setConfigDefault("window_size", { "" : [] }, "To set the initial size of the dynamic/static GUI.")
+        app.setConfigDefault("test_progress", { "" : [] }, "Private: options for showing/customizing tooltip test progress report.")
+        app.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
+        app.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
+        app.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
+    def setMiscDefaults(self, app):
+        app.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
+        app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
+        app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
+        app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
+        app.addConfigEntry("definition_file_stems", "options")
+        app.addConfigEntry("definition_file_stems", "usecase")
+        app.addConfigEntry("definition_file_stems", "input")
+        app.addConfigEntry("definition_file_stems", "knownbugs")
+    def setApplicationDefaults(self, app):
+        self.setComparisonDefaults(app)
+        self.setExternalToolDefaults(app)
+        self.setInterfaceDefaults(app)
+        self.setMiscDefaults(app)
+        self.setBatchDefaults(app)
+        self.setPerformanceDefaults(app)
+        self.setUsecaseDefaults(app)
+        if not plugins.TestState.showExecHosts:
+            plugins.TestState.showExecHosts = self.showExecHostsInFailures()
+
 
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:

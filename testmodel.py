@@ -864,48 +864,13 @@ class Application:
         self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
         self.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
-        self.setConfigDefault("test_data_ignore", { "default" : [] }, "Elements under test data structures which should not be viewed or change-monitored")
-        self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
-        self.setConfigDefault("slow_motion_replay_speed", 0, "How long in seconds to wait between each GUI action")
-        # External viewing tools
-        # Do this here rather than from the GUI: if applications can be run with the GUI
-        # anywhere it needs to be set up
-        self.setConfigDefault("add_shortcut_bar", 1, "Whether or not TextTest's shortcut bar will appear")
-        self.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
-        self.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
-        self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
-        self.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
-        self.setConfigDefault("window_size", { "" : [] }, "To set the initial size of the dynamic/static GUI.")
-        self.setConfigDefault("version_priority", { "default": 99 }, "Mapping of version names to a priority order in case of conflict.") 
-        self.setConfigDefault("test_progress", { "" : [] }, "Private: options for showing/customizing tooltip test progress report.")
-        self.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
+        self.setConfigDefault("test_data_ignore", { "default" : [] }, \
+                              "Elements under test data structures which should not be viewed or change-monitored")
         self.setConfigDefault("definition_file_stems", [ "environment", "testsuite" ], \
                               "files to be shown as definition files by the static GUI")
-        self.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
-        self.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
-        self.setConfigDefault("diff_program", "tkdiff", "External program to use for graphical file comparison")
-        self.setConfigDefault("view_program", { "default": self.defaultViewProgram() },  \
-                              "External program(s) to use for viewing and editing text files")
-        self.setConfigDefault("follow_program", self.defaultFollowProgram(), "External program to use for following progress of a file")
-    def defaultViewProgram(self):
-        if os.name == "posix":
-            return "xemacs"
-        else:
-            return "notepad"
-    def defaultFollowProgram(self):
-        if os.name == "posix":
-            return "tail -f"
-        else:
-            return "baretail"
-    def getGuiColourDictionary(self):
-        dict = {}
-        dict["success"] = "green"
-        dict["failure"] = "red"
-        dict["running"] = "yellow"
-        dict["not_started"] = "white"
-        dict["static"] = "pale green"
-        dict["app_static"] = "purple"
-        return dict
+        self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
+        self.setConfigDefault("version_priority", { "default": 99 }, \
+                              "Mapping of version names to a priority order in case of conflict.") 
     def setDependentConfigDefaults(self):
         binary = self.getConfigValue("binary")
         # Set values which default to other values

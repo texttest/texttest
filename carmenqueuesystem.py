@@ -219,6 +219,8 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         print helpOptions
     def printHelpDescription(self):
         print helpDescription
+    def defaultViewProgram(self):
+        return "xemacs"
     def setApplicationDefaults(self, app):
         queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux")

@@ -839,7 +839,7 @@ class Application:
     def findOtherAppNames(self):
         names = []
         for configFile in self.dircache.findAllFiles("config"):
-            appName = configFile.split(".")[1]
+            appName = os.path.basename(configFile).split(".")[1]
             if appName != self.name and not appName in names:
                 names.append(appName)
         return names

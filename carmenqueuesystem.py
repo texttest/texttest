@@ -162,6 +162,8 @@ class LsfSubmissionRules(CarmenSubmissionRules):
     def getArchQueueName(self):
         if self.archToUse == "sparc_64":
             return "sparc"
+        elif self.archToUse.find("linux") != -1:
+            return "linux"
         else:
             return self.archToUse
     def getMajorReleaseResource(self):
@@ -175,9 +177,7 @@ class LsfSubmissionRules(CarmenSubmissionRules):
         else:
             return "idle_"
     def getQueuePlatformSuffix(self):
-        if self.archToUse == "i386_linux":
-            return "_RHEL"
-        elif self.archToUse == "sparc" or self.archToUse == "sparc_64":
+        if self.archToUse == "sparc" or self.archToUse == "sparc_64":
             return "_sol8"
         elif self.archToUse == "powerpc":
             return "_aix5"

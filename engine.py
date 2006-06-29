@@ -534,7 +534,8 @@ class TextTest:
     def checkNoTestsInApp(self, app, appSuites):
         appsToCheck = [ app ] + app.extras
         for checkApp in appsToCheck:
-            if appSuites[checkApp].size() > 0:
+            suite = appSuites.get(checkApp)
+            if suite and suite.size() > 0:
                 return
         sys.stderr.write("No tests matching the selection criteria found for " + app.description() + "\n")
     def setSignalHandlers(self):

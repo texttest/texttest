@@ -629,6 +629,8 @@ class ExtractApcLogs(plugins.Action):
         plugins.rmtree(apcTmpDir)
     def __repr__(self):
         return "Extracting APC logfile for"
+    def getInterruptActions(self, fetchResults):
+        return []
         
 #
 # TODO: Check Sami's stuff in /users/sami/work/Matador/Doc/Progress

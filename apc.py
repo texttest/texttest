@@ -486,9 +486,9 @@ class ApcCompileRules(ravebased.CompileRules):
         return os.stat(filename)[stat.ST_MTIME]
                           
 class FetchApcCore(default.CollateFiles):
-    def extract(self, sourceFile, targetFile):
+    def extract(self, sourceFile, targetFile, collationErrFile):
         if not os.path.basename(targetFile).startswith("stacktrace") or self.extractCore():
-            default.CollateFiles.extract(self, sourceFile, targetFile)
+            default.CollateFiles.extract(self, sourceFile, targetFile, collationErrFile)
     def isApcLogFileKept(self, errorFileName):
         for line in open(errorFileName).xreadlines():
             if line.find("*** Keeping the logfiles in") != -1:

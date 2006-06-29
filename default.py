@@ -880,10 +880,11 @@ class CollateFiles(plugins.Action):
 	testCollations = self.expandCollations(test, self.collations)
         for targetStem, sourcePattern in testCollations.items():
             targetFile = test.makeTmpFileName(targetStem)
+            collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
             fullpath = self.findPath(test, sourcePattern)
             if fullpath:
                 self.diag.info("Extracting " + fullpath + " to " + targetFile)
-                self.extract(fullpath, targetFile)
+                self.extract(fullpath, targetFile, collationErrFile)
     def findPath(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
@@ -900,10 +901,10 @@ class CollateFiles(plugins.Action):
             from unixonly import isCompressed
             if isCompressed(sourceFile):
                 return "zcat"
-    def extract(self, sourceFile, targetFile):
+    def extract(self, sourceFile, targetFile, collationErrFile):
         extractionScript = self.findExtractionScript(sourceFile, targetFile)
         if extractionScript:
-            os.system(extractionScript + " " + sourceFile + " > " + targetFile)
+            os.system(extractionScript + " " + sourceFile + " > " + targetFile + " 2> " + collationErrFile)
         else:
             shutil.copyfile(sourceFile, targetFile)
     

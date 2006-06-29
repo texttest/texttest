@@ -37,14 +37,18 @@ class CheckPredictions(CheckLogFilePredictions):
         return "Checking predictions for"
     def __call__(self, test):
         self.collectErrors(test)
-    def parseStackTrace(self, stackTraceFile):
+    def parseStackTrace(self, test, stackTraceFile):
         lines = open(stackTraceFile).readlines()
-        return lines[0].strip(), string.join(lines[2:], "")
+        if len(lines) > 2:
+            return lines[0].strip(), string.join(lines[2:], "")
+        else:
+            errFile = test.makeTmpFileName("stacktrace.collate_errs", forFramework=1)
+            return "core not parsed", "Errors from collation script:\n" + open(errFile).read()
     def collectErrors(self, test):
         # Hard-coded prediction: check test didn't crash
         stackTraceFile = test.makeTmpFileName("stacktrace")
         if os.path.isfile(stackTraceFile):
-            summary, errorInfo = self.parseStackTrace(stackTraceFile)
+            summary, errorInfo = self.parseStackTrace(test, stackTraceFile)
             if not summary.startswith("CPU") and not summary.startswith("Cpu"):
                 self.insertError(test, "crash", summary, errorInfo)
             else:

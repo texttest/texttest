@@ -359,6 +359,7 @@ class Test:
     def isAcceptedByAll(self, filters):
         for filter in filters:
             if not self.isAcceptedBy(filter):
+                self.diagnose("Rejected due to " + repr(filter))
                 return False
         return True
     def size(self):
@@ -503,6 +504,7 @@ class TestSuite(Test):
 
         for filter in filters:
             if not filter.acceptsTestSuiteContents(self):
+                self.diagnose("Contents rejected due to " + repr(filter))
                 return False
         return True
     def readTestNames(self, forTestRuns):
@@ -961,6 +963,7 @@ class Application:
         suite = TestSuite(os.path.basename(self.dircache.dir), self.dircache, self)
         suite.readContents(filters, forTestRuns)
         if success:
+            self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
             suite.readEnvironment()
         return success, suite
     def description(self):

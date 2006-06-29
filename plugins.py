@@ -311,19 +311,20 @@ def samefile(writeDir, currDir):
 
 # Version of rmtree not prone to crashing if directory in use or externally removed
 def rmtree(dir, attempts=100):
-    if not os.path.isdir(dir):
+    realDir = os.path.realpath(dir)
+    if not os.path.isdir(realDir):
         print "Write directory", dir, "externally removed"
         return
     # Don't be somewhere under the directory when it's removed
     try:
-        if os.getcwd().startswith(os.path.realpath(dir)):
+        if os.getcwd().startswith(realDir):
             root, local = os.path.split(dir)
             os.chdir(root)
     except OSError:
         pass
     for i in range(attempts):
         try:
-            shutil.rmtree(dir)
+            shutil.rmtree(realDir)
             return
         except OSError:
             if i == attempts - 1:

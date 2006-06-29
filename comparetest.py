@@ -360,6 +360,7 @@ class FileComparison:
         self.stdFile = test.getSaveFileName(self.tmpFile, versionString)
         if os.path.isfile(self.stdFile):
             os.remove(self.stdFile)
+        plugins.ensureDirExistsForFile(self.stdFile)
         # Allow for subclasses to differentiate between a literal overwrite and a
         # more intelligent save, e.g. for performance. Default is the same for exact
         # and inexact save

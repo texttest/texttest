@@ -303,17 +303,13 @@ class SaveTests(SelectionAction):
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!
 class ViewFile(InteractiveTestAction):
-    def __init__(self, test, oldOptionGroup):
+    def __init__(self, test, dynamic, oldOptionGroup):
         InteractiveTestAction.__init__(self, test, "Viewing")
-        try:
-            if test.state.hasStarted():
-                self.addSwitch(oldOptionGroup, "rdt", "Include Run-dependent Text", 0)
-                self.addSwitch(oldOptionGroup, "nf", "Show differences where present", 1)
-                if not test.state.isComplete():
-                    self.addSwitch(oldOptionGroup, "f", "Follow file rather than view it", 1)
-        except AttributeError:
-            # Will get given applications too, don't need options there
-            pass
+        if dynamic and test.classId() == "test-case":
+            self.addSwitch(oldOptionGroup, "rdt", "Include Run-dependent Text", 0)
+            self.addSwitch(oldOptionGroup, "nf", "Show differences where present", 1)
+            if not test.state.isComplete():
+                self.addSwitch(oldOptionGroup, "f", "Follow file rather than view it", 1)
     def canPerform(self):
         return False
     def tmpFile(self, comparison):
@@ -899,9 +895,9 @@ class InteractiveActionHandler:
         self.appClasses = []
         self.selectionClasses = [ SelectTests, SaveTests, RunTests, ResetGroups, SaveSelection ]
         self.optionGroupMap = {}
-    def getInstance(self, test, className):
-        instance = self.makeInstance(className, test)
-        self.storeOptionGroup(className, instance)
+    def getFileViewer(self, test, dynamic):
+        instance = self.makeInstance(ViewFile, test, dynamic)
+        self.storeOptionGroup(ViewFile, instance)
         return instance
     def storeOptionGroup(self, className, instance):
         if len(instance.getOptionGroups()) == 1:
@@ -925,16 +921,17 @@ class InteractiveActionHandler:
             return self.suiteClasses
         else:
             return self.appClasses
-    def makeInstance(self, className, test):
+    def makeInstance(self, className, *args):
         oldOptionGroup = []
         if self.optionGroupMap.has_key(className):
             oldOptionGroup = self.optionGroupMap[className]
-        basicInstance = className(test, oldOptionGroup)
+        args += (oldOptionGroup,)
+        basicInstance = className(*args)
         module = basicInstance.getConfigValue("interactive_action_module")
         command = "from " + module + " import " + className.__name__ + " as realClassName"
         try:
             exec command
-            return realClassName(test, oldOptionGroup)
+            return realClassName(*args)
         except ImportError:
             return basicInstance
         except:

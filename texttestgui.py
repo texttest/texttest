@@ -848,6 +848,13 @@ class RightWindowGUI:
         pageNum = self.notebook.get_current_page()
         page = self.notebook.get_nth_page(pageNum)
         return page is notebook
+    def describeAllTabs(self, notebook):
+        tabTexts = []
+        for pageNum in range(notebook.get_n_pages()):
+            page, tabText = self.getPageText(notebook, pageNum)
+            tabTexts.append(tabText)
+        guilog.info("")
+        guilog.info("Tabs showing : " + string.join(tabTexts, ", "))
     def describeNotebook(self, notebook, pageNum=None):
         if not self.isVisible(notebook):
             return
@@ -973,7 +980,9 @@ class RightWindowGUI:
             # describe the current page, we reloaded it...
             self.describeNotebook(notebook)
         self.removePages(notebook, pageNamesRemoved)
-        self.oldObjectPageNames = newObjectPageNames
+        if newObjectPageNames != self.oldObjectPageNames:
+            self.oldObjectPageNames = newObjectPageNames
+            self.describeAllTabs(notebook)
     def findNewCurrentPageNum(self, newPageNames, pageNamesRemoved):
         for index in range(len(newPageNames)):
             name = newPageNames[index]
@@ -1032,7 +1041,7 @@ class RightWindowGUI:
     
 class FileViewGUI:
     def __init__(self, object, dynamic):
-        self.fileViewAction = guiplugins.interactiveActionHandler.getInstance(object, guiplugins.ViewFile)
+        self.fileViewAction = guiplugins.interactiveActionHandler.getFileViewer(object, dynamic)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.name = object.name.replace("_", "__")
@@ -1069,12 +1078,12 @@ class FileViewGUI:
             view.append_column(perfColumn)
         view.expand_all()
         indexer = TreeModelIndexer(self.model, column, 0)
-        scriptEngine.connect("select file", "row_activated", view, self.displayDifferences, indexer)
+        scriptEngine.connect("select file", "row_activated", view, self.displayFile, indexer)
         view.show()
         fileWin.add(view)
         fileWin.show()
         return fileWin 
-    def displayDifferences(self, view, path, column, *args):
+    def displayFile(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
         if not fileName:

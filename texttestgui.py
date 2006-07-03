@@ -849,10 +849,7 @@ class RightWindowGUI:
         page = self.notebook.get_nth_page(pageNum)
         return page is notebook
     def describeAllTabs(self, notebook):
-        tabTexts = []
-        for pageNum in range(notebook.get_n_pages()):
-            page, tabText = self.getPageText(notebook, pageNum)
-            tabTexts.append(tabText)
+        tabTexts = map(notebook.get_tab_label_text, notebook.get_children())
         guilog.info("")
         guilog.info("Tabs showing : " + string.join(tabTexts, ", "))
     def describeNotebook(self, notebook, pageNum=None):

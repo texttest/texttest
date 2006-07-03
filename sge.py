@@ -48,48 +48,43 @@ class QueueSystem:
                 print "Unexpected output from qsub :", line.strip()
         return jobId
     def getJobFailureInfo(self, jobId):
-        trials = 10
+        methods = [ self.getAccountInfo, self.getAccountInfoOldFiles, self.retryAccountInfo ]
+        for method in methods:
+            acctOutput = method(jobId)
+            if acctOutput is not None:
+                return acctOutput
+        return "SGE lost job:" + jobId + "\n qdel output was as follows:\n" + self.qdelOutput
+    def getAccountInfo(self, jobId, extraArgs=""):
+        cmdLine = "qacct -j " + jobId + extraArgs
+        stdin, stdout, stderr = os.popen3(cmdLine)
+        errMsg = stderr.read()
+        if len(errMsg) == 0 or errMsg.find("error: job id " + jobId + " not found") == -1:
+            return stdout.read()
+    def retryAccountInfo(self, jobId):
         sleepTime = 0.5
-        while trials > 0:
-            errMsg, lines = self.tryGetAccounting(jobId)
-            if len(errMsg) == 0:
-                return string.join(lines)
-            # assume errMsg is because the job hasn't propagated yet, wait a bit
+        for trial in range(9): # would be 10 but we had one already
+            # assume failure is because the job hasn't propagated yet, wait a bit
             sleep(sleepTime)
             if sleepTime < 5:
                 sleepTime *= 2
-            trials -= 1
-        return "SGE lost job:" + jobId + "\n qdel output was as follows:\n" + self.qdelOutput
-    def tryGetAccounting(self, jobId):
-        errMsg, lines, found = self.getAccountingInfo(jobId, "")
-        logNum = 0
-        while found == 0:
+            acctOutput = self.getAccountInfo(jobId)
+            if acctOutput is not None:
+                return acctOutput
+    def getAccountInfoOldFiles(self, jobId):
+        for logNum in range(5):
+            # try at most 5 accounting files for now - assume jobs don't run longer than 5 days!
             fileName = self.findAccountingFile(logNum)
-            if fileName == "":
-                found = 1
-            else:
-                errMsg, lines, found = self.getAccountingInfo(jobId, fileName)
-            logNum = logNum + 1
-        return errMsg, lines
+            if not fileName:
+                return
+            acctInfo = self.getAccountInfo(jobId, " -f " + fileName)
+            if acctInfo:
+                return acctInfo
     def findAccountingFile(self, logNum):
         if os.environ.has_key("SGE_ROOT") and os.environ.has_key("SGE_CELL"):
             findPattern = os.path.join(os.environ["SGE_ROOT"], os.environ["SGE_CELL"])
-            acctFile = os.path.join("common", "accounting." + str(logNum))
+            acctFile = os.path.join(findPattern, "common", "accounting." + str(logNum))
             if os.path.isfile(acctFile):
-                return acctFile
-        return ""
-    def getAccountingInfo(self, jobId, file):
-        if file != "":
-            cmdLine = "qacct -f " + file + " -j " + jobId
-        else:
-            cmdLine = "qacct -j " + jobId
-        stdin, stdout, stderr = os.popen3(cmdLine)
-        errMsg = stderr.readlines()
-        lines = stdout.readlines()
-        if len(errMsg) > 0 and errMsg[0].find("error: job id " + jobId + " not found") != -1:
-            return errMsg, lines, 0
-        else:
-            return errMsg, lines, 1
+                return acctFile        
 
 # Used by slave for producing performance data
 class MachineInfo:

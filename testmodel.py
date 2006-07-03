@@ -1251,7 +1251,23 @@ class MultiEntryDictionary(seqdict):
         return self
     def addLine(self, line, insert, errorOnUnknown, separator = ':'):
         entryName, entry = line.split(separator, 1)
-        self.addEntry(os.path.expandvars(entryName), entry, "", insert, errorOnUnknown)
+        self.addEntry(self.expandvars(entryName), entry, "", insert, errorOnUnknown)
+    def getVarName(self, name):
+        if name.startswith("${"):
+            return name[2:-1]
+        else:
+            return name[1:]
+    def expandvars(self, name):
+        # os.path.expandvars fails on windows, assume entire name is the env variable
+        if name.startswith("$"):
+            varName = self.getVarName(name)
+            value = os.getenv(varName)
+            if value:
+                return value
+            else:
+                return name
+        else:
+            return name
     def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
         if sectionName:
             self.currDict = self[sectionName]

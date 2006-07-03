@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import sys, string, os, plugins
+import sys, string, os, plugins, types
 from usecase import ScriptEngine
 from threading import currentThread
 from Queue import Queue, Empty
@@ -64,7 +64,10 @@ class ThreadedResponder(Responder):
                 self.notifyAllComplete()
                 return False
             if test:
-                test.notifyChanged(state)
+                if type(state) == types.StringType:
+                    test.notifyLifecycle(state)
+                else:
+                    test.notifyChanged(state)
         except Empty:
             pass
         return True
@@ -76,6 +79,10 @@ class ThreadedResponder(Responder):
             return 1
         else:
             self.notifyChangeMainThread(test, state)
+    def notifyLifecycleChange(self, test, changeDesc):
+        if not plugins.inMainThread():
+            self.workQueue.put((test, changeDesc))
+            return 1 
     def notifyAllComplete(self):
         if plugins.inMainThread():
             self.scriptEngine.applicationEvent("completion of test actions")

@@ -304,8 +304,13 @@ class Test:
     def notifyCompleted(self):
         self.diagnose("Completion notified")
         for observer in self.observers:
-            observer.notifyLifecycleChange(self, "complete")
             observer.notifyComplete(self)
+        self.notifyLifecycle("complete")
+    def notifyLifecycle(self, changeDesc):
+        for observer in self.observers:
+            if observer.notifyLifecycleChange(self, changeDesc):
+                # threaded observers/GUI will be notified anyway by notifyChanged - don't create a race condition
+                return
     def notifyChanged(self, state=None):
         self.diagnose("Change notified, state " + repr(state))
         for observer in self.observers:
@@ -313,8 +318,7 @@ class Test:
                 # threaded observers can transfer the change to another thread for later propagation
                 return
         if state and state.lifecycleChange:
-            for observer in self.observers:
-                observer.notifyLifecycleChange(self, state.lifecycleChange)
+            self.notifyLifecycle(state.lifecycleChange)            
     def getRelPath(self):
         # We standardise communication around UNIX paths, it's all much easier that way
         relPath = plugins.relpath(self.getDirectory(), self.app.getDirectory())

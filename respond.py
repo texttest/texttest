@@ -95,6 +95,8 @@ class InteractiveResponder(Responder):
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
     def notifyComplete(self, test):
+        if self.closedown:
+            return
         self.describeFailures(test)
         if self.shouldSave(test):
             self.save(test, test.app.getFullVersion(forSave=1))

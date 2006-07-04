@@ -212,10 +212,10 @@ class OptimizationConfig(ravebased.Config):
         print helpScripts
     def setApplicationDefaults(self, app):
         ravebased.Config.setApplicationDefaults(self, app)
-        app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile)
-        app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods)
-        app.setConfigDefault("cvs_log_for_files", "")
-        app.setConfigDefault("kpi_cost_margin", 0.0)
+        app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile, "Private: Item name map for optimization status file parsing")
+        app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods, "Private: Item names not allowed to increase")
+        app.setConfigDefault("cvs_log_for_files", "", "File list that should be displayed by CVS log functionality")
+        app.setConfigDefault("kpi_cost_margin", 0.0, "Cost margin for the KPI calculations")
         app.addConfigEntry("definition_file_stems", "raveparameters")
 
 # Insert the contents of all raveparameters into the temporary rules file

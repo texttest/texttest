@@ -303,11 +303,11 @@ class Config(CarmenConfig):
         CarmenConfig.printHelpDescription(self)
     def setApplicationDefaults(self, app):
         CarmenConfig.setApplicationDefaults(self, app)
-        app.setConfigDefault("rave_name", { "default" : [] })
-        app.setConfigDefault("rave_static_library", "")
+        app.setConfigDefault("rave_name", { "default" : [] }, "Name of application as used by rule compilation")
+        app.setConfigDefault("rave_static_library", "", "Library to link with when building static rulesets")
         app.setConfigDefault("lines_of_crc_compile", 30, "How many lines to present in textual previews of rave compilation failures")
         # dictionary of lists
-        app.setConfigDefault("build_targets", { "" : [] })
+        app.setConfigDefault("build_targets", { "" : [] }, "Directories to build in when -build specified")
         app.addConfigEntry("need_rulecompile", "white", "test_colours")
         app.addConfigEntry("pend_rulecompile", "white", "test_colours")
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")

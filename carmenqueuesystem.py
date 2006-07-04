@@ -223,10 +223,10 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         return "xemacs"
     def setApplicationDefaults(self, app):
         queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
-        app.setConfigDefault("default_architecture", "i386_linux")
-        app.setConfigDefault("default_major_release", "master")
-        app.setConfigDefault("maximum_cputime_for_short_queue", 10)
-        app.setConfigDefault("maximum_cputime_for_chunking", 0.0)
+        app.setConfigDefault("default_architecture", "i386_linux", "Which Carmen architecture to run tests on by default")
+        app.setConfigDefault("default_major_release", "master", "Which Carmen major release to run by default")
+        app.setConfigDefault("maximum_cputime_for_short_queue", 10, "Maximum time a test can take and be sent to the short queue")
+        app.setConfigDefault("maximum_cputime_for_chunking", 0.0, "(LSF) Maximum time a test can take and be chunked")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")
         for var, value in self.getCarmenEnvironment(app):

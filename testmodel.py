@@ -772,6 +772,7 @@ class Application:
         self.configDir = MultiEntryDictionary()
         self.configDocs = {}
         self.setConfigDefaults()
+        self.readConfigFiles(configModuleInitialised=False)
         self.readValues(self.configDir, "config", self.dircache, insert=0)
         self.fullName = self.getConfigValue("full_name")
         self.diag.info("Found application " + repr(self))
@@ -781,7 +782,7 @@ class Application:
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
-        self.readValues(self.configDir, "config", self.dircache, insert=0, errorOnUnknown=1)
+        self.readConfigFiles(configModuleInitialised=True)
         personalFile = self.getPersonalConfigFile()
         if personalFile:
             self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
@@ -803,11 +804,32 @@ class Application:
         return "test-app"
     def getDirectory(self):
         return self.dircache.dir
+    def readConfigFiles(self, configModuleInitialised):
+        if not configModuleInitialised:
+            self.readExplicitConfigFiles(configModuleInitialised)
+        self.readImportedConfigFiles(configModuleInitialised)
+        self.readExplicitConfigFiles(configModuleInitialised)
+    def readExplicitConfigFiles(self, configModuleInitialised):
+        self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=configModuleInitialised)
+    def readImportedConfigFiles(self, configModuleInitialised):
+        self.configDir.readValues(self.getConfigFilesToImport(), insert=False, errorOnUnknown=configModuleInitialised)
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):
         allowedExtensions = self.getFileExtensions()
         allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists)
         self.diag.info("Reading values for " + stem + " from files : " + string.join(allFiles, "\n"))
-        return multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
+        multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
+    def getConfigFilesToImport(self):
+        return map(self.configPath, self.getConfigValue("import_config_file"))
+    def configPath(self, fileName):
+        if os.path.isabs(fileName):
+            return fileName
+        if self.dircache.exists(fileName):
+            return self.dircache.pathName(fileName)
+        oneLevelUp = os.path.join(os.getenv("TEXTTEST_HOME"), fileName)
+        if os.path.isfile(oneLevelUp):
+            return oneLevelUp
+        else:
+            raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
     def getFileName(self, dirList, stem, versionListMethod=None):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem, versionListMethod=versionListMethod)
@@ -861,6 +883,7 @@ class Application:
     def setConfigDefaults(self):
         self.setConfigDefault("binary", "", "Full path to the System Under Test")
         self.setConfigDefault("config_module", "default", "Configuration module to use")
+        self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", string.upper(self.name), "Expanded name to use for application")
         self.setConfigDefault("checkout_location", [], "Absolute paths to look for checkouts under")
         self.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")

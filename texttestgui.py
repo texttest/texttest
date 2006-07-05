@@ -360,12 +360,6 @@ class TextTestGUI(ThreadedResponder):
         self.rightWindowGUI = self.createDefaultRightGUI()
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
         treeWindow.grab_focus() # To avoid the Quit button getting the initial focus, causing unwanted quit event
-        self.checkGtkVersion()
-    def checkGtkVersion(self):
-        major, minor, debug = gtk.gtk_version
-        if major < 2 or minor < 4:
-            showError("DEPRECATION WARNING!!\nTextTest GUI support for PyGTK " + \
-                      str(major) + "." + str(minor) + " is being phased out\nUse at least PyGTK 2.4 where possible")
     def runWithActionThread(self, actionThread):
         self.setUpGui(actionThread)
         idle_add(self.pickUpChange)

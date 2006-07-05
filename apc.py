@@ -290,6 +290,7 @@ class ViewApcLog(guiplugins.InteractiveTestAction):
 class RunApcTestInDebugger(default.RunTest):
     def __init__(self, options, keepTmpFiles):
         default.RunTest.__init__(self)
+        self.process = None
         self.inXEmacs = None
         self.runPlain = None
         self.runValgrind = None
@@ -323,7 +324,8 @@ class RunApcTestInDebugger(default.RunTest):
         return "Debugging"
     def __del__(self):
         # .nfs lock files are left if we don't kill the less process.
-        self.process.killAll()
+        if self.process:
+            self.process.killAll()
     def __call__(self, test):
         self.describe(test)
         # Get the options that are sent to APCbatch.sh
@@ -341,7 +343,7 @@ class RunApcTestInDebugger(default.RunTest):
         gdbArgs = test.makeTmpFileName("gdb_args")
         gdbArgsFile = open(gdbArgs, "w")
         gdbArgsFile.write("set pagination off" + os.linesep)
-        gdbArgsFile.write(os.path.expandvars("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep))
+        gdbArgsFile.write(os.path.expandvars("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog + " 2>&1" + os.linesep))
         if not self.noRun:
             gdbArgsFile.write("run" + os.linesep)
             gdbArgsFile.write("if $_exitcode" + os.linesep)
@@ -358,6 +360,8 @@ class RunApcTestInDebugger(default.RunTest):
         outFile.close()
         # Create execute command.
         binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
+        if test.app.configObject.target.raveMode() == "-debug":
+            binName += "_g"
         if self.inXEmacs:
             gdbStart, gdbWithArgs = self.runInXEmacs(test, binName, gdbArgs)
             executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
@@ -370,7 +374,13 @@ class RunApcTestInDebugger(default.RunTest):
                 redir = "";
             executeCommand = "valgrind --tool=memcheck -v " + self.valopt + binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + redir
         else:
-            executeCommand = "gdb " + binName + " -silent -x " + gdbArgs
+            # I set the SHELL to be sh since if csh or tcsh is used, an init file is loaded
+            # that executes "stty erase". This command hangs due to that it gets the signal SIGTOOU.
+            # On the other hand, with sh, something weird happens when running with the GUI, gdb
+            # don't end sucessfully. This might be due to that it's not run in the main thread.
+            # It works fine when texttest is run in console mode. The problem might be related to
+            # bugzilla 1659! :-)
+            executeCommand = "SHELL=/bin/sh; gdb " + binName + " -silent -x " + gdbArgs
         # Check for personal .gdbinit.
         if os.path.isfile(os.path.join(os.environ["HOME"], ".gdbinit")):
             print "Warning: You have a personal .gdbinit. This may create unexpected behaviour."

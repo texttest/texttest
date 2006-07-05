@@ -431,7 +431,7 @@ class FilterRuleBuilds(plugins.Action):
     def __call__(self, test):
         arch = getArchitecture(test.app)
         try:
-            ruleset = RuleSet(self.getRuleSetName(test), self.raveNames, arch)
+            ruleset = RuleSet(self.getRuleSetName(test), self.raveNames, arch, test.app.configObject.target.raveMode())
         except plugins.TextTestError, e:
             # assume problems here are due to compilation itself not being setup, ignore
             print e
@@ -469,6 +469,8 @@ class FilterRuleBuilds(plugins.Action):
             return 1
 
         libFile = test.getConfigValue("rave_static_library")
+        if test.app.configObject.target.raveMode() == "-debug":
+            libFile = libFile.replace(".a", "_g.a")
         self.diag.info("Library file is " + libFile)
         if self.assumeDynamicLinkage(libFile, test.getEnvironment("CARMUSR")):
             return 0
@@ -506,7 +508,7 @@ class CompileRules(plugins.Action):
             return
         arch = getArchitecture(test.app)
         raveNames = getRaveNames(test)
-        ruleset = RuleSet(self.getRuleSetName(test), raveNames, arch)
+        ruleset = RuleSet(self.getRuleSetName(test), raveNames, arch, self.modeString)
         self.describe(test, " - ruleset " + ruleset.name)
 
         compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
@@ -518,8 +520,6 @@ class CompileRules(plugins.Action):
         commandLine = compiler + " " + extra + string.join(raveNames) + " " + self.getModeString() \
                           + " -archs " + arch + " " + ruleset.sourceFile
         self.performCompile(test, ruleset.name, commandLine)
-        if self.getModeString() == "-debug":
-            ruleset.moveDebugVersion()
     def getModeString(self):
         if os.environ.has_key("TEXTTEST_RAVE_MODE"):
             return self.modeString + " " + os.environ["TEXTTEST_RAVE_MODE"]
@@ -692,7 +692,7 @@ class RuleBuildFailed(plugins.TestState):
         plugins.TestState.__init__(self, "unrunnable", briefText=briefText, freeText=freeText, completed=1)
                         
 class RuleSet:
-    def __init__(self, ruleSetName, raveNames, arch):
+    def __init__(self, ruleSetName, raveNames, arch, modeString = "-optimize"):
         self.name = ruleSetName
         if not self.name:
             return
@@ -700,6 +700,8 @@ class RuleSet:
         self.targetFiles = []
         for raveName in raveNames:
             self.targetFiles.append(self.targetPath("rule_set", raveName, arch, self.name))
+            if modeString == "-debug":
+                self.targetFiles[-1] += "_g"
     def isValid(self):
         return self.name and os.path.isfile(self.sourceFile)
     def isCompiled(self):
@@ -718,12 +720,6 @@ class RuleSet:
                     shutil.copyfile(targetFile, targetFile + ".bak")
             except IOError:
                 print "WARNING - did not have permissions to backup ruleset, continuing anyway"
-    def moveDebugVersion(self):
-        for targetFile in self.targetFiles:
-            debugVersion = targetFile + "_g"
-            if os.path.isfile(debugVersion):
-                os.remove(targetFile)
-                os.rename(debugVersion, targetFile)
             
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):

@@ -649,19 +649,18 @@ class InteractiveActionGUI:
             hbox.pack_start(gtk.Label(switch.name), expand=False, fill=False)
             count = 0
             buttons = []
+            mainRadioButton = None
             for option in switch.options:
-                if count == 0:
-                    firstRadioButton = gtk.RadioButton(None, option)
-                    radioButton = firstRadioButton
-                else:
-                    radioButton = gtk.RadioButton(firstRadioButton, option)
+                radioButton = gtk.RadioButton(mainRadioButton, option)
+                buttons.append(radioButton)
+                scriptEngine.registerToggleButton(radioButton, "choose " + option)
+                if not mainRadioButton:
+                    mainRadioButton = radioButton
                 if count == switch.getValue():
                     radioButton.set_active(True)
                     switch.resetMethod = radioButton.set_active
                 else:
                     radioButton.set_active(False)
-                buttons.append(radioButton)
-                scriptEngine.registerToggleButton(radioButton, "choose " + option)
                 hbox.pack_start(radioButton, expand=True, fill=True)
                 count = count + 1
             indexer = RadioGroupIndexer(buttons)

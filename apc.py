@@ -343,7 +343,7 @@ class RunApcTestInDebugger(default.RunTest):
         gdbArgs = test.makeTmpFileName("gdb_args")
         gdbArgsFile = open(gdbArgs, "w")
         gdbArgsFile.write("set pagination off" + os.linesep)
-        gdbArgsFile.write(os.path.expandvars("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog + " 2>&1" + os.linesep))
+        gdbArgsFile.write(os.path.expandvars("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep))
         if not self.noRun:
             gdbArgsFile.write("run" + os.linesep)
             gdbArgsFile.write("if $_exitcode" + os.linesep)

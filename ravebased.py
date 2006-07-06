@@ -846,7 +846,11 @@ class BuildCode(plugins.Action):
         os.chdir(absPath)
         arch = getArchitecture(app)
         buildFile = "build.default." + arch
-        commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& " + buildFile)
+        extra = ""
+        if app.configObject.target.raveMode() == "-debug":
+            extra = "VERSION=debug "
+        makeCommand = "gmake " + extra + makeTargets + " >& " + buildFile
+        commandLine = self.getRemoteCommandLine(arch, absPath, makeCommand)
         machine = self.getMachine(app, arch)
         print "Building", app, "in", absPath, "on", machine, "..."
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
@@ -858,7 +862,8 @@ class BuildCode(plugins.Action):
         self.builtDirs[arch].append(absPath)
         os.remove(buildFile)
         if os.environ.has_key("CARMSYS"):
-            commandLine = self.getRemoteCommandLine(arch, absPath, "gmake install CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null")
+            makeCommand = "gmake install " + extra + "CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"
+            commandLine = self.getRemoteCommandLine(arch, absPath, makeCommand)
             os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
             print "Making install from", absPath ,"to", os.environ["CARMSYS"]
     def buildRemote(self, arch, app):

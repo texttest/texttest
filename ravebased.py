@@ -808,11 +808,11 @@ class BuildCode(plugins.Action):
             self.buildRemote("parisc_2_0", app)
             self.buildRemote("powerpc", app)
     def getPathAndTargets(self, optValue):
-        relPath = optValue
+        relPath = os.path.normpath(optValue)
         makeTargets = ""
         optParts = string.split(optValue)
         if len(optParts) > 1:
-            relPath = optParts[0]
+            relPath = os.path.normpath(optParts[0])
             makeTargets = string.join(optParts[1:])
         return (relPath, makeTargets)
     def getMachine(self, app, arch):

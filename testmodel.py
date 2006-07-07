@@ -698,6 +698,11 @@ class ConfigurationWrapper:
             return self.target.getPossibleResultFiles(app)
         except:
             self.raiseException(req = "possible result files")
+    def hasPerformance(self, app):
+        try:
+            return self.target.hasPerformance(app)
+        except:
+            self.raiseException(req = "has performance")
     def useExtraVersions(self):
         try:
             return self.target.useExtraVersions()
@@ -940,6 +945,8 @@ class Application:
         return options + " -c " + checkout + " " + self.configObject.getRunOptions()
     def getPossibleResultFiles(self):
         return self.configObject.getPossibleResultFiles(self)
+    def hasPerformance(self):
+        return self.configObject.hasPerformance(self)
     def addToOptionGroup(self, group):
         if group.name.startswith("What"):
             group.addOption("c", "Use checkout", self.checkout)

@@ -138,6 +138,9 @@ class QueueSystemConfig(default.Config):
     def showExecHostsInFailures(self):
         # Always show execution hosts, many different ones are used
         return 1
+    def hasAutomaticCputimeChecking(self, app):
+        return default.Config.hasAutomaticCputimeChecking(self, app) or \
+               len(app.getCompositeConfigValue("performance_test_resource", "cputime")) > 0
     def getSubmissionRules(self, test):
         return SubmissionRules(self.optionMap, test)
     def getPerformanceFileMaker(self):

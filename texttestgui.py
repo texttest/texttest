@@ -110,7 +110,6 @@ class TextTestGUI(ThreadedResponder):
         self.selectionActionGUI = None
         self.contents = None
         self.totalNofTests = 0
-        self.nofFailedSetupTests = 0
         self.progressMonitor = None
         self.toolTips = gtk.Tooltips()
         self.rootSuites = []
@@ -243,8 +242,6 @@ class TextTestGUI(ThreadedResponder):
             self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
         if suite.classId() == "test-case":
-            if suite.state.category == "unrunnable":
-                self.nofFailedSetupTests += 1
             self.totalNofTests += 1        
         iter = self.model.insert_before(parent, None)
         nodeName = suite.name
@@ -355,7 +352,7 @@ class TextTestGUI(ThreadedResponder):
         # Must be created after addSuiteWithParents has counted all tests ...
         # (but before RightWindowGUI, as that wants in on progress)
         if self.dynamic:            
-            self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.nofFailedSetupTests, self.rootSuites, self.status, self.rootSuites[0].getConfigValue("test_colours"))
+            self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.rootSuites, self.status, self.rootSuites[0].getConfigValue("test_colours"))
 
         self.rightWindowGUI = self.createDefaultRightGUI()
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
@@ -1322,14 +1319,13 @@ class GUIStatusMonitor:
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor:
-    def __init__(self, totalNofTests, nofFailedSetupTests, applications, status, colors):
+    def __init__(self, totalNofTests, applications, status, colors):
         # If we get here, we know that we want to show progress
         self.completedTests = {}
         self.testToIter = {}
         self.completionTime = ""
         self.totalNofTests = totalNofTests
-        self.nofFailedSetupTests = nofFailedSetupTests
-        self.nofCompletedTests = nofFailedSetupTests
+        self.nofCompletedTests = 0
         self.nofPendingTests = 0
         self.nofRunningTests = 0
         self.nofPerformanceDiffTests = 0
@@ -1528,7 +1524,6 @@ class TestProgressMonitor:
         self.pendIter    = self.treeModel.append(None, ["Pending", 0, 1])
         self.runIter     = self.treeModel.append(None, ["Running", 0, 1])
         self.successIter = self.treeModel.append(None, ["Succeeded", 0, 1])
-        self.setupIter   = self.treeModel.append(None, ["Failed in setup", self.nofFailedSetupTests, 1])
         self.failedIter  = self.treeModel.append(None, ["Failed", 0, 1])
         self.performanceIter = self.treeModel.append(self.failedIter, ["Performance differences", 0, 1])
         self.fasterIter  = self.treeModel.append(self.performanceIter, ["Faster", 0, 1])

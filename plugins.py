@@ -89,6 +89,8 @@ class Configuration:
         pass
     def getPossibleResultFiles(self, app):
         return []
+    def hasPerformance(self, app):
+        return False
     def getCleanMode(self):
         return self.CLEAN_SELF
     def getWriteDirectoryName(self, app):

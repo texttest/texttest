@@ -247,21 +247,9 @@ class SaveTests(SelectionAction):
         return app.getFullVersion(forSave = 1)
     def hasPerformance(self):
         for app in self.apps:
-            if self.appHasPerformance(app):
+            if app.hasPerformance():
                 return True
         return False
-    def appHasPerformance(self, app):
-        if len(app.getConfigValue("performance_logfile_extractor")) > 0:
-            return True
-        if len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0:
-            return True
-        try:
-            # only present in queuesystem module, kind of a hack to call it there. Avoid
-            # making Configuration API bigger just for this...
-            if len(app.getCompositeConfigValue("performance_test_resource", "cputime")) > 0:
-                return True
-        except KeyError:
-            return False
     def findAllStems(self):
         allStems = []
         for app in self.apps:

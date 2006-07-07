@@ -139,12 +139,18 @@ class Config(plugins.Configuration):
         collateKeys.sort()
         files += collateKeys
         files += app.getConfigValue("performance_logfile_extractor").keys()
-        if len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0:
+        if self.hasAutomaticCputimeChecking(app):
             files.append("performance")
         for file in app.getConfigValue("discard_file"):
             if file in files:
                 files.remove(file)
         return files
+    def hasPerformance(self, app):
+        if len(app.getConfigValue("performance_logfile_extractor")) > 0:
+            return True
+        return self.hasAutomaticCputimeChecking(app)
+    def hasAutomaticCputimeChecking(self, app):
+        return len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0
     def getPossibleFilterFiles(self, app):
         filterFiles = []
         for directory in self.getFilterDirs(app):

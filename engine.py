@@ -171,8 +171,6 @@ class ApplicationRunner:
         if sys.exc_type != plugins.TextTestError:
             plugins.printException()
             message = str(sys.exc_type) + ": " + message
-        for test in self.testSuite.testCaseList():
-            test.changeState(plugins.TestState("unrunnable", briefText="Set-up Failed", freeText=message, completed=1))
         raise testmodel.BadConfigError, message
     def markForSetUp(self, suite):
         newActions = []
@@ -252,8 +250,6 @@ class ActionRunner:
             testRunner = TestRunner(test, appRunner, self.diag)
             self.testQueue.append(testRunner)
             self.allTests.append(testRunner)
-    def isEmpty(self):
-        return len(self.appRunners) == 0
     def switchToCleanup(self, fetchResults):
         for appRunner in self.appRunners:
             appRunner.switchToCleanup(fetchResults)
@@ -469,15 +465,17 @@ class TextTest:
         script = self.inputOptions.runScript()
         if not script:
             self.checkForNoTests(appSuites)
+        acceptedAppSuites = seqdict()
         for app, testSuite in appSuites.items():
             if not script and testSuite.size() == 0:
                 continue
             print "Using", app.description() + ", checkout", app.checkout
             try:
                 actionRunner.addTestActions(testSuite, script)
+                acceptedAppSuites[app] = testSuite
             except testmodel.BadConfigError:
                 sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + "\n")
-        return actionRunner
+        return actionRunner, acceptedAppSuites
     def run(self):
         if self.inputOptions.helpMode():
             if len(self.allApps) > 0:
@@ -512,12 +510,12 @@ class TextTest:
         self.setUpResponders(appSuites)
         ownThreadResponder.runAlone()
     def runWithTests(self, ownThreadResponder, appSuites):                
-        actionRunner = self.createActionRunner(appSuites)
-        if actionRunner.isEmpty():
+        actionRunner, acceptedAppSuites = self.createActionRunner(appSuites)
+        if len(acceptedAppSuites) == 0:
             return # error already printed
 
         # Wait until now to do this, in case problems encountered so far...
-        self.setUpResponders(appSuites)
+        self.setUpResponders(acceptedAppSuites)
         if ownThreadResponder:
             actionThread = ActionThread(actionRunner)
             actionThread.start()

@@ -1584,7 +1584,7 @@ class TestProgressMonitor:
 
         if showView:
             self.progressReport = gtk.VBox()
-            self.progressReport.pack_start(self.treeView, expand=False, fill=True)
+            self.progressReport.pack_start(self.treeView, expand=True, fill=True)
             self.progressReport.show_all()
         else:
             self.progressReport = None

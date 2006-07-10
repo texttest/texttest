@@ -469,7 +469,7 @@ class TextTest:
         for app, testSuite in appSuites.items():
             if not script and testSuite.size() == 0:
                 continue
-            print "Using", app.description() + ", checkout", app.checkout
+            print "Using", app.description(includeCheckout=True)
             try:
                 actionRunner.addTestActions(testSuite, script)
                 acceptedAppSuites[app] = testSuite

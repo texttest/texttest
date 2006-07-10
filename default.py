@@ -351,6 +351,9 @@ class Config(plugins.Configuration):
         batchSession = self.optionValue("b")
         if batchSession:
             app.addConfigEntry("base_version", batchSession)
+            if batchSession != "default" and not self.optionMap.has_key("c") and \
+                   app.getConfigValue("checkout_location").has_key(batchSession):
+                self.optionMap["c"] = batchSession
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")

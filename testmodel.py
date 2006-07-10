@@ -852,7 +852,8 @@ class Application:
         else:
             return self.getFileExtensions()
     def setCheckoutVariable(self):
-        os.environ["TEXTTEST_CHECKOUT"] = self.checkout
+        if self.checkout:
+            os.environ["TEXTTEST_CHECKOUT"] = self.checkout
     def getPreviousWriteDirInfo(self, userName):
         userId = plugins.tmpString
         if userName:
@@ -890,7 +891,7 @@ class Application:
         self.setConfigDefault("config_module", "default", "Configuration module to use")
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", string.upper(self.name), "Expanded name to use for application")
-        self.setConfigDefault("checkout_location", [], "Absolute paths to look for checkouts under")
+        self.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         self.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         self.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
@@ -942,7 +943,9 @@ class Application:
         options = "-d " + self.inputOptions.directoryName + " -a " + self.name
         if version:
             options += " -v " + version
-        return options + " -c " + checkout + " " + self.configObject.getRunOptions()
+        if checkout:
+            options += " -c " + checkout
+        return options + " " + self.configObject.getRunOptions()
     def getPossibleResultFiles(self):
         return self.configObject.getPossibleResultFiles(self)
     def hasPerformance(self):
@@ -1000,10 +1003,12 @@ class Application:
             self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
             suite.readEnvironment()
         return success, suite
-    def description(self):
+    def description(self, includeCheckout = False):
         description = "Application " + self.fullName
         if len(self.versions):
             description += ", version " + string.join(self.versions, ".")
+        if includeCheckout and self.checkout:
+            description += ", checkout " + self.checkout
         return description
     def filterUnsaveable(self, versions):
         saveableVersions = []
@@ -1141,25 +1146,48 @@ class Application:
         if len(docString) > 0:
             self.configDocs[key] = docString
     def makeCheckout(self, checkoutOverride):
-        checkout = checkoutOverride
-        if not checkoutOverride:
-            checkout = self.getConfigValue("default_checkout")
+        absCheckout = self.getCheckoutPath(checkoutOverride)
+        if len(absCheckout) == 0: # default, allow this, means no checkout is set, basically
+            return ""
+        if not os.path.isabs(absCheckout):
+            raise BadConfigError, "could not create absolute checkout from relative path '" + absCheckout + "'"
+        elif not os.path.isdir(absCheckout):
+            raise BadConfigError, "checkout '" + absCheckout + "' does not exist"
+        else:
+            return absCheckout
+    def getCheckoutPath(self, checkoutOverride):
+        checkout = self.getCheckout(checkoutOverride)
         if os.path.isabs(checkout):
             return checkout
-        checkoutLocations = self.getConfigValue("checkout_location")
+        checkoutLocations = self.getCompositeConfigValue("checkout_location", checkout)
+        # do this afterwards, so it doesn't get expanded (yet)
+        os.environ["TEXTTEST_CHECKOUT_NAME"] = checkout
         if len(checkoutLocations) > 0:
             return self.makeAbsoluteCheckout(checkoutLocations, checkout)
         else:
-            # Assume relative checkouts are relative to the root directory...
-            return os.path.normpath(self.dircache.pathName(checkout))
+            return checkout
+    def getCheckout(self, checkoutOverride):
+        if checkoutOverride:
+            return checkoutOverride
+        else:
+            return self.getConfigValue("default_checkout")        
     def makeAbsoluteCheckout(self, locations, checkout):
+        isSpecific = self.getConfigValue("checkout_location").has_key(checkout)
         for location in locations:
-            fullCheckout = self.absCheckout(location, checkout)
+            fullCheckout = self.absCheckout(location, checkout, isSpecific)
             if os.path.isdir(fullCheckout):
                 return fullCheckout
-        return self.absCheckout(locations[0], checkout)
-    def absCheckout(self, location, checkout):
-        return os.path.join(os.path.expanduser(location), checkout)
+        return self.absCheckout(locations[0], checkout, isSpecific)
+    def absCheckout(self, location, checkout, isSpecific):
+        fullLocation = os.path.expanduser(location)
+        absPath = os.path.expandvars(fullLocation)
+        self.diag.info("Looking for checkout '" + checkout + "' in " + absPath)
+        self.diag.info("Specific = " + repr(isSpecific) + ", unexpanded version is " + fullLocation)
+        if isSpecific or absPath != fullLocation:
+            return absPath
+        else:
+            # old-style: infer expansion in default checkout
+            return os.path.join(fullLocation, checkout)
     def checkBinaryExists(self):
         binary = self.getConfigValue("binary")
         if not binary:

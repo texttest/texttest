@@ -395,7 +395,7 @@ class SubmitTest(plugins.Action):
     def getSlaveCommand(self, test):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
-        commandLine = "exec python " + plugins.textTestName + " " + test.app.getRunOptions() + " -tp " + test.getRelPath() \
+        commandLine = "exec " + plugins.textTestName + " " + test.app.getRunOptions() + " -tp " + test.getRelPath() \
                       + self.getSlaveArgs(test) + " " + self.runOptions
         return "exec " + self.loginShell + " -c \"" + commandLine + "\""
     def getSlaveArgs(self, test):

@@ -433,7 +433,7 @@ class RecordTest(InteractiveTestAction):
     def startTextTestProcess(self, test, usecase):
         ttOptions = self.getRunOptions(test, usecase)
         guilog.info("Starting " + usecase + " run of TextTest with arguments " + ttOptions)
-        commandLine = plugins.getTextTestName() + " " + ttOptions
+        commandLine = plugins.textTestName + " " + ttOptions
         test.app.makeWriteDirectory()
         logFile = self.getLogFile(test, usecase, "run")
         errFile = self.getLogFile(test, usecase)
@@ -745,7 +745,7 @@ class RunTests(SelectionAction):
         errFile = os.path.join(self.apps[0].writeDirectory, "dynamic_errors" + str(self.runNumber) + ".log")
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
-        commandLine = plugins.getTextTestName() + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
+        commandLine = plugins.textTestName + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
         self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,selTestCases), description = description)
     def isTestCase(self, test):
         return isinstance(test, TestCase)

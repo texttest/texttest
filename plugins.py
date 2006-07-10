@@ -22,6 +22,8 @@ tmpString = "tmp"
 if os.environ.has_key("USER"):
     tmpString = os.getenv("USER")
 
+textTestName = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0])
+
 def makeString(char, length):
     if length <= 0:
         return ""
@@ -249,9 +251,6 @@ def relpath(fullpath, parentdir):
         return relPath[1:]
     else:
         return relPath
-
-def getTextTestName():
-    return os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0])
 
 def nullFileName():
     if os.name == "posix":

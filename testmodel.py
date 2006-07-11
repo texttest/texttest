@@ -293,7 +293,7 @@ class Test:
         return self.app._getFileName(self.dircaches, stem, refVersion)
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars)
-    def getCompositeConfigValue(self, key, subKey):
+    def getCompositeConfigValue(self, key, subKey, expandVars=True):
         return self.app.getCompositeConfigValue(key, subKey)
     def makePathName(self, fileName):
         for dircache in self.dircaches:
@@ -1121,8 +1121,8 @@ class Application:
             return newDict
         else:
             return value
-    def getCompositeConfigValue(self, key, subKey):
-        dict = self.getConfigValue(key)
+    def getCompositeConfigValue(self, key, subKey, expandVars=True):
+        dict = self.getConfigValue(key, expandVars)
         listVal = []
         for currSubKey, currValue in dict.items():
             if fnmatch(subKey, currSubKey):
@@ -1159,7 +1159,7 @@ class Application:
         checkout = self.getCheckout(checkoutOverride)
         if os.path.isabs(checkout):
             return checkout
-        checkoutLocations = self.getCompositeConfigValue("checkout_location", checkout)
+        checkoutLocations = self.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
         # do this afterwards, so it doesn't get expanded (yet)
         os.environ["TEXTTEST_CHECKOUT_NAME"] = checkout
         if len(checkoutLocations) > 0:
@@ -1179,12 +1179,11 @@ class Application:
                 return fullCheckout
         return self.absCheckout(locations[0], checkout, isSpecific)
     def absCheckout(self, location, checkout, isSpecific):
-        fullLocation = os.path.expanduser(location)
-        absPath = os.path.expandvars(fullLocation)
-        self.diag.info("Looking for checkout '" + checkout + "' in " + absPath)
-        self.diag.info("Specific = " + repr(isSpecific) + ", unexpanded version is " + fullLocation)
-        if isSpecific or absPath != fullLocation:
-            return absPath
+        fullLocation = os.path.expanduser(os.path.expandvars(location))
+        self.diag.info("Looking for checkout '" + checkout + "' in " + fullLocation)
+        self.diag.info("Specific = " + repr(isSpecific) + ", unexpanded version is " + location)
+        if isSpecific or location.find("TEXTTEST_CHECKOUT_NAME") != -1:
+            return fullLocation
         else:
             # old-style: infer expansion in default checkout
             return os.path.join(fullLocation, checkout)

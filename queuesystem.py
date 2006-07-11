@@ -94,9 +94,9 @@ class QueueSystemConfig(default.Config):
         if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l"):
             return 0
         return 1
-    def getRunOptions(self):
+    def getRunOptions(self, checkout):
         # Options to add by default when recording, auto-replaying or running as slave
-        return "-l"
+        return "-l " + default.Config.getRunOptions(self, checkout)
     def slaveRun(self):
         return self.optionMap.has_key("slave")
     def getWriteDirectoryName(self, app):

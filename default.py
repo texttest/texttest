@@ -25,6 +25,7 @@ class Config(plugins.Configuration):
                 group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
                 group.addOption("r", "Execution time <min, max>")
             elif group.name.startswith("What"):
+                group.addOption("c", "Use checkout", app.checkout)
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
             elif group.name.startswith("How"):
@@ -100,6 +101,11 @@ class Config(plugins.Configuration):
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
+    def getRunOptions(self, checkout):
+        if checkout:
+            return "-c " + checkout
+        else:
+            return ""
     def getWriteDirectoryName(self, app):
         defaultName = plugins.Configuration.getWriteDirectoryName(self, app)
         if self.useStaticGUI(app):
@@ -279,11 +285,43 @@ class Config(plugins.Configuration):
         return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
-        if self.optionMap.has_key(option):
-            return self.optionMap[option]
+        return self.optionMap.get(option, "")
+    def getCheckoutPath(self, app):
+        checkout = self.getCheckout(app)
+        if os.path.isabs(checkout):
+            return checkout
+        checkoutLocations = app.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
+        # do this afterwards, so it doesn't get expanded (yet)
+        os.environ["TEXTTEST_CHECKOUT_NAME"] = checkout
+        if len(checkoutLocations) > 0:
+            return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
         else:
-            return ""
-            info = ""
+            return checkout
+    def getCheckout(self, app):
+        if self.optionMap.has_key("c"):
+            return self.optionMap["c"]
+
+        # Under some circumstances infer checkout from batch session
+        batchSession = self.optionValue("b")
+        if batchSession and  batchSession != "default" and \
+               app.getConfigValue("checkout_location").has_key(batchSession):
+            return batchSession
+        else:
+            return app.getConfigValue("default_checkout")        
+    def makeAbsoluteCheckout(self, locations, checkout, app):
+        isSpecific = app.getConfigValue("checkout_location").has_key(checkout)
+        for location in locations:
+            fullCheckout = self.absCheckout(location, checkout, isSpecific)
+            if os.path.isdir(fullCheckout):
+                return fullCheckout
+        return self.absCheckout(locations[0], checkout, isSpecific)
+    def absCheckout(self, location, checkout, isSpecific):
+        fullLocation = os.path.expanduser(os.path.expandvars(location))
+        if isSpecific or location.find("TEXTTEST_CHECKOUT_NAME") != -1:
+            return fullLocation
+        else:
+            # old-style: infer expansion in default checkout
+            return os.path.join(fullLocation, checkout)
     # For display in the GUI
     def getTextualInfo(self, test):
         info = ""
@@ -351,9 +389,6 @@ class Config(plugins.Configuration):
         batchSession = self.optionValue("b")
         if batchSession:
             app.addConfigEntry("base_version", batchSession)
-            if batchSession != "default" and not self.optionMap.has_key("c") and \
-                   app.getConfigValue("checkout_location").has_key(batchSession):
-                self.optionMap["c"] = batchSession
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
@@ -450,6 +485,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
     def setMiscDefaults(self, app):
+        app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
+        app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         app.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")

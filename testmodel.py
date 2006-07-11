@@ -693,6 +693,11 @@ class ConfigurationWrapper:
             return self.target.getWriteDirectoryName(app)
         except:
             self.raiseException(req = "writedir name")
+    def getCheckoutPath(self, app):
+        try:
+            return self.target.getCheckoutPath(app)
+        except:
+            self.raiseException(req = "checkout path")
     def getPossibleResultFiles(self, app):
         try:
             return self.target.getPossibleResultFiles(app)
@@ -708,9 +713,9 @@ class ConfigurationWrapper:
             return self.target.useExtraVersions()
         except:
             self.raiseException(req = "extra versions")
-    def getRunOptions(self):
+    def getRunOptions(self, checkout):
         try:
-            return self.target.getRunOptions()
+            return self.target.getRunOptions(checkout)
         except:
             self.raiseException(req = "run options")
     def addToOptionGroups(self, app, groups):
@@ -793,7 +798,7 @@ class Application:
             self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
         self.writeDirectory = self.configObject.getWriteDirectoryName(self)
         self.diag.info("Write directory at " + self.writeDirectory)
-        self.checkout = self.makeCheckout(inputOptions.checkoutOverride())
+        self.checkout = self.makeCheckout()
         self.diag.info("Checkout set to " + self.checkout)
         self.setCheckoutVariable()
         self.optionGroups = self.createOptionGroups(inputOptions)
@@ -891,8 +896,6 @@ class Application:
         self.setConfigDefault("config_module", "default", "Configuration module to use")
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", string.upper(self.name), "Expanded name to use for application")
-        self.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
-        self.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         self.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
         # various varieties of test data
@@ -943,16 +946,13 @@ class Application:
         options = "-d " + self.inputOptions.directoryName + " -a " + self.name
         if version:
             options += " -v " + version
-        if checkout:
-            options += " -c " + checkout
-        return options + " " + self.configObject.getRunOptions()
+        return options + " " + self.configObject.getRunOptions(checkout)
     def getPossibleResultFiles(self):
         return self.configObject.getPossibleResultFiles(self)
     def hasPerformance(self):
         return self.configObject.hasPerformance(self)
     def addToOptionGroup(self, group):
         if group.name.startswith("What"):
-            group.addOption("c", "Use checkout", self.checkout)
             group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("Side"):
             group.addSwitch("x", "Write TextTest diagnostics")
@@ -1145,8 +1145,8 @@ class Application:
         self.configDir[key] = value
         if len(docString) > 0:
             self.configDocs[key] = docString
-    def makeCheckout(self, checkoutOverride):
-        absCheckout = self.getCheckoutPath(checkoutOverride)
+    def makeCheckout(self):
+        absCheckout = self.configObject.getCheckoutPath(self)
         if len(absCheckout) == 0: # default, allow this, means no checkout is set, basically
             return ""
         if not os.path.isabs(absCheckout):
@@ -1155,38 +1155,6 @@ class Application:
             raise BadConfigError, "checkout '" + absCheckout + "' does not exist"
         else:
             return absCheckout
-    def getCheckoutPath(self, checkoutOverride):
-        checkout = self.getCheckout(checkoutOverride)
-        if os.path.isabs(checkout):
-            return checkout
-        checkoutLocations = self.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
-        # do this afterwards, so it doesn't get expanded (yet)
-        os.environ["TEXTTEST_CHECKOUT_NAME"] = checkout
-        if len(checkoutLocations) > 0:
-            return self.makeAbsoluteCheckout(checkoutLocations, checkout)
-        else:
-            return checkout
-    def getCheckout(self, checkoutOverride):
-        if checkoutOverride:
-            return checkoutOverride
-        else:
-            return self.getConfigValue("default_checkout")        
-    def makeAbsoluteCheckout(self, locations, checkout):
-        isSpecific = self.getConfigValue("checkout_location").has_key(checkout)
-        for location in locations:
-            fullCheckout = self.absCheckout(location, checkout, isSpecific)
-            if os.path.isdir(fullCheckout):
-                return fullCheckout
-        return self.absCheckout(locations[0], checkout, isSpecific)
-    def absCheckout(self, location, checkout, isSpecific):
-        fullLocation = os.path.expanduser(os.path.expandvars(location))
-        self.diag.info("Looking for checkout '" + checkout + "' in " + fullLocation)
-        self.diag.info("Specific = " + repr(isSpecific) + ", unexpanded version is " + location)
-        if isSpecific or location.find("TEXTTEST_CHECKOUT_NAME") != -1:
-            return fullLocation
-        else:
-            # old-style: infer expansion in default checkout
-            return os.path.join(fullLocation, checkout)
     def checkBinaryExists(self):
         binary = self.getConfigValue("binary")
         if not binary:
@@ -1256,11 +1224,6 @@ class OptionFinder(plugins.OptionFinder):
             appDict[appName].append(versionName)
         else:
             appDict[appName] = [ versionName ]
-    def checkoutOverride(self):
-        if self.has_key("c"):
-            return self["c"]
-        else:
-            return ""
     def helpMode(self):
         return self.has_key("help")
     def runScript(self):

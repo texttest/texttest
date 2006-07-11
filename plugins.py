@@ -97,7 +97,9 @@ class Configuration:
         return self.CLEAN_SELF
     def getWriteDirectoryName(self, app):
         return app.getStandardWriteDirectoryName()
-    def getRunOptions(self):
+    def getCheckoutPath(self, app):
+        return ""
+    def getRunOptions(self, checkout):
         return ""
     def useExtraVersions(self):
         return 1

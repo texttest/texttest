@@ -202,18 +202,6 @@ class AddTestPerformance(plugins.Action):
     def __del__(self):
         print "Added-up test performance (for " + str(self.numberTests) + " tests) is " + str(int(self.performance)) + " minutes (" + str(int(self.performance/60)) + " hours)"
         
-class ShowMemoryUsage(plugins.Action):
-    def __init__(self):
-        self.performance = 0.0
-        self.numberTests = 0
-    def __repr__(self):
-        return "Memory usage for"
-    def scriptDoc(self):
-        return "Prints a report on memory usage per test (looks in \"memory\" files)"
-    def __call__(self, test):
-        testMemory = getTestMemory(test)
-        self.describe(test, ": " + str(testMemory) + " MB")
-
 def percentDiff(perf1, perf2):
     if perf2 != 0:
         return int((perf1 / perf2) * 100.0)
@@ -224,8 +212,9 @@ class PerformanceStatistics(plugins.Action):
     def __init__(self, args = []):
         self.referenceVersion = ""
         self.currentVersion = None
-        self.interpretOptions(args)
         self.limit = 0
+        self.file = "performance"
+        self.interpretOptions(args)
     def interpretOptions(self, args):
         for ar in args:
             arr = ar.split("=")
@@ -235,6 +224,8 @@ class PerformanceStatistics(plugins.Action):
                 self.currentVersion = None
                 if len(versions) > 1:
                     self.currentVersion = versions[1]
+            elif arr[0]=="f":
+                self.file = arr[1]
             elif arr[0]=="l":
                 try:
                     self.limit = int(arr[1])
@@ -243,89 +234,31 @@ class PerformanceStatistics(plugins.Action):
             else:
                 print "Unknown option " + arr[0]
     def scriptDoc(self):
-        return "Prints a report on CPU time usage per test. Can compare versions"
+        return "Prints a report on system resource usage per test. Can compare versions"
     def setUpSuite(self, suite):
         self.suiteName = suite.name + "\n" + "   "
     def __call__(self, test):
-        refPerf = getTestPerformance(test, self.referenceVersion) / 60 # getTestPerformance returns seconds now ...
+        refPerf = getPerformance(test.getFileName(self.file, self.referenceVersion))
         if self.currentVersion is not None:
-            currPerf = getTestPerformance(test, self.currentVersion) / 60 # getTestPerformance returns seconds now ...
+            currPerf = getPerformance(test.getFileName(self.file, self.currentVersion))
             pDiff = percentDiff(currPerf, refPerf)
             if self.limit == 0 or pDiff > self.limit:
-                print self.suiteName + test.name.ljust(30) + "\t", self.minsec(refPerf), self.minsec(currPerf), "\t" + str(pDiff) + "%"
+                print self.suiteName + test.name.ljust(30) + "\t", \
+                      self.format(refPerf), self.format(currPerf), "\t" + str(pDiff) + "%"
                 self.suiteName = "   "
         else:
-            print self.suiteName + test.name.ljust(30) + "\t", self.minsec(refPerf)
-    def minsec(self, minFloat):
-        intMin = int(minFloat)
-        secPart = minFloat - intMin
-        return str(intMin) + "m" + str(int(secPart * 60)) + "s"
-
-class MemoryStatistics(plugins.Action):
-    def __init__(self, args = []):
-        self.interpretOptions(args)
-        self.limit = 0
-    def interpretOptions(self, args):
-        for ar in args:
-            arr = ar.split("=")
-            if arr[0]=="v":
-                versions = arr[1].split(",")
-                self.referenceVersion = versions[0]
-                self.currentVersion = None
-                if len(versions) > 1:
-                    self.currentVersion = versions[1]
-            elif arr[0]=="l":
-                try:
-                    self.limit = int(arr[1])
-                except:
-                    self.limit = 0
-            else:
-                print "Unknown option " + arr[0]
-    def setUpSuite(self, suite):
-        self.suiteName = suite.name + "\n   "
-    def getOutputMemory(self, fileName):
-        if not fileName:
-            return float(-1)
-        try:
-#            memPrefix = test.app.getConfigValue("string_before_memory")
-            memPrefix = "Maximum memory used"
-            if memPrefix == "":
-                return float(-1)
-            line = os.popen("grep '" + memPrefix + "' " + fileName).readline()
-            start = line.find(":")
-            end = line.find("k", start)
-            fullSize = line[start + 1:end - 1]
-            return int((float(string.strip(fullSize)) / 1024.0) * 10.0) / 10.0
-        except:
-            return float(-1)
-    def getTestMemory(self, test, version = None):
-        logFileStem = test.app.getConfigValue("log_file")
-        fileName = test.getFileName(logFileStem, version)
-        outputMemory = self.getOutputMemory(fileName)
-        if outputMemory > 0.0:
-            return outputMemory
-        return -1.0
-    def __call__(self, test):
-        refMem = self.getTestMemory(test, self.referenceVersion)
-        currMem = self.getTestMemory(test, self.currentVersion)
-        refOutput = 1
-        currOutput = 1
-        if refMem < 0.0:
-            refOutput = 0
-        if currMem < 0.0:
-            currOutput = 0
-        pDiff = percentDiff(currMem, refMem)
-        if self.limit == 0 or pDiff > self.limit:
-            title = self.suiteName + test.name.ljust(30)
-            self.suiteName = "   "
-            if refOutput == 0 and currOutput == 0:
-                print title
-                return
-            pDiff = str(pDiff) + "%"
-            if refOutput == 0:
-                refMem = "(" + str(refMem) + ")"
-                pDiff = "(" + pDiff + ")"
-            if currOutput == 0:
-                currMem = "(" + str(currMem) + ")"
-                pDiff = "(" + pDiff + ")"
-            print title + "\t", refMem, currMem, "\t" + pDiff
+            print self.rowHeader(test), self.format(refPerf)
+    def rowHeader(self, test):
+        return self.suiteName + test.name.ljust(30) + "\t"
+    def format(self, number):
+        if self.file.find("mem") != -1:
+            return self.formatMemory(number)
+        else:
+            return self.formatTime(number)
+    def formatMemory(self, memUsed):
+        return str(memUsed) + " MB"
+    def formatTime(self, seconds):
+        intSec = int(seconds)
+        intMin = intSec / 60
+        secPart = intSec - (intMin * 60)
+        return str(intMin) + "m" + str(secPart) + "s"

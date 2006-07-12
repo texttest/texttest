@@ -180,27 +180,7 @@ class TimeFilter(plugins.Filter):
         testPerformance = getTestPerformance(test)
         if testPerformance < 0:
             return 1
-        return testPerformance >= self.minTime and testPerformance <= self.maxTime
-
-class AddTestPerformance(plugins.Action):
-    def __init__(self):
-        self.performance = 0.0
-        self.numberTests = 0
-    def __repr__(self):
-        return "Adding performance for"
-    def __call__(self, test):
-        testPerformance = getTestPerformance(test) / 60 # getTestPerformance returns seconds now ...
-        if os.environ.has_key("LSF_PROCESSES"):
-            parCPUs = int(os.environ["LSF_PROCESSES"])
-            self.describe(test, ": " + str(int(testPerformance)) + " minutes * " + str(parCPUs))
-            if parCPUs > 0:
-                testPerformance *= parCPUs
-        else:
-            self.describe(test, ": " + str(int(testPerformance)) + " minutes")
-        self.performance += testPerformance
-        self.numberTests += 1
-    def __del__(self):
-        print "Added-up test performance (for " + str(self.numberTests) + " tests) is " + str(int(self.performance)) + " minutes (" + str(int(self.performance/60)) + " hours)"
+        return testPerformance >= self.minTime and testPerformance <= self.maxTime       
         
 def percentDiff(perf1, perf2):
     if perf2 != 0:
@@ -213,6 +193,9 @@ class PerformanceStatistics(plugins.Action):
         self.referenceVersion = ""
         self.currentVersion = None
         self.limit = 0
+        self.refTotal = 0.0
+        self.currTotal = 0.0
+        self.testCount = 0
         self.file = "performance"
         self.interpretOptions(args)
     def interpretOptions(self, args):
@@ -238,27 +221,36 @@ class PerformanceStatistics(plugins.Action):
     def setUpSuite(self, suite):
         self.suiteName = suite.name + "\n" + "   "
     def __call__(self, test):
+        self.testCount += 1
         refPerf = getPerformance(test.getFileName(self.file, self.referenceVersion))
+        self.refTotal += refPerf
         if self.currentVersion is not None:
             currPerf = getPerformance(test.getFileName(self.file, self.currentVersion))
-            pDiff = percentDiff(currPerf, refPerf)
-            if self.limit == 0 or pDiff > self.limit:
-                print self.suiteName + test.name.ljust(30) + "\t", \
-                      self.format(refPerf), self.format(currPerf), "\t" + str(pDiff) + "%"
-                self.suiteName = "   "
+            self.currTotal += currPerf
+            self.reportDiff(currPerf, refPerf, self.rowHeader(test), self.limit)
+            self.suiteName = "   "
         else:
             print self.rowHeader(test), self.format(refPerf)
+    def reportDiff(self, currPerf, refPerf, rowHeader, limit=0):
+        pDiff = percentDiff(currPerf, refPerf)
+        if self.limit == 0 or pDiff > self.limit:
+            print rowHeader, self.format(refPerf), self.format(currPerf), "\t" + str(pDiff) + "%"
     def rowHeader(self, test):
         return self.suiteName + test.name.ljust(30) + "\t"
     def format(self, number):
         if self.file.find("mem") != -1:
             return self.formatMemory(number)
         else:
-            return self.formatTime(number)
+            from datetime import timedelta
+            return str(timedelta(seconds=number))
     def formatMemory(self, memUsed):
         return str(memUsed) + " MB"
-    def formatTime(self, seconds):
-        intSec = int(seconds)
-        intMin = intSec / 60
-        secPart = intSec - (intMin * 60)
-        return str(intMin) + "m" + str(secPart) + "s"
+    def __del__(self):
+        # Note - we might need to include parallel in this calculation...
+        rowHeader = "Total " + self.file + " (" + str(self.testCount) + " tests) :"
+        rowHeader = rowHeader.ljust(33) + "\t"
+        print "-" * len(rowHeader)
+        if self.currentVersion is not None:
+            self.reportDiff(self.currTotal, self.refTotal, rowHeader)
+        else:
+            print rowHeader, self.format(self.refTotal)

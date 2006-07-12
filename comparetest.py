@@ -36,6 +36,8 @@ class TestComparison(plugins.TestState):
         # If loaded from old pickle files, can get out of date objects...
         if not hasattr(self, "missingResults"):
             self.missingResults = []
+        for fileComparison in self.allResults:
+            fileComparison.ensureCompatible()
     def updatePaths(self, newAbsPath, newWriteDir):
         self.diag = plugins.getDiagnostics("TestComparison")
         self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
@@ -289,6 +291,7 @@ class FileComparison:
         self.stdFile = standardFile
         self.tmpFile = tmpFile
         self.stem = stem
+        self.differenceCache = False 
         self.diag = plugins.getDiagnostics("FileComparison")
         filter = RunDependentTextFilter(test, self.stem)
         filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
@@ -298,12 +301,14 @@ class FileComparison:
             tmpCmpFileName = filterFileBase + "partcmp"
         self.tmpCmpFile = filter.filterFile(tmpFile, tmpCmpFileName, makeNew=testInProgress)
         self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
-        self._cacheValues(test.app)
-    def _cacheValues(self, app):
-        self.differenceId = self._hasDifferences(app)
-        self.severity = app.getCompositeConfigValue("failure_severity", self.stem)
+        self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
+        # subclasses may override if they don't want to store in this way
+        self.cacheDifferences()
     def __repr__(self):
         return self.stem
+    def ensureCompatible(self):
+        if not hasattr(self, "differenceCache"):
+            self.differenceCache = self.differenceId
     def modifiedDates(self):
         files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
         return string.join(map(self.modifiedDate, files), " : ")
@@ -343,12 +348,10 @@ class FileComparison:
     def hasSucceeded(self):
         return self.stdFile and self.tmpFile and not self.hasDifferences()
     def hasDifferences(self):
-        return self.differenceId
-    def _hasDifferences(self, app):
+        return self.differenceCache
+    def cacheDifferences(self):
         if self.stdCmpFile and self.tmpCmpFile:
-            return not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
-        else:
-            return 0
+            self.differenceCache = not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
     def updatePaths(self, oldAbsPath, newAbsPath):
         if self.stdFile:
             self.stdFile = self.stdFile.replace(oldAbsPath, newAbsPath)
@@ -375,7 +378,7 @@ class FileComparison:
             self.saveTmpFile(test, exact, versionString)
             
         # Try to get everything to behave normally after a save...
-        self.differenceId = 0
+        self.differenceCache = False
         self.tmpFile = self.stdFile
         self.tmpCmpFile = self.stdCmpFile
     def saveResults(self, destFile):
@@ -628,6 +631,7 @@ class LineFilter:
         return len(words) + 1
 
 class RemoveObsoleteVersions(plugins.Action):
+    scriptDoc = "Removes (from CVS) all files with version IDs that are equivalent to a non-versioned file"
     def __init__(self):
         self.filesToRemove = []
     def __repr__(self):
@@ -650,8 +654,6 @@ class RemoveObsoleteVersions(plugins.Action):
         for file in self.filesToRemove:
             os.system("cvs rm -f " + file)
         self.filesToRemove = []
-    def scriptDoc(self):
-        return "Removes (from CVS) all files with version IDs that are equivalent to a non-versioned file"
     def cmpFile(self, test, file):
         basename = os.path.basename(file)
         return mktemp(basename + "cmp")

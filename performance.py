@@ -50,54 +50,35 @@ class PerformanceTestComparison(comparetest.TestComparison):
     def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress):
         if stem in self.getPerformanceStems(test):
             if tmpFile:
-                descriptors = self.findDescriptors(stem)
-                return PerformanceFileComparison(test, stem, standardFile, tmpFile, descriptors, testInProgress)
+                return PerformanceFileComparison(test, stem, standardFile, tmpFile, testInProgress)
             else:
                 # Don't care if performance is missing
                 return None
         else:
             return comparetest.TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)
-    def findDescriptors(self, stem):
-        descriptors = {}
-        if stem == "memory":
-            descriptors["goodperf"] = "smaller"
-            descriptors["badperf"] = "larger"
-            descriptors["config"] = "memory"
-        elif stem == "performance":
-            descriptors["goodperf"] = "faster"
-            descriptors["badperf"] = "slower"
-            descriptors["config"] = "cputime"
-        else:
-            descriptors["config"] = stem
-            if stem.find("mem") != -1:
-                descriptors["goodperf"] = "smaller(" + stem + ")"
-                descriptors["badperf"] = "larger(" + stem + ")"
-            else:
-                descriptors["goodperf"] = "faster(" + stem + ")"
-                descriptors["badperf"] = "slower(" + stem + ")"
-        return descriptors
 
 class PerformanceFileComparison(comparetest.FileComparison):
-    def __init__(self, test, stem, standardFile, tmpFile, descriptors, testInProgress):
-        self.descriptors = descriptors
-        # Don't allow process count of 0, which screws things up...
-        self.processCount = max(len(test.state.executionHosts), 1)
+    def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False):
         comparetest.FileComparison.__init__(self, test, stem, standardFile, tmpFile, testInProgress)
-        self.diag.info("Checking test " + test.name + " process count " + str(self.processCount))
-    def _cacheValues(self, app):
+        # Don't allow process count of 0, which screws things up...
+        self.perfComparison = None
         if self.stdCmpFile:
-            self.oldPerformance = getPerformance(self.stdCmpFile)
-            self.newPerformance = getPerformance(self.tmpCmpFile)
-            self.diag.info("Performance is " + str(self.oldPerformance) + " and " + str(self.newPerformance))
-            self.percentageChange = self.calculatePercentageIncrease()
-            # If we didn't understand the old performance, overwrite it
-            if (self.oldPerformance < 0):
+            oldPerf = getPerformance(self.stdCmpFile)
+            # If we didn't understand the old performance, overwrite it and behave like it didn't exist
+            if (oldPerf < 0):
                 os.remove(self.stdFile)
-        else:
-            self.newPerformance = getPerformance(self.tmpFile)
-            self.oldPerformance = self.newPerformance
-            self.percentageChange = 0.0
-        comparetest.FileComparison._cacheValues(self, app)
+            else:
+                newPerf = getPerformance(self.tmpCmpFile)
+                self.diag.info("Performance is " + str(oldPerf) + " and " + str(newPerf))
+                self.perfComparison = PerformanceComparison(oldPerf, newPerf, stem)
+                self.cachePerformanceChange(test, stem)
+    def ensureCompatible(self):
+        comparetest.FileComparison.ensureCompatible(self)
+        if hasattr(self, "newPerformance"):
+            self.perfComparison = PerformanceComparison(self.oldPerformance, self.newPerformance, self.stem)
+    def cacheDifferences(self):
+        # Overriden from base class. Don't want to do this - we compare in a different way
+        pass
     def __repr__(self):
         baseText = comparetest.FileComparison.__repr__(self)
         if self.newResult():
@@ -106,36 +87,31 @@ class PerformanceFileComparison(comparetest.FileComparison):
     def getType(self):
         if self.newResult():
             return comparetest.FileComparison.getType(self)
-        if self.newPerformance < self.oldPerformance:
-            return self.descriptors["goodperf"]
         else:
-            return self.descriptors["badperf"]
+            return self.perfComparison.descriptor
     def getSummary(self):
-        type = self.getType()
-        return str(int(self.calculatePercentageIncrease())) + "% " + type
+        return self.perfComparison.getSummary()
     def getDetails(self):
         if self.hasDifferences():
             return self.getSummary()
         else:
             return ""
-    def getConfigSetting(self, app, configDescriptor, configName):
-        return self.processCount * float(app.getCompositeConfigValue(configName, configDescriptor))
-    def _hasDifferences(self, app):
-        configDescriptor = self.descriptors["config"]
-        longEnough = self.newPerformance > self.getConfigSetting(app, configDescriptor, "performance_test_minimum")
-        varianceEnough = self.percentageChange > self.getConfigSetting(app, configDescriptor, "performance_variation_%")
-        return longEnough and varianceEnough
-    def calculatePercentageIncrease(self):
-        largest = max(self.oldPerformance, self.newPerformance)
-        smallest = min(self.oldPerformance, self.newPerformance)
-        if smallest == 0.0:
-            return 0.0
-        return ((largest - smallest) / smallest) * 100
+    def getConfigName(self, stem):
+        if stem == "performance":
+            return "cputime"
+        else:
+            return stem
+    def cachePerformanceChange(self, test, stem):
+        processCount = max(len(test.state.executionHosts), 1)
+        configName = self.getConfigName(stem)
+        minPerf = processCount * float(test.getCompositeConfigValue("performance_test_minimum", configName))
+        minVariation = processCount * float(test.getCompositeConfigValue("performance_variation_%", configName))
+        self.differenceCache = self.perfComparison.isSignificant(minPerf, minVariation)
     def saveResults(self, destFile):
         # Here we save the average of the old and new performance, assuming fluctuation
-        avgPerformance = round((self.oldPerformance + self.newPerformance) / 2.0, 2)
+        avgPerformance = self.perfComparison.getAverage()
         line = open(self.tmpFile).readlines()[0]
-        lineToWrite = line.replace(str(self.newPerformance), str(avgPerformance))
+        lineToWrite = line.replace(str(self.perfComparison.newPerformance), str(avgPerformance))
         newFile = open(destFile, "w")
         newFile.write(lineToWrite)
         try:
@@ -143,6 +119,50 @@ class PerformanceFileComparison(comparetest.FileComparison):
         except OSError:
             # May not have permission, don't worry if not
             pass
+
+# class purely for comparing two performance numbers, independent of the files they come from
+class PerformanceComparison:
+    def __init__(self, oldPerf, newPerf, stem):
+        self.oldPerformance = oldPerf
+        self.newPerformance = newPerf
+        self.percentageChange = self.calculatePercentageIncrease()
+        self.descriptor = self.getDescriptor(stem)
+    def calculatePercentageIncrease(self):
+        largest = max(self.oldPerformance, self.newPerformance)
+        smallest = min(self.oldPerformance, self.newPerformance)
+        if smallest == 0.0:
+            return 0.0
+        return ((largest - smallest) / smallest) * 100
+    def getDescriptor(self, stem):
+        improvement = self.newPerformance < self.oldPerformance
+        if stem == "memory":
+            if improvement:
+                return "smaller"
+            else:
+                return "larger"
+        elif stem == "performance":
+            if improvement:
+                return "faster"
+            else:
+                return "slower"
+        else:
+            postfix = "(" + stem + ")"
+            if stem.find("mem") != -1:
+                return self.getDescriptor("memory") + postfix
+            else:
+                return self.getDescriptor("performance") + postfix
+    def getSummary(self):
+        perc = int(self.percentageChange)
+        if perc == 0:
+            return ""
+        else:
+            return str(perc) + "% " + self.descriptor
+    def isSignificant(self, minPerf, minVar):
+        longEnough = self.newPerformance > minPerf
+        varianceEnough = self.percentageChange > minVar
+        return longEnough and varianceEnough
+    def getAverage(self):
+        return round((self.oldPerformance + self.newPerformance) / 2.0, 2)
 
 class TimeFilter(plugins.Filter):
     option = "r"
@@ -182,75 +202,76 @@ class TimeFilter(plugins.Filter):
             return 1
         return testPerformance >= self.minTime and testPerformance <= self.maxTime       
         
-def percentDiff(perf1, perf2):
-    if perf2 != 0:
-        return int((perf1 / perf2) * 100.0)
-    else:
-        return 0
-
 class PerformanceStatistics(plugins.Action):
+    scriptDoc = "Prints a report on system resource usage per test. Can compare versions"
+    printedTitle = False
     def __init__(self, args = []):
-        self.referenceVersion = ""
-        self.currentVersion = None
-        self.limit = 0
-        self.refTotal = 0.0
-        self.currTotal = 0.0
+        self.compareVersion = None
+        self.compareTotal = 0.0
+        self.total = 0.0
         self.testCount = 0
+        self.app = None
         self.file = "performance"
         self.interpretOptions(args)
     def interpretOptions(self, args):
         for ar in args:
             arr = ar.split("=")
-            if arr[0]=="v":
-                versions = arr[1].split(",")
-                self.referenceVersion = versions[0]
-                self.currentVersion = None
-                if len(versions) > 1:
-                    self.currentVersion = versions[1]
-            elif arr[0]=="f":
+            if arr[0]=="compv":
+                self.compareVersion = arr[1]
+            elif arr[0]=="file":
                 self.file = arr[1]
-            elif arr[0]=="l":
-                try:
-                    self.limit = int(arr[1])
-                except:
-                    self.limit = 0
             else:
                 print "Unknown option " + arr[0]
-    def scriptDoc(self):
-        return "Prints a report on system resource usage per test. Can compare versions"
     def setUpSuite(self, suite):
-        self.suiteName = suite.name + "\n" + "   "
+        if suite.parent:
+            print suite.getIndent() + suite.name
+        else:
+            entries = [ suite.app.description(), "Version '" + self.app.getFullVersion() + "'" ]
+            if self.compareVersion is not None:
+                entries += [ "Version '" + self.compareVersion + "'", self.file + " change" ]
+            self.printUnderlined(self.getPaddedLine(entries))
+    def printUnderlined(self, title):
+        print "-" * len(title)
+        print title
+        print "-" * len(title)
+    def getPaddedLine(self, entries):
+        line = entries[0].ljust(40)
+        for entry in entries[1:]:
+            line += entry.rjust(20)
+        return line
     def __call__(self, test):
         self.testCount += 1
-        refPerf = getPerformance(test.getFileName(self.file, self.referenceVersion))
-        self.refTotal += refPerf
-        if self.currentVersion is not None:
-            currPerf = getPerformance(test.getFileName(self.file, self.currentVersion))
-            self.currTotal += currPerf
-            self.reportDiff(currPerf, refPerf, self.rowHeader(test), self.limit)
-            self.suiteName = "   "
-        else:
-            print self.rowHeader(test), self.format(refPerf)
-    def reportDiff(self, currPerf, refPerf, rowHeader, limit=0):
-        pDiff = percentDiff(currPerf, refPerf)
-        if self.limit == 0 or pDiff > self.limit:
-            print rowHeader, self.format(refPerf), self.format(currPerf), "\t" + str(pDiff) + "%"
-    def rowHeader(self, test):
-        return self.suiteName + test.name.ljust(30) + "\t"
+        perf = getPerformance(test.getFileName(self.file))
+        self.total += perf
+        entries = [ test.getIndent() + test.name, self.format(perf) ]
+        if self.compareVersion is not None:
+            comparePerf = getPerformance(test.getFileName(self.file, self.compareVersion))
+            self.compareTotal += comparePerf
+            perfComp = PerformanceComparison(comparePerf, perf, self.file)
+            entries += [ self.format(comparePerf), perfComp.getSummary() ]
+        print self.getPaddedLine(entries)
     def format(self, number):
         if self.file.find("mem") != -1:
             return self.formatMemory(number)
         else:
             from datetime import timedelta
-            return str(timedelta(seconds=number))
+            return str(timedelta(seconds=int(number)))
     def formatMemory(self, memUsed):
         return str(memUsed) + " MB"
     def __del__(self):
+        if not self.printedTitle:
+            entries = [ "Application/Version", "Total" ]
+            if self.compareVersion is not None:
+                entries += [ "Total (" + self.compareVersion + ")", self.file + " change" ]
+            entries.append("No. of Tests")
+            self.printUnderlined(self.getPaddedLine(entries))
+            PerformanceStatistics.printedTitle = True
         # Note - we might need to include parallel in this calculation...
-        rowHeader = "Total " + self.file + " (" + str(self.testCount) + " tests) :"
-        rowHeader = rowHeader.ljust(33) + "\t"
-        print "-" * len(rowHeader)
-        if self.currentVersion is not None:
-            self.reportDiff(self.currTotal, self.refTotal, rowHeader)
-        else:
-            print rowHeader, self.format(self.refTotal)
+        entries = [ self.app.description(), self.format(self.total) ]
+        if self.compareVersion is not None:
+            perfComp = PerformanceComparison(self.compareTotal, self.total, self.file)
+            entries += [ self.format(self.compareTotal), perfComp.getSummary() ]
+        entries.append(str(self.testCount))
+        print self.getPaddedLine(entries)
+    def setUpApplication(self, app):
+        self.app = app

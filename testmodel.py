@@ -470,7 +470,9 @@ class TestCase(Test):
                                             freeText="No file found to load results from", completed=1)
         try:
             unpickler = Unpickler(file)
-            return True, unpickler.load()
+            newState = unpickler.load()
+            newState.ensureCompatible()
+            return True, newState
         except UnpicklingError:
             return False, plugins.TestState("unrunnable", briefText="read error", \
                                             freeText="Failed to read results file", completed=1)

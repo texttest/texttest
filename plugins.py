@@ -24,26 +24,6 @@ if os.environ.has_key("USER"):
 
 textTestName = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0])
 
-def makeString(char, length):
-    if length <= 0:
-        return ""
-    result = ""
-    for x in range(length):
-        result += char
-    return result
-        
-# Adjust (left/center/right) text in string of a specified length,
-# i.e. pad with spaces to the left and/or right.
-def adjustText(text, length, adjustment):
-    if adjustment == "left":
-        return text + makeString(' ', length - len(text))
-    elif adjustment == "center":
-        leftSpaces = (length - text) / 2
-        rightSpaces = length - text - leftSpaces # To adjust for integer division (text will be exactly in the middle, or one step to the left)
-        return makeString(' ', leftSpaces) + text + makeString(' ', rightSpaces)
-    else:
-        return makeString(' ', length - len(text)) + text        
-
 # Parse a time string, either a HH:MM:SS string, or a single int/float,
 # which is interpreted as a number of minutes, for backwards compatibility.
 # Observe that in either 'field' in the HH:MM:SS case, any number is allowed,
@@ -450,28 +430,6 @@ class OptionFinder(seqdict):
         else:
             return item[1:].strip()
     
-# Action for wrapping an executable that isn't Python, or can't be imported in the usual way
-class NonPythonAction(Action):
-    def __init__(self, actionText):
-        self.script = os.path.abspath(actionText)
-        if not os.path.isfile(self.script):
-            raise TextTestError, "Could not find non-python script " + self.script
-    def __repr__(self):
-        return "Running script " + os.path.basename(self.script) + " for"
-    def __call__(self, test):
-        self.describe(test)
-        self.callScript(test, "test_level")
-    def setUpSuite(self, suite):
-        self.describe(suite)
-        os.chdir(suite.getDirectory())
-        self.callScript(suite, "suite_level")
-    def setUpApplication(self, app):
-        print self, "application", app
-        os.chdir(app.getDirectory())
-        os.system(self.script + " app_level " + app.name)
-    def callScript(self, test, level):
-        os.system(self.script + " " + level + " " + test.name + " " + test.app.name)
-
 class TextTrigger:
     def __init__(self, text):
         self.text = text

@@ -205,19 +205,16 @@ class ApplicationRunner:
         actionArgs = script.split(" ")[1:]
         actionOption = actionCom.split(".")
         if len(actionOption) != 2:
-            return self.getNonPython(script)
+            raise plugins.TextTestError, "Plugin scripts must be of the form <module_name>.<script>"
                 
         module, pclass = actionOption
         importCommand = "from " + module + " import " + pclass + " as _pclass"
         try:
             exec importCommand
         except:
-            if os.path.isfile(script):
-                return self.getNonPython(script)
-            else:
-                sys.stderr.write("Import failed, looked at " + repr(sys.path) + "\n")
-                plugins.printException()
-                raise testmodel.BadConfigError, "Could not import script " + pclass + " from module " + module
+            sys.stderr.write("Import failed, looked at " + repr(sys.path) + "\n")
+            plugins.printException()
+            raise testmodel.BadConfigError, "Could not import script " + pclass + " from module " + module
 
         # Assume if we succeed in importing then a python module is intended.
         try:
@@ -229,8 +226,6 @@ class ApplicationRunner:
             plugins.printException()
             raise testmodel.BadConfigError, "Could not instantiate script action " + repr(actionCom) +\
                   " with arguments " + repr(actionArgs) 
-    def getNonPython(self, script):
-        return [ plugins.NonPythonAction(script) ]
 
 class ActionRunner:
     def __init__(self):

@@ -86,17 +86,11 @@ class VirtualDisplayFinder:
         os.system(self.getSysCommand(server, "kill -9 " + pidStr, background=0))
         return True
     def getSysCommand(self, server, command, background=1):
-        if server == gethostname():
-            if background:
-                return command + plugins.nullRedirect() + " &"
-            else:
-                return command
+        if background:
+            command = "'" + command + plugins.nullRedirect() + " &' < /dev/null" + plugins.nullRedirect() + " &"
         else:
-            if background:
-                command = "'" + command + plugins.nullRedirect() + " &' < /dev/null" + plugins.nullRedirect() + " &"
-            else:
-                command = "'" + command + "'"
-            return "rsh " + server + " " + command
+            command = "'" + command + "'"
+        return "rsh " + server + " " + command
     def startServer(self, server):
         print "Starting Xvfb on machine", server
         os.system(self.getSysCommand(server, "Xvfb :42"))

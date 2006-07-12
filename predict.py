@@ -91,6 +91,7 @@ def pad(str, padSize):
     return str.ljust(padSize)
         
 class PredictionStatistics(plugins.Action):
+    scriptDoc = "Displays statistics about application internal errors present in the test suite"
     def __init__(self, args=[]):
         versions = self.getVersions(args)
         self.referenceChecker = CheckPredictions(versions[0])
@@ -104,8 +105,6 @@ class PredictionStatistics(plugins.Action):
         return val.split(",")
     def setUpSuite(self, suite):
         self.suiteName = suite.name + "\n   "
-    def scriptDoc(self):
-        return "Displays statistics about application internal errors present in the test suite"
     def __call__(self, test):
         refErrors = self.referenceChecker.collectErrors(test)
         currErrors = 0

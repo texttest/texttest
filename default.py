@@ -1330,13 +1330,12 @@ class CreateCatalogue(plugins.Action):
             return path
                     
 class CountTest(plugins.Action):
+    scriptDoc = "report on the number of tests selected, by application"
     def __init__(self):
         self.appCount = {}
     def __del__(self):
         for app, count in self.appCount.items():
             print app, "has", count, "tests"
-    def scriptDoc(self):
-        return "report on the number of tests selected, by application"
     def __repr__(self):
         return "Counting"
     def __call__(self, test):
@@ -1644,12 +1643,11 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
 
 # A standalone action, we add description and generate the main file instead...
 class ExtractStandardPerformance(ExtractPerformanceFiles):
+    scriptDoc = "update the standard performance files from the standard log files"
     def __init__(self):
         ExtractPerformanceFiles.__init__(self, MachineInfoFinder())
     def __repr__(self):
         return "Extracting standard performance for"
-    def scriptDoc(self):
-        return "update the standard performance files from the standard log files"
     def __call__(self, test):
         self.describe(test)
         ExtractPerformanceFiles.__call__(self, test)
@@ -1729,17 +1727,9 @@ class DocumentScripts(plugins.Action):
             exec command
             for name in names:
                 scriptName = modName + "." + name
-                constructCommand = "obj = " + scriptName + "()"
+                docFinder = "docString = " + scriptName + ".scriptDoc"
                 try:
-                    exec constructCommand
-                except TypeError:
-                    constructWithArgCmd = "obj = " + scriptName + '([ "before=21Jan2006" ])'
-                    try:
-                        exec constructWithArgCmd
-                    except:
-                        continue
-                try:
-                    docString = obj.scriptDoc()
+                    exec docFinder
                     print scriptName + "|" + docString
                 except AttributeError:
                     pass

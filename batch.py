@@ -392,6 +392,7 @@ class SaveState(respond.SaveState):
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
 
 class ArchiveRepository(plugins.Action):
+    scriptDoc = "Archive parts of the batch result repository to a history directory"
     def __init__(self, args):
         argDict = self.parseArguments(args)
         self.descriptor = ""
@@ -401,8 +402,6 @@ class ArchiveRepository(plugins.Action):
         self.repository = None
         if not self.beforeDate and not self.afterDate:
             raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates!"
-    def scriptDoc(self):
-        return "Archive parts of the batch result repository to a history directory"
     def parseArguments(self, args):
         currKey = ""
         dict = {}
@@ -467,11 +466,10 @@ class ArchiveRepository(plugins.Action):
         return True
 
 class GenerateHistoricalReport(plugins.Action):
+    scriptDoc = "Generate reports based on the historical repository"
     appsGenerated = []
     def __init__(self, args):
         self.batchSession = args[0]
-    def scriptDoc(self):
-        return "Generate reports based on the historical repository"
     def setUpApplication(self, app):
         if app in self.appsGenerated:
             return
@@ -527,6 +525,7 @@ class GenerateHistoricalReport(plugins.Action):
         return True
 
 class CollectFiles(plugins.Action):
+    scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
     def __init__(self, args=[""]):
         self.mailSender = MailSender("collection")
         self.diag = plugins.getDiagnostics("batch collect")
@@ -535,8 +534,6 @@ class CollectFiles(plugins.Action):
             print "Collecting batch files created by user", self.userName + "..."
         else:
             print "Collecting batch files locally..."
-    def scriptDoc(self):
-        return "Collect and send all batch reports that have been written to intermediate files"
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()

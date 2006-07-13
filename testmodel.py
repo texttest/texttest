@@ -798,13 +798,13 @@ class Application:
         personalFile = self.getPersonalConfigFile()
         if personalFile:
             self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
+        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
         self.writeDirectory = self.configObject.getWriteDirectoryName(self)
         self.diag.info("Write directory at " + self.writeDirectory)
         self.checkout = self.makeCheckout()
         self.diag.info("Checkout set to " + self.checkout)
         self.setCheckoutVariable()
         self.optionGroups = self.createOptionGroups(inputOptions)
-        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
     def __repr__(self):
         return self.fullName
     def __hash__(self):

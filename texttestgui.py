@@ -1468,7 +1468,7 @@ class TestProgressMonitor:
             errorCaught = 1
         if category[1].find("unreported bug") != -1:
             self.nofUnreportedBugsTests = self.adjustCount(self.nofUnreportedBugsTests, increase)                    
-            self.treeModel.set_value(self.unreportedIter, 1, self.nofUnreportedBugTests)
+            self.treeModel.set_value(self.unreportedIter, 1, self.nofUnreportedBugsTests)
             self.testToIter[test] = self.unreportedIter
             errorCaught = 1
         elif category[1].find("bug") != -1:

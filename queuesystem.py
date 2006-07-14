@@ -154,7 +154,6 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getMachineInfoFinder(self)
     def defaultLoginShell(self):
-        # For UNIX
         return "sh"
     def printHelpDescription(self):
         print """The queuesystem configuration is a published configuration, 
@@ -365,8 +364,6 @@ class SubmitTest(plugins.Action):
         self.diag = plugins.getDiagnostics("Queue System Submit")
         self.slaveEnv = {}
         self.setUpScriptEngine()
-        if os.environ.has_key("TEXTTEST_DIAGDIR"):
-            self.slaveEnv["TEXTTEST_DIAGDIR"] = os.path.join(os.getenv("TEXTTEST_DIAGDIR"), self.slaveType())
     def setUpScriptEngine(self):
         # For self-testing: make sure the slave doesn't read the master use cases.
         variables = [ "USECASE_RECORD_STDIN", "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]
@@ -416,6 +413,11 @@ class SubmitTest(plugins.Action):
                 runOptions.append(self.optionMap[option])
         if self.optionMap.has_key("keeptmp"):
             runOptions.append("-keeptmp")
+        if self.optionMap.diagsEnabled():
+            runOptions.append("-x")
+            runOptions.append("-xr " + self.optionMap.getDiagReadDir())
+            slaveWriteDir = os.path.join(self.optionMap.getDiagWriteDir(), self.slaveType())
+            runOptions.append("-xw " + slaveWriteDir)
         return string.join(runOptions)
     def findRunGroup(self, app):
         for group in app.optionGroups:

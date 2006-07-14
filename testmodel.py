@@ -957,7 +957,9 @@ class Application:
         if group.name.startswith("What"):
             group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("Side"):
-            group.addSwitch("x", "Write TextTest diagnostics")
+            group.addOption("xr", "Configure self-diagnostics from", self.inputOptions.getDiagReadDir())
+            group.addOption("xw", "Write self-diagnostics to", self.inputOptions.getDiagWriteDir())
+            group.addSwitch("x", "Enable self-diagnostics")
         elif group.name.startswith("Invisible"):
             # Options that don't make sense with the GUI should be invisible there...
             group.addOption("a", "Run Applications whose name contains")
@@ -1173,6 +1175,8 @@ class OptionFinder(plugins.OptionFinder):
         plugins.OptionFinder.__init__(self, sys.argv[1:])
         self.directoryName = os.path.normpath(self.findDirectoryName())
         os.environ["TEXTTEST_HOME"] = self.directoryName
+        self.envReadDir = os.getenv("TEXTTEST_DIAGNOSTICS")
+        self.envWriteDir = os.getenv("TEXTTEST_DIAGDIR")
         self._setUpLogging()
         self.diag = plugins.getDiagnostics("option finder")
         self.diag.info("Replaying from " + repr(os.getenv("USECASE_REPLAY_SCRIPT")))
@@ -1180,12 +1184,12 @@ class OptionFinder(plugins.OptionFinder):
     def _setUpLogging(self):
         # Don't use the default locations, particularly current directory causes trouble
         del log4py.CONFIGURATION_FILES[1]
-        if self.has_key("x") or os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
-            diagFile = self._getDiagnosticFile()
+        if self.diagsEnabled():
+            diagFile = os.path.join(self.getDiagReadDir(), "log4py.conf")
             if os.path.isfile(diagFile):
+                writeDir = self.getDiagWriteDir()
                 if not os.environ.has_key("TEXTTEST_DIAGDIR"):
-                    os.environ["TEXTTEST_DIAGDIR"] = os.path.dirname(diagFile)
-                writeDir = os.getenv("TEXTTEST_DIAGDIR")
+                    os.environ["TEXTTEST_DIAGDIR"] = writeDir
                 plugins.ensureDirectoryExists(writeDir)
                 print "TextTest will write diagnostics in", writeDir, "based on file at", diagFile
                 for file in os.listdir(writeDir):
@@ -1230,10 +1234,17 @@ class OptionFinder(plugins.OptionFinder):
         return self.has_key("help")
     def runScript(self):
         return self.get("s")
-    def _getDiagnosticFile(self):
-        if not os.environ.has_key("TEXTTEST_DIAGNOSTICS"):
-            os.environ["TEXTTEST_DIAGNOSTICS"] = os.path.join(self.directoryName, "Diagnostics")
-        return os.path.join(os.environ["TEXTTEST_DIAGNOSTICS"], "log4py.conf")
+    def diagsEnabled(self):
+        return self.has_key("x") or self.envReadDir
+    def getDiagReadDir(self):
+        return self.get("xr", self._defaultDiagDir(self.envReadDir))
+    def getDiagWriteDir(self):
+        return self.get("xw", self._defaultDiagDir(self.envWriteDir))
+    def _defaultDiagDir(self, envDir):
+        if envDir:
+            return envDir
+        else:            
+            return os.path.join(self.directoryName, "Diagnostics")
     def findDirectoryName(self):
         if self.has_key("d"):
             return plugins.abspath(self["d"])

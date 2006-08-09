@@ -257,6 +257,9 @@ class Config(CarmenConfig):
             return
         fullPath = os.path.join(self._getLocalPlanPath(test), subPlan)
         return os.path.normpath(fullPath)
+    def _subPlanName(self, test):
+        # just a stub so this configuration can be used directly
+        pass
     def extraReadFiles(self, test):
         readDirs = CarmenConfig.extraReadFiles(self, test)
         if test.classId() == "test-case":
@@ -265,9 +268,12 @@ class Config(CarmenConfig):
             if subplan and os.path.isdir(subplan):
                 for title, fileName in self.filesFromSubplan(test, subplan):
                     readDirs[title] = [ fileName ]
-            ruleset = self.getRuleSetName(test)
-            if ruleset:
-                readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", ruleset) ]
+            try:
+                ruleset = self.getRuleSetName(test)
+                if ruleset:
+                    readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", ruleset) ]
+            except plugins.TextTestError:
+                pass
             test.tearDownEnvironment(parents=1)
         elif test.environment.has_key("CARMUSR"):
             files = self.getResourceFiles(test)

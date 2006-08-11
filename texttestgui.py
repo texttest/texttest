@@ -1347,6 +1347,7 @@ class TestProgressMonitor:
         self.nofKilledTests = 0
         self.nofUnreportedBugsTests = 0
         self.nofKnownBugsTests = 0
+        self.nofInternalErrorsTests = 0
         
         self.status = status
         
@@ -1410,43 +1411,48 @@ class TestProgressMonitor:
             self.testToIter[test] = self.noResultIter
             errorCaught = 1
             unrunnableCaught = 1
-        if category[1].find("slower") != -1:
+        if category[1].find(" slower") != -1:
             self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
             self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
             self.nofSlowerTests = self.adjustCount(self.nofSlowerTests, increase)
             self.treeModel.set_value(self.slowerIter, 1, self.nofSlowerTests)
             self.testToIter[test] = self.slowerIter
             errorCaught = 1
-        if category[1].find("faster") != -1:
+        if category[1].find(" faster") != -1:
             self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
             self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
             self.nofFasterTests = self.adjustCount(self.nofFasterTests, increase)
             self.treeModel.set_value(self.fasterIter, 1, self.nofFasterTests)
             self.testToIter[test] = self.fasterIter
             errorCaught = 1
-        if category[1].find("smaller") != -1:
+        if category[1].find(" smaller") != -1:
             self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
             self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
             self.nofSmallerTests = self.adjustCount(self.nofSmallerTests, increase)
             self.treeModel.set_value(self.smallerIter, 1, self.nofSmallerTests)
             self.testToIter[test] = self.smallerIter
             errorCaught = 1
-        if category[1].find("larger") != -1:
+        if category[1].find(" larger") != -1:
             self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
             self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
             self.nofLargerTests = self.adjustCount(self.nofLargerTests, increase)                    
             self.treeModel.set_value(self.largerIter, 1, self.nofLargerTests)
             self.testToIter[test] = self.largerIter
             errorCaught = 1
-        if category[1].find("new") != -1:
+        if category[1].find("new ") != -1:
             self.nofNewFilesTests = self.adjustCount(self.nofNewFilesTests, increase)                    
             self.treeModel.set_value(self.newIter, 1, self.nofNewFilesTests)
             self.testToIter[test] = self.newIter
             errorCaught = 1
-        if category[1].find("missing") != -1:
+        if category[1].find(" missing") != -1: # Extra initial space to avoid catching 'missing 'in helpers''
             self.nofMissingFilesTests = self.adjustCount(self.nofMissingFilesTests, increase)                    
             self.treeModel.set_value(self.missingIter, 1, self.nofMissingFilesTests)
             self.testToIter[test] = self.missingIter
+            errorCaught = 1
+        if category[1].find("missing '") != -1: # To catch 'missing 'in helpers'' et al ...
+            self.nofInternalErrorsTests = self.adjustCount(self.nofInternalErrorsTests, increase)                    
+            self.treeModel.set_value(self.internalErrorIter, 1, self.nofInternalErrorsTests)
+            self.testToIter[test] = self.internalErrorIter
             errorCaught = 1
         i = -1
         for (type, count) in self.customErrorTypes.items():
@@ -1456,12 +1462,12 @@ class TestProgressMonitor:
                 self.treeModel.set_value(self.customErrorIters[i], 1, self.customErrorTypes[type])
                 self.testToIter[test] = self.customErrorIters[i]
                 errorCaught = 1
-        if category[1].find("different(+)") != -1:
+        if category[1].find(" different(+)") != -1:
             self.nofDifferentPlusTests = self.adjustCount(self.nofDifferentPlusTests, increase)                    
             self.treeModel.set_value(self.diffPlusIter, 1, self.nofDifferentPlusTests)
             self.testToIter[test] = self.diffPlusIter
             errorCaught = 1
-        elif category[1].find("different") != -1:
+        elif category[1].find(" different") != -1:
             self.nofDifferentTests = self.adjustCount(self.nofDifferentTests, increase)                    
             self.treeModel.set_value(self.diffIter, 1, self.nofDifferentTests)
             self.testToIter[test] = self.diffIter
@@ -1542,6 +1548,7 @@ class TestProgressMonitor:
         self.newIter         = self.treeModel.append(self.failedIter, ["New file(s)", 0, 1])
         self.knownBugIter    = self.treeModel.append(self.failedIter, ["Known bug", 0, 1])
         self.unreportedIter  = self.treeModel.append(self.failedIter, ["Unreported bug", 0, 1])
+        self.internalErrorIter = self.treeModel.append(self.failedIter, ["Internal error", 0, 1])
         self.crashedIter     = self.treeModel.append(self.failedIter, ["Crashed", 0, 1])
 
         # Custom crashes
@@ -1595,7 +1602,7 @@ class TestProgressMonitor:
                 self.nofCompletedTests += 1
                 self.nofRunningTests -= 1
                 self.completedTests[test] = state.getTypeBreakdown()
-        elif state.hasStarted():
+        elif state.category == "running": # using hasStarted is no good, since internal errors/crashes (and possiblty other categories) are reoprted as not complete, but running, before they are completely analysed, and then again when they are analysed. the state.category string doesn't lie about whether tests are running or not ...
             self.nofRunningTests += 1
             self.nofPendingTests -= 1
             self.testToIter[test] = self.runIter
@@ -1658,8 +1665,17 @@ class TestProgressMonitor:
                     pos = pos + 1
                     subChildIter = self.treeModel.iter_next(subChildIter)
             # Print the iter
-            guilog.info("  " + self.treeModel.get_value(childIter, 0) + " : " + str(self.treeModel.get_value(childIter, 1)))
+            indentation = ("--" * (self.getIterDepth(childIter) + 1)) + "> "
+            guilog.info(indentation + self.treeModel.get_value(childIter, 0) + " : " + str(self.treeModel.get_value(childIter, 1)))
             childIters = childIters[1:len(childIters)]
+
+    def getIterDepth(self, iter):
+        parent = self.treeModel.iter_parent(iter)
+        depth = 0
+        while parent != None:
+            depth = depth + 1
+            parent = self.treeModel.iter_parent(parent)
+        return depth
 
     def showRow(self, model, iter):
         test = model.get_value(iter, 2)        

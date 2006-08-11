@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.29 2006/05/19 14:51:49 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.30 2006/08/11 14:35:27 perb Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -28,17 +28,33 @@ class StudioConfig(ravebased.Config):
     def getRuleSetName(self, test):
         if self.optionMap.has_key("rset"):
             return self.optionMap["rset"]
+	rulesetName = ""
         subplanDir = self._getSubPlanDirName(test)
-        if not subplanDir:
-            return ""
-        headerFile = os.path.join(subplanDir, "subplanHeader")
-        origPath = self.findOrigRulePath(headerFile)
-        rulesetName = os.path.basename(origPath)
+        if subplanDir:
+	    headerFile = os.path.join(subplanDir, "subplanHeader")
+	    origPath = self.findOrigRulePath(headerFile)
+	    rulesetName = os.path.basename(origPath)
+	if not rulesetName:
+	    carmSys = test.getEnvironment("CARMSYS")
+	    carmUsr = test.getEnvironment("CARMUSR")
+	    carmTmp = test.getEnvironment("CARMTMP")
+	    userId = "nightjob"
+	    script = os.path.join(carmSys, "bin", "crsutil")
+	    cmd = "/usr/bin/env USER=" + userId + \
+	    		" CARMUSR=" + carmUsr + \
+			" CARMTMP=" + carmTmp + \
+			" " + script + " -g CrcDefaultRuleSet"
+	    #print "cmd=",cmd
+	    for l in os.popen(cmd):
+	    	name = l[:-1]
+		if name:
+		    rulesetName = os.path.basename(name)
+		    break
         if self.macroBuildsRuleset(test, rulesetName):
             # Don't want to manage the ruleset separately if the macro is going to build it...
             return ""
-        else:
-            return rulesetName
+	#print "returning rulesetName=", rulesetName
+	return rulesetName
     def findOrigRulePath(self, headerFile):
         if not os.path.isfile(headerFile):
             return ""
@@ -96,9 +112,11 @@ class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
             if not line.startswith("cslDispatcher"):
                 continue
             if line.find("returnvalue") != -1:
+	    	print "line=",line
                 cpuTime = int(line.split()[-2])
+                realTime = int(line.split()[-6])
                 if currOperations[-1]:
-                    values.append(cpuTime)
+                    values.append( (cpuTime, realTime) )
                 del currOperations[-1]
             elif line.find(entryFinder) == -1:
                 currOperations.append("")
@@ -107,10 +125,13 @@ class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
                 currOperations.append(operation)
         return values
     def makeTimeLine(self, values, fileStem):
-        sum = 0
-        for value in values:
-            sum += value
-        return "Total CPU time in " + fileStem + "  :      " + str(sum) + " milliseconds"
+        sumCpu = 0
+        sumReal = 0
+        for valueCpu, valueReal in values:
+            sumCpu += valueCpu
+            sumReal += valueReal
+        return "Total CPU time in " + fileStem + "  :      " + str(sumCpu) + " milliseconds" \
+	+"\n"+ "Total REAL time in " + fileStem + "  :      " + str(sumReal) + " milliseconds"
     
 # Graphical import suite. Basically the same as those used for optimizers
 class ImportTestSuite(ravebased.ImportTestSuite):

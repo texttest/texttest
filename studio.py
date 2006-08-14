@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.31 2006/08/14 12:29:33 perb Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.32 2006/08/14 13:41:00 perb Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -50,7 +50,7 @@ class StudioConfig(ravebased.Config):
 		try:
 		    for l in os.popen(cmd):
 			name = l[:-1]
-			if name:
+			if name and os.path.exists(name):
 			    rulesetName = os.path.basename(name)
 			    break
 		except Exception, x:

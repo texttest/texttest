@@ -1439,7 +1439,7 @@ class TestProgressMonitor:
             self.treeModel.set_value(self.largerIter, 1, self.nofLargerTests)
             self.testToIter[test] = self.largerIter
             errorCaught = 1
-        if category[1].find("new ") != -1:
+        if category[1].find(" new") != -1:
             self.nofNewFilesTests = self.adjustCount(self.nofNewFilesTests, increase)                    
             self.treeModel.set_value(self.newIter, 1, self.nofNewFilesTests)
             self.testToIter[test] = self.newIter

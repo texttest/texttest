@@ -4,6 +4,7 @@ import os, shutil, plugins, respond, performance, comparetest, string, predict, 
 import glob
 from threading import currentThread
 from knownbugs import CheckForBugs
+from traffic import SetUpTrafficHandlers
 from cPickle import Unpickler
 from socket import gethostname
 from ndict import seqdict
@@ -133,7 +134,8 @@ class Config(plugins.Configuration):
         
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
-        return [ self.getExecHostFinder(), self.getWriteDirectoryPreparer(ignoreCatalogues),
+        return [ self.getExecHostFinder(), SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
+                 self.getWriteDirectoryPreparer(ignoreCatalogues),
                  catalogueCreator, self.getTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
@@ -435,7 +437,6 @@ class Config(plugins.Configuration):
         app.setConfigDefault("collate_file", self.getDefaultCollations(), "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")
         app.setConfigDefault("collect_traffic", [], "List of command-line programs to intercept")
-        app.setConfigDefault("traffic_ignore_args", { "": []}, "Mapping of traffic file names to unimportant arguments in them")
         app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
@@ -525,7 +526,6 @@ class TestEnvironmentCreator:
         if self.setVirtualDisplay(runsTests):
             self.setDisplayEnvironment()
         self.setDiagEnvironment()
-        self.setTrafficEnvironment()
         if self.testCase():
             self.setUseCaseEnvironment()
     def topLevel(self):
@@ -639,20 +639,7 @@ class TestEnvironmentCreator:
                 self.addJusecaseProperty("record_stdin", recinpScript)
             else:
                 self.test.setEnvironment("USECASE_RECORD_STDIN", recinpScript)
-    def setTrafficEnvironment(self):
-        if not self.optionMap.has_key("gx") and len(self.test.getConfigValue("collect_traffic")) > 0:
-            if self.testCase():
-                if self.optionMap.has_key("rectraffic"):
-                    trafficRecord = self.test.makeTmpFileName("traffic")
-                    self.test.setEnvironment("TRAFFIC_RECORD_FILE", trafficRecord)
-                else:
-                    trafficReplay = self.test.getFileName("traffic")
-                    if trafficReplay:
-                        self.test.setEnvironment("TRAFFIC_REPLAY_FILE", trafficReplay)
-            elif not self.test.parent:
-                ignoreDict = self.test.getConfigValue("traffic_ignore_args")
-                self.test.setEnvironment("TRAFFIC_IGNORE_ARGS", str(ignoreDict))
-
+    
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeWriteDirectories()
@@ -674,7 +661,6 @@ class PrepareWriteDirectory(plugins.Action):
         self.collatePaths(test, "copy_test_path", self.copyTestPath)
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
         self.collatePaths(test, "link_test_path", self.linkTestPath)
-        self.makeTrafficIntercepts(test)
         self.createPropertiesFiles(test)
     def collatePaths(self, test, configListName, collateMethod):
         for configName in test.getConfigValue(configListName, expandVars=False):
@@ -885,17 +871,6 @@ class PrepareWriteDirectory(plugins.Action):
             for subVar, subValue in value.items():
                 # Don't write windows separators, they get confused with escape characters...
                 file.write(subVar + " = " + subValue.replace(os.sep, "/") + "\n")
-    def findTrafficFile(self):
-        for dir in sys.path:
-            fullPath = os.path.join(dir, "traffic.py")
-            if os.path.isfile(fullPath):
-                return fullPath
-    def makeTrafficIntercepts(self, test):
-        if test.getEnvironment("TRAFFIC_RECORD_FILE") or test.getEnvironment("TRAFFIC_REPLAY_FILE"):
-            trafficFile = self.findTrafficFile()
-            for cmd in test.getConfigValue("collect_traffic"):
-                linkName = test.makeTmpFileName(cmd, forComparison=0)
-                self.linkTestPath(test, trafficFile, linkName)
     
 class CollateFiles(plugins.Action):
     def __init__(self):

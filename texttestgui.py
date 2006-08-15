@@ -240,8 +240,8 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 3, nodeName)
     def addSuite(self, suite):
         self.rootSuites.append(suite)
-        if suite.app.getConfigValue("add_shortcut_bar"):
-            scriptEngine.enableShortcuts = 1
+        if not suite.app.getConfigValue("add_shortcut_bar"):
+            scriptEngine.enableShortcuts = 0
         if not self.dynamic:
             self.addApplication(suite.app)
         if not self.dynamic or suite.size() > 0:

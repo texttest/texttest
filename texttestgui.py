@@ -158,7 +158,13 @@ class TextTestGUI(ThreadedResponder):
         if shortcutBar:
             vbox.pack_start(shortcutBar, expand=False, fill=False)
             shortcutBar.show()
-        vbox.pack_start(self.status.createStatusbar(), expand=False, fill=False)
+
+        showStatusBar = True
+        for app in self.rootSuites:
+            showStatusBar = app.getConfigValue("add_status_bar")
+
+        if (showStatusBar):
+            vbox.pack_start(self.status.createStatusbar(), expand=False, fill=False)
         vbox.show()
         topWindow.add(vbox)
         topWindow.show()

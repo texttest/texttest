@@ -1455,7 +1455,7 @@ class TestProgressMonitor:
             self.treeModel.set_value(self.missingIter, 1, self.nofMissingFilesTests)
             self.testToIter[test] = self.missingIter
             errorCaught = 1
-        if category[1].find("missing '") != -1: # To catch 'missing 'in helpers'' et al ...
+        if category[1].find("missing '") != -1 or category[1].find("not built") != -1: # To catch 'missing 'in helpers'' et al ...
             self.nofInternalErrorsTests = self.adjustCount(self.nofInternalErrorsTests, increase)                    
             self.treeModel.set_value(self.internalErrorIter, 1, self.nofInternalErrorsTests)
             self.testToIter[test] = self.internalErrorIter

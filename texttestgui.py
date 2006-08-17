@@ -147,13 +147,16 @@ class TextTestGUI(ThreadedResponder):
         shortcutBar = scriptEngine.createShortcutBar()
 
         vbox = gtk.VBox()
-        vbox.pack_start(self.selectionActionGUI.buttons, expand=False, fill=False)
+        hbox = gtk.HBox()
+        hbox.pack_start(self.selectionActionGUI.buttons, expand=False, fill=False)
                 
         if self.dynamic:            
             progressBar = self.progressMonitor.createProgressBar()
             progressBar.show()
-            vbox.pack_start(progressBar, expand=False, fill=True)
+            hbox.pack_start(progressBar, expand=True, fill=True, padding=15)
 
+        hbox.show_all()
+        vbox.pack_start(hbox, expand=False, fill=True)
         vbox.pack_start(mainWindow, expand=True, fill=True)
         if shortcutBar:
             vbox.pack_start(shortcutBar, expand=False, fill=False)

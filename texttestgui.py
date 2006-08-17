@@ -153,7 +153,10 @@ class TextTestGUI(ThreadedResponder):
         if self.dynamic:            
             progressBar = self.progressMonitor.createProgressBar()
             progressBar.show()
-            hbox.pack_start(progressBar, expand=True, fill=True, padding=15)
+            alignment = gtk.Alignment()
+            alignment.set_padding(0, 0, 15, 0)
+            alignment.add(progressBar)
+            hbox.pack_start(alignment, expand=True, fill=True)
 
         hbox.show_all()
         vbox.pack_start(hbox, expand=False, fill=True)

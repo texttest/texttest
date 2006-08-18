@@ -154,7 +154,7 @@ class TextTestGUI(ThreadedResponder):
             progressBar = self.progressMonitor.createProgressBar()
             progressBar.show()
             alignment = gtk.Alignment()
-            alignment.set_padding(0, 0, 15, 0)
+            alignment.set_padding(0, 0, 1, 0)
             alignment.add(progressBar)
             hbox.pack_start(alignment, expand=True, fill=True)
 

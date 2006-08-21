@@ -117,12 +117,8 @@ class Config(plugins.Configuration):
         else:
             return defaultName
     def addGuiResponder(self, classes):
-        try:
-            from texttestgui import TextTestGUI
-            classes.append(TextTestGUI)
-        except:
-            print "Cannot use GUI: caught exception:"
-            plugins.printException()
+        from texttestgui import TextTestGUI
+        classes.append(TextTestGUI)
     def _getActionSequence(self, makeDirs):
         actions = [ self.getTestProcessor() ]
         if makeDirs:

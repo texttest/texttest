@@ -1,9 +1,27 @@
 #!/usr/bin/env python
 
 # GUI for TextTest written with PyGTK
+# First make sure we can import the GUI modules: if we can't, throw appropriate exceptions
 
-import guiplugins, plugins, comparetest, gtk, gobject, os, string, time, sys
-from gobject import idle_add
+def raiseException(msg):
+    from plugins import TextTestError
+    raise TextTestError, "Could not start TextTest GUI due to PyGTK GUI library problems :\n" + msg
+
+try:
+    import gtk
+except:
+    raiseException("Unable to import module 'gtk'")
+
+major, minor, debug = gtk.pygtk_version
+if major < 2 or minor < 4:
+    raiseException("TextTest GUI requires at least PyGTK 2.4 : found version " + str(major) + "." + str(minor))
+
+try:
+    import gobject
+except:
+    raiseException("Unable to import module 'gobject'")
+
+import guiplugins, plugins, comparetest, os, string, time, sys
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer
 from ndict import seqdict
@@ -153,14 +171,11 @@ class TextTestGUI(ThreadedResponder):
         if self.dynamic:            
             progressBar = self.progressMonitor.createProgressBar()
             progressBar.show()
-            if gtk.pygtk_version[0] >= 2 and gtk.pygtk_version[1] >= 4:
-                alignment = gtk.Alignment()
-                alignment.set_padding(0, 0, 1, 0)
-                alignment.add(progressBar)
-                hbox.pack_start(alignment, expand=True, fill=True)
-            else:
-                hbox.pack_start(progressBar, expand=True, fill=True)
-
+            alignment = gtk.Alignment()
+            alignment.set_padding(0, 0, 1, 0)
+            alignment.add(progressBar)
+            hbox.pack_start(alignment, expand=True, fill=True)
+            
         hbox.show_all()
         vbox.pack_start(hbox, expand=False, fill=True)
         vbox.pack_start(mainWindow, expand=True, fill=True)
@@ -372,19 +387,13 @@ class TextTestGUI(ThreadedResponder):
         self.rightWindowGUI = self.createDefaultRightGUI()
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
         treeWindow.grab_focus() # To avoid the Quit button getting the initial focus, causing unwanted quit event
-        self.checkGtkVersion()
-    def checkGtkVersion(self):
-        major, minor, debug = gtk.gtk_version
-        if major < 2 or minor < 4:
-            showError("DEPRECATION WARNING!!\nTextTest GUI support for PyGTK " + \
-                      str(major) + "." + str(minor) + " is being phased out\nUse at least PyGTK 2.4 where possible")
     def runWithActionThread(self, actionThread):
         self.setUpGui(actionThread)
-        idle_add(self.pickUpChange)
+        gobject.idle_add(self.pickUpChange)
         gtk.main()
     def runAlone(self):
         self.setUpGui()
-        idle_add(self.pickUpProcess)
+        gobject.idle_add(self.pickUpProcess)
         gtk.main()
     def createDefaultRightGUI(self):
         rootSuite = self.rootSuites[0]
@@ -629,18 +638,10 @@ class InteractiveActionGUI:
         vbox.show()
         return vbox, displayDesc
     def createComboBox(self, option):
-        if "ComboBoxEntry" in dir(gtk):
-            # PyGTK 2.4 and above
-            combobox = gtk.combo_box_entry_new_text()
-            entry = combobox.child
-            option.setPossibleValuesAppendMethod(combobox.append_text)
-            return combobox, entry
-        else:
-            # PyGTK 2.0. Remove one day when we don't have to support RHEL3 any more.
-            combobox = gtk.Combo()
-            entry = combobox.entry
-            option.setPossibleValuesUpdateMethod(combobox.set_popdown_strings)
-            return combobox, entry
+        combobox = gtk.combo_box_entry_new_text()
+        entry = combobox.child
+        option.setPossibleValuesAppendMethod(combobox.append_text)
+        return combobox, entry
     def createOptionWidget(self, option):
         if len(option.possibleValues) > 1:
             return self.createComboBox(option)
@@ -1245,7 +1246,13 @@ class TestFileGUI(FileViewGUI):
         self.addStandardFilesUnderIter(defiter, defFiles)
         self.addStaticDataFilesToModel(test)
     def getDisplayDataFiles(self, test):
-        return test.app.configObject.extraReadFiles(test).items()
+        try:
+            return test.app.configObject.extraReadFiles(test).items()
+        except:
+            sys.stderr.write("WARNING - ignoring exception thrown by '" + test.app.configObject.moduleName + \
+                             "' configuration while requesting extra data files, not displaying any such files")
+            plugins.printException()
+            return seqdict()
     def addStaticDataFilesToModel(self, test):
         dataFiles = test.listDataFiles()
         displayDataFiles = self.getDisplayDataFiles(test)

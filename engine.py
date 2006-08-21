@@ -487,7 +487,13 @@ class TextTest:
             if responder.needsOwnThread():
                 return responder
     def _run(self):
-        self.createResponders()
+        try:
+            self.createResponders()
+        except testmodel.BadConfigError, e:
+            # Responder class-level errors are basically fatal : there is no point running without them (cannot
+            # do anything about them) and no way to get partial errors.
+            sys.stderr.write(str(e) + "\n")
+            return
         appSuites = self.createTestSuites()
         try:
             self.runAppSuites(appSuites)

@@ -646,6 +646,24 @@ class TestSuite(Test):
     
 class BadConfigError(RuntimeError):
     pass
+
+class ConfigurationCall:
+    def __init__(self, name, moduleName, target):
+        self.name = name
+        self.moduleName = moduleName
+        exec "self.targetCall = target." + name
+    def __call__(self, *args):
+        try:
+            return self.targetCall(*args)
+        except plugins.TextTestError, e:
+            # Just translate the message here, they're more or less deliberate
+            raise BadConfigError, e
+        except:
+            self.raiseException()
+    def raiseException(self):
+        message = "Exception thrown by '" + self.moduleName + "' configuration, while requesting '" + self.name + "'"
+        plugins.printException()
+        raise BadConfigError, message
         
 class ConfigurationWrapper:
     def __init__(self, moduleName, inputOptions):
@@ -657,118 +675,23 @@ class ConfigurationWrapper:
             if sys.exc_type == exceptions.ImportError:
                 errorString = "No module named " + moduleName
                 if str(sys.exc_value) == errorString:
-                    self.raiseException(msg = "could not find config_module " + moduleName, useOrigException=0)
+                    raise BadConfigError, "could not find config_module " + moduleName
                 elif str(sys.exc_value) == "cannot import name getConfig":
-                    self.raiseException(msg = "module " + moduleName + " is not intended for use as a config_module", useOrigException=0)
-            self.raiseException(msg = "config_module " + moduleName + " contained errors and could not be imported") 
-        self.target = getConfig(inputOptions)
-    def raiseException(self, msg = None, req = None, useOrigException = 1):
-        message = msg
-        if not msg:
-            message = "Exception thrown by '" + self.moduleName + "' configuration, while requesting '" + req + "'"
-        if useOrigException:
+                    raise BadConfigError, "module " + moduleName + " is not intended for use as a config_module"
             plugins.printException()
-        raise BadConfigError, message
+            raise BadConfigError, "config_module " + moduleName + " contained errors and could not be imported"
+        self.target = getConfig(inputOptions)
     def updateOptions(self, optionGroup):
         for key, option in optionGroup.options.items():
             if len(option.getValue()):
                 self.target.optionMap[key] = option.getValue()
             elif self.target.optionMap.has_key(key):
                 del self.target.optionMap[key]
-    def getFilterList(self, app):
-        try:
-            return self.target.getFilterList(app)
-        except:
-            self.raiseException(req = "filter list")
-    def getCleanMode(self):
-        try:
-            return self.target.getCleanMode()
-        except:
-            self.raiseException(req = "clean mode")
-    def setApplicationDefaults(self, app):
-        try:
-            return self.target.setApplicationDefaults(app)
-        except:
-            self.raiseException(req = "set defaults")
-    def getWriteDirectoryName(self, app):
-        try:
-            return self.target.getWriteDirectoryName(app)
-        except:
-            self.raiseException(req = "writedir name")
-    def getCheckoutPath(self, app):
-        try:
-            return self.target.getCheckoutPath(app)
-        except:
-            self.raiseException(req = "checkout path")
-    def getPossibleResultFiles(self, app):
-        try:
-            return self.target.getPossibleResultFiles(app)
-        except:
-            self.raiseException(req = "possible result files")
-    def hasPerformance(self, app):
-        try:
-            return self.target.hasPerformance(app)
-        except:
-            self.raiseException(req = "has performance")
-    def useExtraVersions(self):
-        try:
-            return self.target.useExtraVersions()
-        except:
-            self.raiseException(req = "extra versions")
-    def getRunOptions(self, checkout):
-        try:
-            return self.target.getRunOptions(checkout)
-        except:
-            self.raiseException(req = "run options")
-    def addToOptionGroups(self, app, groups):
-        try:
-            return self.target.addToOptionGroups(app, groups)
-        except:
-            self.raiseException(req = "add to option group")
-    def getActionSequence(self):
-        try:
-            actionSequenceFromConfig = self.target.getActionSequence()
-        except:
-            self.raiseException(req = "action sequence")
-        actionSequence = []
-        # Collapse lists and remove None actions
-        for action in actionSequenceFromConfig:
-            self.addActionToList(action, actionSequence)
-        return actionSequence
-    def getResponderClasses(self, allApps):
-        try:
-            return self.target.getResponderClasses(allApps)
-        except:
-            self.raiseException(req = "responder classes")
-    def addActionToList(self, action, actionSequence):
-        if type(action) == types.ListType:
-            for subAction in action:
-                self.addActionToList(subAction, actionSequence)
-        elif action != None:
-            actionSequence.append(action)
-    def printHelpText(self):
-        try:
-            return self.target.printHelpText()
-        except:
-            self.raiseException(req = "help text")
-    def setEnvironment(self, test):
-        try:
-            self.target.setEnvironment(test)
-        except:
-            self.raiseException(req = "test set environment")
-    def extraReadFiles(self, test):
-        try:
-            return self.target.extraReadFiles(test)
-        except:
-            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.moduleName + \
-                             "' configuration while requesting extra data files, not displaying any such files")
-            plugins.printException()
-            return seqdict()
-    def getTextualInfo(self, test):
-        try:
-            return self.target.getTextualInfo(test)
-        except:
-            self.raiseException(req = "textual info")
+    def __getattr__(self, name):
+        if hasattr(self.target, name):
+            return ConfigurationCall(name, self.moduleName, self.target)
+        else:
+            raise AttributeError, "No such configuration method : " + name        
     
 class Application:
     def __init__(self, name, dircache, version, inputOptions):
@@ -1095,7 +1018,18 @@ class Application:
                 print "Removing previous write directory", previousWriteDir
                 plugins.rmtree(previousWriteDir, attempts=3)
     def getActionSequence(self):
-        return self.configObject.getActionSequence()
+        actionSequenceFromConfig = self.configObject.getActionSequence()
+        actionSequence = []
+        # Collapse lists and remove None actions
+        for action in actionSequenceFromConfig:
+            self.addActionToList(action, actionSequence)
+        return actionSequence
+    def addActionToList(self, action, actionSequence):
+        if type(action) == types.ListType:
+            for subAction in action:
+                self.addActionToList(subAction, actionSequence)
+        elif action != None:
+            actionSequence.append(action)
     def printHelpText(self):
         print helpIntro
         header = "Description of the " + self.getConfigValue("config_module") + " configuration"

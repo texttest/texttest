@@ -127,10 +127,11 @@ def getLimitInterpretation(origLimitText):
     
 # Used by slave to find all execution machines    
 def getExecutionMachines():
-    if not os.environ.has_key("PE_HOSTFILE"):
+    hostFile = os.getenv("PE_HOSTFILE")
+    if not hostFile or not os.path.isfile(hostFile):
         from socket import gethostname
         return [ gethostname() ]
-    hostlines = open(os.environ["PE_HOSTFILE"]).readlines()
+    hostlines = open(hostFile).readlines()
     hostlist = []
     for line in hostlines:
         parts = line.strip().split()

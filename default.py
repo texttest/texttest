@@ -134,8 +134,8 @@ class Config(plugins.Configuration):
         
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
-        return [ self.getExecHostFinder(), SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
-                 self.getWriteDirectoryPreparer(ignoreCatalogues),
+        return [ self.getExecHostFinder(), self.getWriteDirectoryPreparer(ignoreCatalogues), \
+                 SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
                  catalogueCreator, self.getTestRunner(), catalogueCreator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
@@ -446,6 +446,8 @@ class Config(plugins.Configuration):
         
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
+        if self.optionMap.has_key("rectraffic"):
+            app.addConfigEntry("base_version", "rectraffic")
     def defaultViewProgram(self):
         if os.name == "posix":
             return "emacs"
@@ -1449,6 +1451,11 @@ class MachineInfoFinder:
         return app.getCompositeConfigValue("performance_test_machine", fileStem)
     def setUpApplication(self, app):
         pass
+    def getMachineInformation(self, test):
+        # A space for subclasses to write whatever they think is relevant about
+        # the machine environment right now.
+        return ""
+
 
 class PerformanceFileCreator(plugins.Action):
     def __init__(self, machineInfoFinder):
@@ -1548,11 +1555,7 @@ class MakePerformanceFile(PerformanceFileCreator):
         if realTime is not None:
             realLine = "Real time  : " + self.timeString(realTime) + " sec.\n"
             file.write(realLine)
-        self.writeMachineInformation(file, test)
-    def writeMachineInformation(self, file, test):
-        # A space for subclasses to write whatever they think is relevant about
-        # the machine environment right now.
-        pass
+        file.write(self.machineInfoFinder.getMachineInformation(test))
 
 # Relies on the config entry performance_logfile_extractor, so looks in the log file for anything reported
 # by the program
@@ -1581,8 +1584,8 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
             if len(values) > 0:
                 fileName = self.getFileToWrite(test, fileStem)
                 self.diag.info("Writing performance to file " + fileName)
-                lineToWrite = self.makeLine(values, fileStem)
-                self.saveFile(fileName, lineToWrite)
+                contents = self.makeFileContents(test, values, fileStem)
+                self.saveFile(fileName, contents)
     def getFileToWrite(self, test, stem):
         return test.makeTmpFileName(stem)
     def findLogFiles(self, test, stem):
@@ -1592,16 +1595,18 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
             return self.entryFiles[fileStem]
         else:
             return [ self.logFileStem ]
-    def saveFile(self, fileName, lineToWrite):
+    def saveFile(self, fileName, contents):
         file = open(fileName, "w")
-        file.write(lineToWrite + "\n")
+        file.write(contents)
         file.close()
-    def makeLine(self, values, fileStem):
+    def makeFileContents(self, test, values, fileStem):
         # Round to accuracy 0.01
         if fileStem.find("mem") != -1:
-            return self.makeMemoryLine(values, fileStem)
+            return self.makeMemoryLine(values, fileStem) + "\n"
         else:
-            return self.makeTimeLine(values, fileStem)
+            return self.makeTimeLine(values, fileStem) + self.getMachineContents(test)
+    def getMachineContents(self, test):
+        return " " + test.state.hostString() + "\n" + self.machineInfoFinder.getMachineInformation(test)
     def makeMemoryLine(self, values, fileStem):
         maxVal = max(values)
         roundedMaxVal = float(int(100*maxVal))/100
@@ -1671,6 +1676,8 @@ class ExtractStandardPerformance(ExtractPerformanceFiles):
         return 1
     def setUpSuite(self, suite):
         self.describe(suite)
+    def getMachineContents(self, test):
+        return " on unknown machine (extracted)\n"
 
 class DocumentOptions(plugins.Action):
     def setUpApplication(self, app):

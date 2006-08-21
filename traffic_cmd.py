@@ -2,24 +2,28 @@
 
 import sys, os, string, socket
 
-def readFromSocket(sock):
-    response = ""
-    while not response.endswith("TT_END_CMD_RESPONSE"):
-        response += sock.recv(1024)
-    return response[:-19]
+def createSocket():
+    servAddr = os.getenv("TEXTTEST_MIM_SERVER")
+    if servAddr:
+        host, port = servAddr.split(":")
+        serverAddress = (host, int(port))
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(serverAddress)
+        return sock
+
+def sendServerAddress(address):
+    sock = createSocket()
+    if sock:
+        sock.sendall("SUT_SERVER_ADDRESS:" + address + os.linesep)
+        sock.close()
 
 if __name__ == "__main__":
-    servAddr = os.getenv("TEXTTEST_MIM_SERVER")
-    host, port = servAddr.split(":")
-    serverAddress = (host, int(port))
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(serverAddress)
-    text = "SUT_COMMAND_LINE:" + repr(sys.argv) + os.linesep
-    sys.stdout.flush()
+    sock = createSocket()
+    text = "SUT_COMMAND_LINE:" + repr(sys.argv) + ":SUT_ENVIRONMENT:" + repr(os.environ)
     sock.sendall(text)
-    response = readFromSocket(sock)
+    sock.shutdown(1)
+    response = sock.recv(1000000, socket.MSG_WAITALL)
     sock.close()
-    errParts = response.split("->ERR:")
-    outParts = errParts[0].split("->OUT:")
-    sys.stdout.write(string.join(outParts[1:], ""))
-    sys.stderr.write(string.join(errParts[1:], ""))    
+    stdout, stderr = response.split("|TT_STDOUT_STDERR|")
+    sys.stdout.write(stdout)
+    sys.stderr.write(stderr)

@@ -8,6 +8,7 @@ from time import sleep
 from copy import copy, deepcopy
 from cPickle import dumps
 from respond import Responder
+from traffic_cmd import sendServerAddress
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
@@ -57,9 +58,12 @@ class KillTestInSlave(default.KillTest):
     
 class SocketResponder(Responder):
     def __init__(self, optionMap):
-        servAddr = optionMap["servaddr"]
-        host, port = servAddr.split(":")
-        self.serverAddress = (host, int(port))
+        Responder.__init__(self, optionMap)
+        self.serverAddress = None
+        servAddr = optionMap.get("servaddr")
+        if servAddr:
+            host, port = servAddr.split(":")
+            self.serverAddress = (host, int(port))
     def connect(self, sendSocket):
         for attempt in range(5):
             try:
@@ -69,12 +73,15 @@ class SocketResponder(Responder):
                 sleep(1)
         sendSocket.connect(self.serverAddress)
     def notifyLifecycleChange(self, test, changeDesc):
-        testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
-        pickleData = dumps(test.state)
-        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect(sendSocket)
-        sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
-        sendSocket.close()
+        if self.serverAddress:
+            testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
+            pickleData = dumps(test.state)
+            sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.connect(sendSocket)
+            sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
+            sendSocket.close()
+        else:
+            self.describeFailures(test)
     
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
@@ -100,8 +107,9 @@ class QueueSystemConfig(default.Config):
     def slaveRun(self):
         return self.optionMap.has_key("slave")
     def getWriteDirectoryName(self, app):
-        if self.slaveRun():
-            return self.optionMap["slave"]
+        slaveDir = self.optionMap.get("slave")
+        if slaveDir:
+            return slaveDir
         else:
             return default.Config.getWriteDirectoryName(self, app)
     def useExtraVersions(self):
@@ -143,11 +151,6 @@ class QueueSystemConfig(default.Config):
                len(app.getCompositeConfigValue("performance_test_resource", "cputime")) > 0
     def getSubmissionRules(self, test):
         return SubmissionRules(self.optionMap, test)
-    def getPerformanceFileMaker(self):
-        if self.slaveRun():
-            return MakePerformanceFile(self.getMachineInfoFinder())
-        else:
-            return default.Config.getPerformanceFileMaker(self)
     def getMachineInfoFinder(self):
         if self.slaveRun():
             return MachineInfoFinder()
@@ -201,10 +204,19 @@ class SubmissionRules:
         if len(self.envResource):
             resourceList.append(self.envResource)
         if self.forceOnPerformanceMachines():
-            resources = self.test.getCompositeConfigValue("performance_test_resource", "cputime")
+            resources = self.getConfigValue("performance_test_resource")
             for resource in resources:
                 resourceList.append(resource)
         return resourceList
+    def getConfigValue(self, configKey):
+        configDict = self.test.getConfigValue(configKey)
+        defVal = configDict.get("default")
+        if len(defVal) > 0:
+            return defVal
+        for val in configDict.values():
+            if len(val) > 0 and val[0] != "any" and val[0] != "none":
+                return val
+        return []
     def findPriority(self):
         return 0
     def findQueue(self):
@@ -220,8 +232,8 @@ class SubmissionRules:
     def findMachineList(self):
         if not self.forceOnPerformanceMachines():
             return []
-        performanceMachines = self.test.getCompositeConfigValue("performance_test_machine", "cputime")
-        if len(performanceMachines) == 0 or performanceMachines[0] == "none":
+        performanceMachines = self.getConfigValue("performance_test_machine")
+        if len(performanceMachines) == 0:
             return []
 
         return performanceMachines
@@ -243,6 +255,7 @@ class SlaveRequestHandler(StreamRequestHandler):
         clientPid = self.rfile.readline().strip()
         testString = self.rfile.readline().strip()
         test = self.server.getTest(testString)
+        self.wfile.close()
         clientHost, clientPort = self.client_address
         # Don't use port, it changes all the time
         clientInfo = (clientHost, clientPid)
@@ -267,6 +280,10 @@ class SlaveServer(TCPServer):
         self.testMap = {}
         self.testClientInfo = {}
         self.diag = plugins.getDiagnostics("Slave Server")
+        sendServerAddress(self.getAddress())
+    def getAddress(self):
+        host, port = self.socket.getsockname()
+        return host + ":" + str(port)
     def testSubmitted(self, test):
         testPath = test.getRelPath()
         testApp = test.app.name + test.app.versionSuffix()
@@ -301,7 +318,7 @@ class QueueSystemServer:
         self.updateThread.setDaemon(1)
         self.updateThread.start()
     def getServerAddress(self):
-        return self.socketServer.socket.getsockname()
+        return self.socketServer.getAddress()
     def getEnvString(self, envDict):
         envStr = "env "
         for key, value in envDict.items():
@@ -396,8 +413,11 @@ class SubmitTest(plugins.Action):
                       + self.getSlaveArgs(test) + " " + self.runOptions
         return "exec " + self.loginShell + " -c \"" + commandLine + "\""
     def getSlaveArgs(self, test):
-        host, port = QueueSystemServer.instance.getServerAddress()
-        return " -" + self.slaveType() + " " + test.app.writeDirectory + " -servaddr " + host + ":" + str(port)
+        servAddr = os.getenv("TEXTTEST_MIM_SERVER")
+        if not servAddr:
+            servAddr = QueueSystemServer.instance.getServerAddress()
+        return " -" + self.slaveType() + " " + test.app.writeDirectory + \
+               " -servaddr " + servAddr
     def tryStartServer(self):
         if not QueueSystemServer.instance:
             QueueSystemServer.instance = QueueSystemServer()
@@ -575,13 +595,13 @@ class MachineInfoFinder(default.MachineInfoFinder):
         command = "from " + moduleName + " import MachineInfo as _MachineInfo"
         exec command
         self.queueMachineInfo = _MachineInfo()
-
-class MakePerformanceFile(default.MakePerformanceFile):
-    def writeMachineInformation(self, file, test):
+    def getMachineInformation(self, test):
         # Try and write some information about what's happening on the machine
+        info = ""
         for machine in test.state.executionHosts:
             for jobLine in self.findRunningJobs(machine):
-                file.write(jobLine + "\n")
+                info += jobLine + "\n"
+        return info
     def findRunningJobs(self, machine):
         try:
             return self._findRunningJobs(machine)
@@ -592,7 +612,7 @@ class MakePerformanceFile(default.MakePerformanceFile):
         # On a multi-processor machine performance can be affected by jobs on other processors,
         # as for example a process can hog the memory bus. Describe these so the user can judge
         # for himself if performance is likely to be affected...
-        jobsFromQueue = self.machineInfoFinder.queueMachineInfo.findRunningJobs(machine)
+        jobsFromQueue = self.queueMachineInfo.findRunningJobs(machine)
         jobs = []
         for user, jobName in jobsFromQueue:
             jobs.append("Also on " + machine + " : " + user + "'s job '" + jobName + "'")

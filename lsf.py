@@ -116,5 +116,9 @@ def getLimitInterpretation(origLimitText):
     
 # Need to get all hosts for parallel
 def getExecutionMachines():
-    hosts = os.environ["LSB_HOSTS"].split()
-    return [ host.split(".")[0] for host in hosts ] 
+    if os.environ.has_key("LSB_HOSTS"):
+        hosts = os.environ["LSB_HOSTS"].split()
+        return [ host.split(".")[0] for host in hosts ]
+    else:
+        from socket import gethostname
+        return [ gethostname() ]

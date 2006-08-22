@@ -20,11 +20,10 @@ class QueueSystem:
         bsubArgs += " -u nobody -o " + outputFile + " -e " + errorsFile
         return "bsub " + bsubArgs
     def findSubmitError(self, stderr):
-        return stderr.read()
-##        for errorMessage in stderr.readlines():
-##            if self.isRealError(errorMessage):
-##                return errorMessage
-##        return ""
+        for errorMessage in stderr.readlines():
+            if self.isRealError(errorMessage):
+                return errorMessage
+        return ""
     def isRealError(self, errorMessage):
         if not errorMessage:
             return 0

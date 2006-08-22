@@ -78,11 +78,12 @@ class ResponseTraffic(Traffic):
 class ServerTraffic(InTraffic):
     typeId = "SRV"
 
-class ServerAddressTraffic(ServerTraffic):
+class ServerStateTraffic(ServerTraffic):
     def __init__(self, inText, responseFile):
         InTraffic.__init__(self, inText, responseFile)
-        host, port = inText.strip().split(":")
-        ClientSocketTraffic.destination = host, int(port)
+        if not ClientSocketTraffic.destination:
+            host, port = inText.strip().split(":")
+            ClientSocketTraffic.destination = host, int(port)
     def forwardToDestination(self):
         return []
             
@@ -131,10 +132,16 @@ class CommandLineTraffic(InTraffic):
                 return "'" + arg + "'"
         return arg
     def forwardToDestination(self):
-        realCmdLine = self.envStr + self.findRealCommand() + " " + self.argStr
-        self.diag.info("Executing real command : " + realCmdLine)
-        cin, cout, cerr = os.popen3(realCmdLine)
-        return [ StdoutTraffic(cout.read(), self.responseFile), StderrTraffic(cerr.read(), self.responseFile) ]
+        realCmd = self.findRealCommand()
+        if realCmd:
+            realCmdLine = self.envStr + realCmd + " " + self.argStr
+            TrafficServer.instance.diag.info("Executing real command : " + realCmdLine)
+            cin, cout, cerr = os.popen3(realCmdLine)
+            return self.makeResponse(cout.read(), cerr.read())
+        else:
+            return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH")
+    def makeResponse(self, output, errors):
+        return [ StdoutTraffic(output, self.responseFile), StderrTraffic(errors, self.responseFile) ]
     def findRealCommand(self):
         # If we found a link already, use that, otherwise look on the path
         if self.realCommands.has_key(self.commandName):
@@ -179,7 +186,7 @@ class ClientSocketTraffic(ResponseTraffic):
         return [ ServerTraffic(response, self.responseFile) ]
 
 class TrafficRequestHandler(StreamRequestHandler):
-    parseDict = { "SUT_SERVER_ADDRESS" : ServerAddressTraffic, "SUT_COMMAND_LINE" : CommandLineTraffic }
+    parseDict = { "SUT_SERVER" : ServerStateTraffic, "SUT_COMMAND_LINE" : CommandLineTraffic }
     def handle(self):
         text = self.rfile.read()
         traffic = self.parseTraffic(text)
@@ -264,7 +271,7 @@ class TrafficServer(TCPServer):
             return
         if not desc.endswith(os.linesep):
             desc += os.linesep
-        self.diag.info("Recording " + desc)
+        self.diag.info("Recording " + repr(traffic.__class__) + " " + desc)
         writeFile = open(self.recordFile, "a")
         writeFile.write(desc)
         writeFile.close()

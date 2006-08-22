@@ -11,10 +11,10 @@ def createSocket():
         sock.connect(serverAddress)
         return sock
 
-def sendServerAddress(address):
+def sendServerState(stateDesc):
     sock = createSocket()
     if sock:
-        sock.sendall("SUT_SERVER_ADDRESS:" + address + os.linesep)
+        sock.sendall("SUT_SERVER:" + stateDesc + os.linesep)
         sock.close()
 
 if __name__ == "__main__":
@@ -24,6 +24,10 @@ if __name__ == "__main__":
     sock.shutdown(1)
     response = sock.recv(1000000, socket.MSG_WAITALL)
     sock.close()
-    stdout, stderr = response.split("|TT_STDOUT_STDERR|")
-    sys.stdout.write(stdout)
-    sys.stderr.write(stderr)
+    try:
+        stdout, stderr = response.split("|TT_STDOUT_STDERR|")
+        sys.stdout.write(stdout)
+        sys.stderr.write(stderr)
+    except ValueError:
+        sys.stderr.write("Received unexpected communication from MIM server: " + response)
+

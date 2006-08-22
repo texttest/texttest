@@ -8,7 +8,7 @@ from time import sleep
 from copy import copy, deepcopy
 from cPickle import dumps
 from respond import Responder
-from traffic_cmd import sendServerAddress
+from traffic_cmd import sendServerState
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
@@ -280,7 +280,7 @@ class SlaveServer(TCPServer):
         self.testMap = {}
         self.testClientInfo = {}
         self.diag = plugins.getDiagnostics("Slave Server")
-        sendServerAddress(self.getAddress())
+        sendServerState(self.getAddress())
     def getAddress(self):
         host, port = self.socket.getsockname()
         return host + ":" + str(port)
@@ -522,9 +522,11 @@ class KillTestSubmission(plugins.Action):
         self.describe(test, postText)
     
 class WaitForCompletion(plugins.Action):
+    messageSent = False
     def __repr__(self):
         return "Evaluating"
     def __call__(self, test):
+        self.tryNotifyState()
         if test.state.isComplete():
             self.describe(test, self.getPostText(test))
         else:
@@ -534,6 +536,10 @@ class WaitForCompletion(plugins.Action):
             return test.state.getPostText()
         except AttributeError:
             return " (" + test.state.category + ")"
+    def tryNotifyState(self):
+        if not self.messageSent:
+            WaitForCompletion.messageSent = True
+            sendServerState("Completed submission of all tests")
     def getInterruptActions(self, fetchResults):
         actions = [ KillTestSubmission() ]
         if fetchResults:

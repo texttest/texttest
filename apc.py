@@ -297,6 +297,7 @@ class RunApcTestInDebugger(default.RunTest):
         self.showLogFile = 1
         self.noRun = None
         self.keepTmps = keepTmpFiles;
+        self.valOutput = None
         opts = options.split(" ")
         if opts[0] == "":
             return
@@ -314,7 +315,8 @@ class RunApcTestInDebugger(default.RunTest):
                 self.runValgrind = 1
             elif opt.find("val_output=")==0:
                 tmp = opt.split("=")
-                self.valopt += "--log-file=" + tmp[1] + " "
+                self.valOutput = tmp[1]
+                self.valopt += "--log-file=" + self.valOutput + " "
             elif opt == "valdebug":
                 self.valopt += "--db-attach=yes "
 
@@ -369,7 +371,7 @@ class RunApcTestInDebugger(default.RunTest):
             executeCommand = binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
         elif self.runValgrind:
             #no redirecting output when attaching to debugger
-            redir = " > " + apcLog
+            redir = " >& " + apcLog
             if self.valopt.find("db-attach") != -1:
                 redir = "";
             executeCommand = "valgrind --tool=memcheck -v " + self.valopt + binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + redir
@@ -396,6 +398,15 @@ class RunApcTestInDebugger(default.RunTest):
         if self.inXEmacs:
             os.remove(gdbStart)
             os.remove(gdbWithArgs)
+        # Valgrind adds a .pid in the end of the output file, this makes texttest
+        # not extract the file. Now we simply change it back. In later versions of
+        # valgrind, there is an --log-file-exact, we shall remove this code and use
+        # that alternative when it becomes available.
+        if self.valOutput:
+            files = os.listdir(".")
+            for file in files:
+                if file.startswith(self.valOutput):
+                    os.rename(file, self.valOutput + "." + test.app.name)
     def runInXEmacs(self, test, binName, gdbArgs):
         gdbStart = test.makeTmpFileName("gdb_start")
         gdbWithArgs = test.makeTmpFileName("gdb_w_args")

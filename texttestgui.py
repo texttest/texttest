@@ -162,8 +162,7 @@ class TextTestGUI(ThreadedResponder):
         return string.join(names, ",")
     def fillTopWindow(self, topWindow, testWins, rightWindow):
         mainWindow = self.createWindowContents(testWins, rightWindow)
-        shortcutBar = scriptEngine.createShortcutBar()
-
+        
         vbox = gtk.VBox()
         hbox = gtk.HBox()
         hbox.pack_start(self.selectionActionGUI.buttons, expand=False, fill=False)
@@ -179,15 +178,12 @@ class TextTestGUI(ThreadedResponder):
         hbox.show_all()
         vbox.pack_start(hbox, expand=False, fill=True)
         vbox.pack_start(mainWindow, expand=True, fill=True)
-        if shortcutBar:
+        if self.getConfigValue("add_shortcut_bar"):
+            shortcutBar = scriptEngine.createShortcutBar()
             vbox.pack_start(shortcutBar, expand=False, fill=False)
             shortcutBar.show()
 
-        showStatusBar = True
-        for app in self.rootSuites:
-            showStatusBar = app.getConfigValue("add_status_bar")
-
-        if (showStatusBar):
+        if self.getConfigValue("add_status_bar"):
             vbox.pack_start(self.status.createStatusbar(), expand=False, fill=False)
         vbox.show()
         topWindow.add(vbox)
@@ -197,22 +193,23 @@ class TextTestGUI(ThreadedResponder):
         topWindow.resize(width, height)
         self.contents.set_position(int(self.contents.allocation.width / 2))
         self.rightWindowGUI.notifySizeChange(width, height)
+    def getConfigValue(self, configName):
+        return self.rootSuites[0].app.getConfigValue(configName)
     def getWindowHeight(self):
         defaultHeight = (gtk.gdk.screen_height() * 5) / 6
         height = defaultHeight
 
-        for app in self.rootSuites:
-            windowSizeOptions = app.getConfigValue("window_size")
-            if not self.dynamic:
-                if windowSizeOptions.has_key("static_height_pixels"):
-                    height = int(windowSizeOptions["static_height_pixels"][0])
-                if windowSizeOptions.has_key("static_height_screen"):
-                    height = gtk.gdk.screen_height() * float(windowSizeOptions["static_height_screen"][0])
-            else:
-                if windowSizeOptions.has_key("dynamic_height_pixels"):
-                    height = int(windowSizeOptions["dynamic_height_pixels"][0])
-                if windowSizeOptions.has_key("dynamic_height_screen"):
-                    height = gtk.gdk.screen_height() * float(windowSizeOptions["dynamic_height_screen"][0])                
+        windowSizeOptions = self.getConfigValue("window_size")
+        if not self.dynamic:
+            if windowSizeOptions.has_key("static_height_pixels"):
+                height = int(windowSizeOptions["static_height_pixels"][0])
+            if windowSizeOptions.has_key("static_height_screen"):
+                height = gtk.gdk.screen_height() * float(windowSizeOptions["static_height_screen"][0])
+        else:
+            if windowSizeOptions.has_key("dynamic_height_pixels"):
+                height = int(windowSizeOptions["dynamic_height_pixels"][0])
+            if windowSizeOptions.has_key("dynamic_height_screen"):
+                height = gtk.gdk.screen_height() * float(windowSizeOptions["dynamic_height_screen"][0])                
 
         return int(height)
     def getWindowWidth(self):
@@ -222,18 +219,17 @@ class TextTestGUI(ThreadedResponder):
             defaultWidth = gtk.gdk.screen_width() * 0.6
         width = defaultWidth        
 
-        for app in self.rootSuites:
-            windowSizeOptions = app.getConfigValue("window_size")
-            if not self.dynamic:
-                if windowSizeOptions.has_key("static_width_pixels"):
-                    width = int(windowSizeOptions["static_width_pixels"][0])
-                if windowSizeOptions.has_key("static_width_screen"):
-                    width = gtk.gdk.screen_width() * float(windowSizeOptions["static_width_screen"][0])
-            else:
-                if windowSizeOptions.has_key("dynamic_width_pixels"):
-                    width = int(windowSizeOptions["dynamic_width_pixels"][0])
-                if windowSizeOptions.has_key("dynamic_width_screen"):
-                    width = gtk.gdk.screen_width() * float(windowSizeOptions["dynamic_width_screen"][0])                
+        windowSizeOptions = self.getConfigValue("window_size")
+        if not self.dynamic:
+            if windowSizeOptions.has_key("static_width_pixels"):
+                width = int(windowSizeOptions["static_width_pixels"][0])
+            if windowSizeOptions.has_key("static_width_screen"):
+                width = gtk.gdk.screen_width() * float(windowSizeOptions["static_width_screen"][0])
+        else:
+            if windowSizeOptions.has_key("dynamic_width_pixels"):
+                width = int(windowSizeOptions["dynamic_width_pixels"][0])
+            if windowSizeOptions.has_key("dynamic_width_screen"):
+                width = gtk.gdk.screen_width() * float(windowSizeOptions["dynamic_width_screen"][0])                
 
         return int(width)
     def createIterMap(self):
@@ -343,7 +339,15 @@ class TextTestGUI(ThreadedResponder):
             detailsRenderer = gtk.CellRendererText()
             perfColumn = gtk.TreeViewColumn("Details", detailsRenderer, text=4, background=5)
             view.append_column(perfColumn)
-        view.expand_all()
+        if not self.dynamic and self.getConfigValue("static_collapse_suites"):
+            childIter = self.model.get_iter_root()
+            while childIter != None:
+                name = self.model.get_value(childIter, 0)
+                guilog.info("Expanded row titled '" + name + "'")
+                view.expand_row(self.model.get_path(childIter), open_all=False)
+                childIter = self.model.iter_next(childIter)            
+        else:
+            view.expand_all()
         modelIndexer = TreeModelIndexer(self.model, self.testsColumn, 3)
         # This does not interact with TextTest at all, so don't bother to connect to PyUseCase
         view.connect("row_expanded", self.expandFullSuite)

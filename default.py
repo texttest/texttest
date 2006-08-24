@@ -479,6 +479,7 @@ class Config(plugins.Configuration):
         # anywhere it needs to be set up
         app.setConfigDefault("add_shortcut_bar", 1, "Whether or not TextTest's shortcut bar will appear")
         app.setConfigDefault("add_status_bar", 1, "Whether or not TextTest's status bar will appear")
+        app.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
         app.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
         app.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
         app.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")

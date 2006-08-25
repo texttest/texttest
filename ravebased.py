@@ -50,6 +50,7 @@ import queuesystem, default, os, string, shutil, plugins, sys, signal, stat, gui
 from socket import gethostname
 from tempfile import mktemp
 from respond import Responder
+from traffic_cmd import sendServerState
 from carmenqueuesystem import getArchitecture, CarmenConfig, SgeSubmissionRules
 
 def getConfig(optionMap):
@@ -298,6 +299,13 @@ class Config(CarmenConfig):
                             "carmusr_default", "crc", "modules", getBasicRaveName(test))
     def filesFromSubplan(self, test, subplanDir):
         return []
+    def setEnvironment(self, test):
+        CarmenConfig.setEnvironment(self, test)
+        if test.parent and test.parent.parent is None:
+            carmsys = test.getEnvironment("CARMSYS")
+            if carmsys and (not test.parent.environment.has_key("PATH") or \
+                            test.parent.environment["PATH"].find("$CARMSYS/bin") == -1):
+                test.setEnvironment("PATH", "$PATH:$CARMSYS/bin")
     def printHelpOptions(self):
         CarmenConfig.printHelpOptions(self)
         print helpOptions
@@ -498,7 +506,7 @@ class SubmitRuleCompilations(queuesystem.SubmitTest):
         if test.state.testCompiling:
             self.setPending(test)
             return
-        queuesystem.SubmitTest.__call__(self, test)
+        return queuesystem.SubmitTest.__call__(self, test)
     def getPendingState(self, test):
         return PendingRuleCompilation(test.state)
 
@@ -517,13 +525,12 @@ class CompileRules(plugins.Action):
         ruleset = RuleSet(self.getRuleSetName(test), raveNames, arch, self.modeString)
         self.describe(test, " - ruleset " + ruleset.name)
 
-        compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
         # Fix to be able to run crc_compile for apc also on Carmen 8.
         # crc_compile provides backward compability, so we can always have the '-'.
         extra = ""
         if test.app.name == "apc":
             extra = "-"
-        commandLine = compiler + " " + extra + string.join(raveNames) + " " + self.getModeString() \
+        commandLine = "crc_compile " + extra + string.join(raveNames) + " " + self.getModeString() \
                           + " -archs " + arch + " " + ruleset.sourceFile
         self.performCompile(test, ruleset.name, commandLine)
     def getModeString(self):
@@ -613,6 +620,7 @@ class RuleBuildSynchroniser(Responder):
             self.updateMap[test] = []
 
 class WaitForRuleCompile(queuesystem.WaitForCompletion):
+    raveMessageSent = False
     def __init__(self, getRuleSetName):
         self.getRuleSetName = getRuleSetName
     def __repr__(self):
@@ -621,10 +629,15 @@ class WaitForRuleCompile(queuesystem.WaitForCompletion):
         # Don't do this if tests not compiled
         if test.state.category == "not_started":
             return
+        self.tryNotifyState()
         if not test.state.isComplete() and test.state.category != "ruleset_compiled":
             return self.WAIT | self.RETRY
         self.handleCompilerOutput(test)
         self.describe(test, self.getResultText(test))
+    def tryNotifyState(self):
+        if not self.raveMessageSent:
+            WaitForRuleCompile.raveMessageSent = True
+            sendServerState("Completed submission of all rule compilations")
     def getResultText(self, test):
         text = " (ruleset " + self.getRuleSetName(test) + " "
         if test.state.isComplete():

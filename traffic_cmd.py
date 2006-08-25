@@ -28,6 +28,7 @@ if __name__ == "__main__":
         stdout, stderr = response.split("|TT_STDOUT_STDERR|")
         sys.stdout.write(stdout)
         sys.stderr.write(stderr)
+        sys.exit(0)
     except ValueError:
         sys.stderr.write("Received unexpected communication from MIM server: " + response)
 

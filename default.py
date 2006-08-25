@@ -41,8 +41,7 @@ class Config(plugins.Configuration):
                 group.addSwitch("noperf", "Disable any performance testing")
                 if self.isolatesDataUsingCatalogues(app):
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
-                if len(app.getConfigValue("collect_traffic")) > 0:
-                    group.addSwitch("rectraffic", "(Re-)record command-line traffic")
+                group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
             elif group.name.startswith("Invisible"):
                 # Only relevant without the GUI
                 group.addSwitch("g", "use dynamic GUI", 1)

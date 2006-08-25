@@ -16,23 +16,26 @@ class SetUpTrafficHandlers(plugins.Action):
             if os.path.isfile(fullPath):
                 return fullPath
     def __call__(self, test):
-        if not TrafficServer.instance:
-            return
         if self.configureServer(test):
             self.makeIntercepts(test)
     def configureServer(self, test):
         recordFile = test.makeTmpFileName("traffic")
         if self.record:
-            TrafficServer.instance.setState(recordFile, None)
+            self.setServerState(recordFile, None)
             return True
         else:
             trafficReplay = test.getFileName("traffic")
             if trafficReplay:
-                TrafficServer.instance.setState(recordFile, trafficReplay)
+                self.setServerState(recordFile, trafficReplay)
                 return True
             else:
-                TrafficServer.instance.setState(None, None)
+                self.setServerState(None, None)
                 return False
+    def setServerState(self, recordFile, replayFile):
+        if recordFile or replayFile and not TrafficServer.instance:
+            TrafficServer.instance = TrafficServer()
+        if TrafficServer.instance:
+            TrafficServer.instance.setState(recordFile, replayFile)
     def makeIntercepts(self, test):
         for cmd in test.getConfigValue("collect_traffic"):
             linkName = test.makeTmpFileName(cmd, forComparison=0)
@@ -48,9 +51,6 @@ class SetUpTrafficHandlers(plugins.Action):
             os.symlink(self.trafficFile, linkName)
         else:
             shutil.copy(self.trafficFile, linkName)
-    def setUpApplication(self, app):
-        if len(app.getConfigValue("collect_traffic")) > 0 and not TrafficServer.instance:
-            TrafficServer.instance = TrafficServer()
 
 class Traffic:
     def __init__(self, text, responseFile):
@@ -287,17 +287,20 @@ class TrafficServer(TCPServer):
         if len(desc) == 0:
             return []
         if self.replayInfo.has_key(desc):
-            self.replayIndex = self.replayInfo.keys().index(desc)
-            return self.parseResponses(self.replayInfo[desc], traffic)
+            descIndex = self.replayInfo.keys().index(desc)
+            if self.replayIndex < descIndex:
+                self.replayIndex = descIndex
+                return self.parseResponses(self.replayInfo[desc], traffic)
+
+        # If we can't find an exact match in the "future", just pull the next response off the list
+        self.replayIndex += 1
+        self.diag.info("Increased replay index to " + repr(self.replayIndex))
+        if self.replayIndex < len(self.replayInfo.keys()):
+            key = self.replayInfo.keys()[self.replayIndex]
+            return self.parseResponses(self.replayInfo[key], traffic)
         else:
-            self.replayIndex += 1
-            self.diag.info("Increased replay index to " + repr(self.replayIndex))
-            if self.replayIndex < len(self.replayInfo.keys()):
-                key = self.replayInfo.keys()[self.replayIndex]
-                return self.parseResponses(self.replayInfo[key], traffic)
-            else:
-                sys.stderr.write("WARNING: Received more requests than are recorded, could not respond sensibly!\n" + desc)
-                return []
+            sys.stderr.write("WARNING: Received more requests than are recorded, could not respond sensibly!\n" + desc)
+            return []
     def parseResponses(self, trafficStrings, traffic):
         responses = []
         for trafficStr in trafficStrings:

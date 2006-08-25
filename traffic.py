@@ -100,6 +100,7 @@ class CommandLineTraffic(InTraffic):
         self.argStr = string.join(map(self.quote, argv[1:]))
         self.envStr, recEnvStr = self.findDifferences(cmdEnviron)
         self.diag = plugins.getDiagnostics("Traffic Server")
+        self.path = cmdEnviron.get("PATH")
         text = recEnvStr + self.commandName + " " + self.argStr
         InTraffic.__init__(self, text, responseFile)
     def findDifferences(self, cmdEnviron):
@@ -147,7 +148,7 @@ class CommandLineTraffic(InTraffic):
         if self.realCommands.has_key(self.commandName):
             return self.realCommands[self.commandName]
         # Find the first one in the path that isn't us :)
-        for currDir in os.getenv("PATH").split(os.pathsep):
+        for currDir in self.path.split(os.pathsep):
             fullPath = os.path.join(currDir, self.commandName)
             if self.isRealCommand(fullPath):
                 return fullPath

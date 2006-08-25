@@ -68,6 +68,12 @@ def renderParentsBold(column, cell, model, iter):
     else:
         cell.set_property('font', "")
 
+def renderSuitesBold(column, cell, model, iter):
+    if model.get_value(iter, 2).classId() == "test-case":
+        cell.set_property('font', "")
+    else:
+        cell.set_property('font', "bold")
+
 class QuitGUI(guiplugins.SelectionAction):
     def __init__(self, rootSuites, dynamic, topWindow, actionThread):
         guiplugins.SelectionAction.__init__(self, rootSuites)
@@ -121,7 +127,7 @@ class TextTestGUI(ThreadedResponder):
         ThreadedResponder.__init__(self, optionMap)
         guiplugins.scriptEngine = self.scriptEngine
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
-                                   gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
+                                   gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
         self.itermap = seqdict()
         self.rightWindowGUI = None
         self.selection = None
@@ -132,6 +138,7 @@ class TextTestGUI(ThreadedResponder):
         self.toolTips = gtk.Tooltips()
         self.rootSuites = []
         self.status = GUIStatusMonitor()
+        self.collapsedRows = {}
     def readGtkRCFile(self):
         file = getGtkRcFile()
         if file:
@@ -258,6 +265,7 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 1, colour)
         self.model.set_value(iter, 2, app)
         self.model.set_value(iter, 3, nodeName)
+        self.model.set_value(iter, 6, True)
     def addSuite(self, suite):
         self.rootSuites.append(suite)
         if not suite.app.getConfigValue("add_shortcut_bar"):
@@ -267,8 +275,20 @@ class TextTestGUI(ThreadedResponder):
         if not self.dynamic or suite.size() > 0:
             self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent):
-        if suite.classId() == "test-case":
+        hideTest = False
+        if self.dynamic and suite.classId() == "test-case":
             self.totalNofTests += 1        
+            if suite.app.getConfigValue("test_progress").has_key("hide_non_started") and \
+                   suite.app.getConfigValue("test_progress")["hide_non_started"][0] == "1":
+                hideTest = True
+        elif self.dynamic:
+            if suite.app.getConfigValue("test_progress").has_key("hide_non_started") and \
+                   suite.app.getConfigValue("test_progress")["hide_non_started"][0] == "1" and \
+                   suite.app.getConfigValue("test_progress").has_key("hide_empty_suites") and \
+                   suite.app.getConfigValue("test_progress")["hide_empty_suites"][0] == "1":
+                hideTest = True
+        if parent == None:
+            hideTest = False
         iter = self.model.insert_before(parent, None)
         nodeName = suite.name
         if parent == None:
@@ -278,6 +298,7 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 0, nodeName)
         self.model.set_value(iter, 2, suite)
         self.model.set_value(iter, 3, suite.uniqueName)
+        self.model.set_value(iter, 6, not hideTest)
         self.updateStateInModel(suite, iter, suite.state)
         try:
             for test in suite.testcases:
@@ -319,7 +340,7 @@ class TextTestGUI(ThreadedResponder):
     def createSelectionActionGUI(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
-        return SelectionActionGUI(actions, self.selection, self.status)
+        return SelectionActionGUI(actions, self.selection, self.status, self.filteredModel)
     def createTestWindows(self, treeWindow):
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
@@ -327,55 +348,120 @@ class TextTestGUI(ThreadedResponder):
         vbox.show()
         return vbox
     def createTreeWindow(self):
-        view = gtk.TreeView(self.model)
-        self.selection = view.get_selection()
+        self.filteredModel = self.model.filter_new()
+        # It seems that TreeModelFilter might not like new
+        # rows being added to the original model - the AddUsers
+        # test crashed/produced a gtk warning before I added
+        # this if statement (for the dynamic GUI we never add rows)
+        if self.dynamic:
+            self.filteredModel.set_visible_column(6)
+        self.treeView = gtk.TreeView(self.filteredModel)
+        self.selection = self.treeView.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         self.selection.connect("changed", self.selectionChanged)
         testRenderer = gtk.CellRendererText()
-        self.testsColumn = gtk.TreeViewColumn("Tests: 0 selected", testRenderer, text=0, background=1)
-        self.testsColumn.set_cell_data_func(testRenderer, renderParentsBold)
-        view.append_column(self.testsColumn)
+        self.testsColumn = gtk.TreeViewColumn("Tests: 0 of " + str(self.totalNofTests) + " selected, all shown", testRenderer, text=0, background=1)
+        self.testsColumn.set_cell_data_func(testRenderer, renderSuitesBold)
+        self.treeView.append_column(self.testsColumn)
         if self.dynamic:
             detailsRenderer = gtk.CellRendererText()
             perfColumn = gtk.TreeViewColumn("Details", detailsRenderer, text=4, background=5)
-            view.append_column(perfColumn)
+            self.treeView.append_column(perfColumn)
         if not self.dynamic and self.getConfigValue("static_collapse_suites"):
-            childIter = self.model.get_iter_root()
+            childIter = self.filteredModel.get_iter_root()
             while childIter != None:
-                name = self.model.get_value(childIter, 0)
+                name = self.filteredModel.get_value(childIter, 0)
                 guilog.info("Expanded row titled '" + name + "'")
-                view.expand_row(self.model.get_path(childIter), open_all=False)
-                childIter = self.model.iter_next(childIter)            
+                self.treeView.expand_row(self.filteredModel.get_path(childIter), open_all=False)
+                childIter = self.filteredModel.iter_next(childIter)            
         else:
-            view.expand_all()
-        modelIndexer = TreeModelIndexer(self.model, self.testsColumn, 3)
+            self.treeView.expand_all()
+        modelIndexer = TreeModelIndexer(self.filteredModel, self.testsColumn, 3)
         # This does not interact with TextTest at all, so don't bother to connect to PyUseCase
-        view.connect("row_expanded", self.expandFullSuite)
+        self.treeView.connect("row-expanded", self.expandFullSuite)
         # The order of these two is vital!
-        scriptEngine.connect("select test", "row_activated", view, self.viewTest, modelIndexer)
+        scriptEngine.connect("select test", "row_activated", self.treeView, self.viewTest, modelIndexer)
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
-        view.show()
+        self.treeView.show()
+        # This also doesn't interact with the logic, at least in case the
+        # scriptengine reacts correctly when someone tries to access a test/row
+        # which doesn't exist.
+        if self.dynamic:
+            self.treeView.connect('row-expanded', self.rowExpanded)
+            self.treeView.connect('row-collapsed', self.rowCollapsed)
+            self.filteredModel.connect('row-inserted', self.rowInserted)
 
         # Create scrollbars around the view.
         scrolled = gtk.ScrolledWindow()
         scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        scrolled.add(view)
+        scrolled.add(self.treeView)
         framed = gtk.Frame()
         framed.set_shadow_type(gtk.SHADOW_IN)
         framed.add(scrolled)        
         framed.show_all()
         return framed
-    def selectionChanged(self, selection):
+    def rowCollapsed(self, treeview, iter, path):
+        realPath = self.filteredModel.convert_path_to_child_path(path)
+        self.collapsedRows[realPath] = 1
+    def rowExpanded(self, treeview, iter, path):
+        realPath = self.filteredModel.convert_path_to_child_path(path)
+        if self.collapsedRows.has_key(realPath):
+            del self.collapsedRows[realPath]
+    def rowInserted(self, model, path, iter):
+        realPath = self.filteredModel.convert_path_to_child_path(path)
+        self.expandRow(self.filteredModel.iter_parent(iter), False)
+        self.selectionChanged(self.selection, False)
+    def expandRow(self, iter, recurse):
+        if iter == None:
+            return
+        path = self.filteredModel.get_path(iter)
+        realPath = self.filteredModel.convert_path_to_child_path(path)
+        
+        # Iterate over children, call self if they have children
+        if not self.collapsedRows.has_key(realPath):
+            self.treeView.expand_row(path, open_all=False)
+        if recurse:
+            childIter = self.filteredModel.iter_children(iter)
+            while (childIter != None):
+                if self.filteredModel.iter_has_child(childIter):
+                    self.expandRow(childIter, True)
+                childIter = self.filteredModel.iter_next(childIter)
+    def selectionChanged(self, selection, printToLog = True):
         self.nofSelectedTests = 0
+        self.totalNofTestsShown = 0
         self.selection.selected_foreach(self.countSelected)
-        self.testsColumn.set_title("Tests: " + str(self.nofSelectedTests) + " selected")
-        guilog.info(str(self.nofSelectedTests) + " tests selected")
+        self.filteredModel.foreach(self.countAllShown)
+        title = "Tests: "
+        if self.nofSelectedTests == self.totalNofTests:
+            title += "All " + str(self.totalNofTests) + " selected, "
+        else:
+            title += str(self.nofSelectedTests) + "/" + str(self.totalNofTests) + " selected, "
+        if self.totalNofTestsShown == self.totalNofTests:
+            title += "all visible"
+        else:
+            title += str(self.totalNofTestsShown) + " visible"
+        self.testsColumn.set_title(title)
+        if printToLog:
+            guilog.info(str(self.nofSelectedTests) + " tests selected")
     def countSelected(self, model, path, iter):
-        if self.model.get_value(iter, 2).classId() == "test-case":
+        if model.get_value(iter, 2).classId() == "test-case":
             self.nofSelectedTests = self.nofSelectedTests + 1
+    def countAllShown(self, model, path, iter):
+        # When rows are added, they are first empty, and asking for
+        # classId on NoneType gives an error. See e.g.
+        # http://www.async.com.br/faq/pygtk/index.py?req=show&file=faq13.028.htp
+        if model.get_value(iter, 2) == None:
+            return
+        if model.get_value(iter, 2).classId() == "test-case":
+            self.totalNofTestsShown = self.totalNofTestsShown + 1
     def expandFullSuite(self, view, iter, path, *args):
         # Make sure expanding expands everything, better than just one level as default...
-        view.expand_row(path, open_all=True)
+        # Avoid using view.expand_row(path, open_all=True), as the open_all flag
+        # doesn't seem to send the correct 'row-expanded' signal for all rows ...
+        iter = view.get_model().iter_children(iter)
+        while (iter != None):
+            view.expand_row(view.get_model().get_path(iter), open_all=False)
+            iter = view.get_model().iter_next(iter)
     def setUpGui(self, actionThread=None):
         topWindow = self.createTopWindow()
         treeWindow = self.createTreeWindow()
@@ -386,7 +472,8 @@ class TextTestGUI(ThreadedResponder):
         # Must be created after addSuiteWithParents has counted all tests ...
         # (but before RightWindowGUI, as that wants in on progress)
         if self.dynamic:            
-            self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.rootSuites, self.status, self.rootSuites[0].getConfigValue("test_colours"))
+            self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.rootSuites, self.status, self.rootSuites[0].getConfigValue("test_colours"), self)
+            self.reFilter()
 
         self.rightWindowGUI = self.createDefaultRightGUI()
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
@@ -434,6 +521,8 @@ class TextTestGUI(ThreadedResponder):
         self.rightWindowGUI.notifyChange(test)
         if self.progressMonitor:
             self.progressMonitor.notifyChange(test, state)
+            iter = self.itermap[test]
+            self.model.row_changed(self.model.get_path(iter), iter)
     def notifyTreeView(self, test, state):
         if test.classId() == "test-suite":
             return self.redrawSuite(test)
@@ -512,7 +601,18 @@ class TextTestGUI(ThreadedResponder):
         self.model.set_value(iter, 4, "All " + str(nofChildren) + " tests successful")
         self.model.set_value(iter, 5, successColor) 
 
-        self.selection.get_tree_view().collapse_row(self.model.get_path(iter))
+        # To make sure that the path is marked as 'collapsed' even if the row cannot be collapsed
+        # (if the suite is empty, or not shown at all), we set self.collapsedRow manually, instead of
+        # waiting for rowCollapsed() to do it at the 'row-collapsed' signal (which will not be emitted
+        # in the above cases)
+        path = self.model.get_path(iter)
+        self.collapsedRows[path] = 1
+        try:
+            filterIter = self.filteredModel.convert_child_iter_to_iter(iter)
+            filterPath = self.filteredModel.convert_child_path_to_path(path)
+            self.selection.get_tree_view().collapse_row(filterPath)
+        except:
+            pass
         self.collapseIfAllComplete(self.model.iter_parent(iter))
     def addNewTestToModel(self, suite, newTest, suiteIter):
         iter = self.addSuiteWithParent(newTest, suiteIter)
@@ -527,7 +627,7 @@ class TextTestGUI(ThreadedResponder):
         self.selection.get_tree_view().expand_row(self.model.get_path(iter), open_all=0)
     def selectOnlyRow(self, iter):
         self.selection.unselect_all()
-        self.selection.select_iter(iter)
+        self.selection.select_iter(self.filteredModel.convert_child_iter_to_iter(iter))
     def recreateSuiteModel(self, suite, suiteIter):
         oldSize = self.model.iter_n_children(suiteIter)
         if oldSize == 0 and len(suite.testcases) == 0:
@@ -546,11 +646,11 @@ class TextTestGUI(ThreadedResponder):
         del self.itermap[test]
         self.selectionActionGUI.removeTest(test)
     def viewTest(self, view, path, column, *args):
-        iter = self.model.get_iter(path)
+        iter = self.filteredModel.get_iter(path)
         self.selection.select_iter(iter)
         self.viewTestAtIter(iter)
     def viewTestAtIter(self, iter):
-        test = self.model.get_value(iter, 2)
+        test = self.filteredModel.get_value(iter, 2)
         guilog.info("Viewing test " + repr(test))
         if test.classId() == "test-case":
             self.checkUpToDate(test)
@@ -563,7 +663,14 @@ class TextTestGUI(ThreadedResponder):
                 # Not present for fast reconnect, don't crash...
                 cmpAction.setUpApplication(test.app)
                 cmpAction(test)
-    
+    def reFilter(self):
+        self.filteredModel.refilter()
+        self.selectionChanged(self.selection, False)
+        rootIter = self.filteredModel.get_iter_root()
+        while rootIter != None:
+            self.expandRow(rootIter, True)
+            rootIter = self.filteredModel.iter_next(rootIter)
+   
 class InteractiveActionGUI:
     def __init__(self, actions, status, test = None):
         self.actions = actions
@@ -730,12 +837,13 @@ class InteractiveActionGUI:
             self.status.output(message)
 
 class SelectionActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, selection, status):
+    def __init__(self, actions, selection, status, filteredModel):
         InteractiveActionGUI.__init__(self, actions, status)
         self.selection = selection
         self.lastSelectionTests = []
         self.lastSelectionCmd = ""
         self.itermap = {}
+        self.filteredModel = filteredModel
     def addNewTest(self, test, iter):
         if not self.itermap.has_key(test.app):
             self.itermap[test.app] = {}
@@ -773,7 +881,7 @@ class SelectionActionGUI(InteractiveActionGUI):
         self.selection.unselect_all()
         for test in self.lastSelectionTests:
             iter = self.itermap[test.app][test]
-            self.selection.select_iter(iter)
+            self.selection.select_iter(self.filteredModel.convert_child_iter_to_iter(iter))
         self.selection.get_tree_view().grab_focus()
         first = self.getFirstSelectedTest()
         if first != None:
@@ -1345,7 +1453,8 @@ class GUIStatusMonitor:
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor:
-    def __init__(self, totalNofTests, applications, status, colors):
+    def __init__(self, totalNofTests, applications, status, colors, mainGUI):
+        self.mainGUI = mainGUI
         # If we get here, we know that we want to show progress
         self.completedTests = {}
         self.testToIter = {}
@@ -1385,10 +1494,16 @@ class TestProgressMonitor:
         self.customCrashTypes = {}
         self.customCrashMessages = {}
         showView = False
+        self.hideNonStartedTests = False
+        self.hideEmptySuites = False
         for app in applications:
             testProgressOptions = app.getConfigValue("test_progress")
             if testProgressOptions.has_key("show") and testProgressOptions["show"][0] == "1":
                 showView = True
+            if testProgressOptions.has_key("hide_non_started") and testProgressOptions["hide_non_started"][0] == "1":
+                self.hideNonStartedTests = True
+            if testProgressOptions.has_key("hide_empty_suites") and testProgressOptions["hide_empty_suites"][0] == "1":
+                self.hideEmptySuites = True
             if testProgressOptions.has_key("custom_errors"):
                 for t in testProgressOptions["custom_errors"]:
                     self.collectTypeAndMessage(t, self.customErrorTypes, self.customErrorMessages)
@@ -1401,6 +1516,12 @@ class TestProgressMonitor:
 
         self.colors = colors
         self.setupTreeView(showView)
+
+        # Set default values
+        iter = self.treeModel.get_iter_root()
+        while (iter != None):            
+            self.setDefaultValues(iter, applications)
+            iter = self.treeModel.iter_next(iter)
 
     def collectTypeAndMessage(self, typeAndMessage, types, messages):
         # typeAndMessage _might_ be of the form 'type{message}', or
@@ -1593,21 +1714,26 @@ class TestProgressMonitor:
         self.killedIter      = self.treeModel.append(self.unrunnableIter, ["Killed", 0, 1])
 
         self.treeView = gtk.TreeView(self.treeModel)
-        self.treeView.get_selection().set_mode(gtk.SELECTION_NONE)
+        self.selection = self.treeView.get_selection()
+        self.selection.set_mode(gtk.SELECTION_MULTIPLE)
+        self.selection.connect("changed", self.selectionChanged)
         textRenderer = gtk.CellRendererText()
+        numberRenderer = gtk.CellRendererText()
+        numberRenderer.set_property('xalign', 1)
         statusColumn = gtk.TreeViewColumn("Status", textRenderer, text=0)
-        numberColumn = gtk.TreeViewColumn("Number", textRenderer, text=1)
+        numberColumn = gtk.TreeViewColumn("Number", numberRenderer, text=1)
         statusColumn.set_cell_data_func(textRenderer, self.renderPositive)
-        numberColumn.set_cell_data_func(textRenderer, self.renderPositive)
+        numberColumn.set_cell_data_func(numberRenderer, self.renderPositive)
         self.treeView.append_column(statusColumn)
         self.treeView.append_column(numberColumn)
         toggle = gtk.CellRendererToggle()
-        toggle.set_active(False) # For now, disable toggling
-        if gtk.pygtk_version[0] >= 2 and gtk.pygtk_version[1] >= 6: # This probably looks nicer ...
-            toggle.set_property('sensitive', False)
-        #toggle.set_property('activatable', True)
-        #toggle.connect('toggled', self.showToggled)
-        #self.treeView.append_column(gtk.TreeViewColumn("Show", toggle, active=2)) # Don't show this column until the checkboxes are clickable.
+        toggle.set_property('activatable', True)
+        indexer = TreeModelIndexer(self.treeModel, statusColumn, 0)
+        scriptEngine.connect("toggle progress report category ", "toggled", toggle, self.showToggled, indexer)
+        scriptEngine.monitor("set progress report filter selection to", self.selection, indexer)
+        toggleColumn = gtk.TreeViewColumn("Visible", toggle, active=2)
+        toggleColumn.set_alignment(0.5)
+        self.treeView.append_column(toggleColumn)
         self.treeView.expand_all()
 
         if showView:
@@ -1615,8 +1741,83 @@ class TestProgressMonitor:
             self.progressReport.pack_start(self.treeView, expand=True, fill=True)
             self.progressReport.show_all()
         else:
-            self.progressReport = None
-        
+            self.progressReport = None        
+
+    # Set default values for all toggle buttons in the TreeView, based
+    # on the config files.
+    def setDefaultValues(self, iter, applications):
+        # Check config files
+        parents = self.getPath(iter)
+        option = "hide_" + self.formatAsOption(parents + self.treeModel.get_value(iter, 0))
+        for app in applications:
+            testProgressOptions = app.getConfigValue("test_progress")
+            if testProgressOptions.has_key(option):
+                if testProgressOptions[option][0] == "1":
+                    guilog.info("Configuration says: Do not show tests in category " + self.treeModel.get_value(iter, 0))
+                    # Only toggle to off
+                    if self.treeModel.get_value(iter, 2) == 1:
+                        self.showToggled(None, self.tupleToString(self.treeModel.get_path(iter)))
+                else:
+                    guilog.info("Configuration says: Show tests in category " + self.treeModel.get_value(iter, 0))
+                    # Only toggle to on
+                    if self.treeModel.get_value(iter, 2) == 0:
+                        self.showToggled(None, self.tupleToString(self.treeModel.get_path(iter)))
+
+        # Set for all children
+        iter = self.treeModel.iter_children(iter)
+        while (iter != None):
+            self.setDefaultValues(iter, applications)
+            iter = self.treeModel.iter_next(iter)
+
+    # Transforms path in the annoying list format (1,2) to
+    # colon separated string format 1:2, as there seems to
+    # be some inconsistency in pygtk about the format
+    # (gtk.TreeModel.get_path returns list, but
+    # gtk.TreeModel.get_iter_from_string needs string, and
+    # chokes on list. And there doesn't seem to be any
+    # internal conversion between the two ...)
+    def tupleToString(self, path):
+        strPath = ""
+        for i in xrange(0, len(path)):
+            strPath += str(path[i])
+            if i < len(path) - 1:
+                strPath += ":"
+        return strPath
+
+    # Format as a config option: Change to lowercase
+    # letters, exchange spaces for _
+    def formatAsOption(self, s):
+        return s.replace(" ", "_").lower()
+
+    # Get the path as '<root>/<child>/<child>/'
+    def getPath(self, iter):
+        path = ""
+        parent = self.treeModel.iter_parent(iter)
+        while (parent != None):
+            path = (self.treeModel.get_value(parent, 0) + "/") + path
+            parent = self.treeModel.iter_parent(parent)
+        return path
+
+    def selectionChanged(self, selection):
+        # For each selected row, select the corresponding rows in the test treeview
+        self.mainGUI.selection.unselect_all()
+        self.selection.selected_foreach(self.selectCorrespondingTests)
+
+    def selectCorrespondingTests(self, treemodel, path, iter):
+        guilog.info("Selecting all tests in category " + treemodel.get_value(iter, 0))
+        for test, testIter in self.testToIter.iteritems():
+            it = testIter
+            while (it != None):                
+                if treemodel.get_path(it) == path:
+                    try:
+                        realIter = self.mainGUI.filteredModel.convert_child_iter_to_iter(self.mainGUI.itermap[test])
+                        self.mainGUI.selection.select_iter(realIter)
+                    except:
+                        pass
+                    it = None
+                else:
+                    it = treemodel.iter_parent(it)
+    
     def notifyChange(self, test, state):
         if state.isComplete():
             if self.completedTests.has_key(test):
@@ -1647,6 +1848,10 @@ class TestProgressMonitor:
         if self.nofRunningTests < 0:
             self.nofRunningTests = 0
 
+        # Set visibility depending on the state of the category toggle button
+        iter = self.mainGUI.itermap[test]
+        self.setVisibility(self.mainGUI.model, self.mainGUI.model.get_path(iter), iter)
+                
         self.treeModel.set_value(self.pendIter, 1, self.nofPendingTests)
         self.treeModel.set_value(self.runIter, 1, self.nofRunningTests)
         self.treeModel.set_value(self.successIter, 1, self.nofSuccessfulTests)
@@ -1702,25 +1907,7 @@ class TestProgressMonitor:
             depth = depth + 1
             parent = self.treeModel.iter_parent(parent)
         return depth
-
-    def showRow(self, model, iter):
-        test = model.get_value(iter, 2)        
-        if test.classId() == "test-suite":
-            return True
-        elif test.classId() == "test-case":
-            # In what category (iter) does the test get caught?
-            if self.testToIter.has_key(test):
-                statusIter = self.testToIter[test]
-                # Is column 2 checked?
-                if self.treeModel.get_value(statusIter, 2) == 1:
-                    return True
-                else:
-                    return False
-            else:
-                return True
-        else:
-            return True
-    
+   
     def renderPositive(self, column, cell, model, iter):
         if model.get_value(iter, 1) > 0:
             cell.set_property('font', 'bold')
@@ -1736,12 +1923,20 @@ class TestProgressMonitor:
             cell.set_property('font', '')
             cell.set_property('background', 'white')
 
-    def showToggled(self, cell, path):
+    def showToggled(self, cellrenderer, path):
+        # Toggle the toggle button
         self.treeModel[path][2] = not self.treeModel[path][2]
-        childIters = []
-        childIter = self.treeModel.iter_children(self.treeModel.get_iter_from_string(path))
 
-        # Put all children in list to be treated
+        # Print some gui log info
+        iter = self.treeModel.get_iter_from_string(path)
+        if self.treeModel.get_value(iter, 2) == 1:
+            guilog.info("Selecting to show tests in the '" + self.treeModel.get_value(iter, 0) + "' category.")
+        else:
+            guilog.info("Selecting not to show tests in the '" + self.treeModel.get_value(iter, 0) + "' category.")
+
+        # Toggle all children too
+        childIters = []
+        childIter = self.treeModel.iter_children(iter)
         while childIter != None:
             childIters.append(childIter)
             childIter = self.treeModel.iter_next(childIter)
@@ -1759,5 +1954,78 @@ class TestProgressMonitor:
             self.treeModel.set_value(childIter, 2, self.treeModel[path][2])
             childIters = childIters[1:len(childIters)]
 
+        # Now, re-filter the main treeview to be consistent with
+        # the chosen progress report options.        
+        self.reFilter()
+        
+    # Refilter according to the new toggle states. Loop over all tests,
+    # find iter, check if iter column 2 is checked. Finally, send along
+    # to main GUI for treeview updating.
+    def reFilter(self):
+        self.mainGUI.model.foreach(self.setVisibility)
+        self.mainGUI.reFilter()
+
+    # Don't use path, it can be None (when called from notifyChange above)
+    # To decide whether to show suites by checking all children, and proceed
+    # recursively ...
+    def setVisibility(self, model, path, iter):
+        test = model.get_value(iter, 2)
+        type = test.classId()
+        if type == "test-case":
+            oldValue = model.get_value(iter, 6)
+            newValue = not self.hideNonStartedTests
+            try:
+                newValue = self.treeModel.get_value(self.testToIter[test], 2)
+            except:
+                pass
+            if oldValue != newValue:
+                if newValue:
+                    self.makePathVisible(model, iter)
+                else:
+                    guilog.info("Progress report filter: Not showing test " + repr(test) + " in state " + repr(test.state))
+                    self.checkAndHidePath(model, iter)
+            model.set_value(iter, 6, newValue)
+
+    # Make the entire path from the root to iter visible
+    def makePathVisible(self, model, iter):
+        parents = []
+        if (self.hideEmptySuites):
+            parent = model.iter_parent(iter)
+            while (parent != None):
+                if model.get_value(parent, 6) != True:
+                    parents.append(parent)                    
+                parent = model.iter_parent(parent)
+
+        for i in xrange(len(parents) - 1, -1, -1):
+            model.set_value(parents[i], 6, True)
+
+
+    # iter has been hidden - check iter's parent whether
+    # all its parents are invisible, if so hide self and
+    # proceed recursively upwards.
+    def checkAndHidePath(self, model, iter):
+        parent = model.iter_parent(iter)
+        # Don't hide root. (double check in case
+        # we've already reached root)
+        if parent == None or \
+               model.iter_parent(parent) == None or \
+               not self.hideEmptySuites:
+            return
+
+        # Any visible children?
+        visibleChild = False
+        child = model.iter_children(parent)
+        while (child != None):
+            if model.get_path(child) != model.get_path(iter) and model.get_value(child, 6) == True:
+                visibleChild = True
+                break
+            child = model.iter_next(child)
+
+        # If no visible children, hide and proceed upwards
+        if not visibleChild:
+            if model.get_value(parent, 6) != False:
+                model.set_value(parent, 6, False)
+                self.checkAndHidePath(model, parent)
+                    
     def getProgressView(self):
        return self.progressReport

@@ -353,7 +353,13 @@ class TextTestGUI(ThreadedResponder):
         # rows being added to the original model - the AddUsers
         # test crashed/produced a gtk warning before I added
         # this if statement (for the dynamic GUI we never add rows)
-        if self.dynamic:
+        showProgressReport = False
+        for suite in self.rootSuites:
+            if suite.app.getConfigValue("test_progress").has_key("show") and \
+                   suite.app.getConfigValue("test_progress")["show"][0] == "1":
+                showProgressReport = True
+                break
+        if self.dynamic and showProgressReport:
             self.filteredModel.set_visible_column(6)
         self.treeView = gtk.TreeView(self.filteredModel)
         self.selection = self.treeView.get_selection()

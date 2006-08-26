@@ -117,7 +117,10 @@ class CommandLineTraffic(InTraffic):
         if len(envDict) == 0:
             return "", ""
         realStr, recStr = "env ", "env "
-        for var, value in envDict.items():
+        envVars = envDict.keys()
+        envVars.sort()
+        for var in envVars:
+            value = envDict[var]
             line = "'" + var + "=" + value + "' "
             realStr += line
             oldVal = self.origEnviron.get(var)

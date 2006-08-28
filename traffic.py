@@ -105,7 +105,11 @@ class CommandLineTraffic(InTraffic):
         InTraffic.__init__(self, text, responseFile)
     def findDifferences(self, cmdEnviron):
         diffs = {}
-        toIgnore = [ "SHLVL", "_", "PWD", "DISPLAY" ]
+        # ignore TextTest's own variables (which aren't used by the slave anyway)
+        # and various shell things
+        toIgnore = [ "SHLVL", "_", "PWD", "DISPLAY", \
+                     "QUEUE_SYSTEM_RESOURCE", "QUEUE_SYSTEM_PROCESSES", "QUEUE_SYSTEM_SUBMIT_ARGS",
+                     "TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME" ]
         for var, value in cmdEnviron.items():
             if var in toIgnore:
                 continue

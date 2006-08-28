@@ -25,10 +25,13 @@ if __name__ == "__main__":
     response = sock.recv(1000000, socket.MSG_WAITALL)
     sock.close()
     try:
-        stdout, stderr = response.split("|TT_STDOUT_STDERR|")
+        stdout, stderr, exitStr = response.split("|TT_CMD_SEP|")
         sys.stdout.write(stdout)
         sys.stderr.write(stderr)
-        sys.exit(0)
+        exitCode = int(exitStr)
+        if os.name == "posix":
+            exitCode = os.WEXITSTATUS(exitCode)
+        sys.exit(exitCode)
     except ValueError:
-        sys.stderr.write("Received unexpected communication from MIM server: " + response)
+        sys.stderr.write("Received unexpected communication from MIM server:\n " + response + "\n\n")
 

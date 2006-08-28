@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, string, sys, plugins, shutil, sys, socket
+import os, string, sys, plugins, shutil, sys, socket, tempfile
 from copy import deepcopy
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
@@ -56,11 +56,10 @@ class Traffic:
     def __init__(self, text, responseFile):
         self.text = text
         self.responseFile = responseFile
+    def hasInfo(self):
+        return len(self.text) > 0
     def getDescription(self):
-        if len(self.text):
-            return self.direction + self.typeId + ":" + self.text
-        else:
-            return ""
+        return self.direction + self.typeId + ":" + self.text
     def forwardToDestination(self):
         if self.responseFile:
             self.responseFile.write(self.text)
@@ -144,12 +143,19 @@ class CommandLineTraffic(InTraffic):
         if realCmd:
             realCmdLine = self.envStr + realCmd + " " + self.argStr
             TrafficServer.instance.diag.info("Executing real command : " + realCmdLine)
-            cin, cout, cerr = os.popen3(realCmdLine)
-            return self.makeResponse(cout.read(), cerr.read())
+            fd, coutFile = tempfile.mkstemp()
+            fd, cerrFile = tempfile.mkstemp()
+            exitCode = os.system(realCmdLine + " > " + coutFile + " 2> " + cerrFile)
+            output = open(coutFile).read()
+            errors = open(cerrFile).read()
+            os.remove(coutFile)
+            os.remove(cerrFile)
+            return self.makeResponse(output, errors, exitCode)
         else:
-            return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH")
-    def makeResponse(self, output, errors):
-        return [ StdoutTraffic(output, self.responseFile), StderrTraffic(errors, self.responseFile) ]
+            return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH", 256)
+    def makeResponse(self, output, errors, exitCode):
+        return [ StdoutTraffic(output, self.responseFile), StderrTraffic(errors, self.responseFile), \
+                 SysExitTraffic(str(exitCode), self.responseFile) ]
     def findRealCommand(self):
         # If we found a link already, use that, otherwise look on the path
         if self.realCommands.has_key(self.commandName):
@@ -167,7 +173,9 @@ class CommandLineTraffic(InTraffic):
             trafficList.insert(0, StdoutTraffic("", self.responseFile))
         if len(trafficList) == 1 or not isinstance(trafficList[1], StderrTraffic):
             trafficList.insert(1, StderrTraffic("", self.responseFile))
-        for extraTraffic in trafficList[2:]:
+        if len(trafficList) == 2 or not isinstance(trafficList[2], SysExitTraffic):
+            trafficList.insert(2, SysExitTraffic("0", self.responseFile))
+        for extraTraffic in trafficList[3:]:
             extraTraffic.responseFile = None
         return trafficList
                                
@@ -175,11 +183,20 @@ class StdoutTraffic(ResponseTraffic):
     typeId = "OUT"
     def forwardToDestination(self):
         if self.responseFile:
-            self.responseFile.write(self.text + "|TT_STDOUT_STDERR|")
+            self.responseFile.write(self.text + "|TT_CMD_SEP|")
         return []
 
 class StderrTraffic(ResponseTraffic):
     typeId = "ERR"
+    def forwardToDestination(self):
+        if self.responseFile:
+            self.responseFile.write(self.text + "|TT_CMD_SEP|")
+        return []
+
+class SysExitTraffic(ResponseTraffic):
+    typeId = "EXC"
+    def hasInfo(self):
+        return self.text != "0"
 
 class ClientSocketTraffic(ResponseTraffic):
     destination = None
@@ -274,9 +291,9 @@ class TrafficServer(TCPServer):
             for chainResponse in response.forwardToDestination():
                 self.process(chainResponse)
     def record(self, traffic):
-        desc = traffic.getDescription()
-        if len(desc) == 0:
+        if not traffic.hasInfo():
             return
+        desc = traffic.getDescription()
         if not desc.endswith(os.linesep):
             desc += os.linesep
         self.diag.info("Recording " + repr(traffic.__class__) + " " + desc)
@@ -291,9 +308,9 @@ class TrafficServer(TCPServer):
     def readReplayResponses(self, traffic):
         # We return the response matching the traffic in if we can, otherwise just one after the last one
         # assuming a match
-        desc = traffic.getDescription()
-        if len(desc) == 0:
+        if not traffic.hasInfo():
             return []
+        desc = traffic.getDescription()
         if self.replayInfo.has_key(desc):
             descIndex = self.replayInfo.keys().index(desc)
             if self.replayIndex < descIndex:
@@ -313,7 +330,7 @@ class TrafficServer(TCPServer):
         responses = []
         for trafficStr in trafficStrings:
             trafficType = trafficStr[2:5]
-            allClasses = [ ClientSocketTraffic, StdoutTraffic, StderrTraffic ]
+            allClasses = [ ClientSocketTraffic, StdoutTraffic, StderrTraffic, SysExitTraffic ]
             for trafficClass in allClasses:
                 if trafficClass.typeId == trafficType:
                     responses.append(trafficClass(trafficStr[6:], traffic.responseFile))

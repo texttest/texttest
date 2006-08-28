@@ -81,7 +81,8 @@ class ServerStateTraffic(ServerTraffic):
     def __init__(self, inText, responseFile):
         InTraffic.__init__(self, inText, responseFile)
         if not ClientSocketTraffic.destination:
-            host, port = inText.strip().split(":")
+            lastWord = inText.strip().split()[-1]
+            host, port = lastWord.split(":")
             ClientSocketTraffic.destination = host, int(port)
     def forwardToDestination(self):
         return []
@@ -229,7 +230,6 @@ class TrafficServer(TCPServer):
     def __init__(self):
         self.recordFile = None
         self.replayInfo = seqdict()
-        self.replayIndex = -1
         self.diag = plugins.getDiagnostics("Traffic Server")
         TrafficServer.instance = self
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
@@ -257,20 +257,19 @@ class TrafficServer(TCPServer):
             os.environ["TEXTTEST_MIM_SERVER"] = ""
         CommandLineTraffic.origEnviron = deepcopy(os.environ)
     def readReplayFile(self, replayFile):
-        self.replayIndex = -1
         self.replayInfo = seqdict()
         trafficList = self.readIntoList(replayFile)
-        currTrafficIn = ""
+        currResponseHandler = None
         for trafficStr in trafficList:
             if trafficStr.startswith("<-"):
+                if currResponseHandler:
+                    currResponseHandler.endResponse()
                 currTrafficIn = trafficStr.strip()
-                # We can get the same question more than once. If so, store it separately
-                # and rely on the index to get us through...
-                while self.replayInfo.has_key(currTrafficIn):
-                    currTrafficIn = "*" + currTrafficIn 
-                self.replayInfo[currTrafficIn] = []
+                if not self.replayInfo.has_key(currTrafficIn):
+                    self.replayInfo[currTrafficIn] = ReplayedResponseHandler()
+                currResponseHandler = self.replayInfo[currTrafficIn]
             else:
-                self.replayInfo[currTrafficIn].append(trafficStr)
+                currResponseHandler.addResponse(trafficStr)
         self.diag.info("Replay info " + repr(self.replayInfo))
     def readIntoList(self, replayFile):
         trafficList = []
@@ -306,27 +305,62 @@ class TrafficServer(TCPServer):
         else:
             return traffic.forwardToDestination()
     def readReplayResponses(self, traffic):
-        # We return the response matching the traffic in if we can, otherwise just one after the last one
-        # assuming a match
+        # We return the response matching the traffic in if we can, otherwise
+        # the one that is most similar to it
         if not traffic.hasInfo():
             return []
         desc = traffic.getDescription()
+        bestMatchKey = self.findBestMatch(desc)
+        return self.replayInfo[bestMatchKey].makeResponses(traffic)
+    def findBestMatch(self, desc):
         if self.replayInfo.has_key(desc):
-            descIndex = self.replayInfo.keys().index(desc)
-            if self.replayIndex < descIndex:
-                self.replayIndex = descIndex
-                return self.parseResponses(self.replayInfo[desc], traffic)
-
-        # If we can't find an exact match in the "future", just pull the next response off the list
-        self.replayIndex += 1
-        self.diag.info("Increased replay index to " + repr(self.replayIndex))
-        if self.replayIndex < len(self.replayInfo.keys()):
-            key = self.replayInfo.keys()[self.replayIndex]
-            return self.parseResponses(self.replayInfo[key], traffic)
+            return desc
+        bestMatchPerc, bestMatch = 0.0, None
+        for key in self.replayInfo.keys():
+            matchPerc = self.findMatchPercentage(key, desc)
+            if matchPerc > bestMatchPerc:
+                bestMatchPerc, bestMatch = matchPerc, key
+        if bestMatch is not None:
+            return bestMatch
         else:
-            sys.stderr.write("WARNING: Received more requests than are recorded, could not respond sensibly!\n" + desc)
+            sys.stderr.write("WARNING : could not find any sensible match for following traffic :\n" + desc + "\n")
+            return self.replayInfo.keys()[0]
+    def findMatchPercentage(self, traffic1, traffic2):
+        words1 = traffic1.split()
+        words2 = traffic2.split()
+        matches = 0
+        for word in words1:
+            if word in words2:
+                matches += 1
+        nomatches = len(words1) + len(words2) - (2 * matches)
+        return 100.0 * float(matches) / float(nomatches + matches)
+
+# Need to handle multiple replies to the same question
+class ReplayedResponseHandler:
+    def __init__(self):
+        self.currIndex = 0
+        self.readIndex = 0
+        self.responses = []
+    def __repr__(self):
+        return repr(self.responses)
+    def endResponse(self):
+        self.readIndex += 1
+    def addResponse(self, trafficStr):
+        if len(self.responses) <= self.readIndex:
+            self.responses.append([])
+        self.responses[self.readIndex].append(trafficStr)
+    def getCurrentStrings(self):
+        if len(self.responses) == 0:
             return []
-    def parseResponses(self, trafficStrings, traffic):
+        if self.currIndex < len(self.responses):
+            currStrings = self.responses[self.currIndex]
+            self.currIndex += 1
+        else:
+            currStrings = self.responses[0]
+            self.currIndex = 1
+        return currStrings
+    def makeResponses(self, traffic):
+        trafficStrings = self.getCurrentStrings()
         responses = []
         for trafficStr in trafficStrings:
             trafficType = trafficStr[2:5]

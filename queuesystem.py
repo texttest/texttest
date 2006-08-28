@@ -280,7 +280,7 @@ class SlaveServer(TCPServer):
         self.testMap = {}
         self.testClientInfo = {}
         self.diag = plugins.getDiagnostics("Slave Server")
-        sendServerState(self.getAddress())
+        sendServerState("TextTest slave server started on " + self.getAddress())
     def getAddress(self):
         host, port = self.socket.getsockname()
         return host + ":" + str(port)

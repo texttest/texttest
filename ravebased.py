@@ -214,8 +214,6 @@ class Config(CarmenConfig):
     def getRealRuleActions(self):
         filterer = self.getRuleBuildFilterer()
         if self.useQueueSystem():
-            # If building rulesets remotely, don't distribute them further...
-            os.environ["_AUTOTEST__LOCAL_COMPILE_"] = "1"
             submitter = SubmitRuleCompilations(self.getRaveSubmissionRules, self.optionMap)
             waiter = WaitForRuleCompile(self.getRuleSetName)
             return [ filterer, submitter, waiter ]
@@ -432,6 +430,9 @@ class SetBuildRequired(plugins.Action):
         self.getRuleSetName = getRuleSetName
     def __call__(self, test):
         test.changeState(NeedRuleCompilation(self.getRuleSetName(test)))
+    def setUpApplication(self, app):
+        # If building rulesets remotely, don't distribute them further...
+        os.environ["_AUTOTEST__LOCAL_COMPILE_"] = "1"
 
 class FilterRuleBuilds(plugins.Action):
     rulesCompiled = {}

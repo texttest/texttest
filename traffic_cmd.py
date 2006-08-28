@@ -27,7 +27,9 @@ if __name__ == "__main__":
     try:
         stdout, stderr, exitStr = response.split("|TT_CMD_SEP|")
         sys.stdout.write(stdout)
+        sys.stdout.flush()
         sys.stderr.write(stderr)
+        sys.stderr.flush()
         exitCode = int(exitStr)
         if os.name == "posix":
             exitCode = os.WEXITSTATUS(exitCode)

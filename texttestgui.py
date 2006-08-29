@@ -203,10 +203,10 @@ class TextTestGUI(ThreadedResponder):
             topWindow.resize(width, height)
         self.rightWindowGUI.notifySizeChange(topWindow.get_size()[0], topWindow.get_size()[1], self.getConfigValue("window_size"))
         verticalPanePosition = 0.5
-        if self.dynamic and self.getConfigValue("window_size").has_key("dynamic_vertical_pane_position"):
-            verticalPanePosition = float(self.getConfigValue("window_size")["dynamic_vertical_pane_position"][0])
-        elif not self.dynamic and self.getConfigValue("window_size").has_key("static_vertical_pane_position"):
-            verticalPanePosition = float(self.getConfigValue("window_size")["static_vertical_pane_position"][0])
+        if self.dynamic and self.getConfigValue("window_size").has_key("dynamic_vertical_separator_position"):
+            verticalPanePosition = float(self.getConfigValue("window_size")["dynamic_vertical_separator_position"][0])
+        elif not self.dynamic and self.getConfigValue("window_size").has_key("static_vertical_separator_position"):
+            verticalPanePosition = float(self.getConfigValue("window_size")["static_vertical_separator_position"][0])
         self.contents.set_position(int(self.contents.allocation.width * verticalPanePosition))
     def getConfigValue(self, configName):
         return self.rootSuites[0].app.getConfigValue(configName)
@@ -954,10 +954,10 @@ class RightWindowGUI:
         return dict
     def notifySizeChange(self, width, height, options):
         horizontalPanePosition = 0.46
-        if self.dynamic and options.has_key("dynamic_horizontal_pane_position"):
-            horizontalPanePosition = float(options["dynamic_horizontal_pane_position"][0])
-        elif not self.dynamic and options.has_key("static_horizontal_pane_position"):
-            horizontalPanePosition = float(options["static_horizontal_pane_position"][0])
+        if self.dynamic and options.has_key("dynamic_horizontal_separator_position"):
+            horizontalPanePosition = float(options["dynamic_horizontal_separator_position"][0])
+        elif not self.dynamic and options.has_key("static_horizontal_separator_position"):
+            horizontalPanePosition = float(options["static_horizontal_separator_position"][0])
 
         self.vpaned.set_position(int(self.vpaned.allocation.height * horizontalPanePosition))        
     def notifyChange(self, object):

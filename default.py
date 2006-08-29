@@ -1492,11 +1492,11 @@ class UNIXPerformanceInfoFinder:
         realTime = None
         for line in file.readlines():
             self.diag.info("Parsing line " + line.strip())
-            if line.startswith("user"):
+            if line.startswith("user") or line.startswith("User"):
                 cpuTime = self.parseUnixTime(line)
-            if self.includeSystemTime and line.startswith("sys"):
+            if self.includeSystemTime and (line.startswith("sys") or line.startswith("Sys")):
                 cpuTime = cpuTime + self.parseUnixTime(line)
-            if line.startswith("real"):
+            if line.startswith("real") or line.startswith("Real"):
                 realTime = self.parseUnixTime(line)
         return cpuTime, realTime
     def parseUnixTime(self, line):

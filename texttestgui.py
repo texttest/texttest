@@ -194,12 +194,20 @@ class TextTestGUI(ThreadedResponder):
             vbox.pack_start(self.status.createStatusbar(), expand=False, fill=False)
         vbox.show()
         topWindow.add(vbox)
-        topWindow.show()
-        width = self.getWindowWidth()
-        height = self.getWindowHeight()
-        topWindow.resize(width, height)
-        self.contents.set_position(int(self.contents.allocation.width / 2))
-        self.rightWindowGUI.notifySizeChange(width, height)
+        topWindow.show()        
+        if (self.dynamic and self.getConfigValue("window_size").has_key("dynamic_maximize") and self.getConfigValue("window_size")["dynamic_maximize"][0] == "1") or (not self.dynamic and self.getConfigValue("window_size").has_key("static_maximize") and self.getConfigValue("window_size")["static_maximize"][0] == "1"):
+            topWindow.maximize()
+        else:
+            width = self.getWindowWidth()
+            height = self.getWindowHeight()
+            topWindow.resize(width, height)
+        self.rightWindowGUI.notifySizeChange(topWindow.get_size()[0], topWindow.get_size()[1], self.getConfigValue("window_size"))
+        verticalPanePosition = 0.5
+        if self.dynamic and self.getConfigValue("window_size").has_key("dynamic_vertical_pane_position"):
+            verticalPanePosition = float(self.getConfigValue("window_size")["dynamic_vertical_pane_position"][0])
+        elif not self.dynamic and self.getConfigValue("window_size").has_key("static_vertical_pane_position"):
+            verticalPanePosition = float(self.getConfigValue("window_size")["static_vertical_pane_position"][0])
+        self.contents.set_position(int(self.contents.allocation.width * verticalPanePosition))
     def getConfigValue(self, configName):
         return self.rootSuites[0].app.getConfigValue(configName)
     def getWindowHeight(self):
@@ -944,8 +952,14 @@ class RightWindowGUI:
         for page, name in objectPages:
             dict[name] = page
         return dict
-    def notifySizeChange(self, width, height):
-        self.vpaned.set_position(int(self.vpaned.allocation.height * 0.46))        
+    def notifySizeChange(self, width, height, options):
+        horizontalPanePosition = 0.46
+        if self.dynamic and options.has_key("dynamic_horizontal_pane_position"):
+            horizontalPanePosition = float(options["dynamic_horizontal_pane_position"][0])
+        elif not self.dynamic and options.has_key("static_horizontal_pane_position"):
+            horizontalPanePosition = float(options["static_horizontal_pane_position"][0])
+
+        self.vpaned.set_position(int(self.vpaned.allocation.height * horizontalPanePosition))        
     def notifyChange(self, object):
         # Test has changed state, regenerate if we're currently viewing it
         if self.currentObject is object:

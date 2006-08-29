@@ -287,8 +287,11 @@ class TextTestGUI(ThreadedResponder):
                    suite.app.getConfigValue("test_progress").has_key("hide_empty_suites") and \
                    suite.app.getConfigValue("test_progress")["hide_empty_suites"][0] == "1":
                 hideTest = True
+        elif suite.classId() == "test-case":
+            self.totalNofTests += 1                    
         if parent == None:
             hideTest = False
+            
         iter = self.model.insert_before(parent, None)
         nodeName = suite.name
         if parent == None:
@@ -366,7 +369,10 @@ class TextTestGUI(ThreadedResponder):
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         self.selection.connect("changed", self.selectionChanged)
         testRenderer = gtk.CellRendererText()
-        self.testsColumn = gtk.TreeViewColumn("Tests: 0 of " + str(self.totalNofTests) + " selected, all shown", testRenderer, text=0, background=1)
+        testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected"
+        if self.dynamic:
+            testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected, all visible"
+        self.testsColumn = gtk.TreeViewColumn(testsColumnTitle, testRenderer, text=0, background=1)
         self.testsColumn.set_cell_data_func(testRenderer, renderSuitesBold)
         self.treeView.append_column(self.testsColumn)
         if self.dynamic:
@@ -439,13 +445,14 @@ class TextTestGUI(ThreadedResponder):
         self.filteredModel.foreach(self.countAllShown)
         title = "Tests: "
         if self.nofSelectedTests == self.totalNofTests:
-            title += "All " + str(self.totalNofTests) + " selected, "
+            title += "All " + str(self.totalNofTests) + " selected"
         else:
-            title += str(self.nofSelectedTests) + "/" + str(self.totalNofTests) + " selected, "
-        if self.totalNofTestsShown == self.totalNofTests:
-            title += "all visible"
-        else:
-            title += str(self.totalNofTestsShown) + " visible"
+            title += str(self.nofSelectedTests) + "/" + str(self.totalNofTests) + " selected"
+        if self.dynamic:
+            if self.totalNofTestsShown == self.totalNofTests:
+                title += ", all visible"
+            else:
+                title += ", " + str(self.totalNofTestsShown) + " visible"
         self.testsColumn.set_title(title)
         if printToLog:
             guilog.info(str(self.nofSelectedTests) + " tests selected")

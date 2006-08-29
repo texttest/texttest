@@ -478,7 +478,7 @@ class TextTestGUI(ThreadedResponder):
         # Must be created after addSuiteWithParents has counted all tests ...
         # (but before RightWindowGUI, as that wants in on progress)
         if self.dynamic:            
-            self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.rootSuites, self.status, self.rootSuites[0].getConfigValue("test_colours"), self)
+            self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.rootSuites, self.rootSuites[0].getConfigValue("test_colours"), self)
             self.reFilter()
 
         self.rightWindowGUI = self.createDefaultRightGUI()
@@ -1459,8 +1459,8 @@ class GUIStatusMonitor:
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor:
-    def __init__(self, totalNofTests, applications, status, colors, mainGUI):
-        self.mainGUI = mainGUI
+    def __init__(self, totalNofTests, applications, colors, mainGUI):
+        self.mainGUI = mainGUI        
         # If we get here, we know that we want to show progress
         self.completedTests = {}
         self.testToIter = {}
@@ -1489,8 +1489,6 @@ class TestProgressMonitor:
         self.nofUnreportedBugsTests = 0
         self.nofKnownBugsTests = 0
         self.nofInternalErrorsTests = 0
-        
-        self.status = status
         
         # Read custom error types from configuration
         self.customErrorTypes = {}

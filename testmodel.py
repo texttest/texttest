@@ -565,7 +565,7 @@ class TestSuite(Test):
             return allFiles
         compulsoryExts = [ self.app.name ] + self.app.versions
         # Don't do this for extra versions, they appear anyway...
-        ignoreExts = self.app.getExtraVersions()
+        ignoreExts = self.app.getExtraVersions() + self.app.getExtraBaseVersions()
         self.diagnose("Finding test suite files, using all versions in " + repr(compulsoryExts) + " and none in " + repr(ignoreExts))
         for dircache in self.dircaches:
             for newFile in dircache.findAllFiles("testsuite", compulsoryExts, ignoreExts):
@@ -816,6 +816,16 @@ class Application:
             if extra in self.versions:
                 return []
         return extraVersions
+    def getExtraBaseVersions(self):
+        if not self.configObject.useExtraVersions():
+            return []
+
+        extraBases = []
+        for extra in self.extras:
+            for extraBase in extra.getConfigValue("base_version"):
+                if not extraBase in extraBases:
+                    extraBases.append(extraBase)
+        return extraBases
     def setConfigDefaults(self):
         self.setConfigDefault("binary", "", "Full path to the System Under Test")
         self.setConfigDefault("config_module", "default", "Configuration module to use")

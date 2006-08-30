@@ -396,9 +396,10 @@ class TextTestGUI(ThreadedResponder):
                 childIter = self.filteredModel.iter_next(childIter)            
         else:
             self.treeView.expand_all()
+            # This does not interact with TextTest at all, so don't bother to connect to PyUseCase
+            self.treeView.connect("row-expanded", self.expandFullSuite)
+        
         modelIndexer = TreeModelIndexer(self.filteredModel, self.testsColumn, 3)
-        # This does not interact with TextTest at all, so don't bother to connect to PyUseCase
-        self.treeView.connect("row-expanded", self.expandFullSuite)
         # The order of these two is vital!
         scriptEngine.connect("select test", "row_activated", self.treeView, self.viewTest, modelIndexer)
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)

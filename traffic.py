@@ -6,6 +6,13 @@ from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
 
+class MethodWrap:
+    def __init__(self, method, firstArg):
+        self.method = method
+        self.firstArg = firstArg
+    def __call__(self, arg):
+        return self.method(self.firstArg, arg)
+
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
         self.record = record
@@ -20,22 +27,23 @@ class SetUpTrafficHandlers(plugins.Action):
             self.makeIntercepts(test)
     def configureServer(self, test):
         recordFile = test.makeTmpFileName("traffic")
+        envVarMethod = MethodWrap(test.getCompositeConfigValue, "collect_traffic_environment")
         if self.record:
-            self.setServerState(recordFile, None)
+            self.setServerState(recordFile, None, envVarMethod)
             return True
         else:
             trafficReplay = test.getFileName("traffic")
             if trafficReplay:
-                self.setServerState(recordFile, trafficReplay)
+                self.setServerState(recordFile, trafficReplay, envVarMethod)
                 return True
             else:
-                self.setServerState(None, None)
+                self.setServerState(None, None, envVarMethod)
                 return False
-    def setServerState(self, recordFile, replayFile):
+    def setServerState(self, recordFile, replayFile, envVarMethod):
         if recordFile or replayFile and not TrafficServer.instance:
             TrafficServer.instance = TrafficServer()
         if TrafficServer.instance:
-            TrafficServer.instance.setState(recordFile, replayFile)
+            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod)
     def makeIntercepts(self, test):
         for cmd in test.getConfigValue("collect_traffic"):
             linkName = test.makeTmpFileName(cmd, forComparison=0)
@@ -89,42 +97,33 @@ class ServerStateTraffic(ServerTraffic):
             
 class CommandLineTraffic(InTraffic):
     typeId = "CMD"
+    envVarMethod = None
     origEnviron = {}
     realCommands = {}
     def __init__(self, inText, responseFile):
         cmdText, environText = inText.split(":SUT_ENVIRONMENT:")
-        exec "argv = " + cmdText
-        exec "cmdEnviron = " + environText
+        argv = eval(cmdText)
+        cmdEnviron = eval(environText)
         self.fullCommand = argv[0]
         self.commandName = os.path.basename(self.fullCommand)
         self.argStr = string.join(map(self.quote, argv[1:]))
-        self.envStr, recEnvStr = self.findDifferences(cmdEnviron)
+        self.envStr, recEnvStr = self.getEnvStrings(cmdEnviron)
         self.diag = plugins.getDiagnostics("Traffic Server")
         self.path = cmdEnviron.get("PATH")
         text = recEnvStr + self.commandName + " " + self.argStr
         InTraffic.__init__(self, text, responseFile)
-    def findDifferences(self, cmdEnviron):
-        diffs = {}
-        # ignore TextTest's own variables (which aren't used by the slave anyway)
-        # and various shell things
-        toIgnore = [ "SHLVL", "_", "PWD", "DISPLAY", \
-                     "QUEUE_SYSTEM_RESOURCE", "QUEUE_SYSTEM_PROCESSES", "QUEUE_SYSTEM_SUBMIT_ARGS",
-                     "TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME" ]
-        for var, value in cmdEnviron.items():
-            if var in toIgnore:
-                continue
-            oldVal = self.origEnviron.get(var)
-            if oldVal != value:
-                diffs[var] = value
-        return self.getEnvStrings(diffs)
-    def getEnvStrings(self, envDict):
-        if len(envDict) == 0:
+    def getEnvStrings(self, cmdEnviron):
+        interestingEnviron = []
+        for var in self.envVarMethod(self.commandName):
+            value = cmdEnviron.get(var)
+            if value is not None:
+                interestingEnviron.append((var, value))
+        return self.convertToEnvStrings(interestingEnviron)
+    def convertToEnvStrings(self, envVars):
+        if len(envVars) == 0:
             return "", ""
         realStr, recStr = "env ", "env "
-        envVars = envDict.keys()
-        envVars.sort()
-        for var in envVars:
-            value = envDict[var]
+        for var, value in envVars:
             line = "'" + var + "=" + value + "' "
             realStr += line
             oldVal = self.origEnviron.get(var)
@@ -245,7 +244,7 @@ class TrafficServer(TCPServer):
     def setRealVersion(self, command, realCommand):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
-    def setState(self, recordFile, replayFile):
+    def setState(self, recordFile, replayFile, envVarMethod):
         self.recordFile = recordFile
         if replayFile:
             self.readReplayFile(replayFile)
@@ -255,7 +254,9 @@ class TrafficServer(TCPServer):
             self.setAddressVariable()
         else:
             os.environ["TEXTTEST_MIM_SERVER"] = ""
+        CommandLineTraffic.envVarMethod = envVarMethod
         CommandLineTraffic.origEnviron = deepcopy(os.environ)
+        ClientSocketTraffic.destination = None
     def readReplayFile(self, replayFile):
         self.replayInfo = seqdict()
         trafficList = self.readIntoList(replayFile)

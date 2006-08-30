@@ -128,7 +128,7 @@ class CommandLineTraffic(InTraffic):
             realStr += line
             oldVal = self.origEnviron.get(var)
             recLine = line
-            if oldVal:
+            if oldVal and oldVal != value:
                 recLine = line.replace(oldVal, "$" + var)
             recStr += recLine
         return realStr, recStr

@@ -866,6 +866,7 @@ class SelectionActionGUI(InteractiveActionGUI):
         self.lastSelectionCmd = ""
         self.itermap = {}
         self.filteredModel = filteredModel
+        self.selectCollapsed = False
     def addNewTest(self, test, iter):
         if not self.itermap.has_key(test.app):
             self.itermap[test.app] = {}
@@ -879,6 +880,8 @@ class SelectionActionGUI(InteractiveActionGUI):
         # Selection with versions doesn't work from the command line right now, work around...
         if selTests == self.lastSelectionTests and self.lastSelectionCmd and self.lastSelectionCmd.find("-vs") == -1:
             selCmd = self.lastSelectionCmd
+        if isinstance(action, guiplugins.SelectTests):
+            self.selectCollapsed = action.optionGroup.getSwitchValue("select_in_collapsed_suites")
 
         self.status.output(action.messageBeforePerform(selTests, selCmd))
         returnVal = action.performOn(selTests, selCmd)
@@ -903,6 +906,8 @@ class SelectionActionGUI(InteractiveActionGUI):
         self.selection.unselect_all()
         for test in self.lastSelectionTests:
             iter = self.itermap[test.app][test]
+            if self.selectCollapsed:
+                self.selection.get_tree_view().expand_to_path(self.filteredModel.get_path(self.filteredModel.convert_child_iter_to_iter(iter)))
             self.selection.select_iter(self.filteredModel.convert_child_iter_to_iter(iter))
         self.selection.get_tree_view().grab_focus()
         first = self.getFirstSelectedTest()

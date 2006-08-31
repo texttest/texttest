@@ -557,7 +557,9 @@ class SelectTests(SelectionAction):
     def __init__(self, rootSuites, oldOptionGroups):
         SelectionAction.__init__(self, rootSuites, "Select Tests")
         self.addOption(oldOptionGroups, "vs", "Tests for version", self.apps[0].getFullVersion())
+        self.addSwitch(oldOptionGroups, "select_in_collapsed_suites", "Select in collapsed suites", 0)
         self.addSwitch(oldOptionGroups, "current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"])
+        
         self.appSelectGroup = self.findSelectGroup()
         self.optionGroup.options += self.appSelectGroup.options
         self.optionGroup.switches += self.appSelectGroup.switches

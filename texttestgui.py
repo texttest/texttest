@@ -654,7 +654,8 @@ class TextTestGUI(ThreadedResponder):
         oldSize = self.model.iter_n_children(suiteIter)
         if oldSize == 0 and len(suite.testcases) == 0:
             return
-
+        
+        self.selection.unselect_all()
         iter = self.model.iter_children(suiteIter)
         for i in range(oldSize):
             self.model.remove(iter)
@@ -666,7 +667,7 @@ class TextTestGUI(ThreadedResponder):
         self.updateNofTests()
         self.expandSuite(suiteIter)
         self.selectOnlyRow(suiteIter)
-    def removeIter(self, test):
+    def removeIter(self, test):        
         del self.itermap[test]
         self.selectionActionGUI.removeTest(test)
     def viewTest(self, view, path, column, *args):

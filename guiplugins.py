@@ -61,7 +61,10 @@ class InteractiveAction:
             self.optionGroup = plugins.OptionGroup(optionName, self.getConfigValue("gui_entry_overrides"), \
                                                    self.getConfigValue("gui_entry_options"))
     def __repr__(self):
-        return self.optionGroup.name
+        if self.optionGroup != None:
+            return self.optionGroup.name
+        else:
+            return self.getSecondaryTitle()
     def getConfigValue(self, entryName):
         pass
     def getOptionGroups(self):

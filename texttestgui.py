@@ -282,7 +282,6 @@ class TextTestGUI(ThreadedResponder):
     def addSuiteWithParent(self, suite, parent):
         hideTest = False
         if self.dynamic and suite.classId() == "test-case":
-            self.totalNofTests += 1        
             if suite.app.getConfigValue("test_progress").has_key("hide_non_started") and \
                    suite.app.getConfigValue("test_progress")["hide_non_started"][0] == "1":
                 hideTest = True
@@ -292,8 +291,6 @@ class TextTestGUI(ThreadedResponder):
                    suite.app.getConfigValue("test_progress").has_key("hide_empty_suites") and \
                    suite.app.getConfigValue("test_progress")["hide_empty_suites"][0] == "1":
                 hideTest = True
-        elif suite.classId() == "test-case":
-            self.totalNofTests += 1                    
         if parent == None:
             hideTest = False
             
@@ -455,7 +452,7 @@ class TextTestGUI(ThreadedResponder):
                 title += ", " + str(self.totalNofTestsShown) + " visible"
         self.testsColumn.set_title(title)
         if printToLog:
-            guilog.info(str(self.nofSelectedTests) + " tests selected")
+            guilog.info(title)
     def countSelected(self, model, path, iter):
         if model.get_value(iter, 2).classId() == "test-case":
             self.nofSelectedTests = self.nofSelectedTests + 1
@@ -481,6 +478,7 @@ class TextTestGUI(ThreadedResponder):
              
             iter = view.get_model().iter_next(iter)
     def setUpGui(self, actionThread=None):
+        self.updateNofTests()
         topWindow = self.createTopWindow()
         treeWindow = self.createTreeWindow()
         self.selectionActionGUI = self.createSelectionActionGUI(topWindow, actionThread)
@@ -496,6 +494,12 @@ class TextTestGUI(ThreadedResponder):
         self.rightWindowGUI = self.createDefaultRightGUI()
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
         treeWindow.grab_focus() # To avoid the Quit button getting the initial focus, causing unwanted quit event
+    def updateNofTests(self):
+        self.totalNofTests = 0
+        self.model.foreach(self.countTests)        
+    def countTests(self, model, path, iter, data=None):
+        if self.model.get_value(iter, 2).classId() == "test-case":
+            self.totalNofTests += 1
     def runWithActionThread(self, actionThread):
         self.setUpGui(actionThread)
         gobject.idle_add(self.pickUpChange)
@@ -659,6 +663,7 @@ class TextTestGUI(ThreadedResponder):
             self.removeIter(test)
             iter = self.addSuiteWithParent(test, suiteIter)
         self.createSubIterMap(suiteIter, newTest=0)
+        self.updateNofTests()
         self.expandSuite(suiteIter)
         self.selectOnlyRow(suiteIter)
     def removeIter(self, test):

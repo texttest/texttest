@@ -100,7 +100,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
     def __init__(self, optionMap, test, nightjob=False):
         CarmenSubmissionRules.__init__(self, optionMap, test)
         self.nightjob = nightjob
-        self.majRelResourceType = "carmrun"
+        self.majRelResourceType = "run"
     def findQueue(self):
         # Carmen's queues are all 'hidden', requesting them directly is not allowed.
         # They must be requested by their 'queue resources', that have the same names...
@@ -136,11 +136,11 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         if majRelease == "none":
             return ""
         else:
-            return self.majRelResourceType + majRelease + "=1"
+            return "carm" + self.majRelResourceType + majRelease + "=1"
     def findConcreteResources(self):
         # architecture resources
         resources = CarmenSubmissionRules.findResourceList(self)
-        resources.append("carmrunarch=\"*" + self.archToUse + "*\"")
+        resources.append("carmarch=\"*" + self.archToUse + "*\"")
         majRelResource = self.getMajorReleaseResource()
         if majRelResource:
             resources.append(majRelResource)

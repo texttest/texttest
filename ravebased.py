@@ -95,7 +95,7 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         # Ignore all command line options, but take account of environment etc...
         self.normalSubmissionRules.optionMap = {}
         self.normalSubmissionRules.presetPerfCategory = "short"
-        self.normalSubmissionRules.majRelResourceType = "ttrules"
+        self.normalSubmissionRules.majRelResourceType = "build"
         if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY_RAVE"):
             self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
         if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):

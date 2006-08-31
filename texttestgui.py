@@ -248,13 +248,10 @@ class TextTestGUI(ThreadedResponder):
 
         return int(width)
     def createIterMap(self):
-        guilog.info("Mapping tests in tree view...")
         iter = self.model.get_iter_root()
         self.createSubIterMap(iter)
-        guilog.info("")
     def createSubIterMap(self, iter, newTest=1):
         test = self.model.get_value(iter, 2)
-        guilog.info("-> " + test.getIndent() + "Added " + repr(test) + " to test tree view.")
         childIter = self.model.iter_children(iter)
         if test.classId() != "test-app":
             storeIter = iter.copy()
@@ -387,29 +384,19 @@ class TextTestGUI(ThreadedResponder):
             detailsRenderer = gtk.CellRendererText()
             perfColumn = gtk.TreeViewColumn("Details", detailsRenderer, text=4, background=5)
             self.treeView.append_column(perfColumn)
-        if not self.dynamic and self.getConfigValue("static_collapse_suites"):
-            childIter = self.filteredModel.get_iter_root()
-            while childIter != None:
-                name = self.filteredModel.get_value(childIter, 0)
-                guilog.info("Expanded row titled '" + name + "'")
-                self.treeView.expand_row(self.filteredModel.get_path(childIter), open_all=False)
-                childIter = self.filteredModel.iter_next(childIter)            
-        else:
-            self.treeView.expand_all()
-            # This does not interact with TextTest at all, so don't bother to connect to PyUseCase
-            self.treeView.connect("row-expanded", self.expandFullSuite)
-        
+
         modelIndexer = TreeModelIndexer(self.filteredModel, self.testsColumn, 3)
+        scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite", modelIndexer)
+        self.treeView.connect('row-expanded', self.rowExpanded)
+        guilog.info("Expanding tests in tree view...")
+        self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
+        guilog.info("")
+        
         # The order of these two is vital!
         scriptEngine.connect("select test", "row_activated", self.treeView, self.viewTest, modelIndexer)
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
         self.treeView.show()
-        # This also doesn't interact with the logic, at least in case the
-        # scriptengine reacts correctly when someone tries to access a test/row
-        # which doesn't exist.
         if self.dynamic:
-            self.treeView.connect('row-expanded', self.rowExpanded)
-            self.treeView.connect('row-collapsed', self.rowCollapsed)
             self.filteredModel.connect('row-inserted', self.rowInserted)
 
         # Create scrollbars around the view.
@@ -422,12 +409,16 @@ class TextTestGUI(ThreadedResponder):
         framed.show_all()
         return framed
     def rowCollapsed(self, treeview, iter, path):
-        realPath = self.filteredModel.convert_path_to_child_path(path)
-        self.collapsedRows[realPath] = 1
+        if self.dynamic:
+            realPath = self.filteredModel.convert_path_to_child_path(path)
+            self.collapsedRows[realPath] = 1
     def rowExpanded(self, treeview, iter, path):
-        realPath = self.filteredModel.convert_path_to_child_path(path)
-        if self.collapsedRows.has_key(realPath):
-            del self.collapsedRows[realPath]
+        if self.dynamic:
+            realPath = self.filteredModel.convert_path_to_child_path(path)
+            if self.collapsedRows.has_key(realPath):
+                del self.collapsedRows[realPath]
+        recursive = not self.getConfigValue("static_collapse_suites")
+        self.expandLevel(treeview, self.filteredModel.iter_children(iter), recursive)
     def rowInserted(self, model, path, iter):
         realPath = self.filteredModel.convert_path_to_child_path(path)
         self.expandRow(self.filteredModel.iter_parent(iter), False)
@@ -476,13 +467,18 @@ class TextTestGUI(ThreadedResponder):
             return
         if model.get_value(iter, 2).classId() == "test-case":
             self.totalNofTestsShown = self.totalNofTestsShown + 1
-    def expandFullSuite(self, view, iter, path, *args):
+    def expandLevel(self, view, iter, recursive=True):
         # Make sure expanding expands everything, better than just one level as default...
         # Avoid using view.expand_row(path, open_all=True), as the open_all flag
         # doesn't seem to send the correct 'row-expanded' signal for all rows ...
-        iter = view.get_model().iter_children(iter)
+        # This way, the signals are generated one at a time and we call back into here.
+        model = view.get_model()
         while (iter != None):
-            view.expand_row(view.get_model().get_path(iter), open_all=False)
+            test = model.get_value(iter, 2)
+            guilog.info("-> " + test.getIndent() + "Added " + repr(test) + " to test tree view.")
+            if recursive:
+                view.expand_row(model.get_path(iter), open_all=False)
+             
             iter = view.get_model().iter_next(iter)
     def setUpGui(self, actionThread=None):
         topWindow = self.createTopWindow()
@@ -654,10 +650,11 @@ class TextTestGUI(ThreadedResponder):
         oldSize = self.model.iter_n_children(suiteIter)
         if oldSize == 0 and len(suite.testcases) == 0:
             return
-        
+
         iter = self.model.iter_children(suiteIter)
         for i in range(oldSize):
             self.model.remove(iter)
+        guilog.info("-> " + suite.getIndent() + "Recreating contents of " + repr(suite) + ".")
         for test in suite.testcases:
             self.removeIter(test)
             iter = self.addSuiteWithParent(test, suiteIter)

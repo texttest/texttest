@@ -50,6 +50,7 @@ class Config(plugins.Configuration):
                 group.addSwitch("o", "Overwrite all failures")
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
+                group.addOption("fd", "Private: Directory to search for filter files in")
                 group.addSwitch("n", "Create new results files (overwrite everything)")
                 if recordsUseCases:
                     group.addSwitch("record", "Record usecase rather than replay what is present")
@@ -169,6 +170,9 @@ class Config(plugins.Configuration):
         filterDirs = self.getFilterDirs(app)
         return app.getFileName(filterDirs, filename)
     def getFilterDirs(self, app):
+        cmdLineDir = self.optionValue("fd")
+        if cmdLineDir:
+            return [ cmdLineDir ]
         rawDirs = app.getConfigValue("test_list_files_directory")
         allDirs = map(lambda dir: os.path.join(app.getDirectory(), dir), rawDirs)
         return filter(os.path.isdir, allDirs)

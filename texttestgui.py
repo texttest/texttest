@@ -83,7 +83,12 @@ class QuitGUI(guiplugins.SelectionAction):
         scriptEngine.connect("close window", "delete_event", topWindow, self.exit)
     def getTitle(self):
         return "_Quit"
-    def performOn(self, tests, selCmd):
+    def messageBeforePerform(self, testSel):
+        return "Terminating TextTest GUI ..."
+    def messageAfterPerform(self, testSel):
+        # Don't provide one, the GUI isn't there to show it :)
+        pass
+    def performOn(self, tests):
         # Generate a window closedown, so that the quit button behaves the same as closing the window
         self.exit()
     def getDoubleCheckMessage(self, test):
@@ -853,11 +858,11 @@ class InteractiveActionGUI:
                 text += " (checked)"
         return text
     def performInteractiveAction(self, action):
-        message = action.messageAfterPerform(None, None, self.test)
+        message = action.messageBeforePerform(self.test)
         if message != None:
             self.status.output(message)
         self.test.callAction(action)
-        message = action.messageAfterPerform(None, None, self.test)
+        message = action.messageAfterPerform(self.test)
         if message != None:
             self.status.output(message)
 
@@ -865,11 +870,8 @@ class SelectionActionGUI(InteractiveActionGUI):
     def __init__(self, actions, selection, status, filteredModel):
         InteractiveActionGUI.__init__(self, actions, status)
         self.selection = selection
-        self.lastSelectionTests = []
-        self.lastSelectionCmd = ""
         self.itermap = {}
         self.filteredModel = filteredModel
-        self.selectCollapsed = False
     def addNewTest(self, test, iter):
         if not self.itermap.has_key(test.app):
             self.itermap[test.app] = {}
@@ -878,45 +880,34 @@ class SelectionActionGUI(InteractiveActionGUI):
         toRemove = self.itermap[test.app]
         del toRemove[test]
     def performInteractiveAction(self, action):
-        selTests = self.getSelectedTests()
-        selCmd = None
-        # Selection with versions doesn't work from the command line right now, work around...
-        if selTests == self.lastSelectionTests and self.lastSelectionCmd:
-            selCmd = self.lastSelectionCmd
-        if isinstance(action, guiplugins.SelectTests):
-            self.selectCollapsed = action.optionGroup.getSwitchValue("select_in_collapsed_suites")
-
-        self.status.output(action.messageBeforePerform(selTests, selCmd))
-        returnVal = action.performOn(selTests, selCmd)
-        if returnVal:
-            # selection changed by action
-            self.lastSelectionTests, self.lastSelectionCmd = returnVal
-            self.selectInGUI()
-            message = action.messageAfterPerform(self.lastSelectionTests, self.lastSelectionCmd)
-            if message != None:
-                self.status.output(message)
-        elif not isinstance(action, QuitGUI):
-            message = action.messageAfterPerform(selTests, selCmd)
-            if message != None:
-                self.status.output(message)
-    def getSelectedTests(self):
-        tests = []
-        self.selection.selected_foreach(self.addSelTest, tests)
-        return tests
-    def addSelTest(self, model, path, iter, tests, *args):
-        tests.append(model.get_value(iter, 2))
-    def selectInGUI(self):
+        testSel = self.makeTestSelection()
+        self.status.output(action.messageBeforePerform(testSel))
+        action.performOn(testSel)
+        message = action.messageAfterPerform(testSel)
+        if message != None:
+            self.status.output(message)
+    def makeTestSelection(self):
+        # add self as an observer
+        testSel = guiplugins.TestSelection(self)
+        self.selection.selected_foreach(self.addSelTest, testSel)
+        return testSel
+    def addSelTest(self, model, path, iter, testSel, *args):
+        testSel.add(model.get_value(iter, 2))
+    def notifyUpdate(self, newSelTests, selectCollapsed):
+        # call back on selection changes
         self.selection.unselect_all()
-        for test in self.lastSelectionTests:
-            iter = self.itermap[test.app][test]
-            if self.selectCollapsed:
-                self.selection.get_tree_view().expand_to_path(self.filteredModel.get_path(self.filteredModel.convert_child_iter_to_iter(iter)))
-            self.selection.select_iter(self.filteredModel.convert_child_iter_to_iter(iter))
+        for test in newSelTests:
+            childIter = self.itermap[test.app][test]
+            iter = self.filteredModel.convert_child_iter_to_iter(childIter)
+            if selectCollapsed:
+                path = self.filteredModel.get_path(iter) 
+                self.selection.get_tree_view().expand_to_path(path)
+            self.selection.select_iter(iter)
         self.selection.get_tree_view().grab_focus()
         first = self.getFirstSelectedTest()
         if first != None:
             self.selection.get_tree_view().scroll_to_cell(first, None, True, 0.1)
-        guilog.info("Marking " + str(len(self.getSelectedTests())) + " tests as selected")
+        guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
     def getFirstSelectedTest(self):
         firstTest = []
         self.selection.selected_foreach(self.findFirstTest, firstTest)

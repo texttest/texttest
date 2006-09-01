@@ -1,6 +1,5 @@
 
 import plugins, os, sys, shutil, string, types, time
-from testmodel import TestCase, Application
 from threading import Thread
 from glob import glob
 from Queue import Queue, Empty
@@ -54,6 +53,39 @@ class ProcessTerminationMonitor:
 
 processTerminationMonitor = ProcessTerminationMonitor()
 
+class TestSelection:
+    def __init__(self, observer):
+        self.tests = []
+        self.observer = observer
+    def __repr__(self):
+        return str(self.size()) + " tests"
+    def add(self, object):
+        if object.classId() == "test-case":
+            self.tests.append(object)
+    def includes(self, test):
+        return test in self.tests
+    def getAnyApp(self):
+        if self.size() > 0:
+            return self.tests[0].app
+    def size(self):
+        return len(self.tests)
+    def update(self, newTests, expandFlag):
+        self.tests = newTests
+        self.observer.notifyUpdate(newTests, expandFlag)
+    def getCmdlineOption(self):
+        selTestPaths = []
+        for test in self.tests:
+            relPath = test.getRelPath()
+            if not relPath in selTestPaths:
+                selTestPaths.append(relPath)
+        return "-tp " + string.join(selTestPaths, ",")
+    def getCmdlineOptionForApps(self):
+        apps = []
+        for test in self.tests:
+            if not test.app.name in apps:
+                apps.append(test.app.name)
+        return "-a " + string.join(apps, ",")
+
 class InteractiveAction:
     def __init__(self, optionName = ""):
         self.optionGroup = None
@@ -78,16 +110,10 @@ class InteractiveAction:
         pass
     def getSecondaryTitle(self):
         return self.getTitle()
-    def messageBeforePerform(self, selTests, selCmd, test = None):
-        if test != None:
-            return "Performing '" + self.getSecondaryTitle() + "' on " + repr(test) + " ..."
-        else:
-            return "Performing '" + self.getSecondaryTitle() + "' ..."
-    def messageAfterPerform(self, selTests, selCmd, test = None):
-        if test != None:
-            return "Done performing '" + self.getSecondaryTitle() + "' on " + repr(test) + "."
-        else:
-            return "Done performing '" + self.getSecondaryTitle() + "'."
+    def messageBeforePerform(self, parameter):
+        return "Performing '" + self.getSecondaryTitle() + "' on " + repr(parameter) + " ..."
+    def messageAfterPerform(self, parameter):
+        return "Done performing '" + self.getSecondaryTitle() + "' on " + repr(parameter) + "."
     def isFrequentUse(self):
         # Decides how accessible to make it...
         return False
@@ -160,13 +186,6 @@ class SelectionAction(InteractiveAction):
             else:
                 prevValue = currValue
         return prevValue
-    def getSelectionOption(self, selTests):
-        selTestPaths = []
-        for test in selTests:
-            relPath = test.getRelPath()
-            if not relPath in selTestPaths:
-                selTestPaths.append(relPath)
-        return "-tp " + string.join(selTestPaths, ",")
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveTestAction(plugins.Action,InteractiveAction):
@@ -227,10 +246,10 @@ class SaveTests(SelectionAction):
         return "_Save"
     def getSecondaryTitle(self):
         return "Save"
-    def messageBeforePerform(self, selTests, selCmd, test = None):
-        return "Saving " + str(len(selTests)) + " tests ..."
-    def messageAfterPerform(self, selTests, selCmd, test = None):
-        return "Saved " + str(len(selTests)) + " tests."
+    def messageBeforePerform(self, testSel):
+        return "Saving " + repr(testSel) + " ..."
+    def messageAfterPerform(self, testSel):
+        return "Saved " + repr(testSel) + " tests."
     def matchesMode(self, dynamic):
         return dynamic
     def getDefaultSaveOption(self):
@@ -268,7 +287,7 @@ class SaveTests(SelectionAction):
             return self.getDefaultSaveVersion(test.app)
         else:
             return versionString
-    def performOn(self, selTests, selCmd):
+    def performOn(self, testSel):
         saveDesc = ", exactness " + str(self.getExactness())
         singleFile = self.optionGroup.getOptionValue("sinf")
         if singleFile:
@@ -277,7 +296,7 @@ class SaveTests(SelectionAction):
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
 
-        for test in selTests:
+        for test in testSel.tests:
             if not test.state.isSaveable():
                 continue
             version = self.getVersion(test)
@@ -437,14 +456,15 @@ class RecordTest(InteractiveTestAction):
         ttOptions = self.getRunOptions(test, usecase)
         guilog.info("Starting " + usecase + " run of TextTest with arguments " + ttOptions)
         commandLine = plugins.textTestName + " " + ttOptions
-        test.app.makeWriteDirectory()
-        logFile = self.getLogFile(test, usecase, "run")
-        errFile = self.getLogFile(test, usecase)
+        writeDir = self.getWriteDir(test)
+        plugins.ensureDirectoryExists(writeDir)
+        logFile = self.getLogFile(writeDir, usecase, "output")
+        errFile = self.getLogFile(writeDir, usecase)
         commandLine +=  " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
         process = self.startExtProgramNewUsecase(commandLine, usecase, \
                                                  exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase))
-    def getLogFile(self, test, usecase, type="errors"):
-        return os.path.join(test.app.writeDirectory, usecase + "_" + type + ".log")
+    def getLogFile(self, writeDir, usecase, type="errors"):
+        return os.path.join(writeDir, usecase + "_" + type + ".log")
     def canPerform(self):
         return self.recordMode != "disabled"
     def textTestCompleted(self, test, usecase):
@@ -456,8 +476,11 @@ class RecordTest(InteractiveTestAction):
         else:
             self.setTestReady(test, usecase)
         test.notifyChanged()
+    def getWriteDir(self, test):
+        return os.path.join(test.app.writeDirectory, "record")
     def setTestRecorded(self, test, usecase):
-        errFile = self.getLogFile(test, usecase)
+        writeDir = self.getWriteDir(test)
+        errFile = self.getLogFile(writeDir, usecase)
         if os.path.isfile(errFile):
             errText = open(errFile).read()
             if len(errText):
@@ -578,9 +601,9 @@ class SelectTests(SelectionAction):
         return "Select indicated tests"
     def getGroupTabTitle(self):
         return "Selection"
-    def messageBeforePerform(self, selTests, selCmd, test = None):
+    def messageBeforePerform(self, testSel):
         return "Selecting tests ..."
-    def messageAfterPerform(self, selTests, selCmd, test = None):
+    def messageAfterPerform(self, testSel):
         return None    
     # No messageAfterPerform necessary - we update the status bar when the selction changes inside TextTestGUI
     def matchesMode(self, dynamic):
@@ -590,12 +613,9 @@ class SelectTests(SelectionAction):
     def getFilterList(self, app):
         app.configObject.updateOptions(self.appSelectGroup)
         return app.configObject.getFilterList(app)
-    def performOn(self, selTests, selCmd):
+    def performOn(self, testSel):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")
-        selected = {}
-        for t in selTests:
-            selected[t] = 1
         selectedTests = []                
         for suite in self.rootTestSuites:
             filters = self.getFilterList(suite.app)
@@ -603,35 +623,31 @@ class SelectTests(SelectionAction):
                 if not filter.acceptsApplication(suite.app):
                     continue
                 
-            newTests = self.getTestsFromSuite(suite, filters, strategy, selected)
+            newTests = self.getTestsFromSuite(suite, filters, strategy, testSel)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
-        if strategy == 0:
-            commandLines = self.appSelectGroup.getCommandLines()
-            return selectedTests, string.join(commandLines)
-        else:
-            return selectedTests, ""
-    def getTestsFromSuite(self, suite, filters, strategy, selected):
+        testSel.update(selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
+    def getTestsFromSuite(self, suite, filters, strategy, testSel):
         # Strategies: 0 - discard, 1 - refine, 2 - extend, 3 - exclude
         # If we want to extend selection, we include test if it was previsouly selected,
         # even if it doesn't fit the current criterion
-        if strategy == 2 and suite.classId() == "test-case" and selected.has_key(suite):
+        if strategy == 2 and testSel.includes(suite):
             return [ suite ]
         if not suite.isAcceptedByAll(filters):
             return []
         if suite.classId() == "test-suite":
             tests = []
             for subSuite in self.findTestCaseList(suite):
-                tests += self.getTestsFromSuite(subSuite, filters, strategy, selected)
+                tests += self.getTestsFromSuite(subSuite, filters, strategy, testSel)
             return tests
         else:
             if strategy == 0 or strategy == 2:
                 return [ suite ]
             elif strategy == 1: # Refine - only add if already selected
-                if selected.has_key(suite):
+                if testSel.includes(suite):
                     return [ suite ]
             elif strategy == 3: # Exclude - don't add if already selected
-                if not selected.has_key(suite):
+                if not testSel.includes(suite):
                     return [ suite ]
             return []
     def findTestCaseList(self, suite):
@@ -658,15 +674,15 @@ class ResetGroups(SelectionAction):
         SelectionAction.__init__(self, rootSuites)
     def getTitle(self):
         return "R_eset"
-    def messageBeforePerform(self, selTests, selCmd, test = None):
+    def messageBeforePerform(self, testSel):
         return "Resetting options ..."
-    def messageAfterPerform(self, selTests, selCmd, test = None):
+    def messageAfterPerform(self, testSel):
         return "All options reset to default values."
     def matchesMode(self, dynamic):
         return not dynamic
     def getScriptTitle(self, tab):
         return "Reset running options"
-    def performOn(self, selTests, selCmd):
+    def performOn(self, testSel):
         for optionGroups in interactiveActionHandler.optionGroupMap.values():
             for group in optionGroups:
                 group.reset()
@@ -687,27 +703,27 @@ class SaveSelection(SelectionAction):
         return "Selection"
     def matchesMode(self, dynamic):
         return not dynamic
-    def getFileName(self, selTests):
+    def getFileName(self, testSel):
         localName = self.optionGroup.getOptionValue("name")
         if not localName:
             raise plugins.TextTestError, "Must provide a file name to save, fill in the 'Saving' tab"
-        if len(selTests) == 0:
+        if testSel.size() == 0:
             raise plugins.TextTestError, "No tests are selected, cannot save selection!"
 
-        app = selTests[0].app
+        app = testSel.getAnyApp()
         dir = os.path.join(app.getDirectory(), app.getConfigValue("test_list_files_directory")[0])
         plugins.ensureDirectoryExists(dir)
         return os.path.join(dir, localName)
-    def getTextToSave(self, selTests):
+    def getTextToSave(self, testSel):
         actualTests = self.optionGroup.getSwitchValue("tests")
         if actualTests:
-            return self.getSelectionOption(selTests)
+            return testSel.getCmdlineOption()
         else:
             commandLines = self.selectionGroup.getCommandLines()
             return string.join(commandLines)
-    def performOn(self, selTests, selCmd):
-        fileName = self.getFileName(selTests)
-        toWrite = self.getTextToSave(selTests)
+    def performOn(self, testSel):
+        fileName = self.getFileName(testSel)
+        toWrite = self.getTextToSave(testSel)
         file = open(fileName, "w")
         file.write(toWrite + "\n")
         file.close()
@@ -732,52 +748,52 @@ class RunTests(SelectionAction):
         return "Run selected tests"
     def getGroupTabTitle(self):
         return "Running"
-    def messageBeforePerform(self, selTests, selCmd, test = None):
+    def messageBeforePerform(self, testSel):
         return "Starting tests at " + plugins.localtime() + " ..."
-    def messageAfterPerform(self, selTests, selCmd, test = None):
-        return "Started " + str(len(selTests)) + " tests at " + plugins.localtime() + "."
+    def messageAfterPerform(self, testSel):
+        return "Started " + repr(testSel) + " at " + plugins.localtime() + "."
     def matchesMode(self, dynamic):
         return not dynamic
     def isFrequentUse(self):
         return True
-    def performOn(self, selTests, selCmd):
-        selTestCases = filter(self.isTestCase, selTests)
-        if len(selTestCases) == 0:
+    def performOn(self, testSel):
+        if testSel.size() == 0:
             raise plugins.TextTestError, "No tests selected - cannot run!"
-        ttOptions = string.join(self.getTextTestOptions(selTestCases, selCmd))
-        self.apps[0].makeWriteDirectory()
-        logFile = os.path.join(self.apps[0].writeDirectory, "dynamic_run" + str(self.runNumber) + ".log")
-        errFile = os.path.join(self.apps[0].writeDirectory, "dynamic_errors" + str(self.runNumber) + ".log")
+        writeDir = os.path.join(self.apps[0].writeDirectory, "dynamic_run" + str(self.runNumber))
+        plugins.ensureDirectoryExists(writeDir)
+        filterFile = self.writeFilterFile(testSel, writeDir)
+        ttOptions = self.getTextTestOptions(testSel, filterFile)
+        logFile = os.path.join(writeDir, "output.log")
+        errFile = os.path.join(writeDir, "errors.log")
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
         commandLine = plugins.textTestName + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
-        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,selTestCases), description = description)
-    def isTestCase(self, test):
-        return isinstance(test, TestCase)
-    def checkTestRun(self, errFile, selTestCases):
-        for test in selTestCases:
+        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,testSel), description = description)
+    def writeFilterFile(self, testSel, writeDir):
+        # Because the description of the selection can be extremely long, we write it in a file and refer to it
+        # This avoids too-long command lines which are a problem at least on Windows XP
+        filterFileName = os.path.join(writeDir, "gui_select")
+        writeFile = open(filterFileName, "w")
+        writeFile.write(testSel.getCmdlineOption() + "\n")
+        writeFile.close()
+        return filterFileName
+    def getTextTestOptions(self, testSel, filterFile):
+        ttOptions = [ testSel.getCmdlineOptionForApps() ]
+        ttOptions += self.invisibleGroup.getCommandLines()
+        for group in self.optionGroups:
+            ttOptions += group.getCommandLines()
+        filterDir, filterFileName = os.path.split(filterFile)
+        ttOptions.append("-f " + filterFileName)
+        ttOptions.append("-fd " + filterDir)
+        return string.join(ttOptions)
+    def checkTestRun(self, errFile, testSel):
+        for test in testSel.tests:
             test.filesChanged()
         scriptEngine.applicationEvent("dynamic GUI to be closed")
         if os.path.isfile(errFile):
             errText = open(errFile).read()
             if len(errText):
                 raise plugins.TextTestError, "Dynamic run failed, with the following errors:\n" + errText
-    def getAppOption(self, selTests):
-        apps = []
-        for test in selTests:
-            if not test.app.name in apps:
-                apps.append(test.app.name)
-        return string.join(apps, ",")
-    def getTextTestOptions(self, selTests, selCmd):
-        ttOptions = [ "-a " + self.getAppOption(selTests) ]
-        ttOptions += self.invisibleGroup.getCommandLines()
-        for group in self.optionGroups:
-            ttOptions += group.getCommandLines()
-        if selCmd is None:
-            ttOptions.append(self.getSelectionOption(selTests))
-        else:
-            ttOptions.append(selCmd)
-        return ttOptions
 
 class EnableDiagnostics(InteractiveTestAction):
     def __init__(self, test, oldOptionGroups):

@@ -490,6 +490,14 @@ class PrintStrings(plugins.Action):
             self.strings.append(line)
             print line
 
+class FeatureFilter(plugins.Filter):
+    def __init__(self, features):
+        self.grepCommand = "grep -E '" + string.join(features, "|") + "'"
+    def acceptsTestCase(self, test):    
+        logFile = test.getFileName("output")
+        commandLine = "tail -100 " + logFile + " | " + self.grepCommand + " > /dev/null 2>1"
+        return os.system(commandLine)
+
 class SelectTests(guiplugins.SelectTests):
     def __init__(self, rootSuites, oldOptionGroup):
         guiplugins.SelectTests.__init__(self, rootSuites, oldOptionGroup)
@@ -504,21 +512,13 @@ class SelectTests(guiplugins.SelectTests):
                     featureName = line.replace("\n", "")
                     self.addSwitch(oldOptionGroup, featureName, featureName, 0)
                     self.features.append(featureName)
-    def performOn(self, selTests, selCmd):
-        tests, testCmd = guiplugins.SelectTests.performOn(self, selTests, selCmd)
+    def getFilterList(self, app):
+        filters = guiplugins.SelectTests.getFilterList(self, app)    
         selectedFeatures = self.getSelectedFeatures()
-        if len(selectedFeatures) == 0:
-            return tests, testCmd
-        selectedTests = []
-        guiplugins.guilog.info("Selected " + str(len(selectedFeatures)) + " features...")
-        grepCommand = "grep -E '" + string.join(selectedFeatures, "|") + "'"
-        for test in tests:
-            logFile = test.getFileName("output")
-            commandLine = "tail -100 " + logFile + " | " + grepCommand + " > /dev/null 2>1"
-            if os.system(commandLine) == 0:
-                selectedTests.append(test)
-        # There is no way to select features from the command line...
-        return selectedTests, None
+        if len(selectedFeatures) > 0:
+            guiplugins.guilog.info("Selected " + str(len(selectedFeatures)) + " features...")
+            filters.append(FeatureFilter(selectedFeatures))
+        return filters
     def getSelectedFeatures(self):
         result = []
         for feature in self.features:

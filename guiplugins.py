@@ -607,7 +607,7 @@ class SelectTests(SelectionAction):
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         if strategy == 0:
-            commandLines = self.optionGroup.getCommandLines()
+            commandLines = self.appSelectGroup.getCommandLines()
             return selectedTests, string.join(commandLines)
         else:
             return selectedTests, ""

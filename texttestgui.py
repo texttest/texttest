@@ -881,7 +881,7 @@ class SelectionActionGUI(InteractiveActionGUI):
         selTests = self.getSelectedTests()
         selCmd = None
         # Selection with versions doesn't work from the command line right now, work around...
-        if selTests == self.lastSelectionTests and self.lastSelectionCmd and self.lastSelectionCmd.find("-vs") == -1:
+        if selTests == self.lastSelectionTests and self.lastSelectionCmd:
             selCmd = self.lastSelectionCmd
         if isinstance(action, guiplugins.SelectTests):
             self.selectCollapsed = action.optionGroup.getSwitchValue("select_in_collapsed_suites")

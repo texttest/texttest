@@ -582,13 +582,23 @@ class ImportTestSuite(ImportTest):
 class SelectTests(SelectionAction):
     def __init__(self, rootSuites, oldOptionGroups):
         SelectionAction.__init__(self, rootSuites, "Select Tests")
-        self.addOption(oldOptionGroups, "vs", "Tests for version", self.apps[0].getFullVersion())
+        self.diag = plugins.getDiagnostics("Select Tests")
+        self.addOption(oldOptionGroups, "vs", "Tests for version", "", self.getPossibleVersions())
         self.addSwitch(oldOptionGroups, "select_in_collapsed_suites", "Select in collapsed suites", 0)
         self.addSwitch(oldOptionGroups, "current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"])
         
         self.appSelectGroup = self.findSelectGroup()
         self.optionGroup.options += self.appSelectGroup.options
         self.optionGroup.switches += self.appSelectGroup.switches
+    def getPossibleVersions(self):
+        versions = []
+        for app in self.apps:
+            appVer = app.getFullVersion()
+            if len(appVer) == 0:
+                appVer = "<default>"
+            if not appVer in versions:
+                versions.append(appVer)
+        return versions
     def findSelectGroup(self):
         for group in self.apps[0].optionGroups:
             if group.name.startswith("Select"):
@@ -652,16 +662,23 @@ class SelectTests(SelectionAction):
             return []
     def findTestCaseList(self, suite):
         testcases = suite.testcases
-        testCaseFiles = suite.findTestSuiteFiles()
-        if len(testCaseFiles) == 1:
-            return testcases
-        
         version = self.optionGroup.getOptionValue("vs")
-        fullVersion = suite.app.getFullVersion()
-        if len(fullVersion) > 0 and len(version) > 0:
-            version += "." + fullVersion
+        if len(version) == 0:
+            return testcases
 
-        versionFile = suite.getFileName("testsuite", version)
+        if version == "<default>":
+            version = ""
+        fullVersion = suite.app.getFullVersion()
+        self.diag.info("Trying to get test cases for version " + fullVersion)
+        if len(fullVersion) > 0 and len(version) > 0:
+            parts = version.split(".")
+            for appVer in suite.app.versions:
+                if not appVer in parts:
+                    version += "." + appVer
+
+        self.diag.info("Finding test case list for " + repr(suite) + ", version " + version)
+        versionFile = suite.getFileName("testsuite", version)        
+        self.diag.info("Reading test cases from " + versionFile)
         newTestNames = plugins.readList(versionFile)
         newTestList = []
         for testCase in testcases:

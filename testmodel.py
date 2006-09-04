@@ -290,7 +290,10 @@ class Test:
         return allFiles
     def getFileName(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
-        return self.app._getFileName(self.dircaches, stem, refVersion)
+        appToUse = self.app
+        if refVersion:
+            appToUse = self.app.getRefVersionApplication(refVersion)
+        return appToUse._getFileName(self.dircaches, stem)
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
@@ -768,19 +771,15 @@ class Application:
     def getFileName(self, dirList, stem, versionListMethod=None):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem, versionListMethod=versionListMethod)
-    def _getFileName(self, dircaches, stem, refVersion=None, versionListMethod=None):
-        allowedExtensions = self.getFileExtensionsForVersion(refVersion)
+    def _getFileName(self, dircaches, stem, versionListMethod=None):
+        allowedExtensions = self.getFileExtensions()
         for dircache in dircaches:
             allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists, versionListMethod)
-            self.diag.info("Files for stem " + stem + " found " + repr(allFiles))
+            self.diag.info("Files for stem " + stem + " found " + repr(allFiles) + " from " + repr(allowedExtensions))
             if len(allFiles):
                 return allFiles[-1]
-    def getFileExtensionsForVersion(self, refVersion = None):
-        if refVersion:
-            refApp = Application(self.name, self.dircache, refVersion, self.inputOptions)
-            return refApp.getFileExtensions()
-        else:
-            return self.getFileExtensions()
+    def getRefVersionApplication(self, refVersion):
+        return Application(self.name, self.dircache, refVersion, self.inputOptions)
     def setCheckoutVariable(self):
         if self.checkout:
             os.environ["TEXTTEST_CHECKOUT"] = self.checkout
@@ -969,6 +968,8 @@ class Application:
             return cmp(versionCount1, versionCount2)
         baseCount1 = self.getBaseVersionCount(vlist1)
         baseCount2 = self.getBaseVersionCount(vlist2)
+        self.diag.info(repr(vlist1) + " has base count " + str(baseCount1))
+        self.diag.info(repr(vlist2) + " has base count " + str(baseCount2))
         # Less base versions implies higher priority
         return cmp(baseCount2, baseCount1)
     def getBaseVersionCount(self, vlist):

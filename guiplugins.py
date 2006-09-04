@@ -578,7 +578,7 @@ class ImportTestSuite(ImportTest):
             envFile = os.path.join(testDir, "environment")
             file = open(envFile, "w")
             file.write("# Dictionary of environment to variables to set in test suite" + "\n")
-    
+
 class SelectTests(SelectionAction):
     def __init__(self, rootSuites, oldOptionGroups):
         SelectionAction.__init__(self, rootSuites, "Select Tests")
@@ -615,7 +615,7 @@ class SelectTests(SelectionAction):
         return "Selecting tests ..."
     def messageAfterPerform(self, testSel):
         return None    
-    # No messageAfterPerform necessary - we update the status bar when the selction changes inside TextTestGUI
+    # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def matchesMode(self, dynamic):
         return not dynamic
     def isFrequentUse(self):
@@ -627,7 +627,7 @@ class SelectTests(SelectionAction):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")
         selectedTests = []                
-        for suite in self.rootTestSuites:
+        for suite in self.getSuitesToTry():
             filters = self.getFilterList(suite.app)
             for filter in filters:
                 if not filter.acceptsApplication(suite.app):
@@ -637,6 +637,30 @@ class SelectTests(SelectionAction):
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         testSel.update(selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
+    def getSuitesToTry(self):
+        # If only some of the suites present match the version selection, only consider them.
+        # If none of them do, try to filter them all
+        versionSelection = self.optionGroup.getOptionValue("vs")
+        if len(versionSelection) == 0:
+            return self.rootTestSuites
+        versions = versionSelection.split(".")
+        toTry = []
+        for suite in self.rootTestSuites:
+            if self.allVersionsMatch(versions, suite.app.versions):
+                toTry.append(suite)
+        if len(toTry) == 0:
+            return self.rootTestSuites
+        else:
+            return toTry
+    def allVersionsMatch(self, versions, appVersions):
+        for version in versions:
+            if version == "<default>":
+                if len(appVersions) > 0:
+                    return False
+            else:
+                if not version in appVersions:
+                    return False
+        return True
     def getTestsFromSuite(self, suite, filters, strategy, testSel):
         # Strategies: 0 - discard, 1 - refine, 2 - extend, 3 - exclude
         # If we want to extend selection, we include test if it was previsouly selected,

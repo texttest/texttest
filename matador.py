@@ -495,8 +495,11 @@ class FeatureFilter(plugins.Filter):
         self.grepCommand = "grep -E '" + string.join(features, "|") + "'"
     def acceptsTestCase(self, test):    
         logFile = test.getFileName("output")
-        commandLine = "tail -100 " + logFile + " | " + self.grepCommand + " > /dev/null 2>1"
-        return os.system(commandLine)
+        if logFile:
+            commandLine = "tail -100 " + logFile + " | " + self.grepCommand + " > /dev/null 2>1"
+            return os.system(commandLine)
+        else:
+            return False
 
 class SelectTests(guiplugins.SelectTests):
     def __init__(self, rootSuites, oldOptionGroup):

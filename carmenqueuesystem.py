@@ -74,9 +74,7 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
     def __init__(self, optionMap, test):
         queuesystem.SubmissionRules.__init__(self, optionMap, test)
         # Must cache all environment variables, they may not be preserved in queue system thread...
-        self.presetPerfCategory = ""
-        if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY"):
-            self.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY"]
+        self.presetPerfCategory = os.getenv("QUEUE_SYSTEM_PERF_CATEGORY", "")
         self.archToUse = getArchitecture(self.test.app)
     def getShortQueueSeconds(self):
         return plugins.getNumberOfSeconds(str(self.test.getConfigValue("maximum_cputime_for_short_queue")))

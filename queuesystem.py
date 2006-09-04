@@ -175,15 +175,12 @@ class SubmissionRules:
     def __init__(self, optionMap, test):
         self.test = test
         self.optionMap = optionMap
-        self.envResource = ""
+        self.envResource = self.getEnvironmentResource()
         self.processesNeeded = self.getProcessesNeeded()
-        if os.environ.has_key("QUEUE_SYSTEM_RESOURCE"):
-            self.envResource = os.getenv("QUEUE_SYSTEM_RESOURCE")
+    def getEnvironmentResource(self):
+        return os.getenv("QUEUE_SYSTEM_RESOURCE", "")
     def getProcessesNeeded(self):
-        if os.environ.has_key("QUEUE_SYSTEM_PROCESSES"):
-            return os.environ["QUEUE_SYSTEM_PROCESSES"]
-        else:
-            return "1"
+        return os.getenv("QUEUE_SYSTEM_PROCESSES", "1")
     def getJobName(self):
         path = self.test.getRelPath()
         parts = path.split("/")

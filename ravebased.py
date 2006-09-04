@@ -96,10 +96,10 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         self.normalSubmissionRules.optionMap = {}
         self.normalSubmissionRules.presetPerfCategory = "short"
         self.normalSubmissionRules.majRelResourceType = "build"
-        if os.environ.has_key("QUEUE_SYSTEM_PERF_CATEGORY_RAVE"):
-            self.normalSubmissionRules.presetPerfCategory = os.environ["QUEUE_SYSTEM_PERF_CATEGORY_RAVE"]
-        if os.environ.has_key("QUEUE_SYSTEM_RESOURCE_RAVE"):
-            self.normalSubmissionRules.envResource = os.environ["QUEUE_SYSTEM_RESOURCE_RAVE"]
+        self.normalSubmissionRules.envResource = self.getEnvironmentResource()
+        self.normalSubmissionRules.presetPerfCategory = os.getenv("QUEUE_SYSTEM_PERF_CATEGORY_RAVE", "")
+    def getEnvironmentResource(self):
+        return os.getenv("QUEUE_SYSTEM_RESOURCE_RAVE", "")
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName

@@ -166,9 +166,14 @@ class Config(plugins.Configuration):
                 if os.path.isfile(os.path.join(directory, filename)):
                     filterFiles.append(filename)
         return filterFiles
-    def makeFilterFileName(self, app, filename):
+    def getFilterFilePath(self, app, filename, forWrite):
         filterDirs = self.getFilterDirs(app)
-        return app.getFileName(filterDirs, filename)
+        if forWrite:
+            dirToUse = filterDirs[0]
+            plugins.ensureDirectoryExists(dirToUse)
+            return os.path.join(dirToUse, filename)
+        else:
+            return app.getFileName(filterDirs, filename)
     def getFilterDirs(self, app):
         cmdLineDir = self.optionValue("fd")
         if cmdLineDir:
@@ -185,7 +190,7 @@ class Config(plugins.Configuration):
             filters += self.getFiltersFromFile(app, self.optionMap["f"])
         return filters
     def getFiltersFromFile(self, app, filename):
-        fullPath = self.makeFilterFileName(app, filename)
+        fullPath = self.getFilterFilePath(app, filename, forWrite=False)
         if not fullPath:
             sys.stderr.write("Rejected application " + repr(app) + " : filter file '" + filename + "' could not be found\n")
             return [ RejectFilter() ]

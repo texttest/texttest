@@ -752,9 +752,7 @@ class SaveSelection(SelectionAction):
             raise plugins.TextTestError, "No tests are selected, cannot save the selection."
 
         app = testSel.getAnyApp()
-        dir = os.path.join(app.getDirectory(), app.getConfigValue("test_list_files_directory")[0])
-        plugins.ensureDirectoryExists(dir)
-        return os.path.join(dir, localName)
+        return app.configObject.getFilterFilePath(app, localName, True)
     def saveActualTests(self):
         return self.optionGroup.getSwitchValue("tests")
     def getTextToSave(self, testSel):

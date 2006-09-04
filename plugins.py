@@ -81,6 +81,8 @@ class Configuration:
         return ""
     def getRunOptions(self, checkout):
         return ""
+    def getFilterFilePath(self, app, localName, forWrite):
+        return localName
     def useExtraVersions(self):
         return 1
     def printHelpText(self):

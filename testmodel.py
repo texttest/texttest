@@ -968,8 +968,6 @@ class Application:
             return cmp(versionCount1, versionCount2)
         baseCount1 = self.getBaseVersionCount(vlist1)
         baseCount2 = self.getBaseVersionCount(vlist2)
-        self.diag.info(repr(vlist1) + " has base count " + str(baseCount1))
-        self.diag.info(repr(vlist2) + " has base count " + str(baseCount2))
         # Less base versions implies higher priority
         return cmp(baseCount2, baseCount1)
     def getBaseVersionCount(self, vlist):

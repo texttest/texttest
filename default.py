@@ -189,10 +189,18 @@ class Config(plugins.Configuration):
     def getFilterClasses(self):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  batch.BatchFilter, performance.TimeFilter ]
+    def getFilterFileName(self, app):
+        if self.optionMap.has_key("f"):
+            return self.optionMap["f"]
+        if self.batchMode():
+            return app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
+        else:
+            return ""
     def getFilterList(self, app):
         filters = self.getFiltersFromMap(self.optionMap, app)
-        if self.optionMap.has_key("f"):
-            filters += self.getFiltersFromFile(app, self.optionMap["f"])
+        filterFileName = self.getFilterFileName(app)
+        if filterFileName:
+            filters += self.getFiltersFromFile(app, filterFileName)
         return filters
     def getFiltersFromFile(self, app, filename):
         fullPath = self.getFilterFilePath(app, filename, forWrite=False)
@@ -396,6 +404,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
         app.setConfigDefault("batch_timelimit", { "default" : None }, "Maximum length of test to include in batch mode runs")
+        app.setConfigDefault("batch_filter_file", { "default" : None }, "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         # Sample to show that values are lists
         app.setConfigDefault("batch_version", { "default" : [] }, "Which versions are allowed as batch mode runs")

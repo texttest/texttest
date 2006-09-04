@@ -648,6 +648,7 @@ class TextTestGUI(ThreadedResponder):
         self.selectionActionGUI.addNewTest(newTest, storeIter)
         guilog.info("Viewing new test " + newTest.name)
         self.rightWindowGUI.view(newTest)
+        self.updateNofTests()
         self.expandSuite(suiteIter)
         self.selectOnlyRow(iter)
     def expandSuite(self, iter):

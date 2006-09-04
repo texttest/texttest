@@ -309,7 +309,7 @@ class SaveTests(SelectionAction):
                 else:
                     testComparison.save(test, self.getExactness(), version, overwriteSuccess)
                 test.filesChanged()
-
+          
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!
 class ViewFile(InteractiveTestAction):
@@ -723,16 +723,18 @@ class SaveSelection(SelectionAction):
     def getFileName(self, testSel):
         localName = self.optionGroup.getOptionValue("name")
         if not localName:
-            raise plugins.TextTestError, "Must provide a file name to save, fill in the 'Saving' tab"
+            raise plugins.TextTestError, "Please provide a file name to save the selection to."
         if testSel.size() == 0:
-            raise plugins.TextTestError, "No tests are selected, cannot save selection!"
+            raise plugins.TextTestError, "No tests are selected, cannot save the selection."
 
         app = testSel.getAnyApp()
         dir = os.path.join(app.getDirectory(), app.getConfigValue("test_list_files_directory")[0])
         plugins.ensureDirectoryExists(dir)
         return os.path.join(dir, localName)
+    def saveActualTests(self):
+        return self.optionGroup.getSwitchValue("tests")
     def getTextToSave(self, testSel):
-        actualTests = self.optionGroup.getSwitchValue("tests")
+        actualTests = self.saveActualTests()
         if actualTests:
             return testSel.getCmdlineOption()
         else:
@@ -744,9 +746,24 @@ class SaveSelection(SelectionAction):
         file = open(fileName, "w")
         file.write(toWrite + "\n")
         file.close()
-        filterFileOption = self.selectionGroup.options["f"]
-        filterFileOption.addPossibleValue(os.path.basename(fileName))
-    
+        if self.selectionGroup:
+            filterFileOption = self.selectionGroup.options["f"]
+            filterFileOption.addPossibleValue(os.path.basename(fileName))
+    def messageAfterPerform(self, parameter):
+        return "Saved " + repr(parameter) + " in file '" + self.getFileName(parameter) + "'."
+          
+class SaveSelectionDynamic(SaveSelection):
+    def __init__(self, rootSuites, oldOptionGroups):
+        SelectionAction.__init__(self, rootSuites, "Save Selection")
+        self.addOption(oldOptionGroups, "name", "Name to give selection")
+        self.selectionGroup = None
+    def matchesMode(self, dynamic):
+        return dynamic
+    def getGroupTabTitle(self):
+        return "Test" # 'Test' gives us no group tab ...
+    def saveActualTests(self):
+        return True # In the dynamic GUI, we must always save the test names ...
+        
 class RunTests(SelectionAction):
     runNumber = 1
     def __init__(self, rootSuites, oldOptionGroups):
@@ -919,7 +936,7 @@ class InteractiveActionHandler:
         self.testClasses =  [ RecordTest, EnableDiagnostics, CopyTest, RemoveTest ]
         self.suiteClasses = [ ImportTestCase, ImportTestSuite, RemoveTest ]
         self.appClasses = []
-        self.selectionClasses = [ SelectTests, SaveTests, RunTests, ResetGroups, SaveSelection ]
+        self.selectionClasses = [ SelectTests, SaveTests, RunTests, ResetGroups, SaveSelection, SaveSelectionDynamic ]
         self.optionGroupMap = {}
     def getFileViewer(self, test, dynamic):
         instance = self.makeInstance(ViewFile, test, dynamic)

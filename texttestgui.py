@@ -706,7 +706,7 @@ class InteractiveActionGUI:
         self.actions = actions
         self.test = test
         self.buttons = self.makeButtons()
-        self.pageDescriptions = { "Test" : {} }
+        self.pageDescInfo = { "Test" : {} }
         self.indexers = [] # Utility list for getting the values from multi-valued radio button groups :-(
         self.status = status
     def makeButtons(self):
@@ -737,10 +737,17 @@ class InteractiveActionGUI:
         except plugins.TextTestError, e:
             showError(str(e))
     def getPageDescription(self, pageName, subPageName = ""):
+        info = self.getPageDescInfo(pageName, subPageName)
+        if info is None:
+            return
+        optionGroup, buttonDesc = info
+        return "Viewing notebook page for '" + optionGroup.name + "'\n" + \
+               self.describeOptionGroup(optionGroup) + buttonDesc                    
+    def getPageDescInfo(self, pageName, subPageName):
         if subPageName:
-            return self.pageDescriptions.get(pageName).get(subPageName)
+            return self.pageDescInfo.get(pageName).get(subPageName)
         else:
-            return self.pageDescriptions.get("Test").get(pageName)
+            return self.pageDescInfo.get("Test").get(pageName)
     def createOptionGroupPages(self):
         pages = seqdict()
         pages["Test"] = []
@@ -750,24 +757,21 @@ class InteractiveActionGUI:
             hasButton = len(optionGroups) == 1 and instance.canPerform()
             for optionGroup in optionGroups:
                 if optionGroup.switches or optionGroup.options:
-                    display, displayDesc = self.createDisplay(optionGroup, hasButton, instance)
-                    pageDesc = "Viewing notebook page for '" + optionGroup.name + "'\n" + displayDesc
+                    display = self.createDisplay(optionGroup, hasButton, instance)
+                    buttonDesc = self.describeButton(hasButton, instance)
                     if not pages.has_key(instanceTab):
                         pages[instanceTab] = []
-                        self.pageDescriptions[instanceTab] = {}
-                    self.pageDescriptions[instanceTab][optionGroup.name] = pageDesc
+                        self.pageDescInfo[instanceTab] = {}
+                    self.pageDescInfo[instanceTab][optionGroup.name] = optionGroup, buttonDesc
                     pages[instanceTab].append((display, optionGroup.name))
         return pages
     def createDisplay(self, optionGroup, hasButton, instance):
         vbox = gtk.VBox()
-        displayDesc = ""
         for option in optionGroup.options.values():
             hbox = self.createOptionBox(option)
-            displayDesc += self.diagnoseOption(option) + "\n"
             vbox.pack_start(hbox, expand=False, fill=False)
         for switch in optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
-            displayDesc += self.diagnoseSwitch(switch) + "\n"
             vbox.pack_start(hbox, expand=False, fill=False)
         if hasButton:
             button = self.createButton(self.runInteractive, instance.getSecondaryTitle(), instance.getScriptTitle(tab=True), instance)
@@ -775,9 +779,20 @@ class InteractiveActionGUI:
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()
             vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
-            displayDesc += "Viewing button with title '" + instance.getTitle() + "'"
         vbox.show()
-        return vbox, displayDesc
+        return vbox
+    def describeOptionGroup(self, optionGroup):
+        displayDesc = ""
+        for option in optionGroup.options.values():
+            displayDesc += self.diagnoseOption(option) + "\n"
+        for switch in optionGroup.switches.values():
+            displayDesc += self.diagnoseSwitch(switch) + "\n"
+        return displayDesc
+    def describeButton(self, hasButton, instance):
+        if hasButton:
+            return "Viewing button with title '" + instance.getTitle() + "'"
+        else:
+            return ""
     def createComboBox(self, option):
         combobox = gtk.combo_box_entry_new_text()
         entry = combobox.child
@@ -848,9 +863,7 @@ class InteractiveActionGUI:
         value = switch.getValue()
         if len(switch.options) >= 1:
             text = "Viewing radio button for switch '" + switch.name + "', options "
-            for option in switch.options:
-                text += option + "/"
-            text = text[0:len(text) - 1] # Remove last '/'
+            text += string.join(switch.options, "/")
             text += "'. Default value " + str(value) + "."
         else:
             text = "Viewing check button for switch '" + switch.name + "'"

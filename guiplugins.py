@@ -186,6 +186,11 @@ class SelectionAction(InteractiveAction):
             else:
                 prevValue = currValue
         return prevValue
+    def addFilterFile(self, fileName):
+        selectionGroups = interactiveActionHandler.optionGroupMap.get(SelectTests)
+        if selectionGroups:
+            filterFileOption = selectionGroups[0].options["f"]
+            filterFileOption.addPossibleValue(os.path.basename(fileName))
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveTestAction(plugins.Action,InteractiveAction):
@@ -768,9 +773,7 @@ class SaveSelection(SelectionAction):
         file = open(fileName, "w")
         file.write(toWrite + "\n")
         file.close()
-        if self.selectionGroup:
-            filterFileOption = self.selectionGroup.options["f"]
-            filterFileOption.addPossibleValue(os.path.basename(fileName))
+        self.addFilterFile(fileName)
     def messageAfterPerform(self, parameter):
         return "Saved " + repr(parameter) + " in file '" + self.getFileName(parameter) + "'."
           
@@ -778,7 +781,6 @@ class SaveSelectionDynamic(SaveSelection):
     def __init__(self, rootSuites, oldOptionGroups):
         SelectionAction.__init__(self, rootSuites, "Save Selection")
         self.addOption(oldOptionGroups, "name", "Name to give selection")
-        self.selectionGroup = None
     def matchesMode(self, dynamic):
         return dynamic
     def getGroupTabTitle(self):
@@ -850,6 +852,12 @@ class RunTests(SelectionAction):
             errText = open(errFile).read()
             if len(errText):
                 raise plugins.TextTestError, "Dynamic run failed, with the following errors:\n" + errText
+
+        writeDir, local = os.path.split(errFile)
+        prelist = [ "output.log", "errors.log", "gui_select" ]
+        for fileName in os.listdir(writeDir):
+            if not fileName in prelist:
+                self.addFilterFile(fileName)
 
 class EnableDiagnostics(InteractiveTestAction):
     def __init__(self, test, oldOptionGroups):

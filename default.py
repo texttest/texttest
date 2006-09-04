@@ -178,6 +178,11 @@ class Config(plugins.Configuration):
         cmdLineDir = self.optionValue("fd")
         if cmdLineDir:
             return [ cmdLineDir ]
+
+        return self.getTmpFilterDirs(app) + self.getConfigFilterDirs(app)
+    def getTmpFilterDirs(self, app):
+        return glob.glob(os.path.join(app.writeDirectory, "dynamic_run*"))
+    def getConfigFilterDirs(self, app):
         rawDirs = app.getConfigValue("test_list_files_directory")
         allDirs = map(lambda dir: os.path.join(app.getDirectory(), dir), rawDirs)
         return filter(os.path.isdir, allDirs)
@@ -194,6 +199,7 @@ class Config(plugins.Configuration):
         if not fullPath:
             sys.stderr.write("Rejected application " + repr(app) + " : filter file '" + filename + "' could not be found\n")
             return [ RejectFilter() ]
+
         fileData = string.join(plugins.readList(fullPath), ",")
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
         return self.getFiltersFromMap(optionFinder, app)

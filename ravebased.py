@@ -84,22 +84,24 @@ class UserFilter(default.TextFilter):
  # x86_64_linux.master                                                                          X
  #
 
-class RaveSubmissionRules(queuesystem.SubmissionRules):
+class RaveSubmissionRules(CarmenSgeSubmissionRules):
     namesCreated = {}
-    def __init__(self, optionMap, test, getRuleSetName, normalSubmissionRules):
-        queuesystem.SubmissionRules.__init__(self, optionMap, test)
+    def __init__(self, optionMap, test, getRuleSetName):
+        CarmenSgeSubmissionRules.__init__(self, optionMap, test, nightjob=False)
         self.diag = plugins.getDiagnostics("Rule job names")
         self.getRuleSetName = getRuleSetName
         self.testRuleName = None
-        self.normalSubmissionRules = normalSubmissionRules
-        # Ignore all command line options, but take account of environment etc...
-        self.normalSubmissionRules.optionMap = {}
-        self.normalSubmissionRules.presetPerfCategory = "short"
-        self.normalSubmissionRules.majRelResourceType = "build"
-        self.normalSubmissionRules.envResource = self.getEnvironmentResource()
-        self.normalSubmissionRules.presetPerfCategory = os.getenv("QUEUE_SYSTEM_PERF_CATEGORY_RAVE", "")
+    def getMajorReleaseResourceType(self):
+        return "build"
+    def getProcessesNeeded(self):
+        return "1"
+    def findPriority(self):
+        # Don't lower the priority of these
+        return 0
     def getEnvironmentResource(self):
         return os.getenv("QUEUE_SYSTEM_RESOURCE_RAVE", "")
+    def getEnvironmentPerfCategory(self):
+        return os.getenv("QUEUE_SYSTEM_PERF_CATEGORY_RAVE", "short")
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName
@@ -114,32 +116,20 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
         self.diag.info(repr(self.namesCreated))
         self.testRuleName = basicName
         return basicName
-    def findQueue(self):
-        return self.normalSubmissionRules.findDefaultQueue()
-    def findPriority(self):
-        # Don't lower the priority of these
-        return 0
-    def findResourceList(self):
-        return self.normalSubmissionRules.findResourceList()
-    def getSubmitSuffix(self, name):
-        tx = self.normalSubmissionRules.getSubmitSuffix(name)
-        sPos = tx.find(", requesting")
-        if sPos != -1:
-            tx = tx[:sPos] + ", requesting " + string.join(self.findResourceList(), ",")
-        normalSuffix = " (" + self.getRuleSetName(self.test) + " ruleset)" + tx
-        if sPos == -1:
-            majRelResource = self.normalSubmissionRules.getMajorReleaseResource()
-            if majRelResource:
-                normalSuffix += "," + majRelResource
-        return normalSuffix
-    def forceOnPerformanceMachines(self):
-        return 0
-    def getProcessesNeeded(self):
-        return "1"
     def getUserParentName(self, test):
         if isUserSuite(test.parent):
             return test.parent.name
         return self.getUserParentName(test.parent)
+    def findQueueResource(self):
+        return self.getQueueFromCategory(self.presetPerfCategory)
+    def getBasicResources(self):
+        if self.envResource:
+            return [ self.envResource ]
+        else:
+            return []
+    def getSubmitSuffix(self, name):
+        return " (" + self.getRuleSetName(self.test) + " ruleset)" + \
+               CarmenSgeSubmissionRules.getSubmitSuffix(self, name)
 
 class Config(CarmenConfig):
     def addToOptionGroups(self, app, groups):
@@ -218,11 +208,10 @@ class Config(CarmenConfig):
         else:
             return [ filterer, self.getRuleBuildObject(), SynchroniseState() ]
     def getRaveSubmissionRules(self, test):
-        normalSubmissionRules = self.getSubmissionRules(test)
         if queuesystem.queueSystemName(test.app) == "LSF":
-            return normalSubmissionRules
+            return self.getSubmissionRules(test)
         else:    
-            return RaveSubmissionRules(self.optionMap, test, self.getRuleSetName, normalSubmissionRules)
+            return RaveSubmissionRules(self.optionMap, test, self.getRuleSetName)
     def getRuleBuildObject(self):
         return CompileRules(self.getRuleSetName, self.raveMode())
     def buildRules(self):

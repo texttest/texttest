@@ -74,10 +74,13 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
     def __init__(self, optionMap, test, nightjob=False):
         queuesystem.SubmissionRules.__init__(self, optionMap, test)
         # Must cache all environment variables, they may not be preserved in queue system thread...
-        self.presetPerfCategory = os.getenv("QUEUE_SYSTEM_PERF_CATEGORY", "")
+        self.presetPerfCategory = self.getEnvironmentPerfCategory()
         self.archToUse = getArchitecture(self.test.app)
         self.nightjob = nightjob
-        self.majRelResourceType = "run"
+    def getMajorReleaseResourceType(self):
+        return "run"
+    def getEnvironmentPerfCategory(self):
+        return os.getenv("QUEUE_SYSTEM_PERF_CATEGORY", "")
     def getShortQueueSeconds(self):
         return plugins.getNumberOfSeconds(str(self.test.getConfigValue("maximum_cputime_for_short_queue")))
     # Return "short", "medium" or "long"
@@ -103,7 +106,10 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
         requestedQueue = queuesystem.SubmissionRules.findQueue(self)
         if requestedQueue:
             return requestedQueue
-        category = self.getPerformanceCategory()
+        else:
+            category = self.getPerformanceCategory()
+            return self.getQueueFromCategory(category)
+    def getQueueFromCategory(self, category):
         if category == "short":
             return "short"
         elif category == "medium" or self.nightjob:
@@ -130,10 +136,12 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
         if majRelease == "none":
             return ""
         else:
-            return "carm" + self.majRelResourceType + majRelease + "=1"
+            return "carm" + self.getMajorReleaseResourceType() + majRelease + "=1"
+    def getBasicResources(self):
+        return queuesystem.SubmissionRules.findResourceList(self)
     def findConcreteResources(self):
+        resources = self.getBasicResources()
         # architecture resources
-        resources = queuesystem.SubmissionRules.findResourceList(self)
         resources.append("carmarch=\"*" + self.archToUse + "*\"")
         majRelResource = self.getMajorReleaseResource()
         if majRelResource:

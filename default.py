@@ -113,7 +113,7 @@ class Config(plugins.Configuration):
         defaultName = plugins.Configuration.getWriteDirectoryName(self, app)
         if self.useStaticGUI(app):
             dirname, local = os.path.split(defaultName)
-            return os.path.join(dirname, "static_gui." + local)
+            return os.path.join(dirname, "static_gui." + local.replace(app.versionSuffix(), ""))
         else:
             return defaultName
     def addGuiResponder(self, classes):

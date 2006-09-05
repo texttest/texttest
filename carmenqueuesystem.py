@@ -70,12 +70,14 @@ def fullVersionName(version):
     else:
         return "carmen_" + version
 
-class CarmenSubmissionRules(queuesystem.SubmissionRules):
-    def __init__(self, optionMap, test):
+class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
+    def __init__(self, optionMap, test, nightjob=False):
         queuesystem.SubmissionRules.__init__(self, optionMap, test)
         # Must cache all environment variables, they may not be preserved in queue system thread...
         self.presetPerfCategory = os.getenv("QUEUE_SYSTEM_PERF_CATEGORY", "")
         self.archToUse = getArchitecture(self.test.app)
+        self.nightjob = nightjob
+        self.majRelResourceType = "run"
     def getShortQueueSeconds(self):
         return plugins.getNumberOfSeconds(str(self.test.getConfigValue("maximum_cputime_for_short_queue")))
     # Return "short", "medium" or "long"
@@ -93,18 +95,12 @@ class CarmenSubmissionRules(queuesystem.SubmissionRules):
             return "long"
         else:
             return "medium"
-
-class SgeSubmissionRules(CarmenSubmissionRules):
-    def __init__(self, optionMap, test, nightjob=False):
-        CarmenSubmissionRules.__init__(self, optionMap, test)
-        self.nightjob = nightjob
-        self.majRelResourceType = "run"
     def findQueue(self):
         # Carmen's queues are all 'hidden', requesting them directly is not allowed.
         # They must be requested by their 'queue resources', that have the same names...
         return ""
     def findQueueResource(self):
-        requestedQueue = CarmenSubmissionRules.findQueue(self)
+        requestedQueue = queuesystem.SubmissionRules.findQueue(self)
         if requestedQueue:
             return requestedQueue
         category = self.getPerformanceCategory()
@@ -137,7 +133,7 @@ class SgeSubmissionRules(CarmenSubmissionRules):
             return "carm" + self.majRelResourceType + majRelease + "=1"
     def findConcreteResources(self):
         # architecture resources
-        resources = CarmenSubmissionRules.findResourceList(self)
+        resources = queuesystem.SubmissionRules.findResourceList(self)
         resources.append("carmarch=\"*" + self.archToUse + "*\"")
         majRelResource = self.getMajorReleaseResource()
         if majRelResource:
@@ -147,39 +143,6 @@ class SgeSubmissionRules(CarmenSubmissionRules):
         return self.findConcreteResources() + [ self.findQueueResource() ]
     def getSubmitSuffix(self, name):
         return " to " + name + " queue " + self.findQueueResource() + ", requesting " + string.join(self.findConcreteResources(), ",")
-
-class LsfSubmissionRules(CarmenSubmissionRules):
-    def findDefaultQueue(self):
-        if self.archToUse == "i386_linux" and not self.presetPerfCategory:
-            cpuTime = performance.getTestPerformance(self.test)
-            chunkLimit = plugins.getNumberOfSeconds(self.test.app.getConfigValue("maximum_cputime_for_chunking"))
-            if cpuTime > 0 and cpuTime < chunkLimit:
-                return "short_rd_testing_chunked"
-        return self.getQueuePerformancePrefix() + self.getArchQueueName() +\
-               self.getQueuePlatformSuffix()
-    def getArchQueueName(self):
-        if self.archToUse == "sparc_64":
-            return "sparc"
-        elif self.archToUse.find("linux") != -1:
-            return "linux"
-        else:
-            return self.archToUse
-    def getMajorReleaseResource(self):
-        return ""
-    def getQueuePerformancePrefix(self):
-        category = self.getPerformanceCategory()
-        if category == "short":
-            return "short_"
-        elif category == "medium" or (self.archToUse == "powerpc" or self.archToUse == "parisc_2_0"):
-            return ""
-        else:
-            return "idle_"
-    def getQueuePlatformSuffix(self):
-        if self.archToUse == "sparc" or self.archToUse == "sparc_64":
-            return "_sol8"
-        elif self.archToUse == "powerpc":
-            return "_aix5"
-        return ""
 
 class CarmenConfig(queuesystem.QueueSystemConfig):
     def addToOptionGroups(self, app, groups):
@@ -207,9 +170,9 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         return queuesystem.QueueSystemConfig.getTestCollator(self)
     def getSubmissionRules(self, test):
         if queuesystem.queueSystemName(test.app) == "LSF":
-            return LsfSubmissionRules(self.optionMap, test)
+            return queuesystem.QueueSystemConfig.getSubmissionRules(self, test)
         else:
-            return SgeSubmissionRules(self.optionMap, test, self.isNightJob())
+            return CarmenSgeSubmissionRules(self.optionMap, test, self.isNightJob())
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession == "nightjob" or batchSession == "wkendjob" or batchSession.startswith("nightly_publish") or batchSession.startswith("weekly_publish") or batchSession.startswith("small_publish")

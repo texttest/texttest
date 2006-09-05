@@ -51,7 +51,7 @@ from socket import gethostname
 from tempfile import mktemp
 from respond import Responder
 from traffic_cmd import sendServerState
-from carmenqueuesystem import getArchitecture, CarmenConfig, SgeSubmissionRules
+from carmenqueuesystem import getArchitecture, CarmenConfig, CarmenSgeSubmissionRules
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -119,8 +119,6 @@ class RaveSubmissionRules(queuesystem.SubmissionRules):
     def findPriority(self):
         # Don't lower the priority of these
         return 0
-    def useSge(self):
-        return isinstance(self.normalSubmissionRules, SgeSubmissionRules)
     def findResourceList(self):
         return self.normalSubmissionRules.findResourceList()
     def getSubmitSuffix(self, name):
@@ -221,7 +219,10 @@ class Config(CarmenConfig):
             return [ filterer, self.getRuleBuildObject(), SynchroniseState() ]
     def getRaveSubmissionRules(self, test):
         normalSubmissionRules = self.getSubmissionRules(test)
-        return RaveSubmissionRules(self.optionMap, test, self.getRuleSetName, normalSubmissionRules)
+        if queuesystem.queueSystemName(test.app) == "LSF":
+            return normalSubmissionRules
+        else:    
+            return RaveSubmissionRules(self.optionMap, test, self.getRuleSetName, normalSubmissionRules)
     def getRuleBuildObject(self):
         return CompileRules(self.getRuleSetName, self.raveMode())
     def buildRules(self):

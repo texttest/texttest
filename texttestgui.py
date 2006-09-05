@@ -21,7 +21,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, comparetest, os, string, time, sys
+import guiplugins, plugins, comparetest, os, string, time, sys, locale
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer
 from ndict import seqdict
@@ -1212,9 +1212,21 @@ class RightWindowGUI:
         textview = gtk.TextView()
         textview.set_wrap_mode(gtk.WRAP_WORD)
         textbuffer = textview.get_buffer()
-        # Need to convert to utf-8 for display...
-        unicodeInfo = unicode(testInfo, "utf-8", errors="replace")
-        textbuffer.set_text(unicodeInfo.encode("utf-8"))
+
+        # Encode to UTF-8, necessary for gtk.TextView
+        # First decode using most appropriate encoding ...
+        localeEncoding = locale.getdefaultlocale()[1]
+        try:
+            unicodeInfo = unicode(testInfo, localeEncoding, errors="strict")
+        except:
+            try:
+                guilog.info("Warning: Failed to decode string '" + testInfo + "' using default locale encoding " + repr(localeEncoding) + ". Trying strict UTF-8 encoding ...")
+                unicodeInfo = unicode(testInfo, 'utf-8', errors="strict")
+            except:
+                guilog.info("Warning: Failed to decode string '" + testInfo + "' both using strict UTF-8 and " + repr(localeEncoding) + " encodings.\nReverting to non-strict UTF-8 encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+                unicodeInfo = unicode(testInfo, 'utf-8', errors="replace")        
+        textbuffer.set_text(unicodeInfo.encode('utf-8'))
+
         textview.show()
         return textview
     def createProgressView(self):

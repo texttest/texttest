@@ -351,12 +351,17 @@ class MailSender:
     def findCommonVersions(self, app, batchDataList):
         if len(batchDataList) == 0:
             return app.versions
-        versions = batchDataList[0].suite.app.versions
-        for batchData in batchDataList[1:]:
-            for version in versions:
-                if not version in batchData.suite.app.versions:
-                    versions.remove(version)
-        return versions
+        commonVersions = []
+        otherBatchData = batchDataList[1:]
+        for trialVersion in batchDataList[0].suite.app.versions:
+            if self.allContain(otherBatchData, trialVersion):
+                commonVersions.append(trialVersion)
+        return commonVersions
+    def allContain(self, otherBatchData, trialVersion):
+        for batchData in otherBatchData:
+            if not trialVersion in batchData.suite.app.versions:
+                return False
+        return True
 
 # Allow saving results to a historical repository
 class SaveState(respond.SaveState):

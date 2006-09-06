@@ -176,16 +176,18 @@ class TestComparison(plugins.TestState):
                         self.addComparison(comparison)
     def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress = 0):
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress)
-    def saveSingle(self, stem, saveDir, exact = 1, versionString = ""):
-        comparison, storageList = self.findComparison(stem)
-        if comparison:
-            self.diag.info("Saving single file for stem " + stem)
-            comparison.overwrite(saveDir, exact, versionString)
-            storageList.remove(comparison)
-            if storageList is self.missingResults:
-                self.allResults.remove(comparison)
-            else:
-                self.correctResults.append(comparison)
+    def savePartial(self, fileNames, saveDir, exact = 1, versionString = ""):
+        for fileName in fileNames:
+            stem = fileName.split(".")[0]
+            comparison, storageList = self.findComparison(stem)
+            if comparison:
+                self.diag.info("Saving single file for stem " + stem)
+                comparison.overwrite(saveDir, exact, versionString)
+                storageList.remove(comparison)
+                if storageList is self.missingResults:
+                    self.allResults.remove(comparison)
+                else:
+                    self.correctResults.append(comparison)
         if len(self.getComparisons()) == 0:
             self.category = "success"
             self.freeText = ""

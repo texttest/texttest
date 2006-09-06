@@ -69,8 +69,6 @@ class Configuration:
         return []
     def setEnvironment(self, test):
         pass
-    def getPossibleResultFiles(self, app):
-        return []
     def hasPerformance(self, app):
         return False
     def getCleanMode(self):

@@ -881,8 +881,6 @@ class Application:
         if version:
             options += " -v " + version
         return options + " " + self.configObject.getRunOptions(checkout)
-    def getPossibleResultFiles(self):
-        return self.configObject.getPossibleResultFiles(self)
     def hasPerformance(self):
         return self.configObject.hasPerformance(self)
     def addToOptionGroup(self, group):

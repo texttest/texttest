@@ -88,7 +88,7 @@ class QuitGUI(guiplugins.SelectionAction):
     def messageAfterPerform(self, testSel):
         # Don't provide one, the GUI isn't there to show it :)
         pass
-    def performOn(self, tests):
+    def performOn(self, tests, files):
         # Generate a window closedown, so that the quit button behaves the same as closing the window
         self.exit()
     def getDoubleCheckMessage(self, test):
@@ -886,6 +886,9 @@ class SelectionActionGUI(InteractiveActionGUI):
         self.selection = selection
         self.itermap = {}
         self.filteredModel = filteredModel
+        self.currFileSelection = []
+    def notifyFileSelection(self, fileSel):
+        self.currFileSelection = fileSel
     def addNewTest(self, test, iter):
         if not self.itermap.has_key(test.app):
             self.itermap[test.app] = {}
@@ -896,7 +899,7 @@ class SelectionActionGUI(InteractiveActionGUI):
     def performInteractiveAction(self, action):
         testSel = self.makeTestSelection()
         self.status.output(action.messageBeforePerform(testSel))
-        action.performOn(testSel)
+        action.performOn(testSel, self.currFileSelection)
         message = action.messageAfterPerform(testSel)
         if message != None:
             self.status.output(message)
@@ -998,6 +1001,7 @@ class RightWindowGUI:
                 self.view(self.currentObject.parent)
     def makeObjectDependentContents(self, object):
         self.fileViewGUI = self.createFileViewGUI(object)
+        self.fileViewGUI.addObserver(self.selectionActionGUI)
         buttonBar, objectPages = self.makeActionElements(object)
         fileView = self.fileViewGUI.createView()
         return buttonBar, fileView, objectPages
@@ -1242,6 +1246,9 @@ class FileViewGUI:
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.name = object.name.replace("_", "__")
         self.dynamic = dynamic
+        self.observers = []
+    def addObserver(self, observer):
+        self.observers.append(observer)
     def addFileToModel(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
@@ -1265,6 +1272,7 @@ class FileViewGUI:
         fileWin = gtk.ScrolledWindow()
         fileWin.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         view = gtk.TreeView(self.model)
+        view.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn(self.name, renderer, text=0, background=1)
         column.set_cell_data_func(renderer, renderParentsBold)
@@ -1275,10 +1283,20 @@ class FileViewGUI:
         view.expand_all()
         indexer = TreeModelIndexer(self.model, column, 0)
         scriptEngine.connect("select file", "row_activated", view, self.displayFile, indexer)
+        scriptEngine.monitor("set file selection to", view.get_selection(), indexer)
+        self.selectionChanged(view.get_selection())
+        view.get_selection().connect("changed", self.selectionChanged)
         view.show()
         fileWin.add(view)
         fileWin.show()
-        return fileWin 
+        return fileWin
+    def selectionChanged(self, selection):
+        filelist = []
+        selection.selected_foreach(self.fileSelected, filelist)
+        for observer in self.observers:
+            observer.notifyFileSelection(filelist)
+    def fileSelected(self, treemodel, path, iter, filelist):
+        filelist.append(self.model.get_value(iter, 0))
     def displayFile(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)

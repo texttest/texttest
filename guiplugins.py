@@ -243,8 +243,6 @@ class SaveTests(SelectionAction):
         self.addSwitch(oldOptionGroups, "over", "Replace successfully compared files also", 0)
         if self.hasPerformance():
             self.addSwitch(oldOptionGroups, "ex", "Save: ", 1, ["Average performance", "Exact performance"])
-        allStems = self.findAllStems()
-        self.addOption(oldOptionGroups, "sinf", "Save single file", possibleValues=allStems)
     def isFrequentUse(self):
         return True
     def getTitle(self):
@@ -277,13 +275,6 @@ class SaveTests(SelectionAction):
             if app.hasPerformance():
                 return True
         return False
-    def findAllStems(self):
-        allStems = []
-        for app in self.apps:
-            for stem in app.getPossibleResultFiles():
-                if not stem in allStems:
-                    allStems.append(stem)
-        return allStems
     def getExactness(self):
         return int(self.optionGroup.getSwitchValue("ex", 1))
     def getVersion(self, test):
@@ -292,11 +283,10 @@ class SaveTests(SelectionAction):
             return self.getDefaultSaveVersion(test.app)
         else:
             return versionString
-    def performOn(self, testSel):
+    def performOn(self, testSel, fileSel):
         saveDesc = ", exactness " + str(self.getExactness())
-        singleFile = self.optionGroup.getOptionValue("sinf")
-        if singleFile:
-            saveDesc += ", only file with stem " + singleFile
+        if len(fileSel) > 0:
+            saveDesc += ", only " + string.join(fileSel, ",")
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
@@ -309,8 +299,8 @@ class SaveTests(SelectionAction):
             self.describe(test, fullDesc)
             testComparison = test.state
             if testComparison:
-                if singleFile:
-                    testComparison.saveSingle(singleFile, test, self.getExactness(), version)
+                if len(fileSel) > 0:
+                    testComparison.savePartial(fileSel, test, self.getExactness(), version)
                 else:
                     testComparison.save(test, self.getExactness(), version, overwriteSuccess)
                 test.filesChanged()
@@ -628,7 +618,7 @@ class SelectTests(SelectionAction):
     def getFilterList(self, app):
         app.configObject.updateOptions(self.appSelectGroup)
         return app.configObject.getFilterList(app)
-    def performOn(self, testSel):
+    def performOn(self, testSel, fileSel):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")
         selectedTests = []                
@@ -728,7 +718,7 @@ class ResetGroups(SelectionAction):
         return not dynamic
     def getScriptTitle(self, tab):
         return "Reset running options"
-    def performOn(self, testSel):
+    def performOn(self, testSel, fileSel):
         for optionGroups in interactiveActionHandler.optionGroupMap.values():
             for group in optionGroups:
                 group.reset()
@@ -767,7 +757,7 @@ class SaveSelection(SelectionAction):
         else:
             commandLines = self.selectionGroup.getCommandLines()
             return string.join(commandLines)
-    def performOn(self, testSel):
+    def performOn(self, testSel, fileSel):
         fileName = self.getFileName(testSel)
         toWrite = self.getTextToSave(testSel)
         file = open(fileName, "w")
@@ -814,7 +804,7 @@ class RunTests(SelectionAction):
         return not dynamic
     def isFrequentUse(self):
         return True
-    def performOn(self, testSel):
+    def performOn(self, testSel, fileSel):
         if testSel.size() == 0:
             raise plugins.TextTestError, "No tests selected - cannot run!"
         writeDir = os.path.join(self.apps[0].writeDirectory, "dynamic_run" + str(self.runNumber))

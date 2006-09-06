@@ -179,7 +179,7 @@ class Config(plugins.Configuration):
         if cmdLineDir:
             return [ cmdLineDir ]
 
-        return self.getTmpFilterDirs(app) + self.getConfigFilterDirs(app)
+        return self.getConfigFilterDirs(app) + self.getTmpFilterDirs(app) 
     def getTmpFilterDirs(self, app):
         return glob.glob(os.path.join(app.writeDirectory, "dynamic_run*"))
     def getConfigFilterDirs(self, app):

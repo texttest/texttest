@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 
 
-import os, filecmp, string, sys, plugins, time
+import os, filecmp, string, sys, plugins, time, stat
 from ndict import seqdict
 from predict import FailedPrediction
 from shutil import copyfile
@@ -227,6 +227,7 @@ class MakeComparisons(plugins.Action):
         self.lineCount = None
         self.maxLineWidth = None
         self.textDiffTool = None
+        self.textDiffToolMaxSize = -1
         if testComparisonClass:
             self.testComparisonClass = testComparisonClass
             MakeComparisons.defaultComparisonClass = testComparisonClass
@@ -277,6 +278,11 @@ class MakeComparisons(plugins.Action):
             return self.previewGenerator.getPreview(open(comparison.stdCmpFile))
 
         if plugins.canExecute(self.textDiffTool):
+            stdFileSize = os.stat(comparison.stdCmpFile)[stat.ST_SIZE]
+            tmpFileSize = os.stat(comparison.tmpCmpFile)[stat.ST_SIZE]
+            if self.textDiffToolMaxSize >= 0 and (stdFileSize > self.textDiffToolMaxSize or tmpFileSize > self.textDiffToolMaxSize):
+                return self.previewGenerator.getWrappedLine("Warning: The files were too large to compare - " + str(stdFileSize) + " and " + str(tmpFileSize) + " bytes, compared to the limit of " + str(self.textDiffToolMaxSize) + " bytes. Double-click on the file to see the difference, or adjust text_diff_program_max_file_size and re-run to see the difference in this text view.\n")
+            
             cmdLine = self.textDiffTool + " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
             stdout = os.popen(cmdLine)
             return self.previewGenerator.getPreview(stdout)
@@ -287,6 +293,7 @@ class MakeComparisons(plugins.Action):
         maxWidth = app.getConfigValue("max_width_text_difference")
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = app.getConfigValue("text_diff_program")
+        self.textDiffToolMaxSize = plugins.parseBytes(app.getConfigValue("text_diff_program_max_file_size"))
     
 class FileComparison:
     def __init__(self, test, stem, standardFile, tmpFile, testInProgress = 0):

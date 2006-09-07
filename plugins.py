@@ -52,6 +52,102 @@ def findRegularExpression(expr, text):
     except:
         return False
 
+# Parse the string as a byte expression.
+# Mb/mb/megabytes/mbytes
+def parseBytes(text):
+    lcText = text.lower()
+    try:
+        # Try this first, to save time if it works
+        try:
+            return float(text) 
+        except:
+            pass
+        
+        if lcText.endswith("kb") or lcText.endswith("kbytes") or lcText.endswith("k") or lcText.endswith("kilobytes"):
+            splitText = lcText.split('k')
+            if len(splitText) > 2:
+                raise
+            return 1000 * float(splitText[0])
+        elif lcText.endswith("kib") or lcText.endswith("kibibytes"):
+            splitText = lcText.split('k')
+            if len(splitText) > 2:
+                raise
+            return 1024 * float(splitText[0])
+        elif lcText.endswith("mb") or lcText.endswith("mbytes") or lcText.endswith("m") or lcText.endswith("megabytes"):
+            splitText = lcText.split('m')
+            if len(splitText) > 2:
+                raise 
+            return 1000000 * float(splitText[0])
+        elif lcText.endswith("mib") or lcText.endswith("mebibytes"):
+            splitText = lcText.split('m')
+            if len(splitText) > 2:
+                raise
+            return 1048576 * float(splitText[0])
+        elif lcText.endswith("gb") or lcText.endswith("gbytes") or lcText.endswith("g") or lcText.endswith("gigabytes"):
+            splitText = lcText.split('g')
+            if len(splitText) > 2:
+                raise
+            return 1000000000 * float(splitText[0])
+        elif lcText.endswith("gib") or lcText.endswith("gibibytes"):
+            splitText = lcText.split('g')
+            if len(splitText) > 2:
+                raise
+            return 1073741824 * float(splitText[0])
+        elif lcText.endswith("tb") or lcText.endswith("tbytes") or lcText.endswith("t") or lcText.endswith("terabytes"):
+            splitText = lcText.split('t')
+            if len(splitText) > 3:
+                raise
+            return 1000000000000 * float(splitText[0])
+        elif lcText.endswith("tib") or lcText.endswith("tebibytes"):
+            splitText = lcText.split('t')
+            if len(splitText) > 3:
+                raise
+            return 1099511627776 * float(splitText[0])
+        elif lcText.endswith("pb") or lcText.endswith("pbytes") or lcText.endswith("p") or lcText.endswith("petabytes"):
+            splitText = lcText.split('p')
+            if len(splitText) > 2:
+                raise
+            return 10**15 * float(splitText[0])
+        elif lcText.endswith("pib") or lcText.endswith("pebibytes"):
+            splitText = lcText.split('p')
+            if len(splitText) > 2:
+                raise
+            return 2**50 * float(splitText[0])
+        elif lcText.endswith("eb") or lcText.endswith("ebytes") or lcText.endswith("e") or lcText.endswith("exabytes"):
+            splitText = lcText.split('e')
+            if len(splitText) > 3:
+                raise
+            return 10**18 * float(splitText[0])
+        elif lcText.endswith("eib") or lcText.endswith("exbibytes"):
+            splitText = lcText.split('e')
+            if len(splitText) > 3:
+                raise
+            return 2**60 * float(splitText[0])
+        elif lcText.endswith("zb") or lcText.endswith("zbytes") or lcText.endswith("z") or lcText.endswith("zettabytes"):
+            splitText = lcText.split('z')
+            if len(splitText) > 2:
+                raise
+            return 10**21 * float(splitText[0])
+        elif lcText.endswith("zib") or lcText.endswith("zebibytes"):
+            splitText = lcText.split('z')
+            if len(splitText) > 2:
+                raise
+            return 2**70 * float(splitText[0])
+        elif lcText.endswith("yb") or lcText.endswith("ybytes") or lcText.endswith("y") or lcText.endswith("yottabytes"):
+            splitText = lcText.split('y')
+            if len(splitText) > 3:
+                raise
+            return 10**24 * float(splitText[0])
+        elif lcText.endswith("yib") or lcText.endswith("yobibytes"):
+            splitText = lcText.split('y')
+            if len(splitText) > 2:
+                raise
+            return 2**80 * float(splitText[0])
+        else:
+            return float(text) 
+    except:
+        raise "Illegal byte format '" + text + "'"
+
 # Generic configuration class
 class Configuration:
     CLEAN_NONE = 0

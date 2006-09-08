@@ -628,7 +628,8 @@ class SelectTests(SelectionAction):
                 if not filter.acceptsApplication(suite.app):
                     continue
                 
-            newTests = self.getTestsFromSuite(suite, filters, strategy, testSel)
+            reqTests = self.getRequestedTests(suite, filters)
+            newTests = self.combineWithPrevious(reqTests, strategy, testSel)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         testSel.update(selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
@@ -656,29 +657,28 @@ class SelectTests(SelectionAction):
                 if not version in appVersions:
                     return False
         return True
-    def getTestsFromSuite(self, suite, filters, strategy, testSel):
-        # Strategies: 0 - discard, 1 - refine, 2 - extend, 3 - exclude
-        # If we want to extend selection, we include test if it was previsouly selected,
-        # even if it doesn't fit the current criterion
-        if strategy == 2 and testSel.includes(suite):
-            return [ suite ]
+    def getRequestedTests(self, suite, filters):
         if not suite.isAcceptedByAll(filters):
             return []
         if suite.classId() == "test-suite":
             tests = []
             for subSuite in self.findTestCaseList(suite):
-                tests += self.getTestsFromSuite(subSuite, filters, strategy, testSel)
+                tests += self.getRequestedTests(subSuite, filters)
             return tests
         else:
-            if strategy == 0 or strategy == 2:
-                return [ suite ]
-            elif strategy == 1: # Refine - only add if already selected
-                if testSel.includes(suite):
-                    return [ suite ]
-            elif strategy == 3: # Exclude - don't add if already selected
-                if not testSel.includes(suite):
-                    return [ suite ]
-            return []
+            return [ suite ]
+    def combineWithPrevious(self, reqTests, strategy, testSel):
+        # Strategies: 0 - discard, 1 - refine, 2 - extend, 3 - exclude
+        # If we want to extend selection, we include test if it was previsouly selected,
+        # even if it doesn't fit the current criterion
+        if strategy == 0:
+            return reqTests
+        elif strategy == 1:
+            return filter(testSel.includes, reqTests)
+        elif strategy == 2:
+            return reqTests + testSel.tests
+        elif strategy == 3:
+            return filter(lambda test: not testSel.includes(test), reqTests)
     def findTestCaseList(self, suite):
         testcases = suite.testcases
         version = self.optionGroup.getOptionValue("vs")

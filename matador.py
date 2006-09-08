@@ -496,7 +496,7 @@ class FeatureFilter(plugins.Filter):
     def acceptsTestCase(self, test):    
         logFile = test.getFileName("output")
         if logFile:
-            commandLine = "tail -100 " + logFile + " | " + self.grepCommand + " > /dev/null 2>1"
+            commandLine = "tail -100 " + logFile + " | " + self.grepCommand + " > /dev/null 2>&1"
             return os.system(commandLine)
         else:
             return False

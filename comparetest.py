@@ -283,7 +283,7 @@ class MakeComparisons(plugins.Action):
             if self.textDiffToolMaxSize >= 0 and (stdFileSize > self.textDiffToolMaxSize or tmpFileSize > self.textDiffToolMaxSize):
                 return self.previewGenerator.getWrappedLine("Warning: The files were too large to compare - " + str(stdFileSize) + " and " + str(tmpFileSize) + " bytes, compared to the limit of " + str(self.textDiffToolMaxSize) + " bytes. Double-click on the file to see the difference, or adjust text_diff_program_max_file_size and re-run to see the difference in this text view.\n")
             
-            cmdLine = self.textDiffTool + " " + comparison.stdCmpFile + " " + comparison.tmpCmpFile
+            cmdLine = self.textDiffTool + " '" + comparison.stdCmpFile + "' '" + comparison.tmpCmpFile + "'"
             stdout = os.popen(cmdLine)
             return self.previewGenerator.getPreview(stdout)
         else:

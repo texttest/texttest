@@ -438,6 +438,10 @@ class Config(plugins.Configuration):
         severities["catalogue"] = 2
         severities["default"] = 99
         return severities
+    def defaultDisplayPriorities(self):
+        prios = {}
+        prios["default"] = 99
+        return prios
     def getDefaultCollations(self):
         if os.name == "posix":
             return { "stacktrace" : "core*" }
@@ -452,6 +456,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("log_file", "output", "Result file to search, by default")
         app.setConfigDefault("failure_severity", self.defaultSeverities(), \
                              "Mapping of result files to how serious diffs in them are")
+        app.setConfigDefault("failure_display_priority", self.defaultDisplayPriorities(), \
+                             "Mapping of result files to which order they should be shown in the text info window.")
 
         app.setConfigDefault("collate_file", self.getDefaultCollations(), "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")

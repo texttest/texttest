@@ -106,9 +106,25 @@ class TestComparison(plugins.TestState):
     def hasResults(self):
         return len(self.allResults) > 0
     def getComparisons(self):
-        return self.changedResults + self.newResults + self.missingResults
+        return self.changedResults + self.newResults + self.missingResults    
     def _comparisonsString(self, comparisons):
         return string.join([repr(x) for x in comparisons], ",")
+    # Sort according to failure_display_priority. Lower means show earlier,
+    # files with the same prio should be not be shuffled. 
+    def getSortedComparisons(self):
+        # sort() sorts in-place, so we want to copy first ...
+        changed = self.changedResults[:]
+        changed.sort(self.lessDisplayPriority)        
+        new = self.newResults[:]
+        new.sort(self.lessDisplayPriority)
+        missing = self.missingResults[:]
+        missing.sort(self.lessDisplayPriority)
+        return changed + new + missing
+    def lessDisplayPriority(self, first, second):
+        if first.displayPriority == second.displayPriority:
+            return cmp(first.stem, second.stem)
+        else:
+            return cmp(first.displayPriority, second.displayPriority)
     def getDifferenceSummary(self):
         return repr(self) + self._getDifferenceSummary()
     def _getDifferenceSummary(self):
@@ -258,7 +274,7 @@ class MakeComparisons(plugins.Action):
             state.freeText = self.getFreeTextInfo(state)
     def getFreeTextInfo(self, state):
         fullText = ""
-        for comparison in state.getComparisons():
+        for comparison in state.getSortedComparisons():
             fullText += self.fileComparisonTitle(comparison) + "\n"
             fullText += self.fileComparisonBody(comparison)
         return fullText
@@ -311,6 +327,7 @@ class FileComparison:
         self.tmpCmpFile = filter.filterFile(tmpFile, tmpCmpFileName, makeNew=testInProgress)
         self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
         self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
+        self.displayPriority = test.getCompositeConfigValue("failure_display_priority", self.stem)
         # subclasses may override if they don't want to store in this way
         self.cacheDifferences()
     def __repr__(self):

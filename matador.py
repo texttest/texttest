@@ -497,7 +497,7 @@ class FeatureFilter(plugins.Filter):
         logFile = test.getFileName("output")
         if logFile:
             commandLine = "tail -100 " + logFile + " | " + self.grepCommand + " > /dev/null 2>&1"
-            return os.system(commandLine)
+            return os.system(commandLine) == 0
         else:
             return False
 

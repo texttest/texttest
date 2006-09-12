@@ -54,22 +54,37 @@ class CheckForBugs(plugins.Action):
             return
 
         self.readBugs(test)
-        for stem, entryDict in self.bugMap.items():
+        for stem, info in self.bugMap.items():
             # bugs are only relevant if the file itself is changed
             comparison, list = test.state.findComparison(stem)
             if not comparison:
                 continue
             fileName = test.makeTmpFileName(stem)
-            if os.path.isfile(fileName):
-                for line in open(fileName).xreadlines():
-                    for trigger, bug in entryDict.items():
-                        if trigger.matches(line):
-                            newState = copy(test.state)
-                            category, briefText, fullText = bug.findInfo()
-                            bugState = KnownBugState(category, fullText, briefText)
-                            newState.setFailedPrediction(bugState)
-                            test.changeState(newState)
+            bug = self.findBug(fileName, info)
+            if bug:
+                newState = copy(test.state)
+                category, briefText, fullText = bug.findInfo()
+                bugState = KnownBugState(category, fullText, briefText)
+                newState.setFailedPrediction(bugState)
+                test.changeState(newState)
         self.unreadBugs(test)
+    def findBug(self, fileName, entryInfo):
+        if not os.path.isfile(fileName):
+            return
+        presentList, absentList = entryInfo
+        currAbsent = copy(absentList)
+        for line in open(fileName).xreadlines():
+            for trigger, bug in presentList:
+                if trigger.matches(line):
+                    return bug
+            for entry in currAbsent:
+                trigger, bug = entry
+                if trigger.matches(line):
+                    currAbsent.remove(entry)
+                    break
+        if len(currAbsent) > 0:
+            trigger, bug = currAbsent[0]
+            return bug
     def makeBugParser(self, suite):
         bugFile = suite.getFileName("knownbugs")
         if not bugFile:
@@ -94,10 +109,20 @@ class CheckForBugs(plugins.Action):
         for section in testBugParser.sections():
             fileStem, bugText = self.getSearchInfo(testBugParser, section)
             if not self.bugMap.has_key(fileStem):
-                self.bugMap[fileStem] = {}
+                self.bugMap[fileStem] = [], []
             self.diag.info("Adding entry to bug map " + fileStem + " : " + bugText)
             trigger = plugins.TextTrigger(bugText)
-            self.bugMap[fileStem][trigger] = self.createBugInfo(testBugParser, section)
+            presentList, absentList = self.bugMap[fileStem]
+            bugInfo = self.createBugInfo(testBugParser, section)
+            if self.checkForAbsence(testBugParser, section):
+                absentList.append((trigger, bugInfo))
+            else:
+                presentList.append((trigger, bugInfo))
+    def checkForAbsence(self, parser, section):
+        try:
+            return parser.get(section, "trigger_on_absence")
+        except NoOptionError:
+            return False
     def getSearchInfo(self, parser, section):
         return parser.get(section, "search_file"), parser.get(section, "search_string")
     def createBugInfo(self, parser, section):
@@ -115,12 +140,15 @@ class CheckForBugs(plugins.Action):
         for section in testBugParser.sections():
             fileStem, bugText = self.getSearchInfo(testBugParser, section)
             self.diag.info("Removing entry from bug map " + fileStem + " : " + bugText)
-            trigger = self.findTrigger(fileStem, bugText)
-            del self.bugMap[fileStem][trigger]
-    def findTrigger(self, fileStem, bugText):
-        for trigger in self.bugMap[fileStem].keys():
+            presentList, absentList = self.bugMap[fileStem]
+            self.removeFrom(presentList, bugText)
+            self.removeFrom(absentList, bugText)
+    def removeFrom(self, list, bugText):
+        for item in list:
+            trigger, bug = item
             if trigger.text == bugText:
-                return trigger
+                list.remove(item)
+                return
             
 class MigrateFiles(plugins.Action):
     def setUpSuite(self, suite):

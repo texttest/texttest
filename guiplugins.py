@@ -227,19 +227,14 @@ class InteractiveTestAction(plugins.Action,InteractiveAction):
         guilog.info("Viewing file " + fileName.replace(os.sep, "/") + " using '" + descriptor + "', refresh set to " + str(refresh))
         process = self.startExternalProgram(commandLine, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
+    def setUpSuite(self, suite):
+        self(suite)
     
 # Plugin for saving tests (standard)
 class SaveTests(SelectionAction):
     def __init__(self, rootTestSuites, oldOptionGroups):
         SelectionAction.__init__(self, rootTestSuites, "Saving")
-        extensions = []
-        for app in self.apps:
-            for ext in app.getSaveableVersions():
-                if not ext in extensions:
-                    extensions.append(ext)
-        # Include the default version always
-        extensions.append("")
-        self.addOption(oldOptionGroups, "v", "Version to save", self.getDefaultSaveOption(), extensions)
+        self.addOption(oldOptionGroups, "v", "Version to save", self.getDefaultSaveOption(), self.getPossibleVersions())
         self.addSwitch(oldOptionGroups, "over", "Replace successfully compared files also", 0)
         if self.hasPerformance():
             self.addSwitch(oldOptionGroups, "ex", "Save: ", 1, ["Average performance", "Exact performance"])
@@ -261,6 +256,15 @@ class SaveTests(SelectionAction):
             return "<default> - " + saveVersions
         else:
             return saveVersions
+    def getPossibleVersions(self):
+        extensions = []
+        for app in self.apps:
+            for ext in app.getSaveableVersions():
+                if not ext in extensions:
+                    extensions.append(ext)
+        # Include the default version always
+        extensions.append("")
+        return extensions
     def getSaveVersions(self):
         saveVersions = []
         for app in self.apps:
@@ -851,7 +855,7 @@ class RunTests(SelectionAction):
 
 class EnableDiagnostics(InteractiveTestAction):
     def __init__(self, test, oldOptionGroups):
-        InteractiveTestAction.__init__(self, test, oldOptionGroups)
+        InteractiveTestAction.__init__(self, test)
         configDir = test.app.getConfigValue("diagnostics")
         self.configFile = None
         if configDir.has_key("configuration_file"):
@@ -890,8 +894,6 @@ class RemoveTest(InteractiveTestAction):
         suite = test.parent
         self.removeFromTestFile(suite, test.name)
         suite.removeTest(test)
-    def setUpSuite(self, suite):
-        self(suite)
     def removeFromTestFile(self, suite, testName):
         newFileName = os.path.join(suite.app.writeDirectory, "tmptestsuite")
         newFile = plugins.openForWrite(newFileName)
@@ -949,12 +951,78 @@ class CopyTest(ImportTest):
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copyfile(sourcePath, targetPath)
         suite.addTestCase(os.path.basename(testDir))
+
+class ReportBugs(InteractiveTestAction):
+    def __init__(self, test, oldOptionGroups):
+        InteractiveTestAction.__init__(self, test, "Bugs")
+        self.addOption(oldOptionGroups, "search_string", "Text or regexp to match")
+        self.addOption(oldOptionGroups, "search_file", "File to search in", test.app.getConfigValue("log_file"),
+                       self.getPossibleFileStems())
+        self.addOption(oldOptionGroups, "version", "Version to report for", test.app.getFullVersion())
+        self.addOption(oldOptionGroups, "bug_system", "Extract info from bug system", "<none>", [ "bugzilla" ])
+        self.addOption(oldOptionGroups, "bug_id", "Bug ID (only if bug system given)")
+        self.addOption(oldOptionGroups, "full_description", "Full description (only if bug system NOT given)")
+        self.addOption(oldOptionGroups, "brief_description", "Few-word summary (only if bug system NOT given)")
+        self.addSwitch(oldOptionGroups, "trigger_on_absence", "Trigger if given text is NOT present")
+        self.addSwitch(oldOptionGroups, "internal_error", "Trigger even if other files differ (report as internal error)")
+    def getTitle(self):
+        return "Report"
+    def getScriptTitle(self, tab):
+        return "report described bugs"
+    def matchesMode(self, dynamic):
+        return not dynamic
+    def getPossibleFileStems(self):
+        stems = []
+        for test in self.test.testCaseList():
+            resultFiles, defFiles = test.listStandardFiles(allVersions=False)
+            for fileName in resultFiles:
+                stem = os.path.basename(fileName).split(".")[0]
+                if not stem in stems:
+                    stems.append(stem)
+        return stems
+    def checkSanity(self):
+        if len(self.optionGroup.getOptionValue("search_string")) == 0:
+            raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"
+        if self.optionGroup.getOptionValue("bug_system") == "<none>":
+            if len(self.optionGroup.getOptionValue("full_description")) == 0 or \
+               len(self.optionGroup.getOptionValue("brief_description")) == 0:
+                raise plugins.TextTestError, "Must either provide a bug system or fill in both description and summary fields"
+        else:
+            if len(self.optionGroup.getOptionValue("bug_id")) == 0:
+                raise plugins.TextTestError, "Must provide a bug ID if bug system is given"
+    def versionSuffix(self):
+        version = self.optionGroup.getOptionValue("version")
+        if len(version) == 0:
+            return ""
+        else:
+            return "." + version
+    def getFileName(self, test):
+        name = "knownbugs." + test.app.name + self.versionSuffix()
+        return os.path.join(test.getDirectory(), name)
+    def write(self, writeFile, message):
+        writeFile.write(message)
+        guilog.info(message)
+    def __call__(self, test):
+        self.checkSanity()
+        fileName = self.getFileName(test)
+        guilog.info("Recording known bugs to " + fileName + " : ")
+        writeFile = open(fileName, "a")
+        self.write(writeFile, "\n[Reported by " + plugins.tmpString + " at " + plugins.localtime() + "]\n")
+        for name, option in self.optionGroup.options.items():
+            value = option.getValue()
+            if name != "version" and len(value) != 0 and value != "<none>":
+                self.write(writeFile, name + ":" + value + "\n")
+        for name, switch in self.optionGroup.switches.items():
+            if switch.getValue():
+                self.write(writeFile, name + ":1\n")
+        writeFile.close()
+        test.filesChanged()
     
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.testClasses =  [ RecordTest, EnableDiagnostics, CopyTest, RemoveTest ]
-        self.suiteClasses = [ ImportTestCase, ImportTestSuite, RemoveTest ]
+        self.testClasses =  [ RecordTest, EnableDiagnostics, CopyTest, RemoveTest, ReportBugs ]
+        self.suiteClasses = [ ImportTestCase, ImportTestSuite, RemoveTest, ReportBugs ]
         self.appClasses = []
         self.selectionClasses = [ SelectTests, SaveTests, RunTests, ResetGroups, SaveSelection, SaveSelectionDynamic ]
         self.optionGroupMap = {}

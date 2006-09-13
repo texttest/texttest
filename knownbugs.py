@@ -60,7 +60,7 @@ class CheckForBugs(plugins.Action):
             if not comparison:
                 continue
             fileName = test.makeTmpFileName(stem)
-            bug = self.findBug(fileName, info)
+            bug = self.findBug(fileName, test.state.executionHosts, info)
             if bug:
                 newState = copy(test.state)
                 category, briefText, fullText = bug.findInfo()
@@ -68,23 +68,30 @@ class CheckForBugs(plugins.Action):
                 newState.setFailedPrediction(bugState)
                 test.changeState(newState)
         self.unreadBugs(test)
-    def findBug(self, fileName, entryInfo):
+    def findBug(self, fileName, execHosts, entryInfo):
         if not os.path.isfile(fileName):
             return
         presentList, absentList = entryInfo
         currAbsent = copy(absentList)
         for line in open(fileName).xreadlines():
-            for trigger, bug in presentList:
-                if trigger.matches(line):
+            for trigger, triggerHosts, bug in presentList:
+                if trigger.matches(line) and self.hostsMatch(triggerHosts, execHosts):
                     return bug
             for entry in currAbsent:
-                trigger, bug = entry
+                trigger, triggerHosts, bug = entry
                 if trigger.matches(line):
                     currAbsent.remove(entry)
                     break
-        if len(currAbsent) > 0:
-            trigger, bug = currAbsent[0]
-            return bug
+        for trigger, triggerHosts, bug in currAbsent:
+            if self.hostsMatch(triggerHosts, execHosts):
+                return bug
+    def hostsMatch(self, triggerHosts, execHosts):
+        if len(triggerHosts) == 0:
+            return True
+        for host in execHosts:
+            if not host in triggerHosts:
+                return False
+        return True
     def makeBugParser(self, suite):
         bugFile = suite.getFileName("knownbugs")
         if not bugFile:
@@ -112,12 +119,13 @@ class CheckForBugs(plugins.Action):
                 self.bugMap[fileStem] = [], []
             self.diag.info("Adding entry to bug map " + fileStem + " : " + bugText)
             trigger = plugins.TextTrigger(bugText)
+            execHosts = self.getExecutionHosts(testBugParser, section)
             presentList, absentList = self.bugMap[fileStem]
             bugInfo = self.createBugInfo(testBugParser, section)
             if self.checkForAbsence(testBugParser, section):
-                absentList.append((trigger, bugInfo))
+                absentList.append((trigger, execHosts, bugInfo))
             else:
-                presentList.append((trigger, bugInfo))
+                presentList.append((trigger, execHosts, bugInfo))
     def checkForAbsence(self, parser, section):
         try:
             return parser.get(section, "trigger_on_absence")
@@ -125,6 +133,12 @@ class CheckForBugs(plugins.Action):
             return False
     def getSearchInfo(self, parser, section):
         return parser.get(section, "search_file"), parser.get(section, "search_string")
+    def getExecutionHosts(self, parser, section):
+        try:
+            stringVal = parser.get(section, "execution_hosts")
+            return stringVal.split(",")
+        except NoOptionError:
+            return []
     def createBugInfo(self, parser, section):
         try:
             bugSystem = parser.get(section, "bug_system")
@@ -145,7 +159,7 @@ class CheckForBugs(plugins.Action):
             self.removeFrom(absentList, bugText)
     def removeFrom(self, list, bugText):
         for item in list:
-            trigger, bug = item
+            trigger, execHosts, bug = item
             if trigger.text == bugText:
                 list.remove(item)
                 return

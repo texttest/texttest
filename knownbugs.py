@@ -21,9 +21,12 @@ class Bug:
             return "bug"
 
 class BugSystemBug(Bug):
-    def __init__(self, bugSystem, bugId):
+    def __init__(self, bugSystem, bugId, ignoreFlag):
         self.bugId = bugId
         self.bugSystem = bugSystem
+        self.ignoreFlag = ignoreFlag
+    def ignoreOtherErrors(self):
+        return self.ignoreFlag
     def findInfo(self):
         exec "from " + self.bugSystem + " import findBugText, findStatus, isResolved"
         bugText = findBugText(self.bugId)
@@ -39,6 +42,8 @@ class UnreportedBug(Bug):
         self.internalError = internalError
     def findInfo(self):
         return self.findCategory(self.internalError), self.briefText, self.fullText
+    def ignoreOtherErrors(self):
+        return self.internalError        
 
 class CheckForBugs(plugins.Action):
     def __init__(self):
@@ -54,6 +59,7 @@ class CheckForBugs(plugins.Action):
             return
 
         self.readBugs(test)
+        multipleErrors = len(test.state.getComparisons()) > 1
         for stem, info in self.bugMap.items():
             # bugs are only relevant if the file itself is changed
             comparison, list = test.state.findComparison(stem)
@@ -61,9 +67,9 @@ class CheckForBugs(plugins.Action):
                 continue
             fileName = test.makeTmpFileName(stem)
             bug = self.findBug(fileName, test.state.executionHosts, info)
-            if bug:
-                newState = copy(test.state)
+            if bug and (not multipleErrors or bug.ignoreOtherErrors()):
                 category, briefText, fullText = bug.findInfo()
+                newState = copy(test.state)
                 bugState = KnownBugState(category, fullText, briefText)
                 newState.setFailedPrediction(bugState)
                 test.changeState(newState)
@@ -140,12 +146,18 @@ class CheckForBugs(plugins.Action):
         except NoOptionError:
             return []
     def createBugInfo(self, parser, section):
+        internalErrorFlag = self.getIntErrFlag(parser, section)
         try:
             bugSystem = parser.get(section, "bug_system")
-            return BugSystemBug(bugSystem, parser.get(section, "bug_id"))
+            return BugSystemBug(bugSystem, parser.get(section, "bug_id"), internalErrorFlag)
         except NoOptionError:
             return UnreportedBug(parser.get(section, "full_description"), \
-                                 parser.get(section, "brief_description"), int(parser.get(section, "internal_error")))
+                                 parser.get(section, "brief_description"), internalErrorFlag)
+    def getIntErrFlag(self, parser, section):
+        try:
+            return int(parser.get(section, "internal_error"))
+        except NoOptionError:
+            return 0
     def unreadBugs(self, suite):
         testBugParser = self.testBugParserMap.get(suite)
         if not testBugParser:

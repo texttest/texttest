@@ -959,10 +959,11 @@ class ReportBugs(InteractiveTestAction):
         self.addOption(oldOptionGroups, "search_file", "File to search in", test.app.getConfigValue("log_file"),
                        self.getPossibleFileStems())
         self.addOption(oldOptionGroups, "version", "Version to report for", test.app.getFullVersion())
+        self.addOption(oldOptionGroups, "execution_hosts", "Trigger only when run on machine(s)")
         self.addOption(oldOptionGroups, "bug_system", "Extract info from bug system", "<none>", [ "bugzilla" ])
         self.addOption(oldOptionGroups, "bug_id", "Bug ID (only if bug system given)")
-        self.addOption(oldOptionGroups, "full_description", "Full description (only if bug system NOT given)")
-        self.addOption(oldOptionGroups, "brief_description", "Few-word summary (only if bug system NOT given)")
+        self.addOption(oldOptionGroups, "full_description", "Full description (no bug system)")
+        self.addOption(oldOptionGroups, "brief_description", "Few-word summary (no bug system)")
         self.addSwitch(oldOptionGroups, "trigger_on_absence", "Trigger if given text is NOT present")
         self.addSwitch(oldOptionGroups, "internal_error", "Trigger even if other files differ (report as internal error)")
     def getTitle(self):

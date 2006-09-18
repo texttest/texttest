@@ -33,7 +33,7 @@ helpOptions = """
              the graphical information also
 """
 
-import queuesystem, default, performance, os, string, shutil, plugins, respond, predict, time
+import queuesystem, default, performance, os, string, shutil, plugins, respond, time
 from ndict import seqdict
 
 def getConfig(optionMap):

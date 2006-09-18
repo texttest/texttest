@@ -3,7 +3,6 @@
 
 import os, filecmp, string, sys, plugins, time, stat
 from ndict import seqdict
-from predict import FailedPrediction
 from shutil import copyfile
 from tempfile import mktemp
 from re import sub
@@ -20,7 +19,7 @@ class TestComparison(plugins.TestState):
         self.missingResults = []
         self.correctResults = []
         self.failedPrediction = None
-        if previousInfo.category == "killed" or isinstance(previousInfo, FailedPrediction):
+        if previousInfo.category == "killed":
             self.setFailedPrediction(previousInfo)
         self.diag = plugins.getDiagnostics("TestComparison")
         # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved

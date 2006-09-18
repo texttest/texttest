@@ -1,7 +1,6 @@
 #!/usr/local/bin/python
 
-import default, respond, performance, predict, os, shutil, plugins, string, time, sys
-from socket import gethostname
+import default, plugins, os
                 
 class RunTest(default.RunTest):
     def __init__(self):

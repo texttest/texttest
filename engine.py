@@ -5,8 +5,6 @@ from threading import Thread
 from usecase import ScriptEngine
 from ndict import seqdict
 
-plugins.addCategory("unrunnable", "unrunnable", "could not be run")
-
 class TestRunner:
     def __init__(self, test, appRunner, diag):
         self.test = test
@@ -41,8 +39,7 @@ class TestRunner:
             self.failTest(exceptionText)
     def failTest(self, excString):
         execHosts = self.test.state.executionHosts
-        failState = plugins.TestState("unrunnable", briefText="UNRUNNABLE", freeText=excString, \
-                                      executionHosts=execHosts, completed=1)
+        failState = plugins.Unrunnable(freeText=excString, executionHosts=execHosts)
         self.test.changeState(failState)
     def performActions(self, previousTestRunner, runToCompletion):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
@@ -256,15 +253,13 @@ class ActionRunner:
         try:
             self.runNormal()
             self.diag.info("Finishing - notifying all completed")
-            for responder in testmodel.Test.observers:
-                responder.notifyAllComplete()
+            testmodel.Test.observerGroup.notifyAllCompleted()
         except KeyboardInterrupt, e:
             excData = str(e)
             self.writeTermMessage(excData)
             fetchResults = excData.find("LIMIT") != -1
             self.switchToCleanup(fetchResults)
-            for responder in testmodel.Test.observers:
-                responder.notifyInterrupt(fetchResults)
+            testmodel.Test.observerGroup.notifyInterrupted(fetchResults)
             self.run()
     def writeTermMessage(self, excData):
         message = "Terminating testing due to external interruption"
@@ -430,7 +425,7 @@ class TextTest:
         # Make sure we send application events when tests change state
         responderClasses.append(testmodel.ApplicationEventResponder)
         self.allResponders = map(lambda x : x(self.inputOptions), responderClasses)
-        testmodel.Test.observers = self.allResponders
+        testmodel.Test.observerGroup.setObservers(self.allResponders)
     def createTestSuites(self):
         uniqueNameFinder = UniqueNameFinder()
         appSuites = seqdict()

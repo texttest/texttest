@@ -72,10 +72,10 @@ class SocketResponder(Responder):
             except socket.error:
                 sleep(1)
         sendSocket.connect(self.serverAddress)
-    def notifyLifecycleChange(self, test, changeDesc):
+    def notifyLifecycleChange(self, test, state, changeDesc):
         if self.serverAddress:
             testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
-            pickleData = dumps(test.state)
+            pickleData = dumps(state)
             sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.connect(sendSocket)
             sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
@@ -114,6 +114,10 @@ class QueueSystemConfig(default.Config):
             return default.Config.getWriteDirectoryName(self, app)
     def useExtraVersions(self):
         return not self.slaveRun()
+    def getLifecycleCompletor(self):
+        # Don't do this, we notify directly from the socket handler, it's faster that way...
+        if not self.useQueueSystem() or self.slaveRun():
+            return default.Config.getLifecycleCompletor(self)
     def getCleanMode(self):
         if self.slaveRun():
             return self.CLEAN_NONE
@@ -500,8 +504,7 @@ class KillTestSubmission(plugins.Action):
     def setSlaveFailed(self, test):
         failReason, fullText = self.getSlaveFailure(test)
         fullText = failReason + "\n" + fullText
-        test.changeState(plugins.TestState("unrunnable", briefText=failReason, \
-                                           freeText=fullText, completed=1))
+        test.changeState(plugins.Unrunnable(briefText=failReason, freeText=fullText))
     def getSlaveFailure(self, test):
         slaveErrFile = test.makeTmpFileName("slaveerrs", forFramework=1)
         if os.path.isfile(slaveErrFile):

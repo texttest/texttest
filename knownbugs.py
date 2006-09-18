@@ -2,16 +2,22 @@
 
 import plugins, os, string
 from ConfigParser import ConfigParser, NoOptionError
-from predict import FailedPrediction
 from copy import copy
+from ndict import seqdict
 
 plugins.addCategory("bug", "known bugs", "had known bugs")
+plugins.addCategory("badPredict", "internal errors", "had internal errors")
+plugins.addCategory("crash", "CRASHED")
 
-class KnownBugState(FailedPrediction):
+# For backwards compatibility...
+class FailedPrediction(plugins.TestState):
     def isSaveable(self):
         return self.category != "bug"
     def getTypeBreakdown(self):
-        return "success", self.briefText
+        if self.category == "bug":
+            return "success", self.briefText
+        else:
+            return "failure", self.briefText
 
 class Bug:
     def findCategory(self, internalError):
@@ -21,12 +27,9 @@ class Bug:
             return "bug"
 
 class BugSystemBug(Bug):
-    def __init__(self, bugSystem, bugId, ignoreFlag):
+    def __init__(self, bugSystem, bugId):
         self.bugId = bugId
         self.bugSystem = bugSystem
-        self.ignoreFlag = ignoreFlag
-    def ignoreOtherErrors(self):
-        return self.ignoreFlag
     def findInfo(self):
         exec "from " + self.bugSystem + " import findBugText, findStatus, isResolved"
         bugText = findBugText(self.bugId)
@@ -42,139 +45,227 @@ class UnreportedBug(Bug):
         self.internalError = internalError
     def findInfo(self):
         return self.findCategory(self.internalError), self.briefText, self.fullText
-    def ignoreOtherErrors(self):
-        return self.internalError        
 
-class CheckForBugs(plugins.Action):
-    def __init__(self):
-        self.bugMap = {}
-        self.testBugParserMap = {}
+class BugTrigger:
+    def __init__(self, getOption):
+        self.textTrigger = plugins.TextTrigger(getOption("search_string"))
+        self.triggerHosts = self.getTriggerHosts(getOption)
+        self.checkUnchanged = int(getOption("trigger_on_success", "0"))
+        self.ignoreOtherErrors = int(getOption("internal_error", "0"))
+        self.bugInfo = self.createBugInfo(getOption)
         self.diag = plugins.getDiagnostics("Check For Bugs")
-    def setUpSuite(self, suite):
-        self.readBugs(suite)
-    def tearDownSuite(self, suite):
-        self.unreadBugs(suite)
-    def __call__(self, test):
-        if not test.state.hasFailed():
+    def getTriggerHosts(self, getOption):
+        hostStr = getOption("execution_hosts")
+        if hostStr:
+            return hostStr.split(",")
+        else:
+            return []
+    def createBugInfo(self, getOption):
+        bugSystem = getOption("bug_system")
+        if bugSystem:
+            return BugSystemBug(bugSystem, getOption("bug_id"))
+        else:
+            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.ignoreOtherErrors)
+    def hasText(self, bugText):
+        return self.textTrigger.text == bugText
+    def matchesText(self, line):
+        return self.textTrigger.matches(line)
+    def findBug(self, execHosts, isChanged, multipleErrors, line=None):
+        if not self.checkUnchanged and not isChanged:
+            self.diag.info("File not changed, ignoring")
             return
-
-        self.readBugs(test)
-        multipleErrors = len(test.state.getComparisons()) > 1
-        for stem, info in self.bugMap.items():
-            # bugs are only relevant if the file itself is changed
-            comparison, list = test.state.findComparison(stem)
-            if not comparison:
-                continue
-            fileName = test.makeTmpFileName(stem)
-            bug = self.findBug(fileName, test.state.executionHosts, info)
-            if bug and (not multipleErrors or bug.ignoreOtherErrors()):
-                category, briefText, fullText = bug.findInfo()
-                newState = copy(test.state)
-                bugState = KnownBugState(category, fullText, briefText)
-                newState.setFailedPrediction(bugState)
-                test.changeState(newState)
-        self.unreadBugs(test)
-    def findBug(self, fileName, execHosts, entryInfo):
-        if not os.path.isfile(fileName):
+        if multipleErrors and not self.ignoreOtherErrors:
+            self.diag.info("Multiple errors present, allowing others through")
             return
-        presentList, absentList = entryInfo
-        currAbsent = copy(absentList)
-        for line in open(fileName).xreadlines():
-            for trigger, triggerHosts, bug in presentList:
-                if trigger.matches(line) and self.hostsMatch(triggerHosts, execHosts):
-                    return bug
-            for entry in currAbsent:
-                trigger, triggerHosts, bug = entry
-                if trigger.matches(line):
-                    currAbsent.remove(entry)
-                    break
-        for trigger, triggerHosts, bug in currAbsent:
-            if self.hostsMatch(triggerHosts, execHosts):
-                return bug
-    def hostsMatch(self, triggerHosts, execHosts):
-        if len(triggerHosts) == 0:
+        if line is not None and not self.textTrigger.matches(line):
+            return
+        if self.hostsMatch(execHosts):
+            return self.bugInfo
+        else:
+            self.diag.info("No match " + repr(execHosts) + " with " + repr(self.triggerHosts))
+    def hostsMatch(self, execHosts):
+        if len(self.triggerHosts) == 0:
             return True
         for host in execHosts:
-            if not host in triggerHosts:
+            if not host in self.triggerHosts:
                 return False
         return True
-    def makeBugParser(self, suite):
-        bugFile = suite.getFileName("knownbugs")
-        if not bugFile:
-            return
 
-        self.diag.info("Reading bugs from file " + bugFile)
+class FileBugData:
+    def __init__(self):
+        self.presentList = []
+        self.absentList = []
+        self.checkUnchanged = False
+        self.diag = plugins.getDiagnostics("Check For Bugs")
+    def addBugTrigger(self, getOption):
+        bugTrigger = BugTrigger(getOption)
+        if bugTrigger.checkUnchanged:
+            self.checkUnchanged = True
+        if getOption("trigger_on_absence", False):
+            self.absentList.append(bugTrigger)
+        else:
+            self.presentList.append(bugTrigger)
+    def insert(self, bugData):
+        self.presentList += bugData.presentList
+        self.absentList += bugData.absentList
+        self.checkUnchanged |= bugData.checkUnchanged
+    def remove(self, bugData):
+        for trigger in bugData.presentList:
+            self.presentList.remove(trigger)
+        for trigger in bugData.absentList:
+            self.absentList.remove(trigger)
+        if bugData.checkUnchanged:
+            self.checkUnchanged = False
+            for trigger in self.presentList + self.absentList:
+                if trigger.checkUnchanged:
+                    self.checkUnchanged = True
+    def findBug(self, fileName, execHosts, isChanged, multipleErrors):
+        self.diag.info("Looking for bugs in " + fileName)
+        if not self.checkUnchanged and not isChanged:
+            self.diag.info("File not changed, ignoring")
+            return
+        if not os.path.isfile(fileName):
+            self.diag.info("File doesn't exist, ignoring")
+            return
+        currAbsent = copy(self.absentList)
+        for line in open(fileName).xreadlines():
+            for bugTrigger in self.presentList:
+                bug = bugTrigger.findBug(execHosts, isChanged, multipleErrors, line)
+                if bug:
+                    return bug
+            for bugTrigger in currAbsent:
+                if bugTrigger.matchesText(line):
+                    currAbsent.remove(bugTrigger)
+                    break
+        for bugTrigger in currAbsent:
+            bug = bugTrigger.findBug(execHosts, isChanged, multipleErrors)
+            if bug:
+                return bug
+
+class ParseMethod:
+    def __init__(self, parser, section):
+        self.parser = parser
+        self.section = section
+    def __call__(self, option, default=""):
+        try:
+            return self.parser.get(self.section, option)
+        except NoOptionError:
+            return default
+
+class BugMap(seqdict):
+    def checkUnchanged(self):
+        for bugData in self.values():
+            if bugData.checkUnchanged:
+                return True
+        return False
+    def readFromFile(self, fileName):
+        parser = self.makeParser(fileName)
+        if parser:
+            self.readFromParser(parser)
+    def makeParser(self, fileName):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = str
         try:
-            parser.read(bugFile)
+            parser.read(fileName)
             return parser
         except:
-            print "Bug file at", bugFile, "not understood, ignoring"
-    def readBugs(self, suite):
-        if not self.testBugParserMap.has_key(suite):
-            self.testBugParserMap[suite] = self.makeBugParser(suite)
-            
-        testBugParser = self.testBugParserMap.get(suite)
-        if not testBugParser:
-            return
-        for section in testBugParser.sections():
-            fileStem, bugText = self.getSearchInfo(testBugParser, section)
-            if not self.bugMap.has_key(fileStem):
-                self.bugMap[fileStem] = [], []
-            self.diag.info("Adding entry to bug map " + fileStem + " : " + bugText)
-            trigger = plugins.TextTrigger(bugText)
-            execHosts = self.getExecutionHosts(testBugParser, section)
-            presentList, absentList = self.bugMap[fileStem]
-            bugInfo = self.createBugInfo(testBugParser, section)
-            if self.checkForAbsence(testBugParser, section):
-                absentList.append((trigger, execHosts, bugInfo))
+            print "Bug file at", fileName, "not understood, ignoring"
+    def readFromParser(self, parser):
+        for section in parser.sections():
+            getOption = ParseMethod(parser, section)
+            fileStem = getOption("search_file")
+            if not self.has_key(fileStem):
+                self[fileStem] = FileBugData()
+            self[fileStem].addBugTrigger(getOption)
+    def insert(self, bugMap):
+        for fileStem, testBugData in bugMap.items():
+            if self.has_key(fileStem):
+                self[fileStem].insert(testBugData)
             else:
-                presentList.append((trigger, execHosts, bugInfo))
-    def checkForAbsence(self, parser, section):
-        try:
-            return parser.get(section, "trigger_on_absence")
-        except NoOptionError:
-            return False
-    def getSearchInfo(self, parser, section):
-        return parser.get(section, "search_file"), parser.get(section, "search_string")
-    def getExecutionHosts(self, parser, section):
-        try:
-            stringVal = parser.get(section, "execution_hosts")
-            return stringVal.split(",")
-        except NoOptionError:
-            return []
-    def createBugInfo(self, parser, section):
-        internalErrorFlag = self.getIntErrFlag(parser, section)
-        try:
-            bugSystem = parser.get(section, "bug_system")
-            return BugSystemBug(bugSystem, parser.get(section, "bug_id"), internalErrorFlag)
-        except NoOptionError:
-            return UnreportedBug(parser.get(section, "full_description"), \
-                                 parser.get(section, "brief_description"), internalErrorFlag)
-    def getIntErrFlag(self, parser, section):
-        try:
-            return int(parser.get(section, "internal_error"))
-        except NoOptionError:
-            return 0
-    def unreadBugs(self, suite):
-        testBugParser = self.testBugParserMap.get(suite)
-        if not testBugParser:
+                self[fileStem] = testBugData
+    def remove(self, bugMap):
+        for fileStem, testBugData in bugMap.items():
+            self[fileStem].remove(testBugData)
+
+class CheckForCrashes(plugins.Action):
+    def __init__(self):
+        self.diag = plugins.getDiagnostics("check for crashes")
+    def __call__(self, test):
+        if test.state.category == "killed":
             return
-        
-        for section in testBugParser.sections():
-            fileStem, bugText = self.getSearchInfo(testBugParser, section)
-            self.diag.info("Removing entry from bug map " + fileStem + " : " + bugText)
-            presentList, absentList = self.bugMap[fileStem]
-            self.removeFrom(presentList, bugText)
-            self.removeFrom(absentList, bugText)
-    def removeFrom(self, list, bugText):
-        for item in list:
-            trigger, execHosts, bug = item
-            if trigger.text == bugText:
-                list.remove(item)
-                return
+        # Hard-coded prediction: check test didn't crash
+        comparison, newList = test.state.findComparison("stacktrace")
+        if comparison:
+            stackTraceFile = comparison.tmpFile
+            self.diag.info("Parsing " + stackTraceFile)
+            summary, errorInfo = self.parseStackTrace(test, stackTraceFile)
+            newState = copy(test.state)
+            comparison, newList = newState.findComparison("stacktrace")
+            newList.remove(comparison)
+            crashState = FailedPrediction("crash", errorInfo, summary)
+            newState.setFailedPrediction(crashState)
+            test.changeState(newState)
+            os.remove(stackTraceFile)
+    def parseStackTrace(self, test, stackTraceFile):
+        lines = open(stackTraceFile).readlines()
+        if len(lines) > 2:
+            return lines[0].strip(), string.join(lines[2:], "")
+        else:
+            errFile = test.makeTmpFileName("stacktrace.collate_errs", forFramework=1)
+            return "core not parsed", "Errors from collation script:\n" + open(errFile).read()
+
+class CheckForBugs(plugins.Action):
+    def __init__(self):
+        self.activeBugs = BugMap()
+        self.testBugMap = {} # map from test to BugMap
+        self.diag = plugins.getDiagnostics("Check For Bugs")
+    def setUpSuite(self, suite):
+        self.readBugs(suite)
+        self.activateBugs(suite)
+    def tearDownSuite(self, suite):
+        self.deactivateBugs(suite)
+    def __call__(self, test):
+        self.readBugs(test)
+        if not self.checkTest(test):
+            return
+
+        self.activateBugs(test)
+        multipleErrors = len(test.state.getComparisons()) > 1
+        for stem, fileBugData in self.activeBugs.items():
+            # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
+            isChanged = self.fileChanged(test, stem)
+            fileName = test.makeTmpFileName(stem)
+            bug = fileBugData.findBug(fileName, test.state.executionHosts, isChanged, multipleErrors)
+            if bug:
+                category, briefText, fullText = bug.findInfo()
+                self.diag.info("Changing to " + category + " with text " + briefText)
+                newState = copy(test.state)
+                bugState = FailedPrediction(category, fullText, briefText)
+                newState.setFailedPrediction(bugState)
+                test.changeState(newState)
+        self.deactivateBugs(test)
+    def checkTest(self, test):
+        if self.activeBugs.checkUnchanged() or self.testBugMap[test].checkUnchanged():
+            return True
+        return test.state.hasFailed()
+    def fileChanged(self, test, stem):
+        comparison, list = test.state.findComparison(stem)
+        return bool(comparison)
+    def makeBugMap(self, suite):
+        bugFile = suite.getFileName("knownbugs")
+        bugMap = BugMap()
+        if bugFile:
+            self.diag.info("Reading bugs from file " + bugFile)
+            bugMap.readFromFile(bugFile)
+        return bugMap
+    def readBugs(self, suite):
+        if not self.testBugMap.has_key(suite):
+            self.testBugMap[suite] = self.makeBugMap(suite)
+    def activateBugs(self, suite):     
+        self.activeBugs.insert(self.testBugMap[suite])
+    def deactivateBugs(self, suite):
+        self.activeBugs.remove(self.testBugMap[suite])
             
 class MigrateFiles(plugins.Action):
     def setUpSuite(self, suite):
@@ -230,3 +321,26 @@ class MigrateFiles(plugins.Action):
             if not letter in string.digits:
                 return None
         return "bugzilla"
+
+class MigrateInternalErrors(plugins.Action):
+    def setUpApplication(self, app):
+        errNo = 0
+        fileName = os.path.join(app.getDirectory(), "knownbugs." + app.name + app.versionSuffix())
+        print "Writing to", fileName
+        writeFile = open(fileName, "a")
+            
+        for text in app.getConfigValue("internal_error_text"):
+            errNo += 1
+            self.writeSection(writeFile, errNo, text, absent=False)
+        for text in app.getConfigValue("internal_compulsory_text"):
+            errNo += 1
+            self.writeSection(writeFile, errNo, text, absent=True)
+    def writeSection(self, writeFile, errNo, text, absent):
+        writeFile.write("\n[Migrated internal error " + str(errNo) + "]\n")
+        writeFile.write("search_string:" + text + "\n")
+        writeFile.write("search_file:output\n")
+        if absent:
+            writeFile.write("trigger_on_absence:1\n")
+        writeFile.write("full_description:" + text + "\n")
+        writeFile.write("brief_description:" + text + "\n")
+        writeFile.write("internal_error:1\n")

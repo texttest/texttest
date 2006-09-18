@@ -298,11 +298,21 @@ class TestState:
         # Do we have actual results that can be compared
         return 0
     def shouldAbandon(self):
-        return self.category == "unrunnable"
+        return False
     def isSaveable(self):
         return self.hasFailed() and self.hasResults()
     def updatePaths(self, newAbsPath, newWriteDir):
         pass
+
+addCategory("unrunnable", "unrunnable", "could not be run")
+
+class Unrunnable(TestState):
+    def __init__(self, freeText, briefText="UNRUNNABLE", executionHosts=[]):
+        TestState.__init__(self, "unrunnable", freeText, briefText, completed=1, \
+                           executionHosts=executionHosts, lifecycleChange="complete")
+    def shouldAbandon(self):
+        return True
+                        
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
@@ -569,6 +579,7 @@ class BackgroundProcess(Process):
     def doFork(self):
         self.processId, self.processHandle = self.processHandler.spawnProcess(self.commandLine, self.shellTitle, self.holdShell)
     def waitForStart(self):
+        sys.stdout.flush()
         while self.processHandle is None:
             time.sleep(0.1)
     def runExitHandler(self):

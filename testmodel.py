@@ -144,11 +144,25 @@ class EnvironmentReader:
             else:
                 self.diag.info("Not adding reference " + var + " as same as local value " + expValue)
         return childReferenceVars
+
+class ObserverGroup:
+    def __init__(self):
+        self.observers = []
+    def setObservers(self, observers):
+        self.observers = observers
+    def notifyAllCompleted(self):
+        for observer in self.observers:
+            if observer.notifyAllComplete(self):
+                return
+    def notifyInterrupted(self, fetchResults):
+        for observer in self.observers:
+            if observer.notifyInterrupt(fetchResults):
+                return        
     
 # Base class for TestCase and TestSuite
 class Test:
     # List of objects observing all tests, for reacting to state changes
-    observers = []    
+    observerGroup = ObserverGroup()
     def __init__(self, name, dircache, app, parent = None):
         self.name = name
         # There is nothing to stop several tests having the same name. Maintain another name known to be unique
@@ -306,22 +320,21 @@ class Test:
             return self.parent.makePathName(fileName)
     def notifyCompleted(self):
         self.diagnose("Completion notified")
-        for observer in self.observers:
+        for observer in self.observerGroup.observers:
             observer.notifyComplete(self)
-        self.notifyLifecycle("complete")
-    def notifyLifecycle(self, changeDesc):
-        for observer in self.observers:
-            if observer.notifyLifecycleChange(self, changeDesc):
-                # threaded observers/GUI will be notified anyway by notifyChanged - don't create a race condition
-                return
-    def notifyChanged(self, state=None):
-        self.diagnose("Change notified, state " + repr(state))
-        for observer in self.observers:
-            if observer.notifyChange(self, state):
+    def notifyLifecycle(self, state, changeDesc):
+        for observer in self.observerGroup.observers:
+            self.diagnose("Notifying observer called " + str(observer.__class__))
+            if observer.notifyLifecycleChange(self, state, changeDesc):
                 # threaded observers can transfer the change to another thread for later propagation
                 return
-        if state and state.lifecycleChange:
-            self.notifyLifecycle(state.lifecycleChange)            
+    def notifyChanged(self):
+        # Only used for non-lifecycle important changes where GUIs etc need notifying
+        self.diagnose("Change notified")
+        for observer in self.observerGroup.observers:
+            if observer.notifyChange(self):
+                # threaded observers can transfer the change to another thread for later propagation
+                return
     def getRelPath(self):
         # We standardise communication around UNIX paths, it's all much easier that way
         relPath = plugins.relpath(self.getDirectory(), self.app.getDirectory())
@@ -396,7 +409,8 @@ class TestCase(Test):
     def changeState(self, state):
         self.state = state
         self.diagnose("Change notified to state " + state.category)
-        self.notifyChanged(state)
+        if state and state.lifecycleChange:
+            self.notifyLifecycle(state, state.lifecycleChange)            
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
     def setWriteDirectory(self, newDir):
@@ -469,16 +483,16 @@ class TestCase(Test):
             return os.path.join(dir, stem)
     def getNewState(self, file):
         if not file:
-            return False, plugins.TestState("unrunnable", briefText="no results", \
-                                            freeText="No file found to load results from", completed=1)
+            return False, plugins.Unrunnable(briefText="no results", \
+                                            freeText="No file found to load results from")
         try:
             unpickler = Unpickler(file)
             newState = unpickler.load()
             newState.ensureCompatible()
             return True, newState
         except UnpicklingError:
-            return False, plugins.TestState("unrunnable", briefText="read error", \
-                                            freeText="Failed to read results file", completed=1)
+            return False, plugins.Unrunnable(briefText="read error", \
+                                             freeText="Failed to read results file")
     def saveState(self):
         stateFile = self.getStateFile()
         if os.path.isfile(stateFile):
@@ -1196,11 +1210,13 @@ class OptionFinder(plugins.OptionFinder):
     
 # Compulsory responder to generate application events. Always present. See respond module
 class ApplicationEventResponder(Responder):
-    def notifyLifecycleChange(self, test, changeDesc):
+    def notifyLifecycleChange(self, test, state, changeDesc):
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName
         timeDelay = int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
         self.scriptEngine.applicationEvent(eventName, category, timeDelay)
+    def notifyAllComplete(self, observerGroup):
+        self.scriptEngine.applicationEvent("completion of test actions")
             
 class MultiEntryDictionary(seqdict):
     def __init__(self):

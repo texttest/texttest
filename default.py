@@ -1,9 +1,9 @@
 #!/usr/local/bin/python
 
-import os, shutil, plugins, respond, performance, comparetest, string, predict, sys, batch, re, stat
+import os, shutil, plugins, respond, performance, comparetest, string, sys, batch, re, stat
 import glob
 from threading import currentThread
-from knownbugs import CheckForBugs
+from knownbugs import CheckForBugs, CheckForCrashes
 from traffic import SetUpTrafficHandlers
 from cPickle import Unpickler
 from socket import gethostname
@@ -118,6 +118,7 @@ class Config(plugins.Configuration):
             return defaultName
     def addGuiResponder(self, classes):
         from texttestgui import TextTestGUI
+        classes.append(respond.ThreadTransferResponder)
         classes.append(TextTestGUI)
     def _getActionSequence(self, makeDirs):
         actions = [ self.getTestProcessor() ]
@@ -262,8 +263,8 @@ class Config(plugins.Configuration):
         if self.isReconnectingFast():
             return self.getFileExtractor()
         else:
-            return [ self.getFileExtractor(), self.getTestPredictionChecker(), \
-                     self.getTestComparator(), self.getFailureExplainer() ]
+            return [ self.getFileExtractor(), self.getTestComparator(), \
+                     self.getFailureExplainer(), self.getLifecycleCompletor() ]
     def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull"))
@@ -283,12 +284,12 @@ class Config(plugins.Configuration):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def getPerformanceFileMaker(self):
         return MakePerformanceFile(self.getMachineInfoFinder())
+    def getLifecycleCompletor(self):
+        return CompleteLifecycle()
     def getMachineInfoFinder(self):
         return MachineInfoFinder()
-    def getTestPredictionChecker(self):
-        return predict.CheckPredictions()
     def getFailureExplainer(self):
-        return CheckForBugs()
+        return [ CheckForCrashes(), CheckForBugs() ]
     def showExecHostsInFailures(self):
         return self.batchMode()
     def getTestComparator(self):
@@ -467,8 +468,6 @@ class Config(plugins.Configuration):
         app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
         app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")
-        app.setConfigDefault("internal_error_text", [], "List of text to be considered as an internal error, if present")
-        app.setConfigDefault("internal_compulsory_text", [], "List of text to be considered as an internal error, if not present")
         
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
@@ -527,6 +526,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
+        app.setConfigDefault("internal_error_text", [], "deprecated")
+        app.setConfigDefault("internal_compulsory_text", [], "deprecated")
         app.addConfigEntry("definition_file_stems", "options")
         app.addConfigEntry("definition_file_stems", "usecase")
         app.addConfigEntry("definition_file_stems", "traffic")
@@ -543,6 +544,10 @@ class Config(plugins.Configuration):
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.showExecHostsInFailures()
 
+class CompleteLifecycle(plugins.Action):
+    def __call__(self, test):
+        test.state.lifecycleChange = "complete"
+        test.notifyLifecycle(test.state, test.state.lifecycleChange)
 
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:
@@ -1055,7 +1060,7 @@ class RejectFilter(plugins.Filter):
 # if we aren't it...
 class Pending(plugins.TestState):
     def __init__(self, process, execHosts):
-        plugins.TestState.__init__(self, "pending", executionHosts=execHosts)
+        plugins.TestState.__init__(self, "pending", executionHosts=execHosts, lifecycleChange="become pending")
         self.process = process
         if currentThread().getName() == "MainThread":
             self.notifyInMainThread()
@@ -1761,7 +1766,7 @@ class DocumentConfig(plugins.Action):
 
 class DocumentScripts(plugins.Action):
     def setUpApplication(self, app):
-        modNames = [ "batch", "comparetest", "default", "performance", "predict" ]
+        modNames = [ "batch", "comparetest", "default", "performance" ]
         for modName in modNames:
             importCommand = "import " + modName
             exec importCommand

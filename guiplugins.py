@@ -966,6 +966,7 @@ class ReportBugs(InteractiveTestAction):
         self.addOption(oldOptionGroups, "brief_description", "Few-word summary (no bug system)")
         self.addSwitch(oldOptionGroups, "trigger_on_absence", "Trigger if given text is NOT present")
         self.addSwitch(oldOptionGroups, "internal_error", "Trigger even if other files differ (report as internal error)")
+        self.addSwitch(oldOptionGroups, "trigger_on_success", "Trigger even if test would otherwise succeed")
     def getTitle(self):
         return "Report"
     def getScriptTitle(self, tab):

@@ -127,7 +127,7 @@ optimization.PlotSubplans
 """
 
 
-import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, predict, unixonly, guiplugins, copy, comparetest, testoverview, time, testmodel
+import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, unixonly, guiplugins, copy, comparetest, testoverview, time, testmodel
 from ndict import seqdict
 from time import sleep
 from respond import Responder
@@ -357,48 +357,7 @@ class OptimizationTestComparison(performance.PerformanceTestComparison):
 
         floatVal = ((largest - smallest) / abs(smallest)) * 100
         return str(round(floatVal, 1))    
- 
-class CheckOptimizationRun(predict.CheckLogFilePredictions):
-    def __repr__(self):
-        return "Checking optimization values for"
-    def __call__(self, test):
-        self.describe(test)
-        noIncreaseExceptMethods = test.app.getConfigValue(noIncreasMethodsConfigKey)
-        interestingValues = noIncreaseExceptMethods.keys()
-        # Note also that CSL parameter changes in rostering can cause the cost to go up
-        if test.name.find("CSL_param") != -1:
-            interestingValues.remove(costEntryName)
-        optRun = OptimizationRun(test, "", [], interestingValues + [ methodEntryName ])
-        for value in interestingValues:
-            oldValue, newValue = self.findIncrease(optRun, value, noIncreaseExceptMethods)
-            if oldValue != None:
-                self.insertError(test, "Increase in " + value + " (from " + str(oldValue) + " to " + str(newValue) + ")")
-    def findIncrease(self, optRun, entry, noIncreaseExceptMethods):
-        lastEntry = None
-        for solution in optRun.solutions:
-            if not solution.has_key(entry):
-                continue
-            currEntry = solution[entry]
-            optRun.diag.info("Checking solution " + repr(solution))
-            if lastEntry != None and self.hasIncreased(entry, currEntry, lastEntry) and self.shouldCheckMethod(entry, solution, noIncreaseExceptMethods):
-                return lastEntry, currEntry
-            lastEntry = currEntry
-        return None, None
-    def hasIncreased(self, entry, currEntry, lastEntry):
-        if currEntry <= lastEntry:
-            return 0
-        # For cost, allow a certain tolerance corresponding to CPLEX's tolerance
-        if entry != costEntryName:
-            return 1
-        percIncrease = float(currEntry - lastEntry) / float(lastEntry)
-        return percIncrease > 0.00001
-    def shouldCheckMethod(self, entry, solution, noIncreaseExceptMethods):
-        currMethod = solution.get(methodEntryName, "")
-        for skipMethod in noIncreaseExceptMethods[entry]:
-            if currMethod.find(skipMethod) != -1:
-                return 0
-        return 1
-    
+     
 class LogFileFinder:
     def __init__(self, test, tryTmpFile = 1, searchInUser = None):
         self.tryTmpFile = tryTmpFile
@@ -1031,7 +990,7 @@ class GraphPlotResponder(Responder):
             self.writeDir = suite.app.writeDirectory
     def notifyComplete(self, test):
         self.testGraph.createPlotLinesForTest(test)
-    def notifyAllComplete(self):
+    def notifyAllComplete(self, obsGroup):
         try:
             self.testGraph.plot(self.writeDir)
         except plugins.TextTestError, e:

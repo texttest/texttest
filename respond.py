@@ -4,6 +4,7 @@ import sys, string, os, plugins, types
 from usecase import ScriptEngine
 from threading import currentThread
 from Queue import Queue, Empty
+from time import sleep
 
 # Interface all responders must fulfil
 class Responder:
@@ -19,17 +20,17 @@ class Responder:
     # Full suite of tests, get notified of it at the start...
     def addSuite(self, suite):
         pass
-    # Called when anything changes at all
-    def notifyChange(self, test, state):
+    # Called when anything changes at all, not related to lifecycle below
+    def notifyChange(self, test):
         pass
     # Called when the state of the test "moves on" in its lifecycle
-    def notifyLifecycleChange(self, test, changeDesc):
+    def notifyLifecycleChange(self, test, state, changeDesc):
         pass
     # Called when no further actions will be performed on the test
     def notifyComplete(self, test):
         pass
     # Called when everything is finished
-    def notifyAllComplete(self):
+    def notifyAllComplete(self, observerGroup):
         pass
     def notifyInterrupt(self, fetchResults):
         if not fetchResults:
@@ -51,43 +52,41 @@ class SaveState(Responder):
         test.saveState()
 
 # Utility for responders that want a separate thread to run permanently... generally useful for GUIs
-class ThreadedResponder(Responder):
+# Make it a singleton so we can find it...
+class ThreadTransferResponder(Responder):
+    instance = None
     def __init__(self, optionMap):
         Responder.__init__(self, optionMap)
         self.workQueue = Queue()
-    def needsOwnThread(self):
-        return 1
-    def processChangesMainThread(self):
+        self.allCompleted = False
+        ThreadTransferResponder.instance = self
+    def setUpScriptEngine(self):
+        # Don't want the script engine attached here, leave for GUI...
+        pass
+    def pollQueue(self):
         try:
-            test, state = self.workQueue.get_nowait()
-            if state == "allComplete":
-                self.notifyAllComplete()
-                return False
-            if test:
-                if type(state) == types.StringType:
-                    test.notifyLifecycle(state)
-                else:
-                    test.notifyChanged(state)
+            method, args = self.workQueue.get_nowait()
+            method(*args)
         except Empty:
             pass
-        return True
-    def notifyChange(self, test, state):
+        # We must sleep for a bit, or we use the whole CPU (busy-wait)
+        sleep(0.1)
+        return not self.allCompleted
+    def maybeTransfer(self, queueMethod, *args):
         if self.closedown:
             return
         if not plugins.inMainThread():
-            self.workQueue.put((test, state))
+            self.workQueue.put((queueMethod, args))
             return 1
-        else:
-            self.notifyChangeMainThread(test, state)
-    def notifyLifecycleChange(self, test, changeDesc):
-        if not plugins.inMainThread():
-            self.workQueue.put((test, changeDesc))
-            return 1 
-    def notifyAllComplete(self):
+    def notifyChange(self, test):
+        return self.maybeTransfer(test.notifyChanged)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        return self.maybeTransfer(test.notifyLifecycle, state, changeDesc)
+    def notifyAllComplete(self, observerGroup):
+        retVal = self.maybeTransfer(observerGroup.notifyAllCompleted)
         if plugins.inMainThread():
-            self.scriptEngine.applicationEvent("completion of test actions")
-        else:
-            self.workQueue.put((None, "allComplete"))
+            self.allCompleted = True
+        return retVal
             
 class InteractiveResponder(Responder):
     def __init__(self, optionMap):
@@ -140,6 +139,8 @@ class InteractiveResponder(Responder):
     def viewTest(self, test):
         outputText = test.state.freeText
         sys.stdout.write(outputText)
+        if not outputText.endswith("\n"):
+            sys.stdout.write("\n")
         logFile = test.getConfigValue("log_file")
         logFileComparison, list = test.state.findComparison(logFile)
         if logFileComparison:

@@ -25,7 +25,7 @@ import guiplugins, plugins, comparetest, os, string, time, sys, locale
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer
 from ndict import seqdict
-from respond import ThreadedResponder
+from respond import Responder, ThreadTransferResponder
 
 def destroyDialog(dialog, *args):
     dialog.destroy()
@@ -38,7 +38,7 @@ def showError(message):
     dialog.vbox.pack_start(label, expand=True, fill=True)
     label.show()
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
-    dialog.show()
+    dialog.show()    
         
 class DoubleCheckDialog:
     def __init__(self, message, yesMethod, yesMethodArgs=()):
@@ -125,11 +125,11 @@ def getGtkRcFile():
     if os.path.isfile(file):
         return file
 
-class TextTestGUI(ThreadedResponder):
+class TextTestGUI(Responder):
     def __init__(self, optionMap):
         self.readGtkRCFile()
         self.dynamic = not optionMap.has_key("gx")
-        ThreadedResponder.__init__(self, optionMap)
+        Responder.__init__(self, optionMap)
         guiplugins.scriptEngine = self.scriptEngine
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
@@ -144,6 +144,8 @@ class TextTestGUI(ThreadedResponder):
         self.rootSuites = []
         self.status = GUIStatusMonitor()
         self.collapsedRows = {}
+    def needsOwnThread(self):
+        return True
     def readGtkRCFile(self):
         file = getGtkRcFile()
         if file:
@@ -507,7 +509,7 @@ class TextTestGUI(ThreadedResponder):
             self.totalNofTests += 1
     def runWithActionThread(self, actionThread):
         self.setUpGui(actionThread)
-        gobject.idle_add(self.pickUpChange)
+        gobject.idle_add(ThreadTransferResponder.instance.pollQueue)
         gtk.main()
     def runAlone(self):
         self.setUpGui()
@@ -517,11 +519,6 @@ class TextTestGUI(ThreadedResponder):
         rootSuite = self.rootSuites[0]
         guilog.info("Viewing test " + repr(rootSuite))
         return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.status, self.progressMonitor)
-    def pickUpChange(self):
-        response = self.processChangesMainThread()
-        # We must sleep for a bit, or we use the whole CPU (busy-wait)
-        time.sleep(0.1)
-        return response
     def pickUpProcess(self):
         process = guiplugins.processTerminationMonitor.getTerminatedProcess()
         if process:
@@ -533,16 +530,10 @@ class TextTestGUI(ThreadedResponder):
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
         return True
-    def notifyChangeMainThread(self, test, state):
+    def notifyViews(self, test, state):
         # May have already closed down or not started yet, don't crash if so
         if not self.selection or not self.selection.get_tree_view():
             return
-
-        if state:
-            # Working around python bug 853411: main thread must do all forking
-            state.notifyInMainThread()
-        else:
-            state = test.state
 
         self.notifyTreeView(test, state)
         self.rightWindowGUI.notifyChange(test)
@@ -550,6 +541,12 @@ class TextTestGUI(ThreadedResponder):
             self.progressMonitor.notifyChange(test, state)
             iter = self.itermap[test]
             self.model.row_changed(self.model.get_path(iter), iter)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        # Working around python bug 853411: main thread must do all forking
+        state.notifyInMainThread()
+        self.notifyViews(test, state)
+    def notifyChange(self, test):
+        self.notifyViews(test, test.state)
     def notifyTreeView(self, test, state):
         if test.classId() == "test-suite":
             return self.redrawSuite(test)
@@ -694,6 +691,7 @@ class TextTestGUI(ThreadedResponder):
                 # Not present for fast reconnect, don't crash...
                 cmpAction.setUpApplication(test.app)
                 cmpAction(test)
+                test.notifyChanged()
     def reFilter(self):
         self.filteredModel.refilter()
         self.selectionChanged(self.selection, False)
@@ -1551,7 +1549,6 @@ class TestProgressMonitor:
         self.nofFailedTests = 0
         self.nofNoResultTests = 0
         self.nofKilledTests = 0
-        self.nofUnreportedBugsTests = 0
         self.nofKnownBugsTests = 0
         self.nofInternalErrorsTests = 0
         
@@ -1616,56 +1613,56 @@ class TestProgressMonitor:
         else:
             return count - 1
 
-    def analyzeFailure(self, category, test, increase = True):
+    def analyzeFailure(self, category, details, test, increase=True):
         errorCaught = 0
         crashCaught = 0
         unrunnableCaught = 0
         diffCaught = 0
-        if category[1].find("no results") != -1:
+        if details.find("no results") != -1:
             self.nofNoResultTests = self.adjustCount(self.nofNoResultTests, increase)
             self.treeModel.set_value(self.noResultIter, 1, self.nofNoResultTests)
             self.testToIter[test] = self.noResultIter
             errorCaught = 1
             unrunnableCaught = 1
-        if category[1].find(" slower") != -1:
+        if details.find(" slower") != -1:
             self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
             self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
             self.nofSlowerTests = self.adjustCount(self.nofSlowerTests, increase)
             self.treeModel.set_value(self.slowerIter, 1, self.nofSlowerTests)
             self.testToIter[test] = self.slowerIter
             errorCaught = 1
-        if category[1].find(" faster") != -1:
+        if details.find(" faster") != -1:
             self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
             self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
             self.nofFasterTests = self.adjustCount(self.nofFasterTests, increase)
             self.treeModel.set_value(self.fasterIter, 1, self.nofFasterTests)
             self.testToIter[test] = self.fasterIter
             errorCaught = 1
-        if category[1].find(" smaller") != -1:
+        if details.find(" smaller") != -1:
             self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
             self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
             self.nofSmallerTests = self.adjustCount(self.nofSmallerTests, increase)
             self.treeModel.set_value(self.smallerIter, 1, self.nofSmallerTests)
             self.testToIter[test] = self.smallerIter
             errorCaught = 1
-        if category[1].find(" larger") != -1:
+        if details.find(" larger") != -1:
             self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
             self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
             self.nofLargerTests = self.adjustCount(self.nofLargerTests, increase)                    
             self.treeModel.set_value(self.largerIter, 1, self.nofLargerTests)
             self.testToIter[test] = self.largerIter
             errorCaught = 1
-        if category[1].find(" new") != -1:
+        if details.find(" new") != -1:
             self.nofNewFilesTests = self.adjustCount(self.nofNewFilesTests, increase)                    
             self.treeModel.set_value(self.newIter, 1, self.nofNewFilesTests)
             self.testToIter[test] = self.newIter
             errorCaught = 1
-        if category[1].find(" missing") != -1: # Extra initial space to avoid catching 'missing 'in helpers''
+        if details.find(" missing") != -1: # Extra initial space to avoid catching 'missing 'in helpers''
             self.nofMissingFilesTests = self.adjustCount(self.nofMissingFilesTests, increase)                    
             self.treeModel.set_value(self.missingIter, 1, self.nofMissingFilesTests)
             self.testToIter[test] = self.missingIter
             errorCaught = 1
-        if category[1].find("missing '") != -1 or category[1].find("not built") != -1: # To catch 'missing 'in helpers'' et al ...
+        if category == "badPredict":
             self.nofInternalErrorsTests = self.adjustCount(self.nofInternalErrorsTests, increase)                    
             self.treeModel.set_value(self.internalErrorIter, 1, self.nofInternalErrorsTests)
             self.testToIter[test] = self.internalErrorIter
@@ -1673,45 +1670,40 @@ class TestProgressMonitor:
         i = -1
         for (type, count) in self.customErrorTypes.items():
             i += 1
-            if category[1].find(type) != -1:
+            if details.find(type) != -1:
                 self.customErrorTypes[type] = self.adjustCount(self.customErrorTypes[type], increase)                    
                 self.treeModel.set_value(self.customErrorIters[i], 1, self.customErrorTypes[type])
                 self.testToIter[test] = self.customErrorIters[i]
                 errorCaught = 1
-        if category[1].find(" different(+)") != -1:
+        if details.find(" different(+)") != -1:
             self.nofDifferentPlusTests = self.adjustCount(self.nofDifferentPlusTests, increase)                    
             self.treeModel.set_value(self.diffPlusIter, 1, self.nofDifferentPlusTests)
             self.testToIter[test] = self.diffPlusIter
             errorCaught = 1
-        elif category[1].find(" different") != -1:
+        elif details.find(" different") != -1:
             self.nofDifferentTests = self.adjustCount(self.nofDifferentTests, increase)                    
             self.treeModel.set_value(self.diffIter, 1, self.nofDifferentTests)
             self.testToIter[test] = self.diffIter
             errorCaught = 1
-        if category[1].find("unreported bug") != -1:
-            self.nofUnreportedBugsTests = self.adjustCount(self.nofUnreportedBugsTests, increase)                    
-            self.treeModel.set_value(self.unreportedIter, 1, self.nofUnreportedBugsTests)
-            self.testToIter[test] = self.unreportedIter
-            errorCaught = 1
-        elif category[1].find("bug") != -1:
+        if category == "bug":
             self.nofKnownBugsTests = self.adjustCount(self.nofKnownBugsTests, increase) 
             self.treeModel.set_value(self.knownBugIter, 1, self.nofKnownBugsTests)
             self.testToIter[test] = self.knownBugIter
             errorCaught = 1
-        if category[1].find("killed") != -1:
+        if category == "killed":
             self.nofKilledTests = self.adjustCount(self.nofKilledTests, increase)                    
             self.treeModel.set_value(self.killedIter, 1, self.nofKilledTests)
             self.testToIter[test] = self.killedIter
             errorCaught = 1
             unrunnableCaught = 1
-        if category[0] == "crash":
+        if category == "crash":
             self.nofCrashedTests = self.adjustCount(self.nofCrashedTests, increase)
             self.treeModel.set_value(self.crashedIter, 1, self.nofCrashedTests)
             errorCaught = 1
             i = -1
             for (type, count) in self.customCrashTypes.items():
                 i += 1
-                if category[1].find(type) != -1:
+                if details.find(type) != -1:
                     self.customCrashTypes[type] = self.adjustCount(self.customCrashTypes[type], increase)    
                     self.treeModel.set_value(self.customCrashIters[i], 1, self.customCrashTypes[type])
                     self.testToIter[test] = self.customCrashIters[i]
@@ -1719,14 +1711,14 @@ class TestProgressMonitor:
                     crashCaught = 1
             if crashCaught == 0:
                 self.testToIter[test] = self.crashedIter
-        if category[0] == "unrunnable":
+        if category == "unrunnable":
             self.nofUnrunnableTests = self.adjustCount(self.nofUnrunnableTests, increase)            
             self.treeModel.set_value(self.unrunnableIter, 1, self.nofUnrunnableTests)
             errorCaught = 1
             i = -1
             for (type, count) in self.customUnrunnableTypes.items():
                 i += 1
-                if category[1].find(type) != -1:
+                if details.find(type) != -1:
                     self.customUnrunnableTypes[type] = self.adjustCount(self.customUnrunnableTypes[type], increase)
                     self.treeModel.set_value(self.customUnrunnableIters[i], 1, self.customUnrunnableTypes[type])
                     self.testToIter[test] = self.customUnrunnableIters[i]
@@ -1763,7 +1755,6 @@ class TestProgressMonitor:
         self.missingIter     = self.treeModel.append(self.failedIter, ["Missed file(s)", 0, 1])
         self.newIter         = self.treeModel.append(self.failedIter, ["New file(s)", 0, 1])
         self.knownBugIter    = self.treeModel.append(self.failedIter, ["Known bug", 0, 1])
-        self.unreportedIter  = self.treeModel.append(self.failedIter, ["Unreported bug", 0, 1])
         self.internalErrorIter = self.treeModel.append(self.failedIter, ["Internal error", 0, 1])
         self.crashedIter     = self.treeModel.append(self.failedIter, ["Crashed", 0, 1])
 
@@ -1886,23 +1877,27 @@ class TestProgressMonitor:
                     it = None
                 else:
                     it = treemodel.iter_parent(it)
-    
+    def getStateInfo(self, state):
+        successFlag, details = state.getTypeBreakdown()
+        return state.category, details
     def notifyChange(self, test, state):
+        category, details = self.getStateInfo(state)
         if state.isComplete():
             if self.completedTests.has_key(test):
+                oldCategory, oldDetails = self.completedTests[test]
                 # First decrease counts from last time ...
-                self.analyzeFailure(self.completedTests[test], test, False)
+                self.analyzeFailure(oldCategory, oldDetails, test, increase=False)
                 # ... then set new category.
-                self.completedTests[test] = state.getTypeBreakdown()
+                self.completedTests[test] = category, details
             else:
                 self.nofCompletedTests += 1
                 self.nofRunningTests -= 1
-                self.completedTests[test] = state.getTypeBreakdown()
-        elif state.category == "running": # using hasStarted is no good, since internal errors/crashes (and possiblty other categories) are reoprted as not complete, but running, before they are completely analysed, and then again when they are analysed. the state.category string doesn't lie about whether tests are running or not ...
+                self.completedTests[test] = category, details
+        elif state.hasStarted():
             self.nofRunningTests += 1
             self.nofPendingTests -= 1
             self.testToIter[test] = self.runIter
-        elif state.category == "pending":
+        elif category == "pending":
             self.nofPendingTests += 1
             self.testToIter[test] = self.pendIter
 
@@ -1910,7 +1905,7 @@ class TestProgressMonitor:
             self.nofSuccessfulTests += 1
             self.testToIter[test] = self.successIter
         if state.hasFailed():
-            self.analyzeFailure(state.getTypeBreakdown(), test, True)
+            self.analyzeFailure(category, details, test, increase=True)
 
         if self.nofPendingTests < 0:
             self.nofPendingTests = 0

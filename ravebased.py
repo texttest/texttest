@@ -496,7 +496,7 @@ class SubmitRuleCompilations(queuesystem.SubmitTest):
 
         if test.state.testCompiling:
             self.setPending(test)
-            return
+            return self.WAIT
         return queuesystem.SubmitTest.__call__(self, test)
     def getPendingState(self, test):
         return PendingRuleCompilation(test.state)
@@ -539,9 +539,9 @@ class CompileRules(plugins.Action):
         retStatus = os.system(fullCommand)
         raveInfo = open(compTmp).read()
         if retStatus:
-            test.changeState(RuleBuildFailed("Ruleset build failed", raveInfo))
+            test.changeState(RuleBuildFailed(raveInfo, "Ruleset build failed"))
         else:
-            test.changeState(plugins.TestState("ruleset_compiled", raveInfo))
+            test.changeState(plugins.TestState("ruleset_compiled", raveInfo, lifecycleChange="complete rule compilation"))
         os.remove(compTmp) 
     def setUpSuite(self, suite):
         if suite.parent is None or isUserSuite(suite):
@@ -556,7 +556,7 @@ class RuleBuildKilled(queuesystem.KillTestInSlave):
         short, long = self.getKillInfo(test)
         briefText = "Ruleset build " + short
         freeText = "Ruleset compilation " + long
-        test.changeState(RuleBuildFailed(briefText, freeText))    
+        test.changeState(RuleBuildFailed(freeText, briefText))    
     
 class SynchroniseState(plugins.Action):
     def getCompilingTestState(self, test):
@@ -584,7 +584,7 @@ class SynchroniseState(plugins.Action):
             return
         if newState.category == "unrunnable":
             errMsg = "Trying to use ruleset '" + rulesetName + "' that failed to build."
-            test.changeState(RuleBuildFailed("Ruleset build failed (repeat)", errMsg))
+            test.changeState(RuleBuildFailed(errMsg, "Ruleset build failed (repeat)"))
         elif not newState.category.endswith("_rulecompile") and test.state.category.endswith("_rulecompile"):
             test.changeState(plugins.TestState("ruleset_compiled", "Ruleset " + \
                                                rulesetName + " succesfully compiled"))
@@ -594,16 +594,17 @@ class RuleBuildSynchroniser(Responder):
         self.updateMap = {}
         self.synchroniser = SynchroniseState()
         self.diag = plugins.getDiagnostics("Synchroniser")
-    def notifyChange(self, test, state):
+    def notifyLifecycleChange(self, test, state, changeDesc):
         if not state:
             return
         self.diag.info("Got change " + repr(test) + " -> " + state.category)
-        if state.category == "need_rulecompile":
+        if state.category == "pend_rulecompile":
             self.registerUpdate(state.testCompiling, test)
         elif self.updateMap.has_key(test):
             for updateTest in self.updateMap[test]:
                 self.diag.info("Generated change for " + repr(updateTest))
                 self.synchroniser.synchronise(updateTest, state)
+                self.diag.info("Done.")
     def registerUpdate(self, comptest, test):
         if comptest:
             self.updateMap[comptest].append(test)
@@ -697,9 +698,8 @@ class RunningRuleCompilation(plugins.TestState):
         plugins.TestState.__init__(self, "running_rulecompile", briefText=briefText, \
                                    freeText=freeText, lifecycleChange=lifecycleChange)
 
-class RuleBuildFailed(plugins.TestState):
-    def __init__(self, briefText, freeText):
-        plugins.TestState.__init__(self, "unrunnable", briefText=briefText, freeText=freeText, completed=1)
+class RuleBuildFailed(plugins.Unrunnable):
+    pass
                         
 class RuleSet:
     def __init__(self, ruleSetName, raveNames, arch, modeString = "-optimize"):
@@ -939,7 +939,7 @@ class RemoteBuildResponder(Responder):
         Responder.__init__(self, optionMap)
         self.target = optionMap["build"]
         self.checkedDirs = {}
-    def notifyAllComplete(self):
+    def notifyAllComplete(self, obsGroup):
         print "Waiting for remote builds..." 
         for process, arch, buildDirs in BuildCode.childProcesses:
             os.waitpid(process, 0)

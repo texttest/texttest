@@ -526,8 +526,6 @@ class Config(plugins.Configuration):
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")
-        app.setConfigDefault("internal_error_text", [], "deprecated")
-        app.setConfigDefault("internal_compulsory_text", [], "deprecated")
         app.addConfigEntry("definition_file_stems", "options")
         app.addConfigEntry("definition_file_stems", "usecase")
         app.addConfigEntry("definition_file_stems", "traffic")

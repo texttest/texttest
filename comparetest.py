@@ -272,43 +272,8 @@ class MakeComparisons(plugins.Action):
             state.category = worstResult.getType()
             state.freeText = self.getFreeTextInfo(state)
     def getFreeTextInfo(self, state):
-        fullText = ""
-        for comparison in state.getSortedComparisons():
-            fullText += self.fileComparisonTitle(comparison) + "\n"
-            fullText += self.fileComparisonBody(comparison)
-        return fullText
-    def fileComparisonTitle(self, comparison):
-        if comparison.missingResult():
-            titleText = "Missing result in"
-        elif comparison.newResult():
-            titleText = "New result in"
-        else:
-            titleText = "Differences in"
-        titleText += " " + repr(comparison)
-        return "------------------ " + titleText + " --------------------"
-    def fileComparisonBody(self, comparison):
-        if comparison.newResult():
-            return self.previewGenerator.getPreview(open(comparison.tmpCmpFile))
-        elif comparison.missingResult():
-            return self.previewGenerator.getPreview(open(comparison.stdCmpFile))
-
-        if plugins.canExecute(self.textDiffTool):
-            stdFileSize = os.stat(comparison.stdCmpFile)[stat.ST_SIZE]
-            tmpFileSize = os.stat(comparison.tmpCmpFile)[stat.ST_SIZE]
-            if self.textDiffToolMaxSize >= 0 and (stdFileSize > self.textDiffToolMaxSize or tmpFileSize > self.textDiffToolMaxSize):
-                return self.previewGenerator.getWrappedLine("Warning: The files were too large to compare - " + str(stdFileSize) + " and " + str(tmpFileSize) + " bytes, compared to the limit of " + str(self.textDiffToolMaxSize) + " bytes. Double-click on the file to see the difference, or adjust text_diff_program_max_file_size and re-run to see the difference in this text view.\n")
-            
-            cmdLine = self.textDiffTool + " '" + comparison.stdCmpFile + "' '" + comparison.tmpCmpFile + "'"
-            stdout = os.popen(cmdLine)
-            return self.previewGenerator.getPreview(stdout)
-        else:
-            return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'"
-    def setUpApplication(self, app):
-        maxLength = app.getConfigValue("lines_of_text_difference")
-        maxWidth = app.getConfigValue("max_width_text_difference")
-        self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
-        self.textDiffTool = app.getConfigValue("text_diff_program")
-        self.textDiffToolMaxSize = plugins.parseBytes(app.getConfigValue("text_diff_program_max_file_size"))
+        texts = [ fileComp.getFreeText() for fileComp in state.getSortedComparisons() ] 
+        return string.join(texts, "")
     
 class FileComparison:
     def __init__(self, test, stem, standardFile, tmpFile, testInProgress = 0):
@@ -327,6 +292,11 @@ class FileComparison:
         self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
         self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
         self.displayPriority = test.getCompositeConfigValue("failure_display_priority", self.stem)
+        maxLength = test.getConfigValue("lines_of_text_difference")
+        maxWidth = test.getConfigValue("max_width_text_difference")
+        self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
+        self.textDiffTool = test.getConfigValue("text_diff_program")
+        self.textDiffToolMaxSize = plugins.parseBytes(test.getConfigValue("text_diff_program_max_file_size"))
         # subclasses may override if they don't want to store in this way
         self.cacheDifferences()
     def __repr__(self):
@@ -377,6 +347,38 @@ class FileComparison:
     def cacheDifferences(self):
         if self.stdCmpFile and self.tmpCmpFile:
             self.differenceCache = not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
+    def getFreeText(self):
+        return self.getFreeTextTitle() + "\n" + self.getFreeTextBody()
+    def getFreeTextTitle(self):
+        if self.missingResult():
+            titleText = "Missing result in"
+        elif self.newResult():
+            titleText = "New result in"
+        else:
+            titleText = "Differences in"
+        titleText += " " + repr(self)
+        return "------------------ " + titleText + " --------------------"
+    def getFreeTextBody(self):
+        if self.newResult():
+            return self.previewGenerator.getPreview(open(self.tmpCmpFile))
+        elif self.missingResult():
+            return self.previewGenerator.getPreview(open(self.stdCmpFile))
+
+        if plugins.canExecute(self.textDiffTool):
+            stdFileSize = os.stat(self.stdCmpFile)[stat.ST_SIZE]
+            tmpFileSize = os.stat(self.tmpCmpFile)[stat.ST_SIZE]
+            if self.textDiffToolMaxSize >= 0 and (stdFileSize > self.textDiffToolMaxSize or tmpFileSize > self.textDiffToolMaxSize):
+                message = "Warning: The files were too large to compare - " + str(stdFileSize) + " and " + \
+                          str(tmpFileSize) + " bytes, compared to the limit of " + str(self.textDiffToolMaxSize) + \
+                          " bytes. Double-click on the file to see the difference, or adjust text_diff_program_max_file_size" + \
+                          " and re-run to see the difference in this text view.\n"
+                return self.previewGenerator.getWrappedLine(message)
+            
+            cmdLine = self.textDiffTool + " '" + self.stdCmpFile + "' '" + self.tmpCmpFile + "'"
+            stdout = os.popen(cmdLine)
+            return self.previewGenerator.getPreview(stdout)
+        else:
+            return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'"
     def updatePaths(self, oldAbsPath, newAbsPath):
         if self.stdFile:
             self.stdFile = self.stdFile.replace(oldAbsPath, newAbsPath)

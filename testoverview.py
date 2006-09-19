@@ -140,12 +140,9 @@ class GenerateWebPages:
             state = unpickler.load()
             state.ensureCompatible()
             return state
-        except UnpicklingError:
-            print "unpickling error..."
-        except EOFError:
-            print "EOFError..."
-        except AttributeError:
-            print "Attribute Error..."
+        except (UnpicklingError, ImportError, EOFError, AttributeError), e:
+            freeText = "Failed to read results file, possibly deprecated format. Stack info follows:\n " + str(e)
+            return plugins.Unrunnable(freeText, "read error")
     def addOverviewPages(self, item, version, table):
         if not self.pagesOverview.has_key(item):
             pageOverviewTitle = "Test results for " + self.pageAppName + " - version " + self.pageVersion

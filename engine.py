@@ -48,19 +48,21 @@ class TestRunner:
         for suite in setUpSuites:
             suite.setUpEnvironment()
             self.appRunner.markForSetUp(suite)
+        abandon = False
         while len(self.actionSequence):
             action = self.actionSequence[0]
+            if abandon and not action.callDuringAbandon():
+                self.actionSequence.pop(0)
+                continue
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
             self.handleExceptions(self.appRunner.setUpSuites, action, self.test)
             completed, tryOthersNow = self.performAction(action, runToCompletion)
             self.diag.info("<-End Performing action " + str(action) + self.returnString(completed, tryOthersNow))
             if completed:
-                if self.test.state.shouldAbandon():
+                self.actionSequence.pop(0)
+                if not abandon and self.test.state.shouldAbandon():
                     self.diag.info("Abandoning test...")
-                    self.actionSequence = []
-                    break
-                else:
-                    self.actionSequence.pop(0)
+                    abandon = True
             if tryOthersNow:
                 return 0
         self.test.notifyCompleted()

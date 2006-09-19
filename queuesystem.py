@@ -114,10 +114,6 @@ class QueueSystemConfig(default.Config):
             return default.Config.getWriteDirectoryName(self, app)
     def useExtraVersions(self):
         return not self.slaveRun()
-    def getLifecycleCompletor(self):
-        # Don't do this, we notify directly from the socket handler, it's faster that way...
-        if not self.useQueueSystem() or self.slaveRun():
-            return default.Config.getLifecycleCompletor(self)
     def getCleanMode(self):
         if self.slaveRun():
             return self.CLEAN_NONE

@@ -264,7 +264,7 @@ class Config(plugins.Configuration):
             return self.getFileExtractor()
         else:
             return [ self.getFileExtractor(), self.getTestComparator(), \
-                     self.getFailureExplainer(), self.getLifecycleCompletor() ]
+                     self.getFailureExplainer() ]
     def getFileExtractor(self):
         if self.isReconnecting():
             return ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull"))
@@ -284,8 +284,6 @@ class Config(plugins.Configuration):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def getPerformanceFileMaker(self):
         return MakePerformanceFile(self.getMachineInfoFinder())
-    def getLifecycleCompletor(self):
-        return CompleteLifecycle()
     def getMachineInfoFinder(self):
         return MachineInfoFinder()
     def getFailureExplainer(self):
@@ -541,11 +539,6 @@ class Config(plugins.Configuration):
         self.setUsecaseDefaults(app)
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.showExecHostsInFailures()
-
-class CompleteLifecycle(plugins.Action):
-    def __call__(self, test):
-        test.state.lifecycleChange = "complete"
-        test.notifyLifecycle(test.state, test.state.lifecycleChange)
 
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:

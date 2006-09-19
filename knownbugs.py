@@ -82,7 +82,7 @@ class BugTrigger:
             self.diag.info("File not changed, ignoring")
             return
         if multipleDiffs and not self.ignoreOtherErrors:
-            self.diag.info("Multiple errors present, allowing others through")
+            self.diag.info("Multiple differences present, allowing others through")
             return
         if line is not None and not self.textTrigger.matches(line):
             return
@@ -134,8 +134,10 @@ class FileBugData:
         if not os.path.isfile(fileName):
             self.diag.info("File doesn't exist, ignoring")
             return
+        return self.findBugInText(open(fileName).readlines(), execHosts, isChanged, multipleDiffs)
+    def findBugInText(self, lines, execHosts, isChanged=True, multipleDiffs=False):
         currAbsent = copy(self.absentList)
-        for line in open(fileName).xreadlines():
+        for line in lines:
             for bugTrigger in self.presentList:
                 bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs, line)
                 if bug:
@@ -232,6 +234,9 @@ class CheckForBugs(plugins.Action):
         self.activateBugs(suite)
     def tearDownSuite(self, suite):
         self.deactivateBugs(suite)
+    def callDuringAbandon(self):
+        # want to be able to mark UNRUNNABLE tests as known bugs too...
+        return True
     def __call__(self, test):
         self.readBugs(test)
         if not self.checkTest(test):
@@ -240,19 +245,33 @@ class CheckForBugs(plugins.Action):
         self.activateBugs(test)
         multipleDiffs = self.hasMultipleDifferences(test)
         for stem, fileBugData in self.activeBugs.items():
-            # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
-            isChanged = self.fileChanged(test, stem)
-            fileName = test.makeTmpFileName(stem)
-            bug = fileBugData.findBug(fileName, test.state.executionHosts, isChanged, multipleDiffs)
+            bug = self.findBug(test, stem, fileBugData, multipleDiffs)
             if bug:
                 category, briefText, fullText = bug.findInfo()
                 self.diag.info("Changing to " + category + " with text " + briefText)
-                newState = copy(test.state)
-                bugState = FailedPrediction(category, fullText, briefText)
-                newState.setFailedPrediction(bugState)
-                test.changeState(newState)
+                bugState = FailedPrediction(category, fullText, briefText, completed=1)
+                self.changeState(test, bugState)
         self.deactivateBugs(test)
+    def findBug(self, test, stem, fileBugData, multipleDiffs):
+        if stem == "free_text":
+            return fileBugData.findBugInText(test.state.freeText.split("\n"), test.state.executionHosts)
+        elif not test.state.shouldAbandon():
+            # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
+            isChanged = self.fileChanged(test, stem)
+            fileName = test.makeTmpFileName(stem)
+            return fileBugData.findBug(fileName, test.state.executionHosts, isChanged, multipleDiffs)
+    def changeState(self, test, bugState):
+        if hasattr(test.state, "failedPrediction"):
+            # if we've already compared, slot our things into the comparison object
+            newState = copy(test.state)
+            newState.setFailedPrediction(bugState)
+            test.changeState(newState)
+        else:
+            test.changeState(bugState)
     def hasMultipleDifferences(self, test):
+        if test.state.shouldAbandon():
+            # check for unrunnables...
+            return False
         comparisons = test.state.getComparisons()
         diffCount = len(comparisons)
         if diffCount <= 1:

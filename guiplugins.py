@@ -981,6 +981,8 @@ class ReportBugs(InteractiveTestAction):
                 stem = os.path.basename(fileName).split(".")[0]
                 if not stem in stems:
                     stems.append(stem)
+        # use for unrunnable tests...
+        stems.append("free_text")
         return stems
     def checkSanity(self):
         if len(self.optionGroup.getOptionValue("search_string")) == 0:

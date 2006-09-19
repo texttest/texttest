@@ -211,6 +211,9 @@ class Action:
         pass
     def tearDownSuite(self, suite):
         pass
+    def callDuringAbandon(self):
+        # set to True if even unrunnable tests should have this action called
+        return False
     # Return the actions to replace the current one if run is interrupted
     def getInterruptActions(self, fetchResults):
         if fetchResults:
@@ -309,7 +312,7 @@ addCategory("unrunnable", "unrunnable", "could not be run")
 class Unrunnable(TestState):
     def __init__(self, freeText, briefText="UNRUNNABLE", executionHosts=[]):
         TestState.__init__(self, "unrunnable", freeText, briefText, completed=1, \
-                           executionHosts=executionHosts, lifecycleChange="complete")
+                           executionHosts=executionHosts)
     def shouldAbandon(self):
         return True
                         

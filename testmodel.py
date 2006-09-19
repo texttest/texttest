@@ -322,6 +322,9 @@ class Test:
         self.diagnose("Completion notified")
         for observer in self.observerGroup.observers:
             observer.notifyComplete(self)
+        if not self.state.lifecycleChange:
+            self.state.lifecycleChange = "complete"
+            self.notifyLifecycle(self.state, self.state.lifecycleChange)
     def notifyLifecycle(self, state, changeDesc):
         for observer in self.observerGroup.observers:
             self.diagnose("Notifying observer called " + str(observer.__class__))

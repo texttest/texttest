@@ -7,14 +7,14 @@ def findBugText(bugId):
 
 def findStatus(description):
     if len(description) == 0:
-        return "no bugcli found"
+        return "UNKNOWN"
     for line in description.split("\n"):
         words = line.split()
         if len(words) < 4:
             continue
         if words[2].startswith("Status"):
             return words[3]
-    return "no such bug"
+    return "NONEXISTENT"
 
 def isResolved(status):
     return status == "RESOLVED" or status == "CLOSED"

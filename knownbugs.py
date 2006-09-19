@@ -36,7 +36,14 @@ class BugSystemBug(Bug):
         status = findStatus(bugText)
         category = self.findCategory(isResolved(status))
         briefText = "bug " + self.bugId + " (" + status + ")"
-        return category, briefText, bugText
+        return category, briefText, self.getFullText(status, bugText)
+    def getFullText(self, status, description):
+        if status == "UNKNOWN":
+            return "Could not contact " + self.bugSystem + " to extract information about bug " + self.bugId
+        elif status == "NONEXISTENT":
+            return "Bug " + self.bugId + " does not exist in " + self.bugSystem
+        else:
+            return description
     
 class UnreportedBug(Bug):
     def __init__(self, fullText, briefText, internalError):

@@ -3,7 +3,7 @@
 from os import popen
 
 def findBugText(bugId):
-    return popen("qrsh -l 'carmarch=*sparc*,short' -w e 'dumpbug -n -r " + bugId + "'").read()
+    return popen("qrsh -l 'carmarch=*sparc*,short' -w e 'dumpbug -n -r " + bugId + "' 2>&1").read()
 
 def findStatus(description):
     nextLine = False
@@ -13,7 +13,10 @@ def findStatus(description):
             return words[0]
         if len(words) > 0 and words[0] == "Bug":
             nextLine = True
-    return "no such bug"
+    if description.find("Not a bug") != -1:
+        return "NONEXISTENT"
+    else:
+        return "UNKNOWN"
 
 def isResolved(status):
     return status == "RESOLVED" or status == "VERIFIED"

@@ -1243,6 +1243,7 @@ class FileViewGUI:
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.name = object.name.replace("_", "__")
+        self.selection = None
         self.dynamic = dynamic
         self.observers = []
     def addObserver(self, observer):
@@ -1270,7 +1271,8 @@ class FileViewGUI:
         fileWin = gtk.ScrolledWindow()
         fileWin.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         view = gtk.TreeView(self.model)
-        view.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        self.selection = view.get_selection()
+        self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn(self.name, renderer, text=0, background=1)
         column.set_cell_data_func(renderer, renderParentsBold)
@@ -1281,8 +1283,8 @@ class FileViewGUI:
         view.expand_all()
         indexer = TreeModelIndexer(self.model, column, 0)
         scriptEngine.connect("select file", "row_activated", view, self.displayFile, indexer)
-        scriptEngine.monitor("set file selection to", view.get_selection(), indexer)
-        self.selectionChanged(view.get_selection())
+        scriptEngine.monitor("set file selection to", self.selection, indexer)
+        self.selectionChanged(self.selection)
         view.get_selection().connect("changed", self.selectionChanged)
         view.show()
         fileWin.add(view)
@@ -1304,6 +1306,7 @@ class FileViewGUI:
         comparison = self.model.get_value(iter, 3)
         try:
             self.fileViewAction.view(comparison, fileName)
+            self.selection.unselect_all()
         except plugins.TextTestError, e:
             showError(str(e))
 

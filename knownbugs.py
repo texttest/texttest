@@ -77,11 +77,11 @@ class BugTrigger:
         return self.textTrigger.text == bugText
     def matchesText(self, line):
         return self.textTrigger.matches(line)
-    def findBug(self, execHosts, isChanged, multipleErrors, line=None):
+    def findBug(self, execHosts, isChanged, multipleDiffs, line=None):
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring")
             return
-        if multipleErrors and not self.ignoreOtherErrors:
+        if multipleDiffs and not self.ignoreOtherErrors:
             self.diag.info("Multiple errors present, allowing others through")
             return
         if line is not None and not self.textTrigger.matches(line):
@@ -126,7 +126,7 @@ class FileBugData:
             for trigger in self.presentList + self.absentList:
                 if trigger.checkUnchanged:
                     self.checkUnchanged = True
-    def findBug(self, fileName, execHosts, isChanged, multipleErrors):
+    def findBug(self, fileName, execHosts, isChanged, multipleDiffs):
         self.diag.info("Looking for bugs in " + fileName)
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring")
@@ -137,7 +137,7 @@ class FileBugData:
         currAbsent = copy(self.absentList)
         for line in open(fileName).xreadlines():
             for bugTrigger in self.presentList:
-                bug = bugTrigger.findBug(execHosts, isChanged, multipleErrors, line)
+                bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs, line)
                 if bug:
                     return bug
             for bugTrigger in currAbsent:
@@ -145,7 +145,7 @@ class FileBugData:
                     currAbsent.remove(bugTrigger)
                     break
         for bugTrigger in currAbsent:
-            bug = bugTrigger.findBug(execHosts, isChanged, multipleErrors)
+            bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs)
             if bug:
                 return bug
 
@@ -238,12 +238,12 @@ class CheckForBugs(plugins.Action):
             return
 
         self.activateBugs(test)
-        multipleErrors = len(test.state.getComparisons()) > 1
+        multipleDiffs = self.hasMultipleDifferences(test)
         for stem, fileBugData in self.activeBugs.items():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
             isChanged = self.fileChanged(test, stem)
             fileName = test.makeTmpFileName(stem)
-            bug = fileBugData.findBug(fileName, test.state.executionHosts, isChanged, multipleErrors)
+            bug = fileBugData.findBug(fileName, test.state.executionHosts, isChanged, multipleDiffs)
             if bug:
                 category, briefText, fullText = bug.findInfo()
                 self.diag.info("Changing to " + category + " with text " + briefText)
@@ -252,6 +252,16 @@ class CheckForBugs(plugins.Action):
                 newState.setFailedPrediction(bugState)
                 test.changeState(newState)
         self.deactivateBugs(test)
+    def hasMultipleDifferences(self, test):
+        comparisons = test.state.getComparisons()
+        diffCount = len(comparisons)
+        if diffCount <= 1:
+            return False
+        perfStems = test.state.getPerformanceStems(test)
+        for comp in comparisons:
+            if comp.stem in perfStems:
+                diffCount -= 1
+        return diffCount > 1
     def checkTest(self, test):
         if self.activeBugs.checkUnchanged() or self.testBugMap[test].checkUnchanged():
             return True

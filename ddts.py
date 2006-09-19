@@ -3,7 +3,7 @@
 from os import popen
 
 def findBugText(bugId):
-    return popen("qrsh -l 'carmarch=*sparc*,short' -w e 'dumpbug -n -r " + bugId + "' 2>&1").read()
+    return popen("qrsh -l 'carmarch=*sparc*,short' -w e -now n 'dumpbug -n -r " + bugId + "' 2>&1").read()
 
 def findStatus(description):
     nextLine = False

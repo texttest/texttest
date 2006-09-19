@@ -293,7 +293,7 @@ class Config(plugins.Configuration):
     def showExecHostsInFailures(self):
         return self.batchMode()
     def getTestComparator(self):
-        return comparetest.MakeComparisons(performance.PerformanceTestComparison)
+        return comparetest.MakeComparisons()
     def getStateSaver(self):
         if self.batchMode():
             return batch.SaveState

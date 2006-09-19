@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 
-import os, comparetest, string, plugins, sys
+import os, string, plugins, sys
+from comparefile import FileComparison
 
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing
@@ -44,22 +45,9 @@ def parseTimeExpression(timeExpression):
     if timeExpression.startswith(">"):
         return ">", plugins.getNumberOfSeconds(timeExpression[1:])  
 
-class PerformanceTestComparison(comparetest.TestComparison):
-    def getPerformanceStems(self, test):
-        return [ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys()
-    def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress):
-        if stem in self.getPerformanceStems(test):
-            if tmpFile:
-                return PerformanceFileComparison(test, stem, standardFile, tmpFile, testInProgress)
-            else:
-                # Don't care if performance is missing
-                return None
-        else:
-            return comparetest.TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)
-
-class PerformanceFileComparison(comparetest.FileComparison):
+class PerformanceFileComparison(FileComparison):
     def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False):
-        comparetest.FileComparison.__init__(self, test, stem, standardFile, tmpFile, testInProgress)
+        FileComparison.__init__(self, test, stem, standardFile, tmpFile, testInProgress)
         # Don't allow process count of 0, which screws things up...
         self.perfComparison = None
         if self.stdCmpFile:
@@ -73,20 +61,20 @@ class PerformanceFileComparison(comparetest.FileComparison):
                 self.perfComparison = PerformanceComparison(oldPerf, newPerf, stem)
                 self.cachePerformanceChange(test, stem)
     def ensureCompatible(self):
-        comparetest.FileComparison.ensureCompatible(self)
+        FileComparison.ensureCompatible(self)
         if hasattr(self, "newPerformance"):
             self.perfComparison = PerformanceComparison(self.oldPerformance, self.newPerformance, self.stem)
     def cacheDifferences(self):
         # Overriden from base class. Don't want to do this - we compare in a different way
         pass
     def __repr__(self):
-        baseText = comparetest.FileComparison.__repr__(self)
+        baseText = FileComparison.__repr__(self)
         if self.newResult():
             return baseText
         return baseText + "(" + self.getType() + ")"
     def getType(self):
         if self.newResult():
-            return comparetest.FileComparison.getType(self)
+            return FileComparison.getType(self)
         else:
             return self.perfComparison.descriptor
     def getSummary(self):
@@ -275,3 +263,6 @@ class PerformanceStatistics(plugins.Action):
         print self.getPaddedLine(entries)
     def setUpApplication(self, app):
         self.app = app
+
+# for back-compatibility, preserve old names...
+from comparetest import TestComparison as PerformanceTestComparison

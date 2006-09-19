@@ -686,12 +686,11 @@ class TextTestGUI(Responder):
     def checkUpToDate(self, test):
         if test.state.isComplete() and test.state.needsRecalculation():
             cmpAction = comparetest.MakeComparisons()
-            if cmpAction.defaultComparisonClass:
-                guilog.info("Recalculating result info for test: result file changed since created")
-                # Not present for fast reconnect, don't crash...
-                cmpAction.setUpApplication(test.app)
-                cmpAction(test)
-                test.notifyChanged()
+            guilog.info("Recalculating result info for test: result file changed since created")
+            # Not present for fast reconnect, don't crash...
+            cmpAction.setUpApplication(test.app)
+            cmpAction(test)
+            test.notifyChanged()
     def reFilter(self):
         self.filteredModel.refilter()
         self.selectionChanged(self.selection, False)

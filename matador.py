@@ -39,7 +39,7 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
                             making the changes it has shown, and writing an options.<app> file.
 """
 
-import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins, performance
+import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins
 from optimization import GenerateWebPages
 
 def getConfig(optionMap):
@@ -146,7 +146,7 @@ class MakeComparisons(comparetest.MakeComparisons):
         self.getRuleSetting = getRuleSetting
     def __call__(self, test):
         if self.isSeniority(test):
-            self.testComparisonClass = performance.PerformanceTestComparison
+            self.testComparisonClass = comparetest.TestComparison
         else:
             self.testComparisonClass = optimization.OptimizationTestComparison
         comparetest.MakeComparisons.__call__(self, test)

@@ -127,10 +127,12 @@ optimization.PlotSubplans
 """
 
 
-import ravebased, os, sys, string, shutil, KPI, plugins, performance, math, re, unixonly, guiplugins, copy, comparetest, testoverview, time, testmodel
+import ravebased, os, sys, string, shutil, KPI, plugins, math, re, unixonly, guiplugins, copy, testoverview, time, testmodel
 from ndict import seqdict
 from time import sleep
 from respond import Responder
+from comparetest import MakeComparisons, TestComparison
+from performance import getTestPerformance
 
 itemNamesConfigKey = "_itemnames_map"
 noIncreasMethodsConfigKey = "_noincrease_methods_map"
@@ -184,7 +186,7 @@ class OptimizationConfig(ravebased.Config):
         else:
             return ravebased.Config.getResponderClasses(self, allApps)
     def getTestComparator(self):
-        return comparetest.MakeComparisons(OptimizationTestComparison)
+        return MakeComparisons(OptimizationTestComparison)
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def defaultBuildRules(self):
@@ -312,16 +314,16 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
                 return False
         return True   
 
-class OptimizationTestComparison(performance.PerformanceTestComparison):
+class OptimizationTestComparison(TestComparison):
     def __init__(self, previousInfo, app):
-        performance.PerformanceTestComparison.__init__(self, previousInfo, app)
+        TestComparison.__init__(self, previousInfo, app)
         self.costName = costEntryName
         itemsInFile = app.getConfigValue(itemNamesConfigKey)
         if itemsInFile.has_key(costEntryName):
             self.costName = itemsInFile[costEntryName]
         self.logStem = app.getConfigValue("log_file")
     def getTypeBreakdown(self):
-        category, details = performance.PerformanceTestComparison.getTypeBreakdown(self)
+        category, details = TestComparison.getTypeBreakdown(self)
         if not details.startswith("solution different"):
             return category, details
         logComp, resultList = self.findComparison(self.logStem)
@@ -338,7 +340,7 @@ class OptimizationTestComparison(performance.PerformanceTestComparison):
             return category, details
     def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress):
         if stem != "error" or tmpFile:
-            return performance.PerformanceTestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)
+            return TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)
     def getCost(self, file):
         if not os.path.isfile(file):
             raise plugins.TextTestError, "File has been deleted in the meantime..."
@@ -737,8 +739,8 @@ class TestReport(plugins.Action):
         else:
             print "Skipping test due to same logfile", test.name
     def getPerformance(self, test, currentVersion, referenceVersion):
-        currPerf = performance.getTestPerformance(test, self.currentVersion) / 60
-        refPerf = performance.getTestPerformance(test, self.referenceVersion) / 60
+        currPerf = getTestPerformance(test, self.currentVersion) / 60
+        refPerf = getTestPerformance(test, self.referenceVersion) / 60
         return currPerf, refPerf
     def getLogFilesForComparison(self, test):
         currentLogFile = test.getFileName(test.app.getConfigValue("log_file"), self.currentVersion)
@@ -766,8 +768,8 @@ class CalculateKPIs(TestReport):
     def compare(self, test, referenceRun, currentRun):
         referenceFile = referenceRun.logFile
         currentFile = currentRun.logFile
-        floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion) / 60
-        floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion) / 60
+        floatRefPerfScale = getTestPerformance(test, self.referenceVersion) / 60
+        floatNowPerfScale = getTestPerformance(test, self.currentVersion) / 60
         aKPI = None
         listKPIs = []
         for aKPIConstant in self.listKPIs:
@@ -795,8 +797,8 @@ class WriteKPIData(TestReport):
         listThisKPI = [strCarmusr]
         referenceFile = referenceRun.logFile
         currentFile = currentRun.logFile
-        floatRefPerfScale = performance.getTestPerformance(test, self.referenceVersion) / 60
-        floatNowPerfScale = performance.getTestPerformance(test, self.currentVersion) / 60
+        floatRefPerfScale = getTestPerformance(test, self.referenceVersion) / 60
+        floatNowPerfScale = getTestPerformance(test, self.currentVersion) / 60
         aKPI = None
         listKPIData = []
         for aKPIConstant in self.listKPIs:

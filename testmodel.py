@@ -1214,6 +1214,9 @@ class OptionFinder(plugins.OptionFinder):
 # Compulsory responder to generate application events. Always present. See respond module
 class ApplicationEventResponder(Responder):
     def notifyLifecycleChange(self, test, state, changeDesc):
+        if changeDesc.find("saved") != -1:
+            # don't generate application events when a test is saved...
+            return
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName
         timeDelay = int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))

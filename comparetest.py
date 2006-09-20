@@ -11,8 +11,9 @@ plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
 
 class TestComparison(plugins.TestState):
-    def __init__(self, previousInfo, app):
-        plugins.TestState.__init__(self, "failure", "", started=1, completed=1, executionHosts=previousInfo.executionHosts)
+    def __init__(self, previousInfo, app, lifecycleChange=""):
+        plugins.TestState.__init__(self, "failure", "", started=1, completed=1, \
+                                   lifecycleChange=lifecycleChange, executionHosts=previousInfo.executionHosts)
         self.allResults = []
         self.changedResults = []
         self.newResults = []
@@ -153,19 +154,23 @@ class TestComparison(plugins.TestState):
         return string.join(baseNames, ",")
     def addComparison(self, comparison):
         info = "Making comparison for " + comparison.stem + " "
-        self.allResults.append(comparison)
-        if comparison.newResult():
-            self.newResults.append(comparison)
-            info += "(new)"
-        elif comparison.missingResult():
-            self.missingResults.append(comparison)
-            info += "(missing)"
-        elif comparison.hasDifferences():
-            self.changedResults.append(comparison)
-            info += "(diff)"
+        if comparison.isDefunct():
+            # typically "missing file" that got "saved" and removed
+            info += "(defunct)"
         else:
-            self.correctResults.append(comparison)
-            info += "(correct)"
+            self.allResults.append(comparison)
+            if comparison.newResult():
+                self.newResults.append(comparison)
+                info += "(new)"
+            elif comparison.missingResult():
+                self.missingResults.append(comparison)
+                info += "(missing)"
+            elif comparison.hasDifferences():
+                self.changedResults.append(comparison)
+                info += "(diff)"
+            else:
+                self.correctResults.append(comparison)
+                info += "(correct)"
         self.diag.info(info)
     def makeStemDict(self, files):
         stemDict = seqdict()
@@ -200,6 +205,22 @@ class TestComparison(plugins.TestState):
                 return None
         else:
             return FileComparison(test, stem, standardFile, tmpFile, testInProgress)
+    def categorise(self):
+        if self.failedPrediction:
+            # Keep the category we had before
+            self.freeText += self.getFreeTextInfo()
+            return
+        if not self.hasResults():
+            raise plugins.TextTestError, "No output files at all produced, presuming problems running test " + self.hostString() 
+        worstResult = self.getMostSevereFileComparison()
+        if not worstResult:
+            self.category = "success"
+        else:
+            self.category = worstResult.getType()
+            self.freeText = self.getFreeTextInfo()
+    def getFreeTextInfo(self):
+        texts = [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
+        return string.join(texts, "")
     def savePartial(self, fileNames, saveDir, exact = 1, versionString = ""):
         for fileName in fileNames:
             stem = fileName.split(".")[0]
@@ -207,14 +228,6 @@ class TestComparison(plugins.TestState):
             if comparison:
                 self.diag.info("Saving single file for stem " + stem)
                 comparison.overwrite(saveDir, exact, versionString)
-                storageList.remove(comparison)
-                if storageList is self.missingResults:
-                    self.allResults.remove(comparison)
-                else:
-                    self.correctResults.append(comparison)
-        if len(self.getComparisons()) == 0:
-            self.category = "success"
-            self.freeText = ""
     def findComparison(self, stem):
         lists = [ self.changedResults, self.newResults, self.missingResults ]
         self.diag.info("Finding comparison for stem " + stem)
@@ -233,17 +246,15 @@ class TestComparison(plugins.TestState):
             comparison.overwrite(test, exact, versionString)
         for comparison in self.newResults + self.missingResults:
             comparison.overwrite(test, 1, versionString)
-        for comparison in self.missingResults:
-            self.allResults.remove(comparison)
         if overwriteSuccessFiles:
             for comparison in self.correctResults:
                 comparison.overwrite(test, exact, versionString)
-        self.correctResults += self.changedResults + self.newResults
-        self.changedResults = []
-        self.newResults = []
-        self.missingResults = []
-        self.category = "success"
-        self.freeText = ""
+    def makeNewState(self, app):
+        newState = TestComparison(self, app, "be saved")
+        for comparison in self.allResults:
+            newState.addComparison(comparison)
+        newState.categorise()
+        return newState
 
 class MakeComparisons(plugins.Action):
     defaultComparisonClass = TestComparison
@@ -258,27 +269,11 @@ class MakeComparisons(plugins.Action):
     def __call__(self, test):
         testComparison = self.testComparisonClass(test.state, test.app)
         testComparison.makeComparisons(test)
-        self.categorise(testComparison)
+        testComparison.categorise()
         self.describe(test, testComparison.getPostText())
         test.changeState(testComparison)
     def setUpSuite(self, suite):
         self.describe(suite)
-    def categorise(self, state):
-        if state.failedPrediction:
-            # Keep the category we had before
-            state.freeText += self.getFreeTextInfo(state)
-            return
-        if not state.hasResults():
-            raise plugins.TextTestError, "No output files at all produced, presuming problems running test " + state.hostString() 
-        worstResult = state.getMostSevereFileComparison()
-        if not worstResult:
-            state.category = "success"
-        else:
-            state.category = worstResult.getType()
-            state.freeText = self.getFreeTextInfo(state)
-    def getFreeTextInfo(self, state):
-        texts = [ fileComp.getFreeText() for fileComp in state.getSortedComparisons() ] 
-        return string.join(texts, "")
     
 class RemoveObsoleteVersions(plugins.Action):
     scriptDoc = "Removes (from CVS) all files with version IDs that are equivalent to a non-versioned file"

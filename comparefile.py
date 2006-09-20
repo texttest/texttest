@@ -68,9 +68,11 @@ class FileComparison:
     def getSummary(self):
         return self.stem + " different"
     def newResult(self):
-        return not self.stdFile
+        return not self.stdFile and self.tmpFile
     def missingResult(self):
-        return not self.tmpFile
+        return self.stdFile and not self.tmpFile
+    def isDefunct(self):
+        return not self.stdFile and not self.tmpFile
     def hasSucceeded(self):
         return self.stdFile and self.tmpFile and not self.hasDifferences()
     def hasDifferences(self):
@@ -132,6 +134,7 @@ class FileComparison:
     def overwrite(self, test, exact, versionString = ""):
         if self.missingResult():
             os.remove(self.stdFile)
+            self.stdFile = None
         else:
             self.saveTmpFile(test, exact, versionString)
             

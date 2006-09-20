@@ -530,32 +530,26 @@ class TextTestGUI(Responder):
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
         return True
-    def notifyViews(self, test, state):
+    def notifyLifecycleChange(self, test, state, changeDesc):
         # May have already closed down or not started yet, don't crash if so
         if not self.selection or not self.selection.get_tree_view():
-            return
-
-        self.notifyTreeView(test, state)
-        self.rightWindowGUI.notifyChange(test)
-        if self.progressMonitor:
-            self.progressMonitor.notifyChange(test, state)
-            iter = self.itermap[test]
-            self.model.row_changed(self.model.get_path(iter), iter)
-    def notifyLifecycleChange(self, test, state, changeDesc):
+            return 
+        
         # Working around python bug 853411: main thread must do all forking
         state.notifyInMainThread()
-        self.notifyViews(test, state)
-    def notifyChange(self, test):
-        self.notifyViews(test, test.state)
-    def notifyTreeView(self, test, state):
-        if test.classId() == "test-suite":
-            return self.redrawSuite(test)
-
-        if not self.dynamic:
-            # In the static GUI there is nothing to update in the tree view window for test cases
-            return
         self.redrawTest(test, state)
-    # We assume that test-cases have changed state, while test suites have changed contents
+        self.rightWindowGUI.notifyChange(test)
+        if self.progressMonitor:
+            self.progressMonitor.notifyLifecycleChange(test, state)
+            iter = self.itermap[test]
+            self.model.row_changed(self.model.get_path(iter), iter)
+    def notifyChange(self, test):
+        # May have already closed down or not started yet, don't crash if so
+        if not self.selection or not self.selection.get_tree_view():
+            return 
+        if test.classId() == "test-suite":
+            self.redrawSuite(test)
+        self.rightWindowGUI.notifyChange(test)
     def redrawTest(self, test, state):
         iter = self.itermap[test]
         self.updateStateInModel(test, iter, state)
@@ -687,10 +681,8 @@ class TextTestGUI(Responder):
         if test.state.isComplete() and test.state.needsRecalculation():
             cmpAction = comparetest.MakeComparisons()
             guilog.info("Recalculating result info for test: result file changed since created")
-            # Not present for fast reconnect, don't crash...
-            cmpAction.setUpApplication(test.app)
             cmpAction(test)
-            test.notifyChanged()
+            test.notifyLifecycle(test.state, "be recalculated")
     def reFilter(self):
         self.filteredModel.refilter()
         self.selectionChanged(self.selection, False)
@@ -1882,7 +1874,7 @@ class TestProgressMonitor:
     def getStateInfo(self, state):
         successFlag, details = state.getTypeBreakdown()
         return state.category, details
-    def notifyChange(self, test, state):
+    def notifyLifecycleChange(self, test, state):
         category, details = self.getStateInfo(state)
         if state.isComplete():
             if self.completedTests.has_key(test):

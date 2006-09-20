@@ -307,7 +307,8 @@ class SaveTests(SelectionAction):
                     testComparison.savePartial(fileSel, test, self.getExactness(), version)
                 else:
                     testComparison.save(test, self.getExactness(), version, overwriteSuccess)
-                test.filesChanged()
+                newState = testComparison.makeNewState(test.app)
+                test.changeState(newState)
           
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!

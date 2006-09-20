@@ -117,6 +117,8 @@ class InteractiveResponder(Responder):
             saveDesc += "(overwriting succeeded files also)"
         print test.getIndent() + "Saving " + repr(test) + saveDesc
         test.state.save(test, exact, version, self.overwriteSuccess)
+        newState = test.state.makeNewState(test.app)
+        test.changeState(newState)
     def useInteractiveResponse(self, test):
         return test.state.hasFailed() and test.state.hasResults() and not self.overwriteFailure
     def presentInteractiveDialog(self, test):            

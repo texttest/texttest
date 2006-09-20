@@ -1,5 +1,6 @@
 
 import plugins, os, sys, shutil, string, types, time
+import gtk
 from threading import Thread
 from glob import glob
 from Queue import Queue, Empty
@@ -54,13 +55,19 @@ class ProcessTerminationMonitor:
 processTerminationMonitor = ProcessTerminationMonitor()
 
 class TestSelection:
-    def __init__(self, observer):
+    def __init__(self, observer, includeSuites=False):
         self.tests = []
         self.observer = observer
+        self.includeSuites = includeSuites
     def __repr__(self):
-        return str(self.size()) + " tests"
+        rep = str(self.size()) + " tests"
+        if self.includeSuites:
+            rep += " and suites"
+        return rep
     def add(self, object):
         if object.classId() == "test-case":
+            self.tests.append(object)
+        elif self.includeSuites and object.classId() == "test-suite":
             self.tests.append(object)
     def includes(self, test):
         return test in self.tests
@@ -85,7 +92,7 @@ class TestSelection:
             if not test.app.name in apps:
                 apps.append(test.app.name)
         return "-a " + string.join(apps, ",")
-
+       
 class InteractiveAction:
     def __init__(self, optionName = ""):
         self.optionGroup = None
@@ -106,10 +113,20 @@ class InteractiveAction:
             return []
     def canPerform(self):
         return True
+    def canPerformOnSuite(self):
+        return False
+    def getInterfaceDescription(self):
+        return ""
+    def getAccelerator(self):        
+        pass
+    def getStockId(self):
+        pass
     def getTitle(self):
         pass
     def getSecondaryTitle(self):
         return self.getTitle()
+    def getTooltip(self):
+        return self.getScriptTitle(False)
     def messageBeforePerform(self, parameter):
         return "Performing '" + self.getSecondaryTitle() + "' on " + repr(parameter) + " ..."
     def messageAfterPerform(self, parameter):
@@ -240,6 +257,14 @@ class SaveTests(SelectionAction):
             self.addSwitch(oldOptionGroups, "ex", "Save: ", 1, ["Average performance", "Exact performance"])
     def isFrequentUse(self):
         return True
+    def getStockId(self):
+        return gtk.STOCK_SAVE
+    def getInterfaceDescription(self):
+        description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
+        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
+        return description
+    def getAccelerator(self):
+        return "<control>s"
     def getTitle(self):
         return "_Save"
     def getSecondaryTitle(self):
@@ -603,6 +628,14 @@ class SelectTests(SelectionAction):
         for group in self.apps[0].optionGroups:
             if group.name.startswith("Select"):
                 return group
+    def getInterfaceDescription(self):
+        description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
+        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
+        return description
+    def getAccelerator(self):
+        return "<control>s"
+    def getStockId(self):
+        return gtk.STOCK_REFRESH
     def getTitle(self):
         return "_Select"
     def getSecondaryTitle(self):
@@ -713,6 +746,14 @@ class SelectTests(SelectionAction):
 class ResetGroups(SelectionAction):
     def __init__(self, rootSuites, oldOptionGroups):
         SelectionAction.__init__(self, rootSuites)
+    def getStockId(self):
+        return gtk.STOCK_REVERT_TO_SAVED
+    def getInterfaceDescription(self):
+        description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
+        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/></toolbar>\n"
+        return description
+    def getAccelerator(self):
+        return '<control>e'
     def getTitle(self):
         return "R_eset"
     def messageBeforePerform(self, testSel):
@@ -739,7 +780,7 @@ class SaveSelection(SelectionAction):
     def getTitle(self):
         return "S_ave Selection"
     def getScriptTitle(self, tab):
-        return "Save Selection"
+        return "Save selection"
     def getGroupTabTitle(self):
         return "Selection"
     def matchesMode(self, dynamic):
@@ -797,6 +838,14 @@ class RunTests(SelectionAction):
         return self.optionGroups
     def getTitle(self):
         return "_Run Tests"
+    def getStockId(self):
+        return gtk.STOCK_EXECUTE
+    def getInterfaceDescription(self):
+        description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
+        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
+        return description
+    def getAccelerator(self):
+        return "<control>r"
     def getScriptTitle(self, tab):
         return "Run selected tests"
     def getGroupTabTitle(self):
@@ -864,7 +913,7 @@ class EnableDiagnostics(InteractiveTestAction):
     def getTitle(self):
         return "New _Diagnostics"
     def getScriptTitle(self, tab):
-        return "Enable Diagnostics"
+        return "Enable diagnostics"
     def matchesMode(self, dynamic):
         return not dynamic
     def canPerform(self):
@@ -933,7 +982,7 @@ class CopyTest(ImportTest):
     def getTitle(self):
         return "_Copy"
     def getScriptTitle(self, tab):
-        return "Copy Test"
+        return "Copy test"
     def __call__(self, test):
         suite = test.parent
         self.setUpSuite(suite)

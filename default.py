@@ -517,6 +517,11 @@ class Config(plugins.Configuration):
         app.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         app.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
+        app.setConfigDefault("gui_accelerators", { "" : [] }, "Custom action accelerators.")
+        app.setConfigDefault("static_gui_show_menubar", 1, "Show menubar in the static GUI?")
+        app.setConfigDefault("static_gui_show_toolbar", 1, "Show toolbar in the static GUI?")
+        app.setConfigDefault("dynamic_gui_show_menubar", 1, "Show menubar in the dynamic GUI?")
+        app.setConfigDefault("dynamic_gui_show_toolbar", 1, "Show toolbar in the dynamic GUI?")
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")

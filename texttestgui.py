@@ -81,6 +81,14 @@ class QuitGUI(guiplugins.SelectionAction):
         self.topWindow = topWindow
         self.actionThread = actionThread
         scriptEngine.connect("close window", "delete_event", topWindow, self.exit)
+    def getInterfaceDescription(self):
+        description = "<menubar>\n<menu action=\"filemenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
+        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/>\n</toolbar>\n"
+        return description
+    def getStockId(self):
+        return gtk.STOCK_QUIT
+    def getAccelerator(self):
+        return "<control>q"
     def getTitle(self):
         return "_Quit"
     def messageBeforePerform(self, testSel):
@@ -126,6 +134,14 @@ def getGtkRcFile():
         return file
 
 class TextTestGUI(Responder):
+    defaultGUIDescription = '''
+<ui>
+  <menubar>
+  </menubar>
+  <toolbar>
+  </toolbar>
+</ui>
+'''
     def __init__(self, optionMap):
         self.readGtkRCFile()
         self.dynamic = not optionMap.has_key("gx")
@@ -144,6 +160,14 @@ class TextTestGUI(Responder):
         self.rootSuites = []
         self.status = GUIStatusMonitor()
         self.collapsedRows = {}
+
+        # Create GUI manager, and a few default action groups
+        self.uiManager = gtk.UIManager()
+        basicActions = gtk.ActionGroup("Basic")
+        basicActions.add_actions([("filemenu", None, "_File"), ("actionmenu", None, "_Actions")])
+        self.uiManager.insert_action_group(basicActions, 0)
+        self.uiManager.insert_action_group(gtk.ActionGroup("Suite"), 1)
+        self.uiManager.insert_action_group(gtk.ActionGroup("Case"), 2)
     def needsOwnThread(self):
         return True
     def readGtkRCFile(self):
@@ -167,6 +191,7 @@ class TextTestGUI(Responder):
             win.set_title("TextTest static GUI : management of tests for " + self.getAppNames())
             
         guilog.info("Top Window title set to " + win.get_title())
+        win.add_accel_group(self.uiManager.get_accel_group())
         return win
     def getAppNames(self):
         names = []
@@ -176,21 +201,9 @@ class TextTestGUI(Responder):
         return string.join(names, ",")
     def fillTopWindow(self, topWindow, testWins, rightWindow):
         mainWindow = self.createWindowContents(testWins, rightWindow)
-        
+
         vbox = gtk.VBox()
-        hbox = gtk.HBox()
-        hbox.pack_start(self.selectionActionGUI.buttons, expand=False, fill=False)
-                
-        if self.dynamic:            
-            progressBar = self.progressMonitor.createProgressBar()
-            progressBar.show()
-            alignment = gtk.Alignment()
-            alignment.set_padding(0, 0, 1, 0)
-            alignment.add(progressBar)
-            hbox.pack_start(alignment, expand=True, fill=True)
-            
-        hbox.show_all()
-        vbox.pack_start(hbox, expand=False, fill=True)
+        self.placeTopWidgets(vbox)
         vbox.pack_start(mainWindow, expand=True, fill=True)
         if self.getConfigValue("add_shortcut_bar"):
             shortcutBar = scriptEngine.createShortcutBar()
@@ -215,6 +228,44 @@ class TextTestGUI(Responder):
         elif not self.dynamic and self.getConfigValue("window_size").has_key("static_vertical_separator_position"):
             verticalSeparatorPosition = float(self.getConfigValue("window_size")["static_vertical_separator_position"][0])
         self.contents.set_position(int(self.contents.allocation.width * verticalSeparatorPosition))
+    def placeTopWidgets(self, vbox):
+        # Initialize
+        self.uiManager.add_ui_from_string(self.defaultGUIDescription)
+        self.selectionActionGUI.attachTriggers()
+  
+        # Show menu/toolbar?
+        menubar = None
+        toolbar = None
+        if (self.dynamic and self.getConfigValue("dynamic_gui_show_menubar")) or (not self.dynamic and self.getConfigValue("static_gui_show_menubar")):
+            menubar = self.uiManager.get_widget("/menubar")
+        if (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or (not self.dynamic and self.getConfigValue("static_gui_show_toolbar")):
+            toolbarHandle = gtk.HandleBox()
+            toolbar = self.uiManager.get_widget("/toolbar")
+            toolbarHandle.add(toolbar)
+            for item in toolbar.get_children():
+                item.set_is_important(True)
+                toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
+                toolbar.set_style(gtk.TOOLBAR_BOTH_HORIZ)
+        
+        progressBar = None
+        if self.dynamic:            
+            progressBar = self.progressMonitor.createProgressBar()
+            progressBar.show()
+        hbox = gtk.HBox()
+
+        if menubar and toolbar:
+            vbox.pack_start(menubar, expand=False, fill=False)
+            hbox.pack_start(toolbarHandle, expand=True, fill=True)
+        elif menubar:
+            hbox.pack_start(menubar, expand=False, fill=False)
+        elif toolbar:
+            hbox.pack_start(toolbarHandle, expand=True, fill=True)
+
+        if progressBar:
+            hbox.pack_start(progressBar, expand=True, fill=True)
+        hbox.show_all()
+        vbox.pack_start(hbox, expand=False, fill=True)
+                
     def getConfigValue(self, configName):
         return self.rootSuites[0].app.getConfigValue(configName)
     def getWindowHeight(self):
@@ -352,7 +403,7 @@ class TextTestGUI(Responder):
     def createSelectionActionGUI(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
-        return SelectionActionGUI(actions, self.selection, self.status, self.filteredModel)
+        return SelectionActionGUI(actions, self.selection, self.status, self.uiManager, self.rootSuites[0].app, self.filteredModel)
     def createTestWindows(self, treeWindow):
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
@@ -518,7 +569,7 @@ class TextTestGUI(Responder):
     def createDefaultRightGUI(self):
         rootSuite = self.rootSuites[0]
         guilog.info("Viewing test " + repr(rootSuite))
-        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.status, self.progressMonitor)
+        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.status, self.progressMonitor, self.uiManager)
     def pickUpProcess(self):
         process = guiplugins.processTerminationMonitor.getTerminatedProcess()
         if process:
@@ -692,29 +743,90 @@ class TextTestGUI(Responder):
             rootIter = self.filteredModel.iter_next(rootIter)
    
 class InteractiveActionGUI:
-    def __init__(self, actions, status, test = None):
+    def __init__(self, actions, status, uiManager, app, test = None):
+        self.app = app
+        self.uiManager = uiManager
         self.actions = actions
         self.test = test
-        self.buttons = self.makeButtons()
         self.pageDescInfo = { "Test" : {} }
         self.indexers = [] # Utility list for getting the values from multi-valued radio button groups :-(
         self.status = status
+        self.createdActions = []
+    def getInterfaceDescription(self):
+        description = "<ui>\n"
+        buttonInstances = filter(lambda instance : instance.inToolBar(), self.actions)
+        for instance in buttonInstances:
+            description += instance.getInterfaceDescription()
+        description += "</ui>"
+        return description
+    def attachTriggers(self):
+        self.makeActions()
+        self.mergeId = self.uiManager.add_ui_from_string(self.getInterfaceDescription())
+        self.uiManager.ensure_update()
+        toolbar = self.uiManager.get_widget("/toolbar")
+        if toolbar:
+            for item in toolbar.get_children(): 
+                item.set_is_important(True) # Or newly added children without stock ids won't be visible in gtk.TOOLBAR_BOTH_HORIZ style
+    def detachTriggers(self):
+        self.disconnectAccelerators()
+        self.uiManager.remove_ui(self.mergeId)
+        self.uiManager.ensure_update()
+    def makeActions(self):
+        actions = filter(lambda instance : instance.inToolBar(), self.actions)
+        for action in actions:
+            self.createAction(action.getSecondaryTitle(), action.getTitle(), action.getTooltip(), action.getStockId(), action.getAccelerator(), action.getScriptTitle(tab=False), self.runInteractive, action)
+    def createAction(self, name, label, tooltip, stockId, accelerator, scriptTitle, method, option):
+        action = gtk.Action(name, label, tooltip, stockId)
+        realAcc = accelerator
+        realAcc = self.getCustomAccelerator(name, label, realAcc)
+        if realAcc:
+            key, mod = gtk.accelerator_parse(realAcc)
+            if not gtk.accelerator_valid(key, mod):
+                print "Warning: Keyboard accelerator '" + realAcc + "' for action '" + name + "' is not valid, ignoring ..."
+                realAcc = None
+        guilog.info("Creating action '" + name + "' with label '" + repr(label) + "', stock id '" + repr(stockId) + "' and accelerator " + repr(realAcc))
+        self.getActionGroup().add_action_with_accel(action, realAcc)
+        action.set_accel_group(self.uiManager.get_accel_group())
+        action.connect_accelerator()
+        scriptEngine.connect(scriptTitle.replace("_", ""), "activate", action, method, None, option)
+        self.createdActions.append(action)
+        return action
     def makeButtons(self):
         executeButtons = gtk.HBox()
         buttonInstances = filter(lambda instance : instance.inToolBar(), self.actions)
         for instance in buttonInstances:
-            button = self.createButton(self.runInteractive, instance.getTitle(), instance.getScriptTitle(tab=False), instance)
+            button = self.createButton(self.runInteractive, instance.getSecondaryTitle(), instance.getTitle(), instance.getScriptTitle(tab=False), instance.getStockId(), instance.getAccelerator(), instance.getTooltip(), instance)
             executeButtons.pack_start(button, expand=False, fill=False)
         if len(buttonInstances) > 0:
             buttonTitles = map(lambda b: b.getTitle(), buttonInstances)
-            guilog.info("Creating tool bar with buttons : " + string.join(buttonTitles, ", "))
-        executeButtons.show()
+            guilog.info("Creating box with buttons : " + string.join(buttonTitles, ", "))
+        executeButtons.show_all()
         return executeButtons
-    def createButton(self, method, label, scriptTitle, option):
-        button = gtk.Button(label)
-        scriptEngine.connect(scriptTitle.replace("_", ""), "clicked", button, method, None, option)
+    def createButton(self, method, name, label, scriptTitle, stockId, accelerator, tooltip, option):        
+        action = self.createAction(name, label, tooltip, stockId, accelerator, scriptTitle, method, option)
+        button = gtk.Button()
+        action.connect_proxy(button)
         button.show()
         return button
+    def getActionGroup(self):
+        if self.test == None:
+            actionGroupIndex = 0
+        elif self.test.classId() == "test-suite":
+            actionGroupIndex = 1
+        else:
+            actionGroupIndex = 2
+        return self.uiManager.get_action_groups()[actionGroupIndex]
+    def getCustomAccelerator(self, name, label, original):
+        configName = label.replace("_", "").replace(" ", "_").lower()
+        if self.app.getConfigValue("gui_accelerators").has_key(configName):
+            newAccel = self.app.getConfigValue("gui_accelerators")[configName][0]
+            guilog.info("Replacing default accelerator '" + repr(original) + "' for action '" + name + "' by config value '" + newAccel + "'")
+            return newAccel
+        return original
+    def disconnectAccelerators(self):
+        for action in self.getActionGroup().list_actions():
+            guilog.info("Disconnecting accelerator for action '" + action.get_name() + "'")
+            action.disconnect_accelerator()
     def runInteractive(self, button, action, *args):
         doubleCheckMessage = action.getDoubleCheckMessage(self.test)
         if doubleCheckMessage:
@@ -764,7 +876,7 @@ class InteractiveActionGUI:
             hbox = self.createSwitchBox(switch)
             vbox.pack_start(hbox, expand=False, fill=False)
         if hasButton:
-            button = self.createButton(self.runInteractive, instance.getSecondaryTitle(), instance.getScriptTitle(tab=True), instance)
+            button = self.createButton(self.runInteractive, instance.getSecondaryTitle(), instance.getTitle(), instance.getScriptTitle(tab=True), instance.getStockId(), instance.getAccelerator(), instance.getTooltip(), instance)
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()
@@ -870,8 +982,8 @@ class InteractiveActionGUI:
             self.status.output(message)
 
 class SelectionActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, selection, status, filteredModel):
-        InteractiveActionGUI.__init__(self, actions, status)
+    def __init__(self, actions, selection, status, uiManager, app, filteredModel):
+        InteractiveActionGUI.__init__(self, actions, status, uiManager, app)
         self.selection = selection
         self.itermap = {}
         self.filteredModel = filteredModel
@@ -886,15 +998,15 @@ class SelectionActionGUI(InteractiveActionGUI):
         toRemove = self.itermap[test.app]
         del toRemove[test]
     def performInteractiveAction(self, action):
-        testSel = self.makeTestSelection()
+        testSel = self.makeTestSelection(action.canPerformOnSuite())
         self.status.output(action.messageBeforePerform(testSel))
         action.performOn(testSel, self.currFileSelection)
         message = action.messageAfterPerform(testSel)
         if message != None:
             self.status.output(message)
-    def makeTestSelection(self):
+    def makeTestSelection(self, includeSuites):
         # add self as an observer
-        testSel = guiplugins.TestSelection(self)
+        testSel = guiplugins.TestSelection(self, includeSuites)
         self.selection.selected_foreach(self.addSelTest, testSel)
         return testSel
     def addSelTest(self, model, path, iter, testSel, *args):
@@ -926,8 +1038,10 @@ class SelectionActionGUI(InteractiveActionGUI):
             firstTest.append(path)    
 
 class RightWindowGUI:
-    def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor):
+    def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor, uiManager):
         self.dynamic = dynamic
+        self.intvActionGUI = None
+        self.uiManager = uiManager
         self.selectionActionGUI = selectionActionGUI
         self.progressMonitor = progressMonitor
         self.status = status
@@ -995,9 +1109,16 @@ class RightWindowGUI:
         fileView = self.fileViewGUI.createView()
         return buttonBar, fileView, objectPages
     def makeActionElements(self, object):
-        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), self.status, object)
+        app = None
+        if object.classId() == "test-app":
+            app = object
+        else:
+            app = object.app
+        if self.intvActionGUI:
+            self.intvActionGUI.disconnectAccelerators()
+        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), self.status, self.uiManager, app, object)
         objectPages = self.getObjectNotebookPages(object, self.intvActionGUI)
-        return self.intvActionGUI.buttons, objectPages    
+        return self.intvActionGUI.makeButtons(), objectPages    
     def fillWindow(self, buttonBar, fileView):
         self.window.pack_start(buttonBar, expand=False, fill=False)
         self.topFrame.add(fileView)

@@ -1,12 +1,18 @@
 
 import plugins, os, sys, shutil, string, types, time
-import gtk
 from threading import Thread
 from glob import glob
 from Queue import Queue, Empty
 global scriptEngine
 global processTerminationMonitor
 from log4py import LOGLEVEL_NORMAL
+
+try:
+    import gtk
+except:
+    # We ignore this here and hope it won't be a problem
+    # (ravebased tests import guiplugins, but won't call the gtk specific stuff)
+    pass
 
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)

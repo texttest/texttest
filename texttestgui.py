@@ -228,6 +228,14 @@ class TextTestGUI(Responder):
         elif not self.dynamic and self.getConfigValue("window_size").has_key("static_vertical_separator_position"):
             verticalSeparatorPosition = float(self.getConfigValue("window_size")["static_vertical_separator_position"][0])
         self.contents.set_position(int(self.contents.allocation.width * verticalSeparatorPosition))
+
+        # This is a somewhat nasty hack to solve bugzilla 9919 - that the progressbar changes
+        # size when its embedded text changes, when it is used together with a toolbar in the
+        # same HBox. Since the toolbar must expand and fill to be shown properly (?!), the
+        # progress bar cannot steal all the available space, and instead this will be shared
+        # among the two widgets, resulting in a re-adjustment when one of them needs more space.
+        if self.progressMonitor and self.progressMonitor.progressBar:
+            self.progressMonitor.progressBar.set_size_request(int(topWindow.get_size()[0] * 0.75), 1)
     def placeTopWidgets(self, vbox):
         # Initialize
         self.uiManager.add_ui_from_string(self.defaultGUIDescription)
@@ -263,6 +271,7 @@ class TextTestGUI(Responder):
 
         if progressBar:
             hbox.pack_start(progressBar, expand=True, fill=True)
+
         hbox.show_all()
         vbox.pack_start(hbox, expand=False, fill=True)
                 

@@ -251,8 +251,10 @@ class CheckForBugs(plugins.Action):
                 self.diag.info("Changing to " + category + " with text " + briefText)
                 bugState = FailedPrediction(category, fullText, briefText, completed=1)
                 self.changeState(test, bugState)
+                break # no point searching for more bugs...
         self.deactivateBugs(test)
     def findBug(self, test, stem, fileBugData, multipleDiffs):
+        self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
             return fileBugData.findBugInText(test.state.freeText.split("\n"), test.state.executionHosts)
         elif not test.state.shouldAbandon():

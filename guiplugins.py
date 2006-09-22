@@ -7,13 +7,6 @@ global scriptEngine
 global processTerminationMonitor
 from log4py import LOGLEVEL_NORMAL
 
-try:
-    import gtk
-except:
-    # We ignore this here and hope it won't be a problem
-    # (ravebased tests import guiplugins, but won't call the gtk specific stuff)
-    pass
-
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
 # they can be terminated when TextTest is terminated.
@@ -264,7 +257,7 @@ class SaveTests(SelectionAction):
     def isFrequentUse(self):
         return True
     def getStockId(self):
-        return gtk.STOCK_SAVE
+        return "save"
     def getInterfaceDescription(self):
         description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
@@ -641,7 +634,7 @@ class SelectTests(SelectionAction):
     def getAccelerator(self):
         return "<control>s"
     def getStockId(self):
-        return gtk.STOCK_REFRESH
+        return "refresh"
     def getTitle(self):
         return "_Select"
     def getSecondaryTitle(self):
@@ -753,7 +746,7 @@ class ResetGroups(SelectionAction):
     def __init__(self, rootSuites, oldOptionGroups):
         SelectionAction.__init__(self, rootSuites)
     def getStockId(self):
-        return gtk.STOCK_REVERT_TO_SAVED
+        return "revert-to-saved"
     def getInterfaceDescription(self):
         description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/></toolbar>\n"
@@ -845,7 +838,7 @@ class RunTests(SelectionAction):
     def getTitle(self):
         return "_Run Tests"
     def getStockId(self):
-        return gtk.STOCK_EXECUTE
+        return "execute"
     def getInterfaceDescription(self):
         description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"

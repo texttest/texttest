@@ -86,7 +86,7 @@ class QuitGUI(guiplugins.SelectionAction):
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/>\n</toolbar>\n"
         return description
     def getStockId(self):
-        return gtk.STOCK_QUIT
+        return "quit"
     def getAccelerator(self):
         return "<control>q"
     def getTitle(self):
@@ -783,36 +783,44 @@ class InteractiveActionGUI:
     def makeActions(self):
         actions = filter(lambda instance : instance.inToolBar(), self.actions)
         for action in actions:
-            self.createAction(action.getSecondaryTitle(), action.getTitle(), action.getTooltip(), action.getStockId(), action.getAccelerator(), action.getScriptTitle(tab=False), self.runInteractive, action)
-    def createAction(self, name, label, tooltip, stockId, accelerator, scriptTitle, method, option):
-        action = gtk.Action(name, label, tooltip, stockId)
-        realAcc = accelerator
-        realAcc = self.getCustomAccelerator(name, label, realAcc)
+            self.createGtkAction(action)
+    def createGtkAction(self, intvAction, tab=False):
+        actionName = intvAction.getSecondaryTitle()
+        label = intvAction.getTitle()
+        stockId = intvAction.getStockId()
+        if stockId:
+            stockId = "gtk-" + stockId 
+        gtkAction = gtk.Action(actionName, label, intvAction.getTooltip(), stockId)
+        realAcc = intvAction.getAccelerator()
+        realAcc = self.getCustomAccelerator(actionName, label, realAcc)
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
             if not gtk.accelerator_valid(key, mod):
-                print "Warning: Keyboard accelerator '" + realAcc + "' for action '" + name + "' is not valid, ignoring ..."
+                print "Warning: Keyboard accelerator '" + realAcc + "' for action '" + actionName + "' is not valid, ignoring ..."
                 realAcc = None
-        guilog.info("Creating action '" + name + "' with label '" + repr(label) + "', stock id '" + repr(stockId) + "' and accelerator " + repr(realAcc))
-        self.getActionGroup().add_action_with_accel(action, realAcc)
-        action.set_accel_group(self.uiManager.get_accel_group())
-        action.connect_accelerator()
-        scriptEngine.connect(scriptTitle.replace("_", ""), "activate", action, method, None, option)
-        self.createdActions.append(action)
-        return action
+                
+        guilog.info("Creating action '" + actionName + "' with label '" + repr(label) + \
+                    "', stock id '" + repr(stockId) + "' and accelerator " + repr(realAcc))
+        self.getActionGroup().add_action_with_accel(gtkAction, realAcc)
+        gtkAction.set_accel_group(self.uiManager.get_accel_group())
+        gtkAction.connect_accelerator()
+        scriptTitle = intvAction.getScriptTitle(tab).replace("_", "")
+        scriptEngine.connect(scriptTitle, "activate", gtkAction, self.runInteractive, None, intvAction)
+        self.createdActions.append(gtkAction)
+        return gtkAction
     def makeButtons(self):
         executeButtons = gtk.HBox()
         buttonInstances = filter(lambda instance : instance.inToolBar(), self.actions)
         for instance in buttonInstances:
-            button = self.createButton(self.runInteractive, instance.getSecondaryTitle(), instance.getTitle(), instance.getScriptTitle(tab=False), instance.getStockId(), instance.getAccelerator(), instance.getTooltip(), instance)
+            button = self.createButton(instance)
             executeButtons.pack_start(button, expand=False, fill=False)
         if len(buttonInstances) > 0:
             buttonTitles = map(lambda b: b.getTitle(), buttonInstances)
             guilog.info("Creating box with buttons : " + string.join(buttonTitles, ", "))
         executeButtons.show_all()
         return executeButtons
-    def createButton(self, method, name, label, scriptTitle, stockId, accelerator, tooltip, option):        
-        action = self.createAction(name, label, tooltip, stockId, accelerator, scriptTitle, method, option)
+    def createButton(self, intvAction, tab=False):
+        action = self.createGtkAction(intvAction, tab)
         button = gtk.Button()
         action.connect_proxy(button)
         button.show()
@@ -885,7 +893,7 @@ class InteractiveActionGUI:
             hbox = self.createSwitchBox(switch)
             vbox.pack_start(hbox, expand=False, fill=False)
         if hasButton:
-            button = self.createButton(self.runInteractive, instance.getSecondaryTitle(), instance.getTitle(), instance.getScriptTitle(tab=True), instance.getStockId(), instance.getAccelerator(), instance.getTooltip(), instance)
+            button = self.createButton(instance, tab=True)
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()

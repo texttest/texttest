@@ -9,6 +9,7 @@ from copy import copy, deepcopy
 from cPickle import dumps
 from respond import Responder
 from traffic_cmd import sendServerState
+from knownbugs import CheckForBugs
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
@@ -125,7 +126,7 @@ class QueueSystemConfig(default.Config):
             return baseProcessor
 
         submitter = SubmitTest(self.getSubmissionRules, self.optionMap)
-        return [ submitter, WaitForCompletion() ]
+        return [ submitter, WaitForCompletion(), CheckForUnrunnableBugs() ]
     def getExecHostFinder(self):
         if self.slaveRun():
             return FindExecutionHosts()
@@ -620,3 +621,8 @@ class MachineInfoFinder(default.MachineInfoFinder):
             jobs.append("Also on " + machine + " : " + user + "'s job '" + jobName + "'")
         return jobs
         
+class CheckForUnrunnableBugs(CheckForBugs):
+    def __call__(self, test):
+        # Try to pick up only on unrunnable tests that have not come from a slave process
+        if not test.state.hasResults() and test.state.lifecycleChange != "complete":
+            CheckForBugs.__call__(self, test)

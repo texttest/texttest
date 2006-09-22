@@ -257,7 +257,7 @@ class CheckForBugs(plugins.Action):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
             return fileBugData.findBugInText(test.state.freeText.split("\n"), test.state.executionHosts)
-        elif not test.state.shouldAbandon():
+        elif test.state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
             isChanged = self.fileChanged(test, stem)
             fileName = test.makeTmpFileName(stem)
@@ -271,7 +271,7 @@ class CheckForBugs(plugins.Action):
         else:
             test.changeState(bugState)
     def hasMultipleDifferences(self, test):
-        if test.state.shouldAbandon():
+        if not test.state.hasResults():
             # check for unrunnables...
             return False
         comparisons = test.state.getComparisons()

@@ -560,7 +560,7 @@ class TextTestGUI(Responder):
 
         self.rightWindowGUI = self.createDefaultRightGUI()
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
-        treeWindow.grab_focus() # To avoid the Quit button getting the initial focus, causing unwanted quit event
+        self.treeView.grab_focus() # To avoid the Quit button getting the initial focus, causing unwanted quit event
     def updateNofTests(self):
         self.totalNofTests = 0
         self.model.foreach(self.countTests)        

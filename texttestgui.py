@@ -2056,16 +2056,19 @@ class TestProgressMonitor:
             if self.completionTime == "":
                 self.completionTime = plugins.localtime()
             if self.nofFailedTests != 0:
-                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed at " + self.completionTime + " (" + str(self.nofFailedTests) + " tests failed)")
+                text = "All " + str(self.totalNofTests) + " tests completed at " + self.completionTime + " (" + str(self.nofFailedTests) + " tests failed)"
             else:
-                self.progressBar.set_text("All " + str(self.totalNofTests) + " tests completed at " + self.completionTime)
-            self.progressBar.set_fraction(1.0)
+                text = "All " + str(self.totalNofTests) + " tests completed at " + self.completionTime
+            fraction = 1.0
         else:
             if self.nofFailedTests != 0:
-                self.progressBar.set_text(str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed (" + str(self.nofFailedTests) + " tests failed)")
+                text = str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed (" + str(self.nofFailedTests) + " tests failed)"
             else:
-                self.progressBar.set_text(str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed")
-            self.progressBar.set_fraction(float(self.nofCompletedTests) / float(self.totalNofTests))
+                text = str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed"
+            fraction = float(self.nofCompletedTests) / float(self.totalNofTests)
+        guilog.info("Progress bar set to fraction " + str(fraction) + ", text '" + text + "'")
+        self.progressBar.set_text(text)
+        self.progressBar.set_fraction(fraction)
             
         if self.progressReport != None:
             self.diagnoseTree()

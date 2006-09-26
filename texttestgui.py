@@ -156,6 +156,7 @@ class TextTestGUI(Responder):
         self.contents = None
         self.totalNofTests = 0
         self.progressMonitor = None
+        self.progressBar = None
         self.toolTips = gtk.Tooltips()
         self.rootSuites = []
         self.status = GUIStatusMonitor()
@@ -234,8 +235,8 @@ class TextTestGUI(Responder):
         # same HBox. Since the toolbar must expand and fill to be shown properly (?!), the
         # progress bar cannot steal all the available space, and instead this will be shared
         # among the two widgets, resulting in a re-adjustment when one of them needs more space.
-        if self.progressMonitor and self.progressMonitor.progressBar:
-            self.progressMonitor.progressBar.set_size_request(int(topWindow.get_size()[0] * 0.75), 1)
+        if self.progressBar:
+            self.progressBar.adjustToSpace(topWindow.get_size()[0])
     def placeTopWidgets(self, vbox):
         # Initialize
         self.uiManager.add_ui_from_string(self.defaultGUIDescription)
@@ -257,7 +258,7 @@ class TextTestGUI(Responder):
         
         progressBar = None
         if self.dynamic:            
-            progressBar = self.progressMonitor.createProgressBar()
+            progressBar = self.progressBar.createProgressBar()
             progressBar.show()
         hbox = gtk.HBox()
 
@@ -554,8 +555,10 @@ class TextTestGUI(Responder):
 
         # Must be created after addSuiteWithParents has counted all tests ...
         # (but before RightWindowGUI, as that wants in on progress)
-        if self.dynamic:            
-            self.progressMonitor = TestProgressMonitor(self.totalNofTests, self.rootSuites, self.rootSuites[0].getConfigValue("test_colours"), self)
+        if self.dynamic:
+            self.progressBar = TestProgressBar(self.totalNofTests)
+            colourDict = self.rootSuites[0].getConfigValue("test_colours")
+            self.progressMonitor = TestProgressMonitor(self.rootSuites, colourDict, self)
             self.reFilter()
 
         self.rightWindowGUI = self.createDefaultRightGUI()
@@ -599,8 +602,10 @@ class TextTestGUI(Responder):
         state.notifyInMainThread()
         self.redrawTest(test, state)
         self.rightWindowGUI.notifyChange(test)
+        if self.progressBar:
+            self.progressBar.notifyLifecycleChange(test, state, changeDesc)
         if self.progressMonitor:
-            self.progressMonitor.notifyLifecycleChange(test, state)
+            self.progressMonitor.notifyLifecycleChange(test, state, changeDesc)
             iter = self.itermap[test]
             self.model.row_changed(self.model.get_path(iter), iter)
     def notifyChange(self, test):
@@ -1649,19 +1654,63 @@ class GUIStatusMonitor:
         self.statusBarEventBox.add(self.statusBar)
         self.statusBarEventBox.show()
         return self.statusBarEventBox
-                   
+
+class TestProgressBar:
+    def __init__(self, totalNofTests):
+        self.totalNofTests = totalNofTests
+        self.nofCompletedTests = 0
+        self.nofFailedTests = 0
+        self.progressBar = None
+    def createProgressBar(self):
+        self.progressBar = gtk.ProgressBar()
+        self.resetBar()
+        self.progressBar.show()
+        return self.progressBar
+    def adjustToSpace(self, windowWidth):
+        self.progressBar.set_size_request(int(windowWidth * 0.75), 1)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        failed = state.hasFailed()
+        if changeDesc == "complete":
+            self.nofCompletedTests += 1
+            if failed:
+                self.nofFailedTests += 1
+            self.resetBar()
+        elif state.isComplete() and not failed: # test saved, possibly partially so still check 'failed'
+            self.nofFailedTests -= 1
+            self.adjustFailCount()
+    def resetBar(self):
+        message = self.getFractionMessage()
+        message += self.getFailureMessage(self.nofFailedTests)
+        fraction = float(self.nofCompletedTests) / float(self.totalNofTests)
+        guilog.info("Progress bar set to fraction " + str(fraction) + ", text '" + message + "'")
+        self.progressBar.set_text(message)
+        self.progressBar.set_fraction(fraction)
+    def getFractionMessage(self):
+        if self.nofCompletedTests >= self.totalNofTests:
+            completionTime = plugins.localtime()
+            return "All " + str(self.totalNofTests) + " tests completed at " + completionTime
+        else:
+            return str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed"
+    def getFailureMessage(self, failCount):
+        if failCount != 0:
+            return " (" + str(failCount) + " tests failed)"
+        else:
+            return ""
+    def adjustFailCount(self):
+        message = self.progressBar.get_text()
+        oldFailMessage = self.getFailureMessage(self.nofFailedTests + 1)
+        newFailMessage = self.getFailureMessage(self.nofFailedTests)
+        message = message.replace(oldFailMessage, newFailMessage)
+        guilog.info("Progress bar detected save, new text is '" + message + "'")
+        self.progressBar.set_text(message)
 
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor:
-    def __init__(self, totalNofTests, applications, colors, mainGUI):
+    def __init__(self, applications, colors, mainGUI):
         self.mainGUI = mainGUI        
-        # If we get here, we know that we want to show progress
         self.completedTests = {}
         self.testToIter = {}
-        self.completionTime = ""
-        self.totalNofTests = totalNofTests
-        self.nofCompletedTests = 0
         self.nofPendingTests = 0
         self.nofRunningTests = 0
         self.nofPerformanceDiffTests = 0
@@ -1733,12 +1782,6 @@ class TestProgressMonitor:
         else:
             messages[t[0]] = t[0]
             
-    def createProgressBar(self):
-        self.progressBar = gtk.ProgressBar()
-        self.progressBar.set_text("No tests completed")
-        self.progressBar.show()
-        return self.progressBar   
-
     def adjustCount(self, count, increase):
         if increase:
             return count + 1
@@ -2012,7 +2055,7 @@ class TestProgressMonitor:
     def getStateInfo(self, state):
         successFlag, details = state.getTypeBreakdown()
         return state.category, details
-    def notifyLifecycleChange(self, test, state):
+    def notifyLifecycleChange(self, test, state, changeDesc):
         category, details = self.getStateInfo(state)
         if state.isComplete():
             if self.completedTests.has_key(test):
@@ -2022,7 +2065,6 @@ class TestProgressMonitor:
                 # ... then set new category.
                 self.completedTests[test] = category, details
             else:
-                self.nofCompletedTests += 1
                 self.nofRunningTests -= 1
                 self.completedTests[test] = category, details
         elif state.hasStarted():
@@ -2051,24 +2093,6 @@ class TestProgressMonitor:
         self.treeModel.set_value(self.pendIter, 1, self.nofPendingTests)
         self.treeModel.set_value(self.runIter, 1, self.nofRunningTests)
         self.treeModel.set_value(self.successIter, 1, self.nofSuccessfulTests)
-
-        if self.nofCompletedTests >= self.totalNofTests:
-            if self.completionTime == "":
-                self.completionTime = plugins.localtime()
-            if self.nofFailedTests != 0:
-                text = "All " + str(self.totalNofTests) + " tests completed at " + self.completionTime + " (" + str(self.nofFailedTests) + " tests failed)"
-            else:
-                text = "All " + str(self.totalNofTests) + " tests completed at " + self.completionTime
-            fraction = 1.0
-        else:
-            if self.nofFailedTests != 0:
-                text = str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed (" + str(self.nofFailedTests) + " tests failed)"
-            else:
-                text = str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed"
-            fraction = float(self.nofCompletedTests) / float(self.totalNofTests)
-        guilog.info("Progress bar set to fraction " + str(fraction) + ", text '" + text + "'")
-        self.progressBar.set_text(text)
-        self.progressBar.set_fraction(fraction)
             
         if self.progressReport != None:
             self.diagnoseTree()

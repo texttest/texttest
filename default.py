@@ -1429,6 +1429,8 @@ class ReconnectTest(plugins.Action):
             # Only pick up errors here, recalculate the rest. Don't notify until
             # we're done with recalculation.
             if not newState.hasResults():
+                # Don't generate a view of the pre-calculated changes, we're trying again...
+                newState.lifecycleChange = ""
                 test.changeState(newState)
             else:
                 # Also pick up execution machines, we can't get them otherwise...

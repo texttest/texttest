@@ -229,14 +229,6 @@ class TextTestGUI(Responder):
         elif not self.dynamic and self.getConfigValue("window_size").has_key("static_vertical_separator_position"):
             verticalSeparatorPosition = float(self.getConfigValue("window_size")["static_vertical_separator_position"][0])
         self.contents.set_position(int(self.contents.allocation.width * verticalSeparatorPosition))
-
-        # This is a somewhat nasty hack to solve bugzilla 9919 - that the progressbar changes
-        # size when its embedded text changes, when it is used together with a toolbar in the
-        # same HBox. Since the toolbar must expand and fill to be shown properly (?!), the
-        # progress bar cannot steal all the available space, and instead this will be shared
-        # among the two widgets, resulting in a re-adjustment when one of them needs more space.
-        if self.progressBar:
-            self.progressBar.adjustToSpace(topWindow.get_size()[0])
     def placeTopWidgets(self, vbox):
         # Initialize
         self.uiManager.add_ui_from_string(self.defaultGUIDescription)
@@ -271,11 +263,23 @@ class TextTestGUI(Responder):
             hbox.pack_start(toolbarHandle, expand=True, fill=True)
 
         if progressBar:
-            hbox.pack_start(progressBar, expand=True, fill=True)
+            if toolbar:
+                width = 7 # Looks good, same as gtk.Paned border width
+            else:
+                width = 0
+            alignment = gtk.Alignment()
+            alignment.set_padding(width, width, 1, width)
+            alignment.add(progressBar)
+            if toolbar:
+                toolItem = gtk.ToolItem()
+                toolItem.add(alignment)
+                toolItem.set_expand(True)
+                toolbar.insert(toolItem, -1)
+            else:
+                hbox.pack_start(alignment, expand=True, fill=True)
 
         hbox.show_all()
         vbox.pack_start(hbox, expand=False, fill=True)
-                
     def getConfigValue(self, configName):
         return self.rootSuites[0].app.getConfigValue(configName)
     def getWindowHeight(self):

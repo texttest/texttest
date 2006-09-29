@@ -285,23 +285,48 @@ class TestDetails:
                     container.append(HTMLgen.Heading(3, "Detailed information for the tests that " + longDescr + ":"))
                     container.append(fullDescription)
         return detailsContainers
-    def getFullDescription(self, tests, version, linkFromDetailsToOverview):
-        fullText = HTMLgen.Container()
-        textFound = None
-        for test in tests:
-            testName, state, extraVersion = test
+    def getFreeTextData(self, tests):
+        data = seqdict()
+        for testName, state, extraVersion in tests:
             freeText = state.freeText
             if freeText:
-                textFound = 1
+                if not data.has_key(freeText):
+                    data[freeText] = []
+                data[freeText].append((testName, state, extraVersion))
+        return data.items()
+    def getFullDescription(self, tests, version, linkFromDetailsToOverview):
+        freeTextData = self.getFreeTextData(tests)
+        if len(freeTextData) == 0:
+            return
+        fullText = HTMLgen.Container()
+        for freeText, tests in freeTextData:
+            for testName, state, extraVersion in tests:
                 fullText.append(HTMLgen.Name(version + testName + extraVersion))
-                fullText.append(HTMLgen.Heading(4, HTMLgen.Container("TEST " + repr(state) + " " + testName + " (",
-                                                                     self.getLinksToOverview(version, testName, extraVersion, linkFromDetailsToOverview)),")"))
-                freeText = freeText.replace("<", "&lt;").replace(">", "&gt;")
-                fullText.append(HTMLgen.RawText("<PRE>" + freeText + "</PRE>"))
-        if textFound:
-            return fullText
+            fullText.append(self.getHeaderLine(tests, version, linkFromDetailsToOverview))
+            freeText = freeText.replace("<", "&lt;").replace(">", "&gt;")
+            fullText.append(HTMLgen.RawText("<PRE>" + freeText + "</PRE>"))
+            if len(tests) > 1:
+                for line in self.getTestLines(tests, version, linkFromDetailsToOverview):
+                    fullText.append(line)                            
+        return fullText
+    def getHeaderLine(self, tests, version, linkFromDetailsToOverview):
+        testName, state, extraVersion = tests[0]
+        if len(tests) == 1:
+            linksToOverview = self.getLinksToOverview(version, testName, extraVersion, linkFromDetailsToOverview)
+            headerText = "TEST " + repr(state) + " " + testName + " ("
+            container = HTMLgen.Container(headerText, linksToOverview)
+            return HTMLgen.Heading(4, container, ")")
         else:
-            return None
+            headerText = str(len(tests)) + " TESTS " + repr(state)
+            return HTMLgen.Heading(4, headerText) 
+    def getTestLines(self, tests, version, linkFromDetailsToOverview):
+        lines = []
+        for testName, state, extraVersion in tests:
+            linksToOverview = self.getLinksToOverview(version, testName, extraVersion, linkFromDetailsToOverview)
+            headerText = testName + " ("
+            container = HTMLgen.Container(headerText, linksToOverview, ")<br>")
+            lines.append(container)
+        return lines
     def getLinksToOverview(self, version, testName, extraVersion, linkFromDetailsToOverview):
         links = HTMLgen.Container()
         for sel, value in linkFromDetailsToOverview.items():

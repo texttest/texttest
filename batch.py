@@ -93,16 +93,29 @@ class BatchCategory(plugins.Filter):
             return "\nDetailed information for the tests that " + self.longDescription + " follows...\n" + fullDescriptionString
         else:
             return ""
-    def getFullDescription(self):
-        fullText = ""
+    def getFreeTextData(self):
+        data = seqdict()
         for test in self.getAllTests():
             freeText = test.state.freeText
             if freeText:
-                fullText += "--------------------------------------------------------" + "\n"
+                if not data.has_key(freeText):
+                    data[freeText] = []
+                data[freeText].append(test)
+        return data.items()
+    def getFullDescription(self):
+        fullText = ""
+        for freeText, tests in self.getFreeTextData():
+            fullText += "--------------------------------------------------------" + "\n"
+            if len(tests) == 1:
+                test = tests[0]
                 fullText += "TEST " + repr(test.state) + " " + repr(test) + " (under " + test.getRelPath() + ")" + "\n"
-                fullText += freeText
-                if not freeText.endswith("\n"):
-                    fullText += "\n"
+            else:
+                fullText += str(len(tests)) + " TESTS " + repr(tests[0].state) + "\n"
+            fullText += freeText
+            if not freeText.endswith("\n"):
+                fullText += "\n"
+            if len(tests) > 1:
+                fullText += "(tests were " + string.join([ test.name for test in tests ], ", ") + ")\n"
         return fullText
 
 class BatchApplicationData:

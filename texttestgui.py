@@ -1725,8 +1725,6 @@ class TestProgressMonitor:
         self.nofLargerTests = 0
         self.nofUnrunnableTests = 0
         self.nofCrashedTests = 0
-        self.nofBetterTests = 0
-        self.nofWorseTests = 0
         self.nofDifferentTests = 0
         self.nofDifferentPlusTests = 0
         self.nofMissingFilesTests = 0

@@ -511,7 +511,7 @@ class TextTestGUI(Responder):
         self.nofSelectedTests = 0
         self.totalNofTestsShown = 0
         self.selection.selected_foreach(self.countSelected)
-        self.filteredModel.foreach(self.countAllShown)
+        self.filteredModel.foreach(self.countVisible)
         title = "Tests: "
         if self.nofSelectedTests == self.totalNofTests:
             title += "All " + str(self.totalNofTests) + " selected"
@@ -528,7 +528,7 @@ class TextTestGUI(Responder):
     def countSelected(self, model, path, iter):
         if model.get_value(iter, 2).classId() == "test-case":
             self.nofSelectedTests = self.nofSelectedTests + 1
-    def countAllShown(self, model, path, iter):
+    def countVisible(self, model, path, iter):
         # When rows are added, they are first empty, and asking for
         # classId on NoneType gives an error. See e.g.
         # http://www.async.com.br/faq/pygtk/index.py?req=show&file=faq13.028.htp
@@ -2100,6 +2100,8 @@ class TestProgressMonitor:
             
         if self.progressReport != None:
             self.diagnoseTree()
+            
+        self.mainGUI.reFilter()
 
         # Output the tree in textual format
     def diagnoseTree(self):
@@ -2211,7 +2213,7 @@ class TestProgressMonitor:
                 else:
                     guilog.info("Progress report filter: Not showing test " + repr(test) + " in state " + repr(test.state))
                     self.checkAndHidePath(model, iter)
-            model.set_value(iter, 6, newValue)
+                model.set_value(iter, 6, newValue)
 
     # Make the entire path from the root to iter visible
     def makePathVisible(self, model, iter):
@@ -2226,9 +2228,8 @@ class TestProgressMonitor:
         for i in xrange(len(parents) - 1, -1, -1):
             model.set_value(parents[i], 6, True)
 
-
     # iter has been hidden - check iter's parent whether
-    # all its parents are invisible, if so hide self and
+    # all its children are invisible, if so hide self and
     # proceed recursively upwards.
     def checkAndHidePath(self, model, iter):
         parent = model.iter_parent(iter)

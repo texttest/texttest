@@ -46,10 +46,7 @@ class BatchFilter(plugins.Filter):
 class BatchCategory(plugins.Filter):
     def __init__(self, state):
         self.name = state.category
-        if state.categoryDescriptions.has_key(self.name):
-            self.briefDescription, self.longDescription = state.categoryDescriptions[self.name]
-        else:
-            self.briefDescription, self.longDescription = self.name, self.name
+        self.briefDescription, self.longDescription = state.categoryDescriptions.get(self.name, (self.name, self.name))
         self.tests = {}
         self.testSuites = []
     def addTest(self, test):

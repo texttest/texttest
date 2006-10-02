@@ -1859,7 +1859,7 @@ class TestProgressMonitor:
         for classifier in classifiers:
             iter = self.findIter(classifier, searchIter)
             if iter:
-                self.insertTestAtIter(iter, test)
+                self.insertTestAtIter(iter, test, state.category)
                 searchIter = self.treeModel.iter_children(iter)
             else:
                 iter = self.addNewIter(classifier, parentIter, test, state.category)
@@ -1867,9 +1867,12 @@ class TestProgressMonitor:
             parentIter = iter
             self.classifications[test].append(iter)
         return iter
-    def insertTestAtIter(self, iter, test):
+    def insertTestAtIter(self, iter, test, category):
         allTests = self.treeModel.get_value(iter, 5)
         testCount = self.treeModel.get_value(iter, 1)
+        if testCount == 0:
+            self.treeModel.set_value(iter, 3, getTestColour(test, category))
+            self.treeModel.set_value(iter, 4, "bold")
         self.treeModel.set_value(iter, 1, testCount + 1)
         allTests.append(test)
         self.treeModel.set_value(iter, 5, allTests)

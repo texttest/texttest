@@ -800,16 +800,22 @@ class Application:
     def setCheckoutVariable(self):
         if self.checkout:
             os.environ["TEXTTEST_CHECKOUT"] = self.checkout
-    def getPreviousWriteDirInfo(self, userName):
-        userId = plugins.tmpString
-        if userName:
-            if self.rootTmpDir == os.path.expanduser("~/texttesttmp"):
-                return userName, self.rootTmpDir.replace(userId, userName)
-            else:
-                # hack for self-tests, don't replace user globally, only locally
-                return userName, self.rootTmpDir
+    def getPreviousWriteDirInfo(self, previousTmpInfo):
+        # previousTmpInfo can be either a directory, which should be returned if it exists,
+        # a user name, which should be expanded and checked
+        if len(previousTmpInfo) == 0:
+            previousTmpInfo = self.rootTmpDir
+        if os.path.isdir(previousTmpInfo):
+            return previousTmpInfo
         else:
-            return userId, self.rootTmpDir
+            # try as user name, throw if we fail
+            path = os.path.expanduser("~" + previousTmpInfo + "/texttesttmp")
+            if os.path.isdir(path):
+                return path
+            if previousTmpInfo.find(os.sep) != -1:
+                raise plugins.TextTestError, "Could not find TextTest temporary directory at " + previousTmpInfo
+            else:
+                raise plugins.TextTestError, "Could not find TextTest temporary directory for " + previousTmpInfo + " at " + path
     def getPersonalConfigFile(self):
         personalDir = plugins.getPersonalConfigDir()
         if personalDir:
@@ -926,7 +932,7 @@ class Application:
         return os.path.expanduser(os.environ["TEXTTEST_TMP"])
     def getStandardWriteDirectoryName(self):
         timeStr = plugins.startTimeString().replace(":", "")
-        localName = self.name + self.versionSuffix() + plugins.tmpString + timeStr
+        localName = self.name + self.versionSuffix() + "." + plugins.tmpString + "." + timeStr
         return os.path.join(self.rootTmpDir, localName)
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions

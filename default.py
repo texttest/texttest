@@ -1385,8 +1385,8 @@ class CountTest(plugins.Action):
         self.appCount[app.description()] = 0
 
 class ReconnectTest(plugins.Action):
-    def __init__(self, fetchUser, fullRecalculate):
-        self.fetchUser = fetchUser
+    def __init__(self, reconnectTmpInfo, fullRecalculate):
+        self.reconnectTmpInfo = reconnectTmpInfo
         self.rootDirToCopy = None
         self.fullRecalculate = fullRecalculate
         self.diag = plugins.getDiagnostics("Reconnection")
@@ -1455,25 +1455,24 @@ class ReconnectTest(plugins.Action):
         # If the directory does not exist or is empty, we cannot reconnect to it.
         return os.path.exists(dir) and len(os.listdir(dir)) > 0
     def setUpApplication(self, app):
-        userToFind, fetchDir = app.getPreviousWriteDirInfo(self.fetchUser)
-        self.rootDirToCopy = self.findReconnDirectory(fetchDir, app, userToFind)
-        if self.rootDirToCopy:
-            print "Reconnecting to test results in directory", self.rootDirToCopy
-            if not self.fullRecalculate:
-                app.writeDirectory = self.rootDirToCopy
-        else:
-            raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + userToFind + " under " + fetchDir
-    def findReconnDirectory(self, fetchDir, app, userToFind):
-        self.diag.info("Looking for reconnection in " + fetchDir + " for " + userToFind)
-        if os.path.isdir(fetchDir):
-            return app.getFileName([ fetchDir ], userToFind, self.getVersionList)
-    def getVersionList(self, fileName, userToFind):
+        fetchDir = app.getPreviousWriteDirInfo(self.reconnectTmpInfo)
+        self.rootDirToCopy = self.findReconnDirectory(fetchDir, app)
+        if not self.rootDirToCopy:
+            raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + " under " + fetchDir
+
+        print "Reconnecting to test results in directory", self.rootDirToCopy
+        if not self.fullRecalculate:
+            app.writeDirectory = self.rootDirToCopy
+    def findReconnDirectory(self, fetchDir, app):
+        self.diag.info("Looking for reconnection in " + fetchDir)
+        return app.getFileName([ fetchDir ], app.name, self.getVersionList)
+    def getVersionList(self, fileName, stem):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
-        parts = fileName.split(userToFind)
-        if len(parts) < 2:
+        parts = fileName.split(".")
+        if len(parts) < 3 or stem != parts[0]:
             return
-        return parts[0].split(".")
+        return parts[1:-2]
     def setUpSuite(self, suite):
         self.describe(suite)
 

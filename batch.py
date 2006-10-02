@@ -554,10 +554,7 @@ class CollectFiles(plugins.Action):
         totalValues = seqdict()
         # Collection should not itself use collection
         app.addConfigEntry("collection", "false", "batch_use_collection")
-        userName, rootDir = app.getPreviousWriteDirInfo(self.userName)
-        if not os.path.isdir(rootDir):
-            self.diag.info("No directory at " + rootDir)
-            return
+        rootDir = app.getPreviousWriteDirInfo(self.userName)
         dirlist = os.listdir(rootDir)
         dirlist.sort()
         for dir in dirlist:

@@ -421,21 +421,21 @@ class LogFileFinder:
         # Construct a search string.
         app = self.test.app
         if not version:
-            version = string.join(self.test.app.versions, ".")
+            version = string.join(app.versions, ".")
         versionMod = ""
         if version:
             versionMod = "." + version
         searchString = app.name + versionMod
-        userId, root = app.getPreviousWriteDirInfo(self.searchInUser)
-        searchString += userId
-        
+        try:
+            root = app.getPreviousWriteDirInfo(self.searchInUser)
+        except plugins.TextTestError:
+            # If there isn't any temp info, this will throw
+            return None, None
         if thisRun:
             fromThisRun = self.test.makeTmpFileName(stem)
             self.diag.info("Looked for " + fromThisRun)
             if os.path.isfile(fromThisRun): # Temp removed, doesn't work for matador. and fromThisRun.find(searchString) != -1:
                 return fromThisRun, app.writeDirectory
-        if not os.path.isdir(root):
-            return None, None
         for subDir in os.listdir(root):
             fullDir = os.path.join(root, subDir)
             if os.path.isdir(fullDir) and subDir.startswith(searchString):
@@ -1285,7 +1285,7 @@ class TestGraph:
         onlyExactMatch = self.optionGroup.getSwitchValue("oem")
         noTmp = self.optionGroup.getSwitchValue("nt")
         if not noTmp:
-            logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
+            logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
             foundTmp, logFile = logFileFinder.findFile()
             if foundTmp:
                 self.createPlotLines("this run", logFile, test, None)
@@ -1326,7 +1326,7 @@ class TestGraph:
                             self.createPlotLines("CVS " + date, CVSLogFileName, test, None)
                 else:
                     if not noTmp:
-                        logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser  = searchInUser)
+                        logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
                         foundTmp, logFile = logFileFinder.findFile(version)
                         if foundTmp:
                             self.createPlotLines(versionName + "run", logFile, test, scaling)

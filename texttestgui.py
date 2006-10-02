@@ -74,6 +74,14 @@ def renderSuitesBold(column, cell, model, iter):
     else:
         cell.set_property('font', "bold")
 
+def getTestColour(test, category):
+    colours = test.getConfigValue("test_colours")
+    if colours.has_key(category):
+        return colours[category]
+    else:
+        # Everything unknown is assumed to be a new type of failure...
+        return colours["failure"]
+
 class QuitGUI(guiplugins.SelectionAction):
     def __init__(self, rootSuites, dynamic, topWindow, actionThread):
         guiplugins.SelectionAction.__init__(self, rootSuites)
@@ -380,17 +388,10 @@ class TextTestGUI(Responder):
         return iter
     def updateStateInModel(self, test, iter, state):
         if not self.dynamic:
-            return self.modelUpdate(iter, self.getTestColour(test, "static"))
+            return self.modelUpdate(iter, getTestColour(test, "static"))
 
         resultType, summary = state.getTypeBreakdown()
-        return self.modelUpdate(iter, self.getTestColour(test, resultType), summary, self.getTestColour(test, state.category))
-    def getTestColour(self, test, category):
-        colours = test.getConfigValue("test_colours")
-        if colours.has_key(category):
-            return colours[category]
-        else:
-            # Everything unknown is assumed to be a new type of failure...
-            return colours["failure"]
+        return self.modelUpdate(iter, getTestColour(test, resultType), summary, getTestColour(test, state.category))
     def modelUpdate(self, iter, colour, details="", colour2=None):
         if not colour2:
             colour2 = colour
@@ -550,8 +551,7 @@ class TextTestGUI(Responder):
         # (but before RightWindowGUI, as that wants in on progress)
         if self.dynamic:
             self.progressBar = TestProgressBar(self.totalNofTests)
-            colourDict = self.rootSuites[0].getConfigValue("test_colours")
-            self.progressMonitor = TestProgressMonitor(self.rootSuites, colourDict, self)
+            self.progressMonitor = TestProgressMonitor(self.rootSuites, self)
             self.reFilter()
 
         self.rightWindowGUI = self.createDefaultRightGUI()
@@ -1764,14 +1764,14 @@ class TestProgressBar:
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor:
-    def __init__(self, applications, colors, mainGUI):
+    def __init__(self, applications, mainGUI):
         self.mainGUI = mainGUI        
         self.classifications = {} # map from test to list of iterators where it exists
-        self.colors = colors
         self.hideCategories = applications[0].getConfigValue("hide_test_category")
                 
         # Each row has 'type', 'number', 'show', 'tests'
-        self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, gobject.TYPE_PYOBJECT)
+        self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, \
+                                       gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.progressReport = None
         self.treeView = None
         self.setupTreeView()
@@ -1783,10 +1783,8 @@ class TestProgressMonitor:
         textRenderer = gtk.CellRendererText()
         numberRenderer = gtk.CellRendererText()
         numberRenderer.set_property('xalign', 1)
-        statusColumn = gtk.TreeViewColumn("Status", textRenderer, text=0)
-        numberColumn = gtk.TreeViewColumn("Number", numberRenderer, text=1)
-        statusColumn.set_cell_data_func(textRenderer, self.renderPositive)
-        numberColumn.set_cell_data_func(numberRenderer, self.renderPositive)
+        statusColumn = gtk.TreeViewColumn("Status", textRenderer, text=0, background=3, font=4)
+        numberColumn = gtk.TreeViewColumn("Number", numberRenderer, text=1, background=3, font=4)
         self.treeView.append_column(statusColumn)
         self.treeView.append_column(numberColumn)
         toggle = gtk.CellRendererToggle()
@@ -1809,7 +1807,7 @@ class TestProgressMonitor:
 
     def selectCorrespondingTests(self, treemodel, path, iter):
         guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
-        for test in treemodel.get_value(iter, 3):
+        for test in treemodel.get_value(iter, 5):
             self.mainGUI.selectTest(test)
     def findTestIterators(self, test):
         return self.classifications.get(test, [])
@@ -1845,11 +1843,14 @@ class TestProgressMonitor:
         return False
     def removeTest(self, test):
         for iter in self.findTestIterators(test):
-            allTests = self.treeModel.get_value(iter, 3)
             testCount = self.treeModel.get_value(iter, 1)
             self.treeModel.set_value(iter, 1, testCount - 1)
+            if testCount == 1:
+                self.treeModel.set_value(iter, 3, "white")
+                self.treeModel.set_value(iter, 4, "")
+            allTests = self.treeModel.get_value(iter, 5)
             allTests.remove(test)
-            self.treeModel.set_value(iter, 3, allTests)
+            self.treeModel.set_value(iter, 5, allTests)
     def insertTest(self, test, state):
         searchIter = self.treeModel.get_iter_root()
         parentIter = None
@@ -1867,14 +1868,14 @@ class TestProgressMonitor:
             self.classifications[test].append(iter)
         return iter
     def insertTestAtIter(self, iter, test):
-        allTests = self.treeModel.get_value(iter, 3)
+        allTests = self.treeModel.get_value(iter, 5)
         testCount = self.treeModel.get_value(iter, 1)
         self.treeModel.set_value(iter, 1, testCount + 1)
         allTests.append(test)
-        self.treeModel.set_value(iter, 3, allTests)
+        self.treeModel.set_value(iter, 5, allTests)
     def addNewIter(self, classifier, parentIter, test, category):
         showThis = self.showByDefault(category)
-        modelAttributes = [classifier, 1, showThis, [ test ]]
+        modelAttributes = [classifier, 1, showThis, getTestColour(test, category), "bold", [ test ]]
         newIter = self.treeModel.append(parentIter, modelAttributes)
         if parentIter:
             self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)
@@ -1919,7 +1920,11 @@ class TestProgressMonitor:
                     subChildIter = self.treeModel.iter_next(subChildIter)
             # Print the iter
             indentation = ("--" * (self.getIterDepth(childIter) + 1)) + "> "
-            guilog.info(indentation + self.treeModel.get_value(childIter, 0) + " : " + str(self.treeModel.get_value(childIter, 1)))
+            name = self.treeModel.get_value(childIter, 0)
+            count = str(self.treeModel.get_value(childIter, 1))
+            bg = self.treeModel.get_value(childIter, 3)
+            font = self.treeModel.get_value(childIter, 4)
+            guilog.info(indentation + name + " : " + count + ", colour '" + bg + "', font '" + font + "'")
             childIters = childIters[1:len(childIters)]
 
     def getIterDepth(self, iter):
@@ -1930,20 +1935,6 @@ class TestProgressMonitor:
             parent = self.treeModel.iter_parent(parent)
         return depth
    
-    def renderPositive(self, column, cell, model, iter):
-        if model.get_value(iter, 1) > 0:
-            cell.set_property('font', 'bold')
-            if model.get_value(iter, 0) == "Succeeded":
-                cell.set_property('background', self.colors["success"])
-            elif model.get_value(iter, 0) == "Pending":
-                cell.set_property('background', self.colors["pending"])
-            elif model.get_value(iter, 0) == "Running":
-                cell.set_property('background', self.colors["running"])
-            else:
-                cell.set_property('background', self.colors["failure"])                
-        else:
-            cell.set_property('font', '')
-            cell.set_property('background', 'white')
     def getAllChildIters(self, iter):
          # Toggle all children too
         childIters = []
@@ -1970,7 +1961,7 @@ class TestProgressMonitor:
 
         # Now, re-filter the main treeview to be consistent with
         # the chosen progress report options.
-        for test in self.treeModel.get_value(iter, 3):
+        for test in self.treeModel.get_value(iter, 5):
             self.mainGUI.setVisibility(test, newValue)
                     
     def getProgressView(self):

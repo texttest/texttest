@@ -102,11 +102,6 @@ class PerformanceFileComparison(FileComparison):
         lineToWrite = line.replace(str(self.perfComparison.newPerformance), str(avgPerformance))
         newFile = open(destFile, "w")
         newFile.write(lineToWrite)
-        try:
-            os.remove(self.tmpFile)
-        except OSError:
-            # May not have permission, don't worry if not
-            pass
 
 # class purely for comparing two performance numbers, independent of the files they come from
 class PerformanceComparison:

@@ -513,7 +513,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
         app.setConfigDefault("window_size", { "" : [] }, "To set the initial size of the dynamic/static GUI.")
-        app.setConfigDefault("test_progress", { "" : [] }, "Options for showing and customizing test progress report.")
+        app.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
         app.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         app.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")

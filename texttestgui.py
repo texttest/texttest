@@ -351,21 +351,16 @@ class TextTestGUI(Responder):
             self.addApplication(suite.app)
         if not self.dynamic or suite.size() > 0:
             self.addSuiteWithParent(suite, None)
-    def addSuiteWithParent(self, suite, parent):
-        hideTest = False
-        if self.dynamic and suite.classId() == "test-case":
-            if suite.app.getConfigValue("test_progress").has_key("hide_non_started") and \
-                   suite.app.getConfigValue("test_progress")["hide_non_started"][0] == "1":
-                hideTest = True
-        elif self.dynamic:
-            if suite.app.getConfigValue("test_progress").has_key("hide_non_started") and \
-                   suite.app.getConfigValue("test_progress")["hide_non_started"][0] == "1" and \
-                   suite.app.getConfigValue("test_progress").has_key("hide_empty_suites") and \
-                   suite.app.getConfigValue("test_progress")["hide_empty_suites"][0] == "1":
-                hideTest = True
-        if parent == None:
-            hideTest = False
-            
+    def visibleByDefault(self, suite, parent):
+        if parent == None or not self.dynamic:
+            return True
+        hideCategories = self.getConfigValue("hide_test_category")
+        hideNonStarted = "non_started" in hideCategories
+        if suite.classId() == "test-case":
+            return not hideNonStarted
+        else:
+            return not hideNonStarted or not "empty_suite" in hideCategories
+    def addSuiteWithParent(self, suite, parent):    
         iter = self.model.insert_before(parent, None)
         nodeName = suite.name
         if parent == None:
@@ -375,7 +370,7 @@ class TextTestGUI(Responder):
         self.model.set_value(iter, 0, nodeName)
         self.model.set_value(iter, 2, suite)
         self.model.set_value(iter, 3, suite.uniqueName)
-        self.model.set_value(iter, 6, not hideTest)
+        self.model.set_value(iter, 6, self.visibleByDefault(suite, parent))
         self.updateStateInModel(suite, iter, suite.state)
         try:
             for test in suite.testcases:
@@ -430,13 +425,7 @@ class TextTestGUI(Responder):
         # rows being added to the original model - the AddUsers
         # test crashed/produced a gtk warning before I added
         # this if statement (for the dynamic GUI we never add rows)
-        showProgressReport = False
-        for suite in self.rootSuites:
-            if suite.app.getConfigValue("test_progress").has_key("show") and \
-                   suite.app.getConfigValue("test_progress")["show"][0] == "1":
-                showProgressReport = True
-                break
-        if self.dynamic and showProgressReport:
+        if self.dynamic:
             self.filteredModel.set_visible_column(6)
         self.treeView = gtk.TreeView(self.filteredModel)
         self.selection = self.treeView.get_selection()
@@ -752,6 +741,70 @@ class TextTestGUI(Responder):
             guilog.info("Recalculating result info for test: result file changed since created")
             cmpAction(test)
             test.notifyLifecycle(test.state, "be recalculated")
+    def selectTest(self, test):
+        try:
+            realIter = self.filteredModel.convert_child_iter_to_iter(self.itermap[test])
+            self.selection.select_iter(realIter)
+        except RuntimeError:
+            pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
+    def setVisibility(self, test, newValue):
+        # Set visibility depending on the state of the category toggle button
+        iter = self.itermap[test]
+        oldValue = self.model.get_value(iter, 6)
+        if oldValue == newValue:
+            return
+        
+        # To decide whether to show suites by checking all children, and proceed
+        # recursively ...
+        if newValue:
+            guilog.info("Making test visible : " + repr(test))
+            self.makePathVisible(iter)
+        else:
+            guilog.info("Hiding test : " + repr(test))
+            self.checkAndHidePath(iter)
+
+        self.model.set_value(iter, 6, newValue)
+        self.reFilter()
+    # Make the entire path from the root to iter visible
+    def makePathVisible(self, iter):
+        parents = []
+        if "empty_suite" in self.getConfigValue("hide_test_category"):
+            parent = self.model.iter_parent(iter)
+            while (parent != None):
+                if self.model.get_value(parent, 6) != True:
+                    parents.append(parent)                    
+                parent = self.model.iter_parent(parent)
+
+        for i in xrange(len(parents) - 1, -1, -1):
+            self.model.set_value(parents[i], 6, True)
+
+    # iter has been hidden - check iter's parent whether
+    # all its children are invisible, if so hide self and
+    # proceed recursively upwards.
+    def checkAndHidePath(self, iter):
+        parent = self.model.iter_parent(iter)
+        # Don't hide root. (double check in case
+        # we've already reached root)
+        if parent == None or \
+               self.model.iter_parent(parent) == None or \
+               not "empty_suite" in self.getConfigValue("hide_test_category"):
+            return
+
+        # Any visible children?
+        visibleChild = False
+        child = self.model.iter_children(parent)
+        while (child != None):
+            if self.model.get_path(child) != self.model.get_path(iter) and self.model.get_value(child, 6) == True:
+                visibleChild = True
+                break
+            child = self.model.iter_next(child)
+
+        # If no visible children, hide and proceed upwards
+        if not visibleChild:
+            if self.model.get_value(parent, 6) != False:
+                self.model.set_value(parent, 6, False)
+                self.checkAndHidePath(parent)
+    
     def reFilter(self):
         self.filteredModel.refilter()
         self.selectionChanged(self.selection, False)
@@ -1713,247 +1766,20 @@ class TestProgressBar:
 class TestProgressMonitor:
     def __init__(self, applications, colors, mainGUI):
         self.mainGUI = mainGUI        
-        self.completedTests = {}
-        self.testToIter = {}
-        self.nofPendingTests = 0
-        self.nofRunningTests = 0
-        self.nofPerformanceDiffTests = 0
-        self.nofSuccessfulTests = 0
-        self.nofFasterTests = 0
-        self.nofSlowerTests = 0
-        self.nofSmallerTests = 0
-        self.nofLargerTests = 0
-        self.nofUnrunnableTests = 0
-        self.nofCrashedTests = 0
-        self.nofDifferentTests = 0
-        self.nofDifferentPlusTests = 0
-        self.nofMissingFilesTests = 0
-        self.nofNewFilesTests = 0
-        self.nofFailedTests = 0
-        self.nofNoResultTests = 0
-        self.nofKilledTests = 0
-        self.nofKnownBugsTests = 0
-        self.nofInternalErrorsTests = 0
-        
-        # Read custom error types from configuration
-        self.customErrorTypes = {}
-        self.customErrorMessages = {}
-        self.customUnrunnableTypes = {}
-        self.customUnrunnableMessages = {}
-        self.customCrashTypes = {}
-        self.customCrashMessages = {}
-        showView = False
-        self.hideNonStartedTests = False
-        self.hideEmptySuites = False
-        for app in applications:
-            testProgressOptions = app.getConfigValue("test_progress")
-            if testProgressOptions.has_key("show") and testProgressOptions["show"][0] == "1":
-                showView = True
-            if testProgressOptions.has_key("hide_non_started") and testProgressOptions["hide_non_started"][0] == "1":
-                self.hideNonStartedTests = True
-            if testProgressOptions.has_key("hide_empty_suites") and testProgressOptions["hide_empty_suites"][0] == "1":
-                self.hideEmptySuites = True
-            if testProgressOptions.has_key("custom_errors"):
-                for t in testProgressOptions["custom_errors"]:
-                    self.collectTypeAndMessage(t, self.customErrorTypes, self.customErrorMessages)
-            if testProgressOptions.has_key("custom_unrunnable_errors"):
-                for t in testProgressOptions["custom_unrunnable_errors"]:
-                    self.collectTypeAndMessage(t, self.customUnrunnableTypes, self.customUnrunnableMessages)
-            if testProgressOptions.has_key("custom_crash_errors"):
-                for t in testProgressOptions["custom_crash_errors"]:
-                    self.collectTypeAndMessage(t, self.customCrashTypes, self.customCrashMessages)
-
+        self.classifications = {} # map from test to list of iterators where it exists
         self.colors = colors
-        self.setupTreeView(showView)
-
-        # Set default values
-        iter = self.treeModel.get_iter_root()
-        while (iter != None):            
-            self.setDefaultValues(iter, applications)
-            iter = self.treeModel.iter_next(iter)
-
-    def collectTypeAndMessage(self, typeAndMessage, types, messages):
-        # typeAndMessage _might_ be of the form 'type{message}', or
-        # of the form 'type'. In the former case insert 0 in types
-        # and 'message' in messages. In the latter case, insert 0 in types
-        # and 'type' in messages.
-        t = typeAndMessage.strip("}").split("{")
-        types[t[0]] = 0
-        if len(t) > 1:
-            messages[t[0]] = t[1]
-        else:
-            messages[t[0]] = t[0]
-            
-    def adjustCount(self, count, increase):
-        if increase:
-            return count + 1
-        else:
-            return count - 1
-
-    def analyzeFailure(self, category, details, test, increase=True):
-        errorCaught = 0
-        crashCaught = 0
-        unrunnableCaught = 0
-        diffCaught = 0
-        if details.find("no results") != -1:
-            self.nofNoResultTests = self.adjustCount(self.nofNoResultTests, increase)
-            self.treeModel.set_value(self.noResultIter, 1, self.nofNoResultTests)
-            self.testToIter[test] = self.noResultIter
-            errorCaught = 1
-            unrunnableCaught = 1
-        if details.find(" slower") != -1:
-            self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
-            self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
-            self.nofSlowerTests = self.adjustCount(self.nofSlowerTests, increase)
-            self.treeModel.set_value(self.slowerIter, 1, self.nofSlowerTests)
-            self.testToIter[test] = self.slowerIter
-            errorCaught = 1
-        if details.find(" faster") != -1:
-            self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
-            self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
-            self.nofFasterTests = self.adjustCount(self.nofFasterTests, increase)
-            self.treeModel.set_value(self.fasterIter, 1, self.nofFasterTests)
-            self.testToIter[test] = self.fasterIter
-            errorCaught = 1
-        if details.find(" smaller") != -1:
-            self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
-            self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
-            self.nofSmallerTests = self.adjustCount(self.nofSmallerTests, increase)
-            self.treeModel.set_value(self.smallerIter, 1, self.nofSmallerTests)
-            self.testToIter[test] = self.smallerIter
-            errorCaught = 1
-        if details.find(" larger") != -1:
-            self.nofPerformanceDiffTests = self.adjustCount(self.nofPerformanceDiffTests, increase)
-            self.treeModel.set_value(self.performanceIter, 1, self.nofPerformanceDiffTests)
-            self.nofLargerTests = self.adjustCount(self.nofLargerTests, increase)                    
-            self.treeModel.set_value(self.largerIter, 1, self.nofLargerTests)
-            self.testToIter[test] = self.largerIter
-            errorCaught = 1
-        if details.find(" new") != -1:
-            self.nofNewFilesTests = self.adjustCount(self.nofNewFilesTests, increase)                    
-            self.treeModel.set_value(self.newIter, 1, self.nofNewFilesTests)
-            self.testToIter[test] = self.newIter
-            errorCaught = 1
-        if details.find(" missing") != -1: # Extra initial space to avoid catching 'missing 'in helpers''
-            self.nofMissingFilesTests = self.adjustCount(self.nofMissingFilesTests, increase)                    
-            self.treeModel.set_value(self.missingIter, 1, self.nofMissingFilesTests)
-            self.testToIter[test] = self.missingIter
-            errorCaught = 1
-        if category == "badPredict":
-            self.nofInternalErrorsTests = self.adjustCount(self.nofInternalErrorsTests, increase)                    
-            self.treeModel.set_value(self.internalErrorIter, 1, self.nofInternalErrorsTests)
-            self.testToIter[test] = self.internalErrorIter
-            errorCaught = 1
-        i = -1
-        for (type, count) in self.customErrorTypes.items():
-            i += 1
-            if details.find(type) != -1:
-                self.customErrorTypes[type] = self.adjustCount(self.customErrorTypes[type], increase)                    
-                self.treeModel.set_value(self.customErrorIters[i], 1, self.customErrorTypes[type])
-                self.testToIter[test] = self.customErrorIters[i]
-                errorCaught = 1
-        if details.find(" different(+)") != -1:
-            self.nofDifferentPlusTests = self.adjustCount(self.nofDifferentPlusTests, increase)                    
-            self.treeModel.set_value(self.diffPlusIter, 1, self.nofDifferentPlusTests)
-            self.testToIter[test] = self.diffPlusIter
-            errorCaught = 1
-        elif details.find(" different") != -1:
-            self.nofDifferentTests = self.adjustCount(self.nofDifferentTests, increase)                    
-            self.treeModel.set_value(self.diffIter, 1, self.nofDifferentTests)
-            self.testToIter[test] = self.diffIter
-            errorCaught = 1
-        if category == "bug":
-            self.nofKnownBugsTests = self.adjustCount(self.nofKnownBugsTests, increase) 
-            self.treeModel.set_value(self.knownBugIter, 1, self.nofKnownBugsTests)
-            self.testToIter[test] = self.knownBugIter
-            errorCaught = 1
-        if category == "killed":
-            self.nofKilledTests = self.adjustCount(self.nofKilledTests, increase)                    
-            self.treeModel.set_value(self.killedIter, 1, self.nofKilledTests)
-            self.testToIter[test] = self.killedIter
-            errorCaught = 1
-            unrunnableCaught = 1
-        if category == "crash":
-            self.nofCrashedTests = self.adjustCount(self.nofCrashedTests, increase)
-            self.treeModel.set_value(self.crashedIter, 1, self.nofCrashedTests)
-            errorCaught = 1
-            i = -1
-            for (type, count) in self.customCrashTypes.items():
-                i += 1
-                if details.find(type) != -1:
-                    self.customCrashTypes[type] = self.adjustCount(self.customCrashTypes[type], increase)    
-                    self.treeModel.set_value(self.customCrashIters[i], 1, self.customCrashTypes[type])
-                    self.testToIter[test] = self.customCrashIters[i]
-                    errorCaught = 1
-                    crashCaught = 1
-            if crashCaught == 0:
-                self.testToIter[test] = self.crashedIter
-        if category == "unrunnable":
-            self.nofUnrunnableTests = self.adjustCount(self.nofUnrunnableTests, increase)            
-            self.treeModel.set_value(self.unrunnableIter, 1, self.nofUnrunnableTests)
-            errorCaught = 1
-            i = -1
-            for (type, count) in self.customUnrunnableTypes.items():
-                i += 1
-                if details.find(type) != -1:
-                    self.customUnrunnableTypes[type] = self.adjustCount(self.customUnrunnableTypes[type], increase)
-                    self.treeModel.set_value(self.customUnrunnableIters[i], 1, self.customUnrunnableTypes[type])
-                    self.testToIter[test] = self.customUnrunnableIters[i]
-                    errorCaught = 1
-                    unrunnableCaught = 1
-            if unrunnableCaught == 0:
-                self.testToIter[test] = self.unrunnableIter
-          
-        self.nofFailedTests = self.adjustCount(self.nofFailedTests, increase)
-        self.treeModel.set_value(self.failedIter, 1, self.nofFailedTests)
-        if errorCaught == 0:
-            self.testToIter[test] = self.failedIter
-        
-    def setupTreeView(self, showView):
-        # Each row has 'type', 'number', 'show'
-        self.treeModel = gtk.TreeStore(str, int, int)
-        self.pendIter    = self.treeModel.append(None, ["Pending", 0, 1])
-        self.runIter     = self.treeModel.append(None, ["Running", 0, 1])
-        self.successIter = self.treeModel.append(None, ["Succeeded", 0, 1])
-        self.failedIter  = self.treeModel.append(None, ["Failed", 0, 1])
-        self.performanceIter = self.treeModel.append(self.failedIter, ["Performance differences", 0, 1])
-        self.fasterIter  = self.treeModel.append(self.performanceIter, ["Faster", 0, 1])
-        self.slowerIter  = self.treeModel.append(self.performanceIter, ["Slower", 0, 1])
-        self.smallerIter = self.treeModel.append(self.performanceIter, ["Less memory", 0, 1])
-        self.largerIter  = self.treeModel.append(self.performanceIter, ["More memory", 0, 1])
-
-        # Custom errors
-        self.customErrorIters = []
-        for (type, count) in self.customErrorTypes.items():
-            self.customErrorIters.append(self.treeModel.append(self.failedIter, [self.customErrorMessages[type], 0, 1]))
-            
-        self.diffIter        = self.treeModel.append(self.failedIter, ["One different file", 0, 1])
-        self.diffPlusIter    = self.treeModel.append(self.failedIter, ["Multiple different files", 0, 1])
-        self.missingIter     = self.treeModel.append(self.failedIter, ["Missed file(s)", 0, 1])
-        self.newIter         = self.treeModel.append(self.failedIter, ["New file(s)", 0, 1])
-        self.knownBugIter    = self.treeModel.append(self.failedIter, ["Known bug", 0, 1])
-        self.internalErrorIter = self.treeModel.append(self.failedIter, ["Internal error", 0, 1])
-        self.crashedIter     = self.treeModel.append(self.failedIter, ["Crashed", 0, 1])
-
-        # Custom crashes
-        self.customCrashIters = []
-        for (type, count) in self.customCrashTypes.items():
-            self.customCrashIters.append(self.treeModel.append(self.crashedIter, [self.customCrashMessages[type], 0, 1]))
-                                         
-        self.unrunnableIter  = self.treeModel.append(self.failedIter, ["Unrunnable", 0, 1])
-
-        # Custom unrunnables
-        self.customUnrunnableIters = []
-        for (type, count) in self.customUnrunnableTypes.items():
-            self.customUnrunnableIters.append(self.treeModel.append(self.crashedIter, [self.customUnrunnableMessages[type], 0, 1]))
-            
-        self.noResultIter    = self.treeModel.append(self.unrunnableIter, ["No result", 0, 1])
-        self.killedIter      = self.treeModel.append(self.unrunnableIter, ["Killed", 0, 1])
-
+        self.hideCategories = applications[0].getConfigValue("hide_test_category")
+                
+        # Each row has 'type', 'number', 'show', 'tests'
+        self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, gobject.TYPE_PYOBJECT)
+        self.progressReport = None
+        self.treeView = None
+        self.setupTreeView()
+    def setupTreeView(self):
         self.treeView = gtk.TreeView(self.treeModel)
-        self.selection = self.treeView.get_selection()
-        self.selection.set_mode(gtk.SELECTION_MULTIPLE)
-        self.selection.connect("changed", self.selectionChanged)
+        selection = self.treeView.get_selection()
+        selection.set_mode(gtk.SELECTION_MULTIPLE)
+        selection.connect("changed", self.selectionChanged)
         textRenderer = gtk.CellRendererText()
         numberRenderer = gtk.CellRendererText()
         numberRenderer.set_property('xalign', 1)
@@ -1967,141 +1793,110 @@ class TestProgressMonitor:
         toggle.set_property('activatable', True)
         indexer = TreeModelIndexer(self.treeModel, statusColumn, 0)
         scriptEngine.connect("toggle progress report category ", "toggled", toggle, self.showToggled, indexer)
-        scriptEngine.monitor("set progress report filter selection to", self.selection, indexer)
+        scriptEngine.monitor("set progress report filter selection to", selection, indexer)
         toggleColumn = gtk.TreeViewColumn("Visible", toggle, active=2)
         toggleColumn.set_alignment(0.5)
         self.treeView.append_column(toggleColumn)
-        self.treeView.expand_all()
-
-        if showView:
-            self.progressReport = gtk.VBox()
-            self.progressReport.pack_start(self.treeView, expand=True, fill=True)
-            self.progressReport.show_all()
-        else:
-            self.progressReport = None        
-
-    # Set default values for all toggle buttons in the TreeView, based
-    # on the config files.
-    def setDefaultValues(self, iter, applications):
-        # Check config files
-        parents = self.getPath(iter)
-        option = "hide_" + self.formatAsOption(parents + self.treeModel.get_value(iter, 0))
-        for app in applications:
-            testProgressOptions = app.getConfigValue("test_progress")
-            if testProgressOptions.has_key(option):
-                if testProgressOptions[option][0] == "1":
-                    guilog.info("Configuration says: Do not show tests in category " + self.treeModel.get_value(iter, 0))
-                    # Only toggle to off
-                    if self.treeModel.get_value(iter, 2) == 1:
-                        self.showToggled(None, self.tupleToString(self.treeModel.get_path(iter)))
-                else:
-                    guilog.info("Configuration says: Show tests in category " + self.treeModel.get_value(iter, 0))
-                    # Only toggle to on
-                    if self.treeModel.get_value(iter, 2) == 0:
-                        self.showToggled(None, self.tupleToString(self.treeModel.get_path(iter)))
-
-        # Set for all children
-        iter = self.treeModel.iter_children(iter)
-        while (iter != None):
-            self.setDefaultValues(iter, applications)
-            iter = self.treeModel.iter_next(iter)
-
-    # Transforms path in the annoying list format (1,2) to
-    # colon separated string format 1:2, as there seems to
-    # be some inconsistency in pygtk about the format
-    # (gtk.TreeModel.get_path returns list, but
-    # gtk.TreeModel.get_iter_from_string needs string, and
-    # chokes on list. And there doesn't seem to be any
-    # internal conversion between the two ...)
-    def tupleToString(self, path):
-        strPath = ""
-        for i in xrange(0, len(path)):
-            strPath += str(path[i])
-            if i < len(path) - 1:
-                strPath += ":"
-        return strPath
-
-    # Format as a config option: Change to lowercase
-    # letters, exchange spaces for _
-    def formatAsOption(self, s):
-        return s.replace(" ", "_").lower()
-
-    # Get the path as '<root>/<child>/<child>/'
-    def getPath(self, iter):
-        path = ""
-        parent = self.treeModel.iter_parent(iter)
-        while (parent != None):
-            path = (self.treeModel.get_value(parent, 0) + "/") + path
-            parent = self.treeModel.iter_parent(parent)
-        return path
-
+        
+        self.progressReport = gtk.VBox()
+        self.progressReport.pack_start(self.treeView, expand=True, fill=True)
+        self.progressReport.show_all()
+            
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
         self.mainGUI.selection.unselect_all()
-        self.selection.selected_foreach(self.selectCorrespondingTests)
+        selection.selected_foreach(self.selectCorrespondingTests)
 
     def selectCorrespondingTests(self, treemodel, path, iter):
-        guilog.info("Selecting all tests in category " + treemodel.get_value(iter, 0))
-        for test, testIter in self.testToIter.iteritems():
-            it = testIter
-            while (it != None):                
-                if treemodel.get_path(it) == path:
-                    try:
-                        realIter = self.mainGUI.filteredModel.convert_child_iter_to_iter(self.mainGUI.itermap[test])
-                        self.mainGUI.selection.select_iter(realIter)
-                    except:
-                        pass
-                    it = None
-                else:
-                    it = treemodel.iter_parent(it)
-    def getStateInfo(self, state):
-        successFlag, details = state.getTypeBreakdown()
-        return state.category, details
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        category, details = self.getStateInfo(state)
-        if state.isComplete():
-            if self.completedTests.has_key(test):
-                oldCategory, oldDetails = self.completedTests[test]
-                # First decrease counts from last time ...
-                self.analyzeFailure(oldCategory, oldDetails, test, increase=False)
-                # ... then set new category.
-                self.completedTests[test] = category, details
+        guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
+        for test in treemodel.get_value(iter, 3):
+            self.mainGUI.selectTest(test)
+    def findTestIterators(self, test):
+        return self.classifications.get(test, [])
+    def getCategoryDescription(self, state):
+        briefDesc, fullDesc = state.categoryDescriptions.get(state.category, (state.category, state.category))
+        return briefDesc.replace("_", " ").capitalize()
+    def classifyBriefText(self, briefText):
+        if briefText.find(" new") != -1:
+            return "New file(s)"
+        elif briefText.find(" missing") != -1:
+            return "Missing file(s)"
+        elif briefText.find(" different(+)") != -1:
+            return "Multiple different files"
+        else:
+            return "One different file"
+    def getClassifiers(self, state):
+        catDesc = self.getCategoryDescription(state)
+        if not state.isComplete() or not state.hasFailed():
+            return [ catDesc ]
+        classifiers = [ "Failed" ]
+        if self.isPerformance(catDesc):
+            classifiers += [ "Performance differences", catDesc ]
+        elif catDesc == "Failed":
+            overall, briefText = state.getTypeBreakdown()
+            classifiers.append(self.classifyBriefText(briefText))
+        else:
+            classifiers.append(catDesc)
+        return classifiers
+    def isPerformance(self, catDesc):
+        for perfCat in [ "Slower", "Faster", "Memory" ]:
+            if catDesc.find(perfCat) != -1:
+                return True
+        return False
+    def removeTest(self, test):
+        for iter in self.findTestIterators(test):
+            allTests = self.treeModel.get_value(iter, 3)
+            testCount = self.treeModel.get_value(iter, 1)
+            self.treeModel.set_value(iter, 1, testCount - 1)
+            allTests.remove(test)
+            self.treeModel.set_value(iter, 3, allTests)
+    def insertTest(self, test, state):
+        searchIter = self.treeModel.get_iter_root()
+        parentIter = None
+        self.classifications[test] = []
+        classifiers = self.getClassifiers(state)
+        for classifier in classifiers:
+            iter = self.findIter(classifier, searchIter)
+            if iter:
+                self.insertTestAtIter(iter, test)
+                searchIter = self.treeModel.iter_children(iter)
             else:
-                self.nofRunningTests -= 1
-                self.completedTests[test] = category, details
-        elif state.hasStarted():
-            self.nofRunningTests += 1
-            self.nofPendingTests -= 1
-            self.testToIter[test] = self.runIter
-        elif category == "pending":
-            self.nofPendingTests += 1
-            self.testToIter[test] = self.pendIter
-
-        if state.hasSucceeded():
-            self.nofSuccessfulTests += 1
-            self.testToIter[test] = self.successIter
-        if state.hasFailed():
-            self.analyzeFailure(category, details, test, increase=True)
-
-        if self.nofPendingTests < 0:
-            self.nofPendingTests = 0
-        if self.nofRunningTests < 0:
-            self.nofRunningTests = 0
-
-        # Set visibility depending on the state of the category toggle button
-        iter = self.mainGUI.itermap[test]
-        self.setVisibility(self.mainGUI.model, self.mainGUI.model.get_path(iter), iter)
-                
-        self.treeModel.set_value(self.pendIter, 1, self.nofPendingTests)
-        self.treeModel.set_value(self.runIter, 1, self.nofRunningTests)
-        self.treeModel.set_value(self.successIter, 1, self.nofSuccessfulTests)
-            
-        if self.progressReport != None:
-            self.diagnoseTree()
-            
-        self.mainGUI.reFilter()
-
-        # Output the tree in textual format
+                iter = self.addNewIter(classifier, parentIter, test, state.category)
+                searchIter = None
+            parentIter = iter
+            self.classifications[test].append(iter)
+        return iter
+    def insertTestAtIter(self, iter, test):
+        allTests = self.treeModel.get_value(iter, 3)
+        testCount = self.treeModel.get_value(iter, 1)
+        self.treeModel.set_value(iter, 1, testCount + 1)
+        allTests.append(test)
+        self.treeModel.set_value(iter, 3, allTests)
+    def addNewIter(self, classifier, parentIter, test, category):
+        showThis = self.showByDefault(category)
+        modelAttributes = [classifier, 1, showThis, [ test ]]
+        newIter = self.treeModel.append(parentIter, modelAttributes)
+        if parentIter:
+            self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)
+        return newIter
+    def findIter(self, classifier, startIter):
+        iter = startIter
+        while iter != None:
+            name = self.treeModel.get_value(iter, 0)
+            if name == classifier:
+                return iter
+            else:
+                iter = self.treeModel.iter_next(iter)
+    # Set default values for toggle buttons in the TreeView, based
+    # on the config files.
+    def showByDefault(self, category):
+        # Check config files
+        return category.lower() not in self.hideCategories
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        self.removeTest(test)
+        newIter = self.insertTest(test, state)
+        self.mainGUI.setVisibility(test, self.treeModel.get_value(newIter, 2))
+        self.diagnoseTree()   
     def diagnoseTree(self):
         guilog.info("Test progress:")
         childIters = []
@@ -2149,10 +1944,19 @@ class TestProgressMonitor:
         else:
             cell.set_property('font', '')
             cell.set_property('background', 'white')
-
+    def getAllChildIters(self, iter):
+         # Toggle all children too
+        childIters = []
+        childIter = self.treeModel.iter_children(iter)
+        while childIter != None:
+            childIters.append(childIter)
+            childIters += self.getAllChildIters(childIter)
+            childIter = self.treeModel.iter_next(childIter)
+        return childIters
     def showToggled(self, cellrenderer, path):
         # Toggle the toggle button
-        self.treeModel[path][2] = not self.treeModel[path][2]
+        newValue = not self.treeModel[path][2]
+        self.treeModel[path][2] = newValue
 
         # Print some gui log info
         iter = self.treeModel.get_iter_from_string(path)
@@ -2161,97 +1965,13 @@ class TestProgressMonitor:
         else:
             guilog.info("Selecting not to show tests in the '" + self.treeModel.get_value(iter, 0) + "' category.")
 
-        # Toggle all children too
-        childIters = []
-        childIter = self.treeModel.iter_children(iter)
-        while childIter != None:
-            childIters.append(childIter)
-            childIter = self.treeModel.iter_next(childIter)
-
-        while len(childIters) > 0:
-            childIter = childIters[0]
-
-            # If this iter has children, add these to the list to be treated
-            if self.treeModel.iter_has_child(childIter):                            
-                subChildIter = self.treeModel.iter_children(childIter)
-                while subChildIter != None:
-                    childIters.append(subChildIter)
-                    subChildIter = self.treeModel.iter_next(subChildIter)
-
-            self.treeModel.set_value(childIter, 2, self.treeModel[path][2])
-            childIters = childIters[1:len(childIters)]
+        for childIter in self.getAllChildIters(iter):
+            self.treeModel.set_value(childIter, 2, newValue)
 
         # Now, re-filter the main treeview to be consistent with
-        # the chosen progress report options.        
-        self.reFilter()
-        
-    # Refilter according to the new toggle states. Loop over all tests,
-    # find iter, check if iter column 2 is checked. Finally, send along
-    # to main GUI for treeview updating.
-    def reFilter(self):
-        self.mainGUI.model.foreach(self.setVisibility)
-        self.mainGUI.reFilter()
-
-    # Don't use path, it can be None (when called from notifyChange above)
-    # To decide whether to show suites by checking all children, and proceed
-    # recursively ...
-    def setVisibility(self, model, path, iter):
-        test = model.get_value(iter, 2)
-        type = test.classId()
-        if type == "test-case":
-            oldValue = model.get_value(iter, 6)
-            newValue = not self.hideNonStartedTests
-            try:
-                newValue = self.treeModel.get_value(self.testToIter[test], 2)
-            except:
-                pass
-            if oldValue != newValue:
-                if newValue:
-                    self.makePathVisible(model, iter)
-                else:
-                    guilog.info("Progress report filter: Not showing test " + repr(test) + " in state " + repr(test.state))
-                    self.checkAndHidePath(model, iter)
-                model.set_value(iter, 6, newValue)
-
-    # Make the entire path from the root to iter visible
-    def makePathVisible(self, model, iter):
-        parents = []
-        if (self.hideEmptySuites):
-            parent = model.iter_parent(iter)
-            while (parent != None):
-                if model.get_value(parent, 6) != True:
-                    parents.append(parent)                    
-                parent = model.iter_parent(parent)
-
-        for i in xrange(len(parents) - 1, -1, -1):
-            model.set_value(parents[i], 6, True)
-
-    # iter has been hidden - check iter's parent whether
-    # all its children are invisible, if so hide self and
-    # proceed recursively upwards.
-    def checkAndHidePath(self, model, iter):
-        parent = model.iter_parent(iter)
-        # Don't hide root. (double check in case
-        # we've already reached root)
-        if parent == None or \
-               model.iter_parent(parent) == None or \
-               not self.hideEmptySuites:
-            return
-
-        # Any visible children?
-        visibleChild = False
-        child = model.iter_children(parent)
-        while (child != None):
-            if model.get_path(child) != model.get_path(iter) and model.get_value(child, 6) == True:
-                visibleChild = True
-                break
-            child = model.iter_next(child)
-
-        # If no visible children, hide and proceed upwards
-        if not visibleChild:
-            if model.get_value(parent, 6) != False:
-                model.set_value(parent, 6, False)
-                self.checkAndHidePath(model, parent)
+        # the chosen progress report options.
+        for test in self.treeModel.get_value(iter, 3):
+            self.mainGUI.setVisibility(test, newValue)
                     
     def getProgressView(self):
-       return self.progressReport
+        return self.progressReport

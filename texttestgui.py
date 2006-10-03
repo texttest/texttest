@@ -551,7 +551,7 @@ class TextTestGUI(Responder):
         # (but before RightWindowGUI, as that wants in on progress)
         if self.dynamic:
             self.progressBar = TestProgressBar(self.totalNofTests)
-            self.progressMonitor = TestProgressMonitor(self.rootSuites, self)
+            self.progressMonitor = TestProgressMonitor(self)
             self.reFilter()
 
         self.rightWindowGUI = self.createDefaultRightGUI()
@@ -1764,10 +1764,9 @@ class TestProgressBar:
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor:
-    def __init__(self, applications, mainGUI):
+    def __init__(self, mainGUI):
         self.mainGUI = mainGUI        
         self.classifications = {} # map from test to list of iterators where it exists
-        self.hideCategories = applications[0].getConfigValue("hide_test_category")
                 
         # Each row has 'type', 'number', 'show', 'tests'
         self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, \
@@ -1877,7 +1876,7 @@ class TestProgressMonitor:
         allTests.append(test)
         self.treeModel.set_value(iter, 5, allTests)
     def addNewIter(self, classifier, parentIter, test, category):
-        showThis = self.showByDefault(category)
+        showThis = self.showByDefault(test, category)
         modelAttributes = [classifier, 1, showThis, getTestColour(test, category), "bold", [ test ]]
         newIter = self.treeModel.append(parentIter, modelAttributes)
         if parentIter:
@@ -1893,9 +1892,9 @@ class TestProgressMonitor:
                 iter = self.treeModel.iter_next(iter)
     # Set default values for toggle buttons in the TreeView, based
     # on the config files.
-    def showByDefault(self, category):
+    def showByDefault(self, test, category):
         # Check config files
-        return category.lower() not in self.hideCategories
+        return category.lower() not in test.getConfigValue("hide_test_category")
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeTest(test)
         newIter = self.insertTest(test, state)

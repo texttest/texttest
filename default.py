@@ -1470,9 +1470,10 @@ class ReconnectTest(plugins.Action):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
         parts = fileName.split(".")
-        if len(parts) < 3 or stem != parts[0]:
+        if len(parts) < 2 or stem != parts[0]:
             return
-        return parts[1:-2]
+        # drop the application at the start and the date/time at the end
+        return parts[1:-1]
     def setUpSuite(self, suite):
         self.describe(suite)
 

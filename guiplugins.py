@@ -1060,7 +1060,7 @@ class ReportBugs(InteractiveTestAction):
         fileName = self.getFileName(test)
         guilog.info("Recording known bugs to " + fileName + " : ")
         writeFile = open(fileName, "a")
-        self.write(writeFile, "\n[Reported by " + plugins.tmpString + " at " + plugins.localtime() + "]\n")
+        self.write(writeFile, "\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
         for name, option in self.optionGroup.options.items():
             value = option.getValue()
             if name != "version" and len(value) != 0 and value != "<none>":

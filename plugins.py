@@ -17,11 +17,6 @@ def startTimeString():
     global globalStartTime
     return localtime(seconds=globalStartTime)
 
-# Need somewhat different formats on Windows/UNIX
-tmpString = "tmp"
-if os.environ.has_key("USER"):
-    tmpString = os.getenv("USER")
-
 textTestName = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0])
 
 # Parse a time string, either a HH:MM:SS string, or a single int/float,

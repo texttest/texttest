@@ -932,7 +932,7 @@ class Application:
         return os.path.expanduser(os.environ["TEXTTEST_TMP"])
     def getStandardWriteDirectoryName(self):
         timeStr = plugins.startTimeString().replace(":", "")
-        localName = self.name + self.versionSuffix() + "." + plugins.tmpString + "." + timeStr
+        localName = self.name + self.versionSuffix() + "." + timeStr
         return os.path.join(self.rootTmpDir, localName)
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
@@ -1034,19 +1034,18 @@ class Application:
         doRemove = self.cleanMode & plugins.Configuration.CLEAN_SELF
         if doRemove and os.path.isdir(self.writeDirectory):
             plugins.rmtree(self.writeDirectory)
-    def tryCleanPreviousWriteDirs(self, rootDir, nameBase = ""):
+    def tryCleanPreviousWriteDirs(self, rootDir):
         doRemove = self.cleanMode & plugins.Configuration.CLEAN_PREVIOUS
         if not doRemove or not os.path.isdir(rootDir):
             return
-        currTmpString = nameBase + self.name + self.versionSuffix() + plugins.tmpString
+        searchParts = [ self.name ] + self.versions
         for file in os.listdir(rootDir):
-            fpath = os.path.join(rootDir, file)
-            if not os.path.isdir(fpath):
-                continue
-            if file.startswith(currTmpString):
+            fileParts = file.split(".")
+            if fileParts[:-1] == searchParts:
                 previousWriteDir = os.path.join(rootDir, file)
-                print "Removing previous write directory", previousWriteDir
-                plugins.rmtree(previousWriteDir, attempts=3)
+                if os.path.isdir(previousWriteDir):
+                    print "Removing previous write directory", previousWriteDir
+                    plugins.rmtree(previousWriteDir, attempts=3)
     def getActionSequence(self):
         actionSequenceFromConfig = self.configObject.getActionSequence()
         actionSequence = []

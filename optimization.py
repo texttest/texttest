@@ -338,6 +338,14 @@ class OptimizationTestComparison(TestComparison):
             return category, details.replace("solution different", changeDesc)
         except:
             return category, details
+    def getBriefClassifier(self):
+        # no numbers or we get hundreds of these...
+        overall, details = self.getTypeBreakdown()
+        words = details.split()
+        if len(words) > 1 and words[1].endswith("%"):
+            return "solution " + words[-1]
+        else:
+            return details
     def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress):
         if stem != "error" or tmpFile:
             return TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)

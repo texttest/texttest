@@ -1813,15 +1813,6 @@ class TestProgressMonitor:
     def getCategoryDescription(self, state):
         briefDesc, fullDesc = state.categoryDescriptions.get(state.category, (state.category, state.category))
         return briefDesc.replace("_", " ").capitalize()
-    def classifyBriefText(self, briefText):
-        if briefText.find(" new") != -1:
-            return "New file(s)"
-        elif briefText.find(" missing") != -1:
-            return "Missing file(s)"
-        elif briefText.find(" different(+)") != -1:
-            return "Multiple different files"
-        else:
-            return "One different file"
     def getClassifiers(self, state):
         catDesc = self.getCategoryDescription(state)
         if not state.isComplete() or not state.hasFailed():
@@ -1829,11 +1820,12 @@ class TestProgressMonitor:
         classifiers = [ "Failed" ]
         if self.isPerformance(catDesc):
             classifiers += [ "Performance differences", catDesc ]
-        elif catDesc == "Failed":
-            overall, briefText = state.getTypeBreakdown()
-            classifiers.append(self.classifyBriefText(briefText))
         else:
-            classifiers.append(catDesc)
+            briefText = state.getBriefClassifier()
+            if catDesc == "Failed":
+                classifiers += [ "Differences", briefText ]
+            else:
+                classifiers += [ catDesc, briefText ]
         return classifiers
     def isPerformance(self, catDesc):
         for perfCat in [ "Slower", "Faster", "Memory" ]:

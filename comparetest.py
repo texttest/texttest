@@ -78,6 +78,9 @@ class TestComparison(plugins.TestState):
                 worstSeverity = severity
                 worstResult = result
         return worstResult
+    def getBriefClassifier(self):
+        overall, details = self.getTypeBreakdown()
+        return details
     def getTypeBreakdown(self):
         if self.hasSucceeded():
             return self.category, ""

@@ -492,12 +492,13 @@ class KillTestSubmission(plugins.Action):
         test.changeState(plugins.TestState("killed", briefText=briefText, freeText=freeText, completed=1))
     def setSlaveLost(self, test):
         failReason = "no report, possibly killed with SIGKILL"
-        name = queueSystemName(test.app)
-        fullText = "Full accounting info from " + name + " follows:\n" + \
-                   QueueSystemServer.instance.getJobFailureInfo(test)
-        fullText = failReason + "\n" + fullText
+        fullText = failReason + "\n" + self.getJobFailureInfo(test)
         test.changeState(plugins.TestState("killed", briefText=failReason, \
                                            freeText=fullText, completed=1))
+    def getJobFailureInfo(self, test):
+        name = queueSystemName(test.app)
+        return "Full accounting info from " + name + " follows:\n" + \
+               QueueSystemServer.instance.getJobFailureInfo(test)
     def setSlaveFailed(self, test):
         failReason, fullText = self.getSlaveFailure(test)
         fullText = failReason + "\n" + fullText

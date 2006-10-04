@@ -313,6 +313,16 @@ class Unrunnable(TestState):
     def shouldAbandon(self):
         return True
                         
+class Observable:
+    def __init__(self):
+        self.observers = []
+    def addObserver(self, observer):
+        self.observers.append(observer)
+    def notify(self, name, *args):
+        methodName = "notify" + name
+        for observer in self.observers:
+            method = eval("observer." + methodName)
+            method(*args)
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.

@@ -39,7 +39,7 @@ def showError(message):
     label.show()
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show()    
-        
+
 class DoubleCheckDialog:
     def __init__(self, message, yesMethod, yesMethodArgs=()):
         self.dialog = gtk.Dialog("TextTest Query", flags=gtk.DIALOG_MODAL)
@@ -141,7 +141,7 @@ def getGtkRcFile():
     if os.path.isfile(file):
         return file
 
-class TextTestGUI(Responder):
+class TextTestGUI(Responder,plugins.Observable):
     defaultGUIDescription = '''
 <ui>
   <menubar>
@@ -154,6 +154,7 @@ class TextTestGUI(Responder):
         self.readGtkRCFile()
         self.dynamic = not optionMap.has_key("gx")
         Responder.__init__(self, optionMap)
+        plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
@@ -336,7 +337,6 @@ class TextTestGUI(Responder):
         if test.classId() != "test-app":
             storeIter = iter.copy()
             self.itermap[test] = storeIter
-            self.selectionActionGUI.addNewTest(test, storeIter) 
         if childIter:
             self.createSubIterMap(childIter, newTest)
         nextIter = self.model.iter_next(iter)
@@ -413,7 +413,13 @@ class TextTestGUI(Responder):
     def createSelectionActionGUI(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
-        return SelectionActionGUI(actions, self.selection, self.status, self.uiManager, self.rootSuites[0].app, self.filteredModel)
+        for action in actions:
+            # These actions might change the selection, need to observe them
+            action.addObserver(self)
+        selActionGUI = SelectionActionGUI(actions, self.status, self.uiManager, self.rootSuites[0].app)
+        # selection actions need to observer for manual selections
+        self.addObserver(selActionGUI)
+        return selActionGUI
     def createTestWindows(self, treeWindow):
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
@@ -498,9 +504,11 @@ class TextTestGUI(Responder):
                     self.expandRow(childIter, True)
                 childIter = self.filteredModel.iter_next(childIter)
     def selectionChanged(self, selection, printToLog = True):
-        self.nofSelectedTests = 0
         self.totalNofTestsShown = 0
-        self.selection.selected_foreach(self.countSelected)
+
+        allSelected, selectedTests = self.getSelected()
+        self.nofSelectedTests = len(selectedTests)
+        self.notify("NewTestSelection", allSelected)
         self.filteredModel.foreach(self.countVisible)
         title = "Tests: "
         if self.nofSelectedTests == self.totalNofTests:
@@ -515,9 +523,39 @@ class TextTestGUI(Responder):
         self.testsColumn.set_title(title)
         if printToLog:
             guilog.info(title)
-    def countSelected(self, model, path, iter):
-        if model.get_value(iter, 2).classId() == "test-case":
-            self.nofSelectedTests = self.nofSelectedTests + 1
+    def getSelected(self):
+        # add self as an observer
+        allSelected, selectedTests = [], []
+        self.selection.selected_foreach(self.addSelTest, (allSelected, selectedTests))
+        return allSelected, selectedTests
+    def addSelTest(self, model, path, iter, lists, *args):
+        test = model.get_value(iter, 2)
+        allSelected, selectedTests = lists
+        allSelected.append(test)
+        if test.classId() == "test-case":
+            selectedTests.append(test)
+    def findIter(self, test):
+        try:
+            return self.filteredModel.convert_child_iter_to_iter(self.itermap[test])
+        except RuntimeError:
+            pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
+    def notifyNewTestSelection(self, selTests, selectCollapsed=True):
+        self.selection.unselect_all()
+        firstPath = None
+        for test in selTests:
+            iter = self.findIter(test)
+            if not iter:
+                continue
+            path = self.filteredModel.get_path(iter) 
+            if not firstPath:
+                firstPath = path
+            if selectCollapsed:
+                self.selection.get_tree_view().expand_to_path(path)
+            self.selection.select_iter(iter)
+        self.selection.get_tree_view().grab_focus()
+        if firstPath is not None:
+            self.selection.get_tree_view().scroll_to_cell(firstPath, None, True, 0.1)
+        guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
     def countVisible(self, model, path, iter):
         # When rows are added, they are first empty, and asking for
         # classId on NoneType gives an error. See e.g.
@@ -551,7 +589,8 @@ class TextTestGUI(Responder):
         # (but before RightWindowGUI, as that wants in on progress)
         if self.dynamic:
             self.progressBar = TestProgressBar(self.totalNofTests)
-            self.progressMonitor = TestProgressMonitor(self)
+            self.progressMonitor = TestProgressMonitor()
+            self.progressMonitor.addObserver(self)
             self.reFilter()
 
         self.rightWindowGUI = self.createDefaultRightGUI()
@@ -694,7 +733,6 @@ class TextTestGUI(Responder):
         iter = self.addSuiteWithParent(newTest, suiteIter)
         storeIter = iter.copy()
         self.itermap[newTest] = storeIter
-        self.selectionActionGUI.addNewTest(newTest, storeIter)
         guilog.info("Viewing new test " + newTest.name)
         self.rightWindowGUI.view(newTest)
         self.updateNofTests()
@@ -724,7 +762,6 @@ class TextTestGUI(Responder):
         self.selectOnlyRow(suiteIter)
     def removeIter(self, test):        
         del self.itermap[test]
-        self.selectionActionGUI.removeTest(test)
     def viewTest(self, view, path, column, *args):
         iter = self.filteredModel.get_iter(path)
         self.selection.select_iter(iter)
@@ -741,13 +778,7 @@ class TextTestGUI(Responder):
             guilog.info("Recalculating result info for test: result file changed since created")
             cmpAction(test)
             test.notifyLifecycle(test.state, "be recalculated")
-    def selectTest(self, test):
-        try:
-            realIter = self.filteredModel.convert_child_iter_to_iter(self.itermap[test])
-            self.selection.select_iter(realIter)
-        except RuntimeError:
-            pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
-    def setVisibility(self, test, newValue):
+    def notifyVisibility(self, test, newValue):
         # Set visibility depending on the state of the category toggle button
         iter = self.itermap[test]
         oldValue = self.model.get_value(iter, 6)
@@ -1066,21 +1097,14 @@ class InteractiveActionGUI:
             self.status.output(message)
 
 class SelectionActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, selection, status, uiManager, app, filteredModel):
+    def __init__(self, actions, status, uiManager, app):
         InteractiveActionGUI.__init__(self, actions, status, uiManager, app)
-        self.selection = selection
-        self.itermap = {}
-        self.filteredModel = filteredModel
+        self.currTestSelection = []
         self.currFileSelection = []
-    def notifyFileSelection(self, fileSel):
+    def notifyNewTestSelection(self, tests):
+        self.currTestSelection = tests
+    def notifyNewFileSelection(self, fileSel):
         self.currFileSelection = fileSel
-    def addNewTest(self, test, iter):
-        if not self.itermap.has_key(test.app):
-            self.itermap[test.app] = {}
-        self.itermap[test.app][test] = iter
-    def removeTest(self, test):
-        toRemove = self.itermap[test.app]
-        del toRemove[test]
     def performInteractiveAction(self, action):
         testSel = self.makeTestSelection(action.canPerformOnSuite())
         self.status.output(action.messageBeforePerform(testSel))
@@ -1089,38 +1113,11 @@ class SelectionActionGUI(InteractiveActionGUI):
         if message != None:
             self.status.output(message)
     def makeTestSelection(self, includeSuites):
-        # add self as an observer
-        testSel = guiplugins.TestSelection(self, includeSuites)
-        self.selection.selected_foreach(self.addSelTest, testSel)
+        testSel = guiplugins.TestSelection(includeSuites)
+        for test in self.currTestSelection:
+            testSel.add(test)
         return testSel
-    def addSelTest(self, model, path, iter, testSel, *args):
-        testSel.add(model.get_value(iter, 2))
-    def notifyUpdate(self, newSelTests, selectCollapsed):
-        # call back on selection changes
-        self.selection.unselect_all()
-        for test in newSelTests:
-            childIter = self.itermap[test.app][test]
-            iter = self.filteredModel.convert_child_iter_to_iter(childIter)
-            if selectCollapsed:
-                path = self.filteredModel.get_path(iter) 
-                self.selection.get_tree_view().expand_to_path(path)
-            self.selection.select_iter(iter)
-        self.selection.get_tree_view().grab_focus()
-        first = self.getFirstSelectedTest()
-        if first != None:
-            self.selection.get_tree_view().scroll_to_cell(first, None, True, 0.1)
-        guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
-    def getFirstSelectedTest(self):
-        firstTest = []
-        self.selection.selected_foreach(self.findFirstTest, firstTest)
-        if len(firstTest) != 0:
-            return firstTest[0]
-        else:
-            return None
-    def findFirstTest(self, model, path, iter, firstTest, *args):
-        if len(firstTest) == 0:
-            firstTest.append(path)    
-
+    
 class RightWindowGUI:
     def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor, uiManager):
         self.dynamic = dynamic
@@ -1443,17 +1440,15 @@ class RightWindowGUI:
         else:
             return None
         
-class FileViewGUI:
+class FileViewGUI(plugins.Observable):
     def __init__(self, object, dynamic):
+        plugins.Observable.__init__(self)
         self.fileViewAction = guiplugins.interactiveActionHandler.getFileViewer(object, dynamic)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.name = object.name.replace("_", "__")
         self.selection = None
         self.dynamic = dynamic
-        self.observers = []
-    def addObserver(self, observer):
-        self.observers.append(observer)
     def addFileToModel(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
@@ -1499,8 +1494,7 @@ class FileViewGUI:
     def selectionChanged(self, selection):
         filelist = []
         selection.selected_foreach(self.fileSelected, filelist)
-        for observer in self.observers:
-            observer.notifyFileSelection(filelist)
+        self.notify("NewFileSelection", filelist)
     def fileSelected(self, treemodel, path, iter, filelist):
         filelist.append(self.model.get_value(iter, 0))
     def displayFile(self, view, path, column, *args):
@@ -1775,12 +1769,12 @@ class TestProgressBar:
         message = message.replace(oldFailMessage, newFailMessage)
         guilog.info("Progress bar detected save, new text is '" + message + "'")
         self.progressBar.set_text(message)
-
+            
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
-class TestProgressMonitor:
-    def __init__(self, mainGUI):
-        self.mainGUI = mainGUI        
+class TestProgressMonitor(plugins.Observable):
+    def __init__(self):
+        plugins.Observable.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
                 
         # Each row has 'type', 'number', 'show', 'tests'
@@ -1816,13 +1810,12 @@ class TestProgressMonitor:
             
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
-        self.mainGUI.selection.unselect_all()
-        selection.selected_foreach(self.selectCorrespondingTests)
-
-    def selectCorrespondingTests(self, treemodel, path, iter):
+        tests = []
+        selection.selected_foreach(self.selectCorrespondingTests, tests)
+        self.notify("NewTestSelection", tests)
+    def selectCorrespondingTests(self, treemodel, path, iter, tests , *args):
         guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
-        for test in treemodel.get_value(iter, 5):
-            self.mainGUI.selectTest(test)
+        tests += treemodel.get_value(iter, 5)
     def findTestIterators(self, test):
         return self.classifications.get(test, [])
     def getCategoryDescription(self, state):
@@ -1905,7 +1898,7 @@ class TestProgressMonitor:
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeTest(test)
         newIter = self.insertTest(test, state)
-        self.mainGUI.setVisibility(test, self.treeModel.get_value(newIter, 2))
+        self.notify("Visibility", test, self.treeModel.get_value(newIter, 2))
         self.diagnoseTree()   
     def diagnoseTree(self):
         guilog.info("Test progress:")
@@ -1971,7 +1964,7 @@ class TestProgressMonitor:
         # Now, re-filter the main treeview to be consistent with
         # the chosen progress report options.
         for test in self.treeModel.get_value(iter, 5):
-            self.mainGUI.setVisibility(test, newValue)
+            self.notify("Visibility", test, newValue)
                     
     def getProgressView(self):
         return self.progressReport

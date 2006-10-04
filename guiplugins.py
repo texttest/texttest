@@ -54,9 +54,8 @@ class ProcessTerminationMonitor:
 processTerminationMonitor = ProcessTerminationMonitor()
 
 class TestSelection:
-    def __init__(self, observer, includeSuites=False):
+    def __init__(self, includeSuites=False):
         self.tests = []
-        self.observer = observer
         self.includeSuites = includeSuites
     def __repr__(self):
         rep = str(self.size()) + " tests"
@@ -75,9 +74,6 @@ class TestSelection:
             return self.tests[0].app
     def size(self):
         return len(self.tests)
-    def update(self, newTests, expandFlag):
-        self.tests = newTests
-        self.observer.notifyUpdate(newTests, expandFlag)
     def getCmdlineOption(self):
         selTestPaths = []
         for test in self.tests:
@@ -92,8 +88,9 @@ class TestSelection:
                 apps.append(test.app.name)
         return "-a " + string.join(apps, ",")
        
-class InteractiveAction:
+class InteractiveAction(plugins.Observable):
     def __init__(self, optionName = ""):
+        plugins.Observable.__init__(self)
         self.optionGroup = None
         if optionName:
             self.optionGroup = plugins.OptionGroup(optionName, self.getConfigValue("gui_entry_overrides"), \
@@ -669,7 +666,7 @@ class SelectTests(SelectionAction):
             newTests = self.combineWithPrevious(reqTests, strategy, testSel)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
-        testSel.update(selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
+        self.notify("NewTestSelection", selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all

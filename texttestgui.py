@@ -948,9 +948,20 @@ class InteractiveActionGUI:
         return pages
     def createDisplay(self, optionGroup, hasButton, instance):
         vbox = gtk.VBox()
-        for option in optionGroup.options.values():
-            hbox = self.createOptionBox(option)
-            vbox.pack_start(hbox, expand=False, fill=False)
+        if len(optionGroup.options):
+            # Creating 0-row table gives a warning ...
+            table = gtk.Table(len(optionGroup.options), 2, homogeneous=False)
+            table.set_row_spacings(1)
+            rowIndex = 0        
+            for option in optionGroup.options.values():
+                label, entry = self.createOptionEntry(option)
+                label.set_alignment(1.0, 0.5)
+                table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
+                table.attach(entry, 1, 2, rowIndex, rowIndex + 1)
+                rowIndex += 1
+            if len(optionGroup.options):        
+                vbox.pack_start(table, expand=False, fill=False)
+        
         for switch in optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
             vbox.pack_start(hbox, expand=False, fill=False)
@@ -985,19 +996,13 @@ class InteractiveActionGUI:
         else:
             entry = gtk.Entry()
             return entry, entry
-    def createOptionBox(self, option):
-        hbox = gtk.HBox()
+    def createOptionEntry(self, option):
         label = gtk.Label(option.name + "  ")
-        hbox.pack_start(label, expand=False, fill=True)
         widget, entry = self.createOptionWidget(option)
-        hbox.pack_start(widget, expand=True, fill=True)
-        widget.show()
         entry.set_text(option.getValue())
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
         option.setMethods(entry.get_text, entry.set_text)
-        label.show()
-        hbox.show()
-        return hbox
+        return label, widget
     def createSwitchBox(self, switch):
         self.diagnoseSwitch(switch)
         if len(switch.options) >= 1:
@@ -1417,9 +1422,19 @@ class RightWindowGUI:
                 unicodeInfo = unicode(testInfo, 'utf-8', errors="strict")
             except:
                 guilog.info("Warning: Failed to decode string '" + testInfo + "' both using strict UTF-8 and " + repr(localeEncoding) + " encodings.\nReverting to non-strict UTF-8 encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-                unicodeInfo = unicode(testInfo, 'utf-8', errors="replace")        
-        textbuffer.set_text(unicodeInfo.encode('utf-8'))
+                unicodeInfo = unicode(testInfo, 'utf-8', errors="replace")
+        
+        try:
+            result = unicodeInfo.encode('utf-8', 'strict')
+        except:
+            try:
+                guilog.info("Warning: Failed to encode Unicode string '" + unicodeInfo + "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+                result = unicodeInfo.encode('utf-8', 'replace')
+            except:
+                guilog.info("Warning: Failed to encode Unicode string '" + unicodeInfo + "' using both strict UTF-8 encoding and UTF-8 encoding with replacement. Showing error message instead.")
+                result = "Failed to encode Unicode string."
 
+        textbuffer.set_text(result)        
         textview.show()
         return textview
     def createProgressView(self):

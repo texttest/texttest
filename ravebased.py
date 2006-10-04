@@ -963,7 +963,7 @@ class RemoteBuildResponder(Responder):
         Responder.__init__(self, optionMap)
         self.target = optionMap["build"]
         self.checkedDirs = {}
-    def notifyAllComplete(self, obsGroup):
+    def notifyAllComplete(self):
         print "Waiting for remote builds..." 
         for process, arch, buildDirs in BuildCode.childProcesses:
             os.waitpid(process, 0)

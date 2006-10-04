@@ -118,7 +118,6 @@ class Config(plugins.Configuration):
             return defaultName
     def addGuiResponder(self, classes):
         from texttestgui import TextTestGUI
-        classes.append(respond.ThreadTransferResponder)
         classes.append(TextTestGUI)
     def _getActionSequence(self, makeDirs):
         actions = [ self.getTestProcessor() ]

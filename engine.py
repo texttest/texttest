@@ -65,7 +65,7 @@ class TestRunner:
                     abandon = True
             if tryOthersNow:
                 return 0
-        self.test.notifyCompleted()
+        self.test.actionsCompleted()
         return 1
     def returnString(self, completed, tryOthersNow):
         retString = " - "
@@ -226,8 +226,9 @@ class ApplicationRunner:
             raise testmodel.BadConfigError, "Could not instantiate script action " + repr(actionCom) +\
                   " with arguments " + repr(actionArgs) 
 
-class ActionRunner:
+class ActionRunner(plugins.Observable):
     def __init__(self):
+        plugins.Observable.__init__(self)
         self.interrupted = 0
         self.previousTestRunner = None
         self.currentTestRunner = None
@@ -255,13 +256,12 @@ class ActionRunner:
         try:
             self.runNormal()
             self.diag.info("Finishing - notifying all completed")
-            testmodel.Test.observerGroup.notifyAllCompleted()
+            self.notify("AllComplete")
         except KeyboardInterrupt, e:
             excData = str(e)
             self.writeTermMessage(excData)
             fetchResults = excData.find("LIMIT") != -1
             self.switchToCleanup(fetchResults)
-            testmodel.Test.observerGroup.notifyInterrupted(fetchResults)
             self.run()
     def writeTermMessage(self, excData):
         message = "Terminating testing due to external interruption"
@@ -427,7 +427,6 @@ class TextTest:
         # Make sure we send application events when tests change state
         responderClasses.append(testmodel.ApplicationEventResponder)
         self.allResponders = map(lambda x : x(self.inputOptions), responderClasses)
-        testmodel.Test.observerGroup.setObservers(self.allResponders)
     def createTestSuites(self):
         uniqueNameFinder = UniqueNameFinder()
         appSuites = seqdict()
@@ -435,7 +434,7 @@ class TextTest:
         for app in self.allApps:
             valid = False
             try:
-                valid, testSuite = app.createTestSuite(forTestRuns=forTestRuns)
+                valid, testSuite = app.createTestSuite(responders=self.allResponders, forTestRuns=forTestRuns)
             except testmodel.BadConfigError:
                 print "Error creating test suite for application", app, "-", sys.exc_value
             if not valid:
@@ -454,6 +453,7 @@ class TextTest:
                 responder.addSuite(testSuite)
     def createActionRunner(self, appSuites):
         actionRunner = ActionRunner()
+        actionRunner.setObservers(self.allResponders)
         script = self.inputOptions.runScript()
         if not script:
             self.checkForNoTests(appSuites)

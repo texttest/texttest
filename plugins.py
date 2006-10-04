@@ -4,6 +4,7 @@ from ndict import seqdict
 from process import Process
 from traceback import format_exception
 from threading import currentThread
+from Queue import Queue, Empty
 
 # Useful utility...
 def localtime(format="%d%b%H:%M:%S", seconds=None):
@@ -312,17 +313,61 @@ class Unrunnable(TestState):
                            executionHosts=executionHosts)
     def shouldAbandon(self):
         return True
+
+# Observer mechanism shouldn't allow for conflicting notifications. Use main thread at all times
+class ThreadedNotificationHandler:
+    def __init__(self):
+        self.workQueue = Queue()
+        self.active = False
+    def enablePoll(self, idleHandleMethod):
+        self.active = True
+        idleHandleMethod(self.pollQueue)
+    def disablePoll(self):
+        self.active = False
+    def pollQueue(self):
+        try:
+            observable, args = self.workQueue.get_nowait()
+            observable.notify(*args)
+        except Empty:
+            pass
+        # Idle handler. We must sleep for a bit, or we use the whole CPU (busy-wait)
+        time.sleep(0.1)
+        return self.active
+    def transfer(self, observable, *args):
+        self.workQueue.put((observable, args))
                         
 class Observable:
-    def __init__(self):
+    threadedNotificationHandler = ThreadedNotificationHandler()
+    # allow calling code to block all notifications everywhere, during a shutdown
+    blocked = False
+    def __init__(self, passSelf=False):
         self.observers = []
+        self.passSelf = passSelf
     def addObserver(self, observer):
         self.observers.append(observer)
-    def notify(self, name, *args):
+    def setObservers(self, observers):
+        self.observers = observers
+    def inMainThread(self):
+        return currentThread().getName() == "MainThread"
+    def notify(self, *args):
+        if self.blocked:
+            return
+        if not self.inMainThread():
+            self.threadedNotificationHandler.transfer(self, *args)
+        else:
+            self.notifyMainThread(*args)
+    def notifyMainThread(self, name, *args):
         methodName = "notify" + name
         for observer in self.observers:
-            method = eval("observer." + methodName)
-            method(*args)
+            try:
+                method = eval("observer." + methodName)
+                if self.passSelf:
+                    method(self, *args)
+                else:
+                    method(*args)
+            except AttributeError:
+                # doesn't matter if only some of the observers have the method
+                pass
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
@@ -442,9 +487,6 @@ def readList(filename, autosort=0):
     if autosort:
         items.sort()
     return items
-
-def inMainThread():
-    return currentThread().getName() == "MainThread"
 
 def chdir(dir):
     ensureDirectoryExists(dir)

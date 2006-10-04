@@ -2,9 +2,6 @@
 
 import sys, string, os, plugins, types
 from usecase import ScriptEngine
-from threading import currentThread
-from Queue import Queue, Empty
-from time import sleep
 
 # Interface all responders must fulfil
 class Responder:
@@ -13,7 +10,6 @@ class Responder:
             self.scriptEngine = ScriptEngine.instance
         else:
             self.setUpScriptEngine()
-        self.closedown = False
     def setUpScriptEngine(self):
         logger = plugins.getDiagnostics("Use-case log")
         self.scriptEngine = ScriptEngine(logger)
@@ -30,17 +26,14 @@ class Responder:
     def notifyComplete(self, test):
         pass
     # Called when everything is finished
-    def notifyAllComplete(self, observerGroup):
+    def notifyAllComplete(self):
         pass
-    def notifyInterrupt(self, fetchResults):
-        if not fetchResults:
-            self.closedown = True
     def needsOwnThread(self):
         return 0
     def needsTestRuns(self):
         return 1
     def describeFailures(self, test):
-        if test.state.hasFailed() and not self.closedown:
+        if test.state.hasFailed():
             print test.getIndent() + repr(test), test.state.getDifferenceSummary()
         
 class SaveState(Responder):
@@ -50,43 +43,6 @@ class SaveState(Responder):
     def performSave(self, test):
         # overridden in subclasses
         test.saveState()
-
-# Utility for responders that want a separate thread to run permanently... generally useful for GUIs
-# Make it a singleton so we can find it...
-class ThreadTransferResponder(Responder):
-    instance = None
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
-        self.workQueue = Queue()
-        self.allCompleted = False
-        ThreadTransferResponder.instance = self
-    def setUpScriptEngine(self):
-        # Don't want the script engine attached here, leave for GUI...
-        pass
-    def pollQueue(self):
-        try:
-            method, args = self.workQueue.get_nowait()
-            method(*args)
-        except Empty:
-            pass
-        # We must sleep for a bit, or we use the whole CPU (busy-wait)
-        sleep(0.1)
-        return not self.allCompleted
-    def maybeTransfer(self, queueMethod, *args):
-        if self.closedown:
-            return
-        if not plugins.inMainThread():
-            self.workQueue.put((queueMethod, args))
-            return 1
-    def notifyChange(self, test):
-        return self.maybeTransfer(test.notifyChanged)
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        return self.maybeTransfer(test.notifyLifecycle, state, changeDesc)
-    def notifyAllComplete(self, observerGroup):
-        retVal = self.maybeTransfer(observerGroup.notifyAllCompleted)
-        if plugins.inMainThread():
-            self.allCompleted = True
-        return retVal
             
 class InteractiveResponder(Responder):
     def __init__(self, optionMap):
@@ -94,8 +50,6 @@ class InteractiveResponder(Responder):
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
     def notifyComplete(self, test):
-        if self.closedown:
-            return
         self.describeFailures(test)
         if self.shouldSave(test):
             self.save(test, test.app.getFullVersion(forSave=1))

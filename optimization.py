@@ -1000,7 +1000,7 @@ class GraphPlotResponder(Responder):
             self.writeDir = suite.app.writeDirectory
     def notifyComplete(self, test):
         self.testGraph.createPlotLinesForTest(test)
-    def notifyAllComplete(self, obsGroup):
+    def notifyAllComplete(self):
         try:
             self.testGraph.plot(self.writeDir)
         except plugins.TextTestError, e:

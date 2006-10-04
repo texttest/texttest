@@ -144,26 +144,12 @@ class EnvironmentReader:
             else:
                 self.diag.info("Not adding reference " + var + " as same as local value " + expValue)
         return childReferenceVars
-
-class ObserverGroup:
-    def __init__(self):
-        self.observers = []
-    def setObservers(self, observers):
-        self.observers = observers
-    def notifyAllCompleted(self):
-        for observer in self.observers:
-            if observer.notifyAllComplete(self):
-                return
-    def notifyInterrupted(self, fetchResults):
-        for observer in self.observers:
-            if observer.notifyInterrupt(fetchResults):
-                return        
     
 # Base class for TestCase and TestSuite
-class Test:
-    # List of objects observing all tests, for reacting to state changes
-    observerGroup = ObserverGroup()
+class Test(plugins.Observable):
     def __init__(self, name, dircache, app, parent = None):
+        # Should notify which test it is
+        plugins.Observable.__init__(self, passSelf=True)
         self.name = name
         # There is nothing to stop several tests having the same name. Maintain another name known to be unique
         self.uniqueName = name
@@ -280,7 +266,7 @@ class Test:
     def filesChanged(self):
         self.refreshFiles()
         self.refreshContents()
-        self.notifyChanged()
+        self.notify("Change")
     def refreshContents(self):
         pass
     def makeSubDirectory(self, name):
@@ -318,26 +304,12 @@ class Test:
                 return dircache.pathName(fileName)
         if self.parent:
             return self.parent.makePathName(fileName)
-    def notifyCompleted(self):
+    def actionsCompleted(self):
         self.diagnose("Completion notified")
-        for observer in self.observerGroup.observers:
-            observer.notifyComplete(self)
+        self.notify("Complete")
         if not self.state.lifecycleChange:
             self.state.lifecycleChange = "complete"
-            self.notifyLifecycle(self.state, self.state.lifecycleChange)
-    def notifyLifecycle(self, state, changeDesc):
-        for observer in self.observerGroup.observers:
-            self.diagnose("Notifying observer called " + str(observer.__class__))
-            if observer.notifyLifecycleChange(self, state, changeDesc):
-                # threaded observers can transfer the change to another thread for later propagation
-                return
-    def notifyChanged(self):
-        # Only used for non-lifecycle important changes where GUIs etc need notifying
-        self.diagnose("Change notified")
-        for observer in self.observerGroup.observers:
-            if observer.notifyChange(self):
-                # threaded observers can transfer the change to another thread for later propagation
-                return
+            self.notify("LifecycleChange", self.state, self.state.lifecycleChange)
     def getRelPath(self):
         # We standardise communication around UNIX paths, it's all much easier that way
         relPath = plugins.relpath(self.getDirectory(), self.app.getDirectory())
@@ -413,7 +385,7 @@ class TestCase(Test):
         self.state = state
         self.diagnose("Change notified to state " + state.category)
         if state and state.lifecycleChange:
-            self.notifyLifecycle(state, state.lifecycleChange)            
+            self.notify("LifecycleChange", state, state.lifecycleChange)            
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
     def setWriteDirectory(self, newDir):
@@ -635,12 +607,13 @@ class TestSuite(Test):
     def createTestCase(self, testName, cache, filters):
         newTest = TestCase(testName, cache, self.app, self)
         if newTest.isAcceptedByAll(filters):
+            newTest.setObservers(self.observers)
             return newTest
     def createTestSuite(self, testName, cache, filters, forTestRuns):
         newSuite = TestSuite(testName, cache, self.app, self)
         if not newSuite.isAcceptedByAll(filters):
             return
-            
+        newSuite.setObservers(self.observers)
         if newSuite.readContents(filters, forTestRuns):
             return newSuite
     def writeNewTest(self, testName, description):
@@ -656,13 +629,14 @@ class TestSuite(Test):
     def addTest(self, testName, className):
         cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
         test = className(testName, cache, self.app, self)
+        test.setObservers(self.observers)
         self.testcases.append(test)
         test.readEnvironment()
-        self.notifyChanged()
+        self.notify("Change")
         return test
     def removeTest(self, test):
         self.testcases.remove(test)
-        self.notifyChanged()
+        self.notify("Change")
     
 class BadConfigError(RuntimeError):
     pass
@@ -944,10 +918,10 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
-    def createTestSuite(self, filters = None, forTestRuns = True):
+    def createTestSuite(self, responders=[], filters=[], forTestRuns = True):
         # Reasonable that test-suite creation can depend on checkout...
         self.setCheckoutVariable()
-        if not filters:
+        if len(filters) == 0:
             filters = self.configObject.getFilterList(self)
 
         success = 1
@@ -955,6 +929,7 @@ class Application:
             if not filter.acceptsApplication(self):
                 success = 0
         suite = TestSuite(os.path.basename(self.dircache.dir), self.dircache, self)
+        suite.setObservers(responders)
         suite.readContents(filters, forTestRuns)
         if success:
             self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
@@ -1226,7 +1201,7 @@ class ApplicationEventResponder(Responder):
         category = test.uniqueName
         timeDelay = int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
         self.scriptEngine.applicationEvent(eventName, category, timeDelay)
-    def notifyAllComplete(self, observerGroup):
+    def notifyAllComplete(self):
         self.scriptEngine.applicationEvent("completion of test actions")
             
 class MultiEntryDictionary(seqdict):

@@ -496,7 +496,7 @@ class RecordTest(InteractiveTestAction):
             self.setTestRecorded(test, usecase)
         else:
             self.setTestReady(test, usecase)
-        test.notifyChanged()
+        test.filesChanged()
     def getWriteDir(self, test):
         return os.path.join(test.app.writeDirectory, "record")
     def setTestRecorded(self, test, usecase):

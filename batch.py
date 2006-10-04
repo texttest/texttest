@@ -185,7 +185,7 @@ class BatchResponder(respond.Responder):
             self.allApps[app.name] = [ app ]
         else:
             self.allApps[app.name].append(app)
-    def notifyAllComplete(self, observerGroup):
+    def notifyAllComplete(self):
         mailSender = MailSender(self.sessionName)
         for appList in self.allApps.values():
             batchDataList = map(lambda x: self.batchAppData[x], appList)

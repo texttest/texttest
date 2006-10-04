@@ -979,7 +979,7 @@ class InteractiveActionGUI:
         return pages
     def createDisplay(self, optionGroup, hasButton, instance):
         vbox = gtk.VBox()
-        if len(optionGroup.options):
+        if len(optionGroup.options) > 0:
             # Creating 0-row table gives a warning ...
             table = gtk.Table(len(optionGroup.options), 2, homogeneous=False)
             table.set_row_spacings(1)
@@ -990,8 +990,8 @@ class InteractiveActionGUI:
                 table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
                 table.attach(entry, 1, 2, rowIndex, rowIndex + 1)
                 rowIndex += 1
-            if len(optionGroup.options):        
-                vbox.pack_start(table, expand=False, fill=False)
+                table.show_all()
+            vbox.pack_start(table, expand=False, fill=False)
         
         for switch in optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)

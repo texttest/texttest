@@ -65,7 +65,7 @@ class BatchCategory(plugins.Filter):
         return self.tests.has_key(test.getRelPath())
     def describeBrief(self, app):
         if self.size() > 0:
-            valid, suite = app.createTestSuite([ self ])
+            valid, suite = app.createTestSuite(filters = [ self ])
             self.testSuites.append(suite)
             return "The following tests " + self.longDescription + " : \n" + \
                    self.getTestLines(suite) + "\n"

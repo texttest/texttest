@@ -261,6 +261,9 @@ class ActionRunner(plugins.Observable):
             excData = str(e)
             self.writeTermMessage(excData)
             fetchResults = excData.find("LIMIT") != -1
+            # block all event notifications...
+            if not fetchResults:
+                plugins.Observable.blocked = True
             self.switchToCleanup(fetchResults)
             self.run()
     def writeTermMessage(self, excData):

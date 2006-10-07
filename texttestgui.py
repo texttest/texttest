@@ -125,7 +125,7 @@ class QuitGUI(guiplugins.SelectionAction):
             processes += queryValues["static"]
         return processes
     def exit(self, *args):
-        # block all event notifications...
+        # block all event notifications to make sure GUI isn't updated after being destructed
         plugins.Observable.blocked = True
         self.topWindow.destroy()
         gtk.main_quit()
@@ -385,8 +385,8 @@ class TextTestGUI(Responder):
         self.testTreeGUI.addObserver(self.rightWindowGUI)
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
     def runWithActionThread(self, actionThread):
-        self.setUpGui(actionThread)
         plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
+        self.setUpGui(actionThread)
         gtk.main()
     def runAlone(self):
         self.setUpGui()

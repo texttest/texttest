@@ -352,11 +352,11 @@ class Observable:
     def notify(self, *args):
         if self.blocked:
             return
-        if not self.inMainThread():
+        if self.threadedNotificationHandler.active and not self.inMainThread():
             self.threadedNotificationHandler.transfer(self, *args)
         else:
-            self.notifyMainThread(*args)
-    def notifyMainThread(self, name, *args):
+            self.performNotify(*args)
+    def performNotify(self, name, *args):
         methodName = "notify" + name
         for observer in self.observers:
             try:

@@ -418,9 +418,16 @@ class TextTestGUI(Responder):
             self.progressBar.notifyLifecycleChange(test, state, changeDesc)
         if self.progressMonitor:
             self.progressMonitor.notifyLifecycleChange(test, state, changeDesc)
-    def notifyChange(self, test):
-        self.testTreeGUI.notifyChange(test)
-        self.rightWindowGUI.notifyChange(test)
+    def notifyFileChange(self, test):
+        self.rightWindowGUI.notifyFileChange(test)
+    def notifyContentChange(self, suite):
+        self.testTreeGUI.notifyContentChange(suite)
+    def notifyAdd(self, test):
+        self.testTreeGUI.notifyAdd(test)
+        self.rightWindowGUI.notifyAdd(test)
+    def notifyRemove(self, test):
+        self.testTreeGUI.notifyRemove(test)
+        self.rightWindowGUI.notifyRemove(test)
     def notifyAllComplete(self):
         plugins.Observable.threadedNotificationHandler.disablePoll()
             
@@ -569,6 +576,8 @@ class TestTreeGUI(plugins.Observable):
         self.nofSelectedTests = len(selectedTests)
         self.notify("NewTestSelection", allSelected)
         self.filteredModel.foreach(self.countVisible)
+        self.updateColumnTitle(printToLog)
+    def updateColumnTitle(self, printToLog=True):
         title = "Tests: "
         if self.nofSelectedTests == self.totalNofTests:
             title += "All " + str(self.totalNofTests) + " selected"
@@ -636,15 +645,6 @@ class TestTreeGUI(plugins.Observable):
                 view.expand_row(model.get_path(iter), open_all=False)
              
             iter = view.get_model().iter_next(iter)
-    def updateNofTests(self):
-        self.totalNofTests = 0
-        self.model.foreach(self.countTests)        
-    def countTests(self, model, path, iter, data=None):
-        if self.model.get_value(iter, 2).classId() == "test-case":
-            self.totalNofTests += 1
-    def notifyChange(self, test):
-        if test.classId() == "test-suite":
-            self.redrawSuite(test)  
     def notifyLifecycleChange(self, test, state, changeDesc):
         iter = self.itermap[test]
         self.updateStateInModel(test, iter, state)
@@ -655,22 +655,6 @@ class TestTreeGUI(plugins.Observable):
 
         if state.isComplete() and test.getConfigValue("auto_collapse_successful") == 1:
             self.collapseIfAllComplete(self.model.iter_parent(iter))               
-    def redrawSuite(self, suite):
-        testJustAdded = self.findTestJustAdded(suite)
-        suiteIter = self.itermap[suite]
-        if testJustAdded:
-            self.addNewTestToModel(suiteIter, testJustAdded, suiteIter)
-        else:
-            # There wasn't a new test: assume something disappeared or changed order and regenerate the model...
-            self.recreateSuiteModel(suite, suiteIter)
-            self.notify("PossibleDeletion")
-        self.selection.get_tree_view().grab_focus()
-    def findTestJustAdded(self, suite):
-        if len(suite.testcases) == 0:
-            return
-        maybeNewTest = suite.testcases[-1]
-        if not self.itermap.has_key(maybeNewTest):
-            return maybeNewTest
     def collapseIfAllComplete(self, iter):
         # Collapse if all child tests are complete and successful
         if iter == None or not self.model.iter_has_child(iter): 
@@ -727,38 +711,36 @@ class TestTreeGUI(plugins.Observable):
         except:
             pass
         self.collapseIfAllComplete(self.model.iter_parent(iter))
-    def addNewTestToModel(self, suite, newTest, suiteIter):
-        iter = self.addSuiteWithParent(newTest, suiteIter)
-        storeIter = iter.copy()
-        self.itermap[newTest] = storeIter
-        guilog.info("Viewing new test " + newTest.name)
-        self.notify("ViewTest", newTest)
-        self.updateNofTests()
-        self.expandSuite(suiteIter)
-        self.selectOnlyRow(iter)
-    def expandSuite(self, iter):
-        self.selection.get_tree_view().expand_row(self.model.get_path(iter), open_all=0)
-    def selectOnlyRow(self, iter):
+    def notifyAdd(self, test):
+        self.addTest(test)
+        if test.classId() == "test-case":
+            self.totalNofTests += 1
+        self.notifyNewTestSelection([ test ])
+    def addTest(self, test):
+        suiteIter = self.itermap[test.parent]
+        iter = self.addSuiteWithParent(test, suiteIter)
+    def notifyRemove(self, test):
+        self.removeTest(test)
+        if test.classId() == "test-case":
+            self.totalNofTests -= 1
+            self.updateColumnTitle()
+    def removeTest(self, test):
+        guilog.info("-> " + test.getIndent() + "Removed " + repr(test) + " from test tree view.")
+        iter = self.itermap[test]
+        filteredIter = self.findIter(test)
+        if self.selection.iter_is_selected(filteredIter):
+            self.selection.unselect_iter(filteredIter)
+        self.model.remove(iter)
+        del self.itermap[test]
+    def notifyContentChange(self, suite):
+        allSelected, selectedTests = self.getSelected()
         self.selection.unselect_all()
-        self.selection.select_iter(self.filteredModel.convert_child_iter_to_iter(iter))
-    def recreateSuiteModel(self, suite, suiteIter):
-        oldSize = self.model.iter_n_children(suiteIter)
-        if oldSize == 0 and len(suite.testcases) == 0:
-            return
-        
-        self.selection.unselect_all()
-        iter = self.model.iter_children(suiteIter)
-        for i in range(oldSize):
-            self.model.remove(iter)
         guilog.info("-> " + suite.getIndent() + "Recreating contents of " + repr(suite) + ".")
         for test in suite.testcases:
-            self.removeIter(test)
-            iter = self.addSuiteWithParent(test, suiteIter)
-        self.updateNofTests()
-        self.expandSuite(suiteIter)
-        self.selectOnlyRow(suiteIter)
-    def removeIter(self, test):        
-        del self.itermap[test]
+            self.removeTest(test)
+        for test in suite.testcases:
+            self.addTest(test)
+        self.notifyNewTestSelection(allSelected)
     def viewTest(self, view, path, column, *args):
         iter = self.filteredModel.get_iter(path)
         self.selection.select_iter(iter)
@@ -1149,15 +1131,22 @@ class RightWindowGUI:
             horizontalSeparatorPosition = float(options["static_horizontal_separator_position"][0])
 
         self.vpaned.set_position(int(self.vpaned.allocation.height * horizontalSeparatorPosition))        
-    def notifyChange(self, object):
-        # Test has changed state or contents, regenerate if we're currently viewing it
+    def notifyFileChange(self, object):
+        # Test has changed contents or state, regenerate if we're currently viewing it
         if self.currentObject is object:
             self.view(object, resetNotebook=False)
+    def notifyRemove(self, object):
+        # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
+        if self.currentObject is object:
+            self.notifyViewTest(object.parent)
     def notifyLifecycleChange(self, test, state, changeDesc):
-        self.notifyChange(test)
+        self.notifyFileChange(test)
     def notifyViewTest(self, test):
         # Triggered by user double-clicking the test in the test tree
         self.view(test, resetNotebook=True)
+    def notifyAdd(self, test):
+        guilog.info("Viewing new test " + test.name)
+        self.notifyViewTest(test)
     def view(self, object, resetNotebook):
         for child in self.window.get_children():
             if not child is self.notebook:
@@ -1170,11 +1159,6 @@ class RightWindowGUI:
         buttonBar, fileView, objectPages = self.makeObjectDependentContents(object)
         self.updateNotebook(objectPages, resetNotebook)
         self.fillWindow(buttonBar, fileView)
-    def notifyPossibleDeletion(self):
-        # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
-        if self.currentObject.classId() == "test-case":
-            if not os.path.isdir(self.currentObject.getDirectory()):
-                self.notifyViewTest(self.currentObject.parent)
     def makeObjectDependentContents(self, object):
         self.fileViewGUI = self.createFileViewGUI(object)
         self.fileViewGUI.addObserver(self.selectionActionGUI)

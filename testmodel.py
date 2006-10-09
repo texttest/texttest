@@ -260,15 +260,6 @@ class Test(plugins.Observable):
             else:
                 allFiles += dircache.findAllFiles(stem, compulsory=[ self.app.name ])
         return allFiles
-    def refreshFiles(self):
-        for dircache in self.dircaches:
-            dircache.refresh()
-    def filesChanged(self):
-        self.refreshFiles()
-        self.refreshContents()
-        self.notify("Change")
-    def refreshContents(self):
-        pass
     def makeSubDirectory(self, name):
         subdir = self.dircaches[0].pathName(name)
         if os.path.isdir(subdir):
@@ -359,6 +350,12 @@ class Test(plugins.Observable):
         return True
     def size(self):
         return 1
+    def refreshFiles(self):
+        for dircache in self.dircaches:
+            dircache.refresh()
+    def filesChanged(self):
+        self.refreshFiles()
+        self.notify("FileChange")    
 
 class TestCase(Test):
     def __init__(self, name, abspath, app, parent):
@@ -575,8 +572,8 @@ class TestSuite(Test):
         file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
         file.close()
         self.dircaches[0].refresh()
-    def refreshContents(self):
-        # Here we assume that only order can change and suites be removed...
+    def contentChanged(self):
+        # Here we assume that only order can change...
         newList = []
         for testName in self.readTestNamesFromFile(self.getContentFileName()):
             for testcase in self.testcases:
@@ -584,6 +581,7 @@ class TestSuite(Test):
                     newList.append(testcase)
                     break
         self.testcases = newList
+        self.notify("ContentChange")
     def size(self):
         size = 0
         for testcase in self.testcases:
@@ -632,11 +630,11 @@ class TestSuite(Test):
         test.setObservers(self.observers)
         self.testcases.append(test)
         test.readEnvironment()
-        self.notify("Change")
+        test.notify("Add")
         return test
     def removeTest(self, test):
         self.testcases.remove(test)
-        self.notify("Change")
+        test.notify("Remove")
     
 class BadConfigError(RuntimeError):
     pass

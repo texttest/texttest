@@ -237,12 +237,15 @@ class InteractiveTestAction(InteractiveAction):
             return os.path.basename(filename)
         else:
             return os.path.join(self.test.getRelPath(), os.path.basename(filename))
-    def viewFile(self, fileName, refresh=0):
+    def viewFile(self, fileName, refreshContents=False, refreshFiles=False):
         exitHandler = None
-        if refresh:
+        if refreshFiles:
             exitHandler = self.test.filesChanged
+        elif refreshContents:
+            exitHandler = self.test.contentChanged
         commandLine, descriptor = self.getViewCommand(fileName)
         description = descriptor + " " + self.getRelativeFilename(fileName)
+        refresh = str(int(refreshContents or refreshFiles))
         guilog.info("Viewing file " + fileName.replace(os.sep, "/") + " using '" + descriptor + "', refresh set to " + str(refresh))
         process = self.startExternalProgram(commandLine, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
@@ -382,8 +385,9 @@ class ViewFile(InteractiveTestAction):
             return self.followFile(comparison.tmpFile)
         if not comparison:
             baseName = os.path.basename(fileName)
-            refresh = int(baseName.startswith("testsuite.") or baseName.startswith("options."))
-            return self.viewFile(fileName, refresh=refresh)
+            refreshContents = baseName.startswith("testsuite.") # re-read which tests we have
+            refreshFiles = baseName.startswith("options.") # options file can change appearance of test (environment refs etc.)
+            return self.viewFile(fileName, refreshContents, refreshFiles)
         if self.shouldTakeDiff(comparison):
             self.takeDiff(comparison)
         elif comparison.missingResult():
@@ -932,7 +936,7 @@ class EnableDiagnostics(InteractiveTestAction):
         diagFile = os.path.join(test.app.getDirectory(), self.configFile)
         targetDiagFile = os.path.join(diagDir, self.configFile)
         shutil.copyfile(diagFile, targetDiagFile)
-        self.viewFile(targetDiagFile, refresh=1)
+        self.viewFile(targetDiagFile, refreshFiles=True)
 
 class RemoveTest(InteractiveTestAction):
     def getTitle(self):

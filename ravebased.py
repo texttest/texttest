@@ -157,7 +157,7 @@ class Config(CarmenConfig):
         return app.getConfigValue("create_catalogues") == "true"
     def getResponderClasses(self, allApps):
         if self.raveSlave():
-            return [ queuesystem.SocketResponder ]
+            return self.getSlaveResponderClasses()
         baseResponders = CarmenConfig.getResponderClasses(self, allApps)
         if self.optionMap.has_key("build"):
             baseResponders.append(RemoteBuildResponder)

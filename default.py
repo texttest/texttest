@@ -94,6 +94,8 @@ class Config(plugins.Configuration):
         # Put the GUI first ... first one gets the script engine - see respond module :)
         if self.useGUI():
             self.addGuiResponder(classes)
+        else:
+            classes.append(respond.TextDisplayResponder)
         if self.batchMode() and not self.optionMap.has_key("coll"):
             classes.append(batch.BatchResponder)
         if self.keepTemporaryDirectories():

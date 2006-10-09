@@ -7,7 +7,7 @@ from threading import Thread
 from time import sleep
 from copy import copy, deepcopy
 from cPickle import dumps
-from respond import Responder
+from respond import Responder, TextDisplayResponder
 from traffic_cmd import sendServerState
 from knownbugs import CheckForBugs
 
@@ -81,8 +81,6 @@ class SocketResponder(Responder):
             self.connect(sendSocket)
             sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
             sendSocket.close()
-        else:
-            self.describeFailures(test)
     
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
@@ -132,9 +130,11 @@ class QueueSystemConfig(default.Config):
             return FindExecutionHosts()
         else:
             return default.Config.getExecHostFinder(self)
+    def getSlaveResponderClasses(self):
+        return [ TextDisplayResponder, SocketResponder ]
     def getResponderClasses(self, allApps):
         if self.slaveRun():
-            return [ SocketResponder ]
+            return self.getSlaveResponderClasses()
         else:
             return default.Config.getResponderClasses(self, allApps)
     def getTestRunner(self):

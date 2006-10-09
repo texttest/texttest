@@ -32,7 +32,9 @@ class Responder:
         return 0
     def needsTestRuns(self):
         return 1
-    def describeFailures(self, test):
+
+class TextDisplayResponder(Responder):
+    def notifyComplete(self, test):
         if test.state.hasFailed():
             print test.getIndent() + repr(test), test.state.getDifferenceSummary()
         
@@ -50,7 +52,6 @@ class InteractiveResponder(Responder):
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
     def notifyComplete(self, test):
-        self.describeFailures(test)
         if self.shouldSave(test):
             self.save(test, test.app.getFullVersion(forSave=1))
         elif self.useInteractiveResponse(test):

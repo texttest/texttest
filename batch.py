@@ -173,7 +173,6 @@ class BatchResponder(respond.Responder):
         self.batchAppData = seqdict()
         self.allApps = seqdict()
     def notifyComplete(self, test):
-        self.describeFailures(test)
         self.batchAppData[test.app].storeCategory(test)
     def addSuite(self, suite):
         # Don't do anything with empty suites

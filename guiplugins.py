@@ -54,18 +54,12 @@ class ProcessTerminationMonitor:
 processTerminationMonitor = ProcessTerminationMonitor()
 
 class TestSelection:
-    def __init__(self, includeSuites=False):
+    def __init__(self):
         self.tests = []
-        self.includeSuites = includeSuites
     def __repr__(self):
-        rep = str(self.size()) + " tests"
-        if self.includeSuites:
-            rep += " and suites"
-        return rep
+        return str(self.size()) + " tests"
     def add(self, object):
         if object.classId() == "test-case":
-            self.tests.append(object)
-        elif self.includeSuites and object.classId() == "test-suite":
             self.tests.append(object)
     def includes(self, test):
         return test in self.tests
@@ -109,8 +103,6 @@ class InteractiveAction(plugins.Observable):
             return []
     def canPerform(self):
         return True
-    def canPerformOnSuite(self):
-        return False
     def getInterfaceDescription(self):
         return ""
     def getAccelerator(self):        
@@ -184,7 +176,7 @@ class InteractiveAction(plugins.Observable):
         return process
     def describe(self, testObj, postText = ""):
         guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
-
+    
 class SelectionAction(InteractiveAction):
     def __init__(self, rootTestSuites, optionName = ""):
         self.rootTestSuites = rootTestSuites
@@ -204,9 +196,23 @@ class SelectionAction(InteractiveAction):
         if selectionGroups:
             filterFileOption = selectionGroups[0].options["f"]
             filterFileOption.addPossibleValue(os.path.basename(fileName))
+    def perform(self, tests, fileSel):
+        testSel = self.makeTestSelection(tests)
+        message = self.messageBeforePerform(testSel)
+        if message != None:
+            self.notify("Status", message)
+        self.performOn(testSel, fileSel)
+        message = self.messageAfterPerform(testSel)
+        if message != None:
+            self.notify("Status", message)
+    def makeTestSelection(self, tests):
+        testSel = TestSelection()
+        for test in tests:
+            testSel.add(test)
+        return testSel
 
 # The class to inherit from if you want test-based actions that can run from the GUI
-class InteractiveTestAction(plugins.Action,InteractiveAction):
+class InteractiveTestAction(InteractiveAction):
     def __init__(self, test, optionName = ""):
         self.test = test
         InteractiveAction.__init__(self, optionName)
@@ -240,8 +246,15 @@ class InteractiveTestAction(plugins.Action,InteractiveAction):
         guilog.info("Viewing file " + fileName.replace(os.sep, "/") + " using '" + descriptor + "', refresh set to " + str(refresh))
         process = self.startExternalProgram(commandLine, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
-    def setUpSuite(self, suite):
-        self(suite)
+    def perform(self, test, files):
+        message = self.messageBeforePerform(test)
+        if message != None:
+            self.notify("Status", message)
+        self.performOn(test)
+        message = self.messageAfterPerform(test)
+        if message != None:
+            self.notify("Status", message)
+
     
 # Plugin for saving tests (standard)
 class SaveTests(SelectionAction):
@@ -420,7 +433,7 @@ class ImportTest(InteractiveTestAction):
     def getNewTestName(self):
         # Overwritten in subclasses - occasionally it can be inferred
         return self.optionGroup.getOptionValue("name").strip()
-    def setUpSuite(self, suite):
+    def performOn(self, suite):
         testName = self.getNewTestName()
         if len(testName) == 0:
             raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + "\n" + \
@@ -450,7 +463,7 @@ class RecordTest(InteractiveTestAction):
             self.addSwitch(oldOptionGroups, "repgui", "", defaultValue = 0, options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
         if self.recordMode == "console":
             self.addSwitch(oldOptionGroups, "hold", "Hold record shell after recording")
-    def __call__(self, test):
+    def performOn(self, test):
         guilog.info("Starting dynamic GUI in record mode...")
         self.updateRecordTime(test)
         self.startTextTestProcess(test, "record")
@@ -914,7 +927,7 @@ class EnableDiagnostics(InteractiveTestAction):
         return not dynamic
     def canPerform(self):
         return self.test and self.configFile
-    def __call__(self, test):
+    def performOn(self, test):
         diagDir = test.makeSubDirectory("Diagnostics")
         diagFile = os.path.join(test.app.getDirectory(), self.configFile)
         targetDiagFile = os.path.join(diagDir, self.configFile)
@@ -935,7 +948,7 @@ class RemoveTest(InteractiveTestAction):
         else:
             return "You are about to remove the entire test suite '" + test.name + \
                    "' and all " + str(test.size()) + " tests that it contains!\nAre you VERY sure you wish to proceed??"
-    def __call__(self, test):
+    def performOn(self, test):
         plugins.rmtree(test.getDirectory())
         suite = test.parent
         self.removeFromTestFile(suite, test.name)
@@ -979,9 +992,9 @@ class CopyTest(ImportTest):
         return "_Copy"
     def getScriptTitle(self, tab):
         return "Copy test"
-    def __call__(self, test):
+    def performOn(self, test):
         suite = test.parent
-        self.setUpSuite(suite)
+        ImportTest.performOn(self, suite)
     def createTestContents(self, suite, testDir):
         stdFiles, defFiles = self.test.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
@@ -1052,7 +1065,7 @@ class ReportBugs(InteractiveTestAction):
     def write(self, writeFile, message):
         writeFile.write(message)
         guilog.info(message)
-    def __call__(self, test):
+    def performOn(self, test):
         self.checkSanity()
         fileName = self.getFileName(test)
         guilog.info("Recording known bugs to " + fileName + " : ")

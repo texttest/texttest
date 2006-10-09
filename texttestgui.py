@@ -361,9 +361,10 @@ class TextTestGUI(Responder):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
         for action in actions:
-            # These actions might change the tree view selection, need to observe them
+            # These actions might change the tree view selection or the status bar, need to observe them
             action.addObserver(self.testTreeGUI)
-        selActionGUI = SelectionActionGUI(actions, self.status, self.uiManager, self.rootSuites[0].app)
+            action.addObserver(self.status)
+        selActionGUI = SelectionActionGUI(actions, self.uiManager, self.rootSuites[0].app)
         # selection actions need to observer for manual selections
         self.testTreeGUI.addObserver(selActionGUI)
         return selActionGUI
@@ -395,7 +396,7 @@ class TextTestGUI(Responder):
     def createDefaultRightGUI(self):
         rootSuite = self.rootSuites[0]
         guilog.info("Viewing test " + repr(rootSuite))
-        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.status, self.progressMonitor, self.uiManager)
+        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.progressMonitor, self.uiManager)
     def pickUpProcess(self):
         process = guiplugins.processTerminationMonitor.getTerminatedProcess()
         if process:
@@ -841,14 +842,12 @@ class TestTreeGUI(plugins.Observable):
             rootIter = self.filteredModel.iter_next(rootIter)
    
 class InteractiveActionGUI:
-    def __init__(self, actions, status, uiManager, app, test = None):
+    def __init__(self, actions, uiManager, app):
         self.app = app
         self.uiManager = uiManager
         self.actions = actions
-        self.test = test
         self.pageDescInfo = { "Test" : {} }
         self.indexers = [] # Utility list for getting the values from multi-valued radio button groups :-(
-        self.status = status
         self.createdActions = []
     def getInterfaceDescription(self):
         description = "<ui>\n"
@@ -915,13 +914,7 @@ class InteractiveActionGUI:
         button.show()
         return button
     def getActionGroup(self):
-        if self.test == None:
-            actionGroupIndex = 0
-        elif self.test.classId() == "test-suite":
-            actionGroupIndex = 1
-        else:
-            actionGroupIndex = 2
-        return self.uiManager.get_action_groups()[actionGroupIndex]
+        return self.uiManager.get_action_groups()[self.getActionGroupIndex()]
     def getCustomAccelerator(self, name, label, original):
         configName = label.replace("_", "").replace(" ", "_").lower()
         if self.app.getConfigValue("gui_accelerators").has_key(configName):
@@ -934,14 +927,14 @@ class InteractiveActionGUI:
             guilog.info("Disconnecting accelerator for action '" + action.get_name() + "'")
             action.disconnect_accelerator()
     def runInteractive(self, button, action, *args):
-        doubleCheckMessage = action.getDoubleCheckMessage(self.test)
+        doubleCheckMessage = action.getDoubleCheckMessage(self.getTestObject())
         if doubleCheckMessage:
             self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, (action,))
         else:
             self._runInteractive(action)
     def _runInteractive(self, action):
         try:
-            self.performInteractiveAction(action)
+            action.perform(self.getTestObject(), self.getFileObject())
         except plugins.TextTestError, e:
             showError(str(e))
     def getPageDescription(self, pageName, subPageName = ""):
@@ -1083,45 +1076,44 @@ class InteractiveActionGUI:
             if value:
                 text += " (checked)"
         return text
-    def performInteractiveAction(self, action):
-        message = action.messageBeforePerform(self.test)
-        if message != None:
-            self.status.output(message)
-        self.test.callAction(action)
-        message = action.messageAfterPerform(self.test)
-        if message != None:
-            self.status.output(message)
 
+class TestActionGUI(InteractiveActionGUI):
+    def __init__(self, actions, uiManager, app, test):
+        InteractiveActionGUI.__init__(self, actions, uiManager, app)
+        self.test = test
+    def getTestObject(self):
+        return self.test
+    def getFileObject(self):
+        return []
+    def getActionGroupIndex(self):
+        if self.test.classId() == "test-suite":
+            return 1
+        else:
+            return 2    
+        
 class SelectionActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, status, uiManager, app):
-        InteractiveActionGUI.__init__(self, actions, status, uiManager, app)
+    def __init__(self, actions, uiManager, app):
+        InteractiveActionGUI.__init__(self, actions, uiManager, app)
         self.currTestSelection = []
         self.currFileSelection = []
     def notifyNewTestSelection(self, tests):
         self.currTestSelection = tests
     def notifyNewFileSelection(self, fileSel):
         self.currFileSelection = fileSel
-    def performInteractiveAction(self, action):
-        testSel = self.makeTestSelection(action.canPerformOnSuite())
-        self.status.output(action.messageBeforePerform(testSel))
-        action.performOn(testSel, self.currFileSelection)
-        message = action.messageAfterPerform(testSel)
-        if message != None:
-            self.status.output(message)
-    def makeTestSelection(self, includeSuites):
-        testSel = guiplugins.TestSelection(includeSuites)
-        for test in self.currTestSelection:
-            testSel.add(test)
-        return testSel
-    
+    def getTestObject(self):
+        return self.currTestSelection
+    def getFileObject(self):
+        return self.currFileSelection
+    def getActionGroupIndex(self):
+        return 0
+            
 class RightWindowGUI:
-    def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor, uiManager):
+    def __init__(self, object, dynamic, selectionActionGUI, progressMonitor, uiManager):
         self.dynamic = dynamic
         self.intvActionGUI = None
         self.uiManager = uiManager
         self.selectionActionGUI = selectionActionGUI
         self.progressMonitor = progressMonitor
-        self.status = status
         self.window = gtk.VBox()
         self.vpaned = gtk.VPaned()
         self.vpaned.connect('notify', self.paneHasChanged)
@@ -1197,7 +1189,7 @@ class RightWindowGUI:
             app = object.app
         if self.intvActionGUI:
             self.intvActionGUI.disconnectAccelerators()
-        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), self.status, self.uiManager, app, object)
+        self.intvActionGUI = TestActionGUI(self.makeActionInstances(object), self.uiManager, app, object)
         objectPages = self.getObjectNotebookPages(object, self.intvActionGUI)
         return self.intvActionGUI.makeButtons(), objectPages    
     def fillWindow(self, buttonBar, fileView):
@@ -1708,9 +1700,9 @@ class GUIStatusMonitor:
     def __init__(self):
         self.statusBar = gtk.Statusbar()
         self.diag = plugins.getDiagnostics("GUI status monitor")
-        self.output("TextTest started at " + plugins.localtime() + ".")
+        self.notifyStatus("TextTest started at " + plugins.localtime() + ".")
 
-    def output(self, message):
+    def notifyStatus(self, message):
         self.diag.info("Changing GUI status to: '" + message + "'")
         self.statusBar.push(0, message)
         

@@ -271,7 +271,7 @@ class CheckFilesForApc(plugins.Action):
 class ViewApcLog(guiplugins.InteractiveTestAction):
     def __repr__(self):
         return "Viewing log of"
-    def __call__(self, test):
+    def performOn(self, test):
         viewLogScript = test.makeTmpFileName("view_apc_log", forFramework=1)
         if os.path.isfile(viewLogScript):
             file = open(viewLogScript)
@@ -1461,7 +1461,7 @@ class CopyMPSFiles(plugins.Action):
             os.system("gzip " + newFileName)
 
 class SaveBestSolution(guiplugins.InteractiveTestAction):
-    def __call__(self, test):
+    def performOn(self, test):
         import shutil
         # If we have the possibility to save, we know that the current solution is best
         testdir = self.test.parent.getDirectory(1)
@@ -1524,7 +1524,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
     def __init__(self, test, oldOptionGroup = None):
         optimization.PlotTestInGUI.__init__(self, test, oldOptionGroup)
         self.addSwitch(oldOptionGroup, "kpi", "Plot kpi group")
-    def __call__(self, test):
+    def performOn(self, test):
         self.testGraph.createPlotLinesForTest(test)
         # Plot KPI group
         if self.optionGroup.getSwitchValue("kpi"):

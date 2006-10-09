@@ -1027,7 +1027,7 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
         return "Plotting"
     def isFrequentUse(self):
         return True
-    def __call__(self, test):
+    def performOn(self, test):
         self.testGraph.createPlotLinesForTest(test)
         self.plotGraph(test.app.writeDirectory)  
     def plotGraph(self, writeDirectory):
@@ -1812,7 +1812,7 @@ class StartStudio(guiplugins.InteractiveTestAction):
         return "Start Studio"
     def matchesMode(self, dynamic):
         return not dynamic
-    def __call__(self, test):
+    def performOn(self, test):
         test.setUpEnvironment(parents=1)
         os.environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
         print "CARMSYS:", os.environ["CARMSYS"]
@@ -1834,7 +1834,7 @@ class StartStudio(guiplugins.InteractiveTestAction):
 guiplugins.interactiveActionHandler.testClasses += [ StartStudio ]
 
 class CVSLogInGUI(guiplugins.InteractiveTestAction):
-    def __call__(self, test):
+    def performOn(self, test):
         logFileStem = test.app.getConfigValue("log_file")
         files = [ logFileStem ]
         files += test.app.getConfigValue("cvs_log_for_files").split(",")

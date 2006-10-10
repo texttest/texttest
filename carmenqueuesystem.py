@@ -169,13 +169,12 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def isExecutable(self, process, parentProcess, test):
         binaryName = os.path.basename(test.getConfigValue("binary"))
         return binaryName.startswith(parentProcess) and process.find(".") == -1 and process.find("arch") == -1 and process.find("crsutil") == -1 and process.find("CMD") == -1
-    def getTestCollator(self):
+    def getFileExtractor(self):
+        baseExtractor = queuesystem.QueueSystemConfig.getFileExtractor(self)
         if self.optionMap.has_key("lprof"):
-            return [ self.getFileCollator(), ProcessProfilerResults() ]
+            return [ baseExtractor, ProcessProfilerResults() ]
         else:
-            return self.getFileCollator()
-    def getFileCollator(self):
-        return queuesystem.QueueSystemConfig.getTestCollator(self)
+            return baseExtractor
     def getSubmissionRules(self, test):
         if queuesystem.queueSystemName(test.app) == "LSF":
             return queuesystem.QueueSystemConfig.getSubmissionRules(self, test)

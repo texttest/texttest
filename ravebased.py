@@ -165,7 +165,7 @@ class Config(CarmenConfig):
             baseResponders.append(RuleBuildSynchroniser)
         return baseResponders
     def getActionSequence(self):
-        if self.slaveRun() or self.optionMap.has_key("coll"):
+        if self.slaveRun() or self.optionMap.has_key("coll") or self.isReconnecting():
             return CarmenConfig.getActionSequence(self)
 
         if self.raveSlave():

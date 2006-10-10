@@ -60,6 +60,8 @@ class Config(plugins.Configuration):
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
             return [ batch.CollectFiles(), batch.GenerateHistoricalReport([ self.optionValue("b") ]) ]
+        if self.isReconnecting():
+            return self.getReconnectSequence()
 
         return self._getActionSequence(makeDirs=1)
     def useGUI(self):
@@ -126,15 +128,19 @@ class Config(plugins.Configuration):
         if makeDirs:
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
-    def getTestProcessor(self):
-        if self.isReconnecting():
-            return self.getTestEvaluator()
-        
+    def getReconnectSequence(self):
+        reconnFull = self.optionMap.has_key("reconnfull")
+        actions = [ ReconnectTest(self.optionValue("reconnect"), reconnFull) ]
+        if reconnFull:
+            actions += [ self.getTestComparator(), self.getFailureExplainer() ]
+        return actions
+    def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
+        collator = self.getTestCollator()
         return [ self.getExecHostFinder(), self.getWriteDirectoryPreparer(ignoreCatalogues), \
                  SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
-                 catalogueCreator, self.getTestRunner(), catalogueCreator, self.getTestEvaluator() ]
+                 catalogueCreator, collator, self.getTestRunner(), catalogueCreator, collator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
     def getPossibleResultFiles(self, app):
@@ -240,16 +246,11 @@ class Config(plugins.Configuration):
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
-        if self.isReconnecting():
-            return None
-        else:
-            return self._getWriteDirectoryMaker()
+        return MakeWriteDirectory()
     def getExecHostFinder(self):
         return FindExecutionHosts()
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return PrepareWriteDirectory(ignoreCatalogues)
-    def _getWriteDirectoryMaker(self):
-        return MakeWriteDirectory()
     def getTestRunner(self):
         if os.name == "posix":
             # Use Xvfb to suppress GUIs, cmd files to prevent shell-quote problems,
@@ -261,22 +262,15 @@ class Config(plugins.Configuration):
     def isReconnectingFast(self):
         return self.isReconnecting() and not self.optionMap.has_key("reconnfull")
     def getTestEvaluator(self):
-        if self.isReconnectingFast():
-            return self.getFileExtractor()
-        else:
-            return [ self.getFileExtractor(), self.getTestComparator(), \
-                     self.getFailureExplainer() ]
+        return [ self.getFileExtractor(), self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
-        if self.isReconnecting():
-            return ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull"))
+        if self.optionMap.has_key("noperf"):
+            return
+        elif self.optionMap.has_key("diag"):
+            print "Note: Running with Diagnostics on, so performance checking is disabled!"
+            return [ self.getPerformanceExtractor() ] 
         else:
-            if self.optionMap.has_key("noperf"):
-                return self.getTestCollator()
-            elif self.optionMap.has_key("diag"):
-                print "Note: Running with Diagnostics on, so performance checking is disabled!"
-                return [ self.getTestCollator(), self.getPerformanceExtractor() ] 
-            else:
-                return [ self.getTestCollator(), self.getPerformanceFileMaker(), self.getPerformanceExtractor() ] 
+            return [ self.getPerformanceFileMaker(), self.getPerformanceExtractor() ]
     def getCatalogueCreator(self):
         return CreateCatalogue()
     def getTestCollator(self):
@@ -909,6 +903,7 @@ class CollateFiles(plugins.Action):
     def __init__(self):
         self.collations = {}
         self.discardFiles = []
+        self.filesPresentBefore = {}
         self.diag = plugins.getDiagnostics("Collate Files")
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
@@ -954,8 +949,11 @@ class CollateFiles(plugins.Action):
         fileList.sort()
         return fileList
     def __call__(self, test):
-        self.removeUnwanted(test)
-        self.collate(test)
+        if not self.filesPresentBefore.has_key(test):
+            self.filesPresentBefore[test] = self.getFilesPresent(test)
+        else:
+            self.removeUnwanted(test)
+            self.collate(test)
     def removeUnwanted(self, test):
         for stem in self.discardFiles:
             filePath = test.makeTmpFileName(stem)
@@ -967,9 +965,16 @@ class CollateFiles(plugins.Action):
             targetFile = test.makeTmpFileName(targetStem)
             collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
             fullpath = self.findPath(test, sourcePattern)
-            if fullpath:
+            if fullpath and fullpath not in self.filesPresentBefore[test]:
                 self.diag.info("Extracting " + fullpath + " to " + targetFile)
                 self.extract(fullpath, targetFile, collationErrFile)
+    def getFilesPresent(self, test):
+        files = []
+        for targetStem, sourcePattern in self.collations.items():
+            fullPath = self.findPath(test, sourcePattern)
+            if fullPath:
+                files.append(fullPath)
+        return files
     def findPath(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)

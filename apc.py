@@ -169,9 +169,9 @@ class ApcConfig(optimization.OptimizationConfig):
         processData = process[1:]
         rulesetName = self.getRuleSetName(test)
         return processData.startswith(rulesetName) or rulesetName.startswith(processData)
-    def getFileCollator(self):
-        subActions = []
-        subActions.append(FetchApcCore())
+    def getFileExtractor(self):
+        baseExtractor = optimization.OptimizationConfig.getFileExtractor(self)
+        subActions = [ baseExtractor, FetchApcCore() ]
         if self.slaveRun():
             useExtractLogs = self.optionValue("extractlogs")
             if useExtractLogs == "":

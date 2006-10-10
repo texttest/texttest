@@ -97,6 +97,7 @@ class DirectoryCache:
 class EnvironmentReader:
     def __init__(self, app):
         self.app = app
+        self.pathVars = self.getPathVars()
         self.diag = plugins.getDiagnostics("read environment")
     def read(self, test, referenceVars = []):
         self.diag.info("Reading environment for " + repr(test))
@@ -106,7 +107,8 @@ class EnvironmentReader:
         elif isinstance(test, TestCase):
             # Always include the working directory of the test in PATH, to pick up fake
             # executables provided as test data. Allow for later expansion...
-            test.setEnvironment("PATH", test.writeDirectories[0] + os.pathsep + "$PATH")
+            for pathVar in self.pathVars:
+                test.setEnvironment(pathVar, test.writeDirectories[0] + os.pathsep + "$" + pathVar)
 
         self.app.readValues(test.environment, "environment", test.dircaches[0])
         for key, value in test.environment.items():
@@ -120,6 +122,14 @@ class EnvironmentReader:
                 self.read(subTest, childReferenceVars)
         test.tearDownEnvironment()
         self.diag.info("End Expanding " + test.name)
+    def getPathVars(self):
+        pathVars = [ "PATH" ]
+        for dataFile in self.app.getDataFileNames():
+            if dataFile.endswith(".py") and "PYTHONPATH" not in pathVars:
+                pathVars.append("PYTHONPATH")
+            elif (dataFile.endswith(".jar") or dataFile.endswith(".class")) and "CLASSPATH" not in pathVars:
+                pathVars.append("CLASSPATH")
+        return pathVars
     def expandReferences(self, test, referenceVars = []):
         childReferenceVars = copy(referenceVars)
         for var, value in test.environment.items():
@@ -217,10 +227,8 @@ class Test(plugins.Observable):
                     files.append(allFiles[-1])
         return files
     def listDataFiles(self):
-        knownDataFiles = self.getConfigValue("link_test_path") + self.getConfigValue("copy_test_path") + \
-                         self.getConfigValue("partial_copy_test_path")
         existingDataFiles = []
-        for dataFile in knownDataFiles:
+        for dataFile in self.app.getDataFileNames():
             fileName = self.getFileName(dataFile)
             if fileName:
                 existingDataFiles += self.listFiles(fileName, dataFile)
@@ -757,6 +765,9 @@ class Application:
             return oneLevelUp
         else:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
+    def getDataFileNames(self):
+        return self.getConfigValue("link_test_path") + self.getConfigValue("copy_test_path") + \
+               self.getConfigValue("partial_copy_test_path")
     def getFileName(self, dirList, stem, versionListMethod=None):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem, versionListMethod=versionListMethod)

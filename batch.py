@@ -1,18 +1,8 @@
 #!/usr/local/bin/python
 
-import os, performance, plugins, respond, sys, string, time, types, smtplib, shutil, testoverview
+import os, performance, plugins, respond, sys, string, time, types, shutil, testoverview
 from ndict import seqdict
 from cPickle import Pickler
-
-# Class to fake mail sending
-class FakeSMTP:
-    def connect(self, server):
-        print "Connecting to fake SMTP server at", server
-    def sendmail(self, fromAddr, toAddresses, contents):
-        print "Sending mail from address", fromAddr
-        raise smtplib.SMTPServerDisconnected, "Could not send mail to " + repr(toAddresses) + ": I'm only a fake server!"
-    def quit(self):
-        pass
 
 class BatchFilter(plugins.Filter):
     option = "b"
@@ -193,7 +183,6 @@ class BatchResponder(respond.Responder):
 sectionHeaders = [ "Summary of all Unsuccessful tests", "Details of all Unsuccessful tests", "Summary of all Successful tests" ]
 
 class MailSender:
-    fakeMailSend = os.environ.has_key("TEXTTEST_FAKE_SEND_MAIL")
     def __init__(self, sessionName):
         self.sessionName = sessionName
         self.diag = plugins.getDiagnostics("Mail Sender")
@@ -227,19 +216,10 @@ class MailSender:
     def storeMail(self, app, mailContents):
         localFileName = "batchreport." + app.name + app.versionSuffix()
         collFile = os.path.join(app.writeDirectory, localFileName)
-        if not self.useCollection(app):
-            root, local = os.path.split(app.writeDirectory)
-            collFile = self.findAvailable(os.path.join(root, localFileName))
         self.diag.info("Sending mail to", collFile)
-        file = open(collFile, "w")
+        file = plugins.openForWrite(collFile)
         file.write(mailContents)
         file.close()
-    def getSmtp(self):
-        # Mock out sending of mail...
-        if self.fakeMailSend:
-            return FakeSMTP()
-        else:
-            return smtplib.SMTP()
     def sendOrStoreMail(self, app, mailContents):
         sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + repr(app) + " ...")
         sys.stdout.flush()
@@ -247,28 +227,30 @@ class MailSender:
             self.storeMail(app, mailContents)
             sys.stdout.write("file written")
         else:
-            # Write the result in here...
-            smtp = self.getSmtp()
-            self.sendMail(smtp, app, mailContents)
-            smtp.quit()
+            self.sendMail(app, mailContents)
+            sys.stdout.write("done.")
         sys.stdout.write("\n")
-    def sendMail(self, smtp, app, mailContents):
+    def sendMail(self, app, mailContents):
         smtpServer = app.getConfigValue("smtp_server")
         fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
         toAddresses = plugins.commasplit(app.getCompositeConfigValue("batch_recipients", self.sessionName))
+        from smtplib import SMTP
+        smtp = SMTP()    
         try:
             smtp.connect(smtpServer)
-        except smtplib.SMTPException:
-            sys.stdout.write("FAILED : Could not connect to SMTP server\n" + \
-                             str(sys.exc_type) + ": " + str(sys.exc_value))
+        except:
+            sys.stdout.write("FAILED.\nCould not connect to SMTP server at " + smtpServer + "\n" + \
+                             str(sys.exc_type) + ": " + str(sys.exc_value) + "\n" + \
+                             "Trying to store mail contents instead ...")
             return self.storeMail(app, mailContents)
         try:
             smtp.sendmail(fromAddress, toAddresses, mailContents)
-        except smtplib.SMTPException:
-            sys.stdout.write("FAILED : Mail could not be sent\n" + \
-                             str(sys.exc_type) + ": " + str(sys.exc_value))
+        except:
+            sys.stdout.write("FAILED.\nMail could not be sent\n" + \
+                             str(sys.exc_type) + ": " + str(sys.exc_value) + "\n" + \
+                             "Trying to store mail contents instead ...")
             return self.storeMail(app, mailContents)
-        sys.stdout.write("done.")
+        smtp.quit()
     def findAvailable(self, origFile):
         if not os.path.isfile(origFile):
             return origFile

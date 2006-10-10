@@ -388,6 +388,7 @@ class TextTestGUI(Responder):
     def runWithActionThread(self, actionThread):
         plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
         self.setUpGui(actionThread)
+        actionThread.start()
         gtk.main()
     def runAlone(self):
         self.setUpGui()

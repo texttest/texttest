@@ -519,7 +519,6 @@ class TextTest:
         self.setUpResponders(acceptedAppSuites)
         if ownThreadResponder:
             actionThread = ActionThread(actionRunner)
-            actionThread.start()
             ownThreadResponder.runWithActionThread(actionThread)
         else:
             actionRunner.run()

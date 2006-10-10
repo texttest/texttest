@@ -964,24 +964,28 @@ class CollateFiles(plugins.Action):
         for targetStem, sourcePattern in testCollations.items():
             targetFile = test.makeTmpFileName(targetStem)
             collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
-            fullpath = self.findPath(test, sourcePattern)
-            if fullpath and fullpath not in self.filesPresentBefore[test]:
-                self.diag.info("Extracting " + fullpath + " to " + targetFile)
-                self.extract(fullpath, targetFile, collationErrFile)
+            for fullpath in self.findPaths(test, sourcePattern):
+                if self.testEdited(test, fullpath):
+                    self.diag.info("Extracting " + fullpath + " to " + targetFile)
+                    self.extract(fullpath, targetFile, collationErrFile)
+                    break
     def getFilesPresent(self, test):
-        files = []
+        files = seqdict()
         for targetStem, sourcePattern in self.collations.items():
-            fullPath = self.findPath(test, sourcePattern)
-            if fullPath:
-                files.append(fullPath)
+            for fullPath in self.findPaths(test, sourcePattern):
+                self.diag.info("Pre-existing file found " + fullPath)
+                files[fullPath] = plugins.modifiedTime(fullPath)
         return files
-    def findPath(self, test, sourcePattern):
+    def testEdited(self, test, fullPath):
+        filesBefore = self.filesPresentBefore[test]
+        if not filesBefore.has_key(fullPath):
+            return True
+        return filesBefore[fullPath] != plugins.modifiedTime(fullPath)
+    def findPaths(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
         paths = glob.glob(pattern)
-        for path in paths:
-            if os.path.isfile(path):
-                return path
+        return filter(os.path.isfile, paths)
     def findExtractionScript(self, sourceFile, targetFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
         script = self.collateScripts.get(stem)

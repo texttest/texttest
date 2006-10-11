@@ -27,7 +27,7 @@ class Config(plugins.Configuration):
                 group.addOption("r", "Execution time <min, max>")
             elif group.name.startswith("What"):
                 group.addOption("c", "Use checkout", app.checkout)
-                group.addOption("reconnect", "Reconnect to previous run")
+                group.addOption("reconnect", "Reconnect to")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
             elif group.name.startswith("How"):
                 group.addOption("b", "Run batch mode session")

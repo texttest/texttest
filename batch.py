@@ -202,7 +202,7 @@ class MailSender:
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getDetails, sectionHeaders[1])
         if not self.isAllFailure(batchDataList):
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getSuccessBrief, sectionHeaders[2])
-        self.sendOrStoreMail(app, mailContents)
+        self.sendOrStoreMail(app, mailContents, self.useCollection(app))
     def performForAll(self, app, batchDataList, method, headline):
         contents = headline + " follows...\n" + \
                    "---------------------------------------------------------------------------------" + "\n"
@@ -220,12 +220,12 @@ class MailSender:
         file = plugins.openForWrite(collFile)
         file.write(mailContents)
         file.close()
-    def sendOrStoreMail(self, app, mailContents):
+    def sendOrStoreMail(self, app, mailContents, useCollection=False):
         sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + repr(app) + " ...")
         sys.stdout.flush()
-        if self.useCollection(app):
+        if useCollection:
             self.storeMail(app, mailContents)
-            sys.stdout.write("file written")
+            sys.stdout.write("file written.")
         else:
             self.sendMail(app, mailContents)
             sys.stdout.write("done.")
@@ -260,16 +260,16 @@ class MailSender:
                 return attempt
     
     def createMailHeaderSection(self, title, app, batchDataList):
-        toAddress = app.getCompositeConfigValue("batch_recipients", self.sessionName)
-        # blank line needed to separate headers from body
         if self.useCollection(app):
-            return toAddress + "\n" + \
-                   self.getMachineTitle(app, batchDataList) + "\n" + \
+            return self.getMachineTitle(app, batchDataList) + "\n" + \
                    title + "\n\n" # blank line separating headers from body
         else:
-            fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
-            return "From: " + fromAddress + "\nTo: " + toAddress + "\n" + \
-                   "Subject: " + title + "\n\n"
+            return self.createMailHeaderForSend(title, app)
+    def createMailHeaderForSend(self, title, app):
+        fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
+        toAddress = app.getCompositeConfigValue("batch_recipients", self.sessionName)
+        return "From: " + fromAddress + "\nTo: " + toAddress + "\n" + \
+               "Subject: " + title + "\n\n"
     def useCollection(self, app):
         return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
     def getMailHeader(self, app, batchDataList):
@@ -387,7 +387,7 @@ class SaveState(respond.SaveState):
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
 
-class ArchiveRepository(plugins.Action):
+class ArchiveRepository(plugins.ScriptWithArgs):
     scriptDoc = "Archive parts of the batch result repository to a history directory"
     def __init__(self, args):
         argDict = self.parseArguments(args)
@@ -398,16 +398,6 @@ class ArchiveRepository(plugins.Action):
         self.repository = None
         if not self.beforeDate and not self.afterDate:
             raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates!"
-    def parseArguments(self, args):
-        currKey = ""
-        dict = {}
-        for arg in args:
-            if arg.find("=") != -1:
-                currKey, val = arg.split("=")
-                dict[currKey] = val
-            else:
-                dict[currKey] += " " + arg
-        return dict
     def parseDate(self, dict, key):
         if not dict.has_key(key):
             return
@@ -520,12 +510,14 @@ class GenerateHistoricalReport(plugins.Action):
                 return False
         return True
 
-class CollectFiles(plugins.Action):
+class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
     def __init__(self, args=[""]):
-        self.mailSender = MailSender("collection")
+        argDict = self.parseArguments(args)
+        batchSession = argDict.get("batch", "default")
+        self.mailSender = MailSender(batchSession)
         self.diag = plugins.getDiagnostics("batch collect")
-        self.userName = args[0]
+        self.userName = argDict.get("tmp", "")
         if self.userName:
             print "Collecting batch files created by user", self.userName + "..."
         else:
@@ -533,8 +525,6 @@ class CollectFiles(plugins.Action):
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()
-        # Collection should not itself use collection
-        app.addConfigEntry("collection", "false", "batch_use_collection")
         rootDir = app.getPreviousWriteDirInfo(self.userName)
         dirlist = os.listdir(rootDir)
         dirlist.sort()
@@ -547,7 +537,7 @@ class CollectFiles(plugins.Action):
             return
         
         mailTitle = self.getTitle(app, totalValues)
-        mailContents = self.mailSender.createMailHeaderSection(mailTitle, app, [])
+        mailContents = self.mailSender.createMailHeaderForSend(mailTitle, app)
         mailContents += self.getBody(fileBodies)
         self.mailSender.sendOrStoreMail(app, mailContents)
     def parseDirectory(self, fullDir, app, totalValues):
@@ -567,9 +557,6 @@ class CollectFiles(plugins.Action):
         localName = os.path.basename(fullname)
         print "Found file called", localName
         file = open(fullname)
-        recipient = file.readline().strip()
-        if recipient:
-            app.addConfigEntry("collection", recipient, "batch_recipients")
         catValues = plugins.commasplit(file.readline().strip())
         try:
             for value in catValues:

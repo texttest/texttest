@@ -59,7 +59,10 @@ class Config(plugins.Configuration):
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
-            return [ batch.CollectFiles(), batch.GenerateHistoricalReport([ self.optionValue("b") ]) ]
+            batchSession = self.optionValue("b")
+            emailHandler = batch.CollectFiles([ "batch=" + batchSession ])
+            webHandler = batch.GenerateHistoricalReport([ batchSession ])
+            return [ emailHandler, webHandler ]
         if self.isReconnecting():
             return self.getReconnectSequence()
 
@@ -1789,7 +1792,8 @@ class DocumentScripts(plugins.Action):
                 except AttributeError:
                     pass
 
-class ReplaceText(plugins.Action):
+class ReplaceText(plugins.ScriptWithArgs):
+    scriptDoc = "Perform a search and replace on all files with the given stem"
     def __init__(self, args):
         argDict = self.parseArguments(args)
         self.oldText = argDict["old"]
@@ -1800,16 +1804,6 @@ class ReplaceText(plugins.Action):
         self.textDiffTool = None
     def __repr__(self):
         return "Replacing " + self.oldText + " with " + self.newText + " for"
-    def parseArguments(self, args):
-        currKey = ""
-        dict = {}
-        for arg in args:
-            if arg.find("=") != -1:
-                currKey, val = arg.split("=")
-                dict[currKey] = val
-            else:
-                dict[currKey] += " " + arg
-        return dict
     def __call__(self, test):
         logFile = test.getFileName(self.logFile)
         if not logFile:

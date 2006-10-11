@@ -224,6 +224,18 @@ class Action:
     def __str__(self):
         return str(self.__class__)
 
+class ScriptWithArgs(Action):
+    def parseArguments(self, args):
+        currKey = ""
+        dict = {}
+        for arg in args:
+            if arg.find("=") != -1:
+                currKey, val = arg.split("=")
+                dict[currKey] = val
+            elif dict.has_key(currKey):
+                dict[currKey] += " " + arg
+        return dict
+
 def addCategory(name, briefDesc, longDesc = ""):
     if longDesc:
         TestState.categoryDescriptions[name] = briefDesc, longDesc

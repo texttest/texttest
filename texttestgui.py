@@ -706,7 +706,6 @@ class TestTreeGUI(plugins.Observable):
         path = self.model.get_path(iter)
         self.collapsedRows[path] = 1
         try:
-            filterIter = self.filteredModel.convert_child_iter_to_iter(iter)
             filterPath = self.filteredModel.convert_child_path_to_path(path)
             self.selection.get_tree_view().collapse_row(filterPath)
         except:
@@ -764,57 +763,46 @@ class TestTreeGUI(plugins.Observable):
         oldValue = self.model.get_value(iter, 6)
         if oldValue == newValue:
             return
+
+        allIterators = self.findVisibilityIterators(test) # returns leaf-to-root order, good for hiding
+        if newValue:
+            allIterators.reverse()  # but when showing, we want to go root-to-leaf
+
+        for iterator in allIterators:
+            if newValue or not self.hasVisibleChildren(iterator):
+                self.setVisibility(iterator, newValue)
         
-        # To decide whether to show suites by checking all children, and proceed
-        # recursively ...
-        hideEmpty = "empty_suite" in test.getConfigValue("hide_test_category")
+        self.reFilter()
+
+    def setVisibility(self, iter, newValue):
+        test = self.model.get_value(iter, 2)
         if newValue:
             guilog.info("Making test visible : " + repr(test))
-            self.makePathVisible(iter, hideEmpty)
         else:
             guilog.info("Hiding test : " + repr(test))
-            self.checkAndHidePath(iter, hideEmpty)
-
         self.model.set_value(iter, 6, newValue)
-        self.model.row_changed(self.model.get_path(iter), iter)
-        self.reFilter()
-    # Make the entire path from the root to iter visible
-    def makePathVisible(self, iter, hideEmpty):
+        
+    def findVisibilityIterators(self, test):
+        iter = self.itermap[test]
+        if "empty_suite" not in test.getConfigValue("hide_test_category"):
+            return [ iter ]
+        
         parents = []
-        if hideEmpty:
-            parent = self.model.iter_parent(iter)
-            while (parent != None):
-                if self.model.get_value(parent, 6) != True:
-                    parents.append(parent)                    
-                parent = self.model.iter_parent(parent)
-
-        for i in xrange(len(parents) - 1, -1, -1):
-            self.model.set_value(parents[i], 6, True)
-
-    # iter has been hidden - check iter's parent whether
-    # all its children are invisible, if so hide self and
-    # proceed recursively upwards.
-    def checkAndHidePath(self, iter, hideEmpty):
         parent = self.model.iter_parent(iter)
-        # Don't hide root. (double check in case
-        # we've already reached root)
-        if parent is None or self.model.iter_parent(parent) is None or not hideEmpty:
-            return
+        while parent != None:
+            parents.append(parent)                    
+            parent = self.model.iter_parent(parent)
+        # Don't include the root which we never hide
+        return [ iter ] + parents[:-1]
 
-        # Any visible children?
-        visibleChild = False
-        child = self.model.iter_children(parent)
+    def hasVisibleChildren(self, iter):
+        child = self.model.iter_children(iter)
         while (child != None):
-            if self.model.get_path(child) != self.model.get_path(iter) and self.model.get_value(child, 6) == True:
-                visibleChild = True
-                break
-            child = self.model.iter_next(child)
-
-        # If no visible children, hide and proceed upwards
-        if not visibleChild:
-            if self.model.get_value(parent, 6) != False:
-                self.model.set_value(parent, 6, False)
-                self.checkAndHidePath(parent, hideEmpty)
+            if self.model.get_value(child, 6):
+                return True
+            else:
+                child = self.model.iter_next(child)
+        return False
     
     def reFilter(self):
         self.filteredModel.refilter()

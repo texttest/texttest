@@ -464,11 +464,7 @@ class TestTreeGUI(plugins.Observable):
         if parent == None or not self.dynamic:
             return True
         hideCategories = suite.getConfigValue("hide_test_category")
-        hideNonStarted = "non_started" in hideCategories
-        if suite.classId() == "test-case":
-            return not hideNonStarted
-        else:
-            return not hideNonStarted or not "empty_suite" in hideCategories
+        return "non_started" not in hideCategories
     def addSuiteWithParent(self, suite, parent):    
         iter = self.model.insert_before(parent, None)
         nodeName = suite.name
@@ -758,12 +754,6 @@ class TestTreeGUI(plugins.Observable):
             cmpAction(test)
             test.notify("LifecycleChange", test.state, "be recalculated")
     def notifyVisibility(self, test, newValue):
-        # Set visibility depending on the state of the category toggle button
-        iter = self.itermap[test]
-        oldValue = self.model.get_value(iter, 6)
-        if oldValue == newValue:
-            return
-
         allIterators = self.findVisibilityIterators(test) # returns leaf-to-root order, good for hiding
         if newValue:
             allIterators.reverse()  # but when showing, we want to go root-to-leaf
@@ -775,6 +765,10 @@ class TestTreeGUI(plugins.Observable):
         self.reFilter()
 
     def setVisibility(self, iter, newValue):
+        oldValue = self.model.get_value(iter, 6)
+        if oldValue == newValue:
+            return
+
         test = self.model.get_value(iter, 2)
         if newValue:
             guilog.info("Making test visible : " + repr(test))
@@ -784,9 +778,6 @@ class TestTreeGUI(plugins.Observable):
         
     def findVisibilityIterators(self, test):
         iter = self.itermap[test]
-        if "empty_suite" not in test.getConfigValue("hide_test_category"):
-            return [ iter ]
-        
         parents = []
         parent = self.model.iter_parent(iter)
         while parent != None:

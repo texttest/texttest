@@ -442,6 +442,7 @@ class TestTreeGUI(plugins.Observable):
         self.dynamic = dynamic
         self.totalNofTests = 0
         self.collapseStatic = False
+        self.successPerSuite = {} # map from suite to number succeeded
         self.collapsedRows = {}
     def addApplication(self, app):
         colour = app.getConfigValue("test_colours")["app_static"]
@@ -645,56 +646,37 @@ class TestTreeGUI(plugins.Observable):
     def notifyLifecycleChange(self, test, state, changeDesc):
         iter = self.itermap[test]
         self.updateStateInModel(test, iter, state)
+        self.diagnoseTest(test, iter)
+
+        if state.hasSucceeded():
+            self.updateSuiteSuccess(test.parent)
+    def updateSuiteSuccess(self, suite):
+        successCount = self.successPerSuite.get(suite, 0) + 1
+        self.successPerSuite[suite] = successCount
+        suiteSize = suite.size()
+        if successCount == suiteSize:
+            self.setAllSucceeded(suite, suiteSize)
+
+        if suite.parent:
+            self.updateSuiteSuccess(suite.parent)
+            
+    def diagnoseTest(self, test, iter):
         guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
         secondColumnText = self.model.get_value(iter, 4)
         if self.dynamic and secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 5) + ")")
-
-        if state.isComplete() and test.getConfigValue("auto_collapse_successful") == 1:
-            self.collapseIfAllComplete(self.model.iter_parent(iter))               
-    def collapseIfAllComplete(self, iter):
-        # Collapse if all child tests are complete and successful
-        if iter == None or not self.model.iter_has_child(iter): 
-            return
-
-        successColor = self.model.get_value(iter, 2).getConfigValue("test_colours")["success"]
-        nofChildren = 0
-        childIters = []
-        childIter = self.model.iter_children(iter)
-
-        # Put all children in list to be treated
-        while childIter != None:
-            childIters.append(childIter)
-            childIter = self.model.iter_next(childIter)
-
-        while len(childIters) > 0:
-            childIter = childIters[0]
-            if (not self.model.iter_has_child(childIter)):
-                nofChildren = nofChildren + 1
-            childTest = self.model.get_value(childIter, 2)
-
-            # If this iter has children, add these to the list to be treated
-            if self.model.iter_has_child(childIter):                            
-                subChildIter = self.model.iter_children(childIter)
-                while subChildIter != None:
-                    childIters.append(subChildIter)
-                    subChildIter = self.model.iter_next(subChildIter)
-            # For now, we determine if a test is complete by checking whether
-            # it is colored in the success color rather than checking isComplete()
-            # The reason is that checking isComplete() will sometimes collapse suites
-            # before all tests have been colored by the GUI update function, which
-            # doesn't look good.
-            elif not self.model.get_value(childIter, 5) == successColor:
-                return
-            childIters = childIters[1:len(childIters)]
-
-        # By now, we know that all tests were successful:
+    def setAllSucceeded(self, suite, suiteSize):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
-        guilog.info("All " + str(nofChildren) + " tests successful in suite " + repr(self.model.get_value(iter, 2)) + ", collapsing row.")
-        self.model.set_value(iter, 4, "All " + str(nofChildren) + " tests successful")
-        self.model.set_value(iter, 5, successColor) 
+        detailText = "All " + str(suiteSize) + " tests successful"
+        successColour = getTestColour(suite, "success")
+        iter = self.itermap[suite]
+        self.model.set_value(iter, 4, detailText)
+        self.model.set_value(iter, 5, successColour)
+        guilog.info("Redrawing suite " + suite.name + " : second column '" + detailText +  "' coloured " + successColour)
 
+        if suite.getConfigValue("auto_collapse_successful") != 1:
+            return
         # To make sure that the path is marked as 'collapsed' even if the row cannot be collapsed
         # (if the suite is empty, or not shown at all), we set self.collapsedRow manually, instead of
         # waiting for rowCollapsed() to do it at the 'row-collapsed' signal (which will not be emitted
@@ -706,7 +688,6 @@ class TestTreeGUI(plugins.Observable):
             self.selection.get_tree_view().collapse_row(filterPath)
         except:
             pass
-        self.collapseIfAllComplete(self.model.iter_parent(iter))
     def notifyAdd(self, test):
         self.addTest(test)
         if test.classId() == "test-case":

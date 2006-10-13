@@ -567,6 +567,20 @@ class TestTreeGUI(plugins.Observable):
                 if self.filteredModel.iter_has_child(childIter):
                     self.expandRow(childIter, True)
                 childIter = self.filteredModel.iter_next(childIter)
+                
+    def collapseRow(self, iter):
+        # To make sure that the path is marked as 'collapsed' even if the row cannot be collapsed
+        # (if the suite is empty, or not shown at all), we set self.collapsedRow manually, instead of
+        # waiting for rowCollapsed() to do it at the 'row-collapsed' signal (which will not be emitted
+        # in the above cases)
+        path = self.model.get_path(iter)
+        self.collapsedRows[path] = 1
+        try:
+            filterPath = self.filteredModel.convert_child_path_to_path(path)
+            self.selection.get_tree_view().collapse_row(filterPath)
+        except:
+            pass
+
     def selectionChanged(self, selection, printToLog = True):
         self.totalNofTestsShown = 0
 
@@ -675,19 +689,9 @@ class TestTreeGUI(plugins.Observable):
         self.model.set_value(iter, 5, successColour)
         guilog.info("Redrawing suite " + suite.name + " : second column '" + detailText +  "' coloured " + successColour)
 
-        if suite.getConfigValue("auto_collapse_successful") != 1:
-            return
-        # To make sure that the path is marked as 'collapsed' even if the row cannot be collapsed
-        # (if the suite is empty, or not shown at all), we set self.collapsedRow manually, instead of
-        # waiting for rowCollapsed() to do it at the 'row-collapsed' signal (which will not be emitted
-        # in the above cases)
-        path = self.model.get_path(iter)
-        self.collapsedRows[path] = 1
-        try:
-            filterPath = self.filteredModel.convert_child_path_to_path(path)
-            self.selection.get_tree_view().collapse_row(filterPath)
-        except:
-            pass
+        if suite.getConfigValue("auto_collapse_successful") == 1:
+            self.collapseRow(iter)
+            
     def notifyAdd(self, test):
         self.addTest(test)
         if test.classId() == "test-case":

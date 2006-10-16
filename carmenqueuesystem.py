@@ -49,10 +49,15 @@ def getArchitecture(app):
     return app.getConfigValue("default_architecture")
 
 def getMajorReleaseVersion(app):
+    defaultMajRelease = app.getConfigValue("default_major_release")
+    # If we disable this, don't re-enable it whatever the versions are...
+    if defaultMajRelease == "none":
+        return defaultMajRelease
+    
     for version in app.versions:
         if version in majorReleases:
             return version
-    return app.getConfigValue("default_major_release")
+    return defaultMajRelease
 
 def getMajorReleaseId(app):
     return fullVersionName(getMajorReleaseVersion(app))

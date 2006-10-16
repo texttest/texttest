@@ -1008,17 +1008,17 @@ class GraphPlotResponder(Responder):
 
 # This is the action responsible for plotting from the GUI.
 class PlotTestInGUI(guiplugins.InteractiveTestAction):
-    def __init__(self, test, oldOptionGroup = None):
-        guiplugins.InteractiveTestAction.__init__(self, test, "Graph")
-        self.createGUITestGraph(oldOptionGroup)
-    def createGUITestGraph(self, oldOptionGroup = []):
+    def __init__(self, dynamic, test, oldOptionGroups):
+        guiplugins.InteractiveTestAction.__init__(self, test)
+        self.createGUITestGraph(oldOptionGroups)
+    def createGUITestGraph(self, oldOptionGroups = []):
         self.testGraph = TestGraph()
         
         self.testGraph.optionGroup = self.optionGroup
         for name, expl, value in self.testGraph.options:
-            self.addOption(oldOptionGroup, name, expl, value)
+            self.addOption(oldOptionGroups, name, expl, value)
         for name, expl in self.testGraph.switches:
-            self.addSwitch(oldOptionGroup, name, expl)
+            self.addSwitch(oldOptionGroups, name, expl)
     def __repr__(self):
         return "Plotting Graph"
     def getTitle(self):
@@ -1027,9 +1027,11 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
         return "Plotting"
     def isFrequentUse(self):
         return True
-    def performOn(self, test):
-        self.testGraph.createPlotLinesForTest(test)
-        self.plotGraph(test.app.writeDirectory)  
+    def getTabTitle(self):
+        return "Graph"
+    def performOnCurrent(self):
+        self.testGraph.createPlotLinesForTest(self.currentTest)
+        self.plotGraph(self.currentTest.app.writeDirectory)  
     def plotGraph(self, writeDirectory):
         plotProcess = self.testGraph.plot(writeDirectory)
         if plotProcess:
@@ -1801,24 +1803,24 @@ class SelectorWeekend(testoverview.Selector):
         return "Weekend"
     
 class StartStudio(guiplugins.InteractiveTestAction):
-    def __init__(self, test, oldOptionGroup):
-        guiplugins.InteractiveTestAction.__init__(self, test, "Studio")
-        self.addOption(oldOptionGroup, "sys", "Studio CARMSYS to use", test.getEnvironment("CARMSYS"))
+    def __init__(self, test, oldOptionGroups):
+        guiplugins.InteractiveTestAction.__init__(self, test)
+        self.addOption(oldOptionGroups, "sys", "Studio CARMSYS to use", test.getEnvironment("CARMSYS"))
     def __repr__(self):
         return "Studio"
     def getTitle(self):
         return "Studio"
+    def getTabTitle(self):
+        return "Studio"
     def getScriptTitle(self, tab):
         return "Start Studio"
-    def matchesMode(self, dynamic):
-        return not dynamic
-    def performOn(self, test):
-        test.setUpEnvironment(parents=1)
+    def performOnCurrent(self):
+        self.currentTest.setUpEnvironment(parents=1)
         os.environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
         print "CARMSYS:", os.environ["CARMSYS"]
         print "CARMUSR:", os.environ["CARMUSR"]
         print "CARMTMP:", os.environ["CARMTMP"]
-        fullSubPlanPath = test.app.configObject.target._getSubPlanDirName(test)
+        fullSubPlanPath = self.currentTest.app.configObject.target._getSubPlanDirName(self.currentTest)
         lPos = fullSubPlanPath.find("LOCAL_PLAN/")
         subPlan = fullSubPlanPath[lPos + 11:]
         localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
@@ -1829,19 +1831,21 @@ class StartStudio(guiplugins.InteractiveTestAction):
                         "\",0)'" + plugins.nullRedirect() 
         process = self.startExternalProgram(commandLine)
         guiplugins.scriptEngine.monitorProcess("runs studio", process)
-        test.tearDownEnvironment(parents=1)
+        self.currentTest.tearDownEnvironment(parents=1)
 
-guiplugins.interactiveActionHandler.testClasses += [ StartStudio ]
+guiplugins.interactiveActionHandler.testStaticClasses += [ StartStudio ]
 
 class CVSLogInGUI(guiplugins.InteractiveTestAction):
-    def performOn(self, test):
-        logFileStem = test.app.getConfigValue("log_file")
+    def __init__(self, dynamic, test, oldOptionGroups):
+        guiplugins.InteractiveTestAction.__init__(self, test)
+    def performOnCurrent(self):
+        logFileStem = self.currentTest.app.getConfigValue("log_file")
         files = [ logFileStem ]
-        files += test.app.getConfigValue("cvs_log_for_files").split(",")
+        files += self.currentTest.app.getConfigValue("cvs_log_for_files").split(",")
         cvsInfo = ""
-        path = test.getDirectory()
+        path = self.currentTest.getDirectory()
         for file in files:
-            fileName = test.getFileName(file)
+            fileName = self.currentTest.getFileName(file)
             if fileName:
                 cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
         raise  plugins.TextTestError, "CVS Logs" + os.linesep + os.linesep + cvsInfo

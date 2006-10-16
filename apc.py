@@ -269,10 +269,12 @@ class CheckFilesForApc(plugins.Action):
         verifyLogFileDir(getArchitecture(test.app))        
 
 class ViewApcLog(guiplugins.InteractiveTestAction):
+    def __init__(self, test, oldOptionGroups):
+        guiplugins.InteractiveTestAction.__init__(self, test)
     def __repr__(self):
         return "Viewing log of"
-    def performOn(self, test):
-        viewLogScript = test.makeTmpFileName("view_apc_log", forFramework=1)
+    def performOnCurrent(self):
+        viewLogScript = self.currentTest.makeTmpFileName("view_apc_log", forFramework=1)
         if os.path.isfile(viewLogScript):
             file = open(viewLogScript)
             command = file.readlines()[0].strip()
@@ -1461,28 +1463,31 @@ class CopyMPSFiles(plugins.Action):
             os.system("gzip " + newFileName)
 
 class SaveBestSolution(guiplugins.InteractiveTestAction):
-    def performOn(self, test):
+    def __init__(self, test, oldOptionGroups):
+        guiplugins.InteractiveTestAction.__init__(self, test)
+
+    def performOnCurrent(self):
         import shutil
         # If we have the possibility to save, we know that the current solution is best
-        testdir = self.test.parent.getDirectory(1)
+        testdir = self.currentTest.parent.getDirectory(1)
         bestStatusFile = os.path.join(testdir, self.hostCaseName, "best_known_status");
-        currentStatusFile = self.test.makeTmpFileName("status")
+        currentStatusFile = self.currentTest.makeTmpFileName("status")
         shutil.copyfile(currentStatusFile, bestStatusFile)
 
         bestSolFile = os.path.join(testdir, self.hostCaseName, "best_known_solution");
-        currentSolFile = self.test.makeTmpFileName("solution")
+        currentSolFile = self.currentTest.makeTmpFileName("solution")
         shutil.copyfile(currentSolFile, bestSolFile)
         
     def getTitle(self):
         return "Save best"
 
     def solutionIsBetter(self):
-        parentDir = self.test.parent.getDirectory(1)
+        parentDir = self.currentTest.parent.getDirectory(1)
         bestStatusFile = os.path.join(parentDir, self.hostCaseName, "best_known_status");
-        statusFile = self.test.makeTmpFileName("status")
+        statusFile = self.currentTest.makeTmpFileName("status")
         if not os.path.isfile(statusFile):
             return 0
-        solutionFile = self.test.makeTmpFileName("solution")
+        solutionFile = self.currentTest.makeTmpFileName("solution")
         if not os.path.isfile(solutionFile):
             return 0
         # read solutions
@@ -1506,43 +1511,44 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
         return 0
         
     def canPerformOnTest(self):
-        self.kpiGroupForTest, self.kpiGroups, dummy = readKPIGroupFileCommon(self.test.parent)
-        if not self.kpiGroupForTest.has_key(self.test.name):
-            self.hostCaseName = self.test.name
+        self.kpiGroupForTest, self.kpiGroups, dummy = readKPIGroupFileCommon(self.currentTest.parent)
+        if not self.kpiGroupForTest.has_key(self.currentTest.name):
+            self.hostCaseName = self.currentTest.name
         else:
             self.hostCaseName = self.findFirstInKPIGroup()
         return self.solutionIsBetter()
 
     def findFirstInKPIGroup(self):
-        gp=self.kpiGroupForTest[self.test.name]
+        gp=self.kpiGroupForTest[self.currentTest.name]
         tests = filter(lambda x:self.kpiGroupForTest[x] == gp, self.kpiGroupForTest.keys())
         tests.sort()
         return tests[0]
 
 # Specialization of plotting in the GUI for APC
 class PlotTestInGUIAPC(optimization.PlotTestInGUI):
-    def __init__(self, test, oldOptionGroup = None):
-        optimization.PlotTestInGUI.__init__(self, test, oldOptionGroup)
+    def __init__(self, dynamic, test, oldOptionGroup = None):
+        optimization.PlotTestInGUI.__init__(self, dynamic, test, oldOptionGroup)
         self.addSwitch(oldOptionGroup, "kpi", "Plot kpi group")
-    def performOn(self, test):
-        self.testGraph.createPlotLinesForTest(test)
+    def performOnCurrent(self):
+        self.testGraph.createPlotLinesForTest(self.currentTest)
         # Plot KPI group
         if self.optionGroup.getSwitchValue("kpi"):
-            oldTestDir = test.getDirectory(None)
+            oldTestDir = self.currentTest.getDirectory(None)
             path, originalTestName = os.path.split(oldTestDir)
-            kpiGroupForTest, kpiGroups, dummy = readKPIGroupFileCommon(self.test.parent)
+            kpiGroupForTest, kpiGroups, dummy = readKPIGroupFileCommon(self.currentTest.parent)
             if kpiGroupForTest.has_key(originalTestName):
                 testInGroup = kpiGroupForTest[originalTestName]
                 for kpiTest in kpiGroupForTest.keys():
                     if testInGroup == kpiGroupForTest[kpiTest] and  kpiTest != originalTestName:
                         testPath = os.path.join(path, kpiTest)
-                        newTest = testmodel.TestCase(kpiTest, testmodel.DirectoryCache(testPath), self.test.app, self.test.parent)
+                        newTest = testmodel.TestCase(kpiTest, testmodel.DirectoryCache(testPath), self.currentTest.app, self.currentTest.parent)
                         self.testGraph.createPlotLinesForTest(newTest)
             else:
-                print "Test", test.name, "is not in an KPI group."
-        self.plotGraph(test.app.writeDirectory)  
+                print "Test", self.currentTest.name, "is not in an KPI group."
+        self.plotGraph(self.currentTest.app.writeDirectory)  
 
-guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUIAPC, ViewApcLog, SaveBestSolution ] 
+guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUIAPC ]
+guiplugins.interactiveActionHandler.testDynamicClasses += [ ViewApcLog, SaveBestSolution ] 
 
 # A script that mimics _PlotTest in optimization.py, but that is specialized for
 # APC to plot all (selected) KPI groups.

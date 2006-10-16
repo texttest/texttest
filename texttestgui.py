@@ -99,15 +99,15 @@ class QuitGUI(guiplugins.SelectionAction):
         return "<control>q"
     def getTitle(self):
         return "_Quit"
-    def messageBeforePerform(self, testSel):
+    def messageBeforePerform(self):
         return "Terminating TextTest GUI ..."
-    def messageAfterPerform(self, testSel):
+    def messageAfterPerform(self):
         # Don't provide one, the GUI isn't there to show it :)
         pass
-    def performOn(self, tests, files):
+    def performOnCurrent(self):
         # Generate a window closedown, so that the quit button behaves the same as closing the window
         self.exit()
-    def getDoubleCheckMessage(self, test):
+    def getDoubleCheckMessage(self):
         processesToReport = self.processesToReport()
         runningProcesses = guiplugins.processTerminationMonitor.listRunning(processesToReport)
         if len(runningProcesses) == 0:
@@ -359,15 +359,15 @@ class TextTestGUI(Responder):
         return framed
     def createSelectionActionGUI(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
-        actions += guiplugins.interactiveActionHandler.getSelectionInstances(self.rootSuites, self.dynamic)
+        actions += guiplugins.interactiveActionHandler.getInstances(self.dynamic, "selection", self.rootSuites)
         for action in actions:
             # These actions might change the tree view selection or the status bar, need to observe them
             action.addObserver(self.testTreeGUI)
             action.addObserver(self.status)
-        selActionGUI = SelectionActionGUI(actions, self.uiManager, self.rootSuites[0].app)
-        # selection actions need to observer for manual selections
-        self.testTreeGUI.addObserver(selActionGUI)
-        return selActionGUI
+            # Some depend on the test selection also
+            if hasattr(action, "notifyNewTestSelection"):
+                self.testTreeGUI.addObserver(action)
+        return InteractiveActionGUI(actions, self.uiManager, self.rootSuites[0].app, 0)
     def setUpGui(self, actionThread=None):
         topWindow = self.createTopWindow()
         treeWindow = self.createTreeWindow()
@@ -586,7 +586,7 @@ class TestTreeGUI(plugins.Observable):
 
         allSelected, selectedTests = self.getSelected()
         self.nofSelectedTests = len(selectedTests)
-        self.notify("NewTestSelection", allSelected)
+        self.notify("NewTestSelection", selectedTests)
         self.filteredModel.foreach(self.countVisible)
         self.updateColumnTitle(printToLog)
     def updateColumnTitle(self, printToLog=True):
@@ -789,10 +789,11 @@ class TestTreeGUI(plugins.Observable):
             rootIter = self.filteredModel.iter_next(rootIter)
    
 class InteractiveActionGUI:
-    def __init__(self, actions, uiManager, app):
+    def __init__(self, actions, uiManager, app, actionGroupIndex):
         self.app = app
         self.uiManager = uiManager
         self.actions = actions
+        self.actionGroupIndex = actionGroupIndex
         self.pageDescInfo = { "Test" : {} }
         self.indexers = [] # Utility list for getting the values from multi-valued radio button groups :-(
         self.createdActions = []
@@ -861,7 +862,7 @@ class InteractiveActionGUI:
         button.show()
         return button
     def getActionGroup(self):
-        return self.uiManager.get_action_groups()[self.getActionGroupIndex()]
+        return self.uiManager.get_action_groups()[self.actionGroupIndex]
     def getCustomAccelerator(self, name, label, original):
         configName = label.replace("_", "").replace(" ", "_").lower()
         if self.app.getConfigValue("gui_accelerators").has_key(configName):
@@ -874,14 +875,14 @@ class InteractiveActionGUI:
             guilog.info("Disconnecting accelerator for action '" + action.get_name() + "'")
             action.disconnect_accelerator()
     def runInteractive(self, button, action, *args):
-        doubleCheckMessage = action.getDoubleCheckMessage(self.getTestObject())
+        doubleCheckMessage = action.getDoubleCheckMessage()
         if doubleCheckMessage:
             self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, (action,))
         else:
             self._runInteractive(action)
     def _runInteractive(self, action):
         try:
-            action.perform(self.getTestObject(), self.getFileObject())
+            action.perform()
         except plugins.TextTestError, e:
             showError(str(e))
     def getPageDescription(self, pageName, subPageName = ""):
@@ -1023,36 +1024,6 @@ class InteractiveActionGUI:
             if value:
                 text += " (checked)"
         return text
-
-class TestActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, uiManager, app, test):
-        InteractiveActionGUI.__init__(self, actions, uiManager, app)
-        self.test = test
-    def getTestObject(self):
-        return self.test
-    def getFileObject(self):
-        return []
-    def getActionGroupIndex(self):
-        if self.test.classId() == "test-suite":
-            return 1
-        else:
-            return 2    
-        
-class SelectionActionGUI(InteractiveActionGUI):
-    def __init__(self, actions, uiManager, app):
-        InteractiveActionGUI.__init__(self, actions, uiManager, app)
-        self.currTestSelection = []
-        self.currFileSelection = []
-    def notifyNewTestSelection(self, tests):
-        self.currTestSelection = tests
-    def notifyNewFileSelection(self, fileSel):
-        self.currFileSelection = fileSel
-    def getTestObject(self):
-        return self.currTestSelection
-    def getFileObject(self):
-        return self.currFileSelection
-    def getActionGroupIndex(self):
-        return 0
             
 class RightWindowGUI:
     def __init__(self, object, dynamic, selectionActionGUI, progressMonitor, uiManager):
@@ -1126,10 +1097,14 @@ class RightWindowGUI:
         self.fillWindow(buttonBar, fileView)
     def makeObjectDependentContents(self, object):
         self.fileViewGUI = self.createFileViewGUI(object)
-        self.fileViewGUI.addObserver(self.selectionActionGUI)
+        self.observeFileView(self.selectionActionGUI.actions)
         buttonBar, objectPages = self.makeActionElements(object)
         fileView = self.fileViewGUI.createView()
         return buttonBar, fileView, objectPages
+    def observeFileView(self, actions):
+        for action in actions:
+            if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
+                self.fileViewGUI.addObserver(action)
     def makeActionElements(self, object):
         app = None
         if object.classId() == "test-app":
@@ -1138,9 +1113,15 @@ class RightWindowGUI:
             app = object.app
         if self.intvActionGUI:
             self.intvActionGUI.disconnectAccelerators()
-        self.intvActionGUI = TestActionGUI(self.makeActionInstances(object), self.uiManager, app, object)
+        index = self.getActionGroupIndex(object)
+        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), self.uiManager, app, index)
         objectPages = self.getObjectNotebookPages(object, self.intvActionGUI)
-        return self.intvActionGUI.makeButtons(), objectPages    
+        return self.intvActionGUI.makeButtons(), objectPages
+    def getActionGroupIndex(self, object):
+        if object.classId() == "test-suite":
+            return 1
+        else:
+            return 2    
     def fillWindow(self, buttonBar, fileView):
         self.window.pack_start(buttonBar, expand=False, fill=False)
         self.topFrame.add(fileView)
@@ -1149,7 +1130,7 @@ class RightWindowGUI:
         self.window.show_all()    
     def createFileViewGUI(self, object):
         if object.classId() == "test-app":
-            return ApplicationFileGUI(object, self.dynamic)
+            return ApplicationFileGUI(object)
         else:
             return TestFileGUI(object, self.dynamic)
     def describePageSwitch(self, notebook, pagePtr, pageNum, *args):
@@ -1205,8 +1186,16 @@ class RightWindowGUI:
     def getWindow(self):
         return self.window
     def makeActionInstances(self, object):
-        # File view GUI also has a tab, provide that also...
-        return [ self.fileViewGUI.fileViewAction ] + guiplugins.interactiveActionHandler.getInstances(object, self.dynamic)
+        actions = guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.getObjectType(object), object)
+        self.observeFileView(actions)
+        return actions
+    def getObjectType(self, object):
+        if object.classId() == "test-suite":
+            return "suite"
+        elif object.classId() == "test-case":
+            return "test"
+        else:
+            return "app"
     def createNotebook(self, objectPages, selectionActionGUI):
         pageDir = selectionActionGUI.createOptionGroupPages()
         pageDir["Test"] = objectPages + pageDir["Test"]
@@ -1384,7 +1373,6 @@ class RightWindowGUI:
 class FileViewGUI(plugins.Observable):
     def __init__(self, object, dynamic):
         plugins.Observable.__init__(self)
-        self.fileViewAction = guiplugins.interactiveActionHandler.getFileViewer(object, dynamic)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.name = object.name.replace("_", "__")
@@ -1446,14 +1434,16 @@ class FileViewGUI(plugins.Observable):
             return
         comparison = self.model.get_value(iter, 3)
         try:
-            self.fileViewAction.view(comparison, fileName)
+            self.notify("ViewFile", comparison, fileName)
             self.selection.unselect_all()
         except plugins.TextTestError, e:
             showError(str(e))
-
+        except:
+            plugins.printException()
+            
 class ApplicationFileGUI(FileViewGUI):
-    def __init__(self, app, dynamic):
-        FileViewGUI.__init__(self, app, dynamic)
+    def __init__(self, app):
+        FileViewGUI.__init__(self, app, False)
         self.app = app
     def addFilesToModel(self):
         confiter = self.model.insert_before(None, None)

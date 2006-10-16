@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.33 2006/08/15 09:09:38 perb Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.34 2006/10/16 13:49:58 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -212,8 +212,8 @@ class ViewFile(guiplugins.ViewFile):
         if not (fname.startswith("usecase.") \
 	        or (fname.startswith("slave_") and fname.find("usecase.") > 0)):
 	    return guiplugins.ViewFile.getViewCommand(self, fileName)
-        carmSys = self.test.getEnvironment("CARMSYS")
-        carmUsr = self.test.getEnvironment("CARMUSR")
+        carmSys = self.currentTest.getEnvironment("CARMSYS")
+        carmUsr = self.currentTest.getEnvironment("CARMUSR")
 	if not carmSys or not carmUsr:
 	    return guiplugins.ViewFile.getViewCommand(self, fileName)
         viewProgram = os.path.join(carmSys, "bin", "startMacroRecorder")

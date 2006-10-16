@@ -380,7 +380,7 @@ class TextTestGUI(Responder):
             self.progressBar = TestProgressBar(self.testTreeGUI.totalNofTests)
             self.progressMonitor = TestProgressMonitor()
             self.progressMonitor.addObserver(self.testTreeGUI)
-            
+
         self.rightWindowGUI = self.createDefaultRightGUI()
         # watch for double-clicks
         self.testTreeGUI.addObserver(self.rightWindowGUI)
@@ -677,8 +677,9 @@ class TestTreeGUI(plugins.Observable):
     def diagnoseTest(self, test, iter):
         guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
         secondColumnText = self.model.get_value(iter, 4)
-        if self.dynamic and secondColumnText:
+        if secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 5) + ")")
+            
     def setAllSucceeded(self, suite, suiteSize):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
@@ -1371,13 +1372,12 @@ class RightWindowGUI:
             return None
         
 class FileViewGUI(plugins.Observable):
-    def __init__(self, object, dynamic):
+    def __init__(self, object):
         plugins.Observable.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.name = object.name.replace("_", "__")
         self.selection = None
-        self.dynamic = dynamic
     def addFileToModel(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
@@ -1407,12 +1407,12 @@ class FileViewGUI(plugins.Observable):
         column = gtk.TreeViewColumn(self.name, renderer, text=0, background=1)
         column.set_cell_data_func(renderer, renderParentsBold)
         view.append_column(column)
-        if self.dynamic:
-            perfColumn = gtk.TreeViewColumn("Details", renderer, text=4)
-            view.append_column(perfColumn)
+        detailsColumn = self.makeDetailsColumn(renderer)
+        if detailsColumn:
+            view.append_column(detailsColumn)
         view.expand_all()
         indexer = TreeModelIndexer(self.model, column, 0)
-        scriptEngine.connect("select file", "row_activated", view, self.displayFile, indexer)
+        scriptEngine.connect("select file", "row_activated", view, self.fileActivated, indexer)
         scriptEngine.monitor("set file selection to", self.selection, indexer)
         self.selectionChanged(self.selection)
         view.get_selection().connect("changed", self.selectionChanged)
@@ -1420,13 +1420,16 @@ class FileViewGUI(plugins.Observable):
         fileWin.add(view)
         fileWin.show()
         return fileWin
+    def makeDetailsColumn(self, renderer):
+        pass
+        # only used in test view
     def selectionChanged(self, selection):
         filelist = []
         selection.selected_foreach(self.fileSelected, filelist)
         self.notify("NewFileSelection", filelist)
     def fileSelected(self, treemodel, path, iter, filelist):
         filelist.append(self.model.get_value(iter, 0))
-    def displayFile(self, view, path, column, *args):
+    def fileActivated(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
         if not fileName:
@@ -1435,15 +1438,14 @@ class FileViewGUI(plugins.Observable):
         comparison = self.model.get_value(iter, 3)
         try:
             self.notify("ViewFile", comparison, fileName)
-            self.selection.unselect_all()
         except plugins.TextTestError, e:
             showError(str(e))
-        except:
-            plugins.printException()
-            
+
+        self.selection.unselect_all()
+
 class ApplicationFileGUI(FileViewGUI):
     def __init__(self, app):
-        FileViewGUI.__init__(self, app, False)
+        FileViewGUI.__init__(self, app)
         self.app = app
     def addFilesToModel(self):
         confiter = self.model.insert_before(None, None)
@@ -1474,11 +1476,12 @@ class ApplicationFileGUI(FileViewGUI):
     
 class TestFileGUI(FileViewGUI):
     def __init__(self, test, dynamic):
-        FileViewGUI.__init__(self, test, dynamic)
+        FileViewGUI.__init__(self, test)
         self.test = test
         self.colours = test.getConfigValue("file_colours")
         test.refreshFiles()
         self.testComparison = None
+        self.dynamic = dynamic
     def addFilesToModel(self):
         if self.test.state.hasStarted():
             try:
@@ -1488,6 +1491,9 @@ class TestFileGUI(FileViewGUI):
                 pass
         else:
             self.addStaticFilesToModel(self.test)
+    def makeDetailsColumn(self, renderer):
+        if self.dynamic:
+            return gtk.TreeViewColumn("Details", renderer, text=4)
     def addDynamicFilesToModel(self, test):
         self.testComparison = test.state
         if not test.state.isComplete():

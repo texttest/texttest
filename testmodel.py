@@ -1153,10 +1153,13 @@ class OptionFinder(plugins.OptionFinder):
         rootLogger = log4py.Logger().get_root()        
         rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
     def findVersionList(self):
-        if self.has_key("v"):
-            return plugins.commasplit(self["v"])
-        else:
-            return [""]
+        versionList = []
+        for version in plugins.commasplit(self.get("v", "")):
+            if version in versionList:
+                print "WARNING : same version '" + version + "' requested more than once, ignoring"
+            else:
+                versionList.append(version)
+        return versionList
     def findSelectedAppNames(self):
         if not self.has_key("a"):
             return {}

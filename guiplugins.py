@@ -90,9 +90,10 @@ class InteractiveAction(plugins.Observable):
     def getTooltip(self):
         return self.getScriptTitle(False)
     def messageBeforePerform(self):
-        return "Performing '" + self.getSecondaryTitle() + "' on " + self.describeTests() + " ..."
+        # Don't change this by default, most of these things don't take very long
+        pass
     def messageAfterPerform(self):
-        return "Done performing '" + self.getSecondaryTitle() + "' on " + self.describeTests() + "."
+        return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
     def isFrequentUse(self):
         # Decides how accessible to make it...
         return False
@@ -254,6 +255,7 @@ class SaveTests(SelectionAction):
         self.addOption(oldOptionGroups, "v", "Version to save", self.getDefaultSaveOption(), self.getPossibleVersions())
         self.addSwitch(oldOptionGroups, "over", "Replace successfully compared files also", 0)
         self.currFileSelection = []
+        self.currTestDescription = ""
         if self.hasPerformance():
             self.addSwitch(oldOptionGroups, "ex", "Save: ", 1, ["Average performance", "Exact performance"])
     def isFrequentUse(self):
@@ -273,9 +275,11 @@ class SaveTests(SelectionAction):
     def getSecondaryTitle(self):
         return "Save"
     def messageBeforePerform(self):
-        return "Saving " + self.describeTests() + " ..."
+        self.currTestDescription = self.describeTests()
+        return "Saving " + self.currTestDescription + " ..."
     def messageAfterPerform(self):
-        return "Saved " + self.describeTests() + " tests."
+        # Test selection is reset after a save, use the description from before 
+        return "Saved " + self.currTestDescription + "."
     def getDefaultSaveOption(self):
         saveVersions = self.getSaveVersions()
         if saveVersions.find(",") != -1:
@@ -414,6 +418,7 @@ class ImportTest(InteractiveTestAction):
         InteractiveTestAction.__init__(self, suite)
         self.optionGroup.addOption("name", self.getNameTitle(), self.getDefaultName(suite))
         self.optionGroup.addOption("desc", self.getDescTitle(), self.getDefaultDesc(suite))
+        self.testImported = None
     def getNameTitle(self):
         return self.testType() + " Name"
     def getDescTitle(self):
@@ -433,6 +438,9 @@ class ImportTest(InteractiveTestAction):
         return "Add " + self.testType()
     def testType(self):
         return ""
+    def messageAfterPerform(self):
+        if self.testImported:
+            return "Added new " + repr(self.testImported)
     def getNewTestName(self):
         # Overwritten in subclasses - occasionally it can be inferred
         return self.optionGroup.getOptionValue("name").strip()
@@ -449,7 +457,7 @@ class ImportTest(InteractiveTestAction):
                 raise plugins.TextTestError, "A " + self.testType() + " with the name '" + testName + "' already exists, please choose another name"
         guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + repr(suite))
         testDir = suite.writeNewTest(testName, self.optionGroup.getOptionValue("desc"))
-        self.createTestContents(suite, testDir)
+        self.testImported = self.createTestContents(suite, testDir)
     def createTestContents(self, suite, testDir):
         pass
 
@@ -467,6 +475,8 @@ class RecordTest(InteractiveTestAction):
             self.addSwitch(oldOptionGroups, "hold", "Hold record shell after recording")
     def getTabTitle(self):
         return "Recording"
+    def messageAfterPerform(self):
+        return "Started record session for " + repr(self.currentTest)
     def performOnCurrent(self):
         guilog.info("Starting dynamic GUI in record mode...")
         self.updateRecordTime(self.currentTest)
@@ -522,16 +532,18 @@ class RecordTest(InteractiveTestAction):
         if os.path.isfile(errFile):
             errText = open(errFile).read()
             if len(errText):
+                self.notify("Status", "Recording failed for " + repr(test))
                 raise plugins.TextTestError, "Recording use-case failed, with the following errors:\n" + errText
  
         if self.updateRecordTime(test) and self.optionGroup.getSwitchValue("rep"):
             self.startTextTestProcess(test, usecase="replay")
-            test.state.freeText = "Recorded use case - now attempting to replay in the background to collect standard files" + \
-                                  "\n" + "These will appear shortly. You do not need to submit the test manually."
+            message = "Recording completed for " + repr(test) + \
+                      ". Auto-replay of test now started. Don't submit the test manually!"
+            self.notify("Status", message)
         else:
-            self.setTestReady(test)
+            self.notify("Status", "Recording completed for " + repr(test) + ", not auto-replaying")
     def setTestReady(self, test, usecase=""):
-        test.state.freeText = "Recorded use case and collected all standard files"
+        self.notify("Status", "Recording and auto-replay completed for " + repr(test))
     def getRunOptions(self, test, usecase):
         version = self.optionGroup.getOptionValue("v")
         checkout = self.optionGroup.getOptionValue("c")
@@ -562,7 +574,7 @@ class ImportTestCase(ImportTest):
         self.writeDefinitionFiles(suite, testDir)
         self.writeEnvironmentFile(suite, testDir)
         self.writeResultsFiles(suite, testDir)
-        suite.addTestCase(os.path.basename(testDir))
+        return suite.addTestCase(os.path.basename(testDir))
     def getWriteFileName(self, name, suite, testDir):
         fileName = os.path.join(testDir, name + "." + suite.app.name)
         if os.path.isfile(fileName):
@@ -604,7 +616,7 @@ class ImportTestSuite(ImportTest):
         return "Suite"
     def createTestContents(self, suite, testDir):
         self.writeEnvironmentFiles(suite, testDir)
-        suite.addTestSuite(os.path.basename(testDir))
+        return suite.addTestSuite(os.path.basename(testDir))
     def addEnvironmentFileOptions(self, oldOptionGroups):
         self.addSwitch(oldOptionGroups, "env", "Add environment file")
     def writeEnvironmentFiles(self, suite, testDir):
@@ -658,7 +670,7 @@ class SelectTests(SelectionAction):
     def messageBeforePerform(self):
         return "Selecting tests ..."
     def messageAfterPerform(self):
-        return None    
+        return "Selected " + self.describeTests() + "."    
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def isFrequentUse(self):
         return True
@@ -765,8 +777,6 @@ class ResetGroups(SelectionAction):
         return '<control>e'
     def getTitle(self):
         return "R_eset"
-    def messageBeforePerform(self):
-        return "Resetting options ..."
     def messageAfterPerform(self):
         return "All options reset to default values."
     def getScriptTitle(self, tab):
@@ -854,8 +864,6 @@ class RunTests(SelectionAction):
         return "Run selected tests"
     def getGroupTabTitle(self):
         return "Running"
-    def messageBeforePerform(self):
-        return "Starting tests at " + plugins.localtime() + " ..."
     def messageAfterPerform(self):
         return "Started " + self.describeTests() + " at " + plugins.localtime() + "."
     def isFrequentUse(self):
@@ -915,7 +923,7 @@ class EnableDiagnostics(InteractiveTestAction):
     def getTitle(self):
         return "New _Diagnostics"
     def getScriptTitle(self, tab):
-        return "Enable diagnostics"
+        return "Enable Diagnostics"
     def isActive(self):
         return self.configFile
     def performOnCurrent(self):
@@ -986,7 +994,7 @@ class CopyTest(ImportTest):
     def getTitle(self):
         return "_Copy"
     def getScriptTitle(self, tab):
-        return "Copy test"
+        return "Copy Test"
     def notifyViewTest(self, test):
         # apply to parent of where we're viewing!
         self.currentTest = test.parent
@@ -1004,7 +1012,7 @@ class CopyTest(ImportTest):
             targetPath = sourcePath.replace(self.testToCopy.getDirectory(), testDir)
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copyfile(sourcePath, targetPath)
-        suite.addTestCase(os.path.basename(testDir))
+        return suite.addTestCase(os.path.basename(testDir))
 
 class ReportBugs(InteractiveTestAction):
     def __init__(self, test, oldOptionGroups):
@@ -1024,7 +1032,7 @@ class ReportBugs(InteractiveTestAction):
     def getTitle(self):
         return "Report"
     def getScriptTitle(self, tab):
-        return "report described bugs"
+        return "Report Described Bugs"
     def getTabTitle(self):
         return "Bugs"
     def getPossibleFileStems(self):

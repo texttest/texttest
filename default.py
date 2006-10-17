@@ -345,14 +345,14 @@ class Config(plugins.Configuration):
             # old-style: infer expansion in default checkout
             return os.path.join(fullLocation, checkout)
     # For display in the GUI
-    def getTextualInfo(self, test):
+    def getTextualInfo(self, test, state):
         info = ""
-        if test.state.isComplete():
-            info = "Test " + repr(test.state) + "\n"
-            if len(test.state.freeText) == 0:
+        if state.isComplete():
+            info = "Test " + repr(state) + "\n"
+            if len(state.freeText) == 0:
                 info = info.replace(" :", "")
-        info += str(test.state.freeText)
-        if not test.state.isComplete():
+        info += str(state.freeText)
+        if not state.isComplete():
             info += self.progressText(test)
         return info
     def progressText(self, test):

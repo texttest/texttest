@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.34 2006/10/16 13:49:58 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.35 2006/10/17 10:31:40 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -201,8 +201,9 @@ class RecordTest(guiplugins.RecordTest):
     def setTestReady(self, test, usecase=""):
         if usecase == "replay":
             self.startTextTestProcess(test, usecase="replay2")
-            test.state.freeText = "First auto-replay completed - second now in progress to collect standard files" + \
-                                  "\n" + "These will appear shortly. You do not need to submit the test manually."
+            message = "First auto-replay completed for " + repr(test) + \
+                      ". Second auto-replay now started. Don't submit the test manually!"
+            self.notify("Status", message)
         else:
             guiplugins.RecordTest.setTestReady(self, test, usecase)
 

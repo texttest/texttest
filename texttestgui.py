@@ -99,8 +99,6 @@ class QuitGUI(guiplugins.SelectionAction):
         return "<control>q"
     def getTitle(self):
         return "_Quit"
-    def messageBeforePerform(self):
-        return "Terminating TextTest GUI ..."
     def messageAfterPerform(self):
         # Don't provide one, the GUI isn't there to show it :)
         pass
@@ -397,7 +395,7 @@ class TextTestGUI(Responder):
     def createDefaultRightGUI(self):
         rootSuite = self.rootSuites[0]
         guilog.info("Viewing test " + repr(rootSuite))
-        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.progressMonitor, self.uiManager)
+        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.status, self.progressMonitor, self.uiManager)
     def pickUpProcess(self):
         process = guiplugins.processTerminationMonitor.getTerminatedProcess()
         if process:
@@ -1027,12 +1025,13 @@ class InteractiveActionGUI:
         return text
             
 class RightWindowGUI:
-    def __init__(self, object, dynamic, selectionActionGUI, progressMonitor, uiManager):
+    def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor, uiManager):
         self.dynamic = dynamic
         self.intvActionGUI = None
         self.uiManager = uiManager
         self.selectionActionGUI = selectionActionGUI
         self.progressMonitor = progressMonitor
+        self.status = status
         self.window = gtk.VBox()
         self.vpaned = gtk.VPaned()
         self.vpaned.connect('notify', self.paneHasChanged)
@@ -1041,6 +1040,7 @@ class RightWindowGUI:
         self.topFrame.set_shadow_type(gtk.SHADOW_IN)
         self.bottomFrame = gtk.Frame()
         self.bottomFrame.set_shadow_type(gtk.SHADOW_IN)
+        self.textInfoGUI = TextInfoGUI(object)
         self.vpaned.pack1(self.topFrame, resize=True)
         self.vpaned.pack2(self.bottomFrame, resize=True)
         self.currentObject = object
@@ -1068,18 +1068,18 @@ class RightWindowGUI:
             horizontalSeparatorPosition = float(options["static_horizontal_separator_position"][0])
 
         self.vpaned.set_position(int(self.vpaned.allocation.height * horizontalSeparatorPosition))        
-    def notifyFileChange(self, object):
-        # Test has changed contents or state, regenerate if we're currently viewing it
-        if self.currentObject is object:
-            self.view(object, resetNotebook=False)
+    def notifyFileChange(self, test):
+        self.fileViewGUI.notifyFileChange(test)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        self.fileViewGUI.notifyLifecycleChange(test, state, changeDesc)
+        self.textInfoGUI.notifyLifecycleChange(test, state, changeDesc)
     def notifyRemove(self, object):
         # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
         if self.currentObject is object:
             self.notifyViewTest(object.parent)
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        self.notifyFileChange(test)
     def notifyViewTest(self, test):
         # Triggered by user double-clicking the test in the test tree
+        self.textInfoGUI.notifyViewTest(test)
         self.view(test, resetNotebook=True)
     def notifyAdd(self, test):
         guilog.info("Viewing new test " + test.name)
@@ -1154,10 +1154,14 @@ class RightWindowGUI:
         subPageText = ""
         if isinstance(currentPage, gtk.Notebook):
             subPage, subPageText = self.getPageText(currentPage, innerPageNum)
-        pageDesc = self.getPageDescription(currentPageText, subPageText)
-        if pageDesc:
-            guilog.info("")
-            guilog.info(pageDesc)
+        if currentPageText == "Text Info" or subPageText == "Text Info":
+            self.textInfoGUI.describe()
+        else:
+            self.textInfoGUI.visible = False
+            pageDesc = self.getPageDescription(currentPageText, subPageText)
+            if pageDesc:
+                guilog.info("")
+                guilog.info(pageDesc)
         # Can get here viewing text info window ...
     def getPageNumbers(self, notebook, pageNum):
         if notebook is self.notebook:
@@ -1173,12 +1177,6 @@ class RightWindowGUI:
         else:
             return None, ""
     def getPageDescription(self, currentPageText, subPageText):
-        if currentPageText == "Text Info" or subPageText == "Text Info":
-            if len(self.testInfo):
-                return "---------- Text Info Window ----------\n" + self.testInfo.strip() + "\n" + \
-                       "--------------------------------------"
-            else:
-                return ""
         selectionDesc = self.selectionActionGUI.getPageDescription(currentPageText, subPageText)
         if selectionDesc:
             return selectionDesc
@@ -1189,6 +1187,8 @@ class RightWindowGUI:
     def makeActionInstances(self, object):
         actions = guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.getObjectType(object), object)
         self.observeFileView(actions)
+        for action in actions:
+            action.addObserver(self.status)
         return actions
     def getObjectType(self, object):
         if object.classId() == "test-suite":
@@ -1322,54 +1322,96 @@ class RightWindowGUI:
             notebook.remove(oldPage)
     def getObjectNotebookPages(self, object, intvActionGUI):
         testCasePageDir = intvActionGUI.createOptionGroupPages()["Test"]
-        self.testInfo = self.getTestInfo(object)
-        if self.testInfo:
-            textview = self.createTextView(self.testInfo)
+        textview = self.textInfoGUI.createView()
+        if textview:
             testCasePageDir = [(textview, "Text Info")] + testCasePageDir
         progressView = self.createProgressView()
         if progressView != None:
             testCasePageDir = [(progressView, "Progress")] + testCasePageDir
         return testCasePageDir
-    def getTestInfo(self, test):
-        if not test or test.classId() != "test-case":
-            return ""
-        return test.app.configObject.getTextualInfo(test)
-    def createTextView(self, testInfo):
-        textview = gtk.TextView()
-        textview.set_wrap_mode(gtk.WRAP_WORD)
-        textbuffer = textview.get_buffer()
-
-        # Encode to UTF-8, necessary for gtk.TextView
-        # First decode using most appropriate encoding ...
-        localeEncoding = locale.getdefaultlocale()[1]
-        try:
-            unicodeInfo = unicode(testInfo, localeEncoding, errors="strict")
-        except:
-            try:
-                guilog.info("Warning: Failed to decode string '" + testInfo + "' using default locale encoding " + repr(localeEncoding) + ". Trying strict UTF-8 encoding ...")
-                unicodeInfo = unicode(testInfo, 'utf-8', errors="strict")
-            except:
-                guilog.info("Warning: Failed to decode string '" + testInfo + "' both using strict UTF-8 and " + repr(localeEncoding) + " encodings.\nReverting to non-strict UTF-8 encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-                unicodeInfo = unicode(testInfo, 'utf-8', errors="replace")
-        
-        try:
-            result = unicodeInfo.encode('utf-8', 'strict')
-        except:
-            try:
-                guilog.info("Warning: Failed to encode Unicode string '" + unicodeInfo + "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-                result = unicodeInfo.encode('utf-8', 'replace')
-            except:
-                guilog.info("Warning: Failed to encode Unicode string '" + unicodeInfo + "' using both strict UTF-8 encoding and UTF-8 encoding with replacement. Showing error message instead.")
-                result = "Failed to encode Unicode string."
-
-        textbuffer.set_text(result)        
-        textview.show()
-        return textview
     def createProgressView(self):
         if self.progressMonitor != None:
             return self.progressMonitor.getProgressView()
         else:
             return None
+
+class TextInfoGUI:
+    def __init__(self, test):
+        self.currentTest = test
+        self.text = ""
+        self.view = None
+        self.visible = True
+        self.notifyViewTest(test)
+    def resetText(self, test, state):
+        self.text = test.app.configObject.getTextualInfo(test, state)
+    def describe(self):
+        if len(self.text):
+            self.visible = True
+            guilog.info("")
+            guilog.info("---------- Text Info Window ----------")
+            guilog.info(self.text.strip())
+            guilog.info("--------------------------------------")
+    def notifyViewTest(self, test):
+        if test.classId() == "test-case":
+            self.currentTest = test
+            self.resetText(test, test.state)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        if not test is self.currentTest:
+            return
+        self.resetText(test, state)
+        if self.view:
+            self.updateTextInView()
+            if self.visible:
+                self.describe()
+    def createView(self):
+        if len(self.text) == 0:
+            return
+        self.view = gtk.TextView()
+        self.view.set_wrap_mode(gtk.WRAP_WORD)
+        self.updateTextInView()
+        self.view.show()
+        return self.view
+    def updateTextInView(self):
+        textbuffer = self.view.get_buffer()
+        textToUse = self.getTextForView()
+        textbuffer.set_text(textToUse)        
+    def getTextForView(self):
+        # Encode to UTF-8, necessary for gtk.TextView
+        # First decode using most appropriate encoding ...
+        unicodeInfo = self.decodeText()
+        return self.encodeToUTF(unicodeInfo)
+    def decodeText(self):
+        localeEncoding = locale.getdefaultlocale()[1]
+        try:
+            return unicode(self.text, localeEncoding, errors="strict")
+        except:
+            try:
+                guilog.info("Warning: Failed to decode string '" + self.text + \
+                            "' using default locale encoding " + repr(localeEncoding) + \
+                            ". Trying strict UTF-8 encoding ...")
+                return unicode(self.text, 'utf-8', errors="strict")
+            except:
+                guilog.info("Warning: Failed to decode string '" + self.text + \
+                            "' both using strict UTF-8 and " + repr(localeEncoding) + \
+                            " encodings.\nReverting to non-strict UTF-8 encoding but " + \
+                            "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+                return unicode(self.text, 'utf-8', errors="replace")
+    def encodeToUTF(self, unicodeInfo):
+        try:
+            return unicodeInfo.encode('utf-8', 'strict')
+        except:
+            try:
+                guilog.info("Warning: Failed to encode Unicode string '" + unicodeInfo + \
+                            "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
+                            "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+                return unicodeInfo.encode('utf-8', 'replace')
+            except:
+                guilog.info("Warning: Failed to encode Unicode string '" + unicodeInfo + \
+                            "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
+                            "replacement. Showing error message instead.")
+                return "Failed to encode Unicode string."
+
+
         
 class FileViewGUI(plugins.Observable):
     def __init__(self, object):
@@ -1378,6 +1420,10 @@ class FileViewGUI(plugins.Observable):
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.name = object.name.replace("_", "__")
         self.selection = None
+    def notifyFileChange(self, test):
+        pass
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        pass
     def addFileToModel(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
@@ -1480,29 +1526,49 @@ class TestFileGUI(FileViewGUI):
         self.test = test
         self.colours = test.getConfigValue("file_colours")
         test.refreshFiles()
-        self.testComparison = None
         self.dynamic = dynamic
     def addFilesToModel(self):
-        if self.test.state.hasStarted():
+        stateToUse = self.getStateToUse(self.test.state)
+        self._addFilesToModel(stateToUse)
+    def _addFilesToModel(self, state):
+        if state.hasStarted():
             try:
-                self.addDynamicFilesToModel(self.test)
+                self.addDynamicFilesToModel(state)
             except AttributeError:
                 # The above code assumes we have failed on comparison: if not, don't display things
                 pass
         else:
-            self.addStaticFilesToModel(self.test)
+            self.addStaticFilesToModel()
+    def recreateModel(self, test, state):
+        if not test is self.test:
+            return
+        # blank line for demarcation
+        guilog.info("")
+        # In theory we could do something clever here, but for now, just wipe and restart
+        # Need to re-expand after clearing...
+        self.model.clear()
+        self._addFilesToModel(state)
+        self.selection.get_tree_view().expand_all()    
+    def notifyFileChange(self, test):
+        self.recreateModel(test, test.state)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        self.recreateModel(test, state)
     def makeDetailsColumn(self, renderer):
         if self.dynamic:
             return gtk.TreeViewColumn("Details", renderer, text=4)
-    def addDynamicFilesToModel(self, test):
-        self.testComparison = test.state
-        if not test.state.isComplete():
-            self.testComparison = comparetest.TestComparison(test.state, test.app)
-            self.testComparison.makeComparisons(test, testInProgress=1)
+    def getStateToUse(self, state):
+        if state.isComplete() or not state.hasStarted():
+            return state
 
-        self.addDynamicComparisons(self.testComparison.correctResults + self.testComparison.changedResults, "Comparison Files")
-        self.addDynamicComparisons(self.testComparison.newResults, "New Files")
-        self.addDynamicComparisons(self.testComparison.missingResults, "Missing Files")
+        # regenerate for currently running tests
+        newState = comparetest.TestComparison(state, self.test.app)
+        newState.makeComparisons(self.test, testInProgress=1)
+        return newState
+    
+    def addDynamicFilesToModel(self, state):
+        self.addDynamicComparisons(state.correctResults + state.changedResults, "Comparison Files")
+        self.addDynamicComparisons(state.newResults, "New Files")
+        self.addDynamicComparisons(state.missingResults, "Missing Files")
     def addDynamicComparisons(self, compList, title):
         if len(compList) == 0:
             return
@@ -1554,9 +1620,9 @@ class TestFileGUI(FileViewGUI):
             return self.colours["not_started"]
         else:
             return self.colours["static"]
-    def addStaticFilesToModel(self, test):
-        stdFiles, defFiles = test.listStandardFiles(allVersions=True)
-        if test.classId() == "test-case":
+    def addStaticFilesToModel(self):
+        stdFiles, defFiles = self.test.listStandardFiles(allVersions=True)
+        if self.test.classId() == "test-case":
             stditer = self.model.insert_before(None, None)
             self.model.set_value(stditer, 0, "Standard Files")
             if len(stdFiles):
@@ -1565,31 +1631,31 @@ class TestFileGUI(FileViewGUI):
         defiter = self.model.insert_before(None, None)
         self.model.set_value(defiter, 0, "Definition Files")
         self.addStandardFilesUnderIter(defiter, defFiles)
-        self.addStaticDataFilesToModel(test)
-    def getDisplayDataFiles(self, test):
+        self.addStaticDataFilesToModel()
+    def getDisplayDataFiles(self):
         try:
-            return test.app.configObject.extraReadFiles(test).items()
+            return self.test.app.configObject.extraReadFiles(self.test).items()
         except:
-            sys.stderr.write("WARNING - ignoring exception thrown by '" + test.app.configObject.moduleName + \
+            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.test.app.configObject.moduleName + \
                              "' configuration while requesting extra data files, not displaying any such files")
             plugins.printException()
             return seqdict()
-    def addStaticDataFilesToModel(self, test):
-        dataFiles = test.listDataFiles()
-        displayDataFiles = self.getDisplayDataFiles(test)
+    def addStaticDataFilesToModel(self):
+        dataFiles = self.test.listDataFiles()
+        displayDataFiles = self.getDisplayDataFiles()
         if len(dataFiles) == 0 and len(displayDataFiles) == 0:
             return
         datiter = self.model.insert_before(None, None)
         self.model.set_value(datiter, 0, "Data Files")
         colour = self.getStaticColour()
-        self.addDataFilesUnderIter(test, datiter, dataFiles, colour)
+        self.addDataFilesUnderIter(datiter, dataFiles, colour)
         for name, filelist in displayDataFiles:
             exiter = self.model.insert_before(datiter, None)
             self.model.set_value(exiter, 0, name)
             for file in filelist:
                 self.addFileToModel(exiter, file, None, colour)
-    def addDataFilesUnderIter(self, test, iter, files, colour):
-        dirIters = { test.getDirectory() : iter }
+    def addDataFilesUnderIter(self, iter, files, colour):
+        dirIters = { self.test.getDirectory() : iter }
         parentIter = iter
         for file in files:
             parent, local = os.path.split(file)
@@ -1643,15 +1709,17 @@ class RadioGroupIndexer:
 # 
 class GUIStatusMonitor:
     def __init__(self):
-        self.statusBar = gtk.Statusbar()
-        self.diag = plugins.getDiagnostics("GUI status monitor")
-        self.notifyStatus("TextTest started at " + plugins.localtime() + ".")
+        self.statusBar = None
 
     def notifyStatus(self, message):
-        self.diag.info("Changing GUI status to: '" + message + "'")
-        self.statusBar.push(0, message)
+        if self.statusBar:
+            guilog.info("")
+            guilog.info("Changing GUI status to: '" + message + "'")
+            self.statusBar.push(0, message)
         
     def createStatusbar(self):
+        self.statusBar = gtk.Statusbar()
+        self.notifyStatus("TextTest started at " + plugins.localtime() + ".")
         self.statusBar.show()
         self.statusBarEventBox = gtk.EventBox()
         self.statusBarEventBox.add(self.statusBar)

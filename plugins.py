@@ -179,7 +179,7 @@ class Configuration:
         pass
     def extraReadFiles(self, test):
         return {}
-    def getTextualInfo(self, test):
+    def getTextualInfo(self, test, state):
         return ""
     def setApplicationDefaults(self, app):
         pass
@@ -371,16 +371,14 @@ class Observable:
     def performNotify(self, name, *args):
         methodName = "notify" + name
         for observer in self.observers:
-            try:
+            if hasattr(observer, methodName):
+            # doesn't matter if only some of the observers have the method
                 method = eval("observer." + methodName)
                 if self.passSelf:
                     method(self, *args)
                 else:
                     method(*args)
-            except AttributeError:
-                # doesn't matter if only some of the observers have the method
-                pass
-
+            
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
 def getDiagnostics(diagName):

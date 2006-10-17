@@ -187,9 +187,9 @@ class ApcConfig(optimization.OptimizationConfig):
             if option.find("crc" + os.sep + "rule_set") != -1:
                 return option.split(os.sep)[-1]
         return None
-    def getTextualInfo(self, test):
-        basicInfo = optimization.OptimizationConfig.getTextualInfo(self, test)
-        if test.state.hasStarted() and not test.state.isComplete():
+    def getTextualInfo(self, test, state):
+        basicInfo = optimization.OptimizationConfig.getTextualInfo(self, test, state)
+        if state.hasStarted() and not state.isComplete():
             return basicInfo + "\n" + self.getRunStatusInfo(test)
         return basicInfo
     def getRunStatusInfo(self, test):

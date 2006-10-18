@@ -846,6 +846,8 @@ class InteractiveActionGUI:
     def makeButtons(self):
         executeButtons = gtk.HBox()
         buttonInstances = filter(lambda instance : instance.inToolBar(), self.actions)
+        if len(buttonInstances):
+            guilog.info("") # blank line for demarcation
         for instance in buttonInstances:
             button = self.createButton(instance)
             executeButtons.pack_start(button, expand=False, fill=False)
@@ -1023,117 +1025,75 @@ class InteractiveActionGUI:
             if value:
                 text += " (checked)"
         return text
-            
-class RightWindowGUI:
-    def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor, uiManager):
-        self.dynamic = dynamic
-        self.intvActionGUI = None
-        self.uiManager = uiManager
-        self.selectionActionGUI = selectionActionGUI
-        self.progressMonitor = progressMonitor
-        self.status = status
-        self.window = gtk.VBox()
-        self.vpaned = gtk.VPaned()
-        self.vpaned.connect('notify', self.paneHasChanged)
-        self.panedTooltips = gtk.Tooltips()
-        self.topFrame = gtk.Frame()
-        self.topFrame.set_shadow_type(gtk.SHADOW_IN)
-        self.bottomFrame = gtk.Frame()
-        self.bottomFrame.set_shadow_type(gtk.SHADOW_IN)
-        self.textInfoGUI = TextInfoGUI(object)
-        self.vpaned.pack1(self.topFrame, resize=True)
-        self.vpaned.pack2(self.bottomFrame, resize=True)
-        self.currentObject = object
-        buttonBar, fileView, objectPages = self.makeObjectDependentContents(object)
-        self.diag = plugins.getDiagnostics("GUI notebook")
-        self.notebook = self.createNotebook(objectPages, self.selectionActionGUI)
-        self.oldObjectPageNames = self.makeDictionary(objectPages).keys()
-        self.describeNotebook(self.notebook, pageNum=0)
-        self.bottomFrame.add(self.notebook)
-        self.fillWindow(buttonBar, fileView)
-    def paneHasChanged(self, pane, gparamspec):
-        pos = pane.get_position()
-        size = pane.allocation.height
-        self.panedTooltips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + " (" + str(100 * pos / size) + "% from the top)")
-    def makeDictionary(self, objectPages):
-        dict = seqdict()
-        for page, name in objectPages:
-            dict[name] = page
-        return dict
-    def notifySizeChange(self, width, height, options):
-        horizontalSeparatorPosition = 0.46
-        if self.dynamic and options.has_key("dynamic_horizontal_separator_position"):
-            horizontalSeparatorPosition = float(options["dynamic_horizontal_separator_position"][0])
-        elif not self.dynamic and options.has_key("static_horizontal_separator_position"):
-            horizontalSeparatorPosition = float(options["static_horizontal_separator_position"][0])
 
-        self.vpaned.set_position(int(self.vpaned.allocation.height * horizontalSeparatorPosition))        
-    def notifyFileChange(self, test):
-        self.fileViewGUI.notifyFileChange(test)
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        self.fileViewGUI.notifyLifecycleChange(test, state, changeDesc)
-        self.textInfoGUI.notifyLifecycleChange(test, state, changeDesc)
-    def notifyRemove(self, object):
-        # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
-        if self.currentObject is object:
-            self.notifyViewTest(object.parent)
-    def notifyViewTest(self, test):
-        # Triggered by user double-clicking the test in the test tree
-        self.textInfoGUI.notifyViewTest(test)
-        self.view(test, resetNotebook=True)
-    def notifyAdd(self, test):
-        guilog.info("Viewing new test " + test.name)
-        self.notifyViewTest(test)
-    def view(self, object, resetNotebook):
-        for child in self.window.get_children():
-            if not child is self.notebook:
-                self.window.remove(child)
-        if not self.topFrame.get_child() is self.notebook:
-            self.topFrame.remove(self.topFrame.get_child())
-        if not self.bottomFrame.get_child() is self.notebook:
-            self.bottomFrame.remove(self.bottomFrame.get_child())
-        self.currentObject = object
-        buttonBar, fileView, objectPages = self.makeObjectDependentContents(object)
-        self.updateNotebook(objectPages, resetNotebook)
-        self.fillWindow(buttonBar, fileView)
-    def makeObjectDependentContents(self, object):
-        self.fileViewGUI = self.createFileViewGUI(object)
-        self.observeFileView(self.selectionActionGUI.actions)
-        buttonBar, objectPages = self.makeActionElements(object)
-        fileView = self.fileViewGUI.createView()
-        return buttonBar, fileView, objectPages
-    def observeFileView(self, actions):
-        for action in actions:
-            if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
-                self.fileViewGUI.addObserver(action)
-    def makeActionElements(self, object):
-        app = None
-        if object.classId() == "test-app":
-            app = object
+# class to manage the (possibly double) notebook in the right window
+class NotebookGUI:
+    def __init__(self, selectionActionGUI, intvActionGUI, progressMonitor, textInfoGUI):
+        self.selectionActionGUI = selectionActionGUI
+        self.intvActionGUI = intvActionGUI
+        self.progressMonitor = progressMonitor
+        self.textInfoGUI = textInfoGUI
+        self.diag = plugins.getDiagnostics("GUI notebook")
+        guilog.info("") # blank line for demarcation
+        objectPages = self.getObjectNotebookPages()
+        self.notebook = self.createNotebook(objectPages)
+        self.oldObjectPageNames = self.makeDictionary(objectPages).keys()
+        self.describeNotebook(self.notebook, pageNum=0)        
+    def createNotebook(self, objectPages):
+        pageDir = self.selectionActionGUI.createOptionGroupPages()
+        
+        pageDir["Test"] = objectPages + pageDir["Test"]
+        if len(pageDir) == 1:
+            pages = self.addScrollBars(pageDir["Test"])
         else:
-            app = object.app
-        if self.intvActionGUI:
-            self.intvActionGUI.disconnectAccelerators()
-        index = self.getActionGroupIndex(object)
-        self.intvActionGUI = InteractiveActionGUI(self.makeActionInstances(object), self.uiManager, app, index)
-        objectPages = self.getObjectNotebookPages(object, self.intvActionGUI)
-        return self.intvActionGUI.makeButtons(), objectPages
-    def getActionGroupIndex(self, object):
-        if object.classId() == "test-suite":
-            return 1
+            pages = []
+            for groupTab, tabPages in pageDir.items():
+                if len(tabPages) > 0:
+                    scriptTitle = "view sub-options for " + groupTab + " :"
+                    tabNotebook = scriptEngine.createNotebook(scriptTitle, self.addScrollBars(tabPages))
+                    tabNotebook.show()
+                    tabNotebook.connect("switch-page", self.describePageSwitch)
+                    pages.append((tabNotebook, groupTab))
+                
+        notebook = scriptEngine.createNotebook("view options for", pages)
+        notebook.connect("switch-page", self.describePageSwitch)
+        notebook.show()
+        return notebook
+    def getObjectNotebookPages(self):
+        testCasePageDir = self.intvActionGUI.createOptionGroupPages()["Test"]
+        textview = self.textInfoGUI.createView()
+        if textview:
+            testCasePageDir = [(textview, "Text Info")] + testCasePageDir
+        progressView = self.createProgressView()
+        if progressView != None:
+            testCasePageDir = [(progressView, "Progress")] + testCasePageDir
+        return testCasePageDir
+
+    def addScrollBars(self, pages):
+        newPages = []
+        for widget, name in pages:
+            window = self.makeScrolledWindow(widget)
+            newPages.append((window, name))
+        return newPages
+
+    def makeScrolledWindow(self, widget):
+        window = gtk.ScrolledWindow()
+        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        self.addToScrolledWindow(window, widget)
+        window.show()
+        return window
+
+    def addToScrolledWindow(self, window, widget):
+        if isinstance(widget, gtk.TextView) or isinstance(widget, gtk.Viewport):
+            window.add(widget)
+        elif isinstance(widget, gtk.VBox):
+            # Nasty hack (!?) to avoid progress report (which is so far our only persistent widget) from having the previous window as a parent - remove this and watch TextTest crash when switching between Suite and Test views!
+            #if widget.get_parent() != None:
+            #    widget.get_parent().remove(widget)
+            window.add_with_viewport(widget)
         else:
-            return 2    
-    def fillWindow(self, buttonBar, fileView):
-        self.window.pack_start(buttonBar, expand=False, fill=False)
-        self.topFrame.add(fileView)
-        self.window.pack_start(self.vpaned, expand=True, fill=True)
-        self.vpaned.show_all()
-        self.window.show_all()    
-    def createFileViewGUI(self, object):
-        if object.classId() == "test-app":
-            return ApplicationFileGUI(object)
-        else:
-            return TestFileGUI(object, self.dynamic)
+            raise plugins.TextTestError, "Could not decide how to add scrollbars to " + repr(widget)
+
     def describePageSwitch(self, notebook, pagePtr, pageNum, *args):
         self.describeNotebook(notebook, pageNum)
     def isVisible(self, notebook):
@@ -1182,62 +1142,6 @@ class RightWindowGUI:
             return selectionDesc
         else:
             return self.intvActionGUI.getPageDescription(currentPageText, subPageText)
-    def getWindow(self):
-        return self.window
-    def makeActionInstances(self, object):
-        actions = guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.getObjectType(object), object)
-        self.observeFileView(actions)
-        for action in actions:
-            action.addObserver(self.status)
-        return actions
-    def getObjectType(self, object):
-        if object.classId() == "test-suite":
-            return "suite"
-        elif object.classId() == "test-case":
-            return "test"
-        else:
-            return "app"
-    def createNotebook(self, objectPages, selectionActionGUI):
-        pageDir = selectionActionGUI.createOptionGroupPages()
-        pageDir["Test"] = objectPages + pageDir["Test"]
-        if len(pageDir) == 1:
-            pages = self.addScrollBars(pageDir["Test"])
-        else:
-            pages = []
-            for groupTab, tabPages in pageDir.items():
-                if len(tabPages) > 0:
-                    scriptTitle = "view sub-options for " + groupTab + " :"
-                    tabNotebook = scriptEngine.createNotebook(scriptTitle, self.addScrollBars(tabPages))
-                    tabNotebook.show()
-                    tabNotebook.connect("switch-page", self.describePageSwitch)
-                    pages.append((tabNotebook, groupTab))
-                
-        notebook = scriptEngine.createNotebook("view options for", pages)
-        notebook.connect("switch-page", self.describePageSwitch)
-        notebook.show()
-        return notebook
-    def addScrollBars(self, pages):
-        newPages = []
-        for widget, name in pages:
-            window = self.makeScrolledWindow(widget)
-            newPages.append((window, name))
-        return newPages
-    def makeScrolledWindow(self, widget):
-        window = gtk.ScrolledWindow()
-        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self.addToScrolledWindow(window, widget)
-        window.show()
-        return window
-    def addToScrolledWindow(self, window, widget):
-        if isinstance(widget, gtk.TextView) or isinstance(widget, gtk.Viewport):
-            window.add(widget)
-        elif isinstance(widget, gtk.VBox):
-            # Nasty hack (!?) to avoid progress report (which is so far our only persistent widget) from having the previous window as a parent - remove this and watch TextTest crash when switching between Suite and Test views!
-            #if widget.get_parent() != None:
-            #    widget.get_parent().remove(widget)
-            window.add_with_viewport(widget)
-        else:
-            raise plugins.TextTestError, "Could not decide how to add scrollbars to " + repr(widget)
     def findTestNotebook(self):
         page = self.findNotebookPage(self.notebook, "Test")
         if page:
@@ -1260,7 +1164,13 @@ class RightWindowGUI:
             if not item in newList:
                 removed.append(item)
         return created, updated, removed
-    def updateNotebook(self, newObjectPages, reset):
+    def update(self, intvActionGUI, reset):
+        guilog.info("") # blank line for demarcation        
+        # disconnect accelerators for the outgoing parts...
+        self.intvActionGUI.disconnectAccelerators()
+        self.intvActionGUI = intvActionGUI
+        
+        newObjectPages = self.getObjectNotebookPages()
         notebook = self.findTestNotebook()
         newPageDir = self.makeDictionary(newObjectPages)
         newObjectPageNames = newPageDir.keys()
@@ -1320,21 +1230,132 @@ class RightWindowGUI:
             self.diag.info("Removing page " + name)
             oldPage = self.findNotebookPage(notebook, name)
             notebook.remove(oldPage)
-    def getObjectNotebookPages(self, object, intvActionGUI):
-        testCasePageDir = intvActionGUI.createOptionGroupPages()["Test"]
-        textview = self.textInfoGUI.createView()
-        if textview:
-            testCasePageDir = [(textview, "Text Info")] + testCasePageDir
-        progressView = self.createProgressView()
-        if progressView != None:
-            testCasePageDir = [(progressView, "Progress")] + testCasePageDir
-        return testCasePageDir
+    def makeDictionary(self, objectPages):
+        dict = seqdict()
+        for page, name in objectPages:
+            dict[name] = page
+        return dict
+    
     def createProgressView(self):
         if self.progressMonitor != None:
             return self.progressMonitor.getProgressView()
         else:
             return None
 
+            
+class RightWindowGUI:
+    def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor, uiManager):
+        self.dynamic = dynamic
+        self.intvActionGUI = None
+        self.uiManager = uiManager
+        self.selectionActionGUI = selectionActionGUI
+        self.textInfoGUI = TextInfoGUI(object)
+        self.status = status
+        self.window = gtk.VBox()
+        self.vpaned = gtk.VPaned()
+        self.vpaned.connect('notify', self.paneHasChanged)
+        self.panedTooltips = gtk.Tooltips()
+        self.topFrame = gtk.Frame()
+        self.topFrame.set_shadow_type(gtk.SHADOW_IN)
+        self.bottomFrame = gtk.Frame()
+        self.bottomFrame.set_shadow_type(gtk.SHADOW_IN)
+        self.vpaned.pack1(self.topFrame, resize=True)
+        self.vpaned.pack2(self.bottomFrame, resize=True)
+        self.currentObject = object
+        buttonBar, fileView = self.makeObjectDependentContents(object)
+        self.notebookGUI = NotebookGUI(selectionActionGUI, self.intvActionGUI, progressMonitor, self.textInfoGUI)
+        self.bottomFrame.add(self.notebookGUI.notebook)
+        self.fillWindow(buttonBar, fileView)
+    def paneHasChanged(self, pane, gparamspec):
+        pos = pane.get_position()
+        size = pane.allocation.height
+        self.panedTooltips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + " (" + str(100 * pos / size) + "% from the top)")
+    def notifySizeChange(self, width, height, options):
+        horizontalSeparatorPosition = 0.46
+        if self.dynamic and options.has_key("dynamic_horizontal_separator_position"):
+            horizontalSeparatorPosition = float(options["dynamic_horizontal_separator_position"][0])
+        elif not self.dynamic and options.has_key("static_horizontal_separator_position"):
+            horizontalSeparatorPosition = float(options["static_horizontal_separator_position"][0])
+
+        self.vpaned.set_position(int(self.vpaned.allocation.height * horizontalSeparatorPosition))        
+    def notifyFileChange(self, test):
+        self.fileViewGUI.notifyFileChange(test)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        self.fileViewGUI.notifyLifecycleChange(test, state, changeDesc)
+        self.textInfoGUI.notifyLifecycleChange(test, state, changeDesc)
+    def notifyRemove(self, object):
+        # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
+        if self.currentObject is object:
+            self.notifyViewTest(object.parent)
+    def notifyViewTest(self, test):
+        # Triggered by user double-clicking the test in the test tree
+        self.textInfoGUI.notifyViewTest(test)
+        self.view(test, resetNotebook=True)
+    def notifyAdd(self, test):
+        guilog.info("Viewing new test " + test.name)
+        self.notifyViewTest(test)
+    def view(self, object, resetNotebook):
+        self.removeChildrenExcept(self.notebookGUI.notebook)
+        self.currentObject = object
+        buttonBar, fileView = self.makeObjectDependentContents(object)
+        self.notebookGUI.update(self.intvActionGUI, resetNotebook)
+        self.fillWindow(buttonBar, fileView)
+    def removeChildrenExcept(self, notebook):
+        for child in self.window.get_children():
+            if not child is notebook:
+                self.window.remove(child)
+        if not self.topFrame.get_child() is notebook:
+            self.topFrame.remove(self.topFrame.get_child())
+        if not self.bottomFrame.get_child() is notebook:
+            self.bottomFrame.remove(self.bottomFrame.get_child())
+    def makeObjectDependentContents(self, object):
+        self.fileViewGUI = self.createFileViewGUI(object)
+        self.intvActionGUI = self.createIntvActionGUI(object)
+        self.addObservers(self.selectionActionGUI.actions, self.intvActionGUI.actions)
+        return self.intvActionGUI.makeButtons(), self.fileViewGUI.createView()
+    def addObservers(self, selActions, testActions):
+        for action in selActions + testActions:
+            if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
+                self.fileViewGUI.addObserver(action)
+        for action in testActions:
+            action.addObserver(self.status)
+    def createIntvActionGUI(self, object):
+        app = None
+        if object.classId() == "test-app":
+            app = object
+        else:
+            app = object.app
+
+        index = self.getActionGroupIndex(object)
+        return InteractiveActionGUI(self.makeActionInstances(object), self.uiManager, app, index)
+    def getActionGroupIndex(self, object):
+        if object.classId() == "test-suite":
+            return 1
+        else:
+            return 2    
+    def fillWindow(self, buttonBar, fileView):
+        self.window.pack_start(buttonBar, expand=False, fill=False)
+        self.topFrame.add(fileView)
+        self.window.pack_start(self.vpaned, expand=True, fill=True)
+        self.vpaned.show_all()
+        self.window.show_all()    
+    def createFileViewGUI(self, object):
+        if object.classId() == "test-app":
+            return ApplicationFileGUI(object)
+        else:
+            return TestFileGUI(object, self.dynamic)
+    def getWindow(self):
+        return self.window
+    def makeActionInstances(self, object):
+        return guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.getObjectType(object), object)
+    def getObjectType(self, object):
+        if object.classId() == "test-suite":
+            return "suite"
+        elif object.classId() == "test-case":
+            return "test"
+        else:
+            return "app"
+    
 class TextInfoGUI:
     def __init__(self, test):
         self.currentTest = test

@@ -794,8 +794,6 @@ class InteractiveActionGUI:
         self.uiManager = uiManager
         self.actions = actions
         self.actionGroupIndex = actionGroupIndex
-        self.pageDescInfo = { "Test" : {} }
-        self.indexers = [] # Utility list for getting the values from multi-valued radio button groups :-(
         self.createdActions = []
     def getInterfaceDescription(self):
         description = "<ui>\n"
@@ -887,43 +885,37 @@ class InteractiveActionGUI:
             action.perform()
         except plugins.TextTestError, e:
             showError(str(e))
-    def getPageDescription(self, pageName, subPageName = ""):
-        info = self.getPageDescInfo(pageName, subPageName)
-        if info is None:
-            return
-        optionGroup, buttonDesc = info
-        return "Viewing notebook page for '" + optionGroup.name + "'\n" + \
-               self.describeOptionGroup(optionGroup) + buttonDesc                    
-    def getPageDescInfo(self, pageName, subPageName):
-        if subPageName:
-            return self.pageDescInfo.get(pageName).get(subPageName)
-        else:
-            return self.pageDescInfo.get("Test").get(pageName)
-    def createOptionGroupPages(self):
-        pages = seqdict()
-        pages["Test"] = []
+    def getButtonMethod(self, optionGroups, instance):
+        if len(optionGroups) == 1 and instance.canPerform():
+            return self.createButton
+        
+    def createActionTabGUIs(self):
+        actionTabGUIs = []
         for instance in self.actions:
-            instanceTab = instance.getGroupTabTitle()
             optionGroups = instance.getOptionGroups()
-            hasButton = len(optionGroups) == 1 and instance.canPerform()
+            buttonMethod = self.getButtonMethod(optionGroups, instance)
             for optionGroup in optionGroups:
                 if optionGroup.switches or optionGroup.options:
-                    display = self.createDisplay(optionGroup, hasButton, instance)
-                    buttonDesc = self.describeButton(hasButton, instance)
-                    if not pages.has_key(instanceTab):
-                        pages[instanceTab] = []
-                        self.pageDescInfo[instanceTab] = {}
-                    self.pageDescInfo[instanceTab][optionGroup.name] = optionGroup, buttonDesc
-                    pages[instanceTab].append((display, optionGroup.name))
-        return pages
-    def createDisplay(self, optionGroup, hasButton, instance):
+                    actionTabGUIs.append(ActionTabGUI(optionGroup, instance, buttonMethod))
+        return actionTabGUIs
+    
+class ActionTabGUI:
+    def __init__(self, optionGroup, action, buttonMethod):
+        self.optionGroup = optionGroup
+        self.action = action
+        self.buttonMethod = buttonMethod
+
+    def getGroupTabTitle(self):
+        return self.action.getGroupTabTitle()
+        
+    def createDisplay(self):
         vbox = gtk.VBox()
-        if len(optionGroup.options) > 0:
+        if len(self.optionGroup.options) > 0:
             # Creating 0-row table gives a warning ...
-            table = gtk.Table(len(optionGroup.options), 2, homogeneous=False)
+            table = gtk.Table(len(self.optionGroup.options), 2, homogeneous=False)
             table.set_row_spacings(1)
             rowIndex = 0        
-            for option in optionGroup.options.values():
+            for option in self.optionGroup.options.values():
                 label, entry = self.createOptionEntry(option)
                 label.set_alignment(1.0, 0.5)
                 table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
@@ -932,27 +924,33 @@ class InteractiveActionGUI:
                 table.show_all()
             vbox.pack_start(table, expand=False, fill=False)
         
-        for switch in optionGroup.switches.values():
+        for switch in self.optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
             vbox.pack_start(hbox, expand=False, fill=False)
-        if hasButton:
-            button = self.createButton(instance, tab=True)
+        if self.buttonMethod:
+            button = self.buttonMethod(self.action, tab=True)
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()
             vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
         vbox.show()
         return vbox
-    def describeOptionGroup(self, optionGroup):
+
+    def getDescription(self):
+        return "Viewing notebook page for '" + self.optionGroup.name + "'\n" + \
+               self.describeOptionGroup() + self.describeButton()                    
+    
+    def describeOptionGroup(self):
         displayDesc = ""
-        for option in optionGroup.options.values():
+        for option in self.optionGroup.options.values():
             displayDesc += self.diagnoseOption(option) + "\n"
-        for switch in optionGroup.switches.values():
+        for switch in self.optionGroup.switches.values():
             displayDesc += self.diagnoseSwitch(switch) + "\n"
         return displayDesc
-    def describeButton(self, hasButton, instance):
-        if hasButton:
-            return "Viewing button with title '" + instance.getTitle() + "'"
+    
+    def describeButton(self):
+        if self.buttonMethod:
+            return "Viewing button with title '" + self.action.getTitle() + "'"
         else:
             return ""
     def createComboBox(self, option):
@@ -960,12 +958,14 @@ class InteractiveActionGUI:
         entry = combobox.child
         option.setPossibleValuesAppendMethod(combobox.append_text)
         return combobox, entry
+    
     def createOptionWidget(self, option):
         if len(option.possibleValues) > 1:
             return self.createComboBox(option)
         else:
             entry = gtk.Entry()
             return entry, entry
+        
     def createOptionEntry(self, option):
         label = gtk.Label(option.name + "  ")
         widget, entry = self.createOptionWidget(option)
@@ -973,6 +973,7 @@ class InteractiveActionGUI:
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
         option.setMethods(entry.get_text, entry.set_text)
         return label, widget
+    
     def createSwitchBox(self, switch):
         self.diagnoseSwitch(switch)
         if len(switch.options) >= 1:
@@ -995,7 +996,6 @@ class InteractiveActionGUI:
                 hbox.pack_start(radioButton, expand=True, fill=True)
                 count = count + 1
             indexer = RadioGroupIndexer(buttons)
-            self.indexers.append(indexer)
             switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
             hbox.show_all()
             return hbox  
@@ -1007,6 +1007,7 @@ class InteractiveActionGUI:
             switch.setMethods(checkButton.get_active, checkButton.set_active)
             checkButton.show()
             return checkButton
+        
     def diagnoseOption(self, option):
         value = option.getValue()
         text = "Viewing entry for option '" + option.name + "'"
@@ -1015,6 +1016,7 @@ class InteractiveActionGUI:
         if len(option.possibleValues) > 1:
             text += " (drop-down list containing " + repr(option.possibleValues) + ")"
         return text
+    
     def diagnoseSwitch(self, switch):
         value = switch.getValue()
         if len(switch.options) >= 1:
@@ -1034,14 +1036,16 @@ class NotebookGUI:
         self.intvActionGUI = intvActionGUI
         self.progressMonitor = progressMonitor
         self.textInfoGUI = textInfoGUI
+        self.actionTabInfo = { "Test" : {} }
         self.diag = plugins.getDiagnostics("GUI notebook")
         guilog.info("") # blank line for demarcation
         objectPages = self.getObjectNotebookPages()
         self.notebook = self.createNotebook(objectPages)
         self.oldObjectPageNames = self.makeDictionary(objectPages).keys()
-        self.describeNotebook(self.notebook, pageNum=0)        
+        self.describeNotebook(self.notebook, pageNum=0)
+
     def createNotebook(self, objectPages):
-        pageDir = self.selectionActionGUI.createOptionGroupPages()
+        pageDir = self.createOptionGroupPages(self.selectionActionGUI)
         
         pageDir["Test"] = objectPages + pageDir["Test"]
         if len(pageDir) == 1:
@@ -1061,7 +1065,7 @@ class NotebookGUI:
         notebook.show()
         return notebook
     def getObjectNotebookPages(self):
-        testCasePageDir = self.intvActionGUI.createOptionGroupPages()["Test"]
+        testCasePageDir = self.createOptionGroupPages(self.intvActionGUI)["Test"]
         textview = self.textInfoGUI.createView()
         if textview:
             testCasePageDir = [(textview, "Text Info")] + testCasePageDir
@@ -1069,6 +1073,20 @@ class NotebookGUI:
         if progressView != None:
             testCasePageDir = [(progressView, "Progress")] + testCasePageDir
         return testCasePageDir
+
+    def createOptionGroupPages(self, actionGUI):
+        pages = seqdict()
+        pages["Test"] = []
+        for actionTabGUI in actionGUI.createActionTabGUIs():
+            instanceTab = actionTabGUI.getGroupTabTitle()
+            display = actionTabGUI.createDisplay()
+            if not pages.has_key(instanceTab):
+                pages[instanceTab] = []
+                self.actionTabInfo[instanceTab] = {}
+            name = actionTabGUI.optionGroup.name
+            self.actionTabInfo[instanceTab][name] = actionTabGUI
+            pages[instanceTab].append((display, name))
+        return pages
 
     def addScrollBars(self, pages):
         newPages = []
@@ -1137,12 +1155,16 @@ class NotebookGUI:
             return page, notebook.get_tab_label_text(page)
         else:
             return None, ""
-    def getPageDescription(self, currentPageText, subPageText):
-        selectionDesc = self.selectionActionGUI.getPageDescription(currentPageText, subPageText)
-        if selectionDesc:
-            return selectionDesc
+    def getPageDescription(self, pageName, subPageName = ""):
+        actionTabGUI = self.getActionTabGUI(pageName, subPageName)
+        if actionTabGUI is not None:
+            return actionTabGUI.getDescription()
+    def getActionTabGUI(self, pageName, subPageName):
+        if subPageName:
+            return self.actionTabInfo.get(pageName).get(subPageName)
         else:
-            return self.intvActionGUI.getPageDescription(currentPageText, subPageText)
+            return self.actionTabInfo.get("Test").get(pageName)
+
     def findTestNotebook(self):
         page = self.findNotebookPage(self.notebook, "Test")
         if page:
@@ -1226,7 +1248,9 @@ class NotebookGUI:
         oldPage.remove(oldContents)
         oldPage.add(newContents)
         oldPage.show()                
-    def removePages(self, notebook, pageNamesRemoved):     
+    def removePages(self, notebook, pageNamesRemoved):
+        # remove from the back, so we don't momentarily view them all
+        pageNamesRemoved.reverse()
         for name in pageNamesRemoved:
             self.diag.info("Removing page " + name)
             oldPage = self.findNotebookPage(notebook, name)

@@ -271,7 +271,7 @@ class TextTestGUI(Responder):
             else:
                 width = 0
             alignment = gtk.Alignment()
-            alignment.set(1.0, 1.0, 0.0, 1.0)
+            alignment.set(1.0, 1.0, 1.0, 1.0)
             alignment.set_padding(width, width, 1, width)
             alignment.add(progressBar)
             if toolbar:

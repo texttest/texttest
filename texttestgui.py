@@ -206,7 +206,7 @@ class TextTestGUI(Responder):
         return string.join(names, ",")
     def fillTopWindow(self, topWindow, testWins, rightWindow):
         mainWindow = self.createWindowContents(testWins, rightWindow)
-
+        
         vbox = gtk.VBox()
         self.placeTopWidgets(vbox)
         vbox.pack_start(mainWindow, expand=True, fill=True)
@@ -219,7 +219,12 @@ class TextTestGUI(Responder):
             vbox.pack_start(self.status.createStatusbar(), expand=False, fill=False)
         vbox.show()
         topWindow.add(vbox)
-        topWindow.show()        
+        topWindow.show()
+        # avoid the quit button getting initial focus
+        self.testTreeGUI.treeView.grab_focus()
+        self.adjustSize(topWindow)
+        
+    def adjustSize(self, topWindow):
         if (self.dynamic and self.getConfigValue("window_size").has_key("dynamic_maximize") and self.getConfigValue("window_size")["dynamic_maximize"][0] == "1") or (not self.dynamic and self.getConfigValue("window_size").has_key("static_maximize") and self.getConfigValue("window_size")["static_maximize"][0] == "1"):
             topWindow.maximize()
         else:
@@ -385,6 +390,7 @@ class TextTestGUI(Responder):
         # watch for double-clicks
         self.testTreeGUI.addObserver(self.rightWindowGUI)
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
+        guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
     def runWithActionThread(self, actionThread):
         plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
         self.setUpGui(actionThread)
@@ -536,7 +542,6 @@ class TestTreeGUI(plugins.Observable):
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)
             self.reFilter()
-        self.treeView.grab_focus() # to avoid Quit button getting initial focus
         return self.treeView
     def rowCollapsed(self, treeview, iter, path):
         if self.dynamic:

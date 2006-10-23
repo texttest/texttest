@@ -85,6 +85,8 @@ class InteractiveAction(plugins.Observable):
         pass
     def getTitle(self):
         pass
+    def isTestDependent(self):
+        return False
     def getSecondaryTitle(self):
         return self.getTitle()
     def getTooltip(self):
@@ -211,6 +213,8 @@ class InteractiveTestAction(InteractiveAction):
     def __init__(self, test):
         self.currentTest = test
         InteractiveAction.__init__(self)
+    def isTestDependent(self):
+        return True
     def describeTests(self):
         return repr(self.currentTest)
     def getConfigValue(self, entryName):

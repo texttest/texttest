@@ -26,6 +26,7 @@ from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer
 from ndict import seqdict
 from respond import Responder
+from copy import copy
 
 def destroyDialog(dialog, *args):
     dialog.destroy()
@@ -871,7 +872,10 @@ class InteractiveActionGUI:
             return newAccel
         return original
     def disconnectAccelerators(self):
-        for action in self.getActionGroup().list_actions():
+        actions = self.getActionGroup().list_actions()
+        if len(actions) > 0:
+            guilog.info("") # blank line for demarcation
+        for action in actions:
             guilog.info("Disconnecting accelerator for action '" + action.get_name() + "'")
             action.disconnect_accelerator()
     def runInteractive(self, button, action, *args):
@@ -898,18 +902,71 @@ class InteractiveActionGUI:
                 if optionGroup.switches or optionGroup.options:
                     actionTabGUIs.append(ActionTabGUI(optionGroup, instance, buttonMethod))
         return actionTabGUIs
+
+# base class for everything that can go in tabs handled by NotebookGUI
+class TabGUI:
+    def __init__(self, active=False):
+        self.active = active
+    def activate(self):
+        self.active = True
+        guilog.info("")
+        self.describe()
+    def describe(self):
+        pass
+    def deactivate(self):
+        self.active = False
+    def getTabTitle(self):
+        return "Need Title!"
+    def getGroupTabTitle(self):
+        return "Test"
+    def isObjectDependent(self):
+        return True # most of them seem to be
+    def createView(self):
+        pass
+    def replaceView(self, oldGUI):
+        pass
+
+    def addScrollBars(self, view):
+        window = gtk.ScrolledWindow()
+        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        self.addToScrolledWindow(window, view)
+        window.show()
+        return window
+
+    def addToScrolledWindow(self, window, widget):
+        if isinstance(widget, gtk.TextView) or isinstance(widget, gtk.Viewport):
+            window.add(widget)
+        elif isinstance(widget, gtk.VBox):
+            # Nasty hack (!?) to avoid progress report (which is so far our only persistent widget) from having the previous window as a parent - remove this and watch TextTest crash when switching between Suite and Test views!
+            #if widget.get_parent() != None:
+            #    widget.get_parent().remove(widget)
+            window.add_with_viewport(widget)
+        else:
+            raise plugins.TextTestError, "Could not decide how to add scrollbars to " + repr(widget)
     
-class ActionTabGUI:
+class ActionTabGUI(TabGUI):
     def __init__(self, optionGroup, action, buttonMethod):
         self.optionGroup = optionGroup
         self.action = action
         self.buttonMethod = buttonMethod
-
+        self.vbox = None
     def getGroupTabTitle(self):
         return self.action.getGroupTabTitle()
+    def getTabTitle(self):
+        return self.optionGroup.name
+    def isObjectDependent(self):
+        return self.action.isTestDependent()
+    def createView(self):
+        return self.addScrollBars(self.createVBox())
+
+    def replaceView(self, oldGUI):
+        container = oldGUI.vbox.get_parent()
+        container.remove(oldGUI.vbox)
+        container.add(self.createVBox())
+        container.show()
         
-    def createDisplay(self):
-        vbox = gtk.VBox()
+    def createVBox(self):
+        self.vbox = gtk.VBox()
         if len(self.optionGroup.options) > 0:
             # Creating 0-row table gives a warning ...
             table = gtk.Table(len(self.optionGroup.options), 2, homogeneous=False)
@@ -922,37 +979,20 @@ class ActionTabGUI:
                 table.attach(entry, 1, 2, rowIndex, rowIndex + 1)
                 rowIndex += 1
                 table.show_all()
-            vbox.pack_start(table, expand=False, fill=False)
+            self.vbox.pack_start(table, expand=False, fill=False)
         
         for switch in self.optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
-            vbox.pack_start(hbox, expand=False, fill=False)
+            self.vbox.pack_start(hbox, expand=False, fill=False)
         if self.buttonMethod:
             button = self.buttonMethod(self.action, tab=True)
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()
-            vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
-        vbox.show()
-        return vbox
-
-    def getDescription(self):
-        return "Viewing notebook page for '" + self.optionGroup.name + "'\n" + \
-               self.describeOptionGroup() + self.describeButton()                    
-    
-    def describeOptionGroup(self):
-        displayDesc = ""
-        for option in self.optionGroup.options.values():
-            displayDesc += self.diagnoseOption(option) + "\n"
-        for switch in self.optionGroup.switches.values():
-            displayDesc += self.diagnoseSwitch(switch) + "\n"
-        return displayDesc
-    
-    def describeButton(self):
-        if self.buttonMethod:
-            return "Viewing button with title '" + self.action.getTitle() + "'"
-        else:
-            return ""
+            self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
+        self.vbox.show()
+        return self.vbox
+        
     def createComboBox(self, option):
         combobox = gtk.combo_box_entry_new_text()
         entry = combobox.child
@@ -975,7 +1015,6 @@ class ActionTabGUI:
         return label, widget
     
     def createSwitchBox(self, switch):
-        self.diagnoseSwitch(switch)
         if len(switch.options) >= 1:
             hbox = gtk.HBox()
             hbox.pack_start(gtk.Label(switch.name), expand=False, fill=False)
@@ -1007,8 +1046,18 @@ class ActionTabGUI:
             switch.setMethods(checkButton.get_active, checkButton.set_active)
             checkButton.show()
             return checkButton
+
+    def describe(self):
+        guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
+        for option in self.optionGroup.options.values():
+            guilog.info(self.getOptionDescription(option))
+        for switch in self.optionGroup.switches.values():
+            guilog.info(self.getSwitchDescription(switch))
+
+        if self.buttonMethod:
+            guilog.info("Viewing button with title '" + self.action.getTitle() + "'")
         
-    def diagnoseOption(self, option):
+    def getOptionDescription(self, option):
         value = option.getValue()
         text = "Viewing entry for option '" + option.name + "'"
         if len(value) > 0:
@@ -1017,7 +1066,7 @@ class ActionTabGUI:
             text += " (drop-down list containing " + repr(option.possibleValues) + ")"
         return text
     
-    def diagnoseSwitch(self, switch):
+    def getSwitchDescription(self, switch):
         value = switch.getValue()
         if len(switch.options) >= 1:
             text = "Viewing radio button for switch '" + switch.name + "', options "
@@ -1029,153 +1078,91 @@ class ActionTabGUI:
                 text += " (checked)"
         return text
 
-# class to manage the (possibly double) notebook in the right window
-class NotebookGUI:
-    def __init__(self, selectionActionGUI, intvActionGUI, progressMonitor, textInfoGUI):
-        self.selectionActionGUI = selectionActionGUI
-        self.intvActionGUI = intvActionGUI
-        self.progressMonitor = progressMonitor
-        self.textInfoGUI = textInfoGUI
-        self.actionTabInfo = { "Test" : {} }
+class NotebookGUI(TabGUI):
+    def __init__(self, tabGUIs, scriptTitle, active=True):
+        TabGUI.__init__(self, active)
+        self.scriptTitle = scriptTitle
         self.diag = plugins.getDiagnostics("GUI notebook")
-        guilog.info("") # blank line for demarcation
-        objectPages = self.getObjectNotebookPages()
-        self.notebook = self.createNotebook(objectPages)
-        self.oldObjectPageNames = self.makeDictionary(objectPages).keys()
-        self.describeNotebook(self.notebook, pageNum=0)
+        self.tabInfo = self.classify(tabGUIs)
+        self.notebook = None
 
-    def createNotebook(self, objectPages):
-        pageDir = self.createOptionGroupPages(self.selectionActionGUI)
-        
-        pageDir["Test"] = objectPages + pageDir["Test"]
-        if len(pageDir) == 1:
-            pages = self.addScrollBars(pageDir["Test"])
-        else:
-            pages = []
-            for groupTab, tabPages in pageDir.items():
-                if len(tabPages) > 0:
-                    scriptTitle = "view sub-options for " + groupTab + " :"
-                    tabNotebook = scriptEngine.createNotebook(scriptTitle, self.addScrollBars(tabPages))
-                    tabNotebook.show()
-                    tabNotebook.connect("switch-page", self.describePageSwitch)
-                    pages.append((tabNotebook, groupTab))
-                
-        notebook = scriptEngine.createNotebook("view options for", pages)
-        notebook.connect("switch-page", self.describePageSwitch)
-        notebook.show()
-        return notebook
-    def getObjectNotebookPages(self):
-        testCasePageDir = self.createOptionGroupPages(self.intvActionGUI)["Test"]
-        textview = self.textInfoGUI.createView()
-        if textview:
-            testCasePageDir = [(textview, "Text Info")] + testCasePageDir
-        progressView = self.createProgressView()
-        if progressView != None:
-            testCasePageDir = [(progressView, "Progress")] + testCasePageDir
-        return testCasePageDir
+    def activate(self):
+        self.active = True
+        self.getCurrentTabGUI().activate()
 
-    def createOptionGroupPages(self, actionGUI):
-        pages = seqdict()
-        pages["Test"] = []
-        for actionTabGUI in actionGUI.createActionTabGUIs():
-            instanceTab = actionTabGUI.getGroupTabTitle()
-            display = actionTabGUI.createDisplay()
-            if not pages.has_key(instanceTab):
-                pages[instanceTab] = []
-                self.actionTabInfo[instanceTab] = {}
-            name = actionTabGUI.optionGroup.name
-            self.actionTabInfo[instanceTab][name] = actionTabGUI
-            pages[instanceTab].append((display, name))
-        return pages
+    def deactivate(self):
+        self.active = False
+        self.getCurrentTabGUI().deactivate()
 
-    def addScrollBars(self, pages):
-        newPages = []
-        for widget, name in pages:
-            window = self.makeScrolledWindow(widget)
-            newPages.append((window, name))
-        return newPages
+    def createView(self):
+        self.notebook = gtk.Notebook()
+        for tabName, tabGUI in self.tabInfo.items():
+            label = gtk.Label(tabName)
+            self.notebook.append_page(tabGUI.createView(), label)
 
-    def makeScrolledWindow(self, widget):
-        window = gtk.ScrolledWindow()
-        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self.addToScrolledWindow(window, widget)
-        window.show()
-        return window
-
-    def addToScrolledWindow(self, window, widget):
-        if isinstance(widget, gtk.TextView) or isinstance(widget, gtk.Viewport):
-            window.add(widget)
-        elif isinstance(widget, gtk.VBox):
-            # Nasty hack (!?) to avoid progress report (which is so far our only persistent widget) from having the previous window as a parent - remove this and watch TextTest crash when switching between Suite and Test views!
-            #if widget.get_parent() != None:
-            #    widget.get_parent().remove(widget)
-            window.add_with_viewport(widget)
-        else:
-            raise plugins.TextTestError, "Could not decide how to add scrollbars to " + repr(widget)
-
-    def describePageSwitch(self, notebook, pagePtr, pageNum, *args):
-        self.describeNotebook(notebook, pageNum)
-    def isVisible(self, notebook):
-        if notebook is self.notebook:
-            return True
-        pageNum = self.notebook.get_current_page()
-        page = self.notebook.get_nth_page(pageNum)
-        return page is notebook
-    def describeAllTabs(self, notebook):
-        tabTexts = map(notebook.get_tab_label_text, notebook.get_children())
-        guilog.info("")
-        guilog.info("Tabs showing : " + string.join(tabTexts, ", "))
-    def describeNotebook(self, notebook, pageNum=None):
-        if not self.isVisible(notebook):
+        scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
+        self.notebook.connect("switch-page", self.handlePageSwitch)
+        self.notebook.show()
+        if self.active:
+            self.getCurrentTabGUI().activate()
+        return self.notebook
+    
+    def handlePageSwitch(self, notebook, ptr, pageNum, *args):
+        if not self.active:
             return
-        outerPageNum, innerPageNum = self.getPageNumbers(notebook, pageNum)
-        currentPage, currentPageText = self.getPageText(self.notebook, outerPageNum)
-        subPageText = ""
-        if isinstance(currentPage, gtk.Notebook):
-            subPage, subPageText = self.getPageText(currentPage, innerPageNum)
-        if currentPageText == "Text Info" or subPageText == "Text Info":
-            self.textInfoGUI.describe()
-        else:
-            self.textInfoGUI.visible = False
-            pageDesc = self.getPageDescription(currentPageText, subPageText)
-            if pageDesc:
-                guilog.info("")
-                guilog.info(pageDesc)
-        # Can get here viewing text info window ...
-    def getPageNumbers(self, notebook, pageNum):
-        if notebook is self.notebook:
-            return pageNum, None
-        else:
-            return None, pageNum
-    def getPageText(self, notebook, pageNum = None):
-        if pageNum is None:
-            pageNum = notebook.get_current_page()
-        page = notebook.get_nth_page(pageNum)
-        if page:
-            return page, notebook.get_tab_label_text(page)
-        else:
-            return None, ""
-    def getPageDescription(self, pageName, subPageName = ""):
-        actionTabGUI = self.getActionTabGUI(pageName, subPageName)
-        if actionTabGUI is not None:
-            return actionTabGUI.getDescription()
-    def getActionTabGUI(self, pageName, subPageName):
-        if subPageName:
-            return self.actionTabInfo.get(pageName).get(subPageName)
-        else:
-            return self.actionTabInfo.get("Test").get(pageName)
+        activeTabName = self.getPageName(pageNum)
+        self.diag.info("Switching to page " + activeTabName)
+        for tabName, tabGUI in self.tabInfo.items():
+            if tabName == activeTabName:
+                tabGUI.activate()
+            else:
+                tabGUI.deactivate()
 
-    def findTestNotebook(self):
-        page = self.findNotebookPage(self.notebook, "Test")
+    def getPageName(self, pageNum):
+        page = self.notebook.get_nth_page(pageNum)
         if page:
-            return page
+            return self.notebook.get_tab_label_text(page)
         else:
-            return self.notebook
-    def findNotebookPage(self, notebook, name):
-        for child in notebook.get_children():
-            text = notebook.get_tab_label_text(child)
+            return ""
+    def getCurrentPageName(self):
+        return self.getPageName(self.notebook.get_current_page())
+    def getCurrentTabGUI(self):
+        return self.tabInfo[self.getCurrentPageName()]
+
+    def findPage(self, name):
+        for child in self.notebook.get_children():
+            text = self.notebook.get_tab_label_text(child)
             if text == name:
                 return child
+
+
+class TopNotebookGUI(NotebookGUI):
+    tabNames = [ "Test", "Selection", "Running" ]
+    def classify(self, tabGUIs):
+        tabInfo = seqdict()
+        for tabName in self.tabNames:
+            guisUnderTab = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
+            scriptTitle = "view sub-options for " + tabName.lower() + " :"
+            tabInfo[tabName] = SubNotebookGUI(guisUnderTab, scriptTitle, active=False)
+        return tabInfo
+    def update(self, newTestTabGUIs, reset):
+        self.tabInfo["Test"].update(newTestTabGUIs, reset)
+
+class SubNotebookGUI(NotebookGUI):
+    def classify(self, tabGUIs):
+        tabInfo = seqdict()
+        for tabGUI in tabGUIs:
+            tabInfo[tabGUI.getTabTitle()] = tabGUI
+        return tabInfo
+
+    def getObjectDependentTabNames(self):
+        names = []
+        for child in self.notebook.get_children():
+            text = self.notebook.get_tab_label_text(child)
+            if self.tabInfo[text].isObjectDependent():
+                names.append(text)
+        return names
+
     def findChanges(self, newList, oldList):
         created, updated, removed = [], [], []
         for item in newList:
@@ -1187,92 +1174,86 @@ class NotebookGUI:
             if not item in newList:
                 removed.append(item)
         return created, updated, removed
-    def update(self, intvActionGUI, reset):
-        guilog.info("") # blank line for demarcation        
-        # disconnect accelerators for the outgoing parts...
-        self.intvActionGUI.disconnectAccelerators()
-        self.intvActionGUI = intvActionGUI
-        
-        newObjectPages = self.getObjectNotebookPages()
-        notebook = self.findTestNotebook()
-        newPageDir = self.makeDictionary(newObjectPages)
-        newObjectPageNames = newPageDir.keys()
-        self.diag.info("Updating notebook for " + repr(newObjectPageNames) + " from " + repr(self.oldObjectPageNames))
-        currentPage, currentPageName = self.getPageText(notebook)
-        pageNamesCreated, pageNamesUpdated, pageNamesRemoved = self.findChanges(newObjectPageNames, self.oldObjectPageNames)
-        self.prependNewPages(notebook, pageNamesCreated, newPageDir)
-        self.updatePages(notebook, pageNamesUpdated, newPageDir)
-        # Must reset if we're viewing a removed page
-        reset |= currentPageName in pageNamesRemoved
-        # If Text Info is new, it's generally interesting, reset the notebook to view it
-        reset |= "Text Info" in pageNamesCreated
-        newCurrentPageNum = self.findNewCurrentPageNum(newObjectPageNames, pageNamesRemoved)
-        if reset and notebook.get_current_page() != newCurrentPageNum:
-            self.diag.info("Resetting for current page " + currentPageName)
-            notebook.set_current_page(newCurrentPageNum)
-            self.diag.info("Resetting done.")
-        elif currentPageName in pageNamesUpdated:
-            # describe the current page, we reloaded it...
-            self.describeNotebook(notebook)
-        self.removePages(notebook, pageNamesRemoved)
-        if newObjectPageNames != self.oldObjectPageNames:
-            self.oldObjectPageNames = newObjectPageNames
-            self.describeAllTabs(notebook)
-    def findNewCurrentPageNum(self, newPageNames, pageNamesRemoved):
-        for index in range(len(newPageNames)):
-            name = newPageNames[index]
-            if not name in pageNamesRemoved:
+    
+    def findFirstRemainingPageNum(self, pageNamesRemoved):
+        for index in range(len(self.tabInfo.keys())):
+            if not self.getPageName(index) in pageNamesRemoved:
                 return index
         return 0
-    def prependNewPages(self, notebook, pageNamesCreated, newPageDir):
+    
+    def prependNewPages(self, pageNamesCreated, newTabGUIs):
+        newTabInfo = self.classify(newTabGUIs)
+        newPages = self.createNewPages(pageNamesCreated, newTabInfo)
         # Prepend the pages, hence in reverse order...
-        pageNamesCreated.reverse()
-        for name in pageNamesCreated:
-            self.diag.info("Adding new page " + name)
-            newPage = self.makeScrolledWindow(newPageDir[name])
+        newPages.reverse()
+        for name, page in newPages:
             label = gtk.Label(name)
-            notebook.prepend_page(newPage, label)
-    def updatePages(self, notebook, pageNamesUpdated, newPageDir):
-        for name in pageNamesUpdated:
+            self.notebook.prepend_page(page, label)
+
+    def createNewPages(self, pageNamesCreated, newTabGUIs):
+        newPages = []
+        for name in pageNamesCreated:
+            tabGUI = newTabGUIs[name]
+            self.tabInfo[name] = tabGUI
+            newPage = tabGUI.createView()
+            newPages.append((name, newPage))
+        return newPages
+            
+    def updatePages(self, pageNamesUpdated, newTabGUIs):
+        for tabGUI in newTabGUIs:
+            name = tabGUI.getTabTitle()
+            if not name in pageNamesUpdated:
+                continue
+
             self.diag.info("Replacing contents of page " + name)
-            # oldPage is a gtk.ScrolledWindow object, newPage either a gtk.VBox or a gtk.TextView
-            oldPage = self.findNotebookPage(notebook, name)
-            newContents = newPageDir[name]
-            self.replaceContents(oldPage, newContents)
-    def replaceContents(self, oldPage, newContents):
-        oldContents = oldPage.get_child()
-        if isinstance(oldContents, gtk.Viewport):
-            oldPage = oldContents
-            oldContents = oldContents.get_child()
-        self.diag.info("Removing old contents " + repr(oldContents))
-        oldPage.remove(oldContents)
-        oldPage.add(newContents)
-        oldPage.show()                
-    def removePages(self, notebook, pageNamesRemoved):
+            tabGUI.replaceView(self.tabInfo[name])
+            self.tabInfo[name] = tabGUI
+        
+    def removePages(self, pageNamesRemoved):
         # remove from the back, so we don't momentarily view them all
         pageNamesRemoved.reverse()
         for name in pageNamesRemoved:
             self.diag.info("Removing page " + name)
-            oldPage = self.findNotebookPage(notebook, name)
-            notebook.remove(oldPage)
-    def makeDictionary(self, objectPages):
-        dict = seqdict()
-        for page, name in objectPages:
-            dict[name] = page
-        return dict
-    
-    def createProgressView(self):
-        if self.progressMonitor != None:
-            return self.progressMonitor.getProgressView()
-        else:
-            return None
+            oldPage = self.findPage(name)
+            del self.tabInfo[name]
+            self.notebook.remove(oldPage)
 
+    def update(self, newTabGUIs, reset):
+        oldTabNames = self.getObjectDependentTabNames()
+        newTabNames = [ tabGUI.getTabTitle() for tabGUI in newTabGUIs ]
+        self.diag.info("Updating notebook for " + repr(newTabNames) + " from " + repr(oldTabNames))
+        pageNamesCreated, pageNamesUpdated, pageNamesRemoved = self.findChanges(newTabNames, oldTabNames)
+
+        self.prependNewPages(pageNamesCreated, newTabGUIs)
+        self.updatePages(pageNamesUpdated, newTabGUIs)
+
+        # Must reset if we're viewing a removed page
+        currentPageName = self.getCurrentPageName()
+        reset |= currentPageName in pageNamesRemoved
+        newCurrentPageNum = self.findFirstRemainingPageNum(pageNamesRemoved)
+        if reset and self.notebook.get_current_page() != newCurrentPageNum:
+            self.diag.info("Resetting for current page " + currentPageName + " to page " + repr(newCurrentPageNum))
+            self.notebook.set_current_page(newCurrentPageNum)
+            self.diag.info("Resetting done.")
+        elif self.active and currentPageName in pageNamesUpdated:
+            # activate the current page, we reloaded it...
+            self.tabInfo[currentPageName].activate()
+            
+        self.removePages(pageNamesRemoved)
+        if len(pageNamesRemoved) > 0 or len(pageNamesCreated) > 0:
+            self.describeAllTabs()
+
+    def describeAllTabs(self):
+        tabTexts = map(self.notebook.get_tab_label_text, self.notebook.get_children())
+        guilog.info("")
+        guilog.info("Tabs showing : " + string.join(tabTexts, ", "))
+        
             
 class RightWindowGUI:
     def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor, uiManager):
         self.dynamic = dynamic
-        self.intvActionGUI = None
         self.uiManager = uiManager
+        self.progressMonitor = progressMonitor
         self.selectionActionGUI = selectionActionGUI
         self.textInfoGUI = TextInfoGUI(object)
         self.status = status
@@ -1287,10 +1268,33 @@ class RightWindowGUI:
         self.vpaned.pack1(self.topFrame, resize=True)
         self.vpaned.pack2(self.bottomFrame, resize=True)
         self.currentObject = object
-        buttonBar, fileView = self.makeObjectDependentContents(object)
-        self.notebookGUI = NotebookGUI(selectionActionGUI, self.intvActionGUI, progressMonitor, self.textInfoGUI)
-        self.bottomFrame.add(self.notebookGUI.notebook)
-        self.fillWindow(buttonBar, fileView)
+        self.fileViewGUI = self.createFileViewGUI(object)
+        self.intvActionGUI = self.createIntvActionGUI(object)
+        self.notebookGUI = self.createNotebookGUI()
+
+        self.fillWindow()
+        guilog.info("") # createView writes stuff
+        self.bottomFrame.add(self.notebookGUI.createView())
+
+    def createNotebookGUI(self):
+        tabGUIs = self.getTabGUIs()
+        return self.getNotebookClass()(tabGUIs, "view options for")
+    def getNotebookClass(self):
+        if self.dynamic:
+            return SubNotebookGUI 
+        else:
+            return TopNotebookGUI
+    def getTestTabGUIs(self):
+        tabGUIs = []
+        if self.textInfoGUI.hasInfo():
+            tabGUIs.append(self.textInfoGUI)
+        if self.progressMonitor:
+            tabGUIs.append(self.progressMonitor)
+        tabGUIs += self.intvActionGUI.createActionTabGUIs()
+        return tabGUIs
+
+    def getTabGUIs(self):
+        return self.getTestTabGUIs() + self.selectionActionGUI.createActionTabGUIs()    
     def paneHasChanged(self, pane, gparamspec):
         pos = pane.get_position()
         size = pane.allocation.height
@@ -1322,9 +1326,12 @@ class RightWindowGUI:
     def view(self, object, resetNotebook):
         self.removeChildrenExcept(self.notebookGUI.notebook)
         self.currentObject = object
-        buttonBar, fileView = self.makeObjectDependentContents(object)
-        self.notebookGUI.update(self.intvActionGUI, resetNotebook)
-        self.fillWindow(buttonBar, fileView)
+        self.fileViewGUI = self.createFileViewGUI(object)
+        
+        self.intvActionGUI.disconnectAccelerators() # disconnect the old things
+        self.intvActionGUI = self.createIntvActionGUI(object)
+        self.fillWindow()
+        self.notebookGUI.update(self.getTestTabGUIs(), resetNotebook)
     def removeChildrenExcept(self, notebook):
         for child in self.window.get_children():
             if not child is notebook:
@@ -1333,11 +1340,6 @@ class RightWindowGUI:
             self.topFrame.remove(self.topFrame.get_child())
         if not self.bottomFrame.get_child() is notebook:
             self.bottomFrame.remove(self.bottomFrame.get_child())
-    def makeObjectDependentContents(self, object):
-        self.fileViewGUI = self.createFileViewGUI(object)
-        self.intvActionGUI = self.createIntvActionGUI(object)
-        self.addObservers(self.selectionActionGUI.actions, self.intvActionGUI.actions)
-        return self.intvActionGUI.makeButtons(), self.fileViewGUI.createView()
     def addObservers(self, selActions, testActions):
         for action in selActions + testActions:
             if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
@@ -1352,15 +1354,18 @@ class RightWindowGUI:
             app = object.app
 
         index = self.getActionGroupIndex(object)
-        return InteractiveActionGUI(self.makeActionInstances(object), self.uiManager, app, index)
+        actions = self.makeActionInstances(object)
+        self.addObservers(self.selectionActionGUI.actions, actions)
+        return InteractiveActionGUI(actions, self.uiManager, app, index)
+
     def getActionGroupIndex(self, object):
         if object.classId() == "test-suite":
             return 1
         else:
             return 2    
-    def fillWindow(self, buttonBar, fileView):
-        self.window.pack_start(buttonBar, expand=False, fill=False)
-        self.topFrame.add(fileView)
+    def fillWindow(self):
+        self.window.pack_start(self.intvActionGUI.makeButtons(), expand=False, fill=False)
+        self.topFrame.add(self.fileViewGUI.createView())
         self.window.pack_start(self.vpaned, expand=True, fill=True)
         self.vpaned.show_all()
         self.window.show_all()    
@@ -1381,22 +1386,31 @@ class RightWindowGUI:
         else:
             return "app"
     
-class TextInfoGUI:
+class TextInfoGUI(TabGUI):
     def __init__(self, test):
         self.currentTest = test
         self.text = ""
         self.view = None
-        self.visible = True
         self.notifyViewTest(test)
+    def hasInfo(self):
+        return len(self.text) > 0
+    def getTabTitle(self):
+        return "Text Info"
     def resetText(self, test, state):
         self.text = test.app.configObject.getTextualInfo(test, state)
+    def getActualText(self):
+        buffer = self.view.get_buffer()
+        utf8Text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter())
+        localeEncoding = locale.getdefaultlocale()[1]
+        if not localeEncoding:
+            return utf8Text
+
+        unicodeInfo = unicode(utf8Text, "utf-8", errors="strict")
+        return unicodeInfo.encode(localeEncoding, "strict")
     def describe(self):
-        if len(self.text):
-            self.visible = True
-            guilog.info("")
-            guilog.info("---------- Text Info Window ----------")
-            guilog.info(self.text.strip())
-            guilog.info("--------------------------------------")
+        guilog.info("---------- Text Info Window ----------")
+        guilog.info(self.getActualText().strip())
+        guilog.info("--------------------------------------")
     def notifyViewTest(self, test):
         if test.classId() == "test-case":
             self.currentTest = test
@@ -1407,16 +1421,20 @@ class TextInfoGUI:
         self.resetText(test, state)
         if self.view:
             self.updateTextInView()
-            if self.visible:
+            if self.hasInfo() and self.active:
+                guilog.info("")
                 self.describe()
+    def replaceView(self, oldGUI):
+        self.view = oldGUI.view
+        self.updateTextInView()
     def createView(self):
-        if len(self.text) == 0:
+        if not self.hasInfo():
             return
         self.view = gtk.TextView()
         self.view.set_wrap_mode(gtk.WRAP_WORD)
         self.updateTextInView()
         self.view.show()
-        return self.view
+        return self.addScrollBars(self.view)
     def updateTextInView(self):
         textbuffer = self.view.get_buffer()
         textToUse = self.getTextForView()
@@ -1428,20 +1446,24 @@ class TextInfoGUI:
         return self.encodeToUTF(unicodeInfo)
     def decodeText(self):
         localeEncoding = locale.getdefaultlocale()[1]
-        try:
-            return unicode(self.text, localeEncoding, errors="strict")
-        except:
+        if localeEncoding:
             try:
+                return unicode(self.text, localeEncoding, errors="strict")
+            except:
                 guilog.info("Warning: Failed to decode string '" + self.text + \
                             "' using default locale encoding " + repr(localeEncoding) + \
                             ". Trying strict UTF-8 encoding ...")
-                return unicode(self.text, 'utf-8', errors="strict")
-            except:
-                guilog.info("Warning: Failed to decode string '" + self.text + \
-                            "' both using strict UTF-8 and " + repr(localeEncoding) + \
-                            " encodings.\nReverting to non-strict UTF-8 encoding but " + \
-                            "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-                return unicode(self.text, 'utf-8', errors="replace")
+            
+        return self.decodeUtf8Text(localeEncoding)
+    def decodeUtf8Text(self, localeEncoding):
+        try:
+            return unicode(self.text, 'utf-8', errors="strict")
+        except:
+            guilog.info("Warning: Failed to decode string '" + self.text + \
+                        "' both using strict UTF-8 and " + repr(localeEncoding) + \
+                        " encodings.\nReverting to non-strict UTF-8 encoding but " + \
+                        "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+            return unicode(self.text, 'utf-8', errors="replace")
     def encodeToUTF(self, unicodeInfo):
         try:
             return unicodeInfo.encode('utf-8', 'strict')
@@ -1710,34 +1732,6 @@ class TestFileGUI(FileViewGUI):
             if os.path.isdir(file):
                 dirIters[file] = newiter
     
-# Class for importing self tests
-class ImportTestCase(guiplugins.ImportTestCase):
-    def addDefinitionFileOption(self, suite, oldOptionGroup):
-        guiplugins.ImportTestCase.addDefinitionFileOption(self, suite, oldOptionGroup)
-        self.addSwitch(oldOptionGroup, "GUI", "Use TextTest GUI", 1)
-        self.addSwitch(oldOptionGroup, "sGUI", "Use TextTest Static GUI", 0)
-        targetApp = self.test.makePathName("TargetApp")
-        root, local = os.path.split(targetApp)
-        self.defaultTargetApp = plugins.samefile(root, self.test.app.getDirectory())
-        if self.defaultTargetApp:
-            self.addSwitch(oldOptionGroup, "sing", "Only run test A03", 1)
-            self.addSwitch(oldOptionGroup, "fail", "Include test failures", 1)
-            self.addSwitch(oldOptionGroup, "version", "Run with Version 2.4")
-    def getOptions(self, suite):
-        options = guiplugins.ImportTestCase.getOptions(self, suite)
-        if self.optionGroup.getSwitchValue("sGUI"):
-            options += " -gx"
-        elif self.optionGroup.getSwitchValue("GUI"):
-            options += " -g"
-        if self.defaultTargetApp:
-            if self.optionGroup.getSwitchValue("sing"):
-                options += " -t A03"
-            if self.optionGroup.getSwitchValue("fail"):
-                options += " -c CodeFailures"
-            if self.optionGroup.getSwitchValue("version"):
-                options += " -v 2.4"
-        return options
-
 # A utility class to set and get the indices of options in radio button groups.
 class RadioGroupIndexer:
     def __init__(self, listOfButtons):
@@ -1823,9 +1817,10 @@ class TestProgressBar:
             
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
-class TestProgressMonitor(plugins.Observable):
+class TestProgressMonitor(plugins.Observable,TabGUI):
     def __init__(self):
         plugins.Observable.__init__(self)
+        TabGUI.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
                 
         # Each row has 'type', 'number', 'show', 'tests'
@@ -1833,8 +1828,14 @@ class TestProgressMonitor(plugins.Observable):
                                        gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.progressReport = None
         self.treeView = None
-        self.setupTreeView()
-    def setupTreeView(self):
+
+    def getTabTitle(self):
+        return "Progress"
+
+    def activate(self):
+        pass # We don't worry about whether we're visible, we think we're important enough to write lots anyway!
+    
+    def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)
         selection = self.treeView.get_selection()
         selection.set_mode(gtk.SELECTION_MULTIPLE)
@@ -1854,10 +1855,8 @@ class TestProgressMonitor(plugins.Observable):
         toggleColumn = gtk.TreeViewColumn("Visible", toggle, active=2)
         toggleColumn.set_alignment(0.5)
         self.treeView.append_column(toggleColumn)
-        
-        self.progressReport = gtk.VBox()
-        self.progressReport.pack_start(self.treeView, expand=True, fill=True)
-        self.progressReport.show_all()
+        self.treeView.show()
+        return self.treeView
             
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
@@ -2016,6 +2015,17 @@ class TestProgressMonitor(plugins.Observable):
         # the chosen progress report options.
         for test in self.treeModel.get_value(iter, 5):
             self.notify("Visibility", test, newValue)
-                    
-    def getProgressView(self):
-        return self.progressReport
+
+# Class for importing self tests
+class ImportTestCase(guiplugins.ImportTestCase):
+    def addDefinitionFileOption(self, suite, oldOptionGroup):
+        guiplugins.ImportTestCase.addDefinitionFileOption(self, suite, oldOptionGroup)
+        self.addSwitch(oldOptionGroup, "GUI", "Use TextTest GUI", 1)
+        self.addSwitch(oldOptionGroup, "sGUI", "Use TextTest Static GUI", 0)
+    def getOptions(self, suite):
+        options = guiplugins.ImportTestCase.getOptions(self, suite)
+        if self.optionGroup.getSwitchValue("sGUI"):
+            options += " -gx"
+        elif self.optionGroup.getSwitchValue("GUI"):
+            options += " -g"
+        return options

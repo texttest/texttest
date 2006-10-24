@@ -220,7 +220,7 @@ class TextTestGUI(Responder):
         vbox.show()
         topWindow.add(vbox)
         topWindow.show()
-        # avoid the quit button getting initial focus
+        # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.testTreeGUI.treeView.grab_focus()
         self.adjustSize(topWindow)
         
@@ -379,14 +379,19 @@ class TextTestGUI(Responder):
         self.selectionActionGUI = self.createSelectionActionGUI(topWindow, actionThread)
         testWins = self.createTestWindows(treeWindow)
 
+        rootSuite = self.rootSuites[0]
+        self.textInfoGUI = TextInfoGUI(rootSuite)
+        self.testTreeGUI.addObserver(self.textInfoGUI)
+        tabGUIs = [ self.textInfoGUI ]
         # Must be created after addSuiteWithParents has counted all tests ...
         # (but before RightWindowGUI, as that wants in on progress)
         if self.dynamic:
             self.progressBar = TestProgressBar(self.testTreeGUI.totalNofTests)
             self.progressMonitor = TestProgressMonitor()
             self.progressMonitor.addObserver(self.testTreeGUI)
+            tabGUIs.append(self.progressMonitor)
 
-        self.rightWindowGUI = self.createDefaultRightGUI()
+        self.rightWindowGUI = self.createDefaultRightGUI(rootSuite, tabGUIs)
         # watch for double-clicks
         self.testTreeGUI.addObserver(self.rightWindowGUI)
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
@@ -400,10 +405,9 @@ class TextTestGUI(Responder):
         self.setUpGui()
         gobject.idle_add(self.pickUpProcess)
         gtk.main()
-    def createDefaultRightGUI(self):
-        rootSuite = self.rootSuites[0]
+    def createDefaultRightGUI(self, rootSuite, tabGUIs):
         guilog.info("Viewing test " + repr(rootSuite))
-        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.status, self.progressMonitor, self.uiManager)
+        return RightWindowGUI(rootSuite, self.dynamic, self.selectionActionGUI, self.status, tabGUIs, self.uiManager)
     def pickUpProcess(self):
         process = guiplugins.processTerminationMonitor.getTerminatedProcess()
         if process:
@@ -421,6 +425,7 @@ class TextTestGUI(Responder):
         
         self.testTreeGUI.notifyLifecycleChange(test, state, changeDesc)
         self.rightWindowGUI.notifyLifecycleChange(test, state, changeDesc)
+        self.textInfoGUI.notifyLifecycleChange(test, state, changeDesc)
         if self.progressBar:
             self.progressBar.notifyLifecycleChange(test, state, changeDesc)
         if self.progressMonitor:
@@ -918,6 +923,8 @@ class TabGUI:
         self.describe()
     def describe(self):
         pass
+    def hasInfo(self):
+        return True # sometimes these things don't have anything to display
     def deactivate(self):
         self.active = False
     def getTabTitle(self):
@@ -1255,12 +1262,11 @@ class SubNotebookGUI(NotebookGUI):
         
             
 class RightWindowGUI:
-    def __init__(self, object, dynamic, selectionActionGUI, status, progressMonitor, uiManager):
+    def __init__(self, object, dynamic, selectionActionGUI, status, specialTestTabGUIs, uiManager):
         self.dynamic = dynamic
         self.uiManager = uiManager
-        self.progressMonitor = progressMonitor
+        self.specialTestTabGUIs = specialTestTabGUIs
         self.selectionActionGUI = selectionActionGUI
-        self.textInfoGUI = TextInfoGUI(object)
         self.status = status
         self.window = gtk.VBox()
         self.vpaned = gtk.VPaned()
@@ -1291,10 +1297,10 @@ class RightWindowGUI:
             return TopNotebookGUI
     def getTestTabGUIs(self):
         tabGUIs = []
-        if self.textInfoGUI.hasInfo():
-            tabGUIs.append(self.textInfoGUI)
-        if self.progressMonitor:
-            tabGUIs.append(self.progressMonitor)
+        for specialTestTabGUI in self.specialTestTabGUIs:
+            if specialTestTabGUI.hasInfo():
+                tabGUIs.append(specialTestTabGUI)
+
         tabGUIs += self.intvActionGUI.createActionTabGUIs()
         return tabGUIs
 
@@ -1316,14 +1322,12 @@ class RightWindowGUI:
         self.fileViewGUI.notifyFileChange(test)
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.fileViewGUI.notifyLifecycleChange(test, state, changeDesc)
-        self.textInfoGUI.notifyLifecycleChange(test, state, changeDesc)
     def notifyRemove(self, object):
         # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
         if self.currentObject is object:
             self.notifyViewTest(object.parent)
     def notifyViewTest(self, test):
         # Triggered by user double-clicking the test in the test tree
-        self.textInfoGUI.notifyViewTest(test)
         self.view(test, resetNotebook=True)
     def notifyAdd(self, test):
         guilog.info("Viewing new test " + test.name)

@@ -1109,8 +1109,9 @@ class NotebookGUI(TabGUI):
     def createView(self):
         self.notebook = gtk.Notebook()
         for tabName, tabGUI in self.tabInfo.items():
-            label = gtk.Label(tabName)
-            self.notebook.append_page(tabGUI.createView(), label)
+            if tabGUI.hasInfo():
+                label = gtk.Label(tabName)
+                self.notebook.append_page(tabGUI.createView(), label)
 
         scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
         self.notebook.connect("switch-page", self.handlePageSwitch)
@@ -1157,8 +1158,8 @@ class TopNotebookGUI(NotebookGUI):
             scriptTitle = "view sub-options for " + tabName.lower() + " :"
             tabInfo[tabName] = SubNotebookGUI(guisUnderTab, scriptTitle, active=False)
         return tabInfo
-    def update(self, newTestTabGUIs, reset):
-        self.tabInfo["Test"].update(newTestTabGUIs, reset)
+    def update(self, newTestTabGUIs):
+        self.tabInfo["Test"].update(newTestTabGUIs)
 
 class SubNotebookGUI(NotebookGUI):
     def classify(self, tabGUIs):
@@ -1230,9 +1231,16 @@ class SubNotebookGUI(NotebookGUI):
             del self.tabInfo[name]
             self.notebook.remove(oldPage)
 
-    def update(self, newTabGUIs, reset):
+    def getNewTabNames(self, newTabGUIs):
+        names = []
+        for tabGUI in newTabGUIs:
+            if tabGUI.hasInfo():
+                names.append(tabGUI.getTabTitle())
+        return names
+
+    def update(self, newTabGUIs):
         oldTabNames = self.getObjectDependentTabNames()
-        newTabNames = [ tabGUI.getTabTitle() for tabGUI in newTabGUIs ]
+        newTabNames = self.getNewTabNames(newTabGUIs)
         self.diag.info("Updating notebook for " + repr(newTabNames) + " from " + repr(oldTabNames))
         pageNamesCreated, pageNamesUpdated, pageNamesRemoved = self.findChanges(newTabNames, oldTabNames)
 
@@ -1241,9 +1249,8 @@ class SubNotebookGUI(NotebookGUI):
 
         # Must reset if we're viewing a removed page
         currentPageName = self.getCurrentPageName()
-        reset |= currentPageName in pageNamesRemoved
         newCurrentPageNum = self.findFirstRemainingPageNum(pageNamesRemoved)
-        if reset and self.notebook.get_current_page() != newCurrentPageNum:
+        if self.notebook.get_current_page() != newCurrentPageNum:
             self.diag.info("Resetting for current page " + currentPageName + " to page " + repr(newCurrentPageNum))
             self.notebook.set_current_page(newCurrentPageNum)
             self.diag.info("Resetting done.")
@@ -1262,7 +1269,7 @@ class SubNotebookGUI(NotebookGUI):
         
             
 class RightWindowGUI:
-    def __init__(self, object, dynamic, selectionActionGUI, status, specialTestTabGUIs, uiManager):
+    def __init__(self, initialObject, dynamic, selectionActionGUI, status, specialTestTabGUIs, uiManager):
         self.dynamic = dynamic
         self.uiManager = uiManager
         self.specialTestTabGUIs = specialTestTabGUIs
@@ -1278,9 +1285,9 @@ class RightWindowGUI:
         self.bottomFrame.set_shadow_type(gtk.SHADOW_IN)
         self.vpaned.pack1(self.topFrame, resize=True)
         self.vpaned.pack2(self.bottomFrame, resize=True)
-        self.currentObject = object
-        self.fileViewGUI = self.createFileViewGUI(object)
-        self.intvActionGUI = self.createIntvActionGUI(object)
+        self.currentObject = initialObject
+        self.fileViewGUI = self.createFileViewGUI()
+        self.intvActionGUI = self.createIntvActionGUI()
         self.notebookGUI = self.createNotebookGUI()
 
         self.fillWindow()
@@ -1296,13 +1303,7 @@ class RightWindowGUI:
         else:
             return TopNotebookGUI
     def getTestTabGUIs(self):
-        tabGUIs = []
-        for specialTestTabGUI in self.specialTestTabGUIs:
-            if specialTestTabGUI.hasInfo():
-                tabGUIs.append(specialTestTabGUI)
-
-        tabGUIs += self.intvActionGUI.createActionTabGUIs()
-        return tabGUIs
+        return self.specialTestTabGUIs + self.intvActionGUI.createActionTabGUIs()
 
     def getTabGUIs(self):
         return self.getTestTabGUIs() + self.selectionActionGUI.createActionTabGUIs()    
@@ -1322,25 +1323,23 @@ class RightWindowGUI:
         self.fileViewGUI.notifyFileChange(test)
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.fileViewGUI.notifyLifecycleChange(test, state, changeDesc)
-    def notifyRemove(self, object):
+    def notifyRemove(self, test):
         # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
-        if self.currentObject is object:
-            self.notifyViewTest(object.parent)
-    def notifyViewTest(self, test):
-        # Triggered by user double-clicking the test in the test tree
-        self.view(test, resetNotebook=True)
+        if self.currentObject is test:
+            self.notifyViewTest(test.parent)
     def notifyAdd(self, test):
         guilog.info("Viewing new test " + test.name)
         self.notifyViewTest(test)
-    def view(self, object, resetNotebook):
+    def notifyViewTest(self, newObject):
+        # Triggered by user double-clicking the test in the test tree
         self.removeChildrenExcept(self.notebookGUI.notebook)
-        self.currentObject = object
-        self.fileViewGUI = self.createFileViewGUI(object)
+        self.currentObject = newObject
+        self.fileViewGUI = self.createFileViewGUI()
         
         self.intvActionGUI.disconnectAccelerators() # disconnect the old things
-        self.intvActionGUI = self.createIntvActionGUI(object)
+        self.intvActionGUI = self.createIntvActionGUI()
         self.fillWindow()
-        self.notebookGUI.update(self.getTestTabGUIs(), resetNotebook)
+        self.notebookGUI.update(self.getTestTabGUIs())
     def removeChildrenExcept(self, notebook):
         for child in self.window.get_children():
             if not child is notebook:
@@ -1355,15 +1354,15 @@ class RightWindowGUI:
                 self.fileViewGUI.addObserver(action)
         for action in testActions:
             action.addObserver(self.status)
-    def createIntvActionGUI(self, object):
+    def createIntvActionGUI(self):
         app = None
-        if object.classId() == "test-app":
-            app = object
+        if self.currentObject.classId() == "test-app":
+            app = self.currentObject
         else:
-            app = object.app
+            app = self.currentObject.app
 
-        index = self.getActionGroupIndex(object)
-        actions = self.makeActionInstances(object)
+        index = self.getActionGroupIndex(self.currentObject)
+        actions = self.makeActionInstances(self.currentObject)
         self.addObservers(self.selectionActionGUI.actions, actions)
         return InteractiveActionGUI(actions, self.uiManager, app, index)
 
@@ -1378,11 +1377,11 @@ class RightWindowGUI:
         self.window.pack_start(self.vpaned, expand=True, fill=True)
         self.vpaned.show_all()
         self.window.show_all()    
-    def createFileViewGUI(self, object):
-        if object.classId() == "test-app":
-            return ApplicationFileGUI(object)
+    def createFileViewGUI(self):
+        if self.currentObject.classId() == "test-app":
+            return ApplicationFileGUI(self.currentObject)
         else:
-            return TestFileGUI(object, self.dynamic)
+            return TestFileGUI(self.currentObject, self.dynamic)
     def getWindow(self):
         return self.window
     def makeActionInstances(self, object):

@@ -378,7 +378,7 @@ class Observable:
                     method(self, *args)
                 else:
                     method(*args)
-            
+
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
 def getDiagnostics(diagName):
@@ -670,6 +670,10 @@ class Option:
             return self.valueMethod()
         else:
             return self.defaultValue
+    def setValue(self, value):
+        self.defaultValue = value
+        if self.updateMethod:
+            self.updateMethod(value)
     def setMethods(self, valueMethod, updateMethod):
         self.valueMethod = valueMethod
         self.updateMethod = updateMethod
@@ -691,6 +695,8 @@ class TextOption(Option):
     def addPossibleValue(self, value):
         self.possibleValues.append(value)
         self.possValMethod(value)
+    def setPossibleValues(self, values):
+        self.possibleValues = values
 
 class Switch(Option):
     def __init__(self, name, defaultValue, options):
@@ -763,6 +769,20 @@ class OptionGroup:
             return self.options[key].getValue()
         else:
             return self.getDefault(key, defValue)
+    def setSwitchValue(self, key, value):
+        if self.switches.has_key(key):
+            self.switches[key].setValue(value)
+    def setPossibleValues(self, key, possibleValues):
+        option = self.options.get(key)
+        if option:
+            possValuesToUse = self.getDefaultPossiblilities(option.name, option.defaultValue, possibleValues)
+            option.setPossibleValues(possValuesToUse)
+    def removeSwitch(self, key):
+        if self.switches.has_key(key):
+            del self.switches[key]
+    def setOptionValue(self, key, value):
+        if self.options.has_key(key):
+            return self.options[key].setValue(value)
     def getCommandLines(self):
         commandLines = []
         for key, option in self.options.items():

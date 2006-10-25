@@ -757,7 +757,7 @@ class RuleSet:
             
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):
-    def addEnvironmentFileOptions(self, oldOptionGroup):
+    def addEnvironmentFileOptions(self):
         usr = os.getenv("CARMUSR")
         if not usr:
             usr=""
@@ -776,6 +776,10 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
                     dta=""
         self.optionGroup.addOption("usr", "CARMUSR", usr)
         self.optionGroup.addOption("data", "CARMDATA (only if different)", dta)
+    def updateDefaults(self):
+        guiplugins.ImportTestSuite.updateDefaults(self)
+        self.optionGroup.setOptionValue("usr", "")
+        self.optionGroup.setOptionValue("data", "")
     def getCarmValue(self, val):
         optionVal = self.optionGroup.getOptionValue(val)
         if optionVal:

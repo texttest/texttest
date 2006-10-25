@@ -43,15 +43,15 @@ class JavaPropertyReader:
             wFile.write(key + "=" + self.properties[key] + os.linesep)
 
 class ImportTestCase(guiplugins.ImportTestCase):
-    def __init__(self, test, oldOptionGroup):
-        guiplugins.ImportTestCase.__init__(self, test, oldOptionGroup)
-        defaultHTTPdir = test.getEnvironment("DMG_RECORD_HTTP_DIR")
-        baseName = test.getEnvironment("DMG_PROPS_INPUT")
-        propFileInCheckout = os.path.join(test.app.checkout, "Descartes", "DMG", baseName)
+    def __init__(self, test):
+        guiplugins.ImportTestCase.__init__(self, test)
+        defaultHTTPdir = self.currentTest.getEnvironment("DMG_RECORD_HTTP_DIR")
+        baseName = self.currentTest.getEnvironment("DMG_PROPS_INPUT")
+        propFileInCheckout = os.path.join(self.currentTest.app.checkout, "Descartes", "DMG", baseName)
         self.props = JavaPropertyReader(propFileInCheckout)
-        self.addOption(oldOptionGroup, "desmond_host", "Desmond host", self.props.get("desmond_host"))
-        self.addOption(oldOptionGroup, "desmond_port", "Desmond port", self.props.get("desmond_port"))
-        self.addOption(oldOptionGroup, "w", "HTTP dir", defaultHTTPdir)
+        self.addOption("desmond_host", "Desmond host", self.props.get("desmond_host"))
+        self.addOption("desmond_port", "Desmond port", self.props.get("desmond_port"))
+        self.addOption("w", "HTTP dir", defaultHTTPdir)
     def writeEnvironmentFile(self, suite, testDir):
         self.props.set("host", self.optionGroup.getOptionValue("desmond_host"))
         self.props.set("port", self.optionGroup.getOptionValue("desmond_port"))

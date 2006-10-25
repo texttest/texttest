@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.35 2006/10/17 10:31:40 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.36 2006/10/25 12:44:20 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -149,12 +149,14 @@ class ImportTestSuite(ravebased.ImportTestSuite):
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
     newMacroString = "<Record new macro>"
-    def addDefinitionFileOption(self, suite, oldOptionGroup):
-        guiplugins.ImportTestCase.addDefinitionFileOption(self, suite, oldOptionGroup)
-        # Don't use oldOptionGroup, we probably don't want the same macro more than once
-        self.optionGroup.addOption("mac", "Macro to use", self.newMacroString, self.getExistingMacros(suite))
-    def getExistingMacros(self, suite):
-        carmUsr = suite.getEnvironment("CARMUSR")
+    def addDefinitionFileOption(self, suite):
+        guiplugins.ImportTestCase.addDefinitionFileOption(self, suite)
+        self.optionGroup.addOption("mac", "Macro to use", self.newMacroString)
+    def updateDefaults(self):
+        self.optionGroup.setOptionValue("mac", self.newMacroString)
+        self.optionGroup.setPossibleValues("mac", self.getExistingMacros())
+    def getExistingMacros(self):
+        carmUsr = self.currentTest.getEnvironment("CARMUSR")
         if not carmUsr:
             return []
         path = os.path.join(carmUsr, "macros")
@@ -176,12 +178,14 @@ class ImportTestCase(guiplugins.ImportTestCase):
             shutil.copyfile(fullMacroPath, usecaseFile)
 
 class RecordTest(guiplugins.RecordTest):
-    def __init__(self, test, oldOptionGroup):
-        guiplugins.RecordTest.__init__(self, test, oldOptionGroup)
-        if self.canPerform():
-            self.optionGroup.addOption("rset", "Compile this ruleset first", possibleValues=self.findRuleSets(test))
-    def findRuleSets(self, test):
-        carmUsr = test.getEnvironment("CARMUSR")
+    def __init__(self, test):
+        guiplugins.RecordTest.__init__(self, test)
+        self.optionGroup.addOption("rset", "Compile this ruleset first")
+    def updateDefaults(self):
+        self.optionGroup.setOptionValue("rset", "")
+        self.optionGroup.setPossibleValues("rset", self.findRuleSets())
+    def findRuleSets(self):
+        carmUsr = self.currentTest.getEnvironment("CARMUSR")
         if not carmUsr:
             return []
         sourceDir = os.path.join(carmUsr, "crc", "source")

@@ -502,8 +502,8 @@ class FeatureFilter(plugins.Filter):
             return False
 
 class SelectTests(guiplugins.SelectTests):
-    def __init__(self, rootSuites, oldOptionGroup):
-        guiplugins.SelectTests.__init__(self, rootSuites, oldOptionGroup)
+    def __init__(self, rootSuites):
+        guiplugins.SelectTests.__init__(self, rootSuites)
         self.features = []
         for app in self.apps:
             featureFile = os.path.join(app.getDirectory(), "features." + app.name)
@@ -513,7 +513,7 @@ class SelectTests(guiplugins.SelectTests):
                 parts = line.split()
                 if len(parts) > 0:
                     featureName = line.replace("\n", "")
-                    self.addSwitch(oldOptionGroup, featureName, featureName, 0)
+                    self.addSwitch(featureName, featureName, 0)
                     self.features.append(featureName)
     def getFilterList(self, app):
         filters = guiplugins.SelectTests.getFilterList(self, app)    
@@ -529,4 +529,4 @@ class SelectTests(guiplugins.SelectTests):
                 result.append(feature)
         return result
 
-guiplugins.interactiveActionHandler.testClasses.append(optimization.PlotTestInGUI)
+guiplugins.interactiveActionHandler.actionClasses.append(optimization.PlotTestInGUI)

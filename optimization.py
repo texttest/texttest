@@ -927,8 +927,8 @@ class MakeProgressReport(TestReport):
 
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
-    def addDefinitionFileOption(self, suite, oldOptionGroup):
-        self.addOption(oldOptionGroup, "sp", "Subplan name")
+    def addDefinitionFileOption(self, suite):
+        self.addOption("sp", "Subplan name")
     def getSubplanName(self):
         return self.optionGroup.getOptionValue("sp")
     def getNewTestName(self):
@@ -1008,17 +1008,17 @@ class GraphPlotResponder(Responder):
 
 # This is the action responsible for plotting from the GUI.
 class PlotTestInGUI(guiplugins.InteractiveTestAction):
-    def __init__(self, dynamic, test, oldOptionGroups):
+    def __init__(self, dynamic, test):
         guiplugins.InteractiveTestAction.__init__(self, test)
-        self.createGUITestGraph(oldOptionGroups)
-    def createGUITestGraph(self, oldOptionGroups = []):
+        self.createGUITestGraph()
+    def createGUITestGraph(self):
         self.testGraph = TestGraph()
         
         self.testGraph.optionGroup = self.optionGroup
         for name, expl, value in self.testGraph.options:
-            self.addOption(oldOptionGroups, name, expl, value)
+            self.addOption(name, expl, value)
         for name, expl in self.testGraph.switches:
-            self.addSwitch(oldOptionGroups, name, expl)
+            self.addSwitch(name, expl)
     def __repr__(self):
         return "Plotting Graph"
     def getTitle(self):
@@ -1803,9 +1803,9 @@ class SelectorWeekend(testoverview.Selector):
         return "Weekend"
     
 class StartStudio(guiplugins.InteractiveTestAction):
-    def __init__(self, test, oldOptionGroups):
+    def __init__(self, test):
         guiplugins.InteractiveTestAction.__init__(self, test)
-        self.addOption(oldOptionGroups, "sys", "Studio CARMSYS to use", test.getEnvironment("CARMSYS"))
+        self.addOption("sys", "Studio CARMSYS to use", self.currentTest.getEnvironment("CARMSYS"))
     def __repr__(self):
         return "Studio"
     def getTitle(self):
@@ -1833,10 +1833,10 @@ class StartStudio(guiplugins.InteractiveTestAction):
         guiplugins.scriptEngine.monitorProcess("runs studio", process)
         self.currentTest.tearDownEnvironment(parents=1)
 
-guiplugins.interactiveActionHandler.testStaticClasses += [ StartStudio ]
+guiplugins.interactiveActionHandler.actionStaticClasses += [ StartStudio ]
 
 class CVSLogInGUI(guiplugins.InteractiveTestAction):
-    def __init__(self, dynamic, test, oldOptionGroups):
+    def __init__(self, dynamic, test):
         guiplugins.InteractiveTestAction.__init__(self, test)
     def performOnCurrent(self):
         logFileStem = self.currentTest.app.getConfigValue("log_file")
@@ -1876,4 +1876,4 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
             info += os.linesep
         return info
 
-guiplugins.interactiveActionHandler.testClasses += [ CVSLogInGUI ]
+guiplugins.interactiveActionHandler.actionClasses += [ CVSLogInGUI ]

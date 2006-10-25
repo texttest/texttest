@@ -75,6 +75,8 @@ class InteractiveAction(plugins.Observable):
             return []
     def isActive(self):
         return True
+    def isActiveOnCurrent(self):
+        return True
     def canPerform(self):
         return True # do we activate this via performOnCurrent() ?
     def getInterfaceDescription(self):
@@ -116,15 +118,9 @@ class InteractiveAction(plugins.Observable):
             return baseTitle
     def _getScriptTitle(self):
         return self.getTitle()
-    def addOption(self, oldOptionGroups, key, name, value = "", possibleValues = []):
-        for oldOptionGroup in oldOptionGroups:
-            if oldOptionGroup.options.has_key(key):
-                return self.optionGroup.addOption(key, name, oldOptionGroup.getOptionValue(key), possibleValues)
+    def addOption(self, key, name, value = "", possibleValues = []):
         self.optionGroup.addOption(key, name, value, possibleValues)
-    def addSwitch(self, oldOptionGroups, key, name, defaultValue = 0, options = []):
-        for oldOptionGroup in oldOptionGroups:
-            if oldOptionGroup.switches.has_key(key):
-                return self.optionGroup.addSwitch(key, name, oldOptionGroup.getSwitchValue(key), options)
+    def addSwitch(self, key, name, defaultValue = 0, options = []):
         self.optionGroup.addSwitch(key, name, defaultValue, options)
     def startExternalProgram(self, commandLine, description = "", shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
         process = plugins.BackgroundProcess(commandLine, description=description, shellTitle=shellTitle, \
@@ -210,11 +206,13 @@ class SelectionAction(InteractiveAction):
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveTestAction(InteractiveAction):
-    def __init__(self, test):
-        self.currentTest = test
+    def __init__(self, rootTestSuites):
+        self.currentTest = rootTestSuites[0]
         InteractiveAction.__init__(self)
     def isTestDependent(self):
         return True
+    def isActiveOnCurrent(self):
+        return self.currentTest.classId() == "test-case"
     def describeTests(self):
         return repr(self.currentTest)
     def getConfigValue(self, entryName):
@@ -238,6 +236,9 @@ class InteractiveTestAction(InteractiveAction):
             return os.path.join(self.currentTest.getRelPath(), os.path.basename(filename))
     def notifyViewTest(self, test):
         self.currentTest = test
+        self.updateDefaults()
+    def updateDefaults(self):
+        pass # place to change any default values based on the test being viewed
     def viewFile(self, fileName, refreshContents=False, refreshFiles=False):
         exitHandler = None
         if refreshFiles:
@@ -254,14 +255,14 @@ class InteractiveTestAction(InteractiveAction):
     
 # Plugin for saving tests (standard)
 class SaveTests(SelectionAction):
-    def __init__(self, rootTestSuites, oldOptionGroups):
+    def __init__(self, rootTestSuites):
         SelectionAction.__init__(self, rootTestSuites)
-        self.addOption(oldOptionGroups, "v", "Version to save", self.getDefaultSaveOption(), self.getPossibleVersions())
-        self.addSwitch(oldOptionGroups, "over", "Replace successfully compared files also", 0)
+        self.addOption("v", "Version to save", self.getDefaultSaveOption(), self.getPossibleVersions())
+        self.addSwitch("over", "Replace successfully compared files also", 0)
         self.currFileSelection = []
         self.currTestDescription = ""
         if self.hasPerformance():
-            self.addSwitch(oldOptionGroups, "ex", "Save: ", 1, ["Average performance", "Exact performance"])
+            self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
     def isFrequentUse(self):
         return True
     def getStockId(self):
@@ -349,19 +350,26 @@ class SaveTests(SelectionAction):
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!
 class ViewFile(InteractiveTestAction):
-    def __init__(self, dynamic, test, oldOptionGroups):
+    def __init__(self, dynamic, test):
         InteractiveTestAction.__init__(self, test)
-        if dynamic and test.classId() == "test-case":
-            self.addSwitch(oldOptionGroups, "rdt", "Include Run-dependent Text", 0)
-            self.addSwitch(oldOptionGroups, "nf", "Show differences where present", 1)
-            if not test.state.isComplete():
-                self.addSwitch(oldOptionGroups, "f", "Follow file rather than view it", 1)
+        self.dynamic = dynamic
+        if dynamic:
+            self.addSwitch("rdt", "Include Run-dependent Text", 0)
+            self.addSwitch("nf", "Show differences where present", 1)
+    def isActiveOnCurrent(self):
+        return not self.dynamic or InteractiveTestAction.isActiveOnCurrent(self)
     def getTabTitle(self):
         return "Viewing"
     def canPerform(self):
         return False # activate when a file is viewed, not via the performOnCurrent method
     def hasButton(self):
         return False
+    def updateDefaults(self):
+        if self.dynamic:
+            if self.currentTest.state.isComplete():
+                self.optionGroup.removeSwitch("f")
+            else:
+                self.addSwitch("f", "Follow file rather than view it", 1)
     def tmpFile(self, comparison):
         if self.optionGroup.getSwitchValue("rdt"):
             return comparison.tmpFile
@@ -418,23 +426,23 @@ class ViewFile(InteractiveTestAction):
 
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveTestAction):
-    def __init__(self, suite, oldOptionGroups):
+    def __init__(self, suite):
         InteractiveTestAction.__init__(self, suite)
-        self.optionGroup.addOption("name", self.getNameTitle(), self.getDefaultName(suite))
-        self.optionGroup.addOption("desc", self.getDescTitle(), self.getDefaultDesc(suite))
+        self.optionGroup.addOption("name", self.getNameTitle(), self.getDefaultName())
+        self.optionGroup.addOption("desc", self.getDescTitle(), self.getDefaultDesc())
         self.testImported = None
+    def isActiveOnCurrent(self):
+        return self.currentTest.classId() == "test-suite"
     def getNameTitle(self):
         return self.testType() + " Name"
     def getDescTitle(self):
         return self.testType() + " Description"
-    def notifyViewTest(self, test):
-        InteractiveTestAction.notifyViewTest(self, test)
-        if test.classId() == "test-suite":
-            self.optionGroup.setOptionValue("name", self.getDefaultName(test))
-            self.optionGroup.setOptionValue("desc", self.getDefaultDesc(test))
-    def getDefaultName(self, suite):
+    def updateDefaults(self):
+        self.optionGroup.setOptionValue("name", self.getDefaultName())
+        self.optionGroup.setOptionValue("desc", self.getDefaultDesc())
+    def getDefaultName(self):
         return ""
-    def getDefaultDesc(self, suite):
+    def getDefaultDesc(self):
         return ""
     def getTabTitle(self):
         return "Adding " + self.testType()
@@ -466,17 +474,17 @@ class ImportTest(InteractiveTestAction):
         pass
 
 class RecordTest(InteractiveTestAction):
-    def __init__(self, test, oldOptionGroups):
+    def __init__(self, test):
         InteractiveTestAction.__init__(self, test)
         self.recordMode = self.currentTest.getConfigValue("use_case_record_mode")
         self.recordTime = None
         if self.isActive():
-            self.addOption(oldOptionGroups, "v", "Version to record", test.app.getFullVersion(forSave=1))
-            self.addOption(oldOptionGroups, "c", "Checkout to use for recording", test.app.checkout) 
-            self.addSwitch(oldOptionGroups, "rep", "Automatically replay test after recording it", 1)
-            self.addSwitch(oldOptionGroups, "repgui", "", defaultValue = 0, options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+            self.addOption("v", "Version to record", self.currentTest.app.getFullVersion(forSave=1))
+            self.addOption("c", "Checkout to use for recording", self.currentTest.app.checkout) 
+            self.addSwitch("rep", "Automatically replay test after recording it", 1)
+            self.addSwitch("repgui", "", defaultValue = 0, options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
         if self.recordMode == "console":
-            self.addSwitch(oldOptionGroups, "hold", "Hold record shell after recording")
+            self.addSwitch("hold", "Hold record shell after recording")
     def getTabTitle(self):
         return "Recording"
     def messageAfterPerform(self):
@@ -567,13 +575,13 @@ class RecordTest(InteractiveTestAction):
         return "Record _Use-Case"
     
 class ImportTestCase(ImportTest):
-    def __init__(self, suite, oldOptionGroups):
-        ImportTest.__init__(self, suite, oldOptionGroups)
-        self.addDefinitionFileOption(suite, oldOptionGroups)
+    def __init__(self, suite):
+        ImportTest.__init__(self, suite)
+        self.addDefinitionFileOption(suite)
     def testType(self):
         return "Test"
-    def addDefinitionFileOption(self, suite, oldOptionGroups):
-        self.addOption(oldOptionGroups, "opt", "Command line options")
+    def addDefinitionFileOption(self, suite):
+        self.addOption("opt", "Command line options")
     def createTestContents(self, suite, testDir):
         self.writeDefinitionFiles(suite, testDir)
         self.writeEnvironmentFile(suite, testDir)
@@ -613,16 +621,16 @@ class ImportTestCase(ImportTest):
         pass
 
 class ImportTestSuite(ImportTest):
-    def __init__(self, suite, oldOptionGroups):
-        ImportTest.__init__(self, suite, oldOptionGroups)
-        self.addEnvironmentFileOptions(oldOptionGroups)
+    def __init__(self, suite):
+        ImportTest.__init__(self, suite)
+        self.addEnvironmentFileOptions()
     def testType(self):
         return "Suite"
     def createTestContents(self, suite, testDir):
         self.writeEnvironmentFiles(suite, testDir)
         return suite.addTestSuite(os.path.basename(testDir))
-    def addEnvironmentFileOptions(self, oldOptionGroups):
-        self.addSwitch(oldOptionGroups, "env", "Add environment file")
+    def addEnvironmentFileOptions(self):
+        self.addSwitch("env", "Add environment file")
     def writeEnvironmentFiles(self, suite, testDir):
         if self.optionGroup.getSwitchValue("env"):
             envFile = os.path.join(testDir, "environment")
@@ -630,12 +638,12 @@ class ImportTestSuite(ImportTest):
             file.write("# Dictionary of environment to variables to set in test suite" + "\n")
 
 class SelectTests(SelectionAction):
-    def __init__(self, rootSuites, oldOptionGroups):
+    def __init__(self, rootSuites):
         SelectionAction.__init__(self, rootSuites)
         self.diag = plugins.getDiagnostics("Select Tests")
-        self.addOption(oldOptionGroups, "vs", "Tests for version", "", self.getPossibleVersions())
-        self.addSwitch(oldOptionGroups, "select_in_collapsed_suites", "Select in collapsed suites", 0)
-        self.addSwitch(oldOptionGroups, "current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"])
+        self.addOption("vs", "Tests for version", "", self.getPossibleVersions())
+        self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0)
+        self.addSwitch("current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"])
         
         self.appSelectGroup = self.findSelectGroup()
         self.optionGroup.options += self.appSelectGroup.options
@@ -769,8 +777,6 @@ class SelectTests(SelectionAction):
         return newTestList
 
 class ResetGroups(SelectionAction):
-    def __init__(self, rootSuites, oldOptionGroups):
-        SelectionAction.__init__(self, rootSuites)
     def getStockId(self):
         return "revert-to-saved"
     def getInterfaceDescription(self):
@@ -791,12 +797,12 @@ class ResetGroups(SelectionAction):
                 group.reset()
 
 class SaveSelection(SelectionAction):
-    def __init__(self, dynamic, rootSuites, oldOptionGroups):
+    def __init__(self, dynamic, rootSuites):
         self.dynamic = dynamic
         SelectionAction.__init__(self, rootSuites)
-        self.addOption(oldOptionGroups, "name", "Name to give selection")
+        self.addOption("name", "Name to give selection")
         if not dynamic:
-            self.addSwitch(oldOptionGroups, "tests", "Store actual tests selected", 1)
+            self.addSwitch("tests", "Store actual tests selected", 1)
             for group in self.apps[0].optionGroups:
                 if group.name.startswith("Select"):
                     self.selectionGroup = group
@@ -844,7 +850,7 @@ class SaveSelection(SelectionAction):
                   
 class RunTests(SelectionAction):
     runNumber = 1
-    def __init__(self, rootSuites, oldOptionGroups):
+    def __init__(self, rootSuites):
         SelectionAction.__init__(self, rootSuites)
         self.optionGroups = []
         for group in self.apps[0].optionGroups:
@@ -918,9 +924,9 @@ class RunTests(SelectionAction):
                 self.addFilterFile(fileName)
 
 class EnableDiagnostics(InteractiveTestAction):
-    def __init__(self, test, oldOptionGroups):
+    def __init__(self, test):
         InteractiveTestAction.__init__(self, test)
-        configDir = test.getConfigValue("diagnostics")
+        configDir = self.currentTest.getConfigValue("diagnostics")
         self.configFile = None
         if configDir.has_key("configuration_file"):
             self.configFile = configDir["configuration_file"]
@@ -938,8 +944,8 @@ class EnableDiagnostics(InteractiveTestAction):
         self.viewFile(targetDiagFile, refreshFiles=True)
 
 class RemoveTest(InteractiveTestAction):
-    def __init__(self, test, oldOptionGroups):
-        InteractiveTestAction.__init__(self, test)
+    def isActiveOnCurrent(self):
+        return self.currentTest.classId() != "test-app"
     def getTitle(self):
         return "Remove"
     def getScriptTitle(self, tab):
@@ -954,8 +960,12 @@ class RemoveTest(InteractiveTestAction):
     def performOnCurrent(self):
         plugins.rmtree(self.currentTest.getDirectory())
         suite = self.currentTest.parent
-        self.removeFromTestFile(suite, self.currentTest.name)
+        testName = self.currentTest.name
+        self.removeFromTestFile(suite, testName)
         suite.removeTest(self.currentTest)
+        self.notify("Status", "Removed test " + testName)
+    def messageAfterPerform(self):
+        pass # do it as part of the method as currentTest will have changed by the end!
     def removeFromTestFile(self, suite, testName):
         newFileName = os.path.join(suite.app.writeDirectory, "tmptestsuite")
         newFile = plugins.openForWrite(newFileName)
@@ -979,10 +989,11 @@ class RemoveTest(InteractiveTestAction):
         plugins.movefile(newFileName, contentFileName)
 
 class CopyTest(ImportTest):
-    def __init__(self, test, oldOptionGroups):
-        ImportTest.__init__(self, test, oldOptionGroups)
-        self.currentTest = test.parent
-        self.testToCopy = test
+    def __init__(self, rootSuites):
+        self.testToCopy = None 
+        ImportTest.__init__(self, rootSuites)
+    def isActiveOnCurrent(self):
+        return self.testToCopy
     def testType(self):
         return "Test"
     def getTabTitle(self):
@@ -991,17 +1002,29 @@ class CopyTest(ImportTest):
         return "Name of copied test"
     def getDescTitle(self):
         return "Description of new test"
-    def getDefaultName(self, test):
-        return test.name + "_copy"
-    def getDefaultDesc(self, test):
-        return "Copy of " + test.name
+    def getDefaultName(self):
+        if self.testToCopy:
+            return self.testToCopy.name + "_copy"
+        else:
+            return ""
+    def getDefaultDesc(self):
+        if self.testToCopy:
+            return "Copy of " + self.testToCopy.name
+        else:
+            return ""
     def getTitle(self):
         return "_Copy"
     def getScriptTitle(self, tab):
         return "Copy Test"
     def notifyViewTest(self, test):
-        # apply to parent of where we're viewing!
-        self.currentTest = test.parent
+        # apply to parent
+        if test.classId() == "test-case":
+            self.testToCopy = test
+            self.currentTest = test.parent
+        else:
+            self.testToCopy = None
+            self.currentTest = test
+        self.updateDefaults()
     def createTestContents(self, suite, testDir):
         stdFiles, defFiles = self.testToCopy.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
@@ -1019,20 +1042,22 @@ class CopyTest(ImportTest):
         return suite.addTestCase(os.path.basename(testDir))
 
 class ReportBugs(InteractiveTestAction):
-    def __init__(self, test, oldOptionGroups):
+    def __init__(self, test):
         InteractiveTestAction.__init__(self, test)
-        self.addOption(oldOptionGroups, "search_string", "Text or regexp to match")
-        self.addOption(oldOptionGroups, "search_file", "File to search in", test.app.getConfigValue("log_file"),
+        self.addOption("search_string", "Text or regexp to match")
+        self.addOption("search_file", "File to search in", self.currentTest.app.getConfigValue("log_file"),
                        self.getPossibleFileStems())
-        self.addOption(oldOptionGroups, "version", "Version to report for", test.app.getFullVersion())
-        self.addOption(oldOptionGroups, "execution_hosts", "Trigger only when run on machine(s)")
-        self.addOption(oldOptionGroups, "bug_system", "Extract info from bug system", "<none>", [ "bugzilla" ])
-        self.addOption(oldOptionGroups, "bug_id", "Bug ID (only if bug system given)")
-        self.addOption(oldOptionGroups, "full_description", "Full description (no bug system)")
-        self.addOption(oldOptionGroups, "brief_description", "Few-word summary (no bug system)")
-        self.addSwitch(oldOptionGroups, "trigger_on_absence", "Trigger if given text is NOT present")
-        self.addSwitch(oldOptionGroups, "internal_error", "Trigger even if other files differ (report as internal error)")
-        self.addSwitch(oldOptionGroups, "trigger_on_success", "Trigger even if test would otherwise succeed")
+        self.addOption("version", "Version to report for", self.currentTest.app.getFullVersion())
+        self.addOption("execution_hosts", "Trigger only when run on machine(s)")
+        self.addOption("bug_system", "Extract info from bug system", "<none>", [ "bugzilla" ])
+        self.addOption("bug_id", "Bug ID (only if bug system given)")
+        self.addOption("full_description", "Full description (no bug system)")
+        self.addOption("brief_description", "Few-word summary (no bug system)")
+        self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
+        self.addSwitch("internal_error", "Trigger even if other files differ (report as internal error)")
+        self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
+    def isActiveOnCurrent(self):
+        return self.currentTest.classId() != "test-app"
     def getTitle(self):
         return "Report"
     def getScriptTitle(self, tab):
@@ -1091,18 +1116,11 @@ class ReportBugs(InteractiveTestAction):
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.appClasses = [ ViewFile ]
-        self.appDynamicClasses = []
-        self.appStaticClasses = []
-        self.testClasses = [ ViewFile ]
-        self.testDynamicClasses =  []
-        self.testStaticClasses =  [ RecordTest, EnableDiagnostics, CopyTest, RemoveTest, ReportBugs ]
-        self.suiteClasses = [ ViewFile ]
-        self.suiteDynamicClasses = []
-        self.suiteStaticClasses = [ ImportTestCase, ImportTestSuite, RemoveTest, ReportBugs ]
-        self.selectionClasses = [ SaveSelection ]
-        self.selectionDynamicClasses = [ SaveTests ]
-        self.selectionStaticClasses = [ SelectTests, RunTests, ResetGroups ]
+        self.actionClasses = [ ViewFile, SaveSelection ]
+        self.actionDynamicClasses = [ SaveTests ]
+        self.actionStaticClasses = [ RecordTest, EnableDiagnostics, CopyTest, ImportTestCase, \
+                                     ImportTestSuite, RemoveTest, ReportBugs, SelectTests,
+                                     RunTests, ResetGroups ]
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")
     def storeOptionGroup(self, className, instance):
@@ -1112,14 +1130,14 @@ class InteractiveActionHandler:
             return "Dynamic"
         else:
             return "Static"
-    def getInstances(self, dynamic, actionType, *args):
+    def getInstances(self, dynamic, *args):
         instances = []
         mode = self.getMode(dynamic)
-        for intvActionClass in eval("self." + actionType + mode + "Classes"):
+        for intvActionClass in eval("self.action" + mode + "Classes"):
             instance = self.makeInstance(intvActionClass, *args)
             if instance:
                 instances.append(instance)
-        for intvActionClass in eval("self." + actionType + "Classes"):
+        for intvActionClass in self.actionClasses:
             instance = self.makeInstance(intvActionClass, dynamic, *args)
             if instance:
                 instances.append(instance)
@@ -1130,8 +1148,6 @@ class InteractiveActionHandler:
             self.storeOptionGroup(intvActionClass, instance)
             return instance
     def makeInstanceObject(self, intvActionClass, *args):
-        oldOptionGroups = self.optionGroupMap.get(intvActionClass, [])
-        args += (oldOptionGroups,)
         self.diag.info("Trying to create action for " + intvActionClass.__name__)
         basicInstance = intvActionClass(*args)
         module = basicInstance.getConfigValue("interactive_action_module")

@@ -269,8 +269,6 @@ class CheckFilesForApc(plugins.Action):
         verifyLogFileDir(getArchitecture(test.app))        
 
 class ViewApcLog(guiplugins.InteractiveTestAction):
-    def __init__(self, test, oldOptionGroups):
-        guiplugins.InteractiveTestAction.__init__(self, test)
     def __repr__(self):
         return "Viewing log of"
     def performOnCurrent(self):
@@ -1463,9 +1461,6 @@ class CopyMPSFiles(plugins.Action):
             os.system("gzip " + newFileName)
 
 class SaveBestSolution(guiplugins.InteractiveTestAction):
-    def __init__(self, test, oldOptionGroups):
-        guiplugins.InteractiveTestAction.__init__(self, test)
-
     def performOnCurrent(self):
         import shutil
         # If we have the possibility to save, we know that the current solution is best
@@ -1526,9 +1521,9 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
 
 # Specialization of plotting in the GUI for APC
 class PlotTestInGUIAPC(optimization.PlotTestInGUI):
-    def __init__(self, dynamic, test, oldOptionGroup = None):
-        optimization.PlotTestInGUI.__init__(self, dynamic, test, oldOptionGroup)
-        self.addSwitch(oldOptionGroup, "kpi", "Plot kpi group")
+    def __init__(self, dynamic, test):
+        optimization.PlotTestInGUI.__init__(self, dynamic, test)
+        self.addSwitch("kpi", "Plot kpi group")
     def performOnCurrent(self):
         self.testGraph.createPlotLinesForTest(self.currentTest)
         # Plot KPI group
@@ -1547,8 +1542,8 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
                 print "Test", self.currentTest.name, "is not in an KPI group."
         self.plotGraph(self.currentTest.app.writeDirectory)  
 
-guiplugins.interactiveActionHandler.testClasses += [ PlotTestInGUIAPC ]
-guiplugins.interactiveActionHandler.testDynamicClasses += [ ViewApcLog, SaveBestSolution ] 
+guiplugins.interactiveActionHandler.actionClasses += [ PlotTestInGUIAPC ]
+guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ] 
 
 # A script that mimics _PlotTest in optimization.py, but that is specialized for
 # APC to plot all (selected) KPI groups.

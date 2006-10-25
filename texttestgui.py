@@ -31,15 +31,43 @@ from copy import copy
 def destroyDialog(dialog, *args):
     dialog.destroy()
 
+def createDialogMessage(message, stockIcon, scrollBars=False):
+    buffer = gtk.TextBuffer()
+    buffer.set_text(message)
+    textView = gtk.TextView(buffer)
+    textView.set_editable(False)
+    textView.set_cursor_visible(False)
+    textView.set_left_margin(5)
+    textView.set_right_margin(5)
+    hbox = gtk.HBox()
+    imageBox = gtk.VBox()
+    imageBox.pack_start(gtk.image_new_from_stock(stockIcon, gtk.ICON_SIZE_DIALOG), expand=False)
+    hbox.pack_start(imageBox, expand=False)
+    scrolledWindow = gtk.ScrolledWindow()
+    # What we would like is that the dialog expands without scrollbars
+    # until it reaches some maximum size, and then adds scrollbars. At
+    # the moment I cannot make this happen without setting a fixed window
+    # size, so I'll set the scrollbar policy to never instead.
+    if scrollBars:
+        scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+    else:
+        scrolledWindow.set_policy(gtk.POLICY_NEVER, gtk.POLICY_NEVER)
+    scrolledWindow.add(textView)
+    scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
+    hbox.pack_start(scrolledWindow, expand=True, fill=True)
+    alignment = gtk.Alignment()
+    alignment.set_padding(5, 5, 0, 5)
+    alignment.add(hbox)
+    return alignment
+
 def showError(message):
     guilog.info("ERROR : " + message)
-    dialog = gtk.Dialog("TextTest Message", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    dialog = gtk.Dialog("TextTest Error", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
     dialog.set_modal(True)
-    label = gtk.Label(message)
-    dialog.vbox.pack_start(label, expand=True, fill=True)
-    label.show()
+    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_ERROR), expand=True, fill=True)
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
-    dialog.show()    
+    dialog.show_all()
+    dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
 
 class DoubleCheckDialog:
     def __init__(self, message, yesMethod, yesMethodArgs=()):
@@ -50,14 +78,14 @@ class DoubleCheckDialog:
         noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
         self.dialog.set_modal(True)
-        label = gtk.Label(message)
-        self.dialog.vbox.pack_start(label, expand=True, fill=True)
-        label.show()
+        self.dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_QUESTION), expand=True, fill=True)
         # ScriptEngine cannot handle different signals for the same event (e.g. response
         # from gtk.Dialog), so we connect the individual buttons instead ...
         scriptEngine.connect("answer no to texttest query", "clicked", noButton, self.respond, gtk.RESPONSE_NO, False)
         scriptEngine.connect("answer yes to texttest query", "clicked", yesButton, self.respond, gtk.RESPONSE_YES, True)
-        self.dialog.show()
+        self.dialog.show_all()
+        self.dialog.action_area.get_children()[len(self.dialog.action_area.get_children()) - 1].grab_focus()
+
     def respond(self, button, saidYes, *args):
         if saidYes:
             self.yesMethod(*self.yesMethodArgs)

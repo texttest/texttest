@@ -485,6 +485,7 @@ class TestTreeGUI(plugins.Observable):
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
         self.itermap = seqdict()
         self.selection = None
+        self.selecting = False
         self.dynamic = dynamic
         self.totalNofTests = 0
         self.viewedTest = None
@@ -628,6 +629,8 @@ class TestTreeGUI(plugins.Observable):
             pass
 
     def selectionChanged(self, selection, printToLog = True):
+        if self.selecting:
+            return
         self.totalNofTestsShown = 0
 
         allSelected, selectedTests = self.getSelected()
@@ -666,6 +669,7 @@ class TestTreeGUI(plugins.Observable):
         except RuntimeError:
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
     def notifyNewTestSelection(self, selTests, selectCollapsed=True):
+        self.selecting = True
         self.selection.unselect_all()
         firstPath = None
         for test in selTests:
@@ -682,6 +686,8 @@ class TestTreeGUI(plugins.Observable):
         if firstPath is not None:
             self.selection.get_tree_view().scroll_to_cell(firstPath, None, True, 0.1)
         guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
+        self.selecting = False
+        self.selectionChanged(self.selection) 
     def countVisible(self, model, path, iter):
         # When rows are added, they are first empty, and asking for
         # classId on NoneType gives an error. See e.g.

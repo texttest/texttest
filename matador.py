@@ -75,9 +75,11 @@ class MatadorConfig(optimization.OptimizationConfig):
                     finalWord = line.split(" ")[-1]
                     return finalWord.strip()
         subPlanDir = self._getSubPlanDirName(test)
-        for line in open(os.path.join(subPlanDir, "APC_FILES", "problems")).xreadlines():
-            if line.startswith("153"):
-                return line.split(";")[3]
+        problemsFile = os.path.join(subPlanDir, "APC_FILES", "problems")
+        if os.path.isfile(problemsFile):
+            for line in open(problemsFile).xreadlines():
+                if line.startswith("153"):
+                    return line.split(";")[3]
         return ""
     def getRuleBuildFilterer(self):
         return FilterRuleBuilds(self.getRuleSetName, self.rebuildAllRulesets())

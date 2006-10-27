@@ -781,6 +781,7 @@ class TestTreeGUI(plugins.Observable):
             self.removeTest(test)
         for test in suite.testcases:
             self.addTest(test)
+        self.expandRow(self.findIter(suite), True)
         self.notifyNewTestSelection(allSelected)
     def rowActivated(self, view, path, column, *args):
         iter = self.filteredModel.get_iter(path)
@@ -1324,6 +1325,7 @@ class RightWindowGUI:
         self.vpaned.pack2(self.bottomFrame, resize=True)
         self.currentObject = initialObject
         self.fileViewGUI = self.createFileViewGUI()
+        self.addObservers(self.interactiveActionGUI.actions)
         self.notebookGUI = notebookGUI
 
         self.fillWindow()

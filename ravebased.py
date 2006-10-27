@@ -254,17 +254,19 @@ class Config(CarmenConfig):
         readDirs = CarmenConfig.extraReadFiles(self, test)
         if test.classId() == "test-case":
             test.setUpEnvironment(parents=1)
-            subplan = self._getSubPlanDirName(test)
-            if subplan and os.path.isdir(subplan):
-                for title, fileName in self.filesFromSubplan(test, subplan):
-                    readDirs[title] = [ fileName ]
             try:
-                ruleset = self.getRuleSetName(test)
-                if ruleset:
-                    readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", ruleset) ]
-            except plugins.TextTestError:
-                pass
-            test.tearDownEnvironment(parents=1)
+                subplan = self._getSubPlanDirName(test)
+                if subplan and os.path.isdir(subplan):
+                    for title, fileName in self.filesFromSubplan(test, subplan):
+                        readDirs[title] = [ fileName ]
+                try:
+                    ruleset = self.getRuleSetName(test)
+                    if ruleset:
+                        readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", ruleset) ]
+                except plugins.TextTestError:
+                    pass
+            finally:
+                test.tearDownEnvironment(parents=1)
         elif test.environment.has_key("CARMUSR"):
             files = self.getResourceFiles(test)
             if len(files):

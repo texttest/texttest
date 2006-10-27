@@ -1816,22 +1816,24 @@ class StartStudio(guiplugins.InteractiveTestAction):
         return "Start Studio"
     def performOnCurrent(self):
         self.currentTest.setUpEnvironment(parents=1)
-        os.environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
-        print "CARMSYS:", os.environ["CARMSYS"]
-        print "CARMUSR:", os.environ["CARMUSR"]
-        print "CARMTMP:", os.environ["CARMTMP"]
-        fullSubPlanPath = self.currentTest.app.configObject.target._getSubPlanDirName(self.currentTest)
-        lPos = fullSubPlanPath.find("LOCAL_PLAN/")
-        subPlan = fullSubPlanPath[lPos + 11:]
-        localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
-        studio = os.path.join(os.environ["CARMSYS"], "bin", "studio")
-        if not os.path.isfile(studio):
-            raise plugins.TextTestError, "Cannot start studio, no file at " + studio
-        commandLine = "exec " + studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
-                        "\",0)'" + plugins.nullRedirect() 
-        process = self.startExternalProgram(commandLine)
-        guiplugins.scriptEngine.monitorProcess("runs studio", process)
-        self.currentTest.tearDownEnvironment(parents=1)
+        try:
+            os.environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
+            print "CARMSYS:", os.environ["CARMSYS"]
+            print "CARMUSR:", os.environ["CARMUSR"]
+            print "CARMTMP:", os.environ["CARMTMP"]
+            fullSubPlanPath = self.currentTest.app.configObject.target._getSubPlanDirName(self.currentTest)
+            lPos = fullSubPlanPath.find("LOCAL_PLAN/")
+            subPlan = fullSubPlanPath[lPos + 11:]
+            localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
+            studio = os.path.join(os.environ["CARMSYS"], "bin", "studio")
+            if not os.path.isfile(studio):
+                raise plugins.TextTestError, "Cannot start studio, no file at " + studio
+            commandLine = "exec " + studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
+                            "\",0)'" + plugins.nullRedirect() 
+            process = self.startExternalProgram(commandLine)
+            guiplugins.scriptEngine.monitorProcess("runs studio", process)
+        finally:
+            self.currentTest.tearDownEnvironment(parents=1)
 
 guiplugins.interactiveActionHandler.actionStaticClasses += [ StartStudio ]
 

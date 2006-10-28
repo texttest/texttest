@@ -375,13 +375,13 @@ class SaveState(respond.SaveState):
         targetFile = os.path.join(testRepository, test.app.name, test.app.getFullVersion(), \
                                   test.getRelPath(), "teststate_" + self.dateString)
         if os.path.isfile(targetFile):
-            print "Warning: file already exists at", targetFile, "- not overwriting!"
+            plugins.printWarning("File already exists at " + targetFile + " - not overwriting!")
         else:
             try:
                 plugins.ensureDirExistsForFile(targetFile)
                 shutil.copyfile(test.getStateFile(), targetFile)
             except IOError:
-                print "Warning: could not write file at", targetFile
+                plugins.printWarning("Could not write file at " + targetFile)
     def addSuite(self, suite):
         testStateRepository = suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession)
         if testStateRepository:
@@ -565,7 +565,7 @@ class CollectFiles(plugins.ScriptWithArgs):
                     totalValues[catName] = 0
                 totalValues[catName] += int(count)
         except ValueError:
-            print "WARNING : found truncated or old format batch report (" + localName + ") - could not parse result correctly"
+            plugins.printWarning("Found truncated or old format batch report (" + localName + ") - could not parse result correctly.")
         fileBody = file.read()
         file.close()
         return fileBody

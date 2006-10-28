@@ -324,7 +324,7 @@ class TrafficServer(TCPServer):
         if bestMatch is not None:
             return bestMatch
         else:
-            sys.stderr.write("WARNING : could not find any sensible match for following traffic :\n" + desc + "\n")
+            sys.stderr.write("WARNING: Could not find any sensible match for the traffic:\n" + desc + "\n")
             return self.replayInfo.keys()[0]
     def findMatchPercentage(self, traffic1, traffic2):
         words1 = traffic1.split()

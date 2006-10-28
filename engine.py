@@ -34,7 +34,7 @@ class TestRunner:
         except KeyboardInterrupt:
             raise
         except:
-            print "WARNING : caught exception while running", self.test, "changing state to UNRUNNABLE :"
+            plugins.printWarning("Caught exception while running " + repr(self.test) + " changing state to UNRUNNABLE :")
             exceptionText = plugins.printException()
             self.failTest(exceptionText)
     def failTest(self, excString):

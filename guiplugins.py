@@ -153,10 +153,14 @@ class InteractiveAction(plugins.Observable):
         message = self.messageBeforePerform()
         if message != None:
             self.notify("Status", message)
-        self.performOnCurrent()
-        message = self.messageAfterPerform()
-        if message != None:
-            self.notify("Status", message)
+        self.notify("ActionStart", message)
+        try:
+            self.performOnCurrent()
+            message = self.messageAfterPerform()
+            if message != None:
+                self.notify("Status", message)
+        finally:
+            self.notify("ActionStop", message)
     
 class SelectionAction(InteractiveAction):
     def __init__(self, rootTestSuites):
@@ -169,7 +173,7 @@ class SelectionAction(InteractiveAction):
         for app in self.apps:
             currValue = app.getConfigValue(entryName)
             if not prevValue is None and currValue != prevValue:
-                print "WARNING - GUI configuration differs between applications, ignoring that from", app
+                plugins.printWarning("GUI configuration differs between applications, ignoring that from " + app)
             else:
                 prevValue = currValue
         return prevValue
@@ -694,7 +698,7 @@ class SelectTests(SelectionAction):
         strategy = self.optionGroup.getSwitchValue("current_selection")
         selectedTests = []                
         for suite in self.getSuitesToTry():
-            filters = self.getFilterList(suite.app)
+            filters = self.getFilterList(suite.app)            
             for filter in filters:
                 if not filter.acceptsApplication(suite.app):
                     continue
@@ -729,6 +733,7 @@ class SelectTests(SelectionAction):
                     return False
         return True
     def getRequestedTests(self, suite, filters):
+        self.notify("ActionProgress", "") # Just to update gui ...            
         if not suite.isAcceptedByAll(filters):
             return []
         if suite.classId() == "test-suite":

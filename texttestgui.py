@@ -61,10 +61,19 @@ def createDialogMessage(message, stockIcon, scrollBars=False):
     return alignment
 
 def showError(message):
-    guilog.info("ERROR : " + message)
+    guilog.info("ERROR: " + message)
     dialog = gtk.Dialog("TextTest Error", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
     dialog.set_modal(True)
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_ERROR), expand=True, fill=True)
+    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
+    dialog.show_all()
+    dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
+
+def showWarning(message):
+    guilog.info("WARNING: " + message)
+    dialog = gtk.Dialog("TextTest Warning", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    dialog.set_modal(True)
+    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_WARNING), expand=True, fill=True)
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show_all()
     dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
@@ -74,7 +83,7 @@ class DoubleCheckDialog:
         self.dialog = gtk.Dialog("TextTest Query", flags=gtk.DIALOG_MODAL)
         self.yesMethod = yesMethod
         self.yesMethodArgs = yesMethodArgs
-        guilog.info("QUERY : " + message)
+        guilog.info("QUERY: " + message)
         noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
         self.dialog.set_modal(True)
@@ -184,6 +193,7 @@ class TextTestGUI(Responder):
         self.dynamic = not optionMap.has_key("gx")
         Responder.__init__(self, optionMap)
         guiplugins.scriptEngine = self.scriptEngine
+        self.idleSourceId = -1
         self.rightWindowGUI = None
         self.selectionActionGUI = None
         self.testTreeGUI = TestTreeGUI(self.dynamic)
@@ -244,7 +254,9 @@ class TextTestGUI(Responder):
             shortcutBar.show()
 
         if self.getConfigValue("add_status_bar"):
-            vbox.pack_start(self.status.createStatusbar(), expand=False, fill=False)
+            inactiveThrobberIcon = self.getConfigValue("gui_throbber_inactive")
+            activeThrobberIcon = self.getConfigValue("gui_throbber_active")
+            vbox.pack_start(self.status.createStatusbar(inactiveThrobberIcon, activeThrobberIcon), expand=False, fill=False)
         vbox.show()
         topWindow.add(vbox)
         topWindow.show()
@@ -290,7 +302,7 @@ class TextTestGUI(Responder):
             progressBar = self.progressBar.createProgressBar()
             progressBar.show()
         hbox = gtk.HBox()
-
+                        
         if menubar and toolbar:
             vbox.pack_start(menubar, expand=False, fill=False)
             hbox.pack_start(toolbarHandle, expand=True, fill=True)
@@ -397,10 +409,21 @@ class TextTestGUI(Responder):
             # These actions might change the tree view selection or the status bar, need to observe them
             action.addObserver(self.testTreeGUI)
             action.addObserver(self.status)
+            action.addObserver(self)
             # Some depend on the test selection or currently viewed test also
             if hasattr(action, "notifyNewTestSelection") or hasattr(action, "notifyViewTest"):
                 self.testTreeGUI.addObserver(action)
         return InteractiveActionGUI(actions, self.uiManager, self.rootSuites[0].app.getConfigValue("gui_accelerators"))
+    def notifyActionStart(self, message):
+        # To make it possible to have an while-events-process loop
+        # to update the GUI during actions, we need to make sure the idle
+        # process isn't run. We hence remove that for a while here ...
+        if self.idleSourceId > 0:
+            gobject.source_remove(self.idleSourceId)
+    def notifyActionStop(self, message):
+        # Activate idle function again, see comment in notifyActionStart
+        if self.idleSourceId > 0:
+            self.idleSourceId = gobject.idle_add(self.pickUpProcess)
     def setUpGui(self, actionThread=None):
         topWindow = self.createTopWindow()
         treeWindow = self.createTreeWindow()
@@ -432,7 +455,7 @@ class TextTestGUI(Responder):
         gtk.main()
     def runAlone(self):
         self.setUpGui()
-        gobject.idle_add(self.pickUpProcess)
+        self.idleSourceId = gobject.idle_add(self.pickUpProcess)
         gtk.main()
     def createDefaultRightGUI(self, rootSuite, tabGUIs):
         guilog.info("Viewing test " + repr(rootSuite))
@@ -887,7 +910,7 @@ class InteractiveActionGUI:
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
             if not gtk.accelerator_valid(key, mod):
-                print "Warning: Keyboard accelerator '" + realAcc + "' for action '" + actionName + "' is not valid, ignoring ..."
+                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" + actionName + "' is not valid, ignoring ...")
                 realAcc = None
                 
         guilog.info("Creating action '" + actionName + "' with label '" + repr(label) + \
@@ -943,7 +966,7 @@ class InteractiveActionGUI:
         else:
             self._runInteractive(action)
     def _runInteractive(self, action):
-        try:
+        try:            
             action.perform()
         except plugins.TextTestError, e:
             showError(str(e))
@@ -1425,6 +1448,8 @@ class TextInfoGUI(TabGUI):
         if not self.shouldShowCurrent():
             return
         self.view = gtk.TextView()
+        self.view.set_editable(False)
+        self.view.set_cursor_visible(False)
         self.view.set_wrap_mode(gtk.WRAP_WORD)
         self.updateView()
         self.view.show()
@@ -1444,7 +1469,7 @@ class TextInfoGUI(TabGUI):
             try:
                 return unicode(self.text, localeEncoding, errors="strict")
             except:
-                guilog.info("Warning: Failed to decode string '" + self.text + \
+                guilog.info("WARNING: Failed to decode string '" + self.text + \
                             "' using default locale encoding " + repr(localeEncoding) + \
                             ". Trying strict UTF-8 encoding ...")
             
@@ -1453,7 +1478,7 @@ class TextInfoGUI(TabGUI):
         try:
             return unicode(self.text, 'utf-8', errors="strict")
         except:
-            guilog.info("Warning: Failed to decode string '" + self.text + \
+            guilog.info("WARNING: Failed to decode string '" + self.text + \
                         "' both using strict UTF-8 and " + repr(localeEncoding) + \
                         " encodings.\nReverting to non-strict UTF-8 encoding but " + \
                         "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
@@ -1463,12 +1488,12 @@ class TextInfoGUI(TabGUI):
             return unicodeInfo.encode('utf-8', 'strict')
         except:
             try:
-                guilog.info("Warning: Failed to encode Unicode string '" + unicodeInfo + \
+                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
                             "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
                             "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
                 return unicodeInfo.encode('utf-8', 'replace')
             except:
-                guilog.info("Warning: Failed to encode Unicode string '" + unicodeInfo + \
+                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
                             "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
                             "replacement. Showing error message instead.")
                 return "Failed to encode Unicode string."
@@ -1738,27 +1763,62 @@ class RadioGroupIndexer:
         self.buttons[index].set_active(True)
         
 #
-# A simple wrapper class around a gtk.StatusBar, simplifying
-# logging messages/changing the status bar implementation.
+# A class responsible for putting messages in the status bar.
+# It is also responsible for keeping the throbber rotating
+# while actions are under way.
 # 
 class GUIStatusMonitor:
     def __init__(self):
-        self.statusBar = None
+        self.throbber = None
+        self.animation = None
+        self.pixbuf = None
+        self.label = None
+    
+    def notifyActionStart(self, message=""):
+        if self.throbber:
+            if self.pixbuf: # We didn't do ActionStop ...
+                self.notifyActionStop()
+            self.pixbuf = self.throbber.get_pixbuf()
+            self.throbber.set_from_animation(self.animation)
+            self.throbber.grab_add()
+            
+    def notifyActionProgress(self, message=""):
+        while gtk.events_pending():
+            gtk.main_iteration(False)
 
+    def notifyActionStop(self, message=""):
+        if self.throbber:
+            self.throbber.set_from_pixbuf(self.pixbuf)
+            self.pixbuf = None
+            self.throbber.grab_remove()
+        
     def notifyStatus(self, message):
-        if self.statusBar:
+        if self.label:
             guilog.info("")
             guilog.info("Changing GUI status to: '" + message + "'")
-            self.statusBar.push(0, message)
-        
-    def createStatusbar(self):
-        self.statusBar = gtk.Statusbar()
+            self.label.set_markup(message)
+            
+    def createStatusbar(self, staticIcon, animationIcon):
+        hbox = gtk.HBox()
+        self.label = gtk.Label()
+        self.label.set_use_markup(True)
+        hbox.pack_start(self.label, expand=False, fill=False)
+        try:
+            temp = gtk.gdk.pixbuf_new_from_file(staticIcon)
+            self.throbber = gtk.Image()
+            self.throbber.set_from_pixbuf(temp)
+            self.animation = gtk.gdk.PixbufAnimation(animationIcon)
+            hbox.pack_end(self.throbber, expand=False, fill=False)
+        except Exception, e:
+            plugins.printWarning("Failed to create icons for the status throbber.\nOne or both of the icons\n" + staticIcon + "\n" + animationIcon + "\ncould not be loaded (" + str(e) + ")\nAs a result, the throbber will be disabled.")
+            self.throbber = None
+        self.pixbuf = None
         self.notifyStatus("TextTest started at " + plugins.localtime() + ".")
-        self.statusBar.show()
-        self.statusBarEventBox = gtk.EventBox()
-        self.statusBarEventBox.add(self.statusBar)
-        self.statusBarEventBox.show()
-        return self.statusBarEventBox
+        frame = gtk.Frame()
+        frame.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        frame.add(hbox)
+        frame.show_all()
+        return frame
 
 class TestProgressBar:
     def __init__(self, totalNofTests):

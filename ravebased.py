@@ -755,7 +755,7 @@ class RuleSet:
                 for targetFile in self.targetFiles:
                     shutil.copyfile(targetFile, targetFile + ".bak")
             except IOError:
-                print "WARNING - did not have permissions to backup ruleset, continuing anyway"
+                plugins.printWarning("Did not have permissions to backup ruleset, continuing anyway.")
             
 # Graphical import suite
 class ImportTestSuite(guiplugins.ImportTestSuite):

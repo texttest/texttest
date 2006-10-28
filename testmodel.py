@@ -526,13 +526,11 @@ class TestSuite(Test):
         for name in plugins.readList(fileName, self.getConfigValue("auto_sort_test_suites")):
             self.diagnose("Read " + name)
             if name in names:
-                print "WARNING: the test", name, "was included several times in a test suite file"
-                print "Please check the file at", fileName
+                plugins.printWarning("The test " + name + " was included several times in a test suite file.\nPlease check the file at " + fileName)
                 continue
 
             if not self.fileExists(name):
-                print "WARNING: the test", name, "could not be found"
-                print "Please check the file at", fileName
+                plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
                 continue
             names.append(name)
         return names
@@ -1156,7 +1154,7 @@ class OptionFinder(plugins.OptionFinder):
         versionList = []
         for version in plugins.commasplit(self.get("v", "")):
             if version in versionList:
-                print "WARNING : same version '" + version + "' requested more than once, ignoring"
+                plugins.printWarning("Same version '" + version + "' requested more than once, ignoring.")
             else:
                 versionList.append(version)
         return versionList
@@ -1232,14 +1230,14 @@ class MultiEntryDictionary(seqdict):
         elif line.find(":") != -1:
             self.addLine(line, insert, errorOnUnknown)
         else:
-            print "WARNING : could not parse config line", line
+            plugins.printWarning("Could not parse config line " + line)
     def changeSectionMarker(self, name, errorOnUnknown):
         if name == "end":
             return self
         if self.has_key(name) and type(self[name]) == types.DictType:
             return self[name]
         if errorOnUnknown:
-            print "ERROR : config section name '" + name + "' not recognised."
+            print "ERROR: Config section name '" + name + "' not recognised."
         return self
     def addLine(self, line, insert, errorOnUnknown, separator = ':'):
         entryName, entry = line.split(separator, 1)

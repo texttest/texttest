@@ -44,7 +44,7 @@ class VirtualDisplayFinder:
         elif emptyMachine:
             return self.startServer(emptyMachine)
         else:
-            print "WARNING - virtual display test command failed on all machines - attempting to use first one anyway!"
+            plugins.printWarning("Virtual display test command failed on all machines - attempting to use first one anyway.")
             return self.machines[0] + ":42.0"
     def classifyMachines(self):
         emptyMachine = None

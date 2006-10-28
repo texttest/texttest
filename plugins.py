@@ -37,6 +37,9 @@ def getNumberOfSeconds(timeString):
                 seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)                
         return seconds 
 
+def printWarning(message):
+    print "WARNING: " + message
+
 # Useful stuff to handle regular expressions
 regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
 def isRegularExpression(text):

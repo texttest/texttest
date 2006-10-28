@@ -263,7 +263,7 @@ class SlaveRequestHandler(StreamRequestHandler):
                 self.server.storeClient(test, clientInfo)
         else:
             expectedHost, expectedPid = self.server.testClientInfo[test]
-            sys.stderr.write("WARNING : unexpected TextTest slave for " + repr(test) + " connected from " + \
+            sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
                              self.getHostName(clientHost) + " (process " + clientPid + ")\n")
             sys.stderr.write("Slave already registered from " + self.getHostName(expectedHost) + " (process " + expectedPid + ")\n")
             sys.stderr.write("Ignored all communication from this unexpected TextTest slave")

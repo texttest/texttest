@@ -245,17 +245,77 @@ def addCategory(name, briefDesc, longDesc = ""):
     else:
         TestState.categoryDescriptions[name] = briefDesc, briefDesc
 
+# Observer mechanism shouldn't allow for conflicting notifications. Use main thread at all times
+class ThreadedNotificationHandler:
+    def __init__(self):
+        self.workQueue = Queue()
+        self.active = False
+    def enablePoll(self, idleHandleMethod):
+        self.active = True
+        id = idleHandleMethod(self.pollQueue)
+        return id
+    def disablePoll(self):
+        self.active = False
+    def pollQueue(self):
+        try:
+            observable, args = self.workQueue.get_nowait()
+            observable.notify(*args)
+        except Empty:
+            pass
+        # Idle handler. We must sleep for a bit, or we use the whole CPU (busy-wait)
+        time.sleep(0.1)
+        return self.active
+    def transfer(self, observable, *args):
+        self.workQueue.put((observable, args))
+
+class Observable:
+    threadedNotificationHandler = ThreadedNotificationHandler()
+    # allow calling code to block all notifications everywhere, during a shutdown
+    blocked = False
+    def __init__(self, passSelf=False):
+        self.observers = []
+        self.passSelf = passSelf
+    def addObserver(self, observer):
+        self.observers.append(observer)
+    def setObservers(self, observers):
+        self.observers = observers
+    def inMainThread(self):
+        return currentThread().getName() == "MainThread"
+    def notify(self, *args):
+        if self.blocked:
+            return
+        if self.threadedNotificationHandler.active and not self.inMainThread():
+            self.threadedNotificationHandler.transfer(self, *args)
+        else:
+            self.performNotify(*args)
+    def notifyIfMainThread(self, *args):
+        if self.blocked or not self.inMainThread():
+            return
+        else:
+            self.performNotify(*args)
+    def performNotify(self, name, *args):
+        methodName = "notify" + name
+        for observer in self.observers:
+            if hasattr(observer, methodName):
+                # doesn't matter if only some of the observers have the method
+                method = eval("observer." + methodName)
+                if self.passSelf:
+                    method(self, *args)
+                else:
+                    method(*args)
+
 # Generic state which tests can be in, should be overridden by subclasses
 # Acts as a static state for tests which have not run (yet)
 # Free text is text of arbitrary length: it will appear in the "Text Info" GUI window when the test is viewed
 # and the "details" section in batch mode
 # Brief text should be at most two or three words: it appears in the details column in the main GUI window and in
 # the summary of batch mode
-class TestState:
+class TestState(Observable):
     categoryDescriptions = seqdict()
     showExecHosts = 0
     def __init__(self, category, freeText = "", briefText = "", started = 0, completed = 0,\
                  executionHosts = [], lifecycleChange = ""):
+        Observable.__init__(self)
         self.category = category
         self.freeText = freeText
         self.briefText = briefText
@@ -328,59 +388,6 @@ class Unrunnable(TestState):
                            executionHosts=executionHosts)
     def shouldAbandon(self):
         return True
-
-# Observer mechanism shouldn't allow for conflicting notifications. Use main thread at all times
-class ThreadedNotificationHandler:
-    def __init__(self):
-        self.workQueue = Queue()
-        self.active = False
-    def enablePoll(self, idleHandleMethod):
-        self.active = True
-        idleHandleMethod(self.pollQueue)
-    def disablePoll(self):
-        self.active = False
-    def pollQueue(self):
-        try:
-            observable, args = self.workQueue.get_nowait()
-            observable.notify(*args)
-        except Empty:
-            pass
-        # Idle handler. We must sleep for a bit, or we use the whole CPU (busy-wait)
-        time.sleep(0.1)
-        return self.active
-    def transfer(self, observable, *args):
-        self.workQueue.put((observable, args))
-                        
-class Observable:
-    threadedNotificationHandler = ThreadedNotificationHandler()
-    # allow calling code to block all notifications everywhere, during a shutdown
-    blocked = False
-    def __init__(self, passSelf=False):
-        self.observers = []
-        self.passSelf = passSelf
-    def addObserver(self, observer):
-        self.observers.append(observer)
-    def setObservers(self, observers):
-        self.observers = observers
-    def inMainThread(self):
-        return currentThread().getName() == "MainThread"
-    def notify(self, *args):
-        if self.blocked:
-            return
-        if self.threadedNotificationHandler.active and not self.inMainThread():
-            self.threadedNotificationHandler.transfer(self, *args)
-        else:
-            self.performNotify(*args)
-    def performNotify(self, name, *args):
-        methodName = "notify" + name
-        for observer in self.observers:
-            if hasattr(observer, methodName):
-            # doesn't matter if only some of the observers have the method
-                method = eval("observer." + methodName)
-                if self.passSelf:
-                    method(self, *args)
-                else:
-                    method(*args)
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.

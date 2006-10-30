@@ -7,13 +7,14 @@ from shutil import copyfile
 from re import sub
 
 class FileComparison:
-    def __init__(self, test, stem, standardFile, tmpFile, testInProgress = 0):
+    def __init__(self, test, stem, standardFile, tmpFile, testInProgress = 0, observers={}):
         self.stdFile = standardFile
         self.tmpFile = tmpFile
         self.stem = stem
         self.differenceCache = False 
         self.diag = plugins.getDiagnostics("FileComparison")
         filter = RunDependentTextFilter(test, self.stem)
+        filter.setObservers(observers)
         filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
         self.stdCmpFile = filter.filterFile(standardFile, filterFileBase + "origcmp", makeNew=0)
         tmpCmpFileName = filterFileBase + "cmp"
@@ -145,8 +146,9 @@ class FileComparison:
     def saveResults(self, destFile):
         copyfile(self.tmpFile, destFile)
         
-class RunDependentTextFilter:
+class RunDependentTextFilter(plugins.Observable):
     def __init__(self, test, stem):
+        plugins.Observable.__init__(self)
         self.diag = plugins.getDiagnostics("Run Dependent Text")
         regexp = self.getWriteDirRegexp(test)
         runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
@@ -190,6 +192,8 @@ class RunDependentTextFilter:
         newFile = open(newFileName, "w")
         lineNumber = 0
         for line in open(fileName).xreadlines():
+            # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
+            self.notifyIfMainThread("ActionProgress", "")
             lineNumber += 1
             filteredLine = self.getFilteredLine(line, lineNumber)
             if filteredLine:

@@ -186,6 +186,7 @@ class TestComparison(plugins.TestState):
         resultFiles, defFiles = test.listStandardFiles(allVersions=False)
         stdFiles = self.makeStemDict(resultFiles + defFiles)
         for tmpStem, tmpFile in tmpFiles.items():
+            self.notifyIfMainThread("ActionProgress", "")
             stdFile = stdFiles.get(tmpStem)
             self.diag.info("Comparing " + repr(stdFile) + "\nwith " + tmpFile) 
             comparison = self.createFileComparison(test, tmpStem, stdFile, tmpFile, testInProgress)
@@ -193,6 +194,7 @@ class TestComparison(plugins.TestState):
                 self.addComparison(comparison)
         if not testInProgress: # not interested in missing files here
             for stdStem, stdFile in stdFiles.items():
+                self.notifyIfMainThread("ActionProgress", "")
                 if not tmpFiles.has_key(stdStem) and not stdFile in defFiles:
                     comparison = self.createFileComparison(test, stdStem, stdFile, None, testInProgress)
                     if comparison:
@@ -207,7 +209,7 @@ class TestComparison(plugins.TestState):
                 # Don't care if performance is missing
                 return None
         else:
-            return FileComparison(test, stem, standardFile, tmpFile, testInProgress)
+            return FileComparison(test, stem, standardFile, tmpFile, testInProgress, self.observers)
     def categorise(self):
         if self.failedPrediction:
             # Keep the category we had before

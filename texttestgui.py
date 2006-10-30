@@ -28,6 +28,8 @@ from ndict import seqdict
 from respond import Responder
 from copy import copy
 
+import traceback
+
 def destroyDialog(dialog, *args):
     dialog.destroy()
 
@@ -178,6 +180,67 @@ def getGtkRcFile():
     file = os.path.join(configDir, ".texttest_gtk")
     if os.path.isfile(file):
         return file
+        
+#
+# A class responsible for putting messages in the status bar.
+# It is also responsible for keeping the throbber rotating
+# while actions are under way.
+# 
+class GUIStatusMonitor:
+    def __init__(self):
+        self.throbber = None
+        self.animation = None
+        self.pixbuf = None
+        self.label = None
+    
+    def notifyActionStart(self, message=""):
+        if self.throbber:
+            if self.pixbuf: # We didn't do ActionStop ...
+                self.notifyActionStop()
+            self.pixbuf = self.throbber.get_pixbuf()
+            self.throbber.set_from_animation(self.animation)
+            self.throbber.grab_add()
+            
+    def notifyActionProgress(self, message=""):
+        while gtk.events_pending():
+            gtk.main_iteration(False)
+
+    def notifyActionStop(self, message=""):
+        if self.throbber:
+            self.throbber.set_from_pixbuf(self.pixbuf)
+            self.pixbuf = None
+            self.throbber.grab_remove()
+        
+    def notifyStatus(self, message):
+        if self.label:
+            guilog.info("")
+            guilog.info("Changing GUI status to: '" + message + "'")
+            self.label.set_markup(message)
+            
+    def createStatusbar(self, staticIcon, animationIcon):
+        hbox = gtk.HBox()
+        self.label = gtk.Label()
+        self.label.set_use_markup(True)
+        hbox.pack_start(self.label, expand=False, fill=False)
+        try:
+            temp = gtk.gdk.pixbuf_new_from_file(staticIcon)
+            self.throbber = gtk.Image()
+            self.throbber.set_from_pixbuf(temp)
+            self.animation = gtk.gdk.PixbufAnimation(animationIcon)
+            hbox.pack_end(self.throbber, expand=False, fill=False)
+        except Exception, e:
+            plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + "\nAs a result, the throbber will be disabled.")
+            self.throbber = None
+        self.notifyStatus("TextTest started at " + plugins.localtime() + ".")
+        frame = gtk.Frame()
+        frame.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        frame.add(hbox)
+        frame.show_all()
+        return frame
+
+# To make it easier for all sorts of things to connect
+# to the status bar, let it be global, at least for now ...
+statusMonitor = GUIStatusMonitor()
 
 class TextTestGUI(Responder):
     defaultGUIDescription = '''
@@ -194,6 +257,7 @@ class TextTestGUI(Responder):
         Responder.__init__(self, optionMap)
         guiplugins.scriptEngine = self.scriptEngine
         self.idleSourceId = -1
+        self.idleAddedDirectly = True
         self.rightWindowGUI = None
         self.selectionActionGUI = None
         self.testTreeGUI = TestTreeGUI(self.dynamic)
@@ -202,7 +266,8 @@ class TextTestGUI(Responder):
         self.progressBar = None
         self.toolTips = gtk.Tooltips()
         self.rootSuites = []
-        self.status = GUIStatusMonitor()
+        self.testTreeGUI.addObserver(self)
+        self.testTreeGUI.addObserver(statusMonitor)
         
         # Create GUI manager, and a few default action groups
         self.uiManager = gtk.UIManager()
@@ -256,7 +321,7 @@ class TextTestGUI(Responder):
         if self.getConfigValue("add_status_bar"):
             inactiveThrobberIcon = self.getConfigValue("gui_throbber_inactive")
             activeThrobberIcon = self.getConfigValue("gui_throbber_active")
-            vbox.pack_start(self.status.createStatusbar(inactiveThrobberIcon, activeThrobberIcon), expand=False, fill=False)
+            vbox.pack_start(statusMonitor.createStatusbar(inactiveThrobberIcon, activeThrobberIcon), expand=False, fill=False)
         vbox.show()
         topWindow.add(vbox)
         topWindow.show()
@@ -408,7 +473,7 @@ class TextTestGUI(Responder):
         for action in actions:
             # These actions might change the tree view selection or the status bar, need to observe them
             action.addObserver(self.testTreeGUI)
-            action.addObserver(self.status)
+            action.addObserver(statusMonitor)
             action.addObserver(self)
             # Some depend on the test selection or currently viewed test also
             if hasattr(action, "notifyNewTestSelection") or hasattr(action, "notifyViewTest"):
@@ -423,7 +488,10 @@ class TextTestGUI(Responder):
     def notifyActionStop(self, message):
         # Activate idle function again, see comment in notifyActionStart
         if self.idleSourceId > 0:
-            self.idleSourceId = gobject.idle_add(self.pickUpProcess)
+            if self.idleAddedDirectly:
+                self.idleSourceId = gobject.idle_add(self.pickUpProcess)
+            else:
+                self.idleSourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
     def setUpGui(self, actionThread=None):
         topWindow = self.createTopWindow()
         treeWindow = self.createTreeWindow()
@@ -449,7 +517,8 @@ class TextTestGUI(Responder):
         self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
         guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
     def runWithActionThread(self, actionThread):
-        plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
+        self.idleSourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
+        self.idleAddedDirectly = False
         self.setUpGui(actionThread)
         actionThread.start()
         gtk.main()
@@ -807,13 +876,17 @@ class TestTreeGUI(plugins.Observable):
         self.expandRow(self.findIter(suite), True)
         self.notifyNewTestSelection(allSelected)
     def rowActivated(self, view, path, column, *args):
+        self.notify("ActionStart", "")
         iter = self.filteredModel.get_iter(path)
         self.selection.select_iter(iter)
         test = self.filteredModel.get_value(iter, 2)
+        self.notify("Status", "Showing " + repr(test) + " ...")
         guilog.info("Viewing test " + repr(test))
         if test.classId() == "test-case":
             self.checkUpToDate(test)
         self.viewTest(test)
+        self.notify("Status", "Done showing " + repr(test) + ".")
+        self.notify("ActionStop", "")
     def viewTest(self, test):
         self.viewedTest = test
         self.notify("ViewTest", test)
@@ -1608,7 +1681,7 @@ class ApplicationFileGUI(FileViewGUI):
         return personalFiles
     
 class TestFileGUI(FileViewGUI):
-    def __init__(self, test, dynamic):
+    def __init__(self, test, dynamic):        
         FileViewGUI.__init__(self, test)
         self.test = test
         self.colours = test.getConfigValue("file_colours")
@@ -1649,6 +1722,7 @@ class TestFileGUI(FileViewGUI):
 
         # regenerate for currently running tests
         newState = comparetest.TestComparison(state, self.test.app)
+        newState.addObserver(statusMonitor)
         newState.makeComparisons(self.test, testInProgress=1)
         return newState
     
@@ -1761,63 +1835,6 @@ class RadioGroupIndexer:
                 return i
     def setActiveIndex(self, index):
         self.buttons[index].set_active(True)
-        
-#
-# A class responsible for putting messages in the status bar.
-# It is also responsible for keeping the throbber rotating
-# while actions are under way.
-# 
-class GUIStatusMonitor:
-    def __init__(self):
-        self.throbber = None
-        self.animation = None
-        self.pixbuf = None
-        self.label = None
-    
-    def notifyActionStart(self, message=""):
-        if self.throbber:
-            if self.pixbuf: # We didn't do ActionStop ...
-                self.notifyActionStop()
-            self.pixbuf = self.throbber.get_pixbuf()
-            self.throbber.set_from_animation(self.animation)
-            self.throbber.grab_add()
-            
-    def notifyActionProgress(self, message=""):
-        while gtk.events_pending():
-            gtk.main_iteration(False)
-
-    def notifyActionStop(self, message=""):
-        if self.throbber:
-            self.throbber.set_from_pixbuf(self.pixbuf)
-            self.pixbuf = None
-            self.throbber.grab_remove()
-        
-    def notifyStatus(self, message):
-        if self.label:
-            guilog.info("")
-            guilog.info("Changing GUI status to: '" + message + "'")
-            self.label.set_markup(message)
-            
-    def createStatusbar(self, staticIcon, animationIcon):
-        hbox = gtk.HBox()
-        self.label = gtk.Label()
-        self.label.set_use_markup(True)
-        hbox.pack_start(self.label, expand=False, fill=False)
-        try:
-            temp = gtk.gdk.pixbuf_new_from_file(staticIcon)
-            self.throbber = gtk.Image()
-            self.throbber.set_from_pixbuf(temp)
-            self.animation = gtk.gdk.PixbufAnimation(animationIcon)
-            hbox.pack_end(self.throbber, expand=False, fill=False)
-        except Exception, e:
-            plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + "\nAs a result, the throbber will be disabled.")
-            self.throbber = None
-        self.notifyStatus("TextTest started at " + plugins.localtime() + ".")
-        frame = gtk.Frame()
-        frame.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        frame.add(hbox)
-        frame.show_all()
-        return frame
 
 class TestProgressBar:
     def __init__(self, totalNofTests):

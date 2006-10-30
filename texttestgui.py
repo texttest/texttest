@@ -1810,9 +1810,8 @@ class GUIStatusMonitor:
             self.animation = gtk.gdk.PixbufAnimation(animationIcon)
             hbox.pack_end(self.throbber, expand=False, fill=False)
         except Exception, e:
-            plugins.printWarning("Failed to create icons for the status throbber.\nOne or both of the icons\n" + staticIcon + "\n" + animationIcon + "\ncould not be loaded (" + str(e) + ")\nAs a result, the throbber will be disabled.")
+            plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + "\nAs a result, the throbber will be disabled.")
             self.throbber = None
-        self.pixbuf = None
         self.notifyStatus("TextTest started at " + plugins.localtime() + ".")
         frame = gtk.Frame()
         frame.set_shadow_type(gtk.SHADOW_ETCHED_IN)

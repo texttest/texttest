@@ -253,17 +253,17 @@ class TestComparison(plugins.TestState):
         if resultCount > 1:
             exact = 1
         for comparison in self.changedResults:
-            self.notifyIfMainThread("ActionProgress", "")
             self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
+            self.notifyIfMainThread("ActionProgress", "")
             comparison.overwrite(test, exact, versionString)
         for comparison in self.newResults + self.missingResults:
-            self.notifyIfMainThread("ActionProgress", "")
             self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
+            self.notifyIfMainThread("ActionProgress", "")
             comparison.overwrite(test, 1, versionString)
         if overwriteSuccessFiles:
             for comparison in self.correctResults:
-                self.notifyIfMainThread("ActionProgress", "")
                 self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
+                self.notifyIfMainThread("ActionProgress", "")
                 comparison.overwrite(test, exact, versionString)
     def makeNewState(self, app):
         newState = TestComparison(self, app, "be saved")

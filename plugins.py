@@ -587,6 +587,9 @@ class PreviewGenerator:
 class TextTestError(RuntimeError):
     pass
 
+class TextTestWarning(RuntimeError):
+    pass
+
 # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
 class OptionFinder(seqdict):
     def __init__(self, args, defaultKey="default"):

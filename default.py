@@ -182,6 +182,8 @@ class Config(plugins.Configuration):
         return filterFiles
     def getFilterFilePath(self, app, filename, forWrite):
         filterDirs = self.getFilterDirs(app)
+        if not filterDirs:
+            return ""      
         if forWrite:
             dirToUse = filterDirs[0]
             plugins.ensureDirectoryExists(dirToUse)
@@ -192,7 +194,6 @@ class Config(plugins.Configuration):
         cmdLineDir = self.optionValue("fd")
         if cmdLineDir:
             return [ cmdLineDir ]
-
         return self.getConfigFilterDirs(app) + self.getTmpFilterDirs(app) 
     def getTmpFilterDirs(self, app):
         return glob.glob(os.path.join(app.writeDirectory, "dynamic_run*"))

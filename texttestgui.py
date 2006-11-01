@@ -1043,6 +1043,8 @@ class InteractiveActionGUI:
             action.perform()
         except plugins.TextTestError, e:
             showError(str(e))
+        except plugins.TextTestWarning, e:
+            showWarning(str(e))
     def getButtonMethod(self, optionGroups, instance):
         if len(optionGroups) == 1 and instance.canPerform():
             return self.createButton

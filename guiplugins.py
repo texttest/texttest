@@ -847,6 +847,8 @@ class SaveSelection(SelectionAction):
     def performOnCurrent(self):
         fileName = self.getFileName()
         toWrite = self.getTextToSave()
+        if not fileName:
+            raise plugins.TextTestWarning, "\nCould not find any filter file directories, skipping save.\n\nAdjust the configuration value 'test_list_files_directory'\nto make it possible to save filter files.\n"
         file = open(fileName, "w")
         file.write(toWrite + "\n")
         file.close()

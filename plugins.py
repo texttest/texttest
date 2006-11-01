@@ -699,10 +699,11 @@ class Option:
             self.valueMethod = None
 
 class TextOption(Option):
-    def __init__(self, name, value, possibleValues):
+    def __init__(self, name, value, possibleValues, allocateNofValues):
         Option.__init__(self, name, value)
         self.possibleValues = possibleValues
         self.possValMethod = None
+        self.nofValues = allocateNofValues
     def setPossibleValuesAppendMethod(self, method):
         self.possValMethod = method
         for value in self.possibleValues:
@@ -712,6 +713,11 @@ class TextOption(Option):
         self.possValMethod(value)
     def setPossibleValues(self, values):
         self.possibleValues = values
+    def inqNofValues(self): 
+        if self.nofValues > 0:
+            return self.nofValues
+        else:
+            return len(self.possibleValues)
 
 class Switch(Option):
     def __init__(self, name, defaultValue, options):
@@ -769,11 +775,11 @@ class OptionGroup:
         entryName = self.getEntryName(name)
         defaultValue = int(self.getDefault(entryName, value))
         self.switches[key] = Switch(name, defaultValue, options)
-    def addOption(self, key, name, value = "", possibleValues = []):
+    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1):
         entryName = self.getEntryName(name)
         defaultValue = self.getDefault(entryName, value)
         defaultPossValues = self.getDefaultPossiblilities(entryName, defaultValue, possibleValues)
-        self.options[key] = TextOption(name, defaultValue, defaultPossValues)
+        self.options[key] = TextOption(name, defaultValue, defaultPossValues, allocateNofValues)
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()

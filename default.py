@@ -20,7 +20,7 @@ class Config(plugins.Configuration):
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing")
-                group.addOption("f", "Tests listed in file", possibleValues=self.getPossibleFilterFiles(app))
+                group.addOption("f", "Tests listed in file", possibleValues=self.getPossibleFilterFiles(app), allocateNofValues=2)
                 group.addOption("ts", "Suite names containing")
                 group.addOption("grep", "Result files containing")
                 group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
@@ -174,7 +174,10 @@ class Config(plugins.Configuration):
     def getPossibleFilterFiles(self, app):
         filterFiles = []
         for directory in self.getFilterDirs(app):
-            filenames = os.listdir(directory)
+            try:
+                filenames = os.listdir(directory)
+            except:
+                filenames = []
             filenames.sort()
             for filename in filenames:
                 if os.path.isfile(os.path.join(directory, filename)):
@@ -183,7 +186,7 @@ class Config(plugins.Configuration):
     def getFilterFilePath(self, app, filename, forWrite):
         filterDirs = self.getFilterDirs(app)
         if not filterDirs:
-            return ""      
+            return ""
         if forWrite:
             dirToUse = filterDirs[0]
             plugins.ensureDirectoryExists(dirToUse)

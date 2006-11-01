@@ -1157,7 +1157,7 @@ class ActionTabGUI(TabGUI):
         return combobox, entry
     
     def createOptionWidget(self, option):
-        if len(option.possibleValues) > 1:
+        if option.inqNofValues() > 1:
             return self.createComboBox(option)
         else:
             entry = gtk.Entry()
@@ -1219,7 +1219,7 @@ class ActionTabGUI(TabGUI):
         text = "Viewing entry for option '" + option.name + "'"
         if len(value) > 0:
             text += " (set to '" + value + "')"
-        if len(option.possibleValues) > 1:
+        if option.inqNofValues() > 1:
             text += " (drop-down list containing " + repr(option.possibleValues) + ")"
         return text
     

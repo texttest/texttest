@@ -848,7 +848,13 @@ class SaveSelection(SelectionAction):
         fileName = self.getFileName()
         toWrite = self.getTextToSave()
         if not fileName:
-            raise plugins.TextTestWarning, "\nCould not find any filter file directories, skipping save.\n\nAdjust the configuration value 'test_list_files_directory'\nto make it possible to save filter files.\n"
+            app = self.getAnyApp()
+            configValue = app.getConfigValue("test_list_files_directory")
+            if configValue:
+                dirs = string.join(map(lambda dir: os.path.join(app.getDirectory(), dir), configValue), "\n")
+                raise plugins.TextTestWarning, "\nThe specified filter file directory(s)\n" + dirs + "\ndoes not exist.\n\nPlease adjust the configuration value 'test_list_files_directory', or\ncreate the directory above, to make it possible to save filter files.\n"
+            else:
+                raise plugins.TextTestWarning, "\nNo filter file directory specified.\n\nPlease adjust the configuration value 'test_list_files_directory'\nto make it possible to save filter files.\n"   
         file = open(fileName, "w")
         file.write(toWrite + "\n")
         file.close()

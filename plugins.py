@@ -299,7 +299,9 @@ class Observable:
             if hasattr(observer, methodName):
                 # doesn't matter if only some of the observers have the method
                 method = eval("observer." + methodName)
-                if self.passSelf:
+                # unpickled objects have not called __init__, and
+                # hence do not have self.passSelf ...
+                if hasattr(self, "passSelf") and self.passSelf:
                     method(self, *args)
                 else:
                     method(*args)

@@ -343,6 +343,7 @@ class SaveTests(SelectionAction):
             fullDesc = " - version " + version + saveDesc
             self.describe(test, fullDesc)
             testComparison = test.state
+            testComparison.setObservers(self.observers)
             if testComparison:
                 if len(self.currFileSelection) > 0:
                     testComparison.savePartial(self.currFileSelection, test, self.getExactness(), version)

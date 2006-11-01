@@ -245,14 +245,25 @@ class TestComparison(plugins.TestState):
         # Force exactness unless there is only one difference : otherwise
         # performance is averaged when results have changed as well
         resultCount = len(self.changedResults) + len(self.newResults)
+        testRepr = "Saving " + repr(test) + " : "
+        if versionString != "":
+            versionRepr = ", version " + versionString
+        else:
+            versionRepr = ", no version"
         if resultCount > 1:
             exact = 1
         for comparison in self.changedResults:
+            self.notifyIfMainThread("ActionProgress", "")
+            self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
             comparison.overwrite(test, exact, versionString)
         for comparison in self.newResults + self.missingResults:
+            self.notifyIfMainThread("ActionProgress", "")
+            self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
             comparison.overwrite(test, 1, versionString)
         if overwriteSuccessFiles:
             for comparison in self.correctResults:
+                self.notifyIfMainThread("ActionProgress", "")
+                self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
                 comparison.overwrite(test, exact, versionString)
     def makeNewState(self, app):
         newState = TestComparison(self, app, "be saved")

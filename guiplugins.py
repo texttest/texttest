@@ -173,7 +173,7 @@ class SelectionAction(InteractiveAction):
         for app in self.apps:
             currValue = app.getConfigValue(entryName)
             if not prevValue is None and currValue != prevValue:
-                plugins.printWarning("GUI configuration differs between applications, ignoring that from " + app)
+                plugins.printWarning("GUI configuration differs between applications, ignoring that from " + repr(app))
             else:
                 prevValue = currValue
         return prevValue

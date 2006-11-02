@@ -904,7 +904,7 @@ class RunTests(SelectionAction):
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
         commandLine = plugins.textTestName + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
-        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=self.checkTestRun, exitHandlerArgs=(errFile,self.currTestSelection), description = description)
+        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=(lambda x, y: self.checkTestRun("started at " + plugins.localtime(), x, y)), exitHandlerArgs=(errFile,self.currTestSelection), description = description)
     def writeFilterFile(self, writeDir):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
@@ -922,20 +922,28 @@ class RunTests(SelectionAction):
         ttOptions.append("-f " + filterFileName)
         ttOptions.append("-fd " + filterDir)
         return string.join(ttOptions)
-    def checkTestRun(self, errFile, testSel):
-        for test in testSel:
-            test.filesChanged()
-        scriptEngine.applicationEvent("dynamic GUI to be closed")
-        if os.path.isfile(errFile):
-            errText = open(errFile).read()
-            if len(errText):
-                raise plugins.TextTestError, "Dynamic run failed, with the following errors:\n" + errText
-
-        writeDir, local = os.path.split(errFile)
-        prelist = [ "output.log", "errors.log", "gui_select" ]
-        for fileName in os.listdir(writeDir):
-            if not fileName in prelist:
-                self.addFilterFile(fileName)
+    def checkTestRun(self, identifierString, errFile, testSel):
+        try:
+            self.notifyIfMainThread("ActionStart", "")
+            writeDir, local = os.path.split(errFile)
+            prelist = [ "output.log", "errors.log", "gui_select" ]
+            for fileName in os.listdir(writeDir):
+                if not fileName in prelist:
+                    self.notifyIfMainThread("Status", "Adding filter " + fileName + " ...")
+                    self.notifyIfMainThread("ActionProgress", "")
+                    self.addFilterFile(fileName)
+            for test in testSel:
+                self.notifyIfMainThread("Status", "Updating files for " + repr(test) + " ...")
+                self.notifyIfMainThread("ActionProgress", "")
+                test.filesChanged()
+            scriptEngine.applicationEvent("dynamic GUI to be closed")
+            if os.path.isfile(errFile):
+                errText = open(errFile).read()
+                if len(errText):
+                    raise plugins.TextTestError, "Dynamic run failed, with the following errors:\n" + errText
+        finally:
+            self.notifyIfMainThread("Status", "Done updating after dynamic run " + identifierString + ".")
+            self.notifyIfMainThread("ActionStop", "")
 
 class EnableDiagnostics(InteractiveTestAction):
     def __init__(self, test):

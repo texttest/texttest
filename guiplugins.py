@@ -1021,9 +1021,9 @@ class CopyTest(ImportTest):
     def getTabTitle(self):
         return "Copying"
     def getNameTitle(self):
-        return "Name of copied test"
+        return "Name of copy"
     def getDescTitle(self):
-        return "Description of new test"
+        return "Description"
     def getDefaultName(self):
         if self.testToCopy:
             return self.testToCopy.name + "_copy"

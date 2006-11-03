@@ -24,7 +24,7 @@ class Config(plugins.Configuration):
                 group.addOption("ts", "Suite names containing")
                 group.addOption("grep", "Result files containing")
                 group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
-                group.addOption("r", "Execution time <min, max>")
+                group.addOption("r", "Execution time")
             elif group.name.startswith("What"):
                 group.addOption("c", "Use checkout", app.checkout)
                 group.addOption("reconnect", "Reconnect to")
@@ -1760,7 +1760,9 @@ class DocumentOptions(plugins.Action):
             return group.name
     def optionOutput(self, key, group, docs):
         keyOutput = "-" + key + " <value>"
-        if docs.find("<") != -1:
+        if (docs == "Execution time"):
+            keyOutput = "-" + key + " <time specification string>"
+        elif docs.find("<") != -1:
             keyOutput = self.filledOptionOutput(key, docs)
         else:
             docs += " <value>"

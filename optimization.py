@@ -1111,7 +1111,7 @@ class TestGraph:
                          ("ix", "Log file item to plot against", timeEntryName),
                          ("v", "Extra versions to plot", ""),
                          ("title", "Title of the plot", ""),
-                         ("tu", "Search for temporary files in user", ""),
+                         ("tu", "Search for tmp files in user", ""),
                          ("size", "size of the plot", ""),
                          ("terminal", "gnuplot terminal to use", "postscript"),
                          ("engine", "Plot engine to use", "gnuplot") ]

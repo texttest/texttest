@@ -141,7 +141,7 @@ class PerformanceComparison:
         else:
             return str(perc) + "% " + self.descriptor
     def isSignificant(self, minPerf, minVar):
-        longEnough = self.newPerformance > minPerf
+        longEnough = self.newPerformance > minPerf or self.oldPerformance > minPerf
         varianceEnough = self.percentageChange > minVar
         return longEnough and varianceEnough
     def getAverage(self):

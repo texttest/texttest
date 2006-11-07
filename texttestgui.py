@@ -1507,9 +1507,11 @@ class TextInfoGUI(TabGUI):
         guilog.info(self.getActualText().strip())
         guilog.info("--------------------------------------")
     def notifyViewTest(self, test):
+        self.currentTest = test
         if test.classId() == "test-case":
-            self.currentTest = test
             self.resetText(test, test.state)
+        else:
+            self.text = ""
     def notifyLifecycleChange(self, test, state, changeDesc):
         if not test is self.currentTest:
             return

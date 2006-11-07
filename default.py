@@ -174,36 +174,38 @@ class Config(plugins.Configuration):
     def getPossibleFilterFiles(self, app):
         filterFiles = []
         for directory in self.getFilterDirs(app):
-            try:
-                filenames = os.listdir(directory)
-            except:
-                filenames = []
+            filenames = os.listdir(directory)
             filenames.sort()
             for filename in filenames:
                 if os.path.isfile(os.path.join(directory, filename)):
                     filterFiles.append(filename)
         return filterFiles
     def getFilterFilePath(self, app, filename, forWrite):
-        filterDirs = self.getFilterDirs(app)
-        if not filterDirs:
-            return ""
+        filterDirs = self.getFilterDirs(app, forWrite)
+        if len(filterDirs) == 0:
+            raise plugins.TextTestError, "Cannot find path for filter file " + filename + ": no directories described.\n" + \
+                                         "Make sure test_list_files_directory is not an empty list"
         if forWrite:
             dirToUse = filterDirs[0]
             plugins.ensureDirectoryExists(dirToUse)
             return os.path.join(dirToUse, filename)
         else:
             return app.getFileName(filterDirs, filename)
-    def getFilterDirs(self, app):
+    def getFilterDirs(self, app, forWrite=False):
         cmdLineDir = self.optionValue("fd")
         if cmdLineDir:
             return [ cmdLineDir ]
-        return self.getConfigFilterDirs(app) + self.getTmpFilterDirs(app) 
+        return self.getConfigFilterDirs(app, forWrite) + self.getTmpFilterDirs(app) 
     def getTmpFilterDirs(self, app):
         return glob.glob(os.path.join(app.writeDirectory, "dynamic_run*"))
-    def getConfigFilterDirs(self, app):
+    def getConfigFilterDirs(self, app, forWrite):
         rawDirs = app.getConfigValue("test_list_files_directory")
         allDirs = map(lambda dir: os.path.join(app.getDirectory(), dir), rawDirs)
-        return filter(os.path.isdir, allDirs)
+        existingDirs = filter(os.path.isdir, allDirs)
+        if len(existingDirs) > 0 or not forWrite:
+            return existingDirs
+        else:
+            return allDirs
     def getFilterClasses(self):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  batch.BatchFilter, performance.TimeFilter ]

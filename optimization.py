@@ -999,7 +999,7 @@ class GraphPlotResponder(Responder):
         if not self.writeDir:
             self.writeDir = suite.app.writeDirectory
     def notifyComplete(self, test):
-        self.testGraph.createPlotLinesForTest(test)
+        self.testGraph.createPlotObjectsForTest(test)
     def notifyAllComplete(self):
         try:
             self.testGraph.plot(self.writeDir)
@@ -1030,7 +1030,7 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
     def getTabTitle(self):
         return "Graph"
     def performOnCurrent(self):
-        self.testGraph.createPlotLinesForTest(self.currentTest)
+        self.testGraph.createPlotObjectsForTest(self.currentTest)
         self.plotGraph(self.currentTest.app.writeDirectory)  
     def plotGraph(self, writeDirectory):
         plotProcess = self.testGraph.plot(writeDirectory)
@@ -1082,7 +1082,7 @@ class PlotSubplans(plugins.Action):
                     newTest = testmodel.TestCase(testName, testmodel.DirectoryCache(testFullPath), \
                                                  app, parent=None)
                     logFilePath = os.path.join(subplan, "APC_FILES", app.getConfigValue("log_file"))
-                    testGraph.createPlotLines(str(version), logFilePath, newTest, None)
+                    testGraph.createPlotObjects(str(version), logFilePath, newTest, None)
             version += 1
         shutil.rmtree("dummyUser")
         testGraph.plot(app.writeDirectory)
@@ -1255,7 +1255,7 @@ class TestGraph:
     def getXAxisLabel(self):
         return self.axisXLabel
     # The routines below are the ones creating all the PlotLine instances for ONE test.
-    def createPlotLines(self, lineName, logFile, test, scaling):
+    def createPlotObjects(self, lineName, logFile, test, scaling):
         # Find out what to plot.
         plotItemsText = self.optionGroup.getOptionValue("i")
         if plotItemsText == "apctimes":
@@ -1289,7 +1289,7 @@ class TestGraph:
 	if len(dateEntry) == 0:
             return None
         return dateEntry[0]        
-    def createPlotLinesForTest(self, test):
+    def createPlotObjectsForTest(self, test):
         logFileStem = test.app.getConfigValue("log_file")
         searchInUser = self.optionGroup.getOptionValue("tu")
         onlyExactMatch = self.optionGroup.getSwitchValue("oem")
@@ -1298,10 +1298,10 @@ class TestGraph:
             logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
             foundTmp, logFile = logFileFinder.findFile()
             if foundTmp:
-                self.createPlotLines("this run", logFile, test, None)
+                self.createPlotObjects("this run", logFile, test, None)
         stdFile = test.getFileName(logFileStem)
         if stdFile:
-            self.createPlotLines("std result", stdFile, test, None)
+            self.createPlotObjects("std result", stdFile, test, None)
         for versionItem in plugins.commasplit(self.optionGroup.getOptionValue("v")):
             if versionItem.find(":") == -1:
                 versionName = version = versionItem
@@ -1333,19 +1333,19 @@ class TestGraph:
                         if len(stderr.readlines()) > 0:
                             print os.path.basename(originalLogFileName), "is not in the CVS repository at", date
                         else:
-                            self.createPlotLines("CVS " + date, CVSLogFileName, test, None)
+                            self.createPlotObjects("CVS " + date, CVSLogFileName, test, None)
                 else:
                     if not noTmp:
                         logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
                         foundTmp, logFile = logFileFinder.findFile(version)
                         if foundTmp:
-                            self.createPlotLines(versionName + "run", logFile, test, scaling)
+                            self.createPlotObjects(versionName + "run", logFile, test, scaling)
                     logFile = test.getFileName(logFileStem, version)
                     isExactMatch = logFile.endswith(version)
                     if not onlyExactMatch and not isExactMatch:
                         print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
                     if not (onlyExactMatch and not isExactMatch):
-                        self.createPlotLines(versionName, logFile, test, scaling)
+                        self.createPlotObjects(versionName, logFile, test, scaling)
 
 class PlotEngine:
     def __init__(self, testGraph):
@@ -1532,12 +1532,23 @@ class PlotEngineMPL:
                 return (nums[0], nums[1])
         else:
             return None
-    def plot(self, writeDir):
-        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()
+    def createFigure(self, plotSize):
         global mplFigureNumber
         figure(mplFigureNumber, facecolor = 'w', figsize = self.getPlotSize(plotSize))
         mplFigureNumber += 1
         axes(axisbg = '#f6f6f6')
+    def showOrSave(self, targetFile, writeDir):
+        if targetFile:
+            if not os.path.isdir(writeDir):
+                os.makedirs(writeDir)
+            os.chdir(writeDir)
+            absTargetFile = os.path.expanduser(targetFile)
+            savefig(absTargetFile)
+        else:
+            show()
+    def plot(self, writeDir):
+        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()
+        self.createFigure(plotSize)
         min = None
         if plotPercentage:
             min = self.testGraph.findMinOverPlotLines()
@@ -1573,15 +1584,8 @@ class PlotEngineMPL:
             ylabel(self.testGraph.getYAxisLabel())
         else:
             ylabel(self.testGraph.getYAxisLabel() + " % above " + str(min))
-        if targetFile:
-            if not os.path.isdir(writeDir):
-                os.makedirs(writeDir)
-            os.chdir(writeDir)
-            absTargetFile = os.path.expanduser(targetFile)
-            savefig(absTargetFile)
-        else:
-            show()
-
+            
+        self.showOrSave(targetFile, writeDir)
 
 # Class representing ONE curve in plot.
 class PlotLine:

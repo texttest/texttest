@@ -1525,7 +1525,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
         optimization.PlotTestInGUI.__init__(self, dynamic, test)
         self.addSwitch("kpi", "Plot kpi group")
     def performOnCurrent(self):
-        self.testGraph.createPlotLinesForTest(self.currentTest)
+        self.testGraph.createPlotObjectsForTest(self.currentTest)
         # Plot KPI group
         if self.optionGroup.getSwitchValue("kpi"):
             oldTestDir = self.currentTest.getDirectory(None)
@@ -1537,7 +1537,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
                     if testInGroup == kpiGroupForTest[kpiTest] and  kpiTest != originalTestName:
                         testPath = os.path.join(path, kpiTest)
                         newTest = testmodel.TestCase(kpiTest, testmodel.DirectoryCache(testPath), self.currentTest.app, self.currentTest.parent)
-                        self.testGraph.createPlotLinesForTest(newTest)
+                        self.testGraph.createPlotObjectsForTest(newTest)
             else:
                 print "Test", self.currentTest.name, "is not in an KPI group."
         self.plotGraph(self.currentTest.app.writeDirectory)  
@@ -1552,6 +1552,10 @@ class PlotKPIGroups(plugins.Action):
         self.args = args
         self.groupsToPlot = {}
         self.groupScale = {}
+        self.timeDivision = None
+        for arg in args:
+            if arg.find("timediv") != -1:
+                self.timeDivision = 1
     def __call__(self, test):
         kpiGroupForTest, kpiGroups, kpiGroupsScale = readKPIGroupFileCommon(test.parent)
         if kpiGroupForTest.has_key(test.name):
@@ -1565,7 +1569,10 @@ class PlotKPIGroups(plugins.Action):
         self.allGroups.sort()
         for group in self.allGroups:
             # Create a test graph
-            testGraph = optimization.TestGraph()
+            if not self.timeDivision:
+                testGraph = optimization.TestGraph()
+            else:
+                testGraph = TestGraphTimeDiv()
             testGraph.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
             for name, expl, value in testGraph.options:
                 testGraph.optionGroup.addOption(name, expl, value)
@@ -1577,11 +1584,101 @@ class PlotKPIGroups(plugins.Action):
                 testGraph.optionGroup.setValue("yr", self.groupScale[group])
             self.setExtraOptions(testGraph.optionGroup, group)
             for test in self.groupsToPlot[group]:
-                testGraph.createPlotLinesForTest(test)
+                testGraph.createPlotObjectsForTest(test)
             testGraph.plot(test.app.writeDirectory)
         print "Plotted", len(self.groupsToPlot.keys()), "KPI groups."
     def setExtraOptions(self, group, average):
         pass
+
+class TestGraphTimeDiv(optimization.TestGraph):
+    def __init__(self):
+        optimization.TestGraph.__init__(self)
+        self.groupTimes = seqdict()
+        self.numTests = {}
+    def plot(self, writeDir):
+        engineOpt = self.optionGroup.getOptionValue("engine")
+        if engineOpt == "mpl" and mplDefined:
+            engine = PlotEngineMPLTimeDiv(self)
+        else:
+            raise plugins.TextTestError, "Only plot engine matplotlib supports time division - aborting plotting."
+        return engine.plot(writeDir)
+    def createPlotObjects(self, lineName, logFile, test, scaling):
+        times = self.extractColgenData(test.app, logFile)
+        if not self.groupTimes.has_key(lineName):
+            self.groupTimes[lineName] = times
+            self.numTests[lineName] = 1
+        else:
+            self.groupTimes[lineName] = map(lambda x,y:x+y, self.groupTimes[lineName], times)
+            self.numTests[lineName] += 1
+    def extractColgenData(self, app, statusFile):
+        tsValues =  [ "Network generation time", "Generation time", "Coordination time", "DH post processing", "Conn fixing time", "OC to DH time"]
+        optRun = optimization.OptimizationRun(app,  [ optimization.timeEntryName, optimization.activeMethodEntryName], tsValues, statusFile)
+        solutions = optRun.solutions
+        while solutions:
+            lastSolution = solutions.pop()
+            if lastSolution["Active method"] == "column generator":
+                break
+        if not lastSolution["Active method"] == "column generator":
+            print "Warning: didn't find last colgen solution!"
+            return 0, 0
+        
+        totTime = int(lastSolution["cpu time"]*60)
+
+        sum = 0
+        tl = []
+        for val in tsValues:
+            if lastSolution.has_key(val):
+                sum += lastSolution[val]
+                tl.append(lastSolution[val])
+            else:
+                tl.append(0)
+        tl.append(totTime - sum)
+        return tl
+
+try:
+    from matplotlib import *
+    use('TkAgg')
+    from matplotlib.pylab import *
+    mplDefined = 1
+except:
+    pass
+
+class PlotEngineMPLTimeDiv(optimization.PlotEngineMPL):
+    def plot(self, writeDir):
+        xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()
+        self.createFigure(plotSize)
+        clf()
+
+        descAndColours = [ ('Network','brown'),  ('Generation','deepskyblue'), ('PAQS', 'green'),
+                          ('Deadhead post','gray'), ('Conn. fix','gold'), ('OC->DH','magenta'), ('Other','black')]
+
+        xstart = 0
+        width = 1
+        next = width*1.2
+        xtik = []
+        for version, times in self.testGraph.groupTimes.items():
+            numTests = self.testGraph.numTests[version]
+            bottom = 0
+            colour = 0
+            timeSum = reduce(lambda x,y:x+y, times)
+            for time in times:
+                height = time/60.0/numTests
+                desc, col = descAndColours[colour]
+                bar([xstart], height, [width], bottom, col)
+                if time > 0.09*timeSum:
+                    text(xstart+0.5*width, 0.5*(2*bottom+height), desc,
+                         horizontalalignment='center', verticalalignment='center', color = 'white')
+                bottom += height
+                colour += 1
+            xtik.append(xstart+0.5*width)
+            xstart += next
+        xticks(xtik, self.testGraph.groupTimes.keys())
+        gca().set_xlim(0, xstart-next+width)
+        grid()
+        title('Time distribution (average)')
+        ylabel('CPU time (min)')
+
+        self.showOrSave(targetFile, writeDir)
 
 # Override for webpage generation with APC-specific stuff in it
 class GenerateWebPages(optimization.GenerateWebPages):

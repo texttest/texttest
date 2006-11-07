@@ -608,7 +608,7 @@ class OptionFinder(seqdict):
             else:
                 self[defaultKey] = item
     def stripMinuses(self, item):
-        if item[1] == "-":
+        if len(item) > 1 and item[1] == "-":
             return item[2:].strip()
         else:
             return item[1:].strip()

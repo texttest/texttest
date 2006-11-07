@@ -176,6 +176,12 @@ class Config(CarmenConfig):
                  CarmenConfig._getActionSequence(self, makeDirs = 0)
     def raveSlave(self):
         return self.optionMap.has_key("raveslave")
+    def getWriteDirectoryName(self, app):
+        slaveDir = self.optionMap.get("raveslave")
+        if slaveDir:
+            return slaveDir
+        else:
+            return CarmenConfig.getWriteDirectoryName(self, app)
     def getCarmVarChecker(self):
         if not self.isReconnecting():
             return CheckCarmVariables()

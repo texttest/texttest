@@ -369,12 +369,17 @@ class ViewFile(InteractiveTestAction):
         return False # activate when a file is viewed, not via the performOnCurrent method
     def hasButton(self):
         return False
-    def updateDefaults(self):
+    def notifyViewTest(self, test):
         if self.dynamic:
-            if self.currentTest.state.isComplete():
+            oldRunning = self.isRunning(self.currentTest)
+            newRunning = self.isRunning(test)
+            if oldRunning and not newRunning:
                 self.optionGroup.removeSwitch("f")
-            else:
+            if newRunning and not oldRunning:
                 self.addSwitch("f", "Follow file rather than view it", 1)
+        self.currentTest = test
+    def isRunning(self, test):
+        return test.classId() == "test-case" and not test.state.isComplete()
     def tmpFile(self, comparison):
         if self.optionGroup.getSwitchValue("rdt"):
             return comparison.tmpFile

@@ -812,6 +812,13 @@ class PlotKPIGroupsAndGeneratePage(apc.PlotKPIGroups):
             optionGroup.setValue("i", "memory")
             optionGroup.setValue("per", 0)
             optionGroup.setValue("yr", "0:")
+            optionGroup.setValue("title", "Memory")
+        elif self.timeDivision:
+            pass
+        elif self.onlyAverage:
+            optionGroup.setValue("title", "Average")
+        else:
+            optionGroup.setValue("title", "Individual")            
     def getPlotName(self, group, average, mem, timediv, fullPath = 1):
         if mem:
             plotName = group + "_mem" + ".png"

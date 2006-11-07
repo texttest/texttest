@@ -653,9 +653,9 @@ class ConfigurationCall:
     def __call__(self, *args):
         try:
             return self.targetCall(*args)
-        except plugins.TextTestError, e:
-            # Just translate the message here, they're more or less deliberate
-            raise BadConfigError, e
+        except plugins.TextTestError:
+            # Just pass it through here, these are deliberate
+            raise
         except:
             self.raiseException()
     def raiseException(self):

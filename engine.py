@@ -489,7 +489,7 @@ class TextTest:
     def _run(self):
         try:
             self.createResponders()
-        except testmodel.BadConfigError, e:
+        except plugins.TextTestError, e:
             # Responder class-level errors are basically fatal : there is no point running without them (cannot
             # do anything about them) and no way to get partial errors.
             sys.stderr.write(str(e) + "\n")

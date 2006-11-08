@@ -81,7 +81,11 @@ class InteractiveAction(plugins.Observable):
         return True # do we activate this via performOnCurrent() ?
     def getInterfaceDescription(self):
         return ""
-    def getAccelerator(self):        
+    def getAccelerator(self):
+        configName = self.getTitle().replace("_", "").replace(" ", "_").lower()
+        accelerators = self.getConfigValue("gui_accelerators")
+        return accelerators.get(configName, self.getDefaultAccelerator())
+    def getDefaultAccelerator(self):
         pass
     def getStockId(self):
         pass
@@ -277,7 +281,7 @@ class SaveTests(SelectionAction):
         description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
         return description
-    def getAccelerator(self):
+    def getDefaultAccelerator(self):
         return "<control>s"
     def getTitle(self):
         return "_Save"
@@ -675,7 +679,7 @@ class SelectTests(SelectionAction):
         description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
         return description
-    def getAccelerator(self):
+    def getDefaultAccelerator(self):
         return "<control>s"
     def getStockId(self):
         return "refresh"
@@ -794,7 +798,7 @@ class ResetGroups(SelectionAction):
         description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/></toolbar>\n"
         return description
-    def getAccelerator(self):
+    def getDefaultAccelerator(self):
         return '<control>e'
     def getTitle(self):
         return "R_eset"
@@ -879,7 +883,7 @@ class RunTests(SelectionAction):
         description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
         return description
-    def getAccelerator(self):
+    def getDefaultAccelerator(self):
         return "<control>r"
     def getScriptTitle(self, tab):
         return "Run selected tests"
@@ -1137,8 +1141,8 @@ class InteractiveActionHandler:
     def __init__(self):
         self.actionClasses = [ ViewFile, SaveSelection ]
         self.actionDynamicClasses = [ SaveTests ]
-        self.actionStaticClasses = [ RecordTest, EnableDiagnostics, CopyTest, ImportTestCase, \
-                                     ImportTestSuite, RemoveTest, ReportBugs, SelectTests,
+        self.actionStaticClasses = [ RecordTest, RemoveTest, EnableDiagnostics, CopyTest, \
+                                     ImportTestCase, ImportTestSuite, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups ]
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")

@@ -81,10 +81,9 @@ def showWarning(message):
     dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
 
 class DoubleCheckDialog:
-    def __init__(self, message, yesMethod, yesMethodArgs=()):
+    def __init__(self, message, yesMethod):
         self.dialog = gtk.Dialog("TextTest Query", flags=gtk.DIALOG_MODAL)
         self.yesMethod = yesMethod
-        self.yesMethodArgs = yesMethodArgs
         guilog.info("QUERY: " + message)
         noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
@@ -99,7 +98,7 @@ class DoubleCheckDialog:
 
     def respond(self, button, saidYes, *args):
         if saidYes:
-            self.yesMethod(*self.yesMethodArgs)
+            self.yesMethod()
         self.dialog.destroy()
 
 def renderParentsBold(column, cell, model, iter):
@@ -135,7 +134,7 @@ class QuitGUI(guiplugins.SelectionAction):
         return description
     def getStockId(self):
         return "quit"
-    def getAccelerator(self):
+    def getDefaultAccelerator(self):
         return "<control>q"
     def getTitle(self):
         return "_Quit"
@@ -261,10 +260,13 @@ class TextTestGUI(Responder):
         self.rightWindowGUI = None
         self.selectionActionGUI = None
         self.testTreeGUI = TestTreeGUI(self.dynamic)
+        self.fileViewGUI = None
+        self.notebookGUI = None
         self.contents = None
         self.progressMonitor = None
         self.progressBar = None
         self.toolTips = gtk.Tooltips()
+        self.toolBarGUIs = []
         self.rootSuites = []
         self.testTreeGUI.addObserver(self)
         self.testTreeGUI.addObserver(statusMonitor)
@@ -307,11 +309,11 @@ class TextTestGUI(Responder):
             if not suite.app.fullName in names:
                 names.append(suite.app.fullName)
         return string.join(names, ",")
-    def fillTopWindow(self, topWindow, testWins, rightWindow):
+    def fillTopWindow(self, topWindow, testWins, rightWindow, intvActions):
         mainWindow = self.createWindowContents(testWins, rightWindow)
         
         vbox = gtk.VBox()
-        self.placeTopWidgets(vbox)
+        self.placeTopWidgets(vbox, intvActions)
         vbox.pack_start(mainWindow, expand=True, fill=True)
         if self.getConfigValue("add_shortcut_bar"):
             shortcutBar = scriptEngine.createShortcutBar()
@@ -328,25 +330,52 @@ class TextTestGUI(Responder):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.testTreeGUI.treeView.grab_focus()
         self.adjustSize(topWindow)
+    def getWindowOption(self, name, optionDir, default):
+        if self.dynamic:
+            return optionDir.get("dynamic_" + name, default)
+        else:
+            return optionDir.get("static_" + name, default)
         
     def adjustSize(self, topWindow):
-        if (self.dynamic and self.getConfigValue("window_size").has_key("dynamic_maximize") and self.getConfigValue("window_size")["dynamic_maximize"][0] == "1") or (not self.dynamic and self.getConfigValue("window_size").has_key("static_maximize") and self.getConfigValue("window_size")["static_maximize"][0] == "1"):
+        optionDir = self.getConfigValue("window_size")
+        if int(self.getWindowOption("maximize", optionDir, 0)):
             topWindow.maximize()
         else:
             width = self.getWindowWidth()
             height = self.getWindowHeight()
             topWindow.resize(width, height)
-        self.rightWindowGUI.notifySizeChange(topWindow.get_size()[0], topWindow.get_size()[1], self.getConfigValue("window_size"))
-        verticalSeparatorPosition = 0.5
-        if self.dynamic and self.getConfigValue("window_size").has_key("dynamic_vertical_separator_position"):
-            verticalSeparatorPosition = float(self.getConfigValue("window_size")["dynamic_vertical_separator_position"][0])
-        elif not self.dynamic and self.getConfigValue("window_size").has_key("static_vertical_separator_position"):
-            verticalSeparatorPosition = float(self.getConfigValue("window_size")["static_vertical_separator_position"][0])
+
+        horizontalSeparatorPosition = float(self.getWindowOption("horizontal_separator_position", optionDir, 0.46))
+        self.rightWindowGUI.notifySizeChange(horizontalSeparatorPosition)
+        
+        verticalSeparatorPosition = float(self.getWindowOption("vertical_separator_position", optionDir, 0.5))
         self.contents.set_position(int(self.contents.allocation.width * verticalSeparatorPosition))
-    def placeTopWidgets(self, vbox):
+
+    def getInterfaceDescription(self, toolBarActions):
+        description = "<ui>\n"
+        for instance in toolBarActions:
+            description += instance.getInterfaceDescription()
+        description += "</ui>"
+        return description
+
+    def ensureWholeToolbarVisible(self):
+        toolbar = self.uiManager.get_widget("/toolbar")
+        if toolbar:
+            for item in toolbar.get_children(): 
+                item.set_is_important(True) # Or newly added children without stock ids won't be visible in gtk.TOOLBAR_BOTH_HORIZ style
+       
+    def placeTopWidgets(self, vbox, intvActions):
         # Initialize
         self.uiManager.add_ui_from_string(self.defaultGUIDescription)
-        self.interactiveActionGUI.attachTriggers()
+        toolBarActions = filter(lambda instance : instance.inToolBar() and not instance.isTestDependent(), intvActions)
+        for action in toolBarActions:
+            toolBarGUI = self.createActionGUI(action)
+            toolBarGUI.describe()
+            self.toolBarGUIs.append(toolBarGUI)
+    
+        self.uiManager.add_ui_from_string(self.getInterfaceDescription(toolBarActions))
+        self.uiManager.ensure_update()
+        self.ensureWholeToolbarVisible()
   
         # Show menu/toolbar?
         menubar = None
@@ -467,7 +496,7 @@ class TextTestGUI(Responder):
         framed.add(scrolled)        
         framed.show_all()
         return framed
-    def createSelectionActionGUI(self, topWindow, actionThread):
+    def createInteractiveActions(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.rootSuites)
         for action in actions:
@@ -478,7 +507,15 @@ class TextTestGUI(Responder):
             # Some depend on the test selection or currently viewed test also
             if hasattr(action, "notifyNewTestSelection") or hasattr(action, "notifyViewTest"):
                 self.testTreeGUI.addObserver(action)
-        return InteractiveActionGUI(actions, self.uiManager, self.rootSuites[0].app.getConfigValue("gui_accelerators"))
+            if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
+                self.fileViewGUI.addObserver(action)
+    
+        return actions
+    def getActionGroupIndex(self, action):
+        return int(action.isTestDependent())
+    def getActionGroup(self, action):
+        return self.uiManager.get_action_groups()[self.getActionGroupIndex(action)]
+
     def notifyActionStart(self, message):
         # To make it possible to have an while-events-process loop
         # to update the GUI during actions, we need to make sure the idle
@@ -495,12 +532,15 @@ class TextTestGUI(Responder):
     def setUpGui(self, actionThread=None):
         topWindow = self.createTopWindow()
         treeWindow = self.createTreeWindow()
-        self.interactiveActionGUI = self.createSelectionActionGUI(topWindow, actionThread)
         testWins = self.createTestWindows(treeWindow)
 
         rootSuite = self.rootSuites[0]
+        guilog.info("Viewing test " + repr(rootSuite))
+        self.fileViewGUI = FileViewGUI(rootSuite, self.dynamic)
         self.textInfoGUI = TextInfoGUI(rootSuite)
+        # watch for double-clicks
         self.testTreeGUI.addObserver(self.textInfoGUI)
+        self.testTreeGUI.addObserver(self.fileViewGUI)
         tabGUIs = [ self.textInfoGUI ]
         # Must be created after addSuiteWithParents has counted all tests ...
         # (but before RightWindowGUI, as that wants in on progress)
@@ -509,13 +549,30 @@ class TextTestGUI(Responder):
             self.progressMonitor = TestProgressMonitor()
             self.progressMonitor.addObserver(self.testTreeGUI)
             tabGUIs.append(self.progressMonitor)
-        tabGUIs += self.interactiveActionGUI.createActionTabGUIs()
+            
+        intvActions = self.createInteractiveActions(topWindow, actionThread)
+        tabGUIs += self.createActionTabGUIs(intvActions)
 
-        self.rightWindowGUI = self.createDefaultRightGUI(rootSuite, tabGUIs)
-        # watch for double-clicks
-        self.testTreeGUI.addObserver(self.rightWindowGUI)
-        self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.getWindow())
+        self.notebookGUI = self.createNotebookGUI(tabGUIs)
+        buttonBarGUIs = self.createButtonBarGUIs(intvActions)
+        self.rightWindowGUI = RightWindowGUI(self.fileViewGUI, buttonBarGUIs, self.notebookGUI)
+        
+        self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.createView(), intvActions)
         guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
+    def createActionGUI(self, action, fromTab=False):
+        return ActionGUI(action, self.getActionGroup(action), self.uiManager.get_accel_group(), fromTab)
+    def createActionGUIForTab(self, action):
+        if len(action.getOptionGroups()) == 1 and action.canPerform():
+            return self.createActionGUI(action, fromTab=True)
+    def createActionTabGUIs(self, actions):
+        actionTabGUIs = []
+        for action in actions:
+            actionGUI = self.createActionGUIForTab(action)
+            for optionGroup in action.getOptionGroups():
+                if optionGroup.switches or optionGroup.options:
+                    actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
+        return actionTabGUIs
+
     def runWithActionThread(self, actionThread):
         self.idleSourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
         self.idleAddedDirectly = False
@@ -526,12 +583,20 @@ class TextTestGUI(Responder):
         self.setUpGui()
         self.idleSourceId = gobject.idle_add(self.pickUpProcess)
         gtk.main()
-    def createDefaultRightGUI(self, rootSuite, tabGUIs):
-        guilog.info("Viewing test " + repr(rootSuite))
-        notebookGUI = self.createNotebookGUI(tabGUIs)
-        return RightWindowGUI(rootSuite, self.dynamic, self.interactiveActionGUI, notebookGUI, self.uiManager)
+    def createButtonBarGUIs(self, intvActions):
+        buttonBarGUIs = []
+        for action in intvActions:
+            if action.inToolBar() and action.isTestDependent():
+                buttonBarGUI = self.createActionGUI(action)
+                self.testTreeGUI.addObserver(buttonBarGUI)
+                buttonBarGUIs.append(buttonBarGUI)
+        return buttonBarGUIs
     def createNotebookGUI(self, tabGUIs):
-        return self.getNotebookClass()(tabGUIs, "view options for")
+        notebookGUI = self.getNotebookClass()(tabGUIs, "view options for")
+        # watch for double-clicks
+        self.testTreeGUI.addObserver(notebookGUI)
+        return notebookGUI
+    
     def getNotebookClass(self):
         if self.dynamic:
             return SubNotebookGUI 
@@ -553,14 +618,14 @@ class TextTestGUI(Responder):
         state.notifyInMainThread()
         
         self.testTreeGUI.notifyLifecycleChange(test, state, changeDesc)
-        self.rightWindowGUI.notifyLifecycleChange(test, state, changeDesc)
+        self.fileViewGUI.notifyLifecycleChange(test, state, changeDesc)
         self.textInfoGUI.notifyLifecycleChange(test, state, changeDesc)
         if self.progressBar:
             self.progressBar.notifyLifecycleChange(test, state, changeDesc)
         if self.progressMonitor:
             self.progressMonitor.notifyLifecycleChange(test, state, changeDesc)
     def notifyFileChange(self, test):
-        self.rightWindowGUI.notifyFileChange(test)
+        self.fileViewGUI.notifyFileChange(test)
     def notifyContentChange(self, suite):
         self.testTreeGUI.notifyContentChange(suite)
     def notifyAdd(self, test):
@@ -946,119 +1011,74 @@ class TestTreeGUI(plugins.Observable):
             self.expandRow(rootIter, True)
             rootIter = self.filteredModel.iter_next(rootIter)
    
-class InteractiveActionGUI:
-    def __init__(self, actions, uiManager, accelerators):
-        self.accelerators = accelerators
-        self.uiManager = uiManager
-        self.actions = actions
-        self.gtkActions = seqdict()
-    def getInterfaceDescription(self):
-        description = "<ui>\n"
-        buttonInstances = filter(lambda instance : instance.inToolBar() and not instance.isTestDependent(), self.actions)
-        for instance in buttonInstances:
-            description += instance.getInterfaceDescription()
-        description += "</ui>"
-        return description
-    def attachTriggers(self):
-        self.makeToolBarActions()
-        self.mergeId = self.uiManager.add_ui_from_string(self.getInterfaceDescription())
-        self.uiManager.ensure_update()
-        toolbar = self.uiManager.get_widget("/toolbar")
-        if toolbar:
-            for item in toolbar.get_children(): 
-                item.set_is_important(True) # Or newly added children without stock ids won't be visible in gtk.TOOLBAR_BOTH_HORIZ style
-    def makeToolBarActions(self):
-        actions = filter(lambda instance : instance.inToolBar() and not instance.isTestDependent(), self.actions)
-        for action in actions:
-            self.getGtkAction(action, tab=False)
-    def createGtkAction(self, intvAction, scriptTitle):
-        actionName = intvAction.getSecondaryTitle()
-        label = intvAction.getTitle()
-        stockId = intvAction.getStockId()
+class ActionGUI:
+    def __init__(self, action, actionGroup, accelGroup, fromTab):
+        self.action = action
+        self.accelerator = self.getAccelerator()
+        self.gtkAction = gtk.Action(self.action.getSecondaryTitle(), self.action.getTitle(), \
+                                    self.action.getTooltip(), self.getStockId())
+        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
+        self.gtkAction.set_accel_group(accelGroup)
+        self.gtkAction.connect_accelerator()
+        scriptEngine.connect(self.action.getScriptTitle(fromTab), "activate", self.gtkAction, self.runInteractive)
+
+    def getStockId(self):
+        stockId = self.action.getStockId()
         if stockId:
-            stockId = "gtk-" + stockId 
-        gtkAction = gtk.Action(actionName, label, intvAction.getTooltip(), stockId)
-        realAcc = intvAction.getAccelerator()
-        realAcc = self.getCustomAccelerator(actionName, label, realAcc)
+            return "gtk-" + stockId 
+        
+    def getAccelerator(self):
+        realAcc = self.action.getAccelerator()
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
-            if not gtk.accelerator_valid(key, mod):
-                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" + actionName + "' is not valid, ignoring ...")
-                realAcc = None
-                
-        guilog.info("Creating action '" + actionName + "' with label '" + repr(label) + \
-                    "', stock id '" + repr(stockId) + "' and accelerator " + repr(realAcc))
-        self.getActionGroup(intvAction).add_action_with_accel(gtkAction, realAcc)
-        gtkAction.set_accel_group(self.uiManager.get_accel_group())
-        gtkAction.connect_accelerator()
-        scriptEngine.connect(scriptTitle, "activate", gtkAction, self.runInteractive, None, intvAction)
-        return gtkAction
-    def getGtkAction(self, action, tab=False):
-        scriptTitle = action.getScriptTitle(tab)
-        if self.gtkActions.has_key(scriptTitle):
-            return self.gtkActions[scriptTitle]
+            if gtk.accelerator_valid(key, mod):
+                return realAcc
+            else:
+                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
+                                     + self.action.getSecondaryTitle() + "' is not valid, ignoring ...")
+    def describe(self, postText=""):
+        message = "Viewing button with title '" + self.action.getTitle() + "'"
+        stockId = self.getStockId()
+        if stockId:
+            message += ", stock id '" + repr(stockId) + "'"
+        if self.accelerator:
+            message += ", accelerator '" + repr(self.accelerator) + "'"
+        guilog.info(message + postText)
+    def createStandaloneButton(self):
+        button = self.createButton()
+        if self.action.isActiveOnCurrent():
+            self.describe()
         else:
-            gtkAction = self.createGtkAction(action, scriptTitle)
-            self.gtkActions[scriptTitle] = gtkAction
-            return gtkAction
-    def makeTestButtonBar(self):
-        executeButtons = gtk.HBox()
-        buttonInstances = filter(lambda instance : instance.inToolBar() and instance.isTestDependent() and \
-                                 instance.isActiveOnCurrent(), self.actions)
-        if len(buttonInstances):
-            guilog.info("") # blank line for demarcation
-        for instance in buttonInstances:
-            button = self.createButton(instance)
-            executeButtons.pack_start(button, expand=False, fill=False)
-        if len(buttonInstances) > 0:
-            buttonTitles = map(lambda b: b.getTitle(), buttonInstances)
-            guilog.info("Creating box with buttons : " + string.join(buttonTitles, ", "))
-        executeButtons.show_all()
-        return executeButtons
-    def createButton(self, intvAction, tab=False):
-        gtkAction = self.getGtkAction(intvAction, tab)
-        button = gtk.Button()
-        gtkAction.connect_proxy(button)
-        button.show()
+            button.set_property("sensitive", False)
+            self.describe(" (greyed out)")
         return button
-    def getActionGroupIndex(self, action):
-        return int(action.isTestDependent())
-    def getActionGroup(self, action):
-        return self.uiManager.get_action_groups()[self.getActionGroupIndex(action)]
-    def getCustomAccelerator(self, name, label, original):
-        configName = label.replace("_", "").replace(" ", "_").lower()
-        if self.accelerators.has_key(configName):
-            newAccel = self.accelerators[configName][0]
-            guilog.info("Replacing default accelerator '" + repr(original) + "' for action '" + name + "' by config value '" + newAccel + "'")
-            return newAccel
-        return original
-    def runInteractive(self, button, action, *args):
-        doubleCheckMessage = action.getDoubleCheckMessage()
+
+    def notifyViewTest(self, test):
+        oldActive = self.button.get_property("sensitive")
+        newActive = self.action.isActiveOnCurrent()
+        if oldActive != newActive:
+            self.button.set_property("sensitive", newActive)
+            guilog.info("Setting sensitivity of button '" + self.action.getTitle() + "' to " + repr(newActive))
+    def createButton(self):
+        self.button = gtk.Button()
+        self.gtkAction.connect_proxy(self.button)
+        self.button.show()
+        return self.button
+    def runInteractive(self, *args):
+        doubleCheckMessage = self.action.getDoubleCheckMessage()
         if doubleCheckMessage:
-            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, (action,))
+            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive)
         else:
-            self._runInteractive(action)
-    def _runInteractive(self, action):
+            self._runInteractive()
+    def _runInteractive(self):
         try:            
-            action.perform()
+            self.action.perform()
         except plugins.TextTestError, e:
             showError(str(e))
         except plugins.TextTestWarning, e:
             showWarning(str(e))
-    def getButtonMethod(self, optionGroups, instance):
-        if len(optionGroups) == 1 and instance.canPerform():
-            return self.createButton
+    
         
-    def createActionTabGUIs(self):
-        actionTabGUIs = []
-        for instance in self.actions:
-            optionGroups = instance.getOptionGroups()
-            buttonMethod = self.getButtonMethod(optionGroups, instance)
-            for optionGroup in optionGroups:
-                if optionGroup.switches or optionGroup.options:
-                    actionTabGUIs.append(ActionTabGUI(optionGroup, instance, buttonMethod))
-        return actionTabGUIs
-
 # base class for everything that can go in tabs handled by NotebookGUI
 class TabGUI:
     def __init__(self, active=False):
@@ -1100,10 +1120,10 @@ class TabGUI:
             raise plugins.TextTestError, "Could not decide how to add scrollbars to " + repr(widget)
     
 class ActionTabGUI(TabGUI):
-    def __init__(self, optionGroup, action, buttonMethod):
+    def __init__(self, optionGroup, action, buttonGUI):
         self.optionGroup = optionGroup
         self.action = action
-        self.buttonMethod = buttonMethod
+        self.buttonGUI = buttonGUI
         self.vbox = None
     def getGroupTabTitle(self):
         return self.action.getGroupTabTitle()
@@ -1141,8 +1161,8 @@ class ActionTabGUI(TabGUI):
         for switch in self.optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
             self.vbox.pack_start(hbox, expand=False, fill=False)
-        if self.buttonMethod:
-            button = self.buttonMethod(self.action, tab=True)
+        if self.buttonGUI:
+            button = self.buttonGUI.createButton()
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()
@@ -1211,8 +1231,8 @@ class ActionTabGUI(TabGUI):
         for switch in self.optionGroup.switches.values():
             guilog.info(self.getSwitchDescription(switch))
 
-        if self.buttonMethod:
-            guilog.info("Viewing button with title '" + self.action.getTitle() + "'")
+        if self.buttonGUI:
+            self.buttonGUI.describe()
         
     def getOptionDescription(self, option):
         value = option.getValue()
@@ -1407,10 +1427,10 @@ class SubNotebookGUI(NotebookGUI):
         
             
 class RightWindowGUI:
-    def __init__(self, initialObject, dynamic, interactiveActionGUI, notebookGUI, uiManager):
-        self.dynamic = dynamic
-        self.uiManager = uiManager
-        self.interactiveActionGUI = interactiveActionGUI
+    def __init__(self, fileViewGUI, buttonBarGUIs, notebookGUI):
+        self.fileViewGUI = fileViewGUI
+        self.notebookGUI = notebookGUI
+        self.buttonBarGUIs = buttonBarGUIs                
         self.window = gtk.VBox()
         self.vpaned = gtk.VPaned()
         self.vpaned.connect('notify', self.paneHasChanged)
@@ -1421,64 +1441,29 @@ class RightWindowGUI:
         self.bottomFrame.set_shadow_type(gtk.SHADOW_IN)
         self.vpaned.pack1(self.topFrame, resize=True)
         self.vpaned.pack2(self.bottomFrame, resize=True)
-        self.currentObject = initialObject
-        self.fileViewGUI = self.createFileViewGUI()
-        self.addObservers(self.interactiveActionGUI.actions)
-        self.notebookGUI = notebookGUI
-
-        self.fillWindow()
-        guilog.info("") # createView writes stuff
-        self.bottomFrame.add(self.notebookGUI.createView())
 
     def paneHasChanged(self, pane, gparamspec):
         pos = pane.get_position()
         size = pane.allocation.height
         self.panedTooltips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + " (" + str(100 * pos / size) + "% from the top)")
-    def notifySizeChange(self, width, height, options):
-        horizontalSeparatorPosition = 0.46
-        if self.dynamic and options.has_key("dynamic_horizontal_separator_position"):
-            horizontalSeparatorPosition = float(options["dynamic_horizontal_separator_position"][0])
-        elif not self.dynamic and options.has_key("static_horizontal_separator_position"):
-            horizontalSeparatorPosition = float(options["static_horizontal_separator_position"][0])
-
+    def notifySizeChange(self, horizontalSeparatorPosition):
         self.vpaned.set_position(int(self.vpaned.allocation.height * horizontalSeparatorPosition))        
-    def notifyFileChange(self, test):
-        self.fileViewGUI.notifyFileChange(test)
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        self.fileViewGUI.notifyLifecycleChange(test, state, changeDesc)
-    def notifyViewTest(self, newObject):
-        # Triggered by user double-clicking the test in the test tree
-        self.removeChildrenExcept(self.notebookGUI.notebook)
-        self.currentObject = newObject
-        self.fileViewGUI = self.createFileViewGUI()
-        self.addObservers(self.interactiveActionGUI.actions)
-        
-        self.fillWindow()
-        self.notebookGUI.notifyViewTest(newObject)
-    def removeChildrenExcept(self, notebook):
-        for child in self.window.get_children():
-            if not child is notebook:
-                self.window.remove(child)
-        if not self.topFrame.get_child() is notebook:
-            self.topFrame.remove(self.topFrame.get_child())
-        if not self.bottomFrame.get_child() is notebook:
-            self.bottomFrame.remove(self.bottomFrame.get_child())
-    def addObservers(self, actions):
-        for action in actions:
-            if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
-                self.fileViewGUI.addObserver(action)
-    def fillWindow(self):
-        self.window.pack_start(self.interactiveActionGUI.makeTestButtonBar(), expand=False, fill=False)
+    def makeTestButtonBar(self):
+        executeButtons = gtk.HBox()
+        if len(self.buttonBarGUIs):
+            guilog.info("") # blank line for demarcation
+        for buttonGUI in self.buttonBarGUIs:
+            button = buttonGUI.createStandaloneButton()
+            executeButtons.pack_start(button, expand=False, fill=False)
+        executeButtons.show_all()
+        return executeButtons
+    def createView(self):
+        self.window.pack_start(self.makeTestButtonBar(), expand=False, fill=False)
         self.topFrame.add(self.fileViewGUI.createView())
         self.window.pack_start(self.vpaned, expand=True, fill=True)
         self.vpaned.show_all()
         self.window.show_all()    
-    def createFileViewGUI(self):
-        if self.currentObject.classId() == "test-app":
-            return ApplicationFileGUI(self.currentObject)
-        else:
-            return TestFileGUI(self.currentObject, self.dynamic)
-    def getWindow(self):
+        self.bottomFrame.add(self.notebookGUI.createView())
         return self.window
     
 class TextInfoGUI(TabGUI):
@@ -1578,50 +1563,66 @@ class TextInfoGUI(TabGUI):
 
         
 class FileViewGUI(plugins.Observable):
-    def __init__(self, object):
+    def __init__(self, obj, dynamic):
         plugins.Observable.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
-        self.name = object.name.replace("_", "__")
+        self.currentObject = obj
+        self.dynamic = dynamic
+        self.modelHandler = self.createModelHandler(obj)
         self.selection = None
+        self.nameColumn = None
+    def createModelHandler(self, object):
+        if object.classId() == "test-app":
+            return ApplicationFileModelHandler(self.model, object)
+        else:
+            return TestFileModelHandler(self.model, object, self.dynamic)
     def notifyFileChange(self, test):
-        pass
+        if test is self.currentObject:
+            self.recreateModel(test.state)
     def notifyLifecycleChange(self, test, state, changeDesc):
-        pass
-    def addFileToModel(self, iter, name, comp, colour):
-        fciter = self.model.insert_before(iter, None)
-        baseName = os.path.basename(name)
-        heading = self.model.get_value(iter, 0)
-        self.model.set_value(fciter, 0, baseName)
-        self.model.set_value(fciter, 1, colour)
-        self.model.set_value(fciter, 2, name)
-        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour)
-        if comp:
-            self.model.set_value(fciter, 3, comp)
-            details = comp.getDetails()
-            if len(details) > 0:
-                self.model.set_value(fciter, 4, details)
-                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
-        return fciter
+        if test is self.currentObject:
+            self.recreateModel(state)
+    def notifyViewTest(self, obj):
+        self.currentObject = obj
+        self.modelHandler = self.createModelHandler(obj)
+        self.nameColumn.set_title(self.getName())
+        self.recreateModel(self.getState())
+        
+    def recreateModel(self, state):
+        # blank line for demarcation
+        guilog.info("")
+        # In theory we could do something clever here, but for now, just wipe and restart
+        # Need to re-expand after clearing...
+        self.model.clear()
+        self.modelHandler.addFilesToModel(state)
+        self.selection.get_tree_view().expand_all()    
+    
+    def getName(self):
+        return self.currentObject.name.replace("_", "__")
+    def getState(self):
+        try:
+            return self.currentObject.state
+        except AttributeError:
+            pass
     def createView(self):
         # blank line for demarcation
         guilog.info("")
-        # defined in subclasses
-        self.addFilesToModel()
+        self.modelHandler.addFilesToModel(self.getState())
         fileWin = gtk.ScrolledWindow()
         fileWin.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         view = gtk.TreeView(self.model)
         self.selection = view.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn(self.name, renderer, text=0, background=1)
-        column.set_cell_data_func(renderer, renderParentsBold)
-        view.append_column(column)
+        self.nameColumn = gtk.TreeViewColumn(self.getName(), renderer, text=0, background=1)
+        self.nameColumn.set_cell_data_func(renderer, renderParentsBold)
+        view.append_column(self.nameColumn)
         detailsColumn = self.makeDetailsColumn(renderer)
         if detailsColumn:
             view.append_column(detailsColumn)
         view.expand_all()
-        indexer = TreeModelIndexer(self.model, column, 0)
+        indexer = TreeModelIndexer(self.model, self.nameColumn, 0)
         scriptEngine.connect("select file", "row_activated", view, self.fileActivated, indexer)
         scriptEngine.monitor("set file selection to", self.selection, indexer)
         self.selectionChanged(self.selection)
@@ -1630,9 +1631,10 @@ class FileViewGUI(plugins.Observable):
         fileWin.add(view)
         fileWin.show()
         return fileWin
-    def makeDetailsColumn(self, renderer):
-        pass
         # only used in test view
+    def makeDetailsColumn(self, renderer):
+        if self.dynamic:
+            return gtk.TreeViewColumn("Details", renderer, text=4)
     def selectionChanged(self, selection):
         filelist = []
         selection.selected_foreach(self.fileSelected, filelist)
@@ -1653,11 +1655,32 @@ class FileViewGUI(plugins.Observable):
 
         self.selection.unselect_all()
 
-class ApplicationFileGUI(FileViewGUI):
-    def __init__(self, app):
-        FileViewGUI.__init__(self, app)
+class FileModelHandler:
+    def __init__(self, model):
+        self.model = model
+    def addFilesToModel(self, state):
+        pass
+    def addFileToModel(self, iter, name, comp, colour):
+        fciter = self.model.insert_before(iter, None)
+        baseName = os.path.basename(name)
+        heading = self.model.get_value(iter, 0)
+        self.model.set_value(fciter, 0, baseName)
+        self.model.set_value(fciter, 1, colour)
+        self.model.set_value(fciter, 2, name)
+        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour)
+        if comp:
+            self.model.set_value(fciter, 3, comp)
+            details = comp.getDetails()
+            if len(details) > 0:
+                self.model.set_value(fciter, 4, details)
+                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
+        return fciter
+    
+class ApplicationFileModelHandler(FileModelHandler):
+    def __init__(self, model, app):
+        FileModelHandler.__init__(self, model)
         self.app = app
-    def addFilesToModel(self):
+    def addFilesToModel(self, state):
         confiter = self.model.insert_before(None, None)
         self.model.set_value(confiter, 0, "Application Files")
         colour = self.app.getConfigValue("file_colours")["app_static"]
@@ -1684,15 +1707,15 @@ class ApplicationFileGUI(FileViewGUI):
             personalFiles.append(gtkRcFile)
         return personalFiles
     
-class TestFileGUI(FileViewGUI):
-    def __init__(self, test, dynamic):        
-        FileViewGUI.__init__(self, test)
+class TestFileModelHandler(FileModelHandler):
+    def __init__(self, model, test, dynamic):        
+        FileModelHandler.__init__(self, model)
         self.test = test
         self.colours = test.getConfigValue("file_colours")
         test.refreshFiles()
         self.dynamic = dynamic
-    def addFilesToModel(self):
-        stateToUse = self.getStateToUse(self.test.state)
+    def addFilesToModel(self, state):
+        stateToUse = self.getStateToUse(state)
         self._addFilesToModel(stateToUse)
     def _addFilesToModel(self, state):
         if state.hasStarted():
@@ -1703,23 +1726,6 @@ class TestFileGUI(FileViewGUI):
                 pass
         else:
             self.addStaticFilesToModel()
-    def recreateModel(self, test, state):
-        if not test is self.test:
-            return
-        # blank line for demarcation
-        guilog.info("")
-        # In theory we could do something clever here, but for now, just wipe and restart
-        # Need to re-expand after clearing...
-        self.model.clear()
-        self._addFilesToModel(state)
-        self.selection.get_tree_view().expand_all()    
-    def notifyFileChange(self, test):
-        self.recreateModel(test, test.state)
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        self.recreateModel(test, state)
-    def makeDetailsColumn(self, renderer):
-        if self.dynamic:
-            return gtk.TreeViewColumn("Details", renderer, text=4)
     def getStateToUse(self, state):
         if state.isComplete() or not state.hasStarted():
             return state

@@ -1665,8 +1665,8 @@ class PlotEngineMPLTimeDiv(optimization.PlotEngineMPL):
                 height = time/60.0/numTests
                 desc, col = descAndColours[colour]
                 bar([xstart], height, [width], bottom, col)
-                if time > 0.09*timeSum:
-                    text(xstart+0.5*width, 0.5*(2*bottom+height), desc,
+                if time >= 0.05*timeSum:
+                    text(xstart+0.5*width, 0.5*(2*bottom+height), desc + (" %.1f%%" % (100*float(time)/float(timeSum))),
                          horizontalalignment='center', verticalalignment='center', color = 'white')
                 bottom += height
                 colour += 1

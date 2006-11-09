@@ -1479,6 +1479,7 @@ try:
     from matplotlib import *
     use('TkAgg')
     from matplotlib.pylab import *
+    from matplotlib.font_manager import FontProperties
     mplDefined = 1
 except:
     pass
@@ -1578,7 +1579,8 @@ class PlotEngineMPL:
         grid()
         title(self.testGraph.makeTitle(userTitle))
         if legendLine:
-            legend(legendLine, legendLabel)
+            legend(legendLine, legendLabel,
+                   markerscale = 0.6, prop = FontProperties(size='smaller'), labelsep = 0.001) # Added these after migration to RHEL4.
         xlabel(self.testGraph.getXAxisLabel())
         if not plotPercentage:
             ylabel(self.testGraph.getYAxisLabel())

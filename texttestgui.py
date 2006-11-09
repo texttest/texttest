@@ -241,7 +241,7 @@ class GUIStatusMonitor:
 # to the status bar, let it be global, at least for now ...
 statusMonitor = GUIStatusMonitor()
 
-class TextTestGUI(Responder):
+class TextTestGUI(Responder, plugins.Observable):
     defaultGUIDescription = '''
 <ui>
   <menubar>
@@ -254,21 +254,17 @@ class TextTestGUI(Responder):
         self.readGtkRCFile()
         self.dynamic = not optionMap.has_key("gx")
         Responder.__init__(self, optionMap)
+        plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
         self.idleSourceId = -1
         self.idleAddedDirectly = True
-        self.rightWindowGUI = None
-        self.selectionActionGUI = None
         self.testTreeGUI = TestTreeGUI(self.dynamic)
         self.fileViewGUI = None
-        self.notebookGUI = None
-        self.contents = None
         self.progressMonitor = None
         self.progressBar = None
-        self.toolTips = gtk.Tooltips()
-        self.toolBarGUIs = []
         self.rootSuites = []
-        self.testTreeGUI.addObserver(self)
+        self.testTreeGUI.addObserver(self) # to be able to suspend idle handlers
+        self.addObserver(self.testTreeGUI) # to notice when it's complete
         self.testTreeGUI.addObserver(statusMonitor)
         
         # Create GUI manager, and a few default action groups
@@ -310,7 +306,7 @@ class TextTestGUI(Responder):
                 names.append(suite.app.fullName)
         return string.join(names, ",")
     def fillTopWindow(self, topWindow, testWins, rightWindow, intvActions):
-        mainWindow = self.createWindowContents(testWins, rightWindow)
+        mainWindow = self.createPaned(testWins, rightWindow, horizontal=True)
         
         vbox = gtk.VBox()
         self.placeTopWidgets(vbox, intvActions)
@@ -327,29 +323,22 @@ class TextTestGUI(Responder):
         vbox.show()
         topWindow.add(vbox)
         topWindow.show()
-        # avoid the quit button getting initial focus, give it to the tree view (why not?)
-        self.testTreeGUI.treeView.grab_focus()
         self.adjustSize(topWindow)
-    def getWindowOption(self, name, optionDir, default):
+        
+    def getWindowOption(self, name, default):
+        optionDir = self.getConfigValue("window_size")
         if self.dynamic:
             return optionDir.get("dynamic_" + name, default)
         else:
             return optionDir.get("static_" + name, default)
         
     def adjustSize(self, topWindow):
-        optionDir = self.getConfigValue("window_size")
-        if int(self.getWindowOption("maximize", optionDir, 0)):
+        if int(self.getWindowOption("maximize", 0)):
             topWindow.maximize()
         else:
-            width = self.getWindowDimension("width", optionDir)
-            height = self.getWindowDimension("height", optionDir)
+            width = self.getWindowDimension("width")
+            height = self.getWindowDimension("height")
             topWindow.resize(width, height)
-
-        horizontalSeparatorPosition = float(self.getWindowOption("horizontal_separator_position", optionDir, 0.46))
-        self.rightWindowGUI.notifySizeChange(horizontalSeparatorPosition)
-        
-        verticalSeparatorPosition = float(self.getWindowOption("vertical_separator_position", optionDir, 0.5))
-        self.contents.set_position(int(self.contents.allocation.width * verticalSeparatorPosition))
 
     def getInterfaceDescription(self, toolBarActions):
         description = "<ui>\n"
@@ -371,7 +360,6 @@ class TextTestGUI(Responder):
         for action in toolBarActions:
             toolBarGUI = self.createActionGUI(action)
             toolBarGUI.describe()
-            self.toolBarGUIs.append(toolBarGUI)
     
         self.uiManager.add_ui_from_string(self.getInterfaceDescription(toolBarActions))
         self.uiManager.ensure_update()
@@ -426,14 +414,14 @@ class TextTestGUI(Responder):
         vbox.pack_start(hbox, expand=False, fill=True)
     def getConfigValue(self, configName):
         return self.rootSuites[0].app.getConfigValue(configName)
-    def getWindowDimension(self, dimensionName, optionDir):
-        pixelDimension = self.getWindowOption(dimensionName + "_pixels", optionDir, None)
+    def getWindowDimension(self, dimensionName):
+        pixelDimension = self.getWindowOption(dimensionName + "_pixels", None)
         if pixelDimension is not None:
             return int(pixelDimension)
         else:
-            fullSize = eval("gtk.gdk.screen_" + dimensionName + "()") 
-            proportion = float(self.getWindowOption(dimensionName + "_screen", optionDir, \
-                                                    self.getDefaultWindowProportion(dimensionName)))
+            fullSize = eval("gtk.gdk.screen_" + dimensionName + "()")
+            defaultProportion = self.getDefaultWindowProportion(dimensionName)
+            proportion = float(self.getWindowOption(dimensionName + "_screen", defaultProportion))
             return int(fullSize * proportion)
     def getDefaultWindowProportion(self, dimensionName):
         if dimensionName == "height":
@@ -445,17 +433,6 @@ class TextTestGUI(Responder):
         if not suite.app.getConfigValue("add_shortcut_bar"):
             scriptEngine.enableShortcuts = 0
         self.testTreeGUI.addSuite(suite)        
-    def createWindowContents(self, testWins, testCaseWin):
-        self.contents = gtk.HPaned()
-        self.contents.connect('notify', self.paneHasChanged)
-        self.contents.pack1(testWins, resize=True)
-        self.contents.pack2(testCaseWin, resize=True)
-        self.contents.show()
-        return self.contents
-    def paneHasChanged(self, pane, gparamspec):
-        pos = pane.get_position()
-        size = pane.allocation.width
-        self.toolTips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + " (" + str(100 * pos / size) + "% from the left edge)")
     def createTestWindows(self, treeWindow):
         # Create a vertical box to hold the above stuff.
         vbox = gtk.VBox()
@@ -468,11 +445,9 @@ class TextTestGUI(Responder):
         scrolled = gtk.ScrolledWindow()
         scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         scrolled.add(treeView)
-        framed = gtk.Frame()
-        framed.set_shadow_type(gtk.SHADOW_IN)
-        framed.add(scrolled)        
-        framed.show_all()
-        return framed
+        scrolled.show()
+        return scrolled
+
     def createInteractiveActions(self, topWindow, actionThread):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.rootSuites)
@@ -520,7 +495,6 @@ class TextTestGUI(Responder):
         self.testTreeGUI.addObserver(self.fileViewGUI)
         tabGUIs = [ self.textInfoGUI ]
         # Must be created after addSuiteWithParents has counted all tests ...
-        # (but before RightWindowGUI, as that wants in on progress)
         if self.dynamic:
             self.progressBar = TestProgressBar(self.testTreeGUI.totalNofTests)
             self.progressMonitor = TestProgressMonitor()
@@ -530,11 +504,11 @@ class TextTestGUI(Responder):
         intvActions = self.createInteractiveActions(topWindow, actionThread)
         tabGUIs += self.createActionTabGUIs(intvActions)
 
-        self.notebookGUI = self.createNotebookGUI(tabGUIs)
-        buttonBarGUIs = self.createButtonBarGUIs(intvActions)
-        self.rightWindowGUI = RightWindowGUI(self.fileViewGUI, buttonBarGUIs, self.notebookGUI)
+        notebookGUI = self.createNotebookGUI(tabGUIs)
+        rightWindow = self.createPaned(self.createTopRightWindow(intvActions), notebookGUI.createView(), horizontal=False)
         
-        self.fillTopWindow(topWindow, testWins, self.rightWindowGUI.createView(), intvActions)
+        self.fillTopWindow(topWindow, testWins, rightWindow, intvActions)
+        self.notify("GUISetupComplete")
         guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
     def createActionGUI(self, action, fromTab=False):
         return ActionGUI(action, self.getActionGroup(action), self.uiManager.get_accel_group(), fromTab)
@@ -549,6 +523,36 @@ class TextTestGUI(Responder):
                 if optionGroup.switches or optionGroup.options:
                     actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
         return actionTabGUIs
+
+    def getSeparatorPosition(self, horizontal):
+        if horizontal:
+            return float(self.getWindowOption("vertical_separator_position", 0.5))
+        else:
+            return float(self.getWindowOption("horizontal_separator_position", 0.46))
+    def createPaned(self, widget1, widget2, horizontal):
+        paneGUI = PaneGUI([ widget1, widget2 ], self.getSeparatorPosition(horizontal), horizontal)
+        self.addObserver(paneGUI)
+        return paneGUI.createView()
+
+    def createTopRightWindow(self, intvActions):
+        testButtonBarGUIs = self.createButtonBarGUIs(intvActions)
+        if len(testButtonBarGUIs):
+            guilog.info("") # blank line for demarcation
+            vbox = gtk.VBox()
+            vbox.pack_start(self.makeTestButtonBar(testButtonBarGUIs), expand=False, fill=False)
+            vbox.pack_start(self.fileViewGUI.createView(), expand=True, fill=True)
+            vbox.show()
+            return vbox
+        else:
+            return self.fileViewGUI.createView()
+
+    def makeTestButtonBar(self, testButtonBarGUIs):
+        executeButtons = gtk.HBox()
+        for buttonGUI in testButtonBarGUIs:
+            button = buttonGUI.createStandaloneButton()
+            executeButtons.pack_start(button, expand=False, fill=False)
+        executeButtons.show_all()
+        return executeButtons
 
     def runWithActionThread(self, actionThread):
         self.idleSourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
@@ -732,6 +736,9 @@ class TestTreeGUI(plugins.Observable):
             self.filteredModel.connect('row-inserted', self.rowInserted)
             self.reFilter()
         return self.treeView
+    def notifyGUISetupComplete(self):
+        # avoid the quit button getting initial focus, give it to the tree view (why not?)
+        self.treeView.grab_focus()
     def rowCollapsed(self, treeview, iter, path):
         if self.dynamic:
             realPath = self.filteredModel.convert_path_to_child_path(path)
@@ -1396,45 +1403,54 @@ class NotebookGUI(TabGUI):
         guilog.info("Tabs showing : " + string.join(tabTexts, ", "))
         
             
-class RightWindowGUI:
-    def __init__(self, fileViewGUI, buttonBarGUIs, notebookGUI):
-        self.fileViewGUI = fileViewGUI
-        self.notebookGUI = notebookGUI
-        self.buttonBarGUIs = buttonBarGUIs                
-        self.window = gtk.VBox()
-        self.vpaned = gtk.VPaned()
-        self.vpaned.connect('notify', self.paneHasChanged)
+class PaneGUI:
+    def __init__(self, widgets, separatorPosition, horizontal):
+        self.widgets = widgets
+        self.horizontal = horizontal
+        self.separatorPosition = separatorPosition
         self.panedTooltips = gtk.Tooltips()
-        self.topFrame = gtk.Frame()
-        self.topFrame.set_shadow_type(gtk.SHADOW_IN)
-        self.bottomFrame = gtk.Frame()
-        self.bottomFrame.set_shadow_type(gtk.SHADOW_IN)
-        self.vpaned.pack1(self.topFrame, resize=True)
-        self.vpaned.pack2(self.bottomFrame, resize=True)
+        self.paned = self.createPaned()
+        self.paned.connect('notify', self.paneHasChanged)
+    def createPaned(self):
+        if self.horizontal:
+            return gtk.HPaned()
+        else:
+            return gtk.VPaned()
+    def getSize(self):
+        if self.horizontal:
+            return self.paned.allocation.width
+        else:
+            return self.paned.allocation.height
+    def describeEdge(self):
+        if self.horizontal:
+            return "left edge"
+        else:
+            return "top"
+    def createView(self):
+        frames = []
+        for widget in self.widgets:
+            if isinstance(widget, gtk.VPaned):
+                frames.append(widget)
+            else:
+                frame = gtk.Frame()
+                frame.set_shadow_type(gtk.SHADOW_IN)
+                frame.add(widget)
+                frame.show()
+                frames.append(frame)
 
+        self.paned.pack1(frames[0], resize=True)
+        self.paned.pack2(frames[1], resize=True)
+        self.paned.show()
+        return self.paned
+    
     def paneHasChanged(self, pane, gparamspec):
         pos = pane.get_position()
-        size = pane.allocation.height
-        self.panedTooltips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + " (" + str(100 * pos / size) + "% from the top)")
-    def notifySizeChange(self, horizontalSeparatorPosition):
-        self.vpaned.set_position(int(self.vpaned.allocation.height * horizontalSeparatorPosition))        
-    def makeTestButtonBar(self):
-        executeButtons = gtk.HBox()
-        if len(self.buttonBarGUIs):
-            guilog.info("") # blank line for demarcation
-        for buttonGUI in self.buttonBarGUIs:
-            button = buttonGUI.createStandaloneButton()
-            executeButtons.pack_start(button, expand=False, fill=False)
-        executeButtons.show_all()
-        return executeButtons
-    def createView(self):
-        self.window.pack_start(self.makeTestButtonBar(), expand=False, fill=False)
-        self.topFrame.add(self.fileViewGUI.createView())
-        self.window.pack_start(self.vpaned, expand=True, fill=True)
-        self.vpaned.show_all()
-        self.window.show_all()    
-        self.bottomFrame.add(self.notebookGUI.createView())
-        return self.window
+        size = self.getSize()
+        self.panedTooltips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + \
+                                   " (" + str(100 * pos / size) + "% from the " + self.describeEdge() + ")")
+    def notifyGUISetupComplete(self):
+        pos = int(self.getSize() * self.separatorPosition)
+        self.paned.set_position(pos)                
     
 class TextInfoGUI(TabGUI):
     def __init__(self, test):

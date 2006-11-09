@@ -334,6 +334,7 @@ class TextTestGUI(Responder, plugins.Observable):
         
     def adjustSize(self, topWindow):
         if int(self.getWindowOption("maximize", 0)):
+            guilog.info("Maximising top window...")
             topWindow.maximize()
         else:
             width = self.getWindowDimension("width")
@@ -417,11 +418,13 @@ class TextTestGUI(Responder, plugins.Observable):
     def getWindowDimension(self, dimensionName):
         pixelDimension = self.getWindowOption(dimensionName + "_pixels", None)
         if pixelDimension is not None:
+            guilog.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.") 
             return int(pixelDimension)
         else:
             fullSize = eval("gtk.gdk.screen_" + dimensionName + "()")
             defaultProportion = self.getDefaultWindowProportion(dimensionName)
             proportion = float(self.getWindowOption(dimensionName + "_screen", defaultProportion))
+            guilog.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
             return int(fullSize * proportion)
     def getDefaultWindowProportion(self, dimensionName):
         if dimensionName == "height":
@@ -1421,11 +1424,6 @@ class PaneGUI:
             return self.paned.allocation.width
         else:
             return self.paned.allocation.height
-    def describeEdge(self):
-        if self.horizontal:
-            return "left edge"
-        else:
-            return "top"
     def createView(self):
         frames = []
         for widget in self.widgets:
@@ -1447,8 +1445,15 @@ class PaneGUI:
         pos = pane.get_position()
         size = self.getSize()
         self.panedTooltips.set_tip(pane, "Position: " + str(pos) + "/" + str(size) + \
-                                   " (" + str(100 * pos / size) + "% from the " + self.describeEdge() + ")")
+                                   " (" + self.positionDescription(float(pos) / size) + ")")
+    def positionDescription(self, proportion):
+        message = str(int(100 * proportion)) + "% from the "
+        if self.horizontal:
+            return message + "left edge"
+        else:
+            return message + "top"
     def notifyGUISetupComplete(self):
+        guilog.info("Pane separator moved to " + self.positionDescription(self.separatorPosition))
         pos = int(self.getSize() * self.separatorPosition)
         self.paned.set_position(pos)                
     

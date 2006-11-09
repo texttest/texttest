@@ -569,16 +569,29 @@ class TextTestGUI(Responder):
                 buttonBarGUIs.append(buttonBarGUI)
         return buttonBarGUIs
     def createNotebookGUI(self, tabGUIs):
-        notebookGUI = self.getNotebookClass()(tabGUIs, "view options for")
-        # watch for double-clicks
-        self.testTreeGUI.addObserver(notebookGUI)
-        return notebookGUI
-    
-    def getNotebookClass(self):
+        scriptName = "view options for"
         if self.dynamic:
-            return SubNotebookGUI 
+            notebookGUI = NotebookGUI(self.classifyTabGUIs(tabGUIs), scriptName)
+            # watch for double-clicks
+            self.testTreeGUI.addObserver(notebookGUI)
+            return notebookGUI
         else:
-            return TopNotebookGUI
+            tabInfo = seqdict()
+            for tabName in [ "Test", "Selection", "Running" ]:
+                guisUnderTab = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
+                scriptTitle = "view sub-options for " + tabName.lower() + " :"
+                subNotebookGUI = NotebookGUI(self.classifyTabGUIs(guisUnderTab), scriptTitle, active=False)
+                if tabName == "Test":
+                    self.testTreeGUI.addObserver(subNotebookGUI)
+                tabInfo[tabName] = subNotebookGUI
+            return NotebookGUI(tabInfo, scriptName)
+
+    def classifyTabGUIs(self, tabGUIs):
+        tabInfo = seqdict()
+        for tabGUI in tabGUIs:
+            tabInfo[tabGUI.getTabTitle()] = tabGUI
+        return tabInfo
+
     def pickUpProcess(self):
         process = guiplugins.processTerminationMonitor.getTerminatedProcess()
         if process:
@@ -1233,11 +1246,11 @@ class ActionTabGUI(TabGUI):
         return text
 
 class NotebookGUI(TabGUI):
-    def __init__(self, tabGUIs, scriptTitle, active=True):
+    def __init__(self, tabInfo, scriptTitle, active=True):
         TabGUI.__init__(self, active)
         self.scriptTitle = scriptTitle
         self.diag = plugins.getDiagnostics("GUI notebook")
-        self.tabInfo = self.classify(tabGUIs)
+        self.tabInfo = tabInfo
         self.notebook = None
 
     def activate(self):
@@ -1289,26 +1302,6 @@ class NotebookGUI(TabGUI):
             text = self.notebook.get_tab_label_text(child)
             if text == name:
                 return child
-
-
-class TopNotebookGUI(NotebookGUI):
-    tabNames = [ "Test", "Selection", "Running" ]
-    def classify(self, tabGUIs):
-        tabInfo = seqdict()
-        for tabName in self.tabNames:
-            guisUnderTab = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
-            scriptTitle = "view sub-options for " + tabName.lower() + " :"
-            tabInfo[tabName] = SubNotebookGUI(guisUnderTab, scriptTitle, active=False)
-        return tabInfo
-    def notifyViewTest(self, test):
-        self.tabInfo["Test"].notifyViewTest(test)
-
-class SubNotebookGUI(NotebookGUI):
-    def classify(self, tabGUIs):
-        tabInfo = seqdict()
-        for tabGUI in tabGUIs:
-            tabInfo[tabGUI.getTabTitle()] = tabGUI
-        return tabInfo
 
     def getObjectDependentTabNames(self):
         names = []

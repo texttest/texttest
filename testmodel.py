@@ -397,6 +397,7 @@ class TestCase(Test):
         self.writeDirectories = [ newDir ]        
     def makeWriteDirectories(self):
         for dir in self.writeDirectories:
+            self.diagnose("Created writedir at " + dir)
             plugins.ensureDirectoryExists(dir)
         frameworkTmp = self.getDirectory(temporary=1, forFramework=True)
         plugins.ensureDirectoryExists(frameworkTmp)

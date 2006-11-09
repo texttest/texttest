@@ -182,6 +182,11 @@ class Config(CarmenConfig):
             return slaveDir
         else:
             return CarmenConfig.getWriteDirectoryName(self, app)
+    def getCleanMode(self):
+        if self.raveSlave():
+            return self.CLEAN_NONE
+        else:
+            return CarmenConfig.getCleanMode(self)
     def getCarmVarChecker(self):
         if not self.isReconnecting():
             return CheckCarmVariables()

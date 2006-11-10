@@ -241,6 +241,41 @@ class GUIStatusMonitor:
 # to the status bar, let it be global, at least for now ...
 statusMonitor = GUIStatusMonitor()
 
+class IdleHandlerManager:
+    def __init__(self, dynamic):
+        self.dynamic = dynamic
+        self.sourceId = self.enableHandler()
+    def notifyActionStart(self, message):
+        # To make it possible to have an while-events-process loop
+        # to update the GUI during actions, we need to make sure the idle
+        # process isn't run. We hence remove that for a while here ...
+        if self.sourceId > 0:
+            gobject.source_remove(self.sourceId)
+    def notifyActionStop(self, message):
+        # Activate idle function again, see comment in notifyActionStart
+        if self.sourceId > 0:
+            self.sourceId = self.enableHandler()
+
+    def enableHandler(self):
+        if self.dynamic:
+            return plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
+        else:
+            return gobject.idle_add(self.pickUpProcess)
+        
+    def pickUpProcess(self):
+        process = guiplugins.processTerminationMonitor.getTerminatedProcess()
+        if process:
+            try:
+                process.runExitHandler()
+            except plugins.TextTestError, e:
+                showError(str(e))
+        
+        # We must sleep for a bit, or we use the whole CPU (busy-wait)
+        time.sleep(0.1)
+        return True
+
+         
+
 class TextTestGUI(Responder, plugins.Observable):
     defaultGUIDescription = '''
 <ui>
@@ -256,14 +291,11 @@ class TextTestGUI(Responder, plugins.Observable):
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
-        self.idleSourceId = -1
-        self.idleAddedDirectly = True
         self.testTreeGUI = TestTreeGUI(self.dynamic)
         self.fileViewGUI = None
         self.progressMonitor = None
         self.progressBar = None
         self.rootSuites = []
-        self.testTreeGUI.addObserver(self) # to be able to suspend idle handlers
         self.addObserver(self.testTreeGUI) # to notice when it's complete
         self.testTreeGUI.addObserver(statusMonitor)
         
@@ -451,14 +483,14 @@ class TextTestGUI(Responder, plugins.Observable):
         scrolled.show()
         return scrolled
 
-    def createInteractiveActions(self, topWindow, actionThread):
+    def createInteractiveActions(self, topWindow, actionThread, idleManager):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
         actions += guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.rootSuites)
         for action in actions:
             # These actions might change the tree view selection or the status bar, need to observe them
             action.addObserver(self.testTreeGUI)
             action.addObserver(statusMonitor)
-            action.addObserver(self)
+            action.addObserver(idleManager)
             # Some depend on the test selection or currently viewed test also
             if hasattr(action, "notifyNewTestSelection") or hasattr(action, "notifyViewTest"):
                 self.testTreeGUI.addObserver(action)
@@ -471,20 +503,10 @@ class TextTestGUI(Responder, plugins.Observable):
     def getActionGroup(self, action):
         return self.uiManager.get_action_groups()[self.getActionGroupIndex(action)]
 
-    def notifyActionStart(self, message):
-        # To make it possible to have an while-events-process loop
-        # to update the GUI during actions, we need to make sure the idle
-        # process isn't run. We hence remove that for a while here ...
-        if self.idleSourceId > 0:
-            gobject.source_remove(self.idleSourceId)
-    def notifyActionStop(self, message):
-        # Activate idle function again, see comment in notifyActionStart
-        if self.idleSourceId > 0:
-            if self.idleAddedDirectly:
-                self.idleSourceId = gobject.idle_add(self.pickUpProcess)
-            else:
-                self.idleSourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
     def setUpGui(self, actionThread=None):
+        idleManager = IdleHandlerManager(self.dynamic)
+        self.testTreeGUI.addObserver(idleManager)
+        
         topWindow = self.createTopWindow()
         treeWindow = self.createTreeWindow()
         testWins = self.createTestWindows(treeWindow)
@@ -504,7 +526,7 @@ class TextTestGUI(Responder, plugins.Observable):
             self.progressMonitor.addObserver(self.testTreeGUI)
             tabGUIs.append(self.progressMonitor)
             
-        intvActions = self.createInteractiveActions(topWindow, actionThread)
+        intvActions = self.createInteractiveActions(topWindow, actionThread, idleManager)
         tabGUIs += self.createActionTabGUIs(intvActions)
 
         notebookGUI = self.createNotebookGUI(tabGUIs)
@@ -558,14 +580,11 @@ class TextTestGUI(Responder, plugins.Observable):
         return executeButtons
 
     def runWithActionThread(self, actionThread):
-        self.idleSourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
-        self.idleAddedDirectly = False
         self.setUpGui(actionThread)
         actionThread.start()
         gtk.main()
     def runAlone(self):
         self.setUpGui()
-        self.idleSourceId = gobject.idle_add(self.pickUpProcess)
         gtk.main()
     def createButtonBarGUIs(self, intvActions):
         buttonBarGUIs = []
@@ -599,17 +618,6 @@ class TextTestGUI(Responder, plugins.Observable):
             tabInfo[tabGUI.getTabTitle()] = tabGUI
         return tabInfo
 
-    def pickUpProcess(self):
-        process = guiplugins.processTerminationMonitor.getTerminatedProcess()
-        if process:
-            try:
-                process.runExitHandler()
-            except plugins.TextTestError, e:
-                showError(str(e))
-        
-        # We must sleep for a bit, or we use the whole CPU (busy-wait)
-        time.sleep(0.1)
-        return True
     def notifyLifecycleChange(self, test, state, changeDesc):
         # Working around python bug 853411: main thread must do all forking
         state.notifyInMainThread()

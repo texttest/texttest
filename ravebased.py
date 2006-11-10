@@ -101,8 +101,6 @@ class RaveSubmissionRules(CarmenSgeSubmissionRules):
         return 0
     def getEnvironmentResource(self):
         return os.getenv("QUEUE_SYSTEM_RESOURCE_RAVE", "")
-    def getEnvironmentPerfCategory(self):
-        return os.getenv("QUEUE_SYSTEM_PERF_CATEGORY_RAVE", "short")
     def getJobName(self):
         if self.testRuleName:
             return self.testRuleName
@@ -122,7 +120,7 @@ class RaveSubmissionRules(CarmenSgeSubmissionRules):
             return test.parent.name
         return self.getUserParentName(test.parent)
     def findQueueResource(self):
-        return self.getQueueFromCategory(self.presetPerfCategory)
+        return "rave" # all rave compilations now go to this queue which cannot be suspended
     def getBasicResources(self):
         if self.envResource:
             return [ self.envResource ]

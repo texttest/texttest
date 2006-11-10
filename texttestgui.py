@@ -922,9 +922,8 @@ class TestTreeGUI(plugins.Observable):
         iter = self.addSuiteWithParent(test, suiteIter)
     def notifyRemove(self, test):
         self.removeTest(test)
-        if test.classId() == "test-case":
-            self.totalNofTests -= 1
-            self.updateColumnTitle()
+        self.totalNofTests -= test.size()
+        self.updateColumnTitle()
 
         # If we're viewing a test that isn't there any more, view the suite (its parent) instead!
         if self.viewedTest is test:

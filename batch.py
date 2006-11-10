@@ -28,10 +28,10 @@ class BatchFilter(plugins.Filter):
             self.performanceFilter = performance.TimeFilter(timeLimit)
     def findUnacceptableVersion(self, app):
         allowedVersions = app.getCompositeConfigValue("batch_version", self.batchSession)
-        for version in app.versions:
-            if len(version) and not version in allowedVersions:
-                return version
-        return None
+        if len(allowedVersions) > 0:
+            for version in app.versions:
+                if len(version) > 0 and not version in allowedVersions:
+                    return version
 
 class BatchCategory(plugins.Filter):
     def __init__(self, state):

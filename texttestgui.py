@@ -273,7 +273,6 @@ class IdleHandlerManager:
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
         return True
-
          
 
 class TextTestGUI(Responder, plugins.Observable):
@@ -291,21 +290,33 @@ class TextTestGUI(Responder, plugins.Observable):
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
-        self.testTreeGUI = TestTreeGUI(self.dynamic)
-        self.fileViewGUI = None
-        self.progressMonitor = None
-        self.progressBar = None
         self.rootSuites = []
-        self.addObserver(self.testTreeGUI) # to notice when it's complete
-        self.testTreeGUI.addObserver(statusMonitor)
+
+        self.testTreeGUI = TestTreeGUI(self.dynamic)
+        self.fileViewGUI = FileViewGUI(self.dynamic)
+        self.textInfoGUI = TextInfoGUI()
+        self.progressMonitor = TestProgressMonitor(self.dynamic)
+        self.progressBar = TestProgressBar()
+        self.setUpObservers() # uses the above 5
         
-        # Create GUI manager, and a few default action groups
         self.uiManager = gtk.UIManager()
+        self.setUpUIManager()
+    def setUpObservers(self):
+        # watch for test selection and test count
+        for observer in [ self.fileViewGUI, self.textInfoGUI, self.progressBar, statusMonitor ]:
+            self.testTreeGUI.addObserver(observer)
+        # watch for category selections
+        self.progressMonitor.addObserver(self.testTreeGUI)
+        for observer in [ self.testTreeGUI, self.fileViewGUI, self.textInfoGUI, self.progressBar, self.progressMonitor ]:            
+            self.addObserver(observer) # forwarding of test observer mechanism
+    def setUpUIManager(self):
+        # Create GUI manager, and a few default action groups
         basicActions = gtk.ActionGroup("Basic")
         basicActions.add_actions([("filemenu", None, "_File"), ("actionmenu", None, "_Actions")])
         self.uiManager.insert_action_group(basicActions, 0)
         self.uiManager.insert_action_group(gtk.ActionGroup("Suite"), 1)
         self.uiManager.insert_action_group(gtk.ActionGroup("Case"), 2)
+
     def needsOwnThread(self):
         return True
     def readGtkRCFile(self):
@@ -337,9 +348,7 @@ class TextTestGUI(Responder, plugins.Observable):
             if not suite.app.fullName in names:
                 names.append(suite.app.fullName)
         return string.join(names, ",")
-    def fillTopWindow(self, topWindow, testWins, rightWindow, intvActions):
-        mainWindow = self.createPaned(testWins, rightWindow, horizontal=True)
-        
+    def fillTopWindow(self, topWindow, mainWindow, intvActions):
         vbox = gtk.VBox()
         self.placeTopWidgets(vbox, intvActions)
         vbox.pack_start(mainWindow, expand=True, fill=True)
@@ -414,7 +423,7 @@ class TextTestGUI(Responder, plugins.Observable):
         
         progressBar = None
         if self.dynamic:            
-            progressBar = self.progressBar.createProgressBar()
+            progressBar = self.progressBar.createView()
             progressBar.show()
         hbox = gtk.HBox()
                         
@@ -468,20 +477,6 @@ class TextTestGUI(Responder, plugins.Observable):
         if not suite.app.getConfigValue("add_shortcut_bar"):
             scriptEngine.enableShortcuts = 0
         self.testTreeGUI.addSuite(suite)        
-    def createTestWindows(self, treeWindow):
-        # Create a vertical box to hold the above stuff.
-        vbox = gtk.VBox()
-        vbox.pack_start(treeWindow, expand=True, fill=True)
-        vbox.show()
-        return vbox
-    def createTreeWindow(self):
-        treeView = self.testTreeGUI.makeTreeView()
-        # Create scrollbars around the view.
-        scrolled = gtk.ScrolledWindow()
-        scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        scrolled.add(treeView)
-        scrolled.show()
-        return scrolled
 
     def createInteractiveActions(self, topWindow, actionThread, idleManager):
         actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
@@ -508,32 +503,14 @@ class TextTestGUI(Responder, plugins.Observable):
         self.testTreeGUI.addObserver(idleManager)
         
         topWindow = self.createTopWindow()
-        treeWindow = self.createTreeWindow()
-        testWins = self.createTestWindows(treeWindow)
-
-        rootSuite = self.rootSuites[0]
-        guilog.info("Viewing test " + repr(rootSuite))
-        self.fileViewGUI = FileViewGUI(rootSuite, self.dynamic)
-        self.textInfoGUI = TextInfoGUI(rootSuite)
-        # watch for double-clicks
-        self.testTreeGUI.addObserver(self.textInfoGUI)
-        self.testTreeGUI.addObserver(self.fileViewGUI)
-        tabGUIs = [ self.textInfoGUI ]
-        # Must be created after addSuiteWithParents has counted all tests ...
-        if self.dynamic:
-            self.progressBar = TestProgressBar(self.testTreeGUI.totalNofTests)
-            self.progressMonitor = TestProgressMonitor()
-            self.progressMonitor.addObserver(self.testTreeGUI)
-            tabGUIs.append(self.progressMonitor)
-            
         intvActions = self.createInteractiveActions(topWindow, actionThread, idleManager)
-        tabGUIs += self.createActionTabGUIs(intvActions)
 
-        notebookGUI = self.createNotebookGUI(tabGUIs)
-        rightWindow = self.createPaned(self.createTopRightWindow(intvActions), notebookGUI.createView(), horizontal=False)
+        treeWindow = self.testTreeGUI.createView()
+        rightWindow = self.createRightWindow(intvActions)
+        mainWindow = self.createPaned(treeWindow, rightWindow, horizontal=True)
+        self.fillTopWindow(topWindow, mainWindow, intvActions)
         
-        self.fillTopWindow(topWindow, testWins, rightWindow, intvActions)
-        self.notify("GUISetupComplete")
+        self.notify("SetUpGUIComplete")
         guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
     def createActionGUI(self, action, fromTab=False):
         return ActionGUI(action, self.getActionGroup(action), self.uiManager.get_accel_group(), fromTab)
@@ -548,7 +525,8 @@ class TextTestGUI(Responder, plugins.Observable):
                 if optionGroup.switches or optionGroup.options:
                     actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
         return actionTabGUIs
-
+    def createRightWindow(self, intvActions):
+        return self.createPaned(self.createTopRightWindow(intvActions), self.createNotebook(intvActions), horizontal=False)
     def getSeparatorPosition(self, horizontal):
         if horizontal:
             return float(self.getWindowOption("vertical_separator_position", 0.5))
@@ -594,6 +572,11 @@ class TextTestGUI(Responder, plugins.Observable):
                 self.testTreeGUI.addObserver(buttonBarGUI)
                 buttonBarGUIs.append(buttonBarGUI)
         return buttonBarGUIs
+    def createNotebook(self, intvActions):
+        tabGUIs = [ self.textInfoGUI, self.progressMonitor ] + self.createActionTabGUIs(intvActions)
+        notebookGUI = self.createNotebookGUI(tabGUIs)
+        return notebookGUI.createView()
+
     def createNotebookGUI(self, tabGUIs):
         scriptName = "view options for"
         if self.dynamic:
@@ -621,22 +604,16 @@ class TextTestGUI(Responder, plugins.Observable):
     def notifyLifecycleChange(self, test, state, changeDesc):
         # Working around python bug 853411: main thread must do all forking
         state.notifyInMainThread()
-        
-        self.testTreeGUI.notifyLifecycleChange(test, state, changeDesc)
-        self.fileViewGUI.notifyLifecycleChange(test, state, changeDesc)
-        self.textInfoGUI.notifyLifecycleChange(test, state, changeDesc)
-        if self.progressBar:
-            self.progressBar.notifyLifecycleChange(test, state, changeDesc)
-        if self.progressMonitor:
-            self.progressMonitor.notifyLifecycleChange(test, state, changeDesc)
+
+        self.notify("LifecycleChange", test, state, changeDesc)
     def notifyFileChange(self, test):
-        self.fileViewGUI.notifyFileChange(test)
+        self.notify("FileChange", test)
     def notifyContentChange(self, suite):
-        self.testTreeGUI.notifyContentChange(suite)
+        self.notify("ContentChange", suite)
     def notifyAdd(self, test):
-        self.testTreeGUI.notifyAdd(test)
+        self.notify("Add", test)
     def notifyRemove(self, test):
-        self.testTreeGUI.notifyRemove(test)
+        self.notify("Remove", test)
     def notifyAllComplete(self):
         plugins.Observable.threadedNotificationHandler.disablePoll()
             
@@ -708,7 +685,7 @@ class TestTreeGUI(plugins.Observable):
         if self.dynamic:
             self.model.set_value(iter, 4, details)
             self.model.set_value(iter, 5, colour2)
-    def makeTreeView(self):
+    def createView(self):
         self.filteredModel = self.model.filter_new()
         # It seems that TreeModelFilter might not like new
         # rows being added to the original model - the AddUsers
@@ -722,6 +699,7 @@ class TestTreeGUI(plugins.Observable):
         self.selection.connect("changed", self.selectionChanged)
         testRenderer = gtk.CellRendererText()
         testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected"
+        self.notify("TestCount", self.totalNofTests)
         if self.dynamic:
             testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected, all visible"
         self.testsColumn = gtk.TreeViewColumn(testsColumnTitle, testRenderer, text=0, background=1)
@@ -737,8 +715,8 @@ class TestTreeGUI(plugins.Observable):
         self.treeView.connect('row-expanded', self.rowExpanded)
         guilog.info("Expanding tests in tree view...")
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
-        guilog.info("")
-        
+        self.viewRootSuite()
+
         # The order of these two is vital!
         scriptEngine.connect("select test", "row_activated", self.treeView, self.rowActivated, modelIndexer)
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
@@ -746,8 +724,23 @@ class TestTreeGUI(plugins.Observable):
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)
             self.reFilter()
-        return self.treeView
-    def notifyGUISetupComplete(self):
+
+        # Create scrollbars around the view.
+        scrolled = gtk.ScrolledWindow()
+        scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        scrolled.add(self.treeView)
+        scrolled.show()
+        return scrolled
+    def viewRootSuite(self):
+        suiteIter = self.model.get_iter_root()
+        if not self.dynamic:
+            suiteIter = self.model.iter_next(suiteIter)
+        suite = self.model.get_value(suiteIter, 2)
+        guilog.info("")
+        guilog.info("Viewing test " + repr(suite))
+        self.viewTest(suite)
+
+    def notifySetUpGUIComplete(self):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.treeView.grab_focus()
     def rowCollapsed(self, treeview, iter, path):
@@ -1459,17 +1452,16 @@ class PaneGUI:
             return message + "left edge"
         else:
             return message + "top"
-    def notifyGUISetupComplete(self):
+    def notifySetUpGUIComplete(self):
         guilog.info("Pane separator moved to " + self.positionDescription(self.separatorPosition))
         pos = int(self.getSize() * self.separatorPosition)
         self.paned.set_position(pos)                
     
 class TextInfoGUI(TabGUI):
-    def __init__(self, test):
-        self.currentTest = test
+    def __init__(self):
+        self.currentTest = None
         self.text = ""
         self.view = None
-        self.notifyViewTest(test)
     def shouldShowCurrent(self):
         return len(self.text) > 0
     def getTabTitle(self):
@@ -1561,13 +1553,13 @@ class TextInfoGUI(TabGUI):
 
         
 class FileViewGUI(plugins.Observable):
-    def __init__(self, obj, dynamic):
+    def __init__(self, dynamic):
         plugins.Observable.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
-        self.currentObject = obj
+        self.currentObject = None
         self.dynamic = dynamic
-        self.modelHandler = self.createModelHandler(obj)
+        self.modelHandler = None
         self.selection = None
         self.nameColumn = None
     def createModelHandler(self, object):
@@ -1584,8 +1576,9 @@ class FileViewGUI(plugins.Observable):
     def notifyViewTest(self, obj):
         self.currentObject = obj
         self.modelHandler = self.createModelHandler(obj)
-        self.nameColumn.set_title(self.getName())
-        self.recreateModel(self.getState())
+        if self.nameColumn:
+            self.nameColumn.set_title(self.getName())
+            self.recreateModel(self.getState())
         
     def recreateModel(self, state):
         # blank line for demarcation
@@ -1845,18 +1838,20 @@ class RadioGroupIndexer:
         self.buttons[index].set_active(True)
 
 class TestProgressBar:
-    def __init__(self, totalNofTests):
-        self.totalNofTests = totalNofTests
+    def __init__(self):
+        self.totalNofTests = 0
         self.nofCompletedTests = 0
         self.nofFailedTests = 0
         self.progressBar = None
-    def createProgressBar(self):
+    def createView(self):
         self.progressBar = gtk.ProgressBar()
         self.resetBar()
         self.progressBar.show()
         return self.progressBar
     def adjustToSpace(self, windowWidth):
         self.progressBar.set_size_request(int(windowWidth * 0.75), 1)
+    def notifyTestCount(self, testCount):
+        self.totalNofTests = testCount
     def notifyLifecycleChange(self, test, state, changeDesc):
         failed = state.hasFailed()
         if changeDesc == "complete":
@@ -1867,6 +1862,7 @@ class TestProgressBar:
         elif state.isComplete() and not failed: # test saved, possibly partially so still check 'failed'
             self.nofFailedTests -= 1
             self.adjustFailCount()
+            
     def resetBar(self):
         message = self.getFractionMessage()
         message += self.getFailureMessage(self.nofFailedTests)
@@ -1896,7 +1892,7 @@ class TestProgressBar:
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor(plugins.Observable,TabGUI):
-    def __init__(self):
+    def __init__(self, dynamic):
         plugins.Observable.__init__(self)
         TabGUI.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
@@ -1906,12 +1902,13 @@ class TestProgressMonitor(plugins.Observable,TabGUI):
                                        gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.progressReport = None
         self.treeView = None
-
+        self.dynamic = dynamic
     def getTabTitle(self):
         return "Progress"
-
     def activate(self):
         pass # We don't worry about whether we're visible, we think we're important enough to write lots anyway!
+    def shouldShowCurrent(self):
+        return self.dynamic
     
     def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)

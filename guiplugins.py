@@ -238,10 +238,7 @@ class InteractiveTestAction(InteractiveAction):
     def getRelativeFilename(self, filename):
         # Trim the absolute filename to be relative to the application home dir
         # (TEXTTEST_HOME is more difficult to obtain, see testmodel.OptionFinder.getDirectoryName)
-        if self.currentTest.classId() == "test-app":
-            return os.path.basename(filename)
-        else:
-            return os.path.join(self.currentTest.getRelPath(), os.path.basename(filename))
+        return os.path.join(self.currentTest.getRelPath(), os.path.basename(filename))
     def notifyViewTest(self, test):
         self.currentTest = test
         self.updateDefaults()
@@ -446,6 +443,7 @@ class ImportTest(InteractiveTestAction):
         self.optionGroup.addOption("desc", self.getDescTitle(), self.getDefaultDesc())
         self.optionGroup.addOption("testpos", "Place " + self.testType(), "last in suite", allocateNofValues=2)
         self.testImported = None
+        self.setPlacements()
     def isActiveOnCurrent(self):
         return self.currentTest.classId() == "test-suite"
     def getNameTitle(self):
@@ -460,8 +458,6 @@ class ImportTest(InteractiveTestAction):
         suite = self.currentTest
         if suite.classId() == "test-case":
             suite = suite.parent
-        elif suite.classId() == "test-app":
-            return
         # Add suite and its children
         placements = [ "first in suite" ]
         for test in suite.testcases:
@@ -981,7 +977,7 @@ class EnableDiagnostics(InteractiveTestAction):
 
 class RemoveTest(InteractiveTestAction):
     def isActiveOnCurrent(self):
-        return self.currentTest.classId() != "test-app"
+        return True
     def getTitle(self):
         return "Remove"
     def getScriptTitle(self, tab):
@@ -1093,7 +1089,7 @@ class ReportBugs(InteractiveTestAction):
         self.addSwitch("internal_error", "Trigger even if other files differ (report as internal error)")
         self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
     def isActiveOnCurrent(self):
-        return self.currentTest.classId() != "test-app"
+        return True
     def getTitle(self):
         return "Report"
     def getScriptTitle(self, tab):

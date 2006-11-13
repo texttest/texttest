@@ -121,6 +121,39 @@ def getTestColour(test, category):
         # Everything unknown is assumed to be a new type of failure...
         return colours["failure"]
 
+# base class for all "GUI" classes which manage parts of the display
+class SubGUI(plugins.Observable):
+    def __init__(self):
+        plugins.Observable.__init__(self)
+        self.active = False
+    def activate(self):
+        self.active = True
+        self.contentsChanged()
+    def deactivate(self):
+        self.active = False
+    def contentsChanged(self):
+        if self.active and self.shouldShowCurrent():
+            guilog.info("") # blank line for demarcation
+            self.describe()
+    def describe(self):
+        pass
+    def createView(self):
+        pass
+    def shouldShowCurrent(self):
+        return True # sometimes these things don't have anything to display
+    def addScrollBars(self, view):
+        window = gtk.ScrolledWindow()
+        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        self.addToScrolledWindow(window, view)
+        window.show()
+        return window
+
+    def addToScrolledWindow(self, window, widget):
+        if isinstance(widget, gtk.VBox):
+            window.add_with_viewport(widget)
+        else:
+            window.add(widget)
+
 class QuitGUI(guiplugins.SelectionAction):
     def __init__(self, rootSuites, dynamic, topWindow, actionThread):
         guiplugins.SelectionAction.__init__(self, rootSuites)
@@ -293,7 +326,8 @@ class TextTestGUI(Responder, plugins.Observable):
         self.rootSuites = []
 
         self.testTreeGUI = TestTreeGUI(self.dynamic)
-        self.fileViewGUI = FileViewGUI(self.dynamic)
+        self.testFileGUI = TestFileGUI(self.dynamic)
+        self.appFileGUI = ApplicationFileGUI(self.dynamic)
         self.textInfoGUI = TextInfoGUI()
         self.progressMonitor = TestProgressMonitor(self.dynamic)
         self.progressBar = TestProgressBar()
@@ -303,11 +337,11 @@ class TextTestGUI(Responder, plugins.Observable):
         self.setUpUIManager()
     def setUpObservers(self):
         # watch for test selection and test count
-        for observer in [ self.fileViewGUI, self.textInfoGUI, self.progressBar, statusMonitor ]:
+        for observer in [ self.testFileGUI, self.appFileGUI, self.textInfoGUI, self.progressBar, statusMonitor ]:
             self.testTreeGUI.addObserver(observer)
         # watch for category selections
         self.progressMonitor.addObserver(self.testTreeGUI)
-        for observer in [ self.testTreeGUI, self.fileViewGUI, self.textInfoGUI, self.progressBar, self.progressMonitor ]:            
+        for observer in [ self.testTreeGUI, self.testFileGUI, self.textInfoGUI, self.progressBar, self.progressMonitor ]:            
             self.addObserver(observer) # forwarding of test observer mechanism
     def setUpUIManager(self):
         # Create GUI manager, and a few default action groups
@@ -399,6 +433,7 @@ class TextTestGUI(Responder, plugins.Observable):
         # Initialize
         self.uiManager.add_ui_from_string(self.defaultGUIDescription)
         toolBarActions = filter(lambda instance : instance.inToolBar() and not instance.isTestDependent(), intvActions)
+        guilog.info("") # blank line for demarcation
         for action in toolBarActions:
             toolBarGUI = self.createActionGUI(action)
             toolBarGUI.describe()
@@ -490,7 +525,8 @@ class TextTestGUI(Responder, plugins.Observable):
             if hasattr(action, "notifyNewTestSelection") or hasattr(action, "notifyViewTest"):
                 self.testTreeGUI.addObserver(action)
             if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
-                self.fileViewGUI.addObserver(action)
+                self.testFileGUI.addObserver(action)
+                self.appFileGUI.addObserver(action)
     
         return actions
     def getActionGroupIndex(self, action):
@@ -505,13 +541,21 @@ class TextTestGUI(Responder, plugins.Observable):
         topWindow = self.createTopWindow()
         intvActions = self.createInteractiveActions(topWindow, actionThread, idleManager)
 
-        treeWindow = self.testTreeGUI.createView()
-        rightWindow = self.createRightWindow(intvActions)
-        mainWindow = self.createPaned(treeWindow, rightWindow, horizontal=True)
-        self.fillTopWindow(topWindow, mainWindow, intvActions)
-        
+        rightWindowGUI = self.createRightWindowGUI(intvActions)
+        mainWindowGUI = self.createPaned(self.testTreeGUI, rightWindowGUI, horizontal=True)
+        self.fillTopWindow(topWindow, mainWindowGUI.createView(), intvActions)
+        mainWindowGUI.activate()
+
+        guilog.info("") # for demarcation
         self.notify("SetUpGUIComplete")
         guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
+    def runWithActionThread(self, actionThread):
+        self.setUpGui(actionThread)
+        actionThread.start()
+        gtk.main()
+    def runAlone(self):
+        self.setUpGui()
+        gtk.main()
     def createActionGUI(self, action, fromTab=False):
         return ActionGUI(action, self.getActionGroup(action), self.uiManager.get_accel_group(), fromTab)
     def createActionGUIForTab(self, action):
@@ -525,45 +569,43 @@ class TextTestGUI(Responder, plugins.Observable):
                 if optionGroup.switches or optionGroup.options:
                     actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
         return actionTabGUIs
-    def createRightWindow(self, intvActions):
-        return self.createPaned(self.createTopRightWindow(intvActions), self.createNotebook(intvActions), horizontal=False)
     def getSeparatorPosition(self, horizontal):
         if horizontal:
             return float(self.getWindowOption("vertical_separator_position", 0.5))
         else:
             return float(self.getWindowOption("horizontal_separator_position", 0.46))
-    def createPaned(self, widget1, widget2, horizontal):
-        paneGUI = PaneGUI([ widget1, widget2 ], self.getSeparatorPosition(horizontal), horizontal)
+    def createPaned(self, gui1, gui2, horizontal):
+        paneGUI = PaneGUI([ gui1, gui2 ], self.getSeparatorPosition(horizontal), horizontal)
         self.addObserver(paneGUI)
-        return paneGUI.createView()
+        return paneGUI
 
-    def createTopRightWindow(self, intvActions):
-        testButtonBarGUIs = self.createButtonBarGUIs(intvActions)
-        if len(testButtonBarGUIs):
-            guilog.info("") # blank line for demarcation
-            vbox = gtk.VBox()
-            vbox.pack_start(self.makeTestButtonBar(testButtonBarGUIs), expand=False, fill=False)
-            vbox.pack_start(self.fileViewGUI.createView(), expand=True, fill=True)
-            vbox.show()
-            return vbox
+    def createRightWindowGUI(self, intvActions):
+        tabGUIs = [ self.textInfoGUI, self.progressMonitor ] + self.createActionTabGUIs(intvActions)
+        if self.dynamic:
+            notebookGUI = BottomNotebookGUI(self.classifyByTitle(tabGUIs), self.getNotebookScriptName("Top"))
+            return self.createSingleTestGUI(intvActions, notebookGUI)
         else:
-            return self.fileViewGUI.createView()
+            subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
+            tabInfo = seqdict()
+            tabInfo["Test"] = self.createSingleTestGUI(intvActions, subNotebookGUIs["Test"])
+            tabInfo["Selection"] = subNotebookGUIs["Selection"]
+            tabInfo["Running"] = self.createPaned(self.appFileGUI, subNotebookGUIs["Running"], horizontal=False)
+            notebookGUI = StaticTopNotebookGUI(tabInfo, self.getNotebookScriptName("Top"), self.getDefaultPage())
+            self.testTreeGUI.addObserver(notebookGUI)
+            return notebookGUI
 
-    def makeTestButtonBar(self, testButtonBarGUIs):
-        executeButtons = gtk.HBox()
-        for buttonGUI in testButtonBarGUIs:
-            button = buttonGUI.createStandaloneButton()
-            executeButtons.pack_start(button, expand=False, fill=False)
-        executeButtons.show_all()
-        return executeButtons
+    def getDefaultPage(self):
+        if self.testTreeGUI.totalNofTests >= 10:
+            return "Selection"
+        else:
+            return "Test"
 
-    def runWithActionThread(self, actionThread):
-        self.setUpGui(actionThread)
-        actionThread.start()
-        gtk.main()
-    def runAlone(self):
-        self.setUpGui()
-        gtk.main()
+    def createSingleTestGUI(self, intvActions, notebookGUI):
+        testButtonBarGUIs = self.createButtonBarGUIs(intvActions)
+        topTestViewGUI = TopTestViewGUI(testButtonBarGUIs, self.testFileGUI)
+        self.testTreeGUI.addObserver(notebookGUI)
+        return self.createPaned(topTestViewGUI, notebookGUI, horizontal=False)
+        
     def createButtonBarGUIs(self, intvActions):
         buttonBarGUIs = []
         for action in intvActions:
@@ -572,33 +614,23 @@ class TextTestGUI(Responder, plugins.Observable):
                 self.testTreeGUI.addObserver(buttonBarGUI)
                 buttonBarGUIs.append(buttonBarGUI)
         return buttonBarGUIs
-    def createNotebook(self, intvActions):
-        tabGUIs = [ self.textInfoGUI, self.progressMonitor ] + self.createActionTabGUIs(intvActions)
-        notebookGUI = self.createNotebookGUI(tabGUIs)
-        return notebookGUI.createView()
 
-    def createNotebookGUI(self, tabGUIs):
-        scriptName = "view options for"
-        if self.dynamic:
-            notebookGUI = NotebookGUI(self.classifyTabGUIs(tabGUIs), scriptName)
-            # watch for double-clicks
-            self.testTreeGUI.addObserver(notebookGUI)
-            return notebookGUI
+    def getNotebookScriptName(self, tabName):
+        if tabName == "Top":
+            return "view options for"
         else:
-            tabInfo = seqdict()
-            for tabName in [ "Test", "Selection", "Running" ]:
-                guisUnderTab = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
-                scriptTitle = "view sub-options for " + tabName.lower() + " :"
-                subNotebookGUI = NotebookGUI(self.classifyTabGUIs(guisUnderTab), scriptTitle, active=False)
-                if tabName == "Test":
-                    self.testTreeGUI.addObserver(subNotebookGUI)
-                tabInfo[tabName] = subNotebookGUI
-            return NotebookGUI(tabInfo, scriptName)
+            return "view sub-options for " + tabName.lower() + " :"
 
-    def classifyTabGUIs(self, tabGUIs):
+    def classifyByTitle(self, tabGUIs):
         tabInfo = seqdict()
         for tabGUI in tabGUIs:
             tabInfo[tabGUI.getTabTitle()] = tabGUI
+        return tabInfo
+    def createNotebookGUIs(self, tabGUIs):
+        tabInfo = seqdict()
+        for tabName in [ "Test", "Selection", "Running" ]:
+            currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
+            tabInfo[tabName] = BottomNotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
         return tabInfo
 
     def notifyLifecycleChange(self, test, state, changeDesc):
@@ -617,9 +649,9 @@ class TextTestGUI(Responder, plugins.Observable):
     def notifyAllComplete(self):
         plugins.Observable.threadedNotificationHandler.disablePoll()
             
-class TestTreeGUI(plugins.Observable):
+class TestTreeGUI(SubGUI):
     def __init__(self, dynamic):
-        plugins.Observable.__init__(self)
+        SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
         self.itermap = seqdict()
@@ -631,23 +663,17 @@ class TestTreeGUI(plugins.Observable):
         self.collapseStatic = False
         self.successPerSuite = {} # map from suite to number succeeded
         self.collapsedRows = {}
-    def addApplication(self, app):
-        colour = app.getConfigValue("test_colours")["app_static"]
-        iter = self.model.insert_before(None, None)
-        nodeName = "Application " + app.fullName
-        self.model.set_value(iter, 0, nodeName)
-        self.model.set_value(iter, 1, colour)
-        self.model.set_value(iter, 2, app)
-        self.model.set_value(iter, 3, nodeName)
-        self.model.set_value(iter, 6, True)
-        self.collapseStatic = app.getConfigValue("static_collapse_suites")
+    def activate(self):
+        pass # Not really integrated into the description mechanism
     def addSuite(self, suite):
         if not self.dynamic:
-            self.addApplication(suite.app)
+            self.collapseStatic = suite.getConfigValue("static_collapse_suites")
         size = suite.size()
         self.totalNofTests += size
         if not self.dynamic or size > 0:
             self.addSuiteWithParent(suite, None)
+        if not self.viewedTest:
+            self.viewTest(suite)
     def visibleByDefault(self, suite, parent):
         if parent == None or not self.dynamic:
             return True
@@ -664,9 +690,8 @@ class TestTreeGUI(plugins.Observable):
         self.model.set_value(iter, 2, suite)
         self.model.set_value(iter, 3, suite.uniqueName)
         self.model.set_value(iter, 6, self.visibleByDefault(suite, parent))
-        if suite.classId() != "test-app":
-            storeIter = iter.copy()
-            self.itermap[suite] = storeIter
+        storeIter = iter.copy()
+        self.itermap[suite] = storeIter
         self.updateStateInModel(suite, iter, suite.state)
         if suite.classId() == "test-suite":
             for test in suite.testcases:
@@ -715,8 +740,7 @@ class TestTreeGUI(plugins.Observable):
         self.treeView.connect('row-expanded', self.rowExpanded)
         guilog.info("Expanding tests in tree view...")
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
-        self.viewRootSuite()
-
+        
         # The order of these two is vital!
         scriptEngine.connect("select test", "row_activated", self.treeView, self.rowActivated, modelIndexer)
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
@@ -725,21 +749,8 @@ class TestTreeGUI(plugins.Observable):
             self.filteredModel.connect('row-inserted', self.rowInserted)
             self.reFilter()
 
-        # Create scrollbars around the view.
-        scrolled = gtk.ScrolledWindow()
-        scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        scrolled.add(self.treeView)
-        scrolled.show()
-        return scrolled
-    def viewRootSuite(self):
-        suiteIter = self.model.get_iter_root()
-        if not self.dynamic:
-            suiteIter = self.model.iter_next(suiteIter)
-        suite = self.model.get_value(suiteIter, 2)
-        guilog.info("")
-        guilog.info("Viewing test " + repr(suite))
-        self.viewTest(suite)
-
+        return self.addScrollBars(self.treeView)
+    
     def notifySetUpGUIComplete(self):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.treeView.grab_focus()
@@ -1015,6 +1026,7 @@ class ActionGUI:
     def __init__(self, action, actionGroup, accelGroup, fromTab):
         self.action = action
         self.accelerator = self.getAccelerator()
+        self.button = None
         self.gtkAction = gtk.Action(self.action.getSecondaryTitle(), self.action.getTitle(), \
                                     self.action.getTooltip(), self.getStockId())
         actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
@@ -1036,24 +1048,21 @@ class ActionGUI:
             else:
                 plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
                                      + self.action.getSecondaryTitle() + "' is not valid, ignoring ...")
-    def describe(self, postText=""):
+    def describe(self):
         message = "Viewing button with title '" + self.action.getTitle() + "'"
         stockId = self.getStockId()
         if stockId:
             message += ", stock id '" + repr(stockId) + "'"
         if self.accelerator:
             message += ", accelerator '" + repr(self.accelerator) + "'"
-        guilog.info(message + postText)
-    def createStandaloneButton(self):
-        button = self.createButton()
-        if self.action.isActiveOnCurrent():
-            self.describe()
-        else:
-            button.set_property("sensitive", False)
-            self.describe(" (greyed out)")
-        return button
+        if self.button and not self.button.get_property("sensitive"):
+            message += " (greyed out)"
+
+        guilog.info(message)
 
     def notifyViewTest(self, test):
+        if not self.button:
+            return
         oldActive = self.button.get_property("sensitive")
         newActive = self.action.isActiveOnCurrent()
         if oldActive != newActive:
@@ -1062,6 +1071,8 @@ class ActionGUI:
     def createButton(self):
         self.button = gtk.Button()
         self.gtkAction.connect_proxy(self.button)
+        if not self.action.isActiveOnCurrent():
+            self.button.set_property("sensitive", False)
         self.button.show()
         return self.button
     def runInteractive(self, *args):
@@ -1077,50 +1088,58 @@ class ActionGUI:
             showError(str(e))
         except plugins.TextTestWarning, e:
             showWarning(str(e))
-    
         
 # base class for everything that can go in tabs handled by NotebookGUI
-class TabGUI:
-    def __init__(self, active=False):
-        self.active = active
-    def activate(self):
-        self.active = True
-        guilog.info("")
-        self.describe()
-    def describe(self):
-        pass
-    def shouldShowCurrent(self):
-        return True # sometimes these things don't have anything to display
-    def deactivate(self):
-        self.active = False
+class TabGUI(SubGUI):
     def getTabTitle(self):
         return "Need Title!"
     def getGroupTabTitle(self):
         return "Test"
     def isObjectDependent(self):
         return True # most of them seem to be
-    def createView(self):
-        pass
     def updateView(self):
         pass
 
-    def addScrollBars(self, view):
-        window = gtk.ScrolledWindow()
-        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self.addToScrolledWindow(window, view)
-        window.show()
-        return window
-
-    def addToScrolledWindow(self, window, widget):
-        if isinstance(widget, gtk.TextView) or isinstance(widget, gtk.Viewport):
-            window.add(widget)
-        elif isinstance(widget, gtk.VBox):
-            window.add_with_viewport(widget)
+# class for encapsulating the test file view and possibly the test button bar
+class TopTestViewGUI(SubGUI):
+    def __init__(self, buttonBarGUIs, testFileGUI):
+        SubGUI.__init__(self)
+        self.buttonBarGUIs = buttonBarGUIs
+        self.testFileGUI = testFileGUI
+    def createView(self):
+        if len(self.buttonBarGUIs):
+            vbox = gtk.VBox()
+            vbox.pack_start(self.testFileGUI.createView(), expand=True, fill=True)
+            vbox.pack_start(self.makeButtonBar(), expand=False, fill=False)
+            vbox.show()
+            return vbox
         else:
-            raise plugins.TextTestError, "Could not decide how to add scrollbars to " + repr(widget)
+            return self.testFileGUI.createView()
+
+    def makeButtonBar(self):
+        reversedGUIs = copy(self.buttonBarGUIs)
+        reversedGUIs.reverse()
+        executeButtons = gtk.HBox()
+        for buttonGUI in reversedGUIs:
+            button = buttonGUI.createButton()
+            executeButtons.pack_end(button, expand=False, fill=False)
+        executeButtons.show()
+        return executeButtons
+    def activate(self):
+        SubGUI.activate(self)
+        self.testFileGUI.activate()
+    def deactivate(self):
+        self.active = False
+        self.testFileGUI.deactivate()
+    def shouldShowCurrent(self):
+        return len(self.buttonBarGUIs) > 0
+    def describe(self):
+        for buttonBarGUI in self.buttonBarGUIs:
+            buttonBarGUI.describe()
     
 class ActionTabGUI(TabGUI):
     def __init__(self, optionGroup, action, buttonGUI):
+        TabGUI.__init__(self)
         self.optionGroup = optionGroup
         self.action = action
         self.buttonGUI = buttonGUI
@@ -1255,9 +1274,9 @@ class ActionTabGUI(TabGUI):
                 text += " (checked)"
         return text
 
-class NotebookGUI(TabGUI):
-    def __init__(self, tabInfo, scriptTitle, active=True):
-        TabGUI.__init__(self, active)
+class NotebookGUI(SubGUI):
+    def __init__(self, tabInfo, scriptTitle):
+        SubGUI.__init__(self)
         self.scriptTitle = scriptTitle
         self.diag = plugins.getDiagnostics("GUI notebook")
         self.tabInfo = tabInfo
@@ -1313,6 +1332,8 @@ class NotebookGUI(TabGUI):
             if text == name:
                 return child
 
+# For the notebooks appearing in the bottom right corner...
+class BottomNotebookGUI(NotebookGUI):
     def getObjectDependentTabNames(self):
         names = []
         for child in self.notebook.get_children():
@@ -1377,6 +1398,8 @@ class NotebookGUI(TabGUI):
         return names
 
     def notifyViewTest(self, test):
+        if not self.notebook:
+            return
         oldTabNames = self.getObjectDependentTabNames()
         newTabNames = self.getNewTabNames()
         self.diag.info("Updating notebook for " + repr(newTabNames) + " from " + repr(oldTabNames))
@@ -1404,11 +1427,24 @@ class NotebookGUI(TabGUI):
         tabTexts = map(self.notebook.get_tab_label_text, self.notebook.get_children())
         guilog.info("")
         guilog.info("Tabs showing : " + string.join(tabTexts, ", "))
-        
+
+
+class StaticTopNotebookGUI(NotebookGUI):
+    def __init__(self, tabGUIs, scriptName, defaultPage):
+        NotebookGUI.__init__(self, tabGUIs, scriptName)
+        self.defaultPage = defaultPage
+    def createView(self):
+        view = NotebookGUI.createView(self)
+        pageNum = self.tabInfo.keys().index(self.defaultPage)
+        self.notebook.set_current_page(pageNum)
+        return view
+    def notifyViewTest(self, test):
+        self.notebook.set_current_page(0)
             
-class PaneGUI:
-    def __init__(self, widgets, separatorPosition, horizontal):
-        self.widgets = widgets
+class PaneGUI(SubGUI):
+    def __init__(self, subguis, separatorPosition, horizontal):
+        SubGUI.__init__(self)
+        self.subguis = subguis
         self.horizontal = horizontal
         self.separatorPosition = separatorPosition
         self.panedTooltips = gtk.Tooltips()
@@ -1426,8 +1462,9 @@ class PaneGUI:
             return self.paned.allocation.height
     def createView(self):
         frames = []
-        for widget in self.widgets:
-            if isinstance(widget, gtk.VPaned):
+        for subgui in self.subguis:
+            widget = subgui.createView()
+            if isinstance(subgui, PaneGUI):
                 frames.append(widget)
             else:
                 frame = gtk.Frame()
@@ -1441,6 +1478,15 @@ class PaneGUI:
         self.paned.show()
         return self.paned
     
+    def activate(self):
+        self.active = True
+        for subgui in self.subguis:
+            subgui.activate()
+    def deactivate(self):
+        self.active = False
+        for subgui in self.subguis:
+            subgui.deactivate()
+        
     def paneHasChanged(self, pane, gparamspec):
         pos = pane.get_position()
         size = self.getSize()
@@ -1453,12 +1499,14 @@ class PaneGUI:
         else:
             return message + "top"
     def notifySetUpGUIComplete(self):
-        guilog.info("Pane separator moved to " + self.positionDescription(self.separatorPosition))
+        if self.active:
+            guilog.info("Pane separator moved to " + self.positionDescription(self.separatorPosition))
         pos = int(self.getSize() * self.separatorPosition)
         self.paned.set_position(pos)                
     
 class TextInfoGUI(TabGUI):
     def __init__(self):
+        TabGUI.__init__(self)
         self.currentTest = None
         self.text = ""
         self.view = None
@@ -1493,9 +1541,7 @@ class TextInfoGUI(TabGUI):
         self.resetText(test, state)
         if self.view:
             self.updateView()
-            if self.shouldShowCurrent() and self.active:
-                guilog.info("")
-                self.describe()
+            self.contentsChanged()
     def createView(self):
         if not self.shouldShowCurrent():
             return
@@ -1552,54 +1598,56 @@ class TextInfoGUI(TabGUI):
 
 
         
-class FileViewGUI(plugins.Observable):
+class FileViewGUI(SubGUI):
     def __init__(self, dynamic):
-        plugins.Observable.__init__(self)
+        SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.currentObject = None
         self.dynamic = dynamic
-        self.modelHandler = None
         self.selection = None
         self.nameColumn = None
-    def createModelHandler(self, object):
-        if object.classId() == "test-app":
-            return ApplicationFileModelHandler(self.model, object)
-        else:
-            return TestFileModelHandler(self.model, object, self.dynamic)
-    def notifyFileChange(self, test):
-        if test is self.currentObject:
-            self.recreateModel(test.state)
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        if test is self.currentObject:
-            self.recreateModel(state)
-    def notifyViewTest(self, obj):
-        self.currentObject = obj
-        self.modelHandler = self.createModelHandler(obj)
+
+    def recreateAll(self):
         if self.nameColumn:
             self.nameColumn.set_title(self.getName())
             self.recreateModel(self.getState())
-        
+
     def recreateModel(self, state):
-        # blank line for demarcation
-        guilog.info("")
         # In theory we could do something clever here, but for now, just wipe and restart
         # Need to re-expand after clearing...
         self.model.clear()
-        self.modelHandler.addFilesToModel(state)
-        self.selection.get_tree_view().expand_all()    
-    
-    def getName(self):
-        return self.currentObject.name.replace("_", "__")
+        self.addFilesToModel(state)
+        self.selection.get_tree_view().expand_all()
+        self.contentsChanged()
+            
     def getState(self):
         try:
             return self.currentObject.state
         except AttributeError:
             pass
+     
+    def describe(self):
+        self.describeLevel(self.model.get_iter_root())
+    def describeLevel(self, currIter, parentDesc=""): 
+        while currIter is not None:
+            subIter = self.model.iter_children(currIter)
+            if parentDesc:
+                fileName = self.model.get_value(currIter, 0)
+                colour = self.model.get_value(currIter, 1)
+                if colour:
+                    guilog.info("Adding file " + fileName + " under heading '" + parentDesc + "', coloured " + colour)
+                details = self.model.get_value(currIter, 4)
+                if details:
+                    guilog.info("(Second column '" + details + "' coloured " + colour + ")")
+            if subIter:
+                self.describeLevel(subIter, self.model.get_value(currIter, 0))
+            currIter = self.model.iter_next(currIter)
+        
+    def getName(self):
+        return self.currentObject.name.replace("_", "__")
     def createView(self):
-        # blank line for demarcation
-        guilog.info("")
-        self.modelHandler.addFilesToModel(self.getState())
+        self.addFilesToModel(self.getState())
         fileWin = gtk.ScrolledWindow()
         fileWin.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         view = gtk.TreeView(self.model)
@@ -1614,10 +1662,7 @@ class FileViewGUI(plugins.Observable):
             view.append_column(detailsColumn)
         view.expand_all()
         indexer = TreeModelIndexer(self.model, self.nameColumn, 0)
-        scriptEngine.connect("select file", "row_activated", view, self.fileActivated, indexer)
-        scriptEngine.monitor("set file selection to", self.selection, indexer)
-        self.selectionChanged(self.selection)
-        view.get_selection().connect("changed", self.selectionChanged)
+        self.monitorEvents(indexer)
         view.show()
         fileWin.add(view)
         fileWin.show()
@@ -1626,12 +1671,6 @@ class FileViewGUI(plugins.Observable):
     def makeDetailsColumn(self, renderer):
         if self.dynamic:
             return gtk.TreeViewColumn("Details", renderer, text=4)
-    def selectionChanged(self, selection):
-        filelist = []
-        selection.selected_foreach(self.fileSelected, filelist)
-        self.notify("NewFileSelection", filelist)
-    def fileSelected(self, treemodel, path, iter, filelist):
-        filelist.append(self.model.get_value(iter, 0))
     def fileActivated(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
@@ -1645,12 +1684,6 @@ class FileViewGUI(plugins.Observable):
             showError(str(e))
 
         self.selection.unselect_all()
-
-class FileModelHandler:
-    def __init__(self, model):
-        self.model = model
-    def addFilesToModel(self, state):
-        pass
     def addFileToModel(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
@@ -1658,23 +1691,26 @@ class FileModelHandler:
         self.model.set_value(fciter, 0, baseName)
         self.model.set_value(fciter, 1, colour)
         self.model.set_value(fciter, 2, name)
-        guilog.info("Adding file " + baseName + " under heading '" + heading + "', coloured " + colour)
         if comp:
             self.model.set_value(fciter, 3, comp)
             details = comp.getDetails()
             if len(details) > 0:
                 self.model.set_value(fciter, 4, details)
-                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
         return fciter
+    def getColour(self, name):
+        return self.currentObject.getConfigValue("file_colours")[name]
     
-class ApplicationFileModelHandler(FileModelHandler):
-    def __init__(self, model, app):
-        FileModelHandler.__init__(self, model)
-        self.app = app
+class ApplicationFileGUI(FileViewGUI):
+    def notifyViewTest(self, test):
+        if self.currentObject != test.app:
+            self.currentObject = test.app
+            self.recreateAll()
+    def monitorEvents(self, indexer):
+        scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated, indexer)
     def addFilesToModel(self, state):
         confiter = self.model.insert_before(None, None)
         self.model.set_value(confiter, 0, "Application Files")
-        colour = self.app.getConfigValue("file_colours")["app_static"]
+        colour = self.getColour("app_static")
         for file in self.getConfigFiles():
             self.addFileToModel(confiter, file, None, colour)
 
@@ -1685,12 +1721,12 @@ class ApplicationFileModelHandler(FileModelHandler):
             for file in personalFiles:
                 self.addFileToModel(persiter, file, None, colour)
     def getConfigFiles(self):
-        configFiles = self.app.dircache.findAllFiles("config", [ self.app.name ])
+        configFiles = self.currentObject.dircache.findAllFiles("config", [ self.currentObject.name ])
         configFiles.sort()
         return configFiles
     def getPersonalFiles(self):
         personalFiles = []
-        personalFile = self.app.getPersonalConfigFile()
+        personalFile = self.currentObject.getPersonalConfigFile()
         if personalFile:
             personalFiles.append(personalFile)
         gtkRcFile = getGtkRcFile()
@@ -1698,13 +1734,17 @@ class ApplicationFileModelHandler(FileModelHandler):
             personalFiles.append(gtkRcFile)
         return personalFiles
     
-class TestFileModelHandler(FileModelHandler):
-    def __init__(self, model, test, dynamic):        
-        FileModelHandler.__init__(self, model)
-        self.test = test
-        self.colours = test.getConfigValue("file_colours")
+class TestFileGUI(FileViewGUI):
+    def notifyFileChange(self, test):
+        if test is self.currentObject:
+            self.recreateModel(test.state)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        if test is self.currentObject:
+            self.recreateModel(state)
+    def notifyViewTest(self, test):
+        self.currentObject = test
         test.refreshFiles()
-        self.dynamic = dynamic
+        self.recreateAll()
     def addFilesToModel(self, state):
         stateToUse = self.getStateToUse(state)
         self._addFilesToModel(stateToUse)
@@ -1717,14 +1757,27 @@ class TestFileModelHandler(FileModelHandler):
                 pass
         else:
             self.addStaticFilesToModel()
+
+    def monitorEvents(self, indexer):
+        scriptEngine.connect("select file", "row_activated", self.selection.get_tree_view(), self.fileActivated, indexer)
+        scriptEngine.monitor("set file selection to", self.selection, indexer)
+        self.selectionChanged(self.selection)
+        self.selection.connect("changed", self.selectionChanged)
+    def selectionChanged(self, selection):
+        filelist = []
+        selection.selected_foreach(self.fileSelected, filelist)
+        self.notify("NewFileSelection", filelist)
+    def fileSelected(self, treemodel, path, iter, filelist):
+        filelist.append(self.model.get_value(iter, 0))
+
     def getStateToUse(self, state):
         if state.isComplete() or not state.hasStarted():
             return state
 
         # regenerate for currently running tests
-        newState = comparetest.TestComparison(state, self.test.app)
+        newState = comparetest.TestComparison(state, self.currentObject.app)
         newState.addObserver(statusMonitor)
-        newState.makeComparisons(self.test, testInProgress=1)
+        newState.makeComparisons(self.currentObject, testInProgress=1)
         return newState
     
     def addDynamicFilesToModel(self, state):
@@ -1762,7 +1815,7 @@ class TestFileModelHandler(FileModelHandler):
             dict[relDir].append(file)
         return dict
     def getRelDir(self, file):
-        relPath = self.test.getTestRelPath(file)
+        relPath = self.currentObject.getTestRelPath(file)
         if relPath.find(os.sep) != -1:
             dir, local = os.path.split(relPath)
             return dir
@@ -1771,20 +1824,20 @@ class TestFileModelHandler(FileModelHandler):
     def getComparisonColour(self, fileComp):
         if not fileComp:
             return self.getStaticColour()
-        if not self.test.state.isComplete():
-            return self.colours["running"]
+        if not self.currentObject.state.isComplete():
+            return self.getColour("running")
         if fileComp.hasSucceeded():
-            return self.colours["success"]
+            return self.getColour("success")
         else:
-            return self.colours["failure"]
+            return self.getColour("failure")
     def getStaticColour(self):
         if self.dynamic:
-            return self.colours["not_started"]
+            return self.getColour("not_started")
         else:
-            return self.colours["static"]
+            return self.getColour("static")
     def addStaticFilesToModel(self):
-        stdFiles, defFiles = self.test.listStandardFiles(allVersions=True)
-        if self.test.classId() == "test-case":
+        stdFiles, defFiles = self.currentObject.listStandardFiles(allVersions=True)
+        if self.currentObject.classId() == "test-case":
             stditer = self.model.insert_before(None, None)
             self.model.set_value(stditer, 0, "Standard Files")
             if len(stdFiles):
@@ -1796,14 +1849,14 @@ class TestFileModelHandler(FileModelHandler):
         self.addStaticDataFilesToModel()
     def getDisplayDataFiles(self):
         try:
-            return self.test.app.configObject.extraReadFiles(self.test).items()
+            return self.currentObject.app.configObject.extraReadFiles(self.currentObject).items()
         except:
-            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.test.app.configObject.moduleName + \
+            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentObject.app.configObject.moduleName + \
                              "' configuration while requesting extra data files, not displaying any such files")
             plugins.printException()
             return seqdict()
     def addStaticDataFilesToModel(self):
-        dataFiles = self.test.listDataFiles()
+        dataFiles = self.currentObject.listDataFiles()
         displayDataFiles = self.getDisplayDataFiles()
         if len(dataFiles) == 0 and len(displayDataFiles) == 0:
             return
@@ -1817,7 +1870,7 @@ class TestFileModelHandler(FileModelHandler):
             for file in filelist:
                 self.addFileToModel(exiter, file, None, colour)
     def addDataFilesUnderIter(self, iter, files, colour):
-        dirIters = { self.test.getDirectory() : iter }
+        dirIters = { self.currentObject.getDirectory() : iter }
         parentIter = iter
         for file in files:
             parent, local = os.path.split(file)
@@ -1891,9 +1944,8 @@ class TestProgressBar:
             
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
-class TestProgressMonitor(plugins.Observable,TabGUI):
+class TestProgressMonitor(TabGUI):
     def __init__(self, dynamic):
-        plugins.Observable.__init__(self)
         TabGUI.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
                 

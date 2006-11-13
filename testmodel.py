@@ -581,6 +581,7 @@ class TestSuite(Test):
         self.dircaches[0].refresh()
     def contentChanged(self):
         # Here we assume that only order can change...
+        self.refreshFiles()
         newList = []
         for testName in self.readTestNamesFromFile(self.getContentFileName()):
             for testcase in self.testcases:
@@ -621,23 +622,38 @@ class TestSuite(Test):
         newSuite.setObservers(self.observers)
         if newSuite.readContents(filters, forTestRuns):
             return newSuite
-    def writeNewTest(self, testName, description):
-        file = open(self.getContentFileName(), "a")
-        file.write("\n")
-        file.write("# " + description + "\n")
-        file.write(testName + "\n")
+    def writeNewTest(self, testName, description, placement):        
+        file = open(self.getContentFileName(), "r+")
+        lines = file.readlines()
+        if placement == "last in suite":
+            lines += [ "\n", "# " + description + "\n", testName + "\n"]
+        elif placement == "first in suite":
+            newLines = [ "# " + description + "\n", testName + "\n", "\n"]
+            newLines += lines
+            lines = newLines
+        else: # Find line equal to 'placement' minus initial 'after '
+            newLines = []
+            for line in lines:
+                newLines += line
+                if line.rstrip(' \n') == placement[6:len(placement)]:
+                    newLines += [ "\n", "# " + description + "\n", testName + "\n"]
+            lines = newLines
+        file.seek(0, 0)
+        file.writelines(lines)
+        file.close()
         return self.makeSubDirectory(testName)
-    def addTestCase(self, testName):
-        return self.addTest(testName, TestCase)
-    def addTestSuite(self, testName):
-        return self.addTest(testName, TestSuite)
-    def addTest(self, testName, className):
+    def addTestCase(self, testName, placement):
+        return self.addTest(testName, placement, TestCase)
+    def addTestSuite(self, testName, placement):
+        return self.addTest(testName, placement, TestSuite)
+    def addTest(self, testName, placement, className):
         cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
         test = className(testName, cache, self.app, self)
         test.setObservers(self.observers)
-        self.testcases.append(test)
+        self.testcases.append(test) # Reordered in contentChanged below ...
         test.readEnvironment()
         test.notify("Add")
+        self.contentChanged()     
         return test
     def removeTest(self, test):
         self.testcases.remove(test)

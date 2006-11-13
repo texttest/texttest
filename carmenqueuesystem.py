@@ -202,6 +202,8 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("maximum_cputime_for_chunking", 0.0, "(LSF) Maximum time a test can take and be chunked")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")
+        for batchSession in [ "nightjob", "wkendjob", "release", "nightly_publish", "weekly_publish", "small_publish" ]:
+            app.addConfigEntry(batchSession, "true", "batch_use_version_filtering")
         for var, value in self.getCarmenEnvironment(app):
             os.environ[var] = value
     def defaultLoginShell(self):

@@ -224,7 +224,10 @@ class GUIStatusMonitor:
         self.animation = None
         self.pixbuf = None
         self.label = None
-    
+
+    def busy(self):
+        return self.pixbuf != None
+        
     def notifyActionStart(self, message=""):
         if self.throbber:
             if self.pixbuf: # We didn't do ActionStop ...
@@ -1076,6 +1079,8 @@ class ActionGUI:
         self.button.show()
         return self.button
     def runInteractive(self, *args):
+        if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
+            return        
         doubleCheckMessage = self.action.getDoubleCheckMessage()
         if doubleCheckMessage:
             self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive)

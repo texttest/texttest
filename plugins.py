@@ -798,6 +798,9 @@ class OptionGroup:
         if option:
             possValuesToUse = self.getDefaultPossiblilities(option.name, option.defaultValue, possibleValues)
             option.setPossibleValues(possValuesToUse)
+    def removeOption(self, key):
+        if self.options.has_key(key):
+            del self.options[key]
     def removeSwitch(self, key):
         if self.switches.has_key(key):
             del self.switches[key]

@@ -948,6 +948,7 @@ class Application:
         if len(filters) == 0:
             filters = self.configObject.getFilterList(self)
 
+        self.diag.info("Creating test suite with filters " + repr(filters))
         success = 1
         for filter in filters:
             if not filter.acceptsApplication(self):

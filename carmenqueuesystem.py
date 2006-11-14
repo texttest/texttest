@@ -187,13 +187,16 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return CarmenSgeSubmissionRules(self.optionMap, test, self.isNightJob())
     def isNightJob(self):
         batchSession = self.optionValue("b")
-        return batchSession == "nightjob" or batchSession == "wkendjob" or batchSession.startswith("nightly_publish") or batchSession.startswith("weekly_publish") or batchSession.startswith("small_publish")
+        return batchSession != "release" and batchSession in self.getFilteredBatchSessions()
     def printHelpOptions(self):
         print helpOptions
     def printHelpDescription(self):
         print helpDescription
     def defaultViewProgram(self):
         return "xemacs"
+    def getFilteredBatchSessions(self):
+        return [ "nightjob", "wkendjob", "release", "nightly_publish", "nightly_publish.lsf", \
+                 "weekly_publish", "weekly_publish.lsf", "small_publish" ]
     def setApplicationDefaults(self, app):
         queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux", "Which Carmen architecture to run tests on by default")
@@ -202,7 +205,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("maximum_cputime_for_chunking", 0.0, "(LSF) Maximum time a test can take and be chunked")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")
-        for batchSession in [ "nightjob", "wkendjob", "release", "nightly_publish", "weekly_publish", "small_publish" ]:
+        for batchSession in self.getFilteredBatchSessions():
             app.addConfigEntry(batchSession, "true", "batch_use_version_filtering")
         for var, value in self.getCarmenEnvironment(app):
             os.environ[var] = value

@@ -500,8 +500,10 @@ class TextTestGUI(Responder, plugins.Observable):
         elif toolbar:
             hbox.pack_start(toolbarHandle, expand=True, fill=True)
 
+        showToolbar = (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or \
+                      (not self.dynamic and self.getConfigValue("static_gui_show_toolbar"))
         if progressBar:
-            if toolbar:
+            if showToolbar:
                 width = 7 # Looks good, same as gtk.Paned border width
             else:
                 width = 0
@@ -509,7 +511,7 @@ class TextTestGUI(Responder, plugins.Observable):
             alignment.set(1.0, 1.0, 1.0, 1.0)
             alignment.set_padding(width, width, 1, width)
             alignment.add(progressBar)
-            if toolbar:
+            if showToolbar:
                 toolItem = gtk.ToolItem()
                 toolItem.add(alignment)
                 toolItem.set_expand(True)
@@ -518,8 +520,7 @@ class TextTestGUI(Responder, plugins.Observable):
                 hbox.pack_start(alignment, expand=True, fill=True)
 
         hbox.show_all()
-        if (self.dynamic and not self.getConfigValue("dynamic_gui_show_toolbar")) or \
-               (not self.dynamic and not self.getConfigValue("static_gui_show_toolbar")):
+        if not showToolbar:
             toolbarHandle.hide()
         vbox.pack_start(hbox, expand=False, fill=True)
     def getConfigValue(self, configName):
@@ -1133,8 +1134,7 @@ class ActionGUI:
             message += " (greyed out)"
             
         if self.action.isRadio() or self.action.isToggle():
-            message += ". Start value is " + str(self.action.getStartValue())        
-        
+            message += ". Start value is " + str(self.action.getStartValue())                
         guilog.info(message)
 
     def notifyViewTest(self, test):

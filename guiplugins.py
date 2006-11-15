@@ -81,6 +81,12 @@ class InteractiveAction(plugins.Observable):
         return True # do we activate this via performOnCurrent() ?
     def getInterfaceDescription(self):
         return ""
+    def isRadio(self):
+        return False;
+    def isToggle(self):
+        return False;
+    def getStartValue(self): # For radio/toggle actions.
+        return 0
     def getAccelerator(self):
         configName = self.getTitle().replace("_", "").replace(" ", "_").lower()
         accelerators = self.getConfigValue("gui_accelerators")

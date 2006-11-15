@@ -204,6 +204,25 @@ class QuitGUI(guiplugins.SelectionAction):
             self.actionThread.terminate()
         guiplugins.processTerminationMonitor.killAll()    
 
+class ToggleVisibilityGUI(guiplugins.SelectionAction):
+    def __init__(self, rootSuites, title, startValue):
+        guiplugins.SelectionAction.__init__(self, rootSuites)
+        self.title = title
+        self.startValue = startValue
+    def getInterfaceDescription(self):
+        description = "<menubar>\n<menu action=\"viewmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
+        return description
+    def getStartValue(self):
+        return self.startValue
+    def getTitle(self):
+        return self.title    
+    def isToggle(self):
+        return True;
+    def performOnCurrent(self):
+        self.notify("Toggle" + self.getTitle().replace("_", "").replace(" ", ""))
+    def messageAfterPerform(self):
+        pass
+
 def getGtkRcFile():
     configDir = plugins.getPersonalConfigDir()
     if not configDir:
@@ -271,6 +290,7 @@ class GUIStatusMonitor:
         frame.set_shadow_type(gtk.SHADOW_ETCHED_IN)
         frame.add(hbox)
         frame.show_all()
+        frame.hide()
         return frame
 
 # To make it easier for all sorts of things to connect
@@ -349,11 +369,12 @@ class TextTestGUI(Responder, plugins.Observable):
     def setUpUIManager(self):
         # Create GUI manager, and a few default action groups
         basicActions = gtk.ActionGroup("Basic")
-        basicActions.add_actions([("filemenu", None, "_File"), ("actionmenu", None, "_Actions")])
+        basicActions.add_actions([("filemenu", None, "_File"),
+                                  ("viewmenu", None, "_View"),
+                                  ("actionmenu", None, "_Actions")])
         self.uiManager.insert_action_group(basicActions, 0)
         self.uiManager.insert_action_group(gtk.ActionGroup("Suite"), 1)
         self.uiManager.insert_action_group(gtk.ActionGroup("Case"), 2)
-
     def needsOwnThread(self):
         return True
     def readGtkRCFile(self):
@@ -389,15 +410,18 @@ class TextTestGUI(Responder, plugins.Observable):
         vbox = gtk.VBox()
         self.placeTopWidgets(vbox, intvActions)
         vbox.pack_start(mainWindow, expand=True, fill=True)
-        if self.getConfigValue("add_shortcut_bar"):
-            shortcutBar = scriptEngine.createShortcutBar()
-            vbox.pack_start(shortcutBar, expand=False, fill=False)
-            shortcutBar.show()
-
+        self.shortcutBar = scriptEngine.createShortcutBar()
+        vbox.pack_start(self.shortcutBar, expand=False, fill=False)
+        if self.getConfigValue("add_shortcut_bar"):            
+            self.shortcutBar.show()
+            
+        inactiveThrobberIcon = self.getConfigValue("gui_throbber_inactive")
+        activeThrobberIcon = self.getConfigValue("gui_throbber_active")
+        self.statusBar = statusMonitor.createStatusbar(inactiveThrobberIcon, activeThrobberIcon)
         if self.getConfigValue("add_status_bar"):
-            inactiveThrobberIcon = self.getConfigValue("gui_throbber_inactive")
-            activeThrobberIcon = self.getConfigValue("gui_throbber_active")
-            vbox.pack_start(statusMonitor.createStatusbar(inactiveThrobberIcon, activeThrobberIcon), expand=False, fill=False)
+            self.statusBar.show()
+        vbox.pack_start(self.statusBar, expand=False, fill=False)
+
         vbox.show()
         topWindow.add(vbox)
         topWindow.show()
@@ -448,16 +472,19 @@ class TextTestGUI(Responder, plugins.Observable):
         # Show menu/toolbar?
         menubar = None
         toolbar = None
-        if (self.dynamic and self.getConfigValue("dynamic_gui_show_menubar")) or (not self.dynamic and self.getConfigValue("static_gui_show_menubar")):
+        if (self.dynamic and self.getConfigValue("dynamic_gui_show_menubar")) or \
+               (not self.dynamic and self.getConfigValue("static_gui_show_menubar")):
             menubar = self.uiManager.get_widget("/menubar")
-        if (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or (not self.dynamic and self.getConfigValue("static_gui_show_toolbar")):
-            toolbarHandle = gtk.HandleBox()
-            toolbar = self.uiManager.get_widget("/toolbar")
-            toolbarHandle.add(toolbar)
-            for item in toolbar.get_children():
-                item.set_is_important(True)
-                toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
-                toolbar.set_style(gtk.TOOLBAR_BOTH_HORIZ)
+
+        # We always create toolbar, we just don't show it if we don't want it
+        # That way, we can turn it on from the view menu
+        toolbarHandle = gtk.HandleBox()
+        toolbar = self.uiManager.get_widget("/toolbar")
+        toolbarHandle.add(toolbar)
+        for item in toolbar.get_children():
+            item.set_is_important(True)
+            toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
+            toolbar.set_style(gtk.TOOLBAR_BOTH_HORIZ)
         
         progressBar = None
         if self.dynamic:            
@@ -491,6 +518,9 @@ class TextTestGUI(Responder, plugins.Observable):
                 hbox.pack_start(alignment, expand=True, fill=True)
 
         hbox.show_all()
+        if (self.dynamic and not self.getConfigValue("dynamic_gui_show_toolbar")) or \
+               (not self.dynamic and not self.getConfigValue("static_gui_show_toolbar")):
+            toolbarHandle.hide()
         vbox.pack_start(hbox, expand=False, fill=True)
     def getConfigValue(self, configName):
         return self.rootSuites[0].app.getConfigValue(configName)
@@ -512,12 +542,9 @@ class TextTestGUI(Responder, plugins.Observable):
             return 0.6
     def addSuite(self, suite):
         self.rootSuites.append(suite)
-        if not suite.app.getConfigValue("add_shortcut_bar"):
-            scriptEngine.enableShortcuts = 0
         self.testTreeGUI.addSuite(suite)        
-
     def createInteractiveActions(self, topWindow, actionThread, idleManager):
-        actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]
+        actions = self.createPersistentInteractiveActions(topWindow, actionThread)
         actions += guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.rootSuites)
         for action in actions:
             # These actions might change the tree view selection or the status bar, need to observe them
@@ -531,6 +558,18 @@ class TextTestGUI(Responder, plugins.Observable):
                 self.testFileGUI.addObserver(action)
                 self.appFileGUI.addObserver(action)
     
+        return actions
+    def createPersistentInteractiveActions(self, topWindow, actionThread):
+        actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]        
+        toolbarVisible = (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or \
+                             (not self.dynamic and self.getConfigValue("static_gui_show_toolbar"))
+        toggleToolbar = ToggleVisibilityGUI(self.rootSuites, "_Toolbar", toolbarVisible)
+        toggleToolbar.addObserver(self)
+        toggleShortcutbar = ToggleVisibilityGUI(self.rootSuites, "_Shortcut bar", self.getConfigValue("add_shortcut_bar"))
+        toggleShortcutbar.addObserver(self)
+        toggleStatusbar = ToggleVisibilityGUI(self.rootSuites, "_Status bar", self.getConfigValue("add_status_bar"))
+        toggleStatusbar.addObserver(self)
+        actions += [ toggleToolbar, toggleShortcutbar, toggleStatusbar ]
         return actions
     def getActionGroupIndex(self, action):
         return int(action.isTestDependent())
@@ -635,6 +674,13 @@ class TextTestGUI(Responder, plugins.Observable):
             currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
             tabInfo[tabName] = BottomNotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
         return tabInfo
+    def widgetToggleVisibility(self, widget):
+        if widget.get_property('visible'):
+            widget.hide()
+            return False
+        else:
+            widget.show()
+            return True
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         # Working around python bug 853411: main thread must do all forking
@@ -651,7 +697,18 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notify("Remove", test)
     def notifyAllComplete(self):
         plugins.Observable.threadedNotificationHandler.disablePoll()
-            
+    def notifyToggleToolbar(self):
+        toolbar = self.uiManager.get_widget("/toolbar")
+        # actual toolbar lives in a handle, which is what we want to hide/show ...
+        visible = self.widgetToggleVisibility(toolbar.get_parent())
+        guilog.info("Toggled visibility of toolbar: " + str(visible))
+    def notifyToggleShortcutbar(self):
+        visible = self.widgetToggleVisibility(self.shortcutBar)
+        guilog.info("Toggled visibility of shortcut bar: " + str(visible))
+    def notifyToggleStatusbar(self):
+        visible = self.widgetToggleVisibility(self.statusBar)    
+        guilog.info("Toggled visibility of status bar: " + str(visible))
+        
 class TestTreeGUI(SubGUI):
     def __init__(self, dynamic):
         SubGUI.__init__(self)
@@ -1030,8 +1087,16 @@ class ActionGUI:
         self.action = action
         self.accelerator = self.getAccelerator()
         self.button = None
-        self.gtkAction = gtk.Action(self.action.getSecondaryTitle(), self.action.getTitle(), \
-                                    self.action.getTooltip(), self.getStockId())
+        if self.action.isToggle():
+            self.gtkAction = gtk.ToggleAction(self.action.getSecondaryTitle(), self.action.getTitle(), \
+                                              self.action.getTooltip(), self.getStockId())
+            self.gtkAction.set_active(self.action.getStartValue())
+        elif self.action.isRadio():
+            self.gtkAction = gtk.RadioAction(self.action.getSecondaryTitle(), self.action.getTitle(), \
+                                             self.action.getTooltip(), self.getStockId(), self.getStartValue())
+        else:
+            self.gtkAction = gtk.Action(self.action.getSecondaryTitle(), self.action.getTitle(), \
+                                        self.action.getTooltip(), self.getStockId())
         actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
         self.gtkAction.set_accel_group(accelGroup)
         self.gtkAction.connect_accelerator()
@@ -1052,7 +1117,13 @@ class ActionGUI:
                 plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
                                      + self.action.getSecondaryTitle() + "' is not valid, ignoring ...")
     def describe(self):
-        message = "Viewing button with title '" + self.action.getTitle() + "'"
+        type = "action"
+        if self.action.isToggle():
+            type = "toggle action"
+        elif self.action.isRadio():
+            type = "radio action"
+        message = "Viewing " + type + " with title '" + self.action.getTitle() + "'"
+
         stockId = self.getStockId()
         if stockId:
             message += ", stock id '" + repr(stockId) + "'"
@@ -1060,7 +1131,10 @@ class ActionGUI:
             message += ", accelerator '" + repr(self.accelerator) + "'"
         if self.button and not self.button.get_property("sensitive"):
             message += " (greyed out)"
-
+            
+        if self.action.isRadio() or self.action.isToggle():
+            message += ". Start value is " + str(self.action.getStartValue())        
+        
         guilog.info(message)
 
     def notifyViewTest(self, test):
@@ -1087,7 +1161,7 @@ class ActionGUI:
         else:
             self._runInteractive()
     def _runInteractive(self):
-        try:            
+        try:
             self.action.perform()
         except plugins.TextTestError, e:
             showError(str(e))

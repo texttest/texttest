@@ -150,8 +150,6 @@ class ApcConfig(optimization.OptimizationConfig):
             return MakeProgressReportHTML(self.optionValue("prrep"), self.optionValue("prrephtml"))
         else:
             return MakeProgressReport(self.optionValue("prrep"))
-    def getRuleBuildObject(self):
-        return ApcCompileRules(self.getRuleSetName, self.raveMode(), self.optionValue("rulecomp"))
     def getTestRunner(self):
         return [ CheckFilesForApc(), self._getApcTestRunner() ]
     def _getApcTestRunner(self):
@@ -424,88 +422,6 @@ class RunApcTestInDebugger(default.RunTest):
     def setUpSuite(self, suite):
         self.describe(suite)
     
-class ApcCompileRules(ravebased.CompileRules):
-    def __init__(self, getRuleSetName, modeString = "-optimize", ruleCompFlags = None):
-        ravebased.CompileRules.__init__(self, getRuleSetName, modeString)
-        self.ruleCompFlags = ruleCompFlags
-        self.diag = plugins.getDiagnostics("ApcCompileRules")
-    def compileRulesForTest(self, test):
-        self.apcLib = test.getConfigValue("rave_static_library")
-        # If there is a filter we assume we aren't compelled to build rulesets properly...        
-        if self.filter and getArchitecture(test.app) == "i386_linux" and self.ruleCompFlags == "apc":
-            self.linuxRuleSetBuild(test)
-        else:
-            return ravebased.CompileRules.compileRulesForTest(self, test)
-    def linuxRuleSetBuild(self, test):
-        ruleset = ravebased.RuleSet(self.getRuleSetName(test), self.raveName, "i386_linux")
-        if not self.ensureCarmTmpDirExists():
-            #self.rulesCompileFailed.append(ruleset.name)
-            raise plugins.TextTestError, "Non-existing CARMTMP"
-        self.diag.info("Using linuxRuleSetBuild for building rule set " + ruleset.name)
-        #if ruleset.isValid() and ruleset.name in self.rulesCompileFailed:
-        #    raise plugins.TextTestError, "Trying to use ruleset '" + ruleset.name + "' that failed to build."
-        if not ruleset.isValid() or ruleset.name in self.rulesCompiled:
-            return
-        apcExecutable = ruleset.targetFile
-        plugins.ensureDirExistsForFile(apcExecutable)
-        ruleLib = self.getRuleLib(ruleset.name)
-        if self.isNewer(apcExecutable, self.apcLib):
-            self.diag.info("APC binary is newer than libapc.a, returning.")
-            return
-        self.describe(test, " -  ruleset " + ruleset.name)
-        ruleset.backup()
-        self.rulesCompiled.append(ruleset.name)
-        if not os.path.isfile(ruleLib):
-            compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-            self.diag.debug("Building rule set library using the command " + self.ruleCompileCommand(ruleset.sourceFile, test))
-            returnValue = os.system(self.ruleCompileCommand(ruleset.sourceFile, test))
-            if returnValue:
-                #self.rulesCompileFailed.append(ruleset.name)
-                raise plugins.TextTestError, "Failed to build rule library for APC ruleset " + ruleset.name
-        commandLine = "g++ -pthread " + self.linkLibs(self.apcLib, ruleLib, test)
-        commandLine += "-o " + apcExecutable
-        self.diag.debug("Linking APC binary using the command " + commandLine)
-        # We create a temporary file that the output goes to.
-        compTmp = mktemp()
-        returnValue = os.system(commandLine + " > " + compTmp + " 2>&1")
-        if returnValue:
-            #self.rulesCompileFailed.append(ruleset.name)
-            print "Building", ruleset.name, "failed:"
-            se = open(compTmp)
-            lastErrors = se.readlines()
-            for line in lastErrors:
-                print "   ", line.strip()
-            raise plugins.TextTestError, "Failed to link APC ruleset " + ruleset.name
-        os.remove(compTmp)
-
-    def getRuleLib(self, ruleSetName):
-        optArch = "i386_linux_opt"
-        ruleLib = ruleSetName + ".a"
-        return os.path.join(os.environ["CARMTMP"], "compile", self.raveName.upper(), optArch, ruleLib)
-        
-    def ruleCompileCommand(self, sourceFile, test):
-        compiler = os.path.join(os.environ["CARMSYS"], "bin", "crc_compile")
-        params = " -optimize -makelib -archs i386_linux"
-        if "8" in test.app.versions:
-            os.environ["CRC_PATH"] = os.environ["CARMUSR"] + ":" + os.environ["CARMSYS"] + "/carmusr_default"
-        return compiler + " -" + self.raveName + params + " " + sourceFile
-
-    def linkLibs(self, apcLib, ruleLib, test):
-        linkLib = test.app.getConfigValue("link_libs")
-        return apcLib + " " + os.path.expandvars(linkLib) + " " + ruleLib + " "
-
-    def isNewer(self, file1, file2):
-        if not os.path.isfile(file1):
-            return 0
-        if not os.path.isfile(file2):
-            return 1
-        if self.modifiedTime(file1) > self.modifiedTime(file2):
-            return 1
-        else:
-            return 0
-    def modifiedTime(self, filename):
-        return os.stat(filename)[stat.ST_MTIME]
-                          
 class FetchApcCore(default.CollateFiles):
     def extract(self, sourceFile, targetFile, collationErrFile):
         if not os.path.basename(targetFile).startswith("stacktrace") or self.extractCore():

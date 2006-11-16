@@ -215,7 +215,9 @@ class ToggleVisibilityGUI(guiplugins.SelectionAction):
     def getStartValue(self):
         return self.startValue
     def getTitle(self):
-        return self.title    
+        return self.title
+    def getScriptTitle(self, tab):
+        return "Toggle " + self.getTitle().replace("_", "").lower() + " visibility" 
     def isToggle(self):
         return True;
     def performOnCurrent(self):

@@ -165,7 +165,10 @@ class InteractiveAction(plugins.Observable):
             self.notify("Status", message)
         self.notify("ActionStart", message)
         try:
-            self.performOnCurrent()
+            if self.isActiveOnCurrent():
+                self.performOnCurrent()
+            else:
+                raise plugins.TextTestError, "Cannot perform '" + self.getTooltip() + "' on currently selected " + self.describeTests()
             message = self.messageAfterPerform()
             if message != None:
                 self.notify("Status", message)
@@ -193,7 +196,7 @@ class SelectionAction(InteractiveAction):
             filterFileOption = selectionGroups[0].options["f"]
             filterFileOption.addPossibleValue(os.path.basename(fileName))
     def notifyNewTestSelection(self, tests):
-        self.currTestSelection = tests
+        self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def describeTests(self):
         return str(len(self.currTestSelection)) + " tests"
     def getAnyApp(self):
@@ -226,6 +229,8 @@ class InteractiveTestAction(InteractiveAction):
     def isTestDependent(self):
         return True
     def isActiveOnCurrent(self):
+        return self.currentTest is not None and self.correctTestClass()
+    def correctTestClass(self):
         return self.currentTest.classId() == "test-case"
     def describeTests(self):
         return repr(self.currentTest)
@@ -245,9 +250,12 @@ class InteractiveTestAction(InteractiveAction):
         # Trim the absolute filename to be relative to the application home dir
         # (TEXTTEST_HOME is more difficult to obtain, see testmodel.OptionFinder.getDirectoryName)
         return os.path.join(self.currentTest.getRelPath(), os.path.basename(filename))
-    def notifyViewTest(self, test):
-        self.currentTest = test
-        self.updateDefaults()
+    def notifyNewTestSelection(self, tests):
+        if len(tests) == 1:
+            self.currentTest = tests[0]
+            self.updateDefaults()
+        elif len(tests) > 1:
+            self.currentTest = None
     def updateDefaults(self):
         pass # place to change any default values based on the test being viewed
     def viewFile(self, fileName, refreshContents=False, refreshFiles=False):
@@ -376,17 +384,16 @@ class ViewFile(InteractiveTestAction):
         return False # activate when a file is viewed, not via the performOnCurrent method
     def hasButton(self):
         return False
-    def notifyViewTest(self, test):
+    def updateDefaults(self):
         if self.dynamic:
-            oldRunning = self.isRunning(self.currentTest)
-            newRunning = self.isRunning(test)
+            oldRunning = self.optionGroup.switches.has_key("f")
+            newRunning = self.isRunning()
             if oldRunning and not newRunning:
                 self.optionGroup.removeSwitch("f")
             if newRunning and not oldRunning:
                 self.addSwitch("f", "Follow file rather than view it", 1)
-        self.currentTest = test
-    def isRunning(self, test):
-        return test.classId() == "test-case" and not test.state.isComplete()
+    def isRunning(self):
+        return self.currentTest.classId() == "test-case" and not self.currentTest.state.isComplete()
     def tmpFile(self, comparison):
         if self.optionGroup.getSwitchValue("rdt"):
             return comparison.tmpFile
@@ -450,7 +457,7 @@ class ImportTest(InteractiveTestAction):
         self.optionGroup.addOption("testpos", "Place " + self.testType(), "last in suite", allocateNofValues=2)
         self.testImported = None
         self.setPlacements()
-    def isActiveOnCurrent(self):
+    def correctTestClass(self):
         return self.currentTest.classId() == "test-suite"
     def getNameTitle(self):
         return self.testType() + " Name"
@@ -982,13 +989,15 @@ class EnableDiagnostics(InteractiveTestAction):
         self.viewFile(targetDiagFile, refreshFiles=True)
 
 class RemoveTest(InteractiveTestAction):
-    def isActiveOnCurrent(self):
+    def correctTestClass(self):
         return True
     def getTitle(self):
         return "Remove"
     def getScriptTitle(self, tab):
         return "Remove Test"
     def getDoubleCheckMessage(self):
+        if not self.currentTest:
+            return ""
         if self.currentTest.classId() == "test-case":
             return "You are about to remove the test '" + self.currentTest.name + \
                    "' and all associated files.\nAre you sure you wish to proceed?"
@@ -1054,15 +1063,14 @@ class CopyTest(ImportTest):
         return "_Copy"
     def getScriptTitle(self, tab):
         return "Copy Test"
-    def notifyViewTest(self, test):
+    def updateDefaults(self):
         # apply to parent
-        if test.classId() == "test-case":
-            self.testToCopy = test
-            self.currentTest = test.parent
+        if self.currentTest.classId() == "test-case":
+            self.testToCopy = self.currentTest
+            self.currentTest = self.currentTest.parent
         else:
             self.testToCopy = None
-            self.currentTest = test
-        self.updateDefaults()
+        ImportTest.updateDefaults(self)
     def createTestContents(self, suite, testDir, placement):
         stdFiles, defFiles = self.testToCopy.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
@@ -1094,7 +1102,7 @@ class ReportBugs(InteractiveTestAction):
         self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
         self.addSwitch("internal_error", "Trigger even if other files differ (report as internal error)")
         self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
-    def isActiveOnCurrent(self):
+    def correctTestClass(self):
         return True
     def getTitle(self):
         return "Report"

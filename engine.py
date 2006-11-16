@@ -329,10 +329,16 @@ class UniqueNameFinder:
             self.storeBothWays(oldTest.name + " for " + oldTest.app.fullName, oldTest)
             self.storeBothWays(newTest.name + " for " + newTest.app.fullName, newTest)
         elif oldTest.app.getFullVersion() != newTest.app.getFullVersion():
-            self.storeBothWays(oldTest.name + " version " + oldTest.app.getFullVersion(), oldTest)
-            self.storeBothWays(newTest.name + " version " + newTest.app.getFullVersion(), newTest)
+            self.storeBothWays(oldTest.name + " version " + self.getVersionName(oldTest), oldTest)
+            self.storeBothWays(newTest.name + " version " + self.getVersionName(newTest), newTest)
         else:
             raise plugins.TextTestError, "Could not find unique name for tests with name " + oldTest.name
+    def getVersionName(self, test):
+        version = test.app.getFullVersion()
+        if len(version):
+            return version
+        else:
+            return "<default>"
     def storeBothWays(self, name, test):
         self.diag.info("Setting unique name for test " + test.name + " to " + name)
         self.name2test[name] = test

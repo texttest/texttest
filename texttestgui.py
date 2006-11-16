@@ -2064,7 +2064,7 @@ class TestProgressMonitor(TabGUI):
         toggleColumn.set_alignment(0.5)
         self.treeView.append_column(toggleColumn)
         self.treeView.show()
-        return self.treeView
+        return self.addScrollBars(self.treeView)
             
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview

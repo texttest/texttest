@@ -182,7 +182,7 @@ class Config(plugins.Configuration):
         return filterFiles
     def getFilterFilePath(self, app, filename, forWrite):
         filterDirs = self.getFilterDirs(app, forWrite)
-        if len(filterDirs) == 0:
+        if forWrite and len(filterDirs) == 0:
             raise plugins.TextTestError, "Cannot find path for filter file " + filename + ": no directories described.\n" + \
                                          "Make sure test_list_files_directory is not an empty list"
         if forWrite:

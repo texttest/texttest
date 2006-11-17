@@ -537,13 +537,6 @@ class TextTestGUI(Responder, plugins.Observable):
         vbox.show()
         return vbox
         
-    def getWindowOption(self, name, default):
-        optionDir = self.getConfigValue("window_size")
-        if self.dynamic:
-            return optionDir.get("dynamic_" + name, default)
-        else:
-            return optionDir.get("static_" + name, default)
-        
     def adjustSize(self):
         if int(self.getWindowOption("maximize", 0)):
             guilog.info("Maximising top window...")
@@ -979,16 +972,23 @@ class TestTreeGUI(SubGUI):
         if newValue:
             allIterators.reverse()  # but when showing, we want to go root-to-leaf
 
+        changed = False
         for iterator in allIterators:
             if newValue or not self.hasVisibleChildren(iterator):
-                self.setVisibility(iterator, newValue)
+                changed |= self.setVisibility(iterator, newValue)
 
-        self.reFilter()
+        if changed:
+            self.reFilter()
+            if newValue: # if things have become visible, expand everything
+                rootIter = self.filteredModel.get_iter_root()
+                while rootIter != None:
+                    self.expandRow(rootIter, True)
+                    rootIter = self.filteredModel.iter_next(rootIter)
         
     def setVisibility(self, iter, newValue):
         oldValue = self.model.get_value(iter, 6)
         if oldValue == newValue:
-            return
+            return False
 
         test = self.model.get_value(iter, 2)
         if newValue:
@@ -996,7 +996,7 @@ class TestTreeGUI(SubGUI):
         else:
             guilog.info("Hiding test : " + repr(test))
         self.model.set_value(iter, 6, newValue)
-        
+        return True
     def findVisibilityIterators(self, test):
         iter = self.itermap[test]
         parents = []
@@ -1019,12 +1019,7 @@ class TestTreeGUI(SubGUI):
     def reFilter(self):
         self.filteredModel.refilter()
         self.visibilityChanged()
-        
-        rootIter = self.filteredModel.get_iter_root()
-        while rootIter != None:
-            self.expandRow(rootIter, True)
-            rootIter = self.filteredModel.iter_next(rootIter)
-   
+           
 class ActionGUI:
     def __init__(self, action, uiManager, fromTab=False):
         self.action = action

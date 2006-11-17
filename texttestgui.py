@@ -1519,8 +1519,7 @@ class PaneGUI(SubGUI):
         self.horizontal = horizontal
         self.separatorPosition = separatorPosition
         self.panedTooltips = gtk.Tooltips()
-        self.paned = self.createPaned()
-        self.paned.connect('notify', self.paneHasChanged)
+        self.paned = None
     def createPaned(self):
         if self.horizontal:
             return gtk.HPaned()
@@ -1532,6 +1531,8 @@ class PaneGUI(SubGUI):
         else:
             return self.paned.allocation.height
     def createView(self):
+        self.paned = self.createPaned()
+        self.paned.connect('notify', self.paneHasChanged)
         frames = []
         for subgui in self.subguis:
             widget = subgui.createView()
@@ -1683,7 +1684,6 @@ class FileViewGUI(SubGUI):
     def setName(self, tests=[]):
         if self.nameColumn:
             title = self.getName(tests)
-            guilog.info("Setting file-view title to '" + title + "'")
             self.nameColumn.set_title(title)
 
     def recreateModel(self, state):
@@ -1699,7 +1699,11 @@ class FileViewGUI(SubGUI):
         pass
      
     def describe(self):
+        self.describeName()
         self.describeLevel(self.model.get_iter_root())
+    def describeName(self):
+        if self.nameColumn:
+            guilog.info("Setting file-view title to '" + self.nameColumn.get_title() + "'")
     def describeLevel(self, currIter, parentDesc=""): 
         while currIter is not None:
             subIter = self.model.iter_children(currIter)
@@ -1814,11 +1818,18 @@ class TestFileGUI(FileViewGUI):
         if test is self.currentObject:
             self.recreateModel(state)
     def notifyNewTestSelection(self, tests):
-        if len(tests) == 0 or (not self.dynamic and len(tests) > 1): # multiple tests in static GUI result in removal
+        if len(tests) == 0: 
+            return
+
+        if not self.dynamic and len(tests) > 1: # multiple tests in static GUI result in removal
+            self.currentObject = None
+            self.nameColumn = None
+            self.selection = None
             return
 
         if len(tests) > 1 and self.currentObject in tests:
             self.setName(tests)
+            self.describeName()
         else:
             self.currentObject = tests[0]
             self.currentObject.refreshFiles()

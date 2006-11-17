@@ -1884,4 +1884,4 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
             info += os.linesep
         return info
 
-guiplugins.interactiveActionHandler.actionClasses += [ CVSLogInGUI ]
+guiplugins.interactiveActionHandler.actionPostClasses += [ CVSLogInGUI ]

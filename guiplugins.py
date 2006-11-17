@@ -220,6 +220,44 @@ class SelectionAction(InteractiveAction):
                 apps.append(test.app.name)
         return "-a " + string.join(apps, ",")
 
+class Quit(SelectionAction):
+    def __init__(self, dynamic, rootSuites):
+        SelectionAction.__init__(self, rootSuites)
+        self.dynamic = dynamic
+    def getInterfaceDescription(self):
+        description = "<menubar>\n<menu action=\"filemenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
+        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/>\n</toolbar>\n"
+        return description
+    def getStockId(self):
+        return "quit"
+    def getDefaultAccelerator(self):
+        return "<control>q"
+    def getTitle(self):
+        return "_Quit"
+    def messageAfterPerform(self):
+        # Don't provide one, the GUI isn't there to show it :)
+        pass
+    def performOnCurrent(self):
+        # Generate a window closedown, so that the quit button behaves the same as closing the window
+        self.notify("Exit")
+    def getDoubleCheckMessage(self):
+        processesToReport = self.processesToReport()
+        runningProcesses = processTerminationMonitor.listRunning(processesToReport)
+        if len(runningProcesses) == 0:
+            return ""
+        else:
+            return "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n"
+    def processesToReport(self):
+        queryValues = self.getConfigValue("query_kill_processes")
+        processes = []
+        if queryValues.has_key("default"):
+            processes += queryValues["default"]
+        if self.dynamic and queryValues.has_key("dynamic"):
+            processes += queryValues["dynamic"]
+        elif queryValues.has_key("static"):        
+            processes += queryValues["static"]
+        return processes
+
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveTestAction(InteractiveAction):
@@ -1162,11 +1200,12 @@ class ReportBugs(InteractiveTestAction):
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.actionClasses = [ ViewFile, SaveSelection ]
+        self.actionPreClasses = [ Quit ]
         self.actionDynamicClasses = [ SaveTests ]
         self.actionStaticClasses = [ RecordTest, RemoveTest, EnableDiagnostics, CopyTest, \
                                      ImportTestCase, ImportTestSuite, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups ]
+        self.actionPostClasses = [ ViewFile, SaveSelection ]
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")
     def storeOptionGroup(self, className, instance):
@@ -1176,17 +1215,18 @@ class InteractiveActionHandler:
             return "Dynamic"
         else:
             return "Static"
-    def getInstances(self, dynamic, *args):
+    def getListedInstances(self, list, *args):
         instances = []
-        mode = self.getMode(dynamic)
-        for intvActionClass in eval("self.action" + mode + "Classes"):
+        for intvActionClass in list:
             instance = self.makeInstance(intvActionClass, *args)
             if instance:
                 instances.append(instance)
-        for intvActionClass in self.actionClasses:
-            instance = self.makeInstance(intvActionClass, dynamic, *args)
-            if instance:
-                instances.append(instance)
+        return instances
+    def getInstances(self, dynamic, *args):
+        instances = self.getListedInstances(self.actionPreClasses, dynamic, *args)
+        modeClassList = eval("self.action" + self.getMode(dynamic) + "Classes")
+        instances += self.getListedInstances(modeClassList, *args)
+        instances += self.getListedInstances(self.actionPostClasses, dynamic, *args)
         return instances
     def makeInstance(self, intvActionClass, *args):
         instance = self.makeInstanceObject(intvActionClass, *args)

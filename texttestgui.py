@@ -154,56 +154,6 @@ class SubGUI(plugins.Observable):
         else:
             window.add(widget)
 
-class QuitGUI(guiplugins.SelectionAction):
-    def __init__(self, rootSuites, dynamic, topWindow, actionThread):
-        guiplugins.SelectionAction.__init__(self, rootSuites)
-        self.dynamic = dynamic
-        self.topWindow = topWindow
-        self.actionThread = actionThread
-        scriptEngine.connect("close window", "delete_event", topWindow, self.exit)
-    def getInterfaceDescription(self):
-        description = "<menubar>\n<menu action=\"filemenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
-        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/>\n</toolbar>\n"
-        return description
-    def getStockId(self):
-        return "quit"
-    def getDefaultAccelerator(self):
-        return "<control>q"
-    def getTitle(self):
-        return "_Quit"
-    def messageAfterPerform(self):
-        # Don't provide one, the GUI isn't there to show it :)
-        pass
-    def performOnCurrent(self):
-        # Generate a window closedown, so that the quit button behaves the same as closing the window
-        self.exit()
-    def getDoubleCheckMessage(self):
-        processesToReport = self.processesToReport()
-        runningProcesses = guiplugins.processTerminationMonitor.listRunning(processesToReport)
-        if len(runningProcesses) == 0:
-            return ""
-        else:
-            return "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n"
-    def processesToReport(self):
-        queryValues = self.getConfigValue("query_kill_processes")
-        processes = []
-        if queryValues.has_key("default"):
-            processes += queryValues["default"]
-        if self.dynamic and queryValues.has_key("dynamic"):
-            processes += queryValues["dynamic"]
-        elif queryValues.has_key("static"):        
-            processes += queryValues["static"]
-        return processes
-    def exit(self, *args):
-        # block all event notifications to make sure GUI isn't updated after being destructed
-        plugins.Observable.blocked = True
-        self.topWindow.destroy()
-        gtk.main_quit()
-        sys.stdout.flush()
-        if self.actionThread:
-            self.actionThread.terminate()
-        guiplugins.processTerminationMonitor.killAll()    
-
 class ToggleVisibilityGUI(guiplugins.SelectionAction):
     def __init__(self, rootSuites, title, startValue):
         guiplugins.SelectionAction.__init__(self, rootSuites)
@@ -302,7 +252,7 @@ statusMonitor = GUIStatusMonitor()
 class IdleHandlerManager:
     def __init__(self, dynamic):
         self.dynamic = dynamic
-        self.sourceId = self.enableHandler()
+        self.sourceId = -1
     def notifyActionStart(self, message):
         # To make it possible to have an while-events-process loop
         # to update the GUI during actions, we need to make sure the idle
@@ -313,6 +263,8 @@ class IdleHandlerManager:
         # Activate idle function again, see comment in notifyActionStart
         if self.sourceId > 0:
             self.sourceId = self.enableHandler()
+    def notifySetUpGUIComplete(self):
+        self.sourceId = self.enableHandler()
 
     def enableHandler(self):
         if self.dynamic:
@@ -331,7 +283,8 @@ class IdleHandlerManager:
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
         return True
-         
+    def notifyExit(self):
+        guiplugins.processTerminationMonitor.killAll()
 
 class TextTestGUI(Responder, plugins.Observable):
     defaultGUIDescription = '''
@@ -356,18 +309,23 @@ class TextTestGUI(Responder, plugins.Observable):
         self.textInfoGUI = TextInfoGUI()
         self.progressMonitor = TestProgressMonitor(self.dynamic)
         self.progressBar = TestProgressBar()
+        self.idleManager = IdleHandlerManager(self.dynamic)
+
         self.setUpObservers() # uses the above 5
-        
+        self.topWindow = None
+
         self.uiManager = gtk.UIManager()
         self.setUpUIManager()
     def setUpObservers(self):
         # watch for test selection and test count
-        for observer in [ self.testFileGUI, self.appFileGUI, self.textInfoGUI, self.progressBar ]:
+        for observer in [ self.testFileGUI, self.appFileGUI, self.textInfoGUI ]:
             self.testTreeGUI.addObserver(observer)
         self.testFileGUI.addObserver(statusMonitor)
+        self.testFileGUI.addObserver(self.idleManager)
         # watch for category selections
         self.progressMonitor.addObserver(self.testTreeGUI)
-        for observer in [ self.testTreeGUI, self.testFileGUI, self.textInfoGUI, self.progressBar, self.progressMonitor ]:            
+        for observer in [ self.testTreeGUI, self.testFileGUI, self.textInfoGUI, \
+                          self.progressBar, self.progressMonitor, self.idleManager ]:            
             self.addObserver(observer) # forwarding of test observer mechanism
     def setUpUIManager(self):
         # Create GUI manager, and a few default action groups
@@ -392,27 +350,178 @@ class TextTestGUI(Responder, plugins.Observable):
         self.scriptEngine = scriptEngine
     def needsTestRuns(self):
         return self.dynamic
-    def createTopWindow(self):
-        # Create toplevel window to show it all.
-        win = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        if self.dynamic:
-            win.set_title("TextTest dynamic GUI (tests started at " + plugins.startTimeString() + ")")
+    def addSuite(self, suite):
+        self.rootSuites.append(suite)
+        self.testTreeGUI.addSuite(suite)
+        self.progressBar.addSuite(suite)
+    def createInteractiveActions(self):
+        actions = self.createVisibilityActions()
+        actions += guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.rootSuites)
+        for action in actions:
+            # These actions might change the tree view selection or the status bar, need to observe them
+            action.addObserver(self.testTreeGUI)
+            action.addObserver(statusMonitor)
+            action.addObserver(self.idleManager)
+            action.addObserver(self) # watch for quits, size changes etc.
+            # Some depend on the test selection or currently viewed test also
+            if hasattr(action, "notifyNewTestSelection"):
+                self.testTreeGUI.addObserver(action)
+            if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
+                self.testFileGUI.addObserver(action)
+                self.appFileGUI.addObserver(action)
+        return actions
+    def createVisibilityActions(self):
+        toolbarVisible = (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or \
+                             (not self.dynamic and self.getConfigValue("static_gui_show_toolbar"))
+        toggleToolbar = ToggleVisibilityGUI(self.rootSuites, "_Toolbar", toolbarVisible)
+        toggleShortcutbar = ToggleVisibilityGUI(self.rootSuites, "_Shortcut bar", self.getConfigValue("add_shortcut_bar"))
+        toggleStatusbar = ToggleVisibilityGUI(self.rootSuites, "_Status bar", self.getConfigValue("add_status_bar"))
+        return [ toggleToolbar, toggleShortcutbar, toggleStatusbar ]
+    
+    def getConfigValue(self, configName):
+        return self.rootSuites[0].app.getConfigValue(configName)
+    
+    def run(self):        
+        intvActions = self.createInteractiveActions()
+
+        rightWindowGUI = self.createRightWindowGUI(intvActions)
+        mainWindowGUI = self.createPaned(self.testTreeGUI, rightWindowGUI, horizontal=True)
+        
+        topWindow = self.createTopWindow(mainWindowGUI, intvActions)
+        mainWindowGUI.activate()
+
+        guilog.info("") # for demarcation
+        self.notify("SetUpGUIComplete")
+        guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
+        gtk.main()
+    def notifyExit(self, *args):
+        self.notify("Exit")
+        self.topWindow.destroy()
+        sys.stdout.flush()
+        gtk.main_quit()
+    def createActionGUIForTab(self, action):
+        if len(action.getOptionGroups()) == 1 and action.canPerform():
+            return ActionGUI(action, self.uiManager, fromTab=True)
+    def createActionTabGUIs(self, actions):
+        actionTabGUIs = []
+        for action in actions:
+            actionGUI = self.createActionGUIForTab(action)
+            for optionGroup in action.getOptionGroups():
+                if optionGroup.switches or optionGroup.options:
+                    actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
+        return actionTabGUIs
+    def getSeparatorPosition(self, horizontal):
+        if horizontal:
+            return float(self.getWindowOption("vertical_separator_position", 0.5))
         else:
-            win.set_title("TextTest static GUI : management of tests for " + self.getAppNames())
+            return float(self.getWindowOption("horizontal_separator_position", 0.46))
+    def getWindowOption(self, name, default):
+        optionDir = self.getConfigValue("window_size")
+        if self.dynamic:
+            return optionDir.get("dynamic_" + name, default)
+        else:
+            return optionDir.get("static_" + name, default)
+
+    def createPaned(self, gui1, gui2, horizontal):
+        paneGUI = PaneGUI([ gui1, gui2 ], self.getSeparatorPosition(horizontal), horizontal)
+        self.addObserver(paneGUI)
+        return paneGUI
+
+    def createRightWindowGUI(self, intvActions):
+        tabGUIs = [ self.textInfoGUI, self.progressMonitor ] + self.createActionTabGUIs(intvActions)
+        if self.dynamic:
+            notebookGUI = BottomNotebookGUI(self.classifyByTitle(tabGUIs), self.getNotebookScriptName("Top"))
+            return self.createSingleTestGUI(intvActions, notebookGUI)
+        else:
+            subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
+            tabInfo = seqdict()
+            tabInfo["Test"] = self.createSingleTestGUI(intvActions, subNotebookGUIs["Test"])
+            tabInfo["Selection"] = subNotebookGUIs["Selection"]
+            tabInfo["Running"] = self.createPaned(self.appFileGUI, subNotebookGUIs["Running"], horizontal=False)
+            notebookGUI = StaticTopNotebookGUI(tabInfo, self.getNotebookScriptName("Top"), self.getDefaultPage())
+            self.testTreeGUI.addObserver(notebookGUI)
+            return notebookGUI
+
+    def getDefaultPage(self):
+        if self.testTreeGUI.totalNofTests >= 10:
+            return "Selection"
+        else:
+            return "Test"
+
+    def createSingleTestGUI(self, intvActions, notebookGUI):
+        testButtonBarGUIs = self.createButtonBarGUIs(intvActions)
+        topTestViewGUI = TopTestViewGUI(testButtonBarGUIs, self.testFileGUI)
+        self.testTreeGUI.addObserver(notebookGUI)
+        return self.createPaned(topTestViewGUI, notebookGUI, horizontal=False)
+        
+    def createButtonBarGUIs(self, intvActions):
+        buttonBarGUIs = []
+        for action in intvActions:
+            if action.inToolBar() and action.isTestDependent():
+                buttonBarGUI = ActionGUI(action, self.uiManager)
+                self.testTreeGUI.addObserver(buttonBarGUI)
+                buttonBarGUIs.append(buttonBarGUI)
+        return buttonBarGUIs
+
+    def getNotebookScriptName(self, tabName):
+        if tabName == "Top":
+            return "view options for"
+        else:
+            return "view sub-options for " + tabName.lower() + " :"
+
+    def classifyByTitle(self, tabGUIs):
+        tabInfo = seqdict()
+        for tabGUI in tabGUIs:
+            tabInfo[tabGUI.getTabTitle()] = tabGUI
+        return tabInfo
+    def createNotebookGUIs(self, tabGUIs):
+        tabInfo = seqdict()
+        for tabName in [ "Test", "Selection", "Running" ]:
+            currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
+            tabInfo[tabName] = BottomNotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
+        return tabInfo
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        # Working around python bug 853411: main thread must do all forking
+        state.notifyInMainThread()
+
+        self.notify("LifecycleChange", test, state, changeDesc)
+    def notifyFileChange(self, test):
+        self.notify("FileChange", test)
+    def notifyContentChange(self, suite):
+        self.notify("ContentChange", suite)
+    def notifyAdd(self, test):
+        self.notify("Add", test)
+    def notifyRemove(self, test):
+        self.notify("Remove", test)
+    def notifyAllComplete(self):
+        plugins.Observable.threadedNotificationHandler.disablePoll()
+    def createTopWindow(self, mainWindowGUI, intvActions):
+        # Create toplevel window to show it all.
+        self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        if self.dynamic:
+            self.topWindow.set_title("TextTest dynamic GUI (tests started at " + plugins.startTimeString() + ")")
+        else:
+            self.topWindow.set_title("TextTest static GUI : management of tests for " + self.getAppNames())
             
-        guilog.info("Top Window title set to " + win.get_title())
-        win.add_accel_group(self.uiManager.get_accel_group())
-        return win
+        guilog.info("Top Window title set to " + self.topWindow.get_title())
+        self.topWindow.add_accel_group(self.uiManager.get_accel_group())
+        self.topWindow.add(self.createVBox(mainWindowGUI, intvActions))
+        self.topWindow.show()
+        self.adjustSize()
+        scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyExit)
+        return self.topWindow
+    def activate(self):
+        pass # doesn't use this yet
     def getAppNames(self):
         names = []
         for suite in self.rootSuites:
             if not suite.app.fullName in names:
                 names.append(suite.app.fullName)
         return string.join(names, ",")
-    def fillTopWindow(self, topWindow, mainWindow, intvActions):
+    def createVBox(self, mainWindowGUI, intvActions):
         vbox = gtk.VBox()
         self.placeTopWidgets(vbox, intvActions)
-        vbox.pack_start(mainWindow, expand=True, fill=True)
+        vbox.pack_start(mainWindowGUI.createView(), expand=True, fill=True)
         self.shortcutBar = scriptEngine.createShortcutBar()
         vbox.pack_start(self.shortcutBar, expand=False, fill=False)
         if self.getConfigValue("add_shortcut_bar"):            
@@ -426,9 +535,7 @@ class TextTestGUI(Responder, plugins.Observable):
         vbox.pack_start(self.statusBar, expand=False, fill=False)
 
         vbox.show()
-        topWindow.add(vbox)
-        topWindow.show()
-        self.adjustSize(topWindow)
+        return vbox
         
     def getWindowOption(self, name, default):
         optionDir = self.getConfigValue("window_size")
@@ -437,14 +544,14 @@ class TextTestGUI(Responder, plugins.Observable):
         else:
             return optionDir.get("static_" + name, default)
         
-    def adjustSize(self, topWindow):
+    def adjustSize(self):
         if int(self.getWindowOption("maximize", 0)):
             guilog.info("Maximising top window...")
-            topWindow.maximize()
+            self.topWindow.maximize()
         else:
             width = self.getWindowDimension("width")
             height = self.getWindowDimension("height")
-            topWindow.resize(width, height)
+            self.topWindow.resize(width, height)
 
     def getInterfaceDescription(self, toolBarActions):
         description = "<ui>\n"
@@ -465,7 +572,7 @@ class TextTestGUI(Responder, plugins.Observable):
         toolBarActions = filter(lambda instance : instance.inToolBar() and not instance.isTestDependent(), intvActions)
         guilog.info("") # blank line for demarcation
         for action in toolBarActions:
-            toolBarGUI = self.createActionGUI(action)
+            toolBarGUI = ActionGUI(action, self.uiManager)
             toolBarGUI.describe()
     
         self.uiManager.add_ui_from_string(self.getInterfaceDescription(toolBarActions))
@@ -544,163 +651,13 @@ class TextTestGUI(Responder, plugins.Observable):
             return float(5.0) / 6
         else:
             return 0.6
-    def addSuite(self, suite):
-        self.rootSuites.append(suite)
-        self.testTreeGUI.addSuite(suite)        
-    def createInteractiveActions(self, topWindow, actionThread, idleManager):
-        actions = self.createPersistentInteractiveActions(topWindow, actionThread)
-        actions += guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.rootSuites)
-        for action in actions:
-            # These actions might change the tree view selection or the status bar, need to observe them
-            action.addObserver(self.testTreeGUI)
-            action.addObserver(statusMonitor)
-            action.addObserver(idleManager)
-            # Some depend on the test selection or currently viewed test also
-            if hasattr(action, "notifyNewTestSelection"):
-                self.testTreeGUI.addObserver(action)
-            if hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile"):
-                self.testFileGUI.addObserver(action)
-                self.appFileGUI.addObserver(action)
-    
-        return actions
-    def createPersistentInteractiveActions(self, topWindow, actionThread):
-        actions = [ QuitGUI(self.rootSuites, self.dynamic, topWindow, actionThread) ]        
-        toolbarVisible = (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or \
-                             (not self.dynamic and self.getConfigValue("static_gui_show_toolbar"))
-        toggleToolbar = ToggleVisibilityGUI(self.rootSuites, "_Toolbar", toolbarVisible)
-        toggleToolbar.addObserver(self)
-        toggleShortcutbar = ToggleVisibilityGUI(self.rootSuites, "_Shortcut bar", self.getConfigValue("add_shortcut_bar"))
-        toggleShortcutbar.addObserver(self)
-        toggleStatusbar = ToggleVisibilityGUI(self.rootSuites, "_Status bar", self.getConfigValue("add_status_bar"))
-        toggleStatusbar.addObserver(self)
-        actions += [ toggleToolbar, toggleShortcutbar, toggleStatusbar ]
-        return actions
-    def getActionGroupIndex(self, action):
-        return int(action.isTestDependent())
-    def getActionGroup(self, action):
-        return self.uiManager.get_action_groups()[self.getActionGroupIndex(action)]
-
-    def setUpGui(self, actionThread=None):
-        idleManager = IdleHandlerManager(self.dynamic)
-        self.testFileGUI.addObserver(idleManager)
-        
-        topWindow = self.createTopWindow()
-        intvActions = self.createInteractiveActions(topWindow, actionThread, idleManager)
-
-        rightWindowGUI = self.createRightWindowGUI(intvActions)
-        mainWindowGUI = self.createPaned(self.testTreeGUI, rightWindowGUI, horizontal=True)
-        self.fillTopWindow(topWindow, mainWindowGUI.createView(), intvActions)
-        mainWindowGUI.activate()
-
-        guilog.info("") # for demarcation
-        self.notify("SetUpGUIComplete")
-        guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
-    def runWithActionThread(self, actionThread):
-        self.setUpGui(actionThread)
-        actionThread.start()
-        gtk.main()
-    def runAlone(self):
-        self.setUpGui()
-        gtk.main()
-    def createActionGUI(self, action, fromTab=False):
-        return ActionGUI(action, self.getActionGroup(action), self.uiManager.get_accel_group(), fromTab)
-    def createActionGUIForTab(self, action):
-        if len(action.getOptionGroups()) == 1 and action.canPerform():
-            return self.createActionGUI(action, fromTab=True)
-    def createActionTabGUIs(self, actions):
-        actionTabGUIs = []
-        for action in actions:
-            actionGUI = self.createActionGUIForTab(action)
-            for optionGroup in action.getOptionGroups():
-                if optionGroup.switches or optionGroup.options:
-                    actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
-        return actionTabGUIs
-    def getSeparatorPosition(self, horizontal):
-        if horizontal:
-            return float(self.getWindowOption("vertical_separator_position", 0.5))
-        else:
-            return float(self.getWindowOption("horizontal_separator_position", 0.46))
-    def createPaned(self, gui1, gui2, horizontal):
-        paneGUI = PaneGUI([ gui1, gui2 ], self.getSeparatorPosition(horizontal), horizontal)
-        self.addObserver(paneGUI)
-        return paneGUI
-
-    def createRightWindowGUI(self, intvActions):
-        tabGUIs = [ self.textInfoGUI, self.progressMonitor ] + self.createActionTabGUIs(intvActions)
-        if self.dynamic:
-            notebookGUI = BottomNotebookGUI(self.classifyByTitle(tabGUIs), self.getNotebookScriptName("Top"))
-            return self.createSingleTestGUI(intvActions, notebookGUI)
-        else:
-            subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
-            tabInfo = seqdict()
-            tabInfo["Test"] = self.createSingleTestGUI(intvActions, subNotebookGUIs["Test"])
-            tabInfo["Selection"] = subNotebookGUIs["Selection"]
-            tabInfo["Running"] = self.createPaned(self.appFileGUI, subNotebookGUIs["Running"], horizontal=False)
-            notebookGUI = StaticTopNotebookGUI(tabInfo, self.getNotebookScriptName("Top"), self.getDefaultPage())
-            self.testTreeGUI.addObserver(notebookGUI)
-            return notebookGUI
-
-    def getDefaultPage(self):
-        if self.testTreeGUI.totalNofTests >= 10:
-            return "Selection"
-        else:
-            return "Test"
-
-    def createSingleTestGUI(self, intvActions, notebookGUI):
-        testButtonBarGUIs = self.createButtonBarGUIs(intvActions)
-        topTestViewGUI = TopTestViewGUI(testButtonBarGUIs, self.testFileGUI)
-        self.testTreeGUI.addObserver(notebookGUI)
-        return self.createPaned(topTestViewGUI, notebookGUI, horizontal=False)
-        
-    def createButtonBarGUIs(self, intvActions):
-        buttonBarGUIs = []
-        for action in intvActions:
-            if action.inToolBar() and action.isTestDependent():
-                buttonBarGUI = self.createActionGUI(action)
-                self.testTreeGUI.addObserver(buttonBarGUI)
-                buttonBarGUIs.append(buttonBarGUI)
-        return buttonBarGUIs
-
-    def getNotebookScriptName(self, tabName):
-        if tabName == "Top":
-            return "view options for"
-        else:
-            return "view sub-options for " + tabName.lower() + " :"
-
-    def classifyByTitle(self, tabGUIs):
-        tabInfo = seqdict()
-        for tabGUI in tabGUIs:
-            tabInfo[tabGUI.getTabTitle()] = tabGUI
-        return tabInfo
-    def createNotebookGUIs(self, tabGUIs):
-        tabInfo = seqdict()
-        for tabName in [ "Test", "Selection", "Running" ]:
-            currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
-            tabInfo[tabName] = BottomNotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
-        return tabInfo
     def widgetToggleVisibility(self, widget):
         if widget.get_property('visible'):
             widget.hide()
             return False
         else:
             widget.show()
-            return True
-
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        # Working around python bug 853411: main thread must do all forking
-        state.notifyInMainThread()
-
-        self.notify("LifecycleChange", test, state, changeDesc)
-    def notifyFileChange(self, test):
-        self.notify("FileChange", test)
-    def notifyContentChange(self, suite):
-        self.notify("ContentChange", suite)
-    def notifyAdd(self, test):
-        self.notify("Add", test)
-    def notifyRemove(self, test):
-        self.notify("Remove", test)
-    def notifyAllComplete(self):
-        plugins.Observable.threadedNotificationHandler.disablePoll()
+            return True    
     def notifyToggleToolbar(self):
         toolbar = self.uiManager.get_widget("/toolbar")
         # actual toolbar lives in a handle, which is what we want to hide/show ...
@@ -789,7 +746,6 @@ class TestTreeGUI(SubGUI):
         self.selection.connect("changed", self.selectionChanged)
         testRenderer = gtk.CellRendererText()
         testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected"
-        self.notify("TestCount", self.totalNofTests)
         if self.dynamic:
             testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected, all visible"
         self.testsColumn = gtk.TreeViewColumn(testsColumnTitle, testRenderer, text=0, background=1)
@@ -803,6 +759,7 @@ class TestTreeGUI(SubGUI):
         modelIndexer = TreeModelIndexer(self.filteredModel, self.testsColumn, 3)
         scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite", modelIndexer)
         self.treeView.connect('row-expanded', self.rowExpanded)
+        guilog.info("") # demarcation
         guilog.info("Expanding tests in tree view...")
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
         
@@ -1069,7 +1026,7 @@ class TestTreeGUI(SubGUI):
             rootIter = self.filteredModel.iter_next(rootIter)
    
 class ActionGUI:
-    def __init__(self, action, actionGroup, accelGroup, fromTab):
+    def __init__(self, action, uiManager, fromTab=False):
         self.action = action
         self.accelerator = self.getAccelerator()
         self.button = None
@@ -1083,10 +1040,16 @@ class ActionGUI:
         else:
             self.gtkAction = gtk.Action(self.action.getSecondaryTitle(), self.action.getTitle(), \
                                         self.action.getTooltip(), self.getStockId())
-        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
-        self.gtkAction.set_accel_group(accelGroup)
+
+        self.getActionGroup(uiManager).add_action_with_accel(self.gtkAction, self.accelerator)
+        self.gtkAction.set_accel_group(uiManager.get_accel_group())
         self.gtkAction.connect_accelerator()
         scriptEngine.connect(self.action.getScriptTitle(fromTab), "activate", self.gtkAction, self.runInteractive)
+
+    def getActionGroupIndex(self):
+        return int(self.action.isTestDependent())
+    def getActionGroup(self, uiManager):
+        return uiManager.get_action_groups()[self.getActionGroupIndex()]
 
     def getStockId(self):
         stockId = self.action.getStockId()
@@ -2001,8 +1964,8 @@ class TestProgressBar:
         return self.progressBar
     def adjustToSpace(self, windowWidth):
         self.progressBar.set_size_request(int(windowWidth * 0.75), 1)
-    def notifyTestCount(self, testCount):
-        self.totalNofTests = testCount
+    def addSuite(self, suite):
+        self.totalNofTests += suite.size()
     def notifyLifecycleChange(self, test, state, changeDesc):
         failed = state.hasFailed()
         if changeDesc == "complete":

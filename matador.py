@@ -531,4 +531,4 @@ class SelectTests(guiplugins.SelectTests):
                 result.append(feature)
         return result
 
-guiplugins.interactiveActionHandler.actionClasses.append(optimization.PlotTestInGUI)
+guiplugins.interactiveActionHandler.actionPostClasses.append(optimization.PlotTestInGUI)

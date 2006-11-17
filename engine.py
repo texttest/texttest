@@ -515,7 +515,7 @@ class TextTest:
             self.runAlone(ownThreadResponder, appSuites)
     def runAlone(self, ownThreadResponder, appSuites):
         self.setUpResponders(appSuites)
-        ownThreadResponder.runAlone()
+        ownThreadResponder.run()
     def runWithTests(self, ownThreadResponder, appSuites):                
         actionRunner, acceptedAppSuites = self.createActionRunner(appSuites)
         if len(acceptedAppSuites) == 0:
@@ -525,7 +525,8 @@ class TextTest:
         self.setUpResponders(acceptedAppSuites)
         if ownThreadResponder:
             actionThread = ActionThread(actionRunner)
-            ownThreadResponder.runWithActionThread(actionThread)
+            ownThreadResponder.addObserver(actionThread)
+            ownThreadResponder.run()
         else:
             actionRunner.run()
     def checkForNoTests(self, appSuites):
@@ -570,7 +571,9 @@ class ActionThread(Thread):
         try:
             self.actionRunner.run()
         except KeyboardInterrupt:
-            print "Terminated before tests complete: cleaning up..." 
-    def terminate(self):
+            print "Terminated before tests complete: cleaning up..."
+    def notifySetUpGUIComplete(self):
+        self.start()
+    def notifyExit(self):
         self.actionRunner.interrupt()
         self.join()

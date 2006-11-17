@@ -1458,7 +1458,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
                 print "Test", self.currentTest.name, "is not in an KPI group."
         self.plotGraph(self.currentTest.app.writeDirectory)  
 
-guiplugins.interactiveActionHandler.actionClasses += [ PlotTestInGUIAPC ]
+guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC ]
 guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ] 
 
 # A script that mimics _PlotTest in optimization.py, but that is specialized for

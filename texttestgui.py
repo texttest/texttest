@@ -290,6 +290,9 @@ class TextTestGUI(Responder, plugins.Observable):
     defaultGUIDescription = '''
 <ui>
   <menubar>
+    <menu action="filemenu"></menu>
+    <menu action="viewmenu"></menu>
+    <menu action="actionmenu"></menu>
   </menubar>
   <toolbar>
   </toolbar>

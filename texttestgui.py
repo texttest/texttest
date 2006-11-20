@@ -575,44 +575,35 @@ class TextTestGUI(Responder, plugins.Observable):
         self.uiManager.ensure_update()
         self.ensureWholeToolbarVisible()
   
-        # Show menu/toolbar?
-        menubar = None
-        toolbar = None
-        if (self.dynamic and self.getConfigValue("dynamic_gui_show_menubar")) or \
-               (not self.dynamic and self.getConfigValue("static_gui_show_menubar")):
-            menubar = self.uiManager.get_widget("/menubar")
-
-        # We always create toolbar, we just don't show it if we don't want it
-        # That way, we can turn it on from the view menu
-        toolbarHandle = gtk.HandleBox()
+        # We always create toolbar and menu, we just don't show them if we
+        # don't want them. That way, we can e.g. turn the toolbar on from
+        # the view menu
+        menubar = self.uiManager.get_widget("/menubar")
         toolbar = self.uiManager.get_widget("/toolbar")
+
+        toolbarHandle = gtk.HandleBox()
         toolbarHandle.add(toolbar)
         for item in toolbar.get_children():
             item.set_is_important(True)
-            toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
-            toolbar.set_style(gtk.TOOLBAR_BOTH_HORIZ)
-        
-        progressBar = None
-        if self.dynamic:            
-            progressBar = self.progressBar.createView()
-            progressBar.show()
+        toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
+        toolbar.set_style(gtk.TOOLBAR_BOTH_HORIZ)
+
         hbox = gtk.HBox()
-                        
-        if menubar and toolbar:
-            vbox.pack_start(menubar, expand=False, fill=False)
-            hbox.pack_start(toolbarHandle, expand=True, fill=True)
-        elif menubar:
-            hbox.pack_start(menubar, expand=False, fill=False)
-        elif toolbar:
-            hbox.pack_start(toolbarHandle, expand=True, fill=True)
+        vbox.pack_start(menubar, expand=False, fill=False)
+        hbox.pack_start(toolbarHandle, expand=True, fill=True)
 
         showToolbar = (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or \
                       (not self.dynamic and self.getConfigValue("static_gui_show_toolbar"))
-        if progressBar:
+        showMenu = (self.dynamic and self.getConfigValue("dynamic_gui_show_menubar")) or \
+                   (not self.dynamic and self.getConfigValue("static_gui_show_menubar"))
+
+        if self.dynamic:
+            progressBar = self.progressBar.createView()
+            progressBar.show()
             if showToolbar:
                 width = 7 # Looks good, same as gtk.Paned border width
             else:
-                width = 0
+                width = 0                
             alignment = gtk.Alignment()
             alignment.set(1.0, 1.0, 1.0, 1.0)
             alignment.set_padding(width, width, 1, width)
@@ -625,10 +616,12 @@ class TextTestGUI(Responder, plugins.Observable):
             else:
                 hbox.pack_start(alignment, expand=True, fill=True)
 
-        hbox.show_all()
+        vbox.pack_start(hbox, expand=False, fill=False)
+        vbox.show_all()
         if not showToolbar:
             toolbarHandle.hide()
-        vbox.pack_start(hbox, expand=False, fill=True)
+        if not showMenu:
+            menubar.hide()
     def getConfigValue(self, configName):
         return self.rootSuites[0].app.getConfigValue(configName)
     def getWindowDimension(self, dimensionName):

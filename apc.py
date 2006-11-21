@@ -76,6 +76,7 @@ from time import sleep
 from ndict import seqdict
 from tempfile import mktemp
 from carmenqueuesystem import getArchitecture, RunWithParallelAction
+from comparetest import ProgressTestComparison
 
 def readKPIGroupFileCommon(suite):
     kpiGroupForTest = {}
@@ -176,6 +177,8 @@ class ApcConfig(optimization.OptimizationConfig):
                 useExtractLogs = "all"
             subActions.append(ExtractApcLogs(useExtractLogs))
         return subActions
+    def getProgressComparisonClass(self):
+        return ApcProgressTestComparison
     def _getSubPlanDirName(self, test):
         statusFile = os.path.normpath(os.path.expandvars(test.getWordsInFile("options")[1]))
         dirs = statusFile.split(os.sep)[:-2]
@@ -185,20 +188,6 @@ class ApcConfig(optimization.OptimizationConfig):
             if option.find("crc" + os.sep + "rule_set") != -1:
                 return option.split(os.sep)[-1]
         return None
-    def getTextualInfo(self, test, state):
-        basicInfo = optimization.OptimizationConfig.getTextualInfo(self, test, state)
-        if state.hasStarted() and not state.isComplete():
-            return basicInfo + "\n" + self.getRunStatusInfo(test)
-        return basicInfo
-    def getRunStatusInfo(self, test):
-        runStatusHeadFile = test.makeTmpFileName("APC_FILES/run_status_head")
-        if os.path.isfile(runStatusHeadFile):
-            try:
-                return open(runStatusHeadFile).read()
-            except (OSError,IOError):
-                return "Error opening/reading " + runStatusHeadFile                 
-        else:
-            return "Run status file is not available yet."
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)
@@ -260,7 +249,24 @@ def verifyLogFileDir(arch):
                 os.makedirs(logFileDir)
             except OSError:
                 return
-                
+
+class ApcProgressTestComparison(ProgressTestComparison):
+    def computeFor(self, test):
+        self.makeComparisons(test)
+        self.categorise()
+        self.freeText += "\n" + self.runStatusInfo(test)
+        test.changeState(self)
+        
+    def runStatusInfo(self, test):
+        runStatusHeadFile = test.makeTmpFileName("APC_FILES/run_status_head")
+        if os.path.isfile(runStatusHeadFile):
+            try:
+                return open(runStatusHeadFile).read()
+            except (OSError,IOError):
+                return "Error opening/reading " + runStatusHeadFile                 
+        else:
+            return "Run status file is not available yet."
+
 class CheckFilesForApc(plugins.Action):
     def __call__(self, test):
         verifyAirportFile(getArchitecture(test.app))

@@ -163,8 +163,11 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         for group in groups:
             if group.name.startswith("How"):
                 group.addSwitch("lprof", "Run with LProf profiler")
-            elif group.name.startswith("SGE"):
-                group.addOption("q", "Request " + group.name + " queue", possibleValues = ["short", "normal", "idle"])
+    def getPossibleQueues(self, queuesystem):
+        if queuesystem == "SGE":
+            return ["short", "normal", "idle"]
+        else:
+            return []
     def getTestRunner(self):
         baseRunner = queuesystem.QueueSystemConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):

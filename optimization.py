@@ -186,7 +186,9 @@ class OptimizationConfig(ravebased.Config):
         else:
             return ravebased.Config.getResponderClasses(self, allApps)
     def getTestComparator(self):
-        return MakeComparisons(OptimizationTestComparison)
+        return MakeComparisons(OptimizationTestComparison, self.getProgressComparisonClass())
+    def getProgressComparisonClass(self):
+        pass # for APC
     def getProgressReportBuilder(self):
         return MakeProgressReport(self.optionValue("prrep"))
     def defaultBuildRules(self):
@@ -347,9 +349,9 @@ class OptimizationTestComparison(TestComparison):
             return "solution " + words[-1]
         else:
             return details
-    def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress):
+    def createFileComparison(self, test, stem, standardFile, tmpFile):
         if not stem in test.app.getConfigValue("skip_comparison_if_not_present").split(",") or tmpFile:
-            return TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)
+            return TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile)
     def getCost(self, file):
         if not os.path.isfile(file):
             raise plugins.TextTestError, "File has been deleted in the meantime..."

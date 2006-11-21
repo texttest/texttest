@@ -182,7 +182,7 @@ class Configuration:
         pass
     def extraReadFiles(self, test):
         return {}
-    def getTextualInfo(self, test, state):
+    def recomputeProgress(self, test, observers):
         return ""
     def setApplicationDefaults(self, app):
         pass
@@ -772,14 +772,20 @@ class OptionGroup:
     def getEntryName(self, name):
         return name.lower().replace(" ", "_")
     def addSwitch(self, key, name, value = 0, options = []):
+        if self.switches.has_key(key):
+            return False
         entryName = self.getEntryName(name)
         defaultValue = int(self.getDefault(entryName, value))
         self.switches[key] = Switch(name, defaultValue, options)
+        return True
     def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1):
+        if self.options.has_key(key):
+            return False
         entryName = self.getEntryName(name)
         defaultValue = self.getDefault(entryName, value)
         defaultPossValues = self.getDefaultPossiblilities(entryName, defaultValue, possibleValues)
         self.options[key] = TextOption(name, defaultValue, defaultPossValues, allocateNofValues)
+        return True
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()
@@ -801,9 +807,15 @@ class OptionGroup:
     def removeOption(self, key):
         if self.options.has_key(key):
             del self.options[key]
+            return True
+        else:
+            return False
     def removeSwitch(self, key):
         if self.switches.has_key(key):
             del self.switches[key]
+            return True
+        else:
+            return False
     def setOptionValue(self, key, value):
         if self.options.has_key(key):
             return self.options[key].setValue(value)

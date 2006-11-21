@@ -21,7 +21,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, comparetest, os, string, time, sys, locale
+import guiplugins, plugins, os, string, time, sys, locale
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer
 from ndict import seqdict
@@ -323,8 +323,6 @@ class TextTestGUI(Responder, plugins.Observable):
         # watch for test selection and test count
         for observer in [ self.testFileGUI, self.appFileGUI, self.textInfoGUI ]:
             self.testTreeGUI.addObserver(observer)
-        self.testFileGUI.addObserver(statusMonitor)
-        self.testFileGUI.addObserver(self.idleManager)
         # watch for category selections
         self.progressMonitor.addObserver(self.testTreeGUI)
         for observer in [ self.testTreeGUI, self.testFileGUI, self.textInfoGUI, \
@@ -411,7 +409,10 @@ class TextTestGUI(Responder, plugins.Observable):
             actionGUI = self.createActionGUIForTab(action)
             for optionGroup in action.getOptionGroups():
                 if optionGroup.switches or optionGroup.options:
-                    actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
+                    tabGUI = ActionTabGUI(optionGroup, action, actionGUI)
+                    if action.isTestDependent():
+                        self.addObserver(tabGUI) # pick up lifecycle changes
+                    actionTabGUIs.append(tabGUI)
         return actionTabGUIs
     def getSeparatorPosition(self, horizontal):
         if horizontal:
@@ -1173,6 +1174,10 @@ class ActionTabGUI(TabGUI):
     def createView(self):
         return self.addScrollBars(self.createVBox())
 
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        if self.action.updateOptionGroup(test, state):
+            self.updateView()
+        
     def updateView(self):
         container = self.vbox.get_parent()
         container.remove(self.vbox)
@@ -1541,7 +1546,12 @@ class TextInfoGUI(TabGUI):
     def getTabTitle(self):
         return "Text Info"
     def resetText(self, test, state):
-        self.text = test.app.configObject.getTextualInfo(test, state)
+        self.text = ""
+        if state.isComplete():
+            self.text = "Test " + repr(state) + "\n"
+            if len(state.freeText) == 0:
+                self.text = self.text.replace(" :", "")
+        self.text += str(state.freeText)
     def getActualText(self):
         buffer = self.view.get_buffer()
         utf8Text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter())
@@ -1792,11 +1802,11 @@ class TestFileGUI(FileViewGUI):
             
     def addFilesToModel(self, state):
         if state.hasStarted():
-            try:
-                self.addDynamicFilesToModel(state)
-            except AttributeError:
-                # The above code assumes we have failed on comparison: if not, don't display things
-                pass
+            if hasattr(state, "correctResults"):
+                # failed on comparison
+                self.addComparisonsToModel(state)
+            elif not state.isComplete():
+                self.addTmpFilesToModel()
         else:
             self.addStaticFilesToModel()
 
@@ -1812,31 +1822,12 @@ class TestFileGUI(FileViewGUI):
     def fileSelected(self, treemodel, path, iter, filelist):
         filelist.append(self.model.get_value(iter, 0))
     def getState(self):
-        state = self.currentObject.state
-        if not state.hasStarted() or (state.isComplete() and not state.needsRecalculation()):
-            return state
-
-        self.notify("ActionStart", "")
-        self.notify("Status", "Recomputing status of " + repr(self.currentObject) + " ...")
-        newState = self.recalculateState(state)
-        self.notify("Status", "Done recomputing status of " + repr(self.currentObject) + ".")
-        self.notify("ActionStop", "")
-        return newState
-    
-    def recalculateState(self, state):
-        newState = comparetest.TestComparison(state, self.currentObject.app, "be recalculated")
-        newState.addObserver(statusMonitor)
-        complete = state.isComplete()
-        newState.makeComparisons(self.currentObject, testInProgress=not complete)
-        if complete:
-            newState.categorise()
-            self.currentObject.changeState(newState)
-        return newState            
-    def addDynamicFilesToModel(self, state):
-        self.addDynamicComparisons(state.correctResults + state.changedResults, "Comparison Files")
-        self.addDynamicComparisons(state.newResults, "New Files")
-        self.addDynamicComparisons(state.missingResults, "Missing Files")
-    def addDynamicComparisons(self, compList, title):
+        return self.currentObject.state
+    def addComparisonsToModel(self, state):
+        self.addComparisons(state.correctResults + state.changedResults, "Comparison Files")
+        self.addComparisons(state.newResults, "New Files")
+        self.addComparisons(state.missingResults, "Missing Files")
+    def addComparisons(self, compList, title):
         if len(compList) == 0:
             return
         iter = self.model.insert_before(None, None)
@@ -1848,7 +1839,7 @@ class TestFileGUI(FileViewGUI):
             fileCompMap[file] = comp
             filelist.append(file)
         filelist.sort()
-        self.addStandardFilesUnderIter(iter, filelist, fileCompMap)
+        self.addStandardFilesUnderIter(iter, filelist, fileCompMap)    
     def addStandardFilesUnderIter(self, iter, files, compMap = {}):
         for relDir, relDirFiles in self.classifyByRelDir(files).items():
             iterToUse = iter
@@ -1874,7 +1865,7 @@ class TestFileGUI(FileViewGUI):
         else:
             return ""
     def getComparisonColour(self, fileComp):
-        if not fileComp:
+        if not self.currentObject.state.hasStarted():
             return self.getStaticColour()
         if not self.currentObject.state.isComplete():
             return self.getColour("running")
@@ -1887,6 +1878,11 @@ class TestFileGUI(FileViewGUI):
             return self.getColour("not_started")
         else:
             return self.getColour("static")
+    def addTmpFilesToModel(self):
+        tmpFiles = self.currentObject.listTmpFiles()
+        tmpIter = self.model.insert_before(None, None)
+        self.model.set_value(tmpIter, 0, "Temporary Files")
+        self.addStandardFilesUnderIter(tmpIter, tmpFiles)
     def addStaticFilesToModel(self):
         stdFiles, defFiles = self.currentObject.listStandardFiles(allVersions=True)
         if self.currentObject.classId() == "test-case":

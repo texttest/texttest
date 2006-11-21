@@ -89,13 +89,17 @@ class QueueSystemConfig(default.Config):
         queueSystemGroup = app.createOptionGroup(queueSystem)
         queueSystemGroup.addSwitch("l", "", value = 0, options = ["Submit tests to " + queueSystem, "Run tests locally"])
         queueSystemGroup.addSwitch("perf", "Run on performance machines only")
-        queueSystemGroup.addOption("R", "Request " + queueSystem + " resource")
-        queueSystemGroup.addOption("q", "Request " + queueSystem + " queue")
+        queueSystemGroup.addOption("R", "Request " + queueSystem + " resource", possibleValues = self.getPossibleResources(queueSystem))
+        queueSystemGroup.addOption("q", "Request " + queueSystem + " queue", possibleValues = self.getPossibleQueues(queueSystem))
         groups.insert(3, queueSystemGroup)
         for group in groups:
             if group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
+    def getPossibleQueues(self, queueSystem):
+        return [] # placeholders for derived configurations
+    def getPossibleResources(self, queueSystem):
+        return []
     def useQueueSystem(self):
         if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l"):
             return 0

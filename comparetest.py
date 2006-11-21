@@ -10,19 +10,75 @@ from performance import PerformanceFileComparison
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
 
-class TestComparison(plugins.TestState):
-    def __init__(self, previousInfo, app, lifecycleChange=""):
-        plugins.TestState.__init__(self, "failure", "", started=1, completed=1, \
+class BaseTestComparison(plugins.TestState):
+    def __init__(self, category, previousInfo, completed, lifecycleChange=""):
+        plugins.TestState.__init__(self, category, "", started=1, completed=completed, \
                                    lifecycleChange=lifecycleChange, executionHosts=previousInfo.executionHosts)
         self.allResults = []
         self.changedResults = []
         self.newResults = []
         self.missingResults = []
         self.correctResults = []
+        self.diag = plugins.getDiagnostics("TestComparison")
+
+    def hasResults(self):
+        return len(self.allResults) > 0
+    
+    def computeFor(self, test):
+        self.makeComparisons(test)
+        self.categorise()
+        test.changeState(self)
+        
+    def makeComparisons(self, test):
+        tmpFiles = self.makeStemDict(test.listTmpFiles())
+        resultFiles, defFiles = test.listStandardFiles(allVersions=False)
+        stdFiles = self.makeStemDict(resultFiles + defFiles)
+        for tmpStem, tmpFile in tmpFiles.items():
+            self.notifyIfMainThread("ActionProgress", "")
+            stdFile = stdFiles.get(tmpStem)
+            self.diag.info("Comparing " + repr(stdFile) + "\nwith " + tmpFile) 
+            comparison = self.createFileComparison(test, tmpStem, stdFile, tmpFile)
+            if comparison:
+                self.addComparison(comparison)
+        self.makeMissingComparisons(test, stdFiles, tmpFiles, defFiles)
+    def makeMissingComparisons(self, test, stdFiles, tmpFiles, defFiles):
+        pass
+
+    def addComparison(self, comparison):
+        info = "Making comparison for " + comparison.stem + " "
+        if comparison.isDefunct():
+            # typically "missing file" that got "saved" and removed
+            info += "(defunct)"
+        else:
+            self.allResults.append(comparison)
+            if comparison.newResult():
+                self.newResults.append(comparison)
+                info += "(new)"
+            elif comparison.missingResult():
+                self.missingResults.append(comparison)
+                info += "(missing)"
+            elif comparison.hasDifferences():
+                self.changedResults.append(comparison)
+                info += "(diff)"
+            else:
+                self.correctResults.append(comparison)
+                info += "(correct)"
+        self.diag.info(info)
+
+    def makeStemDict(self, files):
+        stemDict = seqdict()
+        for file in files:
+            stem = os.path.basename(file).split(".")[0]
+            stemDict[stem] = file
+        return stemDict
+
+        
+class TestComparison(BaseTestComparison):
+    def __init__(self, previousInfo, app, lifecycleChange=""):
+        BaseTestComparison.__init__(self, "failure", previousInfo, completed=1, lifecycleChange=lifecycleChange)
         self.failedPrediction = None
         if previousInfo.category == "killed":
             self.setFailedPrediction(previousInfo)
-        self.diag = plugins.getDiagnostics("TestComparison")
         # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved
         self.appAbsPath = app.getDirectory()
         self.appWriteDir = app.writeDirectory
@@ -106,8 +162,6 @@ class TestComparison(plugins.TestState):
             return worstResult.stem + " missing"
         else:
             return worstResult.getSummary()
-    def hasResults(self):
-        return len(self.allResults) > 0
     def getComparisons(self):
         return self.changedResults + self.newResults + self.missingResults    
     def _comparisonsString(self, comparisons):
@@ -155,61 +209,24 @@ class TestComparison(plugins.TestState):
             else:
                 baseNames.append(os.path.basename(comparison.stdFile))
         return string.join(baseNames, ",")
-    def addComparison(self, comparison):
-        info = "Making comparison for " + comparison.stem + " "
-        if comparison.isDefunct():
-            # typically "missing file" that got "saved" and removed
-            info += "(defunct)"
-        else:
-            self.allResults.append(comparison)
-            if comparison.newResult():
-                self.newResults.append(comparison)
-                info += "(new)"
-            elif comparison.missingResult():
-                self.missingResults.append(comparison)
-                info += "(missing)"
-            elif comparison.hasDifferences():
-                self.changedResults.append(comparison)
-                info += "(diff)"
-            else:
-                self.correctResults.append(comparison)
-                info += "(correct)"
-        self.diag.info(info)
-    def makeStemDict(self, files):
-        stemDict = seqdict()
-        for file in files:
-            stem = os.path.basename(file).split(".")[0]
-            stemDict[stem] = file
-        return stemDict
-    def makeComparisons(self, test, testInProgress=0):
-        tmpFiles = self.makeStemDict(test.listTmpFiles())
-        resultFiles, defFiles = test.listStandardFiles(allVersions=False)
-        stdFiles = self.makeStemDict(resultFiles + defFiles)
-        for tmpStem, tmpFile in tmpFiles.items():
+    def makeMissingComparisons(self, test, stdFiles, tmpFiles, defFiles):
+        for stdStem, stdFile in stdFiles.items():
             self.notifyIfMainThread("ActionProgress", "")
-            stdFile = stdFiles.get(tmpStem)
-            self.diag.info("Comparing " + repr(stdFile) + "\nwith " + tmpFile) 
-            comparison = self.createFileComparison(test, tmpStem, stdFile, tmpFile, testInProgress)
-            if comparison:
-                self.addComparison(comparison)
-        if not testInProgress: # not interested in missing files here
-            for stdStem, stdFile in stdFiles.items():
-                self.notifyIfMainThread("ActionProgress", "")
-                if not tmpFiles.has_key(stdStem) and not stdFile in defFiles:
-                    comparison = self.createFileComparison(test, stdStem, stdFile, None, testInProgress)
-                    if comparison:
-                        self.addComparison(comparison)
+            if not tmpFiles.has_key(stdStem) and not stdFile in defFiles:
+                comparison = self.createFileComparison(test, stdStem, stdFile, None)
+                if comparison:
+                    self.addComparison(comparison)
     def getPerformanceStems(self, test):
         return [ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys()
-    def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress=0):
+    def createFileComparison(self, test, stem, standardFile, tmpFile):
         if stem in self.getPerformanceStems(test):
             if tmpFile:
-                return PerformanceFileComparison(test, stem, standardFile, tmpFile, testInProgress)
+                return PerformanceFileComparison(test, stem, standardFile, tmpFile)
             else:
                 # Don't care if performance is missing
                 return None
         else:
-            return FileComparison(test, stem, standardFile, tmpFile, testInProgress, self.observers)
+            return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0, observers=self.observers)
     def categorise(self):
         if self.failedPrediction:
             # Keep the category we had before
@@ -272,22 +289,66 @@ class TestComparison(plugins.TestState):
         newState.categorise()
         return newState
 
-class MakeComparisons(plugins.Action):
-    defaultComparisonClass = TestComparison
-    def __init__(self, testComparisonClass=None):
-        if testComparisonClass:
-            self.testComparisonClass = testComparisonClass
-            MakeComparisons.defaultComparisonClass = testComparisonClass
+class ProgressTestComparison(BaseTestComparison):
+    def __init__(self, previousInfo):
+        BaseTestComparison.__init__(self, previousInfo.category, previousInfo, completed=0, lifecycleChange="be recalculated")
+        if isinstance(previousInfo, ProgressTestComparison):
+            self.runningState = previousInfo.runningState
         else:
-            self.testComparisonClass = MakeComparisons.defaultComparisonClass
+            self.runningState = previousInfo
+    def processCompleted(self):
+        return self.runningState.processCompleted()
+    def killProcess(self):
+        self.runningState.killProcess()
+    def createFileComparison(self, test, stem, standardFile, tmpFile):
+        return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1, observers=self.observers)
+    def categorise(self):
+        self.freeText = self.runningState.freeText + self.progressText()
+    def progressText(self):
+        perc = self.calculatePercentage()
+        if perc > 0:
+            return "\nReckoned to be " + str(perc) + "% complete."
+        else:
+            return ""
+    def getSize(self, fileName):
+        if fileName:
+            return os.path.getsize(fileName)
+        else:
+            return 0
+    def calculatePercentage(self):
+        stdSize, tmpSize = 0, 0
+        for comparison in self.allResults:
+            stdSize += self.getSize(comparison.stdFile)
+            tmpSize += self.getSize(comparison.tmpFile)
+
+        if stdSize == 0:
+            return 0
+        return (tmpSize * 100) / stdSize 
+
+class MakeComparisons(plugins.Action):
+    def __init__(self, testComparisonClass=None, progressComparisonClass=None):
+        self.testComparisonClass = self.getClass(testComparisonClass, TestComparison)
+        self.progressComparisonClass = self.getClass(progressComparisonClass, ProgressTestComparison)
+    def getClass(self, given, defaultClass):
+        if given:
+            return given
+        else:
+            return defaultClass
     def __repr__(self):
         return "Comparing differences for"
     def __call__(self, test):
-        testComparison = self.testComparisonClass(test.state, test.app)
-        testComparison.makeComparisons(test)
-        testComparison.categorise()
-        self.describe(test, testComparison.getPostText())
-        test.changeState(testComparison)
+        newState = self.testComparisonClass(test.state, test.app)
+        newState.computeFor(test)
+        self.describe(test, newState.getPostText())
+    def createNewProgressState(self, test):
+        if test.state.isComplete():
+            return self.testComparisonClass(test.state, test.app, lifecycleChange="be recalculated")
+        else:
+            return self.progressComparisonClass(test.state)
+    def recomputeProgress(self, test, observers):
+        newState = self.createNewProgressState(test)
+        newState.setObservers(observers)
+        newState.computeFor(test)        
     def setUpSuite(self, suite):
         self.describe(suite)
     

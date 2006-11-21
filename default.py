@@ -351,33 +351,9 @@ class Config(plugins.Configuration):
             # old-style: infer expansion in default checkout
             return os.path.join(fullLocation, checkout)
     # For display in the GUI
-    def getTextualInfo(self, test, state):
-        info = ""
-        if state.isComplete():
-            info = "Test " + repr(state) + "\n"
-            if len(state.freeText) == 0:
-                info = info.replace(" :", "")
-        info += str(state.freeText)
-        if not state.isComplete():
-            info += self.progressText(test)
-        return info
-    def progressText(self, test):
-        perc = self.calculatePercentage(test)
-        if perc > 0:
-            return "\nFrom log file reckoned to be " + str(perc) + "% complete."
-        else:
-            return ""
-    def calculatePercentage(self, test):
-        logFileStem = test.getConfigValue("log_file")
-        stdFile = test.getFileName(logFileStem)
-        tmpFile = test.makeTmpFileName(logFileStem)
-        if not os.path.isfile(tmpFile) or not stdFile:
-            return 0
-        stdSize = os.path.getsize(stdFile)
-        tmpSize = os.path.getsize(tmpFile)
-        if stdSize == 0:
-            return 0
-        return (tmpSize * 100) / stdSize 
+    def recomputeProgress(self, test, observers):
+        comparator = self.getTestComparator()
+        comparator.recomputeProgress(test, observers)
     def printHelpScripts(self):
         pass
     def printHelpDescription(self):

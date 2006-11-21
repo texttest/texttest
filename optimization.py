@@ -218,6 +218,7 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault(noIncreasMethodsConfigKey, self.noIncreaseExceptMethods, "Private: Item names not allowed to increase")
         app.setConfigDefault("cvs_log_for_files", "", "File list that should be displayed by CVS log functionality")
         app.setConfigDefault("kpi_cost_margin", 0.0, "Cost margin for the KPI calculations")
+        app.setConfigDefault("skip_comparison_if_not_present", "error", "List of files that are compared only if they are created by the test, i.e. they will not be reported as missing")
         app.addConfigEntry("definition_file_stems", "raveparameters")
 
 # Insert the contents of all raveparameters into the temporary rules file
@@ -302,7 +303,7 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             return False
 
         names = [ "input", "status", "colgen_analysis.example_rotations", "hostname", "best_solution" ]
-        prefixes = [ "Solution_", "core", "run_status" ]
+        prefixes = [ "Solution_", "core", "run_status", "optinfo" ]
         postfixes = [ ".log" ]
         if file in names:
             return False
@@ -347,7 +348,7 @@ class OptimizationTestComparison(TestComparison):
         else:
             return details
     def createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress):
-        if stem != "error" or tmpFile:
+        if not stem in test.app.getConfigValue("skip_comparison_if_not_present").split(",") or tmpFile:
             return TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile, testInProgress)
     def getCost(self, file):
         if not os.path.isfile(file):

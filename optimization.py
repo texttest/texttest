@@ -432,8 +432,8 @@ class LogFileFinder:
             version = string.join(app.versions, ".")
         versionMod = ""
         if version:
-            versionMod = "." + version
-        searchString = app.name + versionMod
+            versionMod = "." + version + "."
+        searchString = app.name + versionMod 
         try:
             root = app.getPreviousWriteDirInfo(self.searchInUser)
         except plugins.TextTestError:

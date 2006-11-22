@@ -62,18 +62,18 @@ def createDialogMessage(message, stockIcon, scrollBars=False):
     alignment.add(hbox)
     return alignment
 
-def showError(message):
+def showError(message, parent=None):
     guilog.info("ERROR: " + message)
-    dialog = gtk.Dialog("TextTest Error", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    dialog = gtk.Dialog("TextTest Error", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
     dialog.set_modal(True)
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_ERROR), expand=True, fill=True)
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show_all()
     dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
 
-def showWarning(message):
+def showWarning(message, parent=None):
     guilog.info("WARNING: " + message)
-    dialog = gtk.Dialog("TextTest Warning", buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    dialog = gtk.Dialog("TextTest Warning", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
     dialog.set_modal(True)
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_WARNING), expand=True, fill=True)
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
@@ -81,8 +81,8 @@ def showWarning(message):
     dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
 
 class DoubleCheckDialog:
-    def __init__(self, message, yesMethod):
-        self.dialog = gtk.Dialog("TextTest Query", flags=gtk.DIALOG_MODAL)
+    def __init__(self, message, yesMethod, parent=None):
+        self.dialog = gtk.Dialog("TextTest Query", parent, flags=gtk.DIALOG_MODAL)
         self.yesMethod = yesMethod
         guilog.info("QUERY: " + message)
         noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
@@ -278,7 +278,7 @@ class IdleHandlerManager:
             try:
                 process.runExitHandler()
             except plugins.TextTestError, e:
-                showError(str(e))
+                showError(str(e), globalTopWindow)
         
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
@@ -388,12 +388,12 @@ class TextTestGUI(Responder, plugins.Observable):
         rightWindowGUI = self.createRightWindowGUI(intvActions)
         mainWindowGUI = self.createPaned(self.testTreeGUI, rightWindowGUI, horizontal=True)
         
-        topWindow = self.createTopWindow(mainWindowGUI, intvActions)
+        self.createTopWindow(mainWindowGUI, intvActions)
         mainWindowGUI.activate()
 
         guilog.info("") # for demarcation
         self.notify("SetUpGUIComplete")
-        guilog.info("Default widget is " + str(topWindow.get_focus().__class__))
+        guilog.info("Default widget is " + str(self.topWindow.get_focus().__class__))
         gtk.main()
     def notifyExit(self, *args):
         self.notify("Exit")
@@ -502,6 +502,8 @@ class TextTestGUI(Responder, plugins.Observable):
     def createTopWindow(self, mainWindowGUI, intvActions):
         # Create toplevel window to show it all.
         self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        global globalTopWindow
+        globalTopWindow = self.topWindow
         if self.dynamic:
             self.topWindow.set_title("TextTest dynamic GUI (tests started at " + plugins.startTimeString() + ")")
         else:
@@ -1097,16 +1099,16 @@ class ActionGUI:
             return        
         doubleCheckMessage = self.action.getDoubleCheckMessage()
         if doubleCheckMessage:
-            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive)
+            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, globalTopWindow)
         else:
             self._runInteractive()
     def _runInteractive(self):
         try:
             self.action.perform()
         except plugins.TextTestError, e:
-            showError(str(e))
+            showError(str(e), globalTopWindow)
         except plugins.TextTestWarning, e:
-            showWarning(str(e))
+            showWarning(str(e), globalTopWindow)
         
 # base class for everything that can go in tabs handled by NotebookGUI
 class TabGUI(SubGUI):
@@ -1720,7 +1722,7 @@ class FileViewGUI(SubGUI):
         try:
             self.notify("ViewFile", comparison, fileName)
         except plugins.TextTestError, e:
-            showError(str(e))
+            showError(str(e), globalTopWindow)
 
         self.selection.unselect_all()
     def addFileToModel(self, iter, name, comp, colour):

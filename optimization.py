@@ -1046,6 +1046,16 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
         self.testGraph = TestGraph()
         self.testGraph.optionGroup = self.optionGroup
 
+
+# Hack for PlotSubplans:
+# We redefine getRelPath from testmodel.Test, since it is there assumed that
+# the test is residing in self.app.getDirectory(), which usually isn't equal
+# to self.app.writeDirectory. (We create a "temporary" test for the plotting)
+class TestCasePlotSP(testmodel.TestCase):
+    def getRelPath(self):
+        relPath = plugins.relpath(self.getDirectory(), self.app.writeDirectory)
+        return relPath.replace(os.sep, "/")
+
 plotSubplanDone = None
 
 class PlotSubplans(plugins.Action):
@@ -1079,15 +1089,13 @@ class PlotSubplans(plugins.Action):
                     subplan = os.path.join(dirName, file)
                     testName = file
                     testTmpPath = os.path.join("dummyUser", testName)
-                    os.makedirs(testTmpPath)
-                    testFullPath = os.path.join(app.getDirectory(), testTmpPath)
+                    testFullPath = os.path.join(app.writeDirectory, testTmpPath)
                     os.makedirs(testFullPath)
-                    newTest = testmodel.TestCase(testName, testmodel.DirectoryCache(testFullPath), \
-                                                 app, parent=None)
+                    newTest = TestCasePlotSP(testName, testmodel.DirectoryCache(testFullPath), \
+                                             app, parent=None)
                     logFilePath = os.path.join(subplan, "APC_FILES", app.getConfigValue("log_file"))
                     testGraph.createPlotObjects(str(version), logFilePath, newTest, None)
             version += 1
-        shutil.rmtree("dummyUser")
         testGraph.plot(app.writeDirectory)
         
 # TestGraph is the "real stuff", the PlotLine instances are created here and gnuplot is invoked here.

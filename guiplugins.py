@@ -459,6 +459,11 @@ class ViewFile(InteractiveTestAction):
             return comparison.stdFile
         else:
             return comparison.stdCmpFile
+    def fileToFollow(self, comparison, fileName):
+        if comparison:
+            return comparison.tmpFile
+        else:
+            return fileName
     def followFile(self, fileName):
         followProgram = self.currentTest.app.getConfigValue("follow_program")
         if not plugins.canExecute(followProgram):
@@ -472,7 +477,7 @@ class ViewFile(InteractiveTestAction):
         scriptEngine.monitorProcess("follows progress of test files", process)
     def notifyViewFile(self, comparison, fileName):
         if self.optionGroup.getSwitchValue("f"):
-            return self.followFile(fileName)
+            return self.followFile(self.fileToFollow(comparison, fileName))
         if not comparison:
             baseName = os.path.basename(fileName)
             refreshContents = baseName.startswith("testsuite.") # re-read which tests we have

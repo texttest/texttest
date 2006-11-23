@@ -170,7 +170,7 @@ class ApcConfig(optimization.OptimizationConfig):
         return processData.startswith(rulesetName) or rulesetName.startswith(processData)
     def getFileExtractor(self):
         baseExtractor = optimization.OptimizationConfig.getFileExtractor(self)
-        subActions = [ baseExtractor, FetchApcCore() ]
+        subActions = [ baseExtractor, CreateHTMLFiles(), FetchApcCore() ]
         if self.slaveRun():
             useExtractLogs = self.optionValue("extractlogs")
             if useExtractLogs == "":
@@ -455,6 +455,30 @@ class FetchApcCore(default.CollateFiles):
             self.diag.info("apc_debug file is found. Aborting.")
             return 0
         return 1
+
+class CreateHTMLFiles(plugins.Action):
+    def __call__(self, test):
+        subplanPath = os.path.realpath(test.makeTmpFileName("APC_FILES", forComparison=0))
+        xmlFile = os.path.join(subplanPath, "optinfo.xml")
+        if os.path.isfile(xmlFile):
+            carmsys = os.environ["CARMSYS"]
+            scriptFile = os.path.join(carmsys, "bin/APCcreatexml.sh")
+            runStatusFiles = os.path.join(subplanPath, "run_status")
+            xmlAllFile = os.path.join(subplanPath, "optinfo_all.xml")
+            os.system(scriptFile + " " + runStatusFiles + " " + xmlFile + " " + xmlAllFile)
+            htmlFile = test.makeTmpFileName("optinfo")
+            xslFile = os.path.join(carmsys, "data/apc/feedback/optinfo_html_xsl.xml")
+            arch = getArchitecture(test.app)
+            xsltprocArchs = ["i386_linux", "x86_64_linux" ]
+            if arch in xsltprocArchs:
+                os.system("xsltproc " + xslFile + " " + xmlAllFile + " > " + htmlFile)
+            else:
+                os.system("Xalan " + xmlAllFile + " " + xslFile + " > " + htmlFile)
+            # Create links to the images dir, so we get the pics when looking
+            # in mozilla.
+            imagesDir = os.path.join(carmsys, "data/apc/feedback/images/")
+            os.system("ln -s " + imagesDir)
+            os.system("cd framework_tmp; ln -s " + imagesDir)
 
 class MarkApcLogDir(RunWithParallelAction):
     def __init__(self, baseRunner, isExecutable, keepLogs):
@@ -1471,13 +1495,14 @@ guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBe
 # APC to plot all (selected) KPI groups.
 class PlotKPIGroups(plugins.Action):
     def __init__(self, args = []):
-        self.args = args
+        self.argsRem = copy.deepcopy(args)
         self.groupsToPlot = {}
         self.groupScale = {}
         self.timeDivision = None
         for arg in args:
             if arg.find("timediv") != -1:
                 self.timeDivision = 1
+                self.argsRem.remove(arg)
     def __call__(self, test):
         kpiGroupForTest, kpiGroups, kpiGroupsScale = readKPIGroupFileCommon(test.parent)
         if kpiGroupForTest.has_key(test.name):
@@ -1500,7 +1525,7 @@ class PlotKPIGroups(plugins.Action):
                 testGraph.optionGroup.addOption(name, expl, value)
             for name, expl in testGraph.switches:
                 testGraph.optionGroup.addSwitch(name, expl)
-            testGraph.optionGroup.readCommandLineArguments(self.args)
+            testGraph.optionGroup.readCommandLineArguments(self.argsRem)
             testGraph.optionGroup.setValue("title", "APC user " + self.groupsToPlot[group][0].getRelPath().split(os.sep)[0] + " - KPI group " + group)
             if testGraph.optionGroup.getSwitchValue("per") and self.groupScale[group]:
                 testGraph.optionGroup.setValue("yr", self.groupScale[group])

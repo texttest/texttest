@@ -589,7 +589,6 @@ class TextTestGUI(Responder, plugins.Observable):
         for item in toolbar.get_children():
             item.set_is_important(True)
         toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
-        toolbar.set_style(gtk.TOOLBAR_BOTH_HORIZ)
 
         hbox = gtk.HBox()
         vbox.pack_start(menubar, expand=False, fill=False)

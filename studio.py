@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.36 2006/10/25 12:44:20 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.37 2006/11/24 16:49:38 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -152,7 +152,7 @@ class ImportTestCase(guiplugins.ImportTestCase):
     def addDefinitionFileOption(self, suite):
         guiplugins.ImportTestCase.addDefinitionFileOption(self, suite)
         self.optionGroup.addOption("mac", "Macro to use", self.newMacroString)
-    def updateDefaults(self):
+    def updateOptionGroup(self, state):
         self.optionGroup.setOptionValue("mac", self.newMacroString)
         self.optionGroup.setPossibleValues("mac", self.getExistingMacros())
     def getExistingMacros(self):
@@ -181,7 +181,7 @@ class RecordTest(guiplugins.RecordTest):
     def __init__(self, test):
         guiplugins.RecordTest.__init__(self, test)
         self.optionGroup.addOption("rset", "Compile this ruleset first")
-    def updateDefaults(self):
+    def updateOptionGroup(self, state):
         self.optionGroup.setOptionValue("rset", "")
         self.optionGroup.setPossibleValues("rset", self.findRuleSets())
     def findRuleSets(self):

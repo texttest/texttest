@@ -1028,7 +1028,7 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
-    def isFrequentUse(self):
+    def inButtonBar(self):
         return True
     def getTabTitle(self):
         return "Graph"

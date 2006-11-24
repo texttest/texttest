@@ -787,8 +787,8 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
                     dta=""
         self.optionGroup.addOption("usr", "CARMUSR", usr)
         self.optionGroup.addOption("data", "CARMDATA (only if different)", dta)
-    def updateDefaults(self):
-        guiplugins.ImportTestSuite.updateDefaults(self)
+    def updateOptionGroup(self, state):
+        guiplugins.ImportTestSuite.updateOptionGroup(self, state)
         self.optionGroup.setOptionValue("usr", "")
         self.optionGroup.setOptionValue("data", "")
     def getCarmValue(self, val):

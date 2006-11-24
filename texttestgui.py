@@ -126,11 +126,13 @@ class SubGUI(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
         self.active = False
+    def setActive(self, newValue):
+        self.active = newValue
     def activate(self):
-        self.active = True
+        self.setActive(True)
         self.contentsChanged()
     def deactivate(self):
-        self.active = False
+        self.setActive(False)
     def contentsChanged(self):
         if self.active and self.shouldShowCurrent():
             guilog.info("") # blank line for demarcation
@@ -141,6 +143,12 @@ class SubGUI(plugins.Observable):
         pass
     def shouldShowCurrent(self):
         return True # sometimes these things don't have anything to display
+    def getTabTitle(self):
+        return "Need Title For Tab!"
+    def getGroupTabTitle(self):
+        return "Test"
+    def forceVisible(self, tests):
+        return False
     def addScrollBars(self, view):
         window = gtk.ScrolledWindow()
         window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
@@ -154,9 +162,9 @@ class SubGUI(plugins.Observable):
         else:
             window.add(widget)
 
-class ToggleVisibilityGUI(guiplugins.SelectionAction):
+class ToggleVisibilityGUI(guiplugins.InteractiveAction):
     def __init__(self, rootSuites, title, startValue):
-        guiplugins.SelectionAction.__init__(self, rootSuites)
+        guiplugins.InteractiveAction.__init__(self, rootSuites)
         self.title = title
         self.startValue = startValue
     def getInterfaceDescription(self):
@@ -325,7 +333,7 @@ class TextTestGUI(Responder, plugins.Observable):
             self.testTreeGUI.addObserver(observer)
         # watch for category selections
         self.progressMonitor.addObserver(self.testTreeGUI)
-        for observer in [ self.testTreeGUI, self.testFileGUI, self.textInfoGUI, \
+        for observer in [ self.textInfoGUI, self.testTreeGUI, self.testFileGUI, \
                           self.progressBar, self.progressMonitor, self.idleManager ]:            
             self.addObserver(observer) # forwarding of test observer mechanism
     def setUpUIManager(self):
@@ -410,8 +418,8 @@ class TextTestGUI(Responder, plugins.Observable):
             for optionGroup in action.getOptionGroups():
                 if optionGroup.switches or optionGroup.options:
                     tabGUI = ActionTabGUI(optionGroup, action, actionGUI)
-                    if action.isTestDependent():
-                        self.addObserver(tabGUI) # pick up lifecycle changes
+                    self.testTreeGUI.addObserver(tabGUI)
+                    self.addObserver(tabGUI) # pick up lifecycle changes
                     actionTabGUIs.append(tabGUI)
         return actionTabGUIs
     def getSeparatorPosition(self, horizontal):
@@ -433,17 +441,23 @@ class TextTestGUI(Responder, plugins.Observable):
 
     def createRightWindowGUI(self, intvActions):
         tabGUIs = [ self.textInfoGUI, self.progressMonitor ] + self.createActionTabGUIs(intvActions)
+        buttonBarGUI = self.createButtonBarGUI(intvActions)
+        topTestViewGUI = BoxGUI([ self.testFileGUI, buttonBarGUI ], horizontal=False)
+
         if self.dynamic:
-            notebookGUI = BottomNotebookGUI(self.classifyByTitle(tabGUIs), self.getNotebookScriptName("Top"))
-            return self.createSingleTestGUI(intvActions, notebookGUI)
+            notebookGUI = NotebookGUI(self.classifyByTitle(tabGUIs), self.getNotebookScriptName("Top"))
+            self.testTreeGUI.addObserver(notebookGUI)
+            return self.createPaned(topTestViewGUI, notebookGUI, horizontal=False)
         else:
             subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
             tabInfo = seqdict()
-            tabInfo["Test"] = self.createSingleTestGUI(intvActions, subNotebookGUIs["Test"])
+            tabInfo["Test"] = self.createPaned(topTestViewGUI, subNotebookGUIs["Test"], horizontal=False)
             tabInfo["Selection"] = subNotebookGUIs["Selection"]
             tabInfo["Running"] = self.createPaned(self.appFileGUI, subNotebookGUIs["Running"], horizontal=False)
-            notebookGUI = StaticTopNotebookGUI(tabInfo, self.getNotebookScriptName("Top"), self.getDefaultPage())
+            notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"), self.getDefaultPage())
             self.testTreeGUI.addObserver(notebookGUI)
+            for subNotebookGUI in subNotebookGUIs.values():
+                self.testTreeGUI.addObserver(subNotebookGUI)
             return notebookGUI
 
     def getDefaultPage(self):
@@ -451,21 +465,15 @@ class TextTestGUI(Responder, plugins.Observable):
             return "Selection"
         else:
             return "Test"
-
-    def createSingleTestGUI(self, intvActions, notebookGUI):
-        testButtonBarGUIs = self.createButtonBarGUIs(intvActions)
-        topTestViewGUI = TopTestViewGUI(testButtonBarGUIs, self.testFileGUI)
-        self.testTreeGUI.addObserver(notebookGUI)
-        return self.createPaned(topTestViewGUI, notebookGUI, horizontal=False)
         
-    def createButtonBarGUIs(self, intvActions):
+    def createButtonBarGUI(self, intvActions):
         buttonBarGUIs = []
         for action in intvActions:
-            if action.inToolBar() and action.isTestDependent():
+            if action.inButtonBar():
                 buttonBarGUI = ActionGUI(action, self.uiManager)
                 self.testTreeGUI.addObserver(buttonBarGUI)
                 buttonBarGUIs.append(buttonBarGUI)
-        return buttonBarGUIs
+        return BoxGUI(buttonBarGUIs, horizontal=True, reversed=True)
 
     def getNotebookScriptName(self, tabName):
         if tabName == "Top":
@@ -482,7 +490,8 @@ class TextTestGUI(Responder, plugins.Observable):
         tabInfo = seqdict()
         for tabName in [ "Test", "Selection", "Running" ]:
             currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
-            tabInfo[tabName] = BottomNotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
+            notebookGUI = NotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
+            tabInfo[tabName] = notebookGUI
         return tabInfo
     def notifyLifecycleChange(self, test, state, changeDesc):
         # Working around python bug 853411: main thread must do all forking
@@ -516,7 +525,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.adjustSize()
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyExit)
         return self.topWindow
-    def activate(self):
+    def contentsChanged(self):
         pass # doesn't use this yet
     def getAppNames(self):
         names = []
@@ -568,10 +577,11 @@ class TextTestGUI(Responder, plugins.Observable):
     def placeTopWidgets(self, vbox, intvActions):
         # Initialize
         self.uiManager.add_ui_from_string(self.defaultGUIDescription)
-        toolBarActions = filter(lambda instance : instance.inToolBar() and not instance.isTestDependent(), intvActions)
+        toolBarActions = filter(lambda instance : instance.inToolBar(), intvActions)
         guilog.info("") # blank line for demarcation
         for action in toolBarActions:
             toolBarGUI = ActionGUI(action, self.uiManager)
+            self.testTreeGUI.addObserver(toolBarGUI)
             toolBarGUI.describe()
     
         self.uiManager.add_ui_from_string(self.getInterfaceDescription(toolBarActions))
@@ -676,7 +686,7 @@ class TestTreeGUI(SubGUI):
         self.collapseStatic = False
         self.successPerSuite = {} # map from suite to number succeeded
         self.collapsedRows = {}
-    def activate(self):
+    def contentsChanged(self):
         pass # Not really integrated into the description mechanism
     def addSuite(self, suite):
         if not self.dynamic:
@@ -809,7 +819,7 @@ class TestTreeGUI(SubGUI):
             pass
 
     def selectionChanged(self, *args):
-        if self.selecting:
+        if self.selecting or hasattr(self.selection, "unseen_changes"):
             return
         
         allSelected, selectedTests = self.getSelected()
@@ -939,13 +949,13 @@ class TestTreeGUI(SubGUI):
         suiteIter = self.itermap[test.parent]
         iter = self.addSuiteWithParent(test, suiteIter)
     def notifyRemove(self, test):
-        self.removeTest(test)
-        self.totalNofTests -= test.size()
-        self.updateColumnTitle()
-
         # This test is currently selected. View the suite (its parent) instead!
         guilog.info("Selecting " + repr(test.parent) + " as test " + test.name + " removed")
         self.notifyNewTestSelection([ test.parent ])
+
+        self.removeTest(test)
+        self.totalNofTests -= test.size()
+        self.updateColumnTitle()
     def removeTest(self, test):
         guilog.info("-> " + test.getIndent() + "Removed " + repr(test) + " from test tree view.")
         iter = self.itermap[test]
@@ -1018,11 +1028,11 @@ class TestTreeGUI(SubGUI):
         self.filteredModel.refilter()
         self.visibilityChanged()
            
-class ActionGUI:
+class ActionGUI(SubGUI):
     def __init__(self, action, uiManager, fromTab=False):
+        SubGUI.__init__(self)
         self.action = action
         self.accelerator = self.getAccelerator()
-        self.button = None
         if self.action.isToggle():
             self.gtkAction = gtk.ToggleAction(self.action.getSecondaryTitle(), self.action.getTitle(), \
                                               self.action.getTooltip(), self.getStockId())
@@ -1038,9 +1048,11 @@ class ActionGUI:
         self.gtkAction.set_accel_group(uiManager.get_accel_group())
         self.gtkAction.connect_accelerator()
         scriptEngine.connect(self.action.getScriptTitle(fromTab), "activate", self.gtkAction, self.runInteractive)
+        if not fromTab and not self.action.isActiveOnCurrent():
+            self.gtkAction.set_property("sensitive", False) # tab guis are always sensitive, we manage this by removing the tab!
 
     def getActionGroupIndex(self):
-        return int(self.action.isTestDependent())
+        return 0
     def getActionGroup(self, uiManager):
         return uiManager.get_action_groups()[self.getActionGroupIndex()]
 
@@ -1071,7 +1083,7 @@ class ActionGUI:
             message += ", stock id '" + repr(stockId) + "'"
         if self.accelerator:
             message += ", accelerator '" + repr(self.accelerator) + "'"
-        if self.button and not self.button.get_property("sensitive"):
+        if not self.gtkAction.is_sensitive():
             message += " (greyed out)"
             
         if self.action.isRadio() or self.action.isToggle():
@@ -1079,20 +1091,16 @@ class ActionGUI:
         guilog.info(message)
 
     def notifyNewTestSelection(self, tests):
-        if not self.button:
-            return
-        oldActive = self.button.get_property("sensitive")
+        oldActive = self.gtkAction.is_sensitive()
         newActive = self.action.isActiveOnCurrent()
         if oldActive != newActive:
-            self.button.set_property("sensitive", newActive)
+            self.gtkAction.set_property("sensitive", newActive)
             guilog.info("Setting sensitivity of button '" + self.action.getTitle() + "' to " + repr(newActive))
-    def createButton(self):
-        self.button = gtk.Button()
-        self.gtkAction.connect_proxy(self.button)
-        if not self.action.isActiveOnCurrent():
-            self.button.set_property("sensitive", False)
-        self.button.show()
-        return self.button
+    def createView(self):
+        button = gtk.Button()
+        self.gtkAction.connect_proxy(button)
+        button.show()
+        return button
     def runInteractive(self, *args):
         if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
             return        
@@ -1109,57 +1117,83 @@ class ActionGUI:
         except plugins.TextTestWarning, e:
             showWarning(str(e), globalTopWindow)
         
-# base class for everything that can go in tabs handled by NotebookGUI
-class TabGUI(SubGUI):
-    def getTabTitle(self):
-        return "Need Title!"
-    def getGroupTabTitle(self):
-        return "Test"
-    def isObjectDependent(self):
-        return True # most of them seem to be
-    def updateView(self):
-        pass
 
-# class for encapsulating the test file view and possibly the test button bar
-class TopTestViewGUI(SubGUI):
-    def __init__(self, buttonBarGUIs, testFileGUI):
+class ContainerGUI(SubGUI):
+    def __init__(self, subguis):
         SubGUI.__init__(self)
-        self.buttonBarGUIs = buttonBarGUIs
-        self.testFileGUI = testFileGUI
-    def createView(self):
-        if len(self.buttonBarGUIs):
-            vbox = gtk.VBox()
-            vbox.pack_start(self.testFileGUI.createView(), expand=True, fill=True)
-            vbox.pack_start(self.makeButtonBar(), expand=False, fill=False)
-            vbox.show()
-            return vbox
-        else:
-            return self.testFileGUI.createView()
-
-    def makeButtonBar(self):
-        reversedGUIs = copy(self.buttonBarGUIs)
-        reversedGUIs.reverse()
-        executeButtons = gtk.HBox()
-        for buttonGUI in reversedGUIs:
-            button = buttonGUI.createButton()
-            executeButtons.pack_end(button, expand=False, fill=False)
-        executeButtons.show()
-        return executeButtons
-    def activate(self):
-        SubGUI.activate(self)
-        self.testFileGUI.activate()
-    def deactivate(self):
-        self.active = False
-        self.testFileGUI.deactivate()
-    def shouldShowCurrent(self):
-        return len(self.buttonBarGUIs) > 0
-    def describe(self):
-        for buttonBarGUI in self.buttonBarGUIs:
-            buttonBarGUI.describe()
+        self.subguis = subguis
+    def forceVisible(self, tests):
+        for subgui in self.subguis:
+            if subgui.forceVisible(tests):
+                return True
+        return False
     
-class ActionTabGUI(TabGUI):
+    def shouldShowCurrent(self):
+        for subgui in self.subguis:
+            if not subgui.shouldShowCurrent():
+                return False
+        return True
+    
+    def setActive(self, value):
+        SubGUI.setActive(self, value)
+        for subgui in self.subguis:
+            subgui.setActive(value)
+    def contentsChanged(self):
+        for subgui in self.subguis:
+            subgui.contentsChanged()
+    def describe(self):
+        for subgui in self.subguis:
+            subgui.describe()
+    
+class BoxGUI(ContainerGUI):
+    def __init__(self, subguis, horizontal, reversed=False):
+        ContainerGUI.__init__(self, subguis)
+        self.horizontal = horizontal
+        self.reversed = reversed
+
+    def createBox(self):
+        if self.horizontal:
+            return gtk.HBox()
+        else:
+            return gtk.VBox()
+    def getPackMethod(self, box):
+        if self.reversed:
+            return box.pack_end
+        else:
+            return box.pack_start
+    def getOrderedSubGUIs(self):
+        if self.reversed:
+            reversedGUIs = copy(self.subguis)
+            reversedGUIs.reverse()
+            return reversedGUIs
+        else:
+            return self.subguis
+
+    def shouldExpand(self, view):
+        if isinstance(view, gtk.Box) or isinstance(view, gtk.Button):
+            return False
+        else:
+            return True
+    def contentsChanged(self):
+        if self.horizontal:
+            SubGUI.contentsChanged(self)
+        else:
+            ContainerGUI.contentsChanged(self)
+        
+    def createView(self):
+        box = self.createBox()
+        packMethod = self.getPackMethod(box)
+        for subgui in self.getOrderedSubGUIs():
+            view = subgui.createView()
+            expand = self.shouldExpand(view)
+            packMethod(view, expand=expand, fill=expand)
+            
+        box.show()
+        return box
+        
+class ActionTabGUI(SubGUI):
     def __init__(self, optionGroup, action, buttonGUI):
-        TabGUI.__init__(self)
+        SubGUI.__init__(self)
         self.optionGroup = optionGroup
         self.action = action
         self.buttonGUI = buttonGUI
@@ -1170,20 +1204,27 @@ class ActionTabGUI(TabGUI):
         return self.optionGroup.name
     def shouldShowCurrent(self):
         return self.action.isActiveOnCurrent()
-    def isObjectDependent(self):
-        return self.action.isTestDependent()
     def createView(self):
         return self.addScrollBars(self.createVBox())
 
     def notifyLifecycleChange(self, test, state, changeDesc):
-        if self.action.updateOptionGroup(test, state):
+        if self.action.updateDefaults(test, state):
             self.updateView()
-        
+
+    def notifyNewTestSelection(self, tests):
+        if len(tests) == 0:
+            return
+        if self.action.updateDefaults(tests[0], tests[0].state):
+            self.updateView()
+            
     def updateView(self):
+        if not self.vbox:
+            return
         container = self.vbox.get_parent()
         container.remove(self.vbox)
         container.add(self.createVBox())
         container.show()
+        self.contentsChanged()
         
     def createVBox(self):
         self.vbox = gtk.VBox()
@@ -1205,7 +1246,7 @@ class ActionTabGUI(TabGUI):
             hbox = self.createSwitchBox(switch)
             self.vbox.pack_start(hbox, expand=False, fill=False)
         if self.buttonGUI:
-            button = self.buttonGUI.createButton()
+            button = self.buttonGUI.createView()
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()
@@ -1299,44 +1340,50 @@ class ActionTabGUI(TabGUI):
         return text
 
 class NotebookGUI(SubGUI):
-    def __init__(self, tabInfo, scriptTitle):
+    def __init__(self, tabInfo, scriptTitle, defaultPage=""):
         SubGUI.__init__(self)
         self.scriptTitle = scriptTitle
         self.diag = plugins.getDiagnostics("GUI notebook")
         self.tabInfo = tabInfo
         self.notebook = None
+        self.currentPageName = defaultPage
 
-    def activate(self):
-        self.active = True
-        self.getCurrentTabGUI().activate()
+    def setActive(self, value):
+        SubGUI.setActive(self, value)
+        if self.currentPageName:
+            self.tabInfo[self.currentPageName].setActive(value)
 
-    def deactivate(self):
-        self.active = False
-        self.getCurrentTabGUI().deactivate()
+    def contentsChanged(self):
+        SubGUI.contentsChanged(self)
+        if self.currentPageName:
+            self.tabInfo[self.currentPageName].contentsChanged()
 
     def createView(self):
         self.notebook = gtk.Notebook()
         for tabName, tabGUI in self.tabInfo.items():
             if tabGUI.shouldShowCurrent():
                 label = gtk.Label(tabName)
+                self.diag.info("Adding page " + tabName)
                 self.notebook.append_page(tabGUI.createView(), label)
 
         scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
+        if not self.setCurrentPage(self.currentPageName):
+            self.currentPageName = self.getPageName(0)
         self.notebook.connect("switch-page", self.handlePageSwitch)
         self.notebook.show()
-        if self.active:
-            self.getCurrentTabGUI().activate()
         return self.notebook
     
     def handlePageSwitch(self, notebook, ptr, pageNum, *args):
         if not self.active:
             return
-        activeTabName = self.getPageName(pageNum)
-        self.diag.info("Switching to page " + activeTabName)
+        self.currentPageName = self.getPageName(pageNum)
+        self.diag.info("Switching to page " + self.currentPageName)
         for tabName, tabGUI in self.tabInfo.items():
-            if tabName == activeTabName:
+            if tabName == self.currentPageName:
+                self.diag.info("Activating " + tabName)
                 tabGUI.activate()
             else:
+                self.diag.info("Deactivating " + tabName)
                 tabGUI.deactivate()
 
     def getPageName(self, pageNum):
@@ -1345,10 +1392,6 @@ class NotebookGUI(SubGUI):
             return self.notebook.get_tab_label_text(page)
         else:
             return ""
-    def getCurrentPageName(self):
-        return self.getPageName(self.notebook.get_current_page())
-    def getCurrentTabGUI(self):
-        return self.tabInfo[self.getCurrentPageName()]
 
     def findPage(self, name):
         for child in self.notebook.get_children():
@@ -1356,123 +1399,94 @@ class NotebookGUI(SubGUI):
             if text == name:
                 return child
 
+    def getTabNames(self):
+        return map(self.notebook.get_tab_label_text, self.notebook.get_children())
+
     def removePage(self, name):
         oldPage = self.findPage(name)
         if oldPage:
             self.diag.info("Removing page " + name)
             self.notebook.remove(oldPage)
 
-    def prependNewPage(self, name):
-        tabGUI = self.tabInfo.get(name)
+    def insertNewPage(self, name, insertPosition=0):
+        if self.notebook.get_n_pages() == 0:
+            self.currentPageName = name
+        tabGUI = self.tabInfo[name]
+        self.diag.info("Inserting new page " + name)
         page = tabGUI.createView()
         label = gtk.Label(name)
-        self.notebook.prepend_page(page, label)
+        self.notebook.insert_page(page, label, insertPosition)
 
+    def describe(self):
+        guilog.info("Tabs showing : " + string.join(self.getTabNames(), ", "))
 
-# For the notebooks appearing in the bottom right corner...
-class BottomNotebookGUI(NotebookGUI):
-    def getObjectDependentTabNames(self):
-        names = []
-        for child in self.notebook.get_children():
-            text = self.notebook.get_tab_label_text(child)
-            if self.tabInfo[text].isObjectDependent():
-                names.append(text)
-        return names
-
-    def findChanges(self, newList, oldList):
-        created, updated, removed = [], [], []
-        for item in newList:
-            if item in oldList:
-                updated.append(item)
-            else:
-                created.append(item)
-        for item in oldList:
-            if not item in newList:
-                removed.append(item)
-        return created, updated, removed
+    def findFirstRemaining(self, pageNamesRemoved):
+        for tabName in self.getTabNames():
+            if tabName not in pageNamesRemoved:
+                return tabName
     
-    def findFirstRemainingPageNum(self, pageNamesRemoved):
-        for index in range(len(self.tabInfo.keys())):
-            if not self.getPageName(index) in pageNamesRemoved:
-                return index
-        return 0
-    
-    def prependNewPages(self, pageNamesCreated):
-        # Prepend the pages, hence in reverse order...
-        pageNamesCreated.reverse()
-        for name in pageNamesCreated:
-            self.prependNewPage(name)
-            
-    def updatePages(self, pageNamesUpdated):
-        for name in pageNamesUpdated:
-            tabGUI = self.tabInfo.get(name)
-            self.diag.info("Replacing contents of page " + name)
-            tabGUI.updateView()
+    def insertNewPages(self):
+        currTabNames = self.getTabNames()
+        insertIndex = 0
+        changed = False
+        for name, tabGUI in self.tabInfo.items():
+            if name in currTabNames:
+                insertIndex += 1
+            elif tabGUI.shouldShowCurrent():
+                self.insertNewPage(name, insertIndex)
+                insertIndex += 1
+                changed = True
+        return changed
+
+    def setCurrentPage(self, newName):
+        self.diag.info("Resetting for current page " + self.currentPageName + " to page " + repr(newName))
+        try:
+            index = self.getTabNames().index(newName)
+            self.notebook.set_current_page(index)
+            self.currentPageName = newName
+            self.diag.info("Resetting done.")
+            return True
+        except ValueError:
+            return False
+
+    def findPagesToRemove(self):
+        return filter(lambda name: not self.tabInfo[name].shouldShowCurrent(), self.getTabNames())
         
-    def removePages(self, pageNamesRemoved):
-        # remove from the back, so we don't momentarily view them all
+    def removeOldPages(self):
+        # Must reset the current page before removing it if we're viewing a removed page
+        # otherwise we can output lots of pages we don't really look at
+        pageNamesRemoved = self.findPagesToRemove()
+        if len(pageNamesRemoved) == 0:
+            return False
+
+        if self.currentPageName in pageNamesRemoved:
+            newCurrentPageName = self.findFirstRemaining(pageNamesRemoved)
+            if newCurrentPageName:
+                self.setCurrentPage(newCurrentPageName)
+            
+        # remove from the back, so we don't momentarily view them all if removing everything
         pageNamesRemoved.reverse()
         for name in pageNamesRemoved:
             self.removePage(name)
-
-    def getNewTabNames(self):
-        names = []
-        for name, tabGUI in self.tabInfo.items():
-            if tabGUI.isObjectDependent() and tabGUI.shouldShowCurrent():
-                names.append(name)
-        return names
+        return True
+    def updateCurrentPage(self, tests):
+        allNames = self.getTabNames()
+        for name in allNames:
+            if self.tabInfo[name].forceVisible(tests):
+                self.notebook.set_current_page(allNames.index(name))
 
     def notifyNewTestSelection(self, tests):
-        if not self.notebook or len(tests) != 1:
-            return # For multiple tests, don't take test-specific parts away here
-        oldTabNames = self.getObjectDependentTabNames()
-        newTabNames = self.getNewTabNames()
-        self.diag.info("Updating notebook for " + repr(newTabNames) + " from " + repr(oldTabNames))
-        pageNamesCreated, pageNamesUpdated, pageNamesRemoved = self.findChanges(newTabNames, oldTabNames)
+        if not self.notebook:
+            return 
 
-        self.prependNewPages(pageNamesCreated)
-        self.updatePages(pageNamesUpdated)
-
-        # Must reset if we're viewing a removed page
-        currentPageName = self.getCurrentPageName()
-        newCurrentPageNum = self.findFirstRemainingPageNum(pageNamesRemoved)
-        if self.notebook.get_current_page() != newCurrentPageNum:
-            self.diag.info("Resetting for current page " + currentPageName + " to page " + repr(newCurrentPageNum))
-            self.notebook.set_current_page(newCurrentPageNum)
-            self.diag.info("Resetting done.")
-        elif self.active and currentPageName in pageNamesUpdated:
-            # activate the current page, we reloaded it...
-            self.tabInfo[currentPageName].activate()
-            
-        self.removePages(pageNamesRemoved)
-        if len(pageNamesRemoved) > 0 or len(pageNamesCreated) > 0:
-            self.describeAllTabs()
-
-    def describeAllTabs(self):
-        tabTexts = map(self.notebook.get_tab_label_text, self.notebook.get_children())
-        guilog.info("")
-        guilog.info("Tabs showing : " + string.join(tabTexts, ", "))
-
-
-class StaticTopNotebookGUI(NotebookGUI):
-    def __init__(self, tabGUIs, scriptName, defaultPage):
-        NotebookGUI.__init__(self, tabGUIs, scriptName)
-        self.defaultPage = defaultPage
-    def createView(self):
-        view = NotebookGUI.createView(self)
-        pageNum = self.tabInfo.keys().index(self.defaultPage)
-        self.notebook.set_current_page(pageNum)
-        return view
-    def notifyNewTestSelection(self, tests):
-        if len(tests) > 1:
-            self.removePage("Test")
-        elif len(tests) == 1:
-            if not self.findPage("Test"):
-                self.prependNewPage("Test")
-            self.notebook.set_current_page(0)
-
-            
-class PaneGUI(SubGUI):
+        pagesAdded = self.insertNewPages()
+        pagesRemoved = self.removeOldPages()
+        self.updateCurrentPage(tests)
+  
+        if pagesAdded or pagesRemoved:
+            SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
+          
+class PaneGUI(ContainerGUI):
     def __init__(self, subguis, separatorPosition, horizontal):
         SubGUI.__init__(self)
         self.subguis = subguis
@@ -1509,15 +1523,6 @@ class PaneGUI(SubGUI):
         self.paned.pack2(frames[1], resize=True)
         self.paned.show()
         return self.paned
-    
-    def activate(self):
-        self.active = True
-        for subgui in self.subguis:
-            subgui.activate()
-    def deactivate(self):
-        self.active = False
-        for subgui in self.subguis:
-            subgui.deactivate()
         
     def paneHasChanged(self, pane, gparamspec):
         pos = pane.get_position()
@@ -1536,9 +1541,9 @@ class PaneGUI(SubGUI):
         pos = int(self.getSize() * self.separatorPosition)
         self.paned.set_position(pos)                
     
-class TextInfoGUI(TabGUI):
+class TextInfoGUI(SubGUI):
     def __init__(self):
-        TabGUI.__init__(self)
+        SubGUI.__init__(self)
         self.currentTest = None
         self.text = ""
         self.view = None
@@ -1546,6 +1551,8 @@ class TextInfoGUI(TabGUI):
         return len(self.text) > 0
     def getTabTitle(self):
         return "Text Info"
+    def forceVisible(self, tests):
+        return len(tests) == 1
     def resetText(self, test, state):
         self.text = ""
         if state.isComplete():
@@ -1573,13 +1580,16 @@ class TextInfoGUI(TabGUI):
                 self.resetText(self.currentTest, self.currentTest.state)
             else:
                 self.text = ""
+            self.updateView()
+    def updateView(self):
+        if self.view:
+            self.updateViewFromText()
+            self.contentsChanged()
     def notifyLifecycleChange(self, test, state, changeDesc):
         if not test is self.currentTest:
             return
         self.resetText(test, state)
-        if self.view:
-            self.updateView()
-            self.contentsChanged()
+        self.updateView()
     def createView(self):
         if not self.shouldShowCurrent():
             return
@@ -1587,10 +1597,10 @@ class TextInfoGUI(TabGUI):
         self.view.set_editable(False)
         self.view.set_cursor_visible(False)
         self.view.set_wrap_mode(gtk.WRAP_WORD)
-        self.updateView()
+        self.updateViewFromText()
         self.view.show()
         return self.addScrollBars(self.view)
-    def updateView(self):
+    def updateViewFromText(self):
         textbuffer = self.view.get_buffer()
         textToUse = self.getTextForView()
         textbuffer.set_text(textToUse)        
@@ -1782,6 +1792,9 @@ class TestFileGUI(FileViewGUI):
     def notifyLifecycleChange(self, test, state, changeDesc):
         if test is self.currentObject:
             self.recreateModel(state)
+    def forceVisible(self, tests):
+        return len(tests) == 1
+    
     def notifyNewTestSelection(self, tests):
         if len(tests) == 0: 
             return
@@ -1800,6 +1813,9 @@ class TestFileGUI(FileViewGUI):
             self.currentObject.refreshFiles()
             self.setName(tests)
             self.recreateModel(self.getState())
+
+    def shouldShowCurrent(self):
+        return self.currentObject is not None
             
     def addFilesToModel(self, state):
         if state.hasStarted():
@@ -1993,9 +2009,9 @@ class TestProgressBar:
             
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
-class TestProgressMonitor(TabGUI):
+class TestProgressMonitor(SubGUI):
     def __init__(self, dynamic):
-        TabGUI.__init__(self)
+        SubGUI.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
                 
         # Each row has 'type', 'number', 'show', 'tests'
@@ -2006,11 +2022,10 @@ class TestProgressMonitor(TabGUI):
         self.dynamic = dynamic
     def getTabTitle(self):
         return "Progress"
-    def activate(self):
+    def contentsChanged(self):
         pass # We don't worry about whether we're visible, we think we're important enough to write lots anyway!
     def shouldShowCurrent(self):
         return self.dynamic
-    
     def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)
         selection = self.treeView.get_selection()

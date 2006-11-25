@@ -23,7 +23,7 @@ except:
 
 import guiplugins, plugins, os, string, time, sys, locale
 from threading import Thread, currentThread
-from gtkusecase import ScriptEngine, TreeModelIndexer
+from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
 from respond import Responder
 from copy import copy
@@ -1367,6 +1367,7 @@ class NotebookGUI(SubGUI):
                 self.notebook.append_page(tabGUI.createView(), label)
 
         scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
+	self.notebook.set_scrollable(True)
         if not self.setCurrentPage(self.currentPageName):
             self.currentPageName = self.getPageName(0)
         self.notebook.connect("switch-page", self.handlePageSwitch)
@@ -1943,18 +1944,7 @@ class TestFileGUI(FileViewGUI):
             newiter = self.addFileToModel(parentIter, file, None, colour)
             if os.path.isdir(file):
                 dirIters[file] = newiter
-    
-# A utility class to set and get the indices of options in radio button groups.
-class RadioGroupIndexer:
-    def __init__(self, listOfButtons):
-        self.buttons = listOfButtons
-    def getActiveIndex(self):
-        for i in xrange(0, len(self.buttons)):
-            if self.buttons[i].get_active():
-                return i
-    def setActiveIndex(self, index):
-        self.buttons[index].set_active(True)
-
+  
 class TestProgressBar:
     def __init__(self):
         self.totalNofTests = 0

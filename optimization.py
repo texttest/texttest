@@ -318,8 +318,8 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         return True   
 
 class OptimizationTestComparison(TestComparison):
-    def __init__(self, previousInfo, app):
-        TestComparison.__init__(self, previousInfo, app)
+    def __init__(self, previousInfo, app, lifecycleChange=""):
+        TestComparison.__init__(self, previousInfo, app, lifecycleChange)
         self.costName = costEntryName
         itemsInFile = app.getConfigValue(itemNamesConfigKey)
         if itemsInFile.has_key(costEntryName):

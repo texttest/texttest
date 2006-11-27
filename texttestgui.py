@@ -1221,10 +1221,11 @@ class ActionTabGUI(SubGUI):
         if not self.vbox:
             return
         container = self.vbox.get_parent()
-        container.remove(self.vbox)
-        container.add(self.createVBox())
-        container.show()
-        self.contentsChanged()
+        if container:
+            container.remove(self.vbox)
+            container.add(self.createVBox())
+            container.show()
+            self.contentsChanged()
         
     def createVBox(self):
         self.vbox = gtk.VBox()

@@ -175,7 +175,7 @@ class ImportTestSuite(ravebased.ImportTestSuite):
     def hasStaticLinkage(self, carmUsr):
         return staticLinkageInCustomerFile(carmUsr)
     def getCarmtmpPath(self, carmtmp):
-        return os.path.join("/carm/proj/matador/carmtmps/${MAJOR_RELEASE_ID}/${ARCHITECTURE}", carmtmp)
+        return os.path.join("${TEST_DATA_ROOT}/carmtmps/${MAJOR_RELEASE_ID}/${ARCHITECTURE}", carmtmp)
 
 class FilterRuleBuilds(ravebased.FilterRuleBuilds):
     def assumeDynamicLinkage(self, libFile, carmUsr):

@@ -17,19 +17,15 @@ helpOptions = """
              rebuilt 'from scratch'. This is sometimes useful when the RAVE compiler has depenedency bugs
 
 -build <t> - Prior to running any tests, build in the appropriate location specified by <t>. This is specified in
-             the config file as the entries "build_xxx". So if my config file contains the lines
-             build_codebase:Rules_and_Reports
-             build_codebase:Optimization
+             the config file as the entries "build_targets". So if my config file contains the lines
+             [build_targets]
+             codebase:$TEXTTEST_CHECKOUT/Rules_and_Reports
+             codebase:$TEXTTEST_CHECKOUT/Optimization
              then specifying -build codebase will cause a build (= gmake) to be run in these places (relative to checkout
              of course), before anything else is done.
 
-             It is expected that this option is used on linux. Note that in addition, a build is kicked off in parallel
-             on sparc (sundance) and parisc_2_0 (ramechap), which run in the background while your tests run,
-             and are reported on at the end. This should ensure that they don't delay the appearance of test information.
-
--buildl <t>
-           - As above, but no parallel builds are done.
-
+             It will build on the platform whose architecture you specify.
+             
 -skip      - Don't build any rulesets before running the tests.
 
 -debug     - Compile a debug ruleset, and rename it so that it is used instead of the normal one.
@@ -144,7 +140,6 @@ class Config(CarmenConfig):
                 group.addSwitch("raveexp", "Run with RAVE Explorer")
             elif group.name.startswith("Side"):
                 group.addOption("build", "Build application target")
-                group.addOption("buildl", "Build application target locally")
             elif group.name.startswith("Invisible"):
                 group.addOption("raveslave", "Private: used for submitting slaves to compile rulesets")
     def getFilterClasses(self):
@@ -157,8 +152,6 @@ class Config(CarmenConfig):
         if self.raveSlave():
             return self.getSlaveResponderClasses()
         baseResponders = CarmenConfig.getResponderClasses(self, allApps)
-        if self.optionMap.has_key("build"):
-            baseResponders.append(RemoteBuildResponder)
         if self.useQueueSystem():
             baseResponders.append(RuleBuildSynchroniser)
         return baseResponders
@@ -242,8 +235,6 @@ class Config(CarmenConfig):
     def getAppBuilder(self):
         if self.optionMap.has_key("build"):
             return BuildCode(self.optionValue("build"))
-        elif self.optionMap.has_key("buildl"):
-            return BuildCode(self.optionValue("buildl"), remote = 0)
         else:
             return None
     def _getLocalPlanPath(self, test):
@@ -838,11 +829,8 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
 class BuildCode(plugins.Action):
     builtDirs = {}
     buildFailedDirs = {}
-    builtDirsBackground = {}
-    childProcesses = []
-    def __init__(self, target, remote = 1):
+    def __init__(self, target):
         self.target = target
-        self.remote = remote
     def setUpApplication(self, app):
         targetDir = app.getConfigValue("build_targets")
         if not targetDir.has_key(self.target):
@@ -864,14 +852,6 @@ class BuildCode(plugins.Action):
                 self.buildLocal(absPath, app, makeTargets)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
-        if arch == "i386_linux" and self.remote:
-            self.buildRemote("sparc", app)
-            if not "9" in app.versions and not "10" in app.versions:
-                self.buildRemote("sparc_64", app)
-                if not "11" in app.versions:
-                    self.buildRemote("x86_64_linux", app)
-            self.buildRemote("parisc_2_0", app)
-            self.buildRemote("powerpc", app)
     def getPathAndTargets(self, optValue):
         relPath = os.path.normpath(optValue)
         makeTargets = ""
@@ -919,7 +899,7 @@ class BuildCode(plugins.Action):
         machine = self.getMachine(app, arch)
         print "Building", app, "in", absPath, "on", machine, "..."
         os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
-        if checkBuildFile(buildFile):
+        if self.checkBuildFile(buildFile):
             self.buildFailedDirs[arch].append(absPath)
             raise plugins.TextTestError, "BUILD ERROR: Product " + repr(app) + " did not build!" + os.linesep + \
                   "(See " + os.path.join(absPath, buildFile) + " for details)"
@@ -931,80 +911,11 @@ class BuildCode(plugins.Action):
             commandLine = self.getRemoteCommandLine(arch, absPath, makeCommand)
             os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
             print "Making install from", absPath ,"to", os.environ["CARMSYS"]
-    def buildRemote(self, arch, app):
-        targetDir = app.getConfigValue("build_targets")
-        if not targetDir.has_key("codebase"):
-            return
-        if not self.builtDirsBackground.has_key(arch):
-            self.builtDirsBackground[arch] = []
-        buildDirs = []
-        machine = self.getMachine(app, arch)
-        for optValue in targetDir["codebase"]:
-            absPath, makeTargets = self.getPathAndTargets(optValue)
-            if os.path.isdir(absPath) and not absPath in self.builtDirsBackground[arch]:
-                buildDirs.append((absPath, makeTargets))
-                print "Building", absPath, "remotely in parallel on", machine, "..."
-                self.builtDirsBackground[arch].append(absPath)
-        if len(buildDirs) == 0:
-            return
-        processId = os.fork()
-        if processId == 0:
-            result = self.buildRemoteInChild(machine, arch, buildDirs)
-            os._exit(result)
-        else:
-            tuple = processId, arch, buildDirs
-            self.childProcesses.append(tuple)
-    def buildRemoteInChild(self, machine, arch, buildDirs):
-        sys.stdin = open("/dev/null")
-        signal.signal(1, self.killBuild)
-        signal.signal(2, self.killBuild)
-        signal.signal(15, self.killBuild)
-        for absPath, makeTargets in buildDirs:
-            commandLine = self.getRemoteCommandLine(arch, absPath, "gmake " + makeTargets + " >& build." + arch)
-            os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
-        return 0            
-    def killBuild(self):
-        print "Terminating remote build."
-
-def checkBuildFile(buildFile):
-    for line in open(buildFile).xreadlines():
-        if line.find("***") != -1 and line.find("Error") != -1:
-            return 1
-    return 0
-    
-
-class RemoteBuildResponder(Responder):
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
-        self.target = optionMap["build"]
-        self.checkedDirs = {}
-    def notifyAllComplete(self):
-        print "Waiting for remote builds..." 
-        for process, arch, buildDirs in BuildCode.childProcesses:
-            os.waitpid(process, 0)
-            for absPath, makeTargets in buildDirs:
-                # In theory we should be able to trust the status. In practice, it seems to be 0, even when the build failed.
-                if os.path.isdir(absPath):
-                    self.checkBuild(arch, absPath)
-    def checkBuild(self, arch, absPath):
-        os.chdir(absPath)
-        if not self.checkedDirs.has_key(arch):
-            self.checkedDirs[arch] = []
-        if absPath in self.checkedDirs[arch]:
-            return
-        
-        self.checkedDirs[arch].append(absPath)
-        fileName = "build." + arch
-        if not os.path.isfile(fileName):
-            print "FILE NOT FOUND: ", os.path.join(absPath, fileName)
-            return
-        result = checkBuildFile(fileName)
-        resultString = " SUCCEEDED!"
-        if result:
-            resultString = " FAILED!"
-        print "Build on " + arch + " in " + absPath + resultString
-        if result == 0:
-            os.remove(fileName)
+    def checkBuildFile(self, buildFile):
+        for line in open(buildFile).xreadlines():
+            if line.find("***") != -1 and line.find("Error") != -1:
+                return 1
+        return 0
 
 class TraverseCarmUsers(plugins.Action):
     def __init__(self, args = []):

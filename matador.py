@@ -40,6 +40,7 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
 """
 
 import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins
+from sets import Set
 from optimization import GenerateWebPages
 
 def getConfig(optionMap):
@@ -452,28 +453,61 @@ class TimeSummary(plugins.Action):
 class CleanSubplans(plugins.Action):
     def __init__(self):
         self.config = MatadorConfig(None)
-        self.user = os.environ["USER"]
-        self.cleanedPlans = 0
-    def __del__(self):
-        print "Removed ", self.cleanedPlans, " temporary subplan directories"
+        self.preservePaths = Set([])
+        self.preserveNames = [ "APC_FILES", "etable" ]
+        self.preserveUsers = [ "/carm/proj/matador/carmusrs/master/RD_dl_cbs_v13", \
+                               "/carm/proj/matador/carmusrs/carmen_10/RD_song_cas_v10_user", \
+                               "/carm/proj/matador/carmusrs/carmen_12/RD_strict_seniority_user" ]
     def __repr__(self):
         return "Cleaning subplans for"
     def __call__(self, test):
         subplan = self.config._getSubPlanDirName(test)
-        localplan, subdir = os.path.split(subplan)
-        searchStr = subdir + "." + test.app.name
-        cleanedPlansTest = 0
-        for file in os.listdir(localplan):
-            startsubplan = file.find(searchStr)
-            if startsubplan == -1:
-                continue
-            if file.find(self.user, startsubplan + len(searchStr)) != -1:
-                cleanedPlansTest += 1
-                shutil.rmtree(os.path.join(localplan, file))
-        self.describe(test, " (" + str(cleanedPlansTest) + ")")
-        self.cleanedPlans += cleanedPlansTest
+        self.addAll(subplan)
+        realpath = self.realpath(subplan)
+        if realpath != subplan and realpath.find("LOCAL_PLAN") != -1:
+            self.addAll(realpath)
+    def addAll(self, path):
+        self.preservePaths.add(path)
+        dir, local = os.path.split(path)
+        if not dir.endswith("LOCAL_PLAN"):
+            self.addAll(dir)
     def setUpSuite(self, suite):
         self.describe(suite)
+        if ravebased.isUserSuite(suite):
+            print suite.getIndent() + "Collecting subplans for " + ravebased.getCarmdata()
+            self.preservePaths.clear()
+    def realpath(self, path):
+        return os.path.normpath(os.path.realpath(path).replace("/nfs/vm", "/carm/proj"))
+    def tearDownSuite(self, suite):
+        if ravebased.isUserSuite(suite):
+            if suite.getEnvironment("CARMUSR") in self.preserveUsers:
+                print "Ignoring for Curt", suite
+            else:
+                self.removeUnused()
+    def removeUnused(self):
+        localplanPath = self.config._getLocalPlanPath(None)
+        before = self.getDiskUsage(localplanPath)
+        print "Disk usage before", before, "MB"
+        self.removeUnder(localplanPath)
+        after = self.getDiskUsage(localplanPath)
+        print "Removed", before - after, "MB of the original", before
+    def removeUnder(self, path):
+        for file in os.listdir(path):
+            if file in self.preserveNames or file.lower().find("env") != -1:
+                continue
+            fullPath = os.path.join(path, file)
+            if os.path.isdir(fullPath) and not os.path.islink(fullPath):
+                if fullPath in self.preservePaths:
+                    self.removeUnder(fullPath)
+                else:
+                    print "Removing unused directory", fullPath, "..."
+                    try:
+                        shutil.rmtree(fullPath)
+                    except:
+                        print "FAILED!", str(sys.exc_value)
+    def getDiskUsage(self, dir):
+        output = os.popen("du -s " + dir).read()
+        return int(output.split()[0]) / 1000
 
 class PrintStrings(plugins.Action):
     def __init__(self):

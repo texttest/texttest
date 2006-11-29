@@ -1198,6 +1198,7 @@ class ActionTabGUI(SubGUI):
         self.action = action
         self.buttonGUI = buttonGUI
         self.vbox = None
+        self.tooltips = gtk.Tooltips()
     def getGroupTabTitle(self):
         return self.action.getGroupTabTitle()
     def getTabTitle(self):
@@ -1236,7 +1237,10 @@ class ActionTabGUI(SubGUI):
             rowIndex = 0        
             for option in self.optionGroup.options.values():
                 label, entry = self.createOptionEntry(option)
-                label.set_alignment(1.0, 0.5)
+                if isinstance(label, gtk.Label):
+                    label.set_alignment(1.0, 0.5)
+                else:
+                    label.get_children()[0].set_alignment(1.0, 0.5)
                 table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
                 table.attach(entry, 1, 2, rowIndex, rowIndex + 1)
                 rowIndex += 1
@@ -1269,8 +1273,11 @@ class ActionTabGUI(SubGUI):
             return entry, entry
         
     def createOptionEntry(self, option):
-        label = gtk.Label(option.name + "  ")
         widget, entry = self.createOptionWidget(option)
+        label = gtk.EventBox()
+        label.add(gtk.Label(option.name + "  "))
+        if option.description:
+            self.tooltips.set_tip(label, option.description)
         entry.set_text(option.getValue())
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
         option.setMethods(entry.get_text, entry.set_text)
@@ -1279,7 +1286,11 @@ class ActionTabGUI(SubGUI):
     def createSwitchBox(self, switch):
         if len(switch.options) >= 1:
             hbox = gtk.HBox()
-            hbox.pack_start(gtk.Label(switch.name), expand=False, fill=False)
+            label = gtk.EventBox()
+            label.add(gtk.Label(switch.name))
+            if switch.description:
+                self.tooltips.set_tip(label, switch.description)
+            hbox.pack_start(label, expand=False, fill=False)
             count = 0
             buttons = []
             mainRadioButton = None

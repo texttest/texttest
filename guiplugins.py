@@ -138,10 +138,10 @@ class InteractiveAction(plugins.Observable):
             return baseTitle
     def _getScriptTitle(self):
         return self.getTitle()
-    def addOption(self, key, name, value = "", possibleValues = []):
-        self.optionGroup.addOption(key, name, value, possibleValues)
-    def addSwitch(self, key, name, defaultValue = 0, options = []):
-        self.optionGroup.addSwitch(key, name, defaultValue, options)
+    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, description = ""):
+        self.optionGroup.addOption(key, name, value, possibleValues, allocateNofValues, description)
+    def addSwitch(self, key, name, defaultValue = 0, options = [], description = ""):
+        self.optionGroup.addSwitch(key, name, defaultValue, options, description)
     def startExternalProgram(self, commandLine, description = "", shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
         process = plugins.BackgroundProcess(commandLine, description=description, shellTitle=shellTitle, \
                                             holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
@@ -514,8 +514,8 @@ class ImportTest(InteractiveTestAction):
     def __init__(self, suite):
         InteractiveTestAction.__init__(self, suite)
         self.optionGroup.addOption("name", self.getNameTitle(), self.getDefaultName())
-        self.optionGroup.addOption("desc", self.getDescTitle(), self.getDefaultDesc())
-        self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2)
+        self.optionGroup.addOption("desc", self.getDescTitle(), self.getDefaultDesc(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
+        self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
         self.testImported = None
         self.setPlacements()
     def correctTestClass(self):
@@ -743,7 +743,7 @@ class SelectTests(SelectionAction):
         self.diag = plugins.getDiagnostics("Select Tests")
         self.addOption("vs", "Tests for version", "", self.getPossibleVersions())
         self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0)
-        self.addSwitch("current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"])
+        self.addSwitch("current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
         
         self.appSelectGroup = self.findSelectGroup()
         self.optionGroup.options += self.appSelectGroup.options

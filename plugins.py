@@ -7,7 +7,7 @@ from threading import currentThread
 from Queue import Queue, Empty
 
 # Useful utility...
-def localtime(format="%d%b%H:%M:%S", seconds=None):
+def localtime(format= "%d%b%H:%M:%S", seconds=None):
     if not seconds:
         seconds = time.time()
     return time.strftime(format, time.localtime(seconds))
@@ -385,7 +385,7 @@ class TestState(Observable):
 addCategory("unrunnable", "unrunnable", "could not be run")
 
 class Unrunnable(TestState):
-    def __init__(self, freeText, briefText="UNRUNNABLE", executionHosts=[]):
+    def __init__(self, freeText, briefText = "UNRUNNABLE", executionHosts=[]):
         TestState.__init__(self, "unrunnable", freeText, briefText, completed=1, \
                            executionHosts=executionHosts)
     def shouldAbandon(self):
@@ -592,7 +592,7 @@ class TextTestWarning(RuntimeError):
 
 # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
 class OptionFinder(seqdict):
-    def __init__(self, args, defaultKey="default"):
+    def __init__(self, args, defaultKey = "default"):
         seqdict.__init__(self)
         self.buildOptions(args, defaultKey)
     def buildOptions(self, args, defaultKey):
@@ -675,11 +675,12 @@ class BackgroundProcess(Process):
         return self.processHandler.hasTerminated(self.processId, childProcess=1)
     
 class Option:    
-    def __init__(self, name, value):
+    def __init__(self, name, value, description):
         self.name = name
         self.defaultValue = value
         self.valueMethod = None
         self.updateMethod = None
+        self.description = description
     def getValue(self):
         if self.valueMethod:
             return self.valueMethod()
@@ -699,8 +700,8 @@ class Option:
             self.valueMethod = None
 
 class TextOption(Option):
-    def __init__(self, name, value, possibleValues, allocateNofValues):
-        Option.__init__(self, name, value)
+    def __init__(self, name, value, possibleValues, allocateNofValues, description):
+        Option.__init__(self, name, value, description)
         self.possibleValues = possibleValues
         self.possValMethod = None
         self.nofValues = allocateNofValues
@@ -720,8 +721,8 @@ class TextOption(Option):
             return len(self.possibleValues)
 
 class Switch(Option):
-    def __init__(self, name, defaultValue, options):
-        Option.__init__(self, name, defaultValue)
+    def __init__(self, name, defaultValue, options, description):
+        Option.__init__(self, name, defaultValue, description)
         self.options = options
         self.resetMethod = None
     def reset(self):
@@ -729,11 +730,11 @@ class Switch(Option):
             self.resetMethod(1)
         else:
             Option.reset(self)
-    def description(self):
-        description = self.name
+    def describe(self):
+        text = self.name
         if len(self.options) > 0:
-            description += self.options[-1]
-        return description
+            text += self.options[-1]
+        return text
 
 class OptionGroup:
     def __init__(self, name, defaultDict, possibleValueDict):
@@ -771,19 +772,21 @@ class OptionGroup:
             return values
     def getEntryName(self, name):
         return name.lower().replace(" ", "_")
-    def addSwitch(self, key, name, value = 0, options = []):
+    def addSwitch(self, key, name, value = 0, options = [], description = ""):
         if self.switches.has_key(key):
-            return
+            return False
         entryName = self.getEntryName(name)
         defaultValue = int(self.getDefault(entryName, value))
-        self.switches[key] = Switch(name, defaultValue, options)
-    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1):
+        self.switches[key] = Switch(name, defaultValue, options, description)
+        return True
+    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, description = ""):
         if self.options.has_key(key):
-            return
+            return False
         entryName = self.getEntryName(name)
         defaultValue = self.getDefault(entryName, value)
         defaultPossValues = self.getDefaultPossiblilities(entryName, defaultValue, possibleValues)
-        self.options[key] = TextOption(name, defaultValue, defaultPossValues, allocateNofValues)
+        self.options[key] = TextOption(name, defaultValue, defaultPossValues, allocateNofValues, description)
+        return True
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()

@@ -24,10 +24,10 @@ class Config(plugins.Configuration):
                 group.addOption("ts", "Suite names containing")
                 group.addOption("grep", "Result files containing")
                 group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
-                group.addOption("r", "Execution time")
+                group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("What"):
                 group.addOption("c", "Use checkout", app.checkout)
-                group.addOption("reconnect", "Reconnect to")
+                group.addOption("reconnect", "Reconnect to", description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
             elif group.name.startswith("How"):
                 group.addOption("b", "Run batch mode session")
@@ -1726,7 +1726,7 @@ class DocumentOptions(plugins.Action):
                 keyOutput, docOutput = self.optionOutput(key, group, group.options[key].name)
                 self.display(keyOutput, self.groupOutput(group), docOutput)
             if group.switches.has_key(key):    
-                self.display("-" + key, self.groupOutput(group), group.switches[key].description())
+                self.display("-" + key, self.groupOutput(group), group.switches[key].describe())
     def display(self, keyOutput, groupOutput, docOutput):
         if not docOutput.startswith("Private"):
             print keyOutput + ";" + groupOutput + ";" + docOutput.replace("SGE", "SGE/LSF")

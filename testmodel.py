@@ -196,6 +196,8 @@ class Test(plugins.Observable):
     def getTestRelPath(self, file):
         # test suites don't use this mechanism currently
         return ""
+    def needsRecalculation(self):
+        return False
     def defFileStems(self):
         return self.getConfigValue("definition_file_stems")
     def resultFileStems(self):
@@ -384,15 +386,9 @@ class TestCase(Test):
                 return self.writeDirectories[0]
         else:
             return self.dircaches[0].dir
-    def hasFiles(self):
-        dir = self.getDirectory(temporary=1)
-        if not os.path.isdir(dir):
-            return False
-        for file in os.listdir(dir):
-            fullPath = os.path.join(dir, file)
-            if os.path.isfile(fullPath):
-                return True
-        return False
+    def needsRecalculation(self):
+        return self.state.isComplete() and self.state.needsRecalculation() and \
+               os.path.isdir(self.getDirectory(temporary=1))
     def callAction(self, action):
         return action(self)
     def changeState(self, state):

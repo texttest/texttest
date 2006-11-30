@@ -328,10 +328,12 @@ class TestState(Observable):
     def __str__(self):
         return self.freeText
     def __repr__(self):
+        return self.categoryRepr() + self.hostRepr() + self.colonRepr()
+    def categoryRepr(self):
         if not self.categoryDescriptions.has_key(self.category):
-            return self.category + self.hostRepr()
+            return self.category
         briefDescription, longDescription = self.categoryDescriptions[self.category]
-        return longDescription + self.hostRepr()
+        return longDescription
     def hostString(self):
         if len(self.executionHosts) == 0:
             return "(no execution hosts given)"
@@ -339,7 +341,12 @@ class TestState(Observable):
             return "on " + string.join(self.executionHosts, ",")
     def hostRepr(self):
         if self.showExecHosts and len(self.executionHosts) > 0:
-            return " " + self.hostString() + " :"
+            return " " + self.hostString()
+        else:
+            return ""
+    def colonRepr(self):
+        if self.hasSucceeded():
+            return ""
         else:
             return " :"
     def notifyInMainThread(self):
@@ -349,7 +356,7 @@ class TestState(Observable):
         # Is some aspect of the state out of date
         return 0
     # Used by text interface to print states
-    def getDifferenceSummary(self):
+    def description(self):
         if self.freeText:
             if self.freeText.find("\n") == -1:
                 return "not compared:  " + self.freeText
@@ -376,7 +383,7 @@ class TestState(Observable):
         # Do we have actual results that can be compared
         return 0
     def shouldAbandon(self):
-        return False
+        return self.lifecycleChange == "complete"
     def isSaveable(self):
         return self.hasFailed() and self.hasResults()
     def updateAbsPath(self, newAbsPath):

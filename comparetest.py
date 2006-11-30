@@ -82,12 +82,12 @@ class TestComparison(BaseTestComparison):
         # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved
         self.appAbsPath = app.getDirectory()
         self.appWriteDir = app.writeDirectory
-    def __repr__(self):    
+    def categoryRepr(self):    
         if self.failedPrediction:
             briefDescription, longDescription = self.categoryDescriptions[self.category]
-            return longDescription + " (" + self.failedPrediction.briefText + ")" + self.hostRepr()
+            return longDescription + " (" + self.failedPrediction.briefText + ")"
         else:
-            return plugins.TestState.__repr__(self)
+            return plugins.TestState.categoryRepr(self)
     def ensureCompatible(self):
         # If loaded from old pickle files, can get out of date objects...
         if not hasattr(self, "missingResults"):
@@ -185,11 +185,9 @@ class TestComparison(BaseTestComparison):
             return cmp(first.stem, second.stem)
         else:
             return cmp(first.displayPriority, second.displayPriority)
+    def description(self):
+        return repr(self) + self.getDifferenceSummary()
     def getDifferenceSummary(self):
-        return repr(self) + self._getDifferenceSummary()
-    def _getDifferenceSummary(self):
-        if len(self.getComparisons()) == 0:
-            return ""
         texts = []
         if len(self.newResults) > 0:
             texts.append("new results in " + self._comparisonsString(self.newResults))
@@ -197,7 +195,10 @@ class TestComparison(BaseTestComparison):
             texts.append("missing results for " + self._comparisonsString(self.missingResults))
         if len(self.changedResults) > 0:
             texts.append("differences in " + self._comparisonsString(self.changedResults))
-        return " " + string.join(texts, ", ")
+        if len(texts) > 0:
+            return " " + string.join(texts, ", ")
+        else:
+            return ""
     def getPostText(self):
         if not self.hasResults():
             return " - NONE!"
@@ -235,8 +236,6 @@ class TestComparison(BaseTestComparison):
             # Keep the category we had before
             self.freeText += self.getFreeTextInfo()
             return
-        if not self.hasResults():
-            raise plugins.TextTestError, "No output files at all produced, presuming problems running test " + self.hostString() 
         worstResult = self.getMostSevereFileComparison()
         if not worstResult:
             self.category = "success"

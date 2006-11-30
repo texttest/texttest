@@ -36,8 +36,10 @@ class Responder:
 class TextDisplayResponder(Responder):
     def notifyComplete(self, test):
         if test.state.hasFailed():
-            print test.getIndent() + repr(test), test.state.getDifferenceSummary()
-        
+            self.describe(test)
+    def describe(self, test):
+        print test.getIndent() + repr(test), test.state.description()
+            
 class SaveState(Responder):
     def notifyComplete(self, test):
         if test.state.isComplete():

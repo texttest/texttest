@@ -100,7 +100,7 @@ class Config(plugins.Configuration):
         if self.useGUI():
             self.addGuiResponder(classes)
         else:
-            classes.append(respond.TextDisplayResponder)
+            classes.append(self.getTextDisplayResponderClass())
         if self.batchMode() and not self.optionMap.has_key("coll"):
             classes.append(batch.BatchResponder)
         if self.keepTemporaryDirectories():
@@ -108,6 +108,8 @@ class Config(plugins.Configuration):
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
         return classes
+    def getTextDisplayResponderClass(self):
+        return respond.TextDisplayResponder
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
@@ -135,10 +137,8 @@ class Config(plugins.Configuration):
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
     def getReconnectSequence(self):
-        reconnFull = self.optionMap.has_key("reconnfull")
-        actions = [ ReconnectTest(self.optionValue("reconnect"), reconnFull) ]
-        if reconnFull:
-            actions += [ self.getTestComparator(), self.getFailureExplainer() ]
+        actions = [ ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull")) ]
+        actions += [ self.getTestComparator(), self.getFailureExplainer() ]
         return actions
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()
@@ -1390,50 +1390,48 @@ class ReconnectTest(plugins.Action):
         self.fullRecalculate = fullRecalculate
         self.diag = plugins.getDiagnostics("Reconnection")
     def __repr__(self):
-        if self.fullRecalculate:
-            return "Copying files for recalculation of"
-        else:
-            return "Reconnecting to"
+        return "Reconnecting to"
     def __call__(self, test):
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
-        if self.fullRecalculate:
-            self.copyFiles(reconnLocation, test)
+        if os.path.isdir(reconnLocation):
+            self.reconnect(test, reconnLocation)
+        else:
+            test.changeState(plugins.Unrunnable(briefText="no results", \
+                                                freeText="No file found to load results from"))
+            
+        self.describe(test, self.getStateText(test))
+    def getStateText(self, test):
+        if test.state.isComplete():
+            return " (state " + test.state.category + ")"
+        else:
+            return " (recomputing)"
+    def reconnect(self, test, location):
+        stateFile = os.path.join(location, "framework_tmp", "teststate")
+        if os.path.isfile(stateFile):
+            loaded, newState = test.getNewState(open(stateFile))
+            if loaded: # if we can't read it, recompute it
+                self.loadState(test, newState)
 
-        self.loadStoredState(test, reconnLocation)
-    def copyFiles(self, reconnLocation, test):
-        if not self.canReconnectTo(reconnLocation):
-            return
+        if self.fullRecalculate or not test.state.isComplete():
+            self.copyFiles(test, location)
 
+    def copyFiles(self, test, reconnLocation):
         test.makeWriteDirectories()
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
-            self.copyFile(fullPath, test.makeTmpFileName(file, forComparison=0))
+            if os.path.isfile(fullPath):
+                shutil.copyfile(fullPath, test.makeTmpFileName(file, forComparison=0))
 
-        testStateFile = os.path.join(reconnLocation, "framework_tmp", "teststate")
-        self.copyFile(testStateFile, test.getStateFile())
-    def copyFile(self, sourcePath, targetPath):
-        if os.path.isfile(sourcePath):
-            shutil.copyfile(sourcePath, targetPath)
-    def getStoredStateInfo(self, test, location):
-        stateFile = os.path.join(location, "framework_tmp", "teststate")
-        if os.path.isfile(stateFile):
-            return test.getNewState(open(stateFile))
-        else:
-            return False, plugins.Unrunnable(briefText="no results", \
-                                            freeText="No file found to load results from")
-    def loadStoredState(self, test, reconnLocation):
-        loaded, newState = self.getStoredStateInfo(test, reconnLocation)
-        
-        if self.fullRecalculate:
-            if not loaded and test.hasFiles():
-                # If the teststate file isn't there or we can't read it, ignore it and recompute, provided
-                # we have some files to do so with...
-                return self.describe(test)
+    def loadState(self, test, newState):            
+        # State will refer to TEXTTEST_HOME in the original (which we may not have now,
+        # and certainly don't want to save), try to fix this...
+        newState.updateAbsPath(test.app.getDirectory())
+
+        if self.fullRecalculate:                
             # Only pick up errors here, recalculate the rest. Don't notify until
             # we're done with recalculation.
             if not newState.hasResults():
-                # Don't generate a view of the pre-calculated changes, we're trying again...
-                newState.lifecycleChange = ""
+                newState.lifecycleChange = "" # otherwise it's regarded as complete
                 test.changeState(newState)
             else:
                 # Also pick up execution machines, we can't get them otherwise...
@@ -1441,14 +1439,6 @@ class ReconnectTest(plugins.Action):
         else:
             newState.updateTmpPath(self.rootDirToCopy)
             test.changeState(newState)
-
-        # State will refer to TEXTTEST_HOME in the original (which we may not have now,
-        # and certainly don't want to save), try to fix this...
-        test.state.updateAbsPath(test.app.getDirectory())
-        self.describe(test, " (state " + test.state.category + ")")
-    def canReconnectTo(self, dir):
-        # If the directory does not exist or is empty, we cannot reconnect to it.
-        return os.path.exists(dir) and len(os.listdir(dir)) > 0
     def setUpApplication(self, app):
         fetchDir = app.getPreviousWriteDirInfo(self.reconnectTmpInfo)
         self.rootDirToCopy = self.findReconnDirectory(fetchDir, app)

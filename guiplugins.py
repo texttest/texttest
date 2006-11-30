@@ -1234,10 +1234,8 @@ class RecomputeTest(InteractiveTestAction):
                self.currentTest.state.hasStarted() and not self.currentTest.state.isComplete()
     def notifyNewTestSelection(self, tests):
         InteractiveTestAction.notifyNewTestSelection(self, tests)
-        if self.currentTest:
-            state = self.currentTest.state
-            if state.isComplete() and state.needsRecalculation() and self.currentTest.hasFiles():
-                self.perform()
+        if self.currentTest and self.currentTest.needsRecalculation():
+            self.perform()
     def getTitle(self):
         return "Progress"
     def getScriptTitle(self, tab):

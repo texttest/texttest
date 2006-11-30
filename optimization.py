@@ -180,6 +180,11 @@ class OptimizationConfig(ravebased.Config):
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
         return ravebased.Config.getActionSequence(self)
+    def useQueueSystem(self):
+        if self.optionMap.has_key("plot") or self.optionMap.has_key("kpi") or \
+               self.optionMap.has_key("kpiData") or self.optionMap.has_key("prrep"):
+            return False
+        return ravebased.Config.useQueueSystem(self)
     def getResponderClasses(self, allApps):
         if self.optionMap.has_key("plot"):
             return [ GraphPlotResponder ]

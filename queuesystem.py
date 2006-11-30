@@ -141,6 +141,11 @@ class QueueSystemConfig(default.Config):
             return self.getSlaveResponderClasses()
         else:
             return default.Config.getResponderClasses(self, allApps)
+    def getTextDisplayResponderClass(self):
+        if self.useQueueSystem():
+            return MasterTextResponder
+        else:
+            return default.Config.getTextDisplayResponderClass(self)
     def getTestRunner(self):
         if self.slaveRun():
             return RunTestInSlave()
@@ -306,7 +311,11 @@ class SlaveServer(TCPServer):
         self.testClientInfo[test] = clientInfo
     def handle_error(self, request, client_address):
         print "Slave server caught an exception, ignoring..."
-        
+
+class MasterTextResponder(TextDisplayResponder):
+    def notifyComplete(self, test):
+        self.describe(test) # Do it for all of them, as we don't see the comparison stage
+
 class QueueSystemServer:
     instance = None
     def __init__(self):
@@ -525,19 +534,10 @@ class KillTestSubmission(plugins.Action):
     
 class WaitForCompletion(plugins.Action):
     messageSent = False
-    def __repr__(self):
-        return "Evaluating"
     def __call__(self, test):
         self.tryNotifyState()
-        if test.state.isComplete():
-            self.describe(test, self.getPostText(test))
-        else:
+        if not test.state.isComplete():
             return self.WAIT | self.RETRY
-    def getPostText(self, test):
-        try:
-            return test.state.getPostText()
-        except AttributeError:
-            return " (" + test.state.category + ")"
     def tryNotifyState(self):
         if not self.messageSent:
             WaitForCompletion.messageSent = True

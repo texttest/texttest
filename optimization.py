@@ -1206,20 +1206,19 @@ class TestGraph:
         return min
     def addLine(self, plotLine):
         self.plotLines.append(plotLine)
-        test = plotLine.test
-        if not test.app in self.apps:
-            self.apps.append(test.app)
-        user = plotLine.getUserName()
-        if not user in self.users:
-            self.users.append(user)
-        if not test.name in self.pointTypes.keys():
+        description = plotLine.description
+        if not description["app"] in self.apps:
+            self.apps.append(description["app"])
+        if not description["user"] in self.users:
+            self.users.append(description["user"])
+        if not description["test"] in self.pointTypes.keys():
             plotLine.pointType = str(self.pointTypeCounter)
-            self.pointTypes[test.name] = plotLine.pointType
+            self.pointTypes[description["test"]] = plotLine.pointType
             self.pointTypeCounter += 1
         else:
-            plotLine.pointType = self.pointTypes[test.name]
+            plotLine.pointType = self.pointTypes[description["test"]]
         # Fill in the map for later deduction
-        self.lineTypes[plotLine.name] = 0
+        self.lineTypes[description["name"]] = 0
     def deduceLineTypes(self, nextLineType):
         self.multipleApps = len(self.apps) > 1
         self.multipleUsers = len(self.users) > 1
@@ -1228,11 +1227,11 @@ class TestGraph:
         plotArguments = []
         for plotLine in self.plotLines:
             if not plotLine.plotLineRepresentant:
-                if not self.multipleTests or not self.multipleLineTypes or self.lineTypes[plotLine.name] == 0:
+                if not self.multipleTests or not self.multipleLineTypes or self.lineTypes[plotLine.description["name"]] == 0:
                     plotLine.lineType = str(nextLineType())
-                    self.lineTypes[plotLine.name] = plotLine.lineType
+                    self.lineTypes[plotLine.description["name"]] = plotLine.lineType
                 else:
-                    plotLine.lineType = self.lineTypes[plotLine.name]
+                    plotLine.lineType = self.lineTypes[plotLine.description["name"]]
     def getYAxisLabel(self):
         label = None
         for plotLine in self.plotLines:
@@ -1248,22 +1247,41 @@ class TestGraph:
             return None
         if onlyLegendAverage and not plotLine.plotLineRepresentant:
             return None
-        return plotLine.getPlotName(self.multipleApps, self.multipleUsers, self.multipleTests)
+        if plotLine.plotLineRepresentant:
+            return plotLine.plotLineRepresentant.description["name"]
+        title = ""
+        if self.multipleApps:
+            title += plotLine.description["app"].fullName
+        if self.multipleUsers:
+            title += plotLine.description["user"]
+        if self.multipleTests:
+            title += plotLine.description["test"] + "."
+        title += plotLine.description["name"]
+        return title
+    def plotLineDescription(self, test, lineName, item):
+        description = {}
+        description["name"] = lineName
+        if item != costEntryName:
+            description["name"] += "." + item
+        description["test"] = test.name
+        description["user"] = test.getRelPath().split(os.sep)[0]
+        description["app"]  = test.app
+        return description
     def makeTitle(self, title):
         if title:
             return title;
         title = ""
-        firstApp = self.apps[0]
         if len(self.apps) == 1:
+            firstApp = self.apps[0]
             title += firstApp.fullName + " "
             version = firstApp.getFullVersion(forSave=1)
             if version:
                 title += "Version " + version + " "
-        firstUser = self.users[0]
         if len(self.users) == 1:
+            firstUser = self.users[0]
             title += "(in user " + firstUser + ") " 
-        firstTestName = self.pointTypes.keys()[0]
         if len(self.pointTypes) == 1:
+            firstTestName = self.pointTypes.keys()[0]
             title += ": Test " + firstTestName
         return title
     def setXAxisScaleAndLabel(self):
@@ -1307,7 +1325,9 @@ class TestGraph:
             return
 
         for item in plotItems:
-            plotLine = PlotLine(test, lineName, xItem, item, optRun, self.optionGroup.getSwitchValue("s"), scaling)
+            description = self.plotLineDescription(test, lineName, item)
+            plotFiles = test.makeTmpFileName("plot-" + description["name"].replace(" ", "-"), forFramework=1)
+            plotLine = PlotLine(plotFiles, description , xItem, item, optRun, self.optionGroup.getSwitchValue("s"), scaling)
             self.addLine(plotLine)
             # Average
             if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
@@ -1627,13 +1647,10 @@ class PlotEngineMPL:
 
 # Class representing ONE curve in plot.
 class PlotLine:
-    def __init__(self, test, lineName, xItem, item, optRun, plotAgainstSolution, scaling):
-        self.test = test
-        self.name = lineName
+    def __init__(self, plotFileName, description, xItem, item, optRun, plotAgainstSolution, scaling):
+        self.description = description
         self.lineType = None
         self.pointType = None
-        if item != costEntryName:
-            self.name += "." + item
         self.axisYLabel = None
         self.plotLineRepresentant = None
         timeScaleFactor = 1.0
@@ -1641,15 +1658,10 @@ class PlotLine:
         if scaling:
             timeScaleFactor *= scaling
         self.axisYLabel = item
-        self.plotFileName = test.makeTmpFileName(self.getPlotFileName(lineName, str(item)), forFramework=1)
+        self.plotFileName = plotFileName 
         self.createGraph(optRun, xItem, item, plotAgainstSolution, timeScaleFactor)
     def getYAxisLabel(self):
         return self.axisYLabel
-    def getPlotFileName(self, lineName, item):
-        if item == costEntryName:
-            return "plot-" + lineName.replace(" ", "-")
-        else:
-            return "plot-" + lineName.replace(" ", "-") + "-" + item.replace(" ", "-")
     def createGraph(self, optRun, xItem, item, plotAgainstSolution, timeScaleFactor):
         self.graph = {}
         self.min = None
@@ -1686,18 +1698,6 @@ class PlotLine:
             yy.append(y)
             xxx.append(x*xScaleFactor)
         return xxx, yy
-    def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):
-        title = ""
-        if addAppDescriptor:
-            title += self.test.app.fullName + "."
-        if addUserDescriptor:
-            title += self.getUserName() + "."
-        if addTestDescriptor:
-            title += self.test.name + "."
-        title += self.name
-        return title
-    def getUserName(self):
-        return self.test.getRelPath().split(os.sep)[0]
 
 # Create averages of several graphs.
 class Averager:
@@ -1813,8 +1813,6 @@ class PlotAverager(Averager):
             yValues.append(y)
             xx.append(xScaleFactor * xVal)
         return xx, yValues
-    def getPlotName(self, addAppDescriptor, addUserDescriptor, addTestDescriptor):
-        return self.plotLineRepresentant.name
 
 # End of "PlotTest" functionality.
 

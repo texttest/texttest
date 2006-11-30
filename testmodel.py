@@ -384,6 +384,15 @@ class TestCase(Test):
                 return self.writeDirectories[0]
         else:
             return self.dircaches[0].dir
+    def hasFiles(self):
+        dir = self.getDirectory(temporary=1)
+        if not os.path.isdir(dir):
+            return False
+        for file in os.listdir(dir):
+            fullPath = os.path.join(dir, file)
+            if os.path.isfile(fullPath):
+                return True
+        return False
     def callAction(self, action):
         return action(self)
     def changeState(self, state):
@@ -409,19 +418,9 @@ class TestCase(Test):
         writeSubDir = os.path.join(self.writeDirectories[0], subdir)
         self.writeDirectories.append(writeSubDir)
     def getTestRelPath(self, file):
-        dir = self.getDirectory()
-        stdPath = plugins.relpath(file, dir)
-        if not stdPath is None:
-            return stdPath
-        tmpDir = self.getDirectory(temporary=1)
-        return plugins.relpath(file, tmpDir)
-    def getSaveFileName(self, tmpFile, versionString):
-        self.diagnose("save file from " + tmpFile + " - " + self.getDirectory(temporary=1))
-        relPath = plugins.relpath(tmpFile, self.getDirectory(temporary=1))
-        stdFile = os.path.join(self.getDirectory(), relPath)
-        if len(versionString):
-            stdFile += "." + versionString
-        return stdFile
+        parts = file.split(self.getRelPath() + "/")
+        if len(parts) == 2:
+            return parts[-1]
     def listTmpFiles(self):
         tmpFiles = []
         for dir in self.writeDirectories:
@@ -444,15 +443,6 @@ class TestCase(Test):
         return paths
     def grabWorkingDirectory(self):
         os.chdir(self.writeDirectories[0])
-    def getFileToLoad(self):
-        stateFile = self.getStateFile()
-        if not os.path.isfile(stateFile):
-            return None
-        
-        return open(stateFile)
-    def getStoredStateInfo(self):
-        file = self.getFileToLoad()
-        return self.getNewState(file)
     def loadState(self, file):
         loaded, state = self.getNewState(file)
         self.changeState(state)
@@ -463,9 +453,6 @@ class TestCase(Test):
         else:
             return os.path.join(dir, stem)
     def getNewState(self, file):
-        if not file:
-            return False, plugins.Unrunnable(briefText="no results", \
-                                            freeText="No file found to load results from")
         try:
             unpickler = Unpickler(file)
             newState = unpickler.load()

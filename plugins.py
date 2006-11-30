@@ -379,7 +379,9 @@ class TestState(Observable):
         return False
     def isSaveable(self):
         return self.hasFailed() and self.hasResults()
-    def updatePaths(self, newAbsPath, newWriteDir):
+    def updateAbsPath(self, newAbsPath):
+        pass
+    def updateTmpPath(self, newTmpPath):
         pass
 
 addCategory("unrunnable", "unrunnable", "could not be run")

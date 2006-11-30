@@ -120,8 +120,15 @@ class FileComparison:
         if self.tmpFile:
             self.tmpCmpFile = self.tmpCmpFile.replace(oldAbsPath, newAbsPath)
             self.tmpFile = self.tmpFile.replace(oldAbsPath, newAbsPath)
+    def getSaveFileName(self, test, versionString):
+        self.diag.info("save file from " + self.tmpFile)
+        relPath = test.getTestRelPath(self.tmpFile)
+        stdFile = os.path.join(test.getDirectory(), relPath)
+        if len(versionString):
+            stdFile += "." + versionString
+        return stdFile
     def saveTmpFile(self, test, exact, versionString):
-        self.stdFile = test.getSaveFileName(self.tmpFile, versionString)
+        self.stdFile = self.getSaveFileName(test, versionString)
         if os.path.isfile(self.stdFile):
             os.remove(self.stdFile)
         plugins.ensureDirExistsForFile(self.stdFile)

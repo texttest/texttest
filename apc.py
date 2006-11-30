@@ -1471,7 +1471,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
         optimization.PlotTestInGUI.__init__(self, dynamic, test)
         self.addSwitch("kpi", "Plot kpi group")
     def performOnCurrent(self):
-        self.testGraph.createPlotObjectsForTest(self.currentTest)
+        self.createGUIPlotObjects(self.currentTest)
         # Plot KPI group
         if self.optionGroup.getSwitchValue("kpi"):
             oldTestDir = self.currentTest.getDirectory(None)
@@ -1483,7 +1483,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
                     if testInGroup == kpiGroupForTest[kpiTest] and  kpiTest != originalTestName:
                         testPath = os.path.join(path, kpiTest)
                         newTest = testmodel.TestCase(kpiTest, testmodel.DirectoryCache(testPath), self.currentTest.app, self.currentTest.parent)
-                        self.testGraph.createPlotObjectsForTest(newTest)
+                        self.createGUIPlotObjects(newTest)
             else:
                 print "Test", self.currentTest.name, "is not in an KPI group."
         self.plotGraph(self.currentTest.app.writeDirectory)  
@@ -1520,12 +1520,7 @@ class PlotKPIGroups(plugins.Action):
                 testGraph = optimization.TestGraph()
             else:
                 testGraph = TestGraphTimeDiv()
-            testGraph.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
-            for name, expl, value in testGraph.options:
-                testGraph.optionGroup.addOption(name, expl, value)
-            for name, expl in testGraph.switches:
-                testGraph.optionGroup.addSwitch(name, expl)
-            testGraph.optionGroup.readCommandLineArguments(self.argsRem)
+            testGraph.readCommandLine(self.argsRem)
             testGraph.optionGroup.setValue("title", "APC user " + self.groupsToPlot[group][0].getRelPath().split(os.sep)[0] + " - KPI group " + group)
             if testGraph.optionGroup.getSwitchValue("per") and self.groupScale[group]:
                 testGraph.optionGroup.setValue("yr", self.groupScale[group])

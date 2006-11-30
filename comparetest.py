@@ -92,17 +92,20 @@ class TestComparison(BaseTestComparison):
         # If loaded from old pickle files, can get out of date objects...
         if not hasattr(self, "missingResults"):
             self.missingResults = []
+        if not hasattr(self, "diag"):
+            self.diag = plugins.getDiagnostics("TestComparison")
         for fileComparison in self.allResults:
             fileComparison.ensureCompatible()
-    def updatePaths(self, newAbsPath, newWriteDir):
-        self.diag = plugins.getDiagnostics("TestComparison")
-        self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
-        self.diag.info("Updating writedir " + self.appWriteDir + " to " + newWriteDir)
+    def updateAbsPath(self, newPath):
+        self.diag.info("Updating abspath " + self.appAbsPath + " to " + newPath)
         for comparison in self.allResults:
-            comparison.updatePaths(self.appAbsPath, newAbsPath)
-            comparison.updatePaths(self.appWriteDir, newWriteDir)
-        self.appAbsPath = newAbsPath
-        self.appWriteDir = newWriteDir
+            comparison.updatePaths(self.appAbsPath, newPath)
+        self.appAbsPath = newPath
+    def updateTmpPath(self, newPath):
+        self.diag.info("Updating abspath " + self.appWriteDir + " to " + newPath)
+        for comparison in self.allResults:
+            comparison.updatePaths(self.appWriteDir, newPath)
+        self.appAbsPath = newPath
     def setFailedPrediction(self, prediction):
         self.failedPrediction = prediction
         self.freeText = str(prediction)

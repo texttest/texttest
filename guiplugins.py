@@ -1236,7 +1236,7 @@ class RecomputeTest(InteractiveTestAction):
         InteractiveTestAction.notifyNewTestSelection(self, tests)
         if self.currentTest:
             state = self.currentTest.state
-            if state.isComplete() and state.needsRecalculation():
+            if state.isComplete() and state.needsRecalculation() and self.currentTest.hasFiles():
                 self.perform()
     def getTitle(self):
         return "Progress"

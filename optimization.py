@@ -1013,15 +1013,8 @@ class GraphPlotResponder(Responder):
 class PlotTestInGUI(guiplugins.InteractiveTestAction):
     def __init__(self, dynamic, test):
         guiplugins.InteractiveTestAction.__init__(self, test)
-        self.createGUITestGraph()
-    def createGUITestGraph(self):
-        self.testGraph = TestGraph()
-        
-        self.testGraph.optionGroup = self.optionGroup
-        for name, expl, value in self.testGraph.options:
-            self.addOption(name, expl, value)
-        for name, expl in self.testGraph.switches:
-            self.addSwitch(name, expl)
+        self.dynamic = dynamic
+        self.testGraph = TestGraph(self.optionGroup)
     def __repr__(self):
         return "Plotting Graph"
     def getTitle(self):
@@ -1033,8 +1026,35 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
     def getTabTitle(self):
         return "Graph"
     def performOnCurrent(self):
-        self.testGraph.createPlotObjectsForTest(self.currentTest)
-        self.plotGraph(self.currentTest.app.writeDirectory)  
+        self.createGUIPlotObjects(self.currentTest)
+        self.plotGraph(self.currentTest.app.writeDirectory)
+    def createGUIPlotObjects(self, test):
+        logFileStem = test.getConfigValue("log_file")
+        if self.dynamic:
+            tmpFile = self.getTmpFile(logFileStem)
+            if tmpFile:
+                self.testGraph.createPlotObjects("this run", tmpFile, test, None)
+
+        stdFile = test.getFileName(logFileStem)
+        if stdFile:
+            self.testGraph.createPlotObjects("std result", stdFile, test, None)
+    
+        if not self.dynamic:
+            for version in self.testGraph.getExtraVersions():
+                plotFile = test.getFileName(logFileStem, version)
+                if plotFile and plotFile.endswith(test.app.name + "." + version):
+                    self.testGraph.createPlotObjects(version, plotFile, test, None)
+
+    def getTmpFile(self, logFileStem):
+        if self.currentTest.state.isComplete():
+            try:
+                fileComp, storageList = self.currentTest.state.findComparison(logFileStem)
+                if fileComp:
+                    return fileComp.tmpFile
+            except AttributeError:
+                pass
+        else:
+            return self.currentTest.makeTmpFileName(logFileStem)
     def plotGraph(self, writeDirectory):
         plotProcess = self.testGraph.plot(writeDirectory)
         if plotProcess:
@@ -1043,8 +1063,7 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
             #self.processes.append(plotProcess)
             guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
         # The TestGraph is "used", create a new one so that the user can do another plot.
-        self.testGraph = TestGraph()
-        self.testGraph.optionGroup = self.optionGroup
+        self.testGraph = TestGraph(self.optionGroup)
 
 
 # Hack for PlotSubplans:
@@ -1069,13 +1088,8 @@ class PlotSubplans(plugins.Action):
         plotSubplanDone = 1
         # Create a test graph
         testGraph = TestGraph()
-        testGraph.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
-        for name, expl, value in testGraph.options:
-            testGraph.optionGroup.addOption(name, expl, value)
-        for name, expl in testGraph.switches:
-            testGraph.optionGroup.addSwitch(name, expl)
         testGraph.optionGroup.addOption("sp", "Subplan")
-        testGraph.optionGroup.readCommandLineArguments(self.args)
+        testGraph.readCommandLine(self.args)
         if not testGraph.optionGroup.getOptionValue("title"):
             testGraph.optionGroup.setValue("title", " ")
         subplan = testGraph.optionGroup.getOptionValue("sp")
@@ -1101,7 +1115,7 @@ class PlotSubplans(plugins.Action):
         
 # TestGraph is the "real stuff", the PlotLine instances are created here and gnuplot is invoked here.
 class TestGraph:
-    def __init__(self):
+    def __init__(self, guiOptionGroup=None):
         self.plotLines = []
         self.pointTypes = {}
         self.lineTypes = {}
@@ -1114,37 +1128,39 @@ class TestGraph:
         self.xScaleFactor = 1
         # This is the options and switches that are common
         # both for the GUI and command line.
-        self.options = [ ("r", "Horizontal range", "0:"),
-                         ("yr", "Vertical range", ""),
-                         ("ts", "Time scale to use", "minutes"),
-                         ("p", "Absolute file to print to", ""),
-                         ("pr", "Printer to print to", ""),
-                         ("i", "Log file item to plot", costEntryName),
-                         ("ix", "Log file item to plot against", timeEntryName),
-                         ("v", "Extra versions to plot", ""),
-                         ("title", "Title of the plot", ""),
-                         ("tu", "Search for tmp files in user", ""),
-                         ("size", "size of the plot", ""),
-                         ("terminal", "gnuplot terminal to use", "postscript"),
-                         ("engine", "Plot engine to use", "gnuplot") ]
-        self.switches = [ ("per", "Plot percentage"),
-                          ("oem", "Only plot exactly matching versions"),
-                          ("pc", "Print in colour"),
-                          ("pa3", "Print in A3"),
-                          ("s", "Plot against solution number rather than time"),
-                          ("av", "Plot also average"),
-                          ("oav", "Plot only average"),
-                          ("nl", "No legend"), 
-                          ("olav", "Only legend for the averages"),
-                          ("nt", "Don't search for temporary files") ]
+        options = [ ("r", "Horizontal range", "0:"),
+                    ("yr", "Vertical range", ""),
+                    ("ts", "Time scale to use", "minutes"),
+                    ("p", "Absolute file to print to", ""),
+                    ("pr", "Printer to print to", ""),
+                    ("i", "Log file item to plot", costEntryName),
+                    ("ix", "Log file item to plot against", timeEntryName),
+                    ("v", "Extra versions to plot", ""),
+                    ("title", "Title of the plot", ""),
+                    ("size", "size of the plot", ""),
+                    ("terminal", "gnuplot terminal to use", "postscript"),
+                    ("engine", "Plot engine to use", "gnuplot") ]
+        switches = [ ("per", "Plot percentage"),
+                     ("pc", "Print in colour"),
+                     ("pa3", "Print in A3"),
+                     ("s", "Plot against solution number rather than time"),
+                     ("av", "Plot also average"),
+                     ("oav", "Plot only average"),
+                     ("nl", "No legend"), 
+                     ("olav", "Only legend for the averages") ]
         self.diag = plugins.getDiagnostics("Test Graph")
-        self.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
-    def readCommandLine(self, args):
+        self.optionGroup = guiOptionGroup
+        if not self.optionGroup:
+            self.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
+            self.optionGroup.addOption("tu", "Search for tmp files in user", "")
+            self.optionGroup.addSwitch("oem", "Only plot exactly matching versions")
+            self.optionGroup.addSwitch("nt", "Don't search for temporary files")
         # Create the options and read the command line arguments.
-        for name, expl, value in self.options:
+        for name, expl, value in options:
             self.optionGroup.addOption(name, expl, value)
-        for name, expl in self.switches:
+        for name, expl in switches:
             self.optionGroup.addSwitch(name, expl)
+    def readCommandLine(self, args):
         self.optionGroup.readCommandLineArguments(args)
     def plot(self, writeDir):
         # Add the PlotAveragers last in the PlotLine list.
@@ -1158,6 +1174,9 @@ class TestGraph:
         else:
             raise plugins.TextTestError, "Unknown plot engine " + engineOpt + " - aborting plotting."
         return engine.plot(writeDir)
+    def getExtraVersions(self):
+        rawText = self.optionGroup.getOptionValue("v")
+        return filter(lambda version: version, plugins.commasplit(rawText))
     def getPlotOptions(self):
         xrange = self.optionGroup.getOptionValue("r")
         yrange = self.optionGroup.getOptionValue("yr")
@@ -1300,8 +1319,9 @@ class TestGraph:
         dateEntry = re.findall(r'[0-9]{6}', version)
 	if len(dateEntry) == 0:
             return None
-        return dateEntry[0]        
+        return dateEntry[0]
     def createPlotObjectsForTest(self, test):
+        # for command-line plotting only
         logFileStem = test.app.getConfigValue("log_file")
         searchInUser = self.optionGroup.getOptionValue("tu")
         onlyExactMatch = self.optionGroup.getSwitchValue("oem")
@@ -1314,7 +1334,7 @@ class TestGraph:
         stdFile = test.getFileName(logFileStem)
         if stdFile:
             self.createPlotObjects("std result", stdFile, test, None)
-        for versionItem in plugins.commasplit(self.optionGroup.getOptionValue("v")):
+        for versionItem in self.getExtraVersions():
             if versionItem.find(":") == -1:
                 versionName = version = versionItem
                 scaling = None
@@ -1331,33 +1351,32 @@ class TestGraph:
                     date = self.isDate(tmp[2])
                 else:
                     date = None
-            if version:
-                if date:
-                    originalLogFileName = test.getFileName(logFileStem, version)
-                    CVSLogFileName = test.makeTmpFileName(logFileStem + "_" + date)
-                    # We may already have checked out the file.
-                    if not os.path.isfile(CVSLogFileName):
-                        try:
-                            os.makedirs(os.path.dirname(CVSLogFileName))
-                        except OSError:
-                            pass
-                        stdin, stdout, stderr = os.popen3("cvs -q upd -p -D " + date + " " + originalLogFileName + " > " + CVSLogFileName)
-                        if len(stderr.readlines()) > 0:
-                            print os.path.basename(originalLogFileName), "is not in the CVS repository at", date
-                        else:
-                            self.createPlotObjects("CVS " + date, CVSLogFileName, test, None)
-                else:
-                    if not noTmp:
-                        logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
-                        foundTmp, logFile = logFileFinder.findFile(version)
-                        if foundTmp:
-                            self.createPlotObjects(versionName + "run", logFile, test, scaling)
-                    logFile = test.getFileName(logFileStem, version)
-                    isExactMatch = logFile.endswith(version)
-                    if not onlyExactMatch and not isExactMatch:
-                        print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
-                    if not (onlyExactMatch and not isExactMatch):
-                        self.createPlotObjects(versionName, logFile, test, scaling)
+            if date:
+                originalLogFileName = test.getFileName(logFileStem, version)
+                CVSLogFileName = test.makeTmpFileName(logFileStem + "_" + date)
+                # We may already have checked out the file.
+                if not os.path.isfile(CVSLogFileName):
+                    try:
+                        os.makedirs(os.path.dirname(CVSLogFileName))
+                    except OSError:
+                        pass
+                    stdin, stdout, stderr = os.popen3("cvs -q upd -p -D " + date + " " + originalLogFileName + " > " + CVSLogFileName)
+                    if len(stderr.readlines()) > 0:
+                        print os.path.basename(originalLogFileName), "is not in the CVS repository at", date
+                    else:
+                        self.createPlotObjects("CVS " + date, CVSLogFileName, test, None)
+            else:
+                if not noTmp:
+                    logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
+                    foundTmp, logFile = logFileFinder.findFile(version)
+                    if foundTmp:
+                        self.createPlotObjects(versionName + "run", logFile, test, scaling)
+                logFile = test.getFileName(logFileStem, version)
+                isExactMatch = logFile.endswith(version)
+                if not onlyExactMatch and not isExactMatch:
+                    print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
+                if not (onlyExactMatch and not isExactMatch):
+                    self.createPlotObjects(versionName, logFile, test, scaling)
 
 class PlotEngine:
     def __init__(self, testGraph):

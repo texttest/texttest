@@ -40,7 +40,6 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
 """
 
 import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins
-from sets import Set
 from optimization import GenerateWebPages
 
 def getConfig(optionMap):
@@ -453,6 +452,7 @@ class TimeSummary(plugins.Action):
 class CleanSubplans(plugins.Action):
     def __init__(self):
         self.config = MatadorConfig(None)
+        from sets import Set
         self.preservePaths = Set([])
         self.preserveNames = [ "APC_FILES", "etable" ]
         self.preserveUsers = [ "/carm/proj/matador/carmusrs/master/RD_dl_cbs_v13", \

@@ -1053,7 +1053,7 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
     def getTmpFile(self, logFileStem):
         if self.currentTest.state.isComplete():
             try:
-                fileComp, storageList = self.currentTest.state.findComparison(logFileStem)
+                fileComp, storageList = self.currentTest.state.findComparison(logFileStem, includeSuccess=True)
                 if fileComp:
                     return fileComp.tmpFile
             except AttributeError:

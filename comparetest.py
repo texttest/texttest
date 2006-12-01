@@ -252,8 +252,10 @@ class TestComparison(BaseTestComparison):
             if comparison:
                 self.diag.info("Saving single file for stem " + stem)
                 comparison.overwrite(saveDir, exact, versionString)
-    def findComparison(self, stem):
+    def findComparison(self, stem, includeSuccess=False):
         lists = [ self.changedResults, self.newResults, self.missingResults ]
+        if includeSuccess:
+            lists.append(self.correctResults)
         self.diag.info("Finding comparison for stem " + stem)
         for list in lists:
             for comparison in list:

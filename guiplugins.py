@@ -54,6 +54,16 @@ class ProcessTerminationMonitor:
 processTerminationMonitor = ProcessTerminationMonitor()
        
 class InteractiveAction(plugins.Observable):
+    stdInterfaceDescription = """
+<menubar>
+    <menu action=\"filemenu\">
+       <menuitem action=\"%s\"/>
+    </menu>
+</menubar>
+<toolbar> 
+   <toolitem action=\"%s\"/>
+</toolbar>
+"""
     def __init__(self, rootTestSuites):
         plugins.Observable.__init__(self)
         self.optionGroup = None
@@ -90,7 +100,11 @@ class InteractiveAction(plugins.Observable):
     def canPerform(self):
         return True # do we activate this via performOnCurrent() ?
     def getInterfaceDescription(self):
-        return ""
+        if self.inToolBar():
+            title = self.getSecondaryTitle()
+            return self.stdInterfaceDescription % (title, title)    
+        else:
+            return ""
     def isRadio(self):
         return False;
     def isToggle(self):
@@ -225,7 +239,7 @@ class Quit(InteractiveAction):
     def __init__(self, dynamic, rootSuites):
         InteractiveAction.__init__(self, rootSuites)
         self.dynamic = dynamic
-    def getInterfaceDescription(self):
+    def getInterfaceDescription(self): # override for separator in toolbar
         description = "<menubar>\n<menu action=\"filemenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
         description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/>\n</toolbar>\n"
         return description
@@ -333,10 +347,6 @@ class SaveTests(SelectionAction):
         return "save"
     def getTabTitle(self):
         return "Saving"
-    def getInterfaceDescription(self):
-        description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
-        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
-        return description
     def getDefaultAccelerator(self):
         return "<control>s"
     def getTitle(self):
@@ -763,10 +773,6 @@ class SelectTests(SelectionAction):
         for group in self.apps[0].optionGroups:
             if group.name.startswith("Select"):
                 return group
-    def getInterfaceDescription(self):
-        description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
-        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
-        return description
     def getDefaultAccelerator(self):
         return "<control>s"
     def getStockId(self):
@@ -882,10 +888,6 @@ class SelectTests(SelectionAction):
 class ResetGroups(InteractiveAction):
     def getStockId(self):
         return "revert-to-saved"
-    def getInterfaceDescription(self):
-        description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
-        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n<separator/></toolbar>\n"
-        return description
     def getDefaultAccelerator(self):
         return '<control>e'
     def getTitle(self):
@@ -965,10 +967,6 @@ class RunTests(SelectionAction):
         return "_Run Tests"
     def getStockId(self):
         return "execute"
-    def getInterfaceDescription(self):
-        description = "<menubar>\n<menu action=\"actionmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
-        description += "<toolbar>\n<toolitem action=\"" + self.getSecondaryTitle() + "\"/>\n</toolbar>\n"
-        return description
     def getDefaultAccelerator(self):
         return "<control>r"
     def getScriptTitle(self, tab):
@@ -1050,28 +1048,38 @@ class EnableDiagnostics(InteractiveTestAction):
         shutil.copyfile(diagFile, targetDiagFile)
         self.viewFile(targetDiagFile, refreshFiles=True)
 
-class RemoveTest(InteractiveTestAction):
-    def correctTestClass(self):
-        return True
+class RemoveTest(SelectionAction):
+    def notifyNewTestSelection(self, tests):
+        self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def getTitle(self):
         return "Remove"
+    def getStockId(self):
+        return "delete"
     def getScriptTitle(self, tab):
         return "Remove Test"
     def getDoubleCheckMessage(self):
-        if not self.currentTest:
-            return ""
-        if self.currentTest.classId() == "test-case":
-            return "You are about to remove the test '" + self.currentTest.name + \
-                   "' and all associated files.\nAre you sure you wish to proceed?"
+        if len(self.currTestSelection) == 1:
+            currTest = self.currTestSelection[0]
+            if currTest.classId() == "test-case":
+                return "You are about to remove the test '" + currTest.name + \
+                       "' and all associated files.\nAre you sure you wish to proceed?"
+            else:
+                return "You are about to remove the entire test suite '" + currTest.name + \
+                       "' and all " + str(currTest.size()) + " tests that it contains!\nAre you VERY sure you wish to proceed??"
         else:
-            return "You are about to remove the entire test suite '" + self.currentTest.name + \
-                   "' and all " + str(self.currentTest.size()) + " tests that it contains!\nAre you VERY sure you wish to proceed??"
+            return "You are about to remove " + repr(len(self.currTestSelection)) + \
+                   " tests with associated files!\nAre you VERY sure you wish to proceed??"
     def performOnCurrent(self):
-        plugins.rmtree(self.currentTest.getDirectory())
-        suite = self.currentTest.parent
-        testName = self.currentTest.name
+        for test in self.currTestSelection:
+            dir = test.getDirectory()
+            if os.path.isdir(dir): # might have already removed the enclosing suite
+                plugins.rmtree(dir)
+                self.removeTest(test)
+    def removeTest(self, test):
+        suite = test.parent
+        testName = test.name
         self.removeFromTestFile(suite, testName)
-        suite.removeTest(self.currentTest)
+        suite.removeTest(test)
         self.notify("Status", "Removed test " + testName)
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
@@ -1252,9 +1260,9 @@ class InteractiveActionHandler:
     def __init__(self):
         self.actionPreClasses = [ Quit, ViewFile ]
         self.actionDynamicClasses = [ SaveTests, RecomputeTest ]
-        self.actionStaticClasses = [ RecordTest, RemoveTest, EnableDiagnostics, CopyTest, \
+        self.actionStaticClasses = [ RecordTest, EnableDiagnostics, CopyTest, \
                                      ImportTestCase, ImportTestSuite, ReportBugs, SelectTests, \
-                                     RunTests, ResetGroups ]
+                                     RunTests, ResetGroups, RemoveTest ]
         self.actionPostClasses = [ SaveSelection ]
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")

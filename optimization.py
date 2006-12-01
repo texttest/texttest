@@ -1510,6 +1510,7 @@ class PlotEngine:
             if len(tmppf) > 0:
                 open(absTargetFile, "w").write(tmppf)
             if printer:
+                print "Printing to", printer
                 os.system("lpr -o PageSize=A3 -P" + printer + " " + absTargetFile)
     def terminalLine(self, terminal, colour, printA3=0):
         line = "set terminal " + terminal

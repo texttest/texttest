@@ -56,7 +56,7 @@ processTerminationMonitor = ProcessTerminationMonitor()
 class InteractiveAction(plugins.Observable):
     stdInterfaceDescription = """
 <menubar>
-    <menu action=\"filemenu\">
+    <menu action=\"actionmenu\">
        <menuitem action=\"%s\"/>
     </menu>
 </menubar>

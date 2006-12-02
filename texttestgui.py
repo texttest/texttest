@@ -628,6 +628,8 @@ class TextTestGUI(Responder, plugins.Observable):
             else:
                 hbox.pack_start(alignment, expand=True, fill=True)
 
+        guilog.info("UI layout: \n" + self.uiManager.get_ui())
+
         vbox.pack_start(hbox, expand=False, fill=False)
         vbox.show_all()
         if not showToolbar:

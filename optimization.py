@@ -1036,7 +1036,7 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
     def createGUIPlotObjects(self, test):
         logFileStem = test.getConfigValue("log_file")
         if self.dynamic:
-            tmpFile = self.getTmpFile(logFileStem)
+            tmpFile = self.getTmpFile(test, logFileStem)
             if tmpFile:
                 self.testGraph.createPlotObjects("this run", tmpFile, test, None)
 
@@ -1050,16 +1050,20 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
                 if plotFile and plotFile.endswith(test.app.name + "." + version):
                     self.testGraph.createPlotObjects(version, plotFile, test, None)
 
-    def getTmpFile(self, logFileStem):
-        if self.currentTest.state.isComplete():
+    def getTmpFile(self, test, logFileStem):
+        if test.state.isComplete():
             try:
-                fileComp, storageList = self.currentTest.state.findComparison(logFileStem, includeSuccess=True)
+                fileComp, storageList = test.state.findComparison(logFileStem, includeSuccess=True)
                 if fileComp:
                     return fileComp.tmpFile
             except AttributeError:
                 pass
         else:
-            return self.currentTest.makeTmpFileName(logFileStem)
+            tmpFile = self.getRunningTmpFile(test, logFileStem)
+            if os.path.isfile(tmpFile):
+                return tmpFile
+    def getRunningTmpFile(self, test, logFileStem):
+        return test.makeTmpFileName(logFileStem)
     def plotGraph(self, writeDirectory):
         plotProcess = self.testGraph.plot(writeDirectory)
         if plotProcess:

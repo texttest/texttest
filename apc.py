@@ -1467,26 +1467,31 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
 
 # Specialization of plotting in the GUI for APC
 class PlotTestInGUIAPC(optimization.PlotTestInGUI):
-    def __init__(self, dynamic, test):
-        optimization.PlotTestInGUI.__init__(self, dynamic, test)
+    def __init__(self, dynamic, rootSuites):
+        optimization.PlotTestInGUI.__init__(self, dynamic, rootSuites)
         self.addSwitch("kpi", "Plot kpi group")
     def performOnCurrent(self):
-        self.createGUIPlotObjects(self.currentTest)
-        # Plot KPI group
-        if self.optionGroup.getSwitchValue("kpi"):
-            oldTestDir = self.currentTest.getDirectory(None)
-            path, originalTestName = os.path.split(oldTestDir)
-            kpiGroupForTest, kpiGroups, dummy = readKPIGroupFileCommon(self.currentTest.parent)
-            if kpiGroupForTest.has_key(originalTestName):
-                testInGroup = kpiGroupForTest[originalTestName]
-                for kpiTest in kpiGroupForTest.keys():
-                    if testInGroup == kpiGroupForTest[kpiTest] and  kpiTest != originalTestName:
-                        testPath = os.path.join(path, kpiTest)
-                        newTest = testmodel.TestCase(kpiTest, testmodel.DirectoryCache(testPath), self.currentTest.app, self.currentTest.parent)
-                        self.createGUIPlotObjects(newTest)
-            else:
-                print "Test", self.currentTest.name, "is not in an KPI group."
-        self.plotGraph(self.currentTest.app.writeDirectory)  
+        for test in self.findAllTests():
+            self.createGUIPlotObjects(test)
+
+        self.plotGraph(self.currentTest.app.writeDirectory)
+    def findAllTests(self):
+        if not self.optionGroup.getSwitchValue("kpi"):
+            return [ self.currentTest ]
+                # Plot KPI group
+
+        suite = self.currentTest.parent
+        kpiGroupForTest, kpiGroups, dummy = readKPIGroupFileCommon(suite)
+        if not kpiGroupForTest.has_key(self.currentTest.name):
+            print "Test", self.currentTest.name, "is not in an KPI group."
+            return [ self.currentTest ]
+
+        kpiGroup = kpiGroupForTest[self.currentTest.name]
+        return filter(lambda test: kpiGroupForTest.get(test.name) == kpiGroup, suite.testcases)
+                
+    def getRunningTmpFile(self, test, logFileStem):
+        return test.makeTmpFileName("APC_FILES/" + logFileStem, forComparison=0)
+    
 
 guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC ]
 guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ] 

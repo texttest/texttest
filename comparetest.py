@@ -307,6 +307,7 @@ class ProgressTestComparison(BaseTestComparison):
     def createFileComparison(self, test, stem, standardFile, tmpFile):
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1, observers=self.observers)
     def categorise(self):
+        self.briefText = self.runningState.briefText
         self.freeText = self.runningState.freeText + self.progressText()
     def progressText(self):
         perc = self.calculatePercentage()

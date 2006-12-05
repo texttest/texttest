@@ -1074,16 +1074,6 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
         # The TestGraph is "used", create a new one so that the user can do another plot.
         self.testGraph = TestGraph(self.optionGroup)
 
-
-# Hack for PlotSubplans:
-# We redefine getRelPath from testmodel.Test, since it is there assumed that
-# the test is residing in self.app.getDirectory(), which usually isn't equal
-# to self.app.writeDirectory. (We create a "temporary" test for the plotting)
-class TestCasePlotSP(testmodel.TestCase):
-    def getRelPath(self):
-        relPath = plugins.relpath(self.getDirectory(), self.app.writeDirectory)
-        return relPath.replace(os.sep, "/")
-
 plotSubplanDone = None
 
 class PlotSubplans(plugins.Action):
@@ -1110,15 +1100,12 @@ class PlotSubplans(plugins.Action):
             for file in os.listdir(dirName):
                 if re.findall(regexp, file):
                     subplan = os.path.join(dirName, file)
-                    testName = file
-                    testTmpPath = os.path.join("dummyUser", testName)
-                    testFullPath = os.path.join(app.writeDirectory, testTmpPath)
-                    if not os.path.isdir(testFullPath):
-                        os.makedirs(testFullPath)
-                    newTest = TestCasePlotSP(testName, testmodel.DirectoryCache(testFullPath), \
-                                             app, parent=None)
+                    testTmpDir = os.path.join(app.writeDirectory, file)
+                    if not os.path.isdir(testTmpDir):
+                        os.makedirs(testTmpDir)
                     logFilePath = os.path.join(subplan, "APC_FILES", app.getConfigValue("log_file"))
-                    testGraph.createPlotObjects(str(version), logFilePath, newTest, None)
+                    desc = testGraph.getPlotLineDescriptionForSubplan(file, app)
+                    testGraph.createPlotObjectsForItems(str(version), logFilePath, desc, None, testTmpDir, app)
             version += 1
         testGraph.plot(app.writeDirectory)
         
@@ -1262,14 +1249,20 @@ class TestGraph:
             title += plotLine.description["test"] + "."
         title += plotLine.description["name"]
         return title
-    def plotLineDescription(self, test, lineName):
+    def getPlotLineDescriptionForSubplan(self, testName, app):
         description = {}
-        description["name"] = lineName
+        description["test"] = testName
+        description["user"] = "unknown"
+        description["app"]  = app
+        return description
+    def getPlotLineDescriptionForTest(self, test):
+        description = {}
         description["test"] = test.name
         description["user"] = test.getRelPath().split(os.sep)[0]
         description["app"]  = test.app
         return description
-    def addItemToDescription(self, description, item):
+    def addItemToDescription(self, description, lineName, item):
+        description["name"] = lineName
         if item != costEntryName:
             description["name"] += "." + item
     def makeTitle(self, title):
@@ -1331,7 +1324,7 @@ class TestGraph:
 
         for item in plotItems:
             desc = copy.copy(description)
-            self.addItemToDescription(desc, item)
+            self.addItemToDescription(desc, lineName, item)
             plotFile = os.path.join(dir, "plot-" + desc["name"].replace(" ", "-"))
             plotLine = PlotLine(plotFile, desc , xItem, item, optRun, self.optionGroup.getSwitchValue("s"), scaling)
             self.addLine(plotLine)
@@ -1353,7 +1346,7 @@ class TestGraph:
         return dateEntry[0]
     def createPlotObjects(self, lineName, logFile, test, scaling):
         dir = test.getDirectory(temporary=1, forFramework = 1)
-        description = self.plotLineDescription(test, lineName)
+        description = self.getPlotLineDescriptionForTest(test)
         self.createPlotObjectsForItems(lineName, logFile, description, scaling, dir, test.app)
     def createPlotObjectsForTest(self, test):
         # for command-line plotting only

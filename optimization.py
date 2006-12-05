@@ -1262,15 +1262,16 @@ class TestGraph:
             title += plotLine.description["test"] + "."
         title += plotLine.description["name"]
         return title
-    def plotLineDescription(self, test, lineName, item):
+    def plotLineDescription(self, test, lineName):
         description = {}
         description["name"] = lineName
-        if item != costEntryName:
-            description["name"] += "." + item
         description["test"] = test.name
         description["user"] = test.getRelPath().split(os.sep)[0]
         description["app"]  = test.app
         return description
+    def addItemToDescription(self, description, item):
+        if item != costEntryName:
+            description["name"] += "." + item
     def makeTitle(self, title):
         if title:
             return title;
@@ -1313,7 +1314,7 @@ class TestGraph:
     def getXAxisLabel(self):
         return self.axisXLabel
     # The routines below are the ones creating all the PlotLine instances for ONE test.
-    def createPlotObjects(self, lineName, logFile, test, scaling):
+    def createPlotObjectsForItems(self, lineName, logFile, description, scaling, dir, app):
         # Find out what to plot.
         plotItemsText = self.optionGroup.getOptionValue("i")
         if plotItemsText == "apctimes":
@@ -1324,19 +1325,20 @@ class TestGraph:
         if not xItem:
             xItem = timeEntryName
         
-        optRun = OptimizationRun(test.app, [ xItem ], plotItems, logFile)
+        optRun = OptimizationRun(app, [ xItem ], plotItems, logFile)
         if len(optRun.solutions) == 0:
             return
 
         for item in plotItems:
-            description = self.plotLineDescription(test, lineName, item)
-            plotFiles = test.makeTmpFileName("plot-" + description["name"].replace(" ", "-"), forFramework=1)
-            plotLine = PlotLine(plotFiles, description , xItem, item, optRun, self.optionGroup.getSwitchValue("s"), scaling)
+            desc = copy.copy(description)
+            self.addItemToDescription(desc, item)
+            plotFile = os.path.join(dir, "plot-" + desc["name"].replace(" ", "-"))
+            plotLine = PlotLine(plotFile, desc , xItem, item, optRun, self.optionGroup.getSwitchValue("s"), scaling)
             self.addLine(plotLine)
             # Average
             if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
                 if not self.plotAveragers.has_key(lineName+item):
-                    averager = self.plotAveragers[lineName+item] = PlotAverager(test.app.writeDirectory)
+                    averager = self.plotAveragers[lineName+item] = PlotAverager(app.writeDirectory)
                 else:
                     averager = self.plotAveragers[lineName+item]
                 averager.addGraph(plotLine.graph)
@@ -1349,6 +1351,10 @@ class TestGraph:
 	if len(dateEntry) == 0:
             return None
         return dateEntry[0]
+    def createPlotObjects(self, lineName, logFile, test, scaling):
+        dir = test.getDirectory(temporary=1, forFramework = 1)
+        description = self.plotLineDescription(test, lineName)
+        self.createPlotObjectsForItems(lineName, logFile, description, scaling, dir, test.app)
     def createPlotObjectsForTest(self, test):
         # for command-line plotting only
         logFileStem = test.app.getConfigValue("log_file")

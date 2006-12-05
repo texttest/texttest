@@ -1406,12 +1406,22 @@ class TestGraph:
                 if not (onlyExactMatch and not isExactMatch):
                     self.createPlotObjects(versionName, logFile, test, scaling)
 
-class PlotEngine:
+class PlotEngineCommon:
     def __init__(self, testGraph):
         self.testGraph = testGraph
+        self.diag = plugins.getDiagnostics("Test Graph")
+    def doPrint(self, printer, printA3, file):
+        print "Printing to", printer
+        extraArgs = ""
+        if printA3:
+            extraArgs += "-o PageSize=A3 "
+        os.system("lpr " + extraArgs + "-P" + printer + " " + file)
+        
+class PlotEngine(PlotEngineCommon):
+    def __init__(self, testGraph):
+        PlotEngineCommon.__init__(self, testGraph)
         self.lineTypeCounter = 1
         self.undesiredLineTypes = []
-        self.diag = plugins.getDiagnostics("Test Graph")
     def getNextLineType(self):
         self.lineTypeCounter += 1
         while self.undesiredLineTypes.count(self.lineTypeCounter) > 0:
@@ -1513,8 +1523,7 @@ class PlotEngine:
             if len(tmppf) > 0:
                 open(absTargetFile, "w").write(tmppf)
             if printer:
-                print "Printing to", printer
-                os.system("lpr -o PageSize=A3 -P" + printer + " " + absTargetFile)
+                self.doPrint(printer, printA3, absTargetFile)
     def terminalLine(self, terminal, colour, printA3=0):
         line = "set terminal " + terminal
         if printA3:
@@ -1546,10 +1555,9 @@ except:
 
 mplFigureNumber = 1
 
-class PlotEngineMPL:
+class PlotEngineMPL(PlotEngineCommon):
     def __init__(self, testGraph):
-        self.testGraph = testGraph
-        self.diag = plugins.getDiagnostics("Test Graph")
+        PlotEngineCommon.__init__(self, testGraph)
         self.markers = ["o", "s", "x", "d", "+", "v", "1", "^"]
         # See /usr/lib/python2.2/site-packages/matplotlib/colors.py for more colors.
         self.colors = [ 'blue', 'red', 'green', 'cyan', 'magenta', 'black',
@@ -1598,13 +1606,17 @@ class PlotEngineMPL:
         figure(mplFigureNumber, facecolor = 'w', figsize = self.getPlotSize(plotSize))
         mplFigureNumber += 1
         axes(axisbg = '#f6f6f6')
-    def showOrSave(self, targetFile, writeDir):
+    def showOrSave(self, targetFile, writeDir, printer, printA3):
+        if printer:
+            targetFile = os.path.join(writeDir, "texttest.ps")
         if targetFile:
             if not os.path.isdir(writeDir):
                 os.makedirs(writeDir)
             os.chdir(writeDir)
             absTargetFile = os.path.expanduser(targetFile)
             savefig(absTargetFile)
+            if printer:
+                self.doPrint(printer, printA3, absTargetFile)
         else:
             show()
     def plot(self, writeDir):
@@ -1647,7 +1659,7 @@ class PlotEngineMPL:
         else:
             ylabel(self.testGraph.getYAxisLabel() + " % above " + str(min))
             
-        self.showOrSave(targetFile, writeDir)
+        self.showOrSave(targetFile, writeDir, printer, printA3)
 
 # Class representing ONE curve in plot.
 class PlotLine:

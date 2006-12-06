@@ -1478,7 +1478,7 @@ class PlotEngine(PlotEngineCommon):
                 absTargetFile = os.path.join(writeDir, absTargetFile)
             self.writePlot(self.terminalLine(terminal, colour))
         if printer:
-            absTargetFile = os.path.join(writeDir, "texttest.ps")
+            absTargetFile = os.path.join(writeDir, "graph.ps")
             self.writePlot(self.terminalLine(terminal, colour, printA3))
             if printA3:
                 self.writePlot("set size 1.45,1.45")
@@ -1612,7 +1612,7 @@ class PlotEngineMPL(PlotEngineCommon):
         axes(axisbg = '#f6f6f6')
     def showOrSave(self, targetFile, writeDir, printer, printA3):
         if printer:
-            targetFile = os.path.join(writeDir, "texttest.ps")
+            targetFile = os.path.join(writeDir, "graph.ps")
         if targetFile:
             if not os.path.isdir(writeDir):
                 os.makedirs(writeDir)

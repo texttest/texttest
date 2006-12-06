@@ -11,8 +11,6 @@ plugins.addCategory("crash", "CRASHED")
 
 # For backwards compatibility...
 class FailedPrediction(plugins.TestState):
-    def isSaveable(self):
-        return self.category != "bug"
     def getTypeBreakdown(self):
         if self.category == "bug":
             return "success", self.briefText

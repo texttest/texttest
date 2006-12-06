@@ -77,11 +77,11 @@ class PerformanceFileComparison(FileComparison):
             return FileComparison.getType(self)
         else:
             return self.perfComparison.descriptor
-    def getSummary(self):
-        return self.perfComparison.getSummary()
+    def getDifferencesSummary(self, includeNumbers=True):
+        return self.perfComparison.getSummary(includeNumbers)
     def getDetails(self):
         if self.hasDifferences():
-            return self.getSummary()
+            return self.getDifferencesSummary()
         else:
             return ""
     def getConfigName(self, stem):
@@ -134,12 +134,14 @@ class PerformanceComparison:
                 return self.getDescriptor("memory") + postfix
             else:
                 return self.getDescriptor("performance") + postfix
-    def getSummary(self):
+    def getSummary(self, includeNumbers=True):
         perc = int(self.percentageChange)
         if perc == 0:
             return ""
-        else:
+        elif includeNumbers:
             return str(perc) + "% " + self.descriptor
+        else:
+            return self.descriptor
     def isSignificant(self, minPerf, minVar):
         longEnough = self.newPerformance > minPerf or self.oldPerformance > minPerf
         varianceEnough = self.percentageChange > minVar

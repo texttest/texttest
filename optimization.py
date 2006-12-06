@@ -132,6 +132,7 @@ from ndict import seqdict
 from time import sleep
 from respond import Responder
 from comparetest import MakeComparisons, TestComparison
+from comparefile import FileComparison
 from performance import getTestPerformance
 
 itemNamesConfigKey = "_itemnames_map"
@@ -330,51 +331,54 @@ class OptimizationTestComparison(TestComparison):
         if itemsInFile.has_key(costEntryName):
             self.costName = itemsInFile[costEntryName]
         self.logStem = app.getConfigValue("log_file")
-    def getTypeBreakdown(self):
-        category, details = TestComparison.getTypeBreakdown(self)
-        if not details.startswith("solution different"):
-            return category, details
-        logComp, resultList = self.findComparison(self.logStem)
-        if not logComp or resultList is self.newResults:
-            return category, details
-        try:
-            oldCost = self.getCost(logComp.stdFile)
-            newCost = self.getCost(logComp.tmpFile)
-            if oldCost == newCost:
-                return category, details
-            changeDesc = self.getChangeDescription(oldCost, newCost)
-            return category, details.replace("solution different", changeDesc)
-        except:
-            return category, details
-    def getBriefClassifier(self):
-        # no numbers or we get hundreds of these...
-        overall, details = self.getTypeBreakdown()
-        words = details.split()
-        if len(words) > 1 and words[1].endswith("%"):
-            return "solution " + words[-1]
-        else:
-            return details
     def createFileComparison(self, test, stem, standardFile, tmpFile):
-        if not stem in test.app.getConfigValue("skip_comparison_if_not_present").split(",") or tmpFile:
-            return TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile)
+        if not tmpFile and stem in test.app.getConfigValue("skip_comparison_if_not_present").split(","):
+            return
+        
+        if stem == "solution" and tmpFile and standardFile:
+            tmpLogFile = test.makeTmpFileName(self.logStem)
+            stdLogFile = test.getFileName(self.logStem)
+            if stdLogFile and os.path.isfile(tmpLogFile):
+                oldCost = self.getCost(stdLogFile)
+                newCost = self.getCost(tmpLogFile)
+                if oldCost is not None and newCost is not None and oldCost != newCost:
+                    return SolutionFileComparison(test, stem, standardFile, tmpFile, oldCost, newCost)
+            
+        return TestComparison.createFileComparison(self, test, stem, standardFile, tmpFile)
     def getCost(self, file):
-        if not os.path.isfile(file):
-            raise plugins.TextTestError, "File has been deleted in the meantime..."
         cmd = "grep '" + self.costName + "' " + file
         grepLines = os.popen(cmd).readlines()
-        lastField = grepLines[-1].split(" ")[-1]
-        return float(lastField.strip())
-    def getChangeDescription(self, oldCost, newCost):
-        if oldCost < newCost:
-            return "solution " + self.calculatePercentageIncrease(oldCost, newCost) + "% worse"
+        if len(grepLines) > 0:
+            lastField = grepLines[-1].split(" ")[-1]
+            return float(lastField.strip())
+    
+class SolutionFileComparison(FileComparison):
+    def __init__(self, test, stem, standardFile, tmpFile, oldCost, newCost):
+        FileComparison.__init__(self, test, stem, standardFile, tmpFile, testInProgress=0, observers=[])
+        self.oldCost = oldCost
+        self.newCost = newCost
+    def getDifferencesSummary(self, includeNumbers=True):
+        if self.oldCost < self.newCost:
+            if includeNumbers:
+                return "solution " + self.calculatePercentageIncrease(self.oldCost, self.newCost) + "% worse"
+            else:
+                return "solution worse"
         else:
-            return "solution " + self.calculatePercentageIncrease(newCost, oldCost) + "% better"
+            if includeNumbers:
+                return "solution " + self.calculatePercentageIncrease(self.newCost, self.oldCost) + "% better"
+            else:
+                return "solution better"
     def calculatePercentageIncrease(self, smallest, largest):
         if smallest == 0.0:
             return 0.0
 
         floatVal = ((largest - smallest) / abs(smallest)) * 100
-        return str(round(floatVal, 1))    
+        return str(round(floatVal, 1))
+    def getDetails(self):
+        if self.hasDifferences():
+            return self.getDifferencesSummary()
+        else:
+            return ""
      
 class LogFileFinder:
     def __init__(self, test, tryTmpFile = 1, searchInUser = None):

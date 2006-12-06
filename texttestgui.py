@@ -2010,6 +2010,16 @@ class TestProgressBar:
         message = message.replace(oldFailMessage, newFailMessage)
         guilog.info("Progress bar detected save, new text is '" + message + "'")
         self.progressBar.set_text(message)
+
+class ClassificationTree(seqdict):
+    def addClassification(self, path):
+        prevElement = None
+        for element in path:
+            if not self.has_key(element):
+                self[element] = []
+            if prevElement and element not in self[prevElement]:
+                self[prevElement].append(element)
+            prevElement = element
             
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
@@ -2063,28 +2073,33 @@ class TestProgressMonitor(SubGUI):
         tests += treemodel.get_value(iter, 5)
     def findTestIterators(self, test):
         return self.classifications.get(test, [])
-    def getCategoryDescription(self, state):
-        briefDesc, fullDesc = state.categoryDescriptions.get(state.category, (state.category, state.category))
+    def getCategoryDescription(self, state, categoryName=None):
+        if not categoryName:
+            categoryName = state.category
+        briefDesc, fullDesc = state.categoryDescriptions.get(categoryName, (categoryName, categoryName))
         return briefDesc.replace("_", " ").capitalize()
     def getClassifiers(self, state):
+        classifiers = ClassificationTree()
         catDesc = self.getCategoryDescription(state)
         if not state.isComplete() or not state.hasFailed():
-            return [ catDesc ]
-        classifiers = [ "Failed" ]
-        if self.isPerformance(catDesc):
-            classifiers += [ "Performance differences", catDesc ]
-        else:
-            briefText = state.getBriefClassifier()
-            if catDesc == "Failed":
-                classifiers += [ "Differences", briefText ]
-            else:
-                classifiers += [ catDesc, briefText ]
+            classifiers.addClassification([ catDesc ])
+            return classifiers
+
+        if not state.isSaveable(): # If it's not saveable, don't classify it by the files
+            overall, details = state.getTypeBreakdown()
+            classifiers.addClassification([ "Failed", catDesc, details ])
+            return classifiers
+
+        for fileComp in state.getComparisons():
+            classifiers.addClassification(self.getFileClassification(fileComp, state))
+
         return classifiers
-    def isPerformance(self, catDesc):
-        for perfCat in [ "Slower", "Faster", "Memory" ]:
-            if catDesc.find(perfCat) != -1:
-                return True
-        return False
+    def getFileClassification(self, fileComp, state):
+        summary = fileComp.getSummary(includeNumbers=False)
+        if fileComp.getType() == "failure":
+            return [ "Failed", "Differences", summary ]
+        else:
+            return [ "Failed", "Performance differences", self.getCategoryDescription(state, summary) ]
     def removeTest(self, test):
         for iter in self.findTestIterators(test):
             testCount = self.treeModel.get_value(iter, 1)
@@ -2096,21 +2111,20 @@ class TestProgressMonitor(SubGUI):
             allTests.remove(test)
             self.treeModel.set_value(iter, 5, allTests)
     def insertTest(self, test, state):
-        searchIter = self.treeModel.get_iter_root()
-        parentIter = None
         self.classifications[test] = []
         classifiers = self.getClassifiers(state)
-        for classifier in classifiers:
-            iter = self.findIter(classifier, searchIter)
-            if iter:
-                self.insertTestAtIter(iter, test, state.category)
-                searchIter = self.treeModel.iter_children(iter)
-            else:
-                iter = self.addNewIter(classifier, parentIter, test, state.category)
-                searchIter = None
-            parentIter = iter
-            self.classifications[test].append(iter)
-        return iter
+        nodeClassifier = classifiers.keys()[0]
+        self.addTestForNode(test, state, nodeClassifier, classifiers)
+    def addTestForNode(self, test, state, nodeClassifier, classifiers, parentIter=None):
+        nodeIter = self.findIter(nodeClassifier, parentIter)
+        if nodeIter:
+            self.insertTestAtIter(nodeIter, test, state.category)
+        else:
+            nodeIter = self.addNewIter(nodeClassifier, parentIter, test, state.category)
+
+        self.classifications[test].append(nodeIter)
+        for subNodeClassifier in classifiers[nodeClassifier]:
+            self.addTestForNode(test, state, subNodeClassifier, classifiers, nodeIter)
     def insertTestAtIter(self, iter, test, category):
         allTests = self.treeModel.get_value(iter, 5)
         testCount = self.treeModel.get_value(iter, 1)
@@ -2128,7 +2142,7 @@ class TestProgressMonitor(SubGUI):
             self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)
         return newIter
     def findIter(self, classifier, startIter):
-        iter = startIter
+        iter = self.treeModel.iter_children(startIter)
         while iter != None:
             name = self.treeModel.get_value(iter, 0)
             if name == classifier:
@@ -2142,9 +2156,15 @@ class TestProgressMonitor(SubGUI):
         return category.lower() not in test.getConfigValue("hide_test_category")
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeTest(test)
-        newIter = self.insertTest(test, state)
-        self.notify("Visibility", test, self.treeModel.get_value(newIter, 2)) 
-        self.diagnoseTree()   
+        self.insertTest(test, state)
+        self.notify("Visibility", test, self.shouldBeVisible(test))
+        self.diagnoseTree()
+    def shouldBeVisible(self, test):
+        for nodeIter in self.classifications[test]:
+            visible = self.treeModel.get_value(nodeIter, 2)
+            if not visible:
+                return False
+        return True
     def diagnoseTree(self):
         guilog.info("Test progress:")
         childIters = []

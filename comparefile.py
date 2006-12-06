@@ -66,8 +66,6 @@ class FileComparison:
     def getDetails(self):
         # Nothing to report above what is already known
         return ""
-    def getSummary(self):
-        return self.stem + " different"
     def newResult(self):
         return not self.stdFile and self.tmpFile
     def missingResult(self):
@@ -81,6 +79,15 @@ class FileComparison:
     def cacheDifferences(self):
         if self.stdCmpFile and self.tmpCmpFile:
             self.differenceCache = not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
+    def getSummary(self, includeNumbers=True):
+        if self.newResult():
+            return self.stem + " new"
+        elif self.missingResult():
+            return self.stem + " missing"
+        else:
+            return self.getDifferencesSummary(includeNumbers)
+    def getDifferencesSummary(self, includeNumbers=True):
+        return self.stem + " different"
     def getFreeText(self):
         return self.getFreeTextTitle() + "\n" + self.getFreeTextBody()
     def getFreeTextTitle(self):

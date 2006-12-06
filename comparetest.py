@@ -115,7 +115,7 @@ class TestComparison(BaseTestComparison):
         return self.category == "success"
     def isSaveable(self):
         if self.failedPrediction:
-            return self.failedPrediction.isSaveable()
+            return False
         else:
             return plugins.TestState.isSaveable(self)
     def hasDifferences(self):
@@ -149,22 +149,13 @@ class TestComparison(BaseTestComparison):
         worstResult = self.getMostSevereFileComparison()
         worstSeverity = worstResult.severity
         self.diag.info("Severity " + str(worstSeverity) + " for failing test")
-        details = self.getSummary(worstResult)
+        details = worstResult.getSummary()
         if len(self.getComparisons()) > 1:
             details += "(+)"
         if worstSeverity == 1:
             return "failure", details
         else:
             return "success", details
-    def getSummary(self, worstResult):
-        # Don't call worstResult.newResult() - we want the right answer
-        # even if all the files are gone, for the sake of testoverview etc.
-        if worstResult in self.newResults:
-            return worstResult.stem + " new"
-        elif worstResult in self.missingResults:
-            return worstResult.stem + " missing"
-        else:
-            return worstResult.getSummary()
     def getComparisons(self):
         return self.changedResults + self.newResults + self.missingResults    
     def _comparisonsString(self, comparisons):

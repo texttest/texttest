@@ -366,8 +366,6 @@ class TestState(Observable):
             return "not compared"
     def getTypeBreakdown(self):
         return self.category, self.briefText
-    def getBriefClassifier(self):
-        return self.briefText
     def ensureCompatible(self):
         # If loaded from old pickle files, can get out of date objects...
         pass

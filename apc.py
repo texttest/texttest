@@ -1625,7 +1625,7 @@ class PlotEngineMPLTimeDiv(optimization.PlotEngineMPL):
         title('Time distribution (average)')
         ylabel('CPU time (min)')
 
-        self.showOrSave(targetFile, writeDir)
+        self.showOrSave(targetFile, writeDir, printer, printA3)
 
 # Override for webpage generation with APC-specific stuff in it
 class GenerateWebPages(optimization.GenerateWebPages):

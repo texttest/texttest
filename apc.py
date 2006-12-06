@@ -70,7 +70,7 @@ apc.PlotKPIGroups          - A specialization of optimization.PlotTest for APC w
 
 """
 
-import default, ravebased, queuesystem, performance, os, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview
+import default, ravebased, queuesystem, performance, os, copy, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview
 from socket import gethostname
 from time import sleep
 from ndict import seqdict

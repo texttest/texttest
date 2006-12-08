@@ -307,10 +307,11 @@ class Test(plugins.Observable):
             return self.parent.makePathName(fileName)
     def actionsCompleted(self):
         self.diagnose("Completion notified")
-        self.notify("Complete")
         if not self.state.lifecycleChange:
             self.state.lifecycleChange = "complete"
             self.notify("LifecycleChange", self.state, self.state.lifecycleChange)
+
+        self.notify("Complete")
     def getRelPath(self):
         # We standardise communication around UNIX paths, it's all much easier that way
         relPath = plugins.relpath(self.getDirectory(), self.app.getDirectory())

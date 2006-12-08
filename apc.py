@@ -1471,10 +1471,13 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
     def __init__(self, dynamic, rootSuites):
         optimization.PlotTestInGUI.__init__(self, dynamic, rootSuites)
         self.addSwitch("kpi", "Plot kpi group")
+    def describeTests(self):
+        return str(self.numPlottedTests) + " tests"
     def performOnCurrent(self):
+        self.numPlottedTests = 0
         for test in self.findAllTests():
             self.createGUIPlotObjects(test)
-
+            self.numPlottedTests += 1
         self.plotGraph(self.currTestSelection[0].app.writeDirectory)
     def findAllTests(self):
         if not self.optionGroup.getSwitchValue("kpi"):

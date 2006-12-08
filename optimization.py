@@ -1032,6 +1032,8 @@ class PlotTestInGUI(guiplugins.SelectionAction):
         return "Plotting"
     def inToolBar(self):
         return True
+    def getDefaultAccelerator(self):
+        return "<control>p"
     def getStockId(self):
         return "clear"    
     def getTabTitle(self):
@@ -1041,6 +1043,10 @@ class PlotTestInGUI(guiplugins.SelectionAction):
             return "Test" # 'Test' gives us no group tab ...
         else:
             return "Graph"
+    def messageBeforePerform(self):
+        return "Plotting tests ..."
+    def messageAfterPerform(self):
+        return "Plotted " + self.describeTests() + "."    
     def performOnCurrent(self):
         for test in self.currTestSelection:
             self.createGUIPlotObjects(test)

@@ -51,7 +51,7 @@ class TestRunner:
         abandon = False
         while len(self.actionSequence):
             action = self.actionSequence[0]
-            if abandon and not action.callDuringAbandon():
+            if abandon and not action.callDuringAbandon(self.test):
                 self.actionSequence.pop(0)
                 continue
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))

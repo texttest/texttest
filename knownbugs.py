@@ -232,9 +232,9 @@ class CheckForBugs(plugins.Action):
         self.activateBugs(suite)
     def tearDownSuite(self, suite):
         self.deactivateBugs(suite)
-    def callDuringAbandon(self):
+    def callDuringAbandon(self, test):
         # want to be able to mark UNRUNNABLE tests as known bugs too...
-        return True
+        return test.state.lifecycleChange != "complete"
     def __call__(self, test):
         self.readBugs(test)
         if not self.checkTest(test):

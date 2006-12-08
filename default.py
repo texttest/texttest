@@ -1430,12 +1430,12 @@ class ReconnectTest(plugins.Action):
         if self.fullRecalculate:                
             # Only pick up errors here, recalculate the rest. Don't notify until
             # we're done with recalculation.
-            if not newState.hasResults():
-                newState.lifecycleChange = "" # otherwise it's regarded as complete
-                test.changeState(newState)
-            else:
+            if newState.hasResults():
                 # Also pick up execution machines, we can't get them otherwise...
                 test.state.executionHosts = newState.executionHosts
+            else:
+                newState.lifecycleChange = "" # otherwise it's regarded as complete
+                test.changeState(newState)
         else:
             newState.updateTmpPath(self.rootDirToCopy)
             test.changeState(newState)

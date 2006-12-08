@@ -210,7 +210,7 @@ class Action:
         pass
     def tearDownSuite(self, suite):
         pass
-    def callDuringAbandon(self):
+    def callDuringAbandon(self, test):
         # set to True if even unrunnable tests should have this action called
         return False
     # Return the actions to replace the current one if run is interrupted

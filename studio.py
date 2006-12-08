@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.37 2006/11/24 16:49:38 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.38 2006/12/08 08:04:29 perb Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -46,20 +46,17 @@ class StudioConfig(ravebased.Config):
 			    " CARMUSR=" + carmUsr + \
 			    " CARMTMP=" + carmTmp + \
 			    " " + script + " -g CrcDefaultRuleSet"
-		#print "cmd=",cmd
 		try:
 		    for l in os.popen(cmd):
 			name = l[:-1]
-			if name and os.path.exists(name):
+			if name:
 			    rulesetName = os.path.basename(name)
 			    break
 		except Exception, x:
-		    #print "crsutil failed: ", x
 		    pass
         if self.macroBuildsRuleset(test, rulesetName):
             # Don't want to manage the ruleset separately if the macro is going to build it...
             return ""
-	#print "returning rulesetName=", rulesetName
 	return rulesetName
     def findOrigRulePath(self, headerFile):
         if not os.path.isfile(headerFile):

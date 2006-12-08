@@ -451,9 +451,14 @@ class TextTestGUI(Responder, plugins.Observable):
         else:
             subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
             tabInfo = seqdict()
-            tabInfo["Test"] = self.createPaned(topTestViewGUI, subNotebookGUIs["Test"], horizontal=False)
-            tabInfo["Selection"] = subNotebookGUIs["Selection"]
-            tabInfo["Running"] = self.createPaned(self.appFileGUI, subNotebookGUIs["Running"], horizontal=False)
+            for name, notebookGUI in subNotebookGUIs.items():
+                if name == "Test":
+                    tabInfo[name] = self.createPaned(topTestViewGUI, notebookGUI, horizontal=False)
+                elif name == "Running":
+                    tabInfo[name] = self.createPaned(self.appFileGUI, notebookGUI, horizontal=False)
+                else:
+                    tabInfo[name] = notebookGUI
+
             notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"), self.getDefaultPage())
             self.testTreeGUI.addObserver(notebookGUI)
             for subNotebookGUI in subNotebookGUIs.values():
@@ -486,12 +491,22 @@ class TextTestGUI(Responder, plugins.Observable):
         for tabGUI in tabGUIs:
             tabInfo[tabGUI.getTabTitle()] = tabGUI
         return tabInfo
+    def getGroupTabNames(self, tabGUIs):
+        tabNames = [ "Test", "Selection", "Running" ]
+        for tabGUI in tabGUIs:
+            tabName = tabGUI.getGroupTabTitle()
+            if not tabName in tabNames:
+                tabNames.append(tabName)
+        return tabNames
     def createNotebookGUIs(self, tabGUIs):
         tabInfo = seqdict()
-        for tabName in [ "Test", "Selection", "Running" ]:
+        for tabName in self.getGroupTabNames(tabGUIs):
             currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
-            notebookGUI = NotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
-            tabInfo[tabName] = notebookGUI
+            if len(currTabGUIs) > 1:
+                notebookGUI = NotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
+                tabInfo[tabName] = notebookGUI
+            else:
+                tabInfo[tabName] = currTabGUIs[0]
         return tabInfo
     def notifyLifecycleChange(self, test, state, changeDesc):
         # Working around python bug 853411: main thread must do all forking

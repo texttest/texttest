@@ -1,5 +1,6 @@
 
 import plugins, os, sys, shutil, string, types, time
+from copy import copy
 from threading import Thread
 from glob import glob
 from Queue import Queue, Empty
@@ -406,6 +407,7 @@ class SaveTests(SelectionAction):
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
 
+        fileSel = copy(self.currFileSelection) # Saving can cause it to be updated, meaning we don't save what we intend
         for test in self.currTestSelection:
             if not test.state.isSaveable():
                 continue
@@ -415,8 +417,8 @@ class SaveTests(SelectionAction):
             testComparison = test.state
             testComparison.setObservers(self.observers)
             if testComparison:
-                if len(self.currFileSelection) > 0:
-                    testComparison.savePartial(self.currFileSelection, test, self.getExactness(), version)
+                if len(fileSel) > 0:
+                    testComparison.savePartial(fileSel, test, self.getExactness(), version)
                 else:
                     testComparison.save(test, self.getExactness(), version, overwriteSuccess)
                 newState = testComparison.makeNewState(test.app)

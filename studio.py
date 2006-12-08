@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.38 2006/12/08 08:04:29 perb Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.39 2006/12/08 10:47:47 perb Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -45,9 +45,11 @@ class StudioConfig(ravebased.Config):
 		cmd = "/usr/bin/env USER=" + userId + \
 			    " CARMUSR=" + carmUsr + \
 			    " CARMTMP=" + carmTmp + \
-			    " " + script + " -g CrcDefaultRuleSet"
+			    " " + script + " -f 'CrcDefaultRuleSet: %s\n'  -g CrcDefaultRuleSet"
 		try:
 		    for l in os.popen(cmd):
+		    	if not l.startswith("CrcDefaultRuleSet:"):
+			    continue
 			name = l[:-1]
 			if name:
 			    rulesetName = os.path.basename(name)

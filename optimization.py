@@ -1019,9 +1019,9 @@ class GraphPlotResponder(Responder):
             print e
 
 # This is the action responsible for plotting from the GUI.
-class PlotTestInGUI(guiplugins.InteractiveTestAction):
+class PlotTestInGUI(guiplugins.SelectionAction):
     def __init__(self, dynamic, test):
-        guiplugins.InteractiveTestAction.__init__(self, test)
+        guiplugins.SelectionAction.__init__(self, test)
         self.dynamic = dynamic
         self.testGraph = TestGraph(self.optionGroup)
     def __repr__(self):
@@ -1030,13 +1030,21 @@ class PlotTestInGUI(guiplugins.InteractiveTestAction):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
-    def inButtonBar(self):
+    def inToolBar(self):
         return True
+    def getStockId(self):
+        return "clear"    
     def getTabTitle(self):
         return "Graph"
+    def getGroupTabTitle(self):
+        if self.dynamic:
+            return "Test" # 'Test' gives us no group tab ...
+        else:
+            return "Graph"
     def performOnCurrent(self):
-        self.createGUIPlotObjects(self.currentTest)
-        self.plotGraph(self.currentTest.app.writeDirectory)
+        for test in self.currTestSelection:
+            self.createGUIPlotObjects(test)
+        self.plotGraph(self.currTestSelection[0].app.writeDirectory) # This is not correct if you plot multiple applications!
     def createGUIPlotObjects(self, test):
         logFileStem = test.getConfigValue("log_file")
         if self.dynamic:

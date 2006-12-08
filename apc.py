@@ -270,7 +270,8 @@ class ApcProgressTestComparison(ProgressTestComparison):
 class CheckFilesForApc(plugins.Action):
     def __call__(self, test):
         verifyAirportFile(getArchitecture(test.app))
-        verifyLogFileDir(getArchitecture(test.app))        
+        verifyLogFileDir(getArchitecture(test.app))
+        os.environ["TEXTTEST_TEST_RELPATH"] = test.getRelPath()
 
 class ViewApcLog(guiplugins.InteractiveTestAction):
     def __repr__(self):
@@ -1474,19 +1475,23 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
         for test in self.findAllTests():
             self.createGUIPlotObjects(test)
 
-        self.plotGraph(self.currentTest.app.writeDirectory)
+        self.plotGraph(self.currTestSelection[0].app.writeDirectory)
     def findAllTests(self):
         if not self.optionGroup.getSwitchValue("kpi"):
-            return [ self.currentTest ]
-                # Plot KPI group
-
-        suite = self.currentTest.parent
+            return self.currTestSelection
+        if len(self.currTestSelection) > 1:
+            print "Only one test allowed to be selected when plotting KPI group."
+            print "Ignoring 'Plot kpi group' setting and plot selected tests."
+            return self.currTestSelection
+        # Plot KPI group
+        currentTest = self.currTestSelection[0] # Only one test!
+        suite = currentTest.parent
         kpiGroupForTest, kpiGroups, dummy = readKPIGroupFileCommon(suite)
-        if not kpiGroupForTest.has_key(self.currentTest.name):
-            print "Test", self.currentTest.name, "is not in an KPI group."
-            return [ self.currentTest ]
+        if not kpiGroupForTest.has_key(currentTest.name):
+            print "Test", currentTest.name, "is not in an KPI group."
+            return [ currentTest ]
 
-        kpiGroup = kpiGroupForTest[self.currentTest.name]
+        kpiGroup = kpiGroupForTest[currentTest.name]
         return filter(lambda test: kpiGroupForTest.get(test.name) == kpiGroup, suite.testcases)
                 
     def getRunningTmpFile(self, test, logFileStem):

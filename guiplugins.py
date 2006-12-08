@@ -979,6 +979,11 @@ class RunTests(SelectionAction):
         return "Started " + self.describeTests() + " at " + plugins.localtime() + "."
     def isFrequentUse(self):
         return True
+    def getUseCaseName(self):
+        if self.runNumber == 1:
+            return "dynamic"
+        else:
+            return "dynamic_" + str(self.runNumber)
     def performOnCurrent(self):
         writeDir = os.path.join(self.apps[0].writeDirectory, "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
@@ -986,10 +991,12 @@ class RunTests(SelectionAction):
         ttOptions = self.getTextTestOptions(filterFile)
         logFile = os.path.join(writeDir, "output.log")
         errFile = os.path.join(writeDir, "errors.log")
+        usecase = self.getUseCaseName()
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
         commandLine = plugins.textTestName + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
-        self.startExtProgramNewUsecase(commandLine, usecase="dynamic", exitHandler=(lambda x, y: self.checkTestRun("started at " + plugins.localtime(), x, y)), exitHandlerArgs=(errFile,self.currTestSelection), description = description)
+        identifierString = "started at " + plugins.localtime()
+        self.startExtProgramNewUsecase(commandLine, usecase, exitHandler=self.checkTestRun, exitHandlerArgs=(identifierString,errFile,self.currTestSelection), description = description)
     def writeFilterFile(self, writeDir):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
@@ -1021,7 +1028,11 @@ class RunTests(SelectionAction):
                 self.notifyIfMainThread("Status", "Updating files for " + repr(test) + " ...")
                 self.notifyIfMainThread("ActionProgress", "")
                 test.filesChanged()
-            scriptEngine.applicationEvent("dynamic GUI to be closed")
+            runNumber = int(os.path.basename(writeDir).replace("dynamic_run", ""))
+            if runNumber == 1:
+                scriptEngine.applicationEvent("dynamic GUI to be closed")
+            else:
+                scriptEngine.applicationEvent("dynamic GUI " + str(runNumber) + " to be closed")
             if os.path.isfile(errFile):
                 errText = open(errFile).read()
                 if len(errText):

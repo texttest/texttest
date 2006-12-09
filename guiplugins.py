@@ -354,6 +354,8 @@ class SaveTests(SelectionAction):
         return "_Save"
     def getSecondaryTitle(self):
         return "Save"
+    def getScriptTitle(self, tab):
+        return "Save results for selected tests"
     def messageBeforePerform(self):
         self.currTestDescription = self.describeTests()
         return "Saving " + self.currTestDescription + " ..."
@@ -441,7 +443,7 @@ class ViewFile(InteractiveTestAction):
     def hasButton(self):
         return False
     def addDifferenceSwitches(self):
-        self.addSwitch("rdt", "Include Run-dependent Text", 0)
+        self.addSwitch("rdt", "Include run-dependent text", 0)
         self.addSwitch("nf", "Show differences where present", 1)
     def updateOptionGroup(self, state):
         if not self.dynamic:
@@ -914,9 +916,9 @@ class SaveSelection(SelectionAction):
                 if group.name.startswith("Select"):
                     self.selectionGroup = group
     def getTitle(self):
-        return "S_ave Selection"
+        return "S_ave selection"
     def getScriptTitle(self, tab):
-        return "Save selection"
+        return "Save selected tests in file"
     def getTabTitle(self):
         if self.dynamic:
             return "Save Selection"
@@ -966,7 +968,7 @@ class RunTests(SelectionAction):
     def getOptionGroups(self):
         return self.optionGroups
     def getTitle(self):
-        return "_Run Tests"
+        return "_Run"
     def getStockId(self):
         return "execute"
     def getDefaultAccelerator(self):
@@ -1069,7 +1071,7 @@ class RemoveTest(SelectionAction):
     def getStockId(self):
         return "delete"
     def getScriptTitle(self, tab):
-        return "Remove Test"
+        return "Remove selected tests"
     def getDoubleCheckMessage(self):
         if len(self.currTestSelection) == 1:
             currTest = self.currTestSelection[0]

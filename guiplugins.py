@@ -354,7 +354,7 @@ class SaveTests(SelectionAction):
         return "_Save"
     def getSecondaryTitle(self):
         return "Save"
-    def getScriptTitle(self, tab):
+    def _getScriptTitle(self):
         return "Save results for selected tests"
     def messageBeforePerform(self):
         self.currTestDescription = self.describeTests()
@@ -898,7 +898,7 @@ class ResetGroups(InteractiveAction):
         return "R_eset"
     def messageAfterPerform(self):
         return "All options reset to default values."
-    def getScriptTitle(self, tab):
+    def _getScriptTitle(self):
         return "Reset running options"
     def performOnCurrent(self):
         for optionGroups in interactiveActionHandler.optionGroupMap.values():
@@ -917,7 +917,7 @@ class SaveSelection(SelectionAction):
                     self.selectionGroup = group
     def getTitle(self):
         return "S_ave selection"
-    def getScriptTitle(self, tab):
+    def _getScriptTitle(self):
         return "Save selected tests in file"
     def getTabTitle(self):
         if self.dynamic:
@@ -973,7 +973,7 @@ class RunTests(SelectionAction):
         return "execute"
     def getDefaultAccelerator(self):
         return "<control>r"
-    def getScriptTitle(self, tab):
+    def _getScriptTitle(self):
         return "Run selected tests"
     def getGroupTabTitle(self):
         return "Running"
@@ -1070,7 +1070,7 @@ class RemoveTest(SelectionAction):
         return "Remove"
     def getStockId(self):
         return "delete"
-    def getScriptTitle(self, tab):
+    def _getScriptTitle(self):
         return "Remove selected tests"
     def getDoubleCheckMessage(self):
         if len(self.currTestSelection) == 1:

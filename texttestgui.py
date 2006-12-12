@@ -231,15 +231,18 @@ class GUIStatusMonitor:
             guilog.info("Changing GUI status to: '" + message + "'")
             self.label.set_markup(message)
             
-    def createStatusbar(self, staticIcon, animationIcon):
+    def createStatusbar(self):
         hbox = gtk.HBox()
         self.label = gtk.Label()
         self.label.set_use_markup(True)
         hbox.pack_start(self.label, expand=False, fill=False)
+        imageDir = os.path.join(os.path.dirname(__file__), "images")
         try:
+            staticIcon = os.path.join(imageDir, "throbber_inactive.png")
             temp = gtk.gdk.pixbuf_new_from_file(staticIcon)
             self.throbber = gtk.Image()
             self.throbber.set_from_pixbuf(temp)
+            animationIcon = os.path.join(imageDir, "throbber_active.gif")
             self.animation = gtk.gdk.PixbufAnimation(animationIcon)
             hbox.pack_end(self.throbber, expand=False, fill=False)
         except Exception, e:
@@ -557,9 +560,7 @@ class TextTestGUI(Responder, plugins.Observable):
         if self.getConfigValue("add_shortcut_bar"):            
             self.shortcutBar.show()
             
-        inactiveThrobberIcon = self.getConfigValue("gui_throbber_inactive")
-        activeThrobberIcon = self.getConfigValue("gui_throbber_active")
-        self.statusBar = statusMonitor.createStatusbar(inactiveThrobberIcon, activeThrobberIcon)
+        self.statusBar = statusMonitor.createStatusbar()
         if self.getConfigValue("add_status_bar"):
             self.statusBar.show()
         vbox.pack_start(self.statusBar, expand=False, fill=False)

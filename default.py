@@ -504,8 +504,6 @@ class Config(plugins.Configuration):
         app.setConfigDefault("static_gui_show_toolbar", 1, "Show toolbar in the static GUI?")
         app.setConfigDefault("dynamic_gui_show_menubar", 1, "Show menubar in the dynamic GUI?")
         app.setConfigDefault("dynamic_gui_show_toolbar", 1, "Show toolbar in the dynamic GUI?")
-        app.setConfigDefault("gui_throbber_inactive", "/carm/master/Testing/TextTest/throbber_inactive.png", "The inactive image for the status throbber.")
-        app.setConfigDefault("gui_throbber_active", "/carm/master/Testing/TextTest/throbber_active.gif", "The active image for the status throbber.")
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")

@@ -1,14 +1,17 @@
 XCOMM Install test components in generally available place.
-XCOMM $Id: Imakefile,v 1.52 2006/11/10 10:19:56 geoff Exp $
+XCOMM $Id: Imakefile,v 1.53 2006/12/12 10:16:33 geoff Exp $
 
 MODULEDIR=/usr/local/share/python
 FRAMEWORK_MODULES=batch.py bugzilla.py comparefile.py comparetest.py default.py engine.py guiplugins.py knownbugs.py lsf.py performance.py plugins.py queuesystem.py respond.py sge.py testmodel.py testoverview.py texttestgui.py traffic.py traffic_cmd.py unixonly.py
 CARMEN_MODULES=carmenqueuesystem.py ddts.py ravebased.py optimization.py apc.py apcinfo.py KPI.py matador.py studio.py fleet.py mpssolver.py
 THIRD_PARTY_MODULES=HTMLgen.py HTMLcolors.py ImageH.py ImagePaletteH.py imgsize.py
 THIRD_PARTY_CARMEN_MODULES=barchart.py
+EXECUTABLE_SCRIPTS=texttest.py interpretcore.py
+FRAMEWORK_IMAGES=images/throbber_inactive.png images/throbber_active.gif
+
 PYTHONVERSIONS=2.2 2.3 2.4
 ALLDIRS=$(addprefix $(MODULEDIR)/, $(PYTHONVERSIONS))
-ALLTARGETS=$(foreach ver, $(ALLDIRS), $(addprefix $(ver)/, $(FRAMEWORK_MODULES) $(CARMEN_MODULES) $(THIRD_PARTY_MODULES) $(THIRD_PARTY_CARMEN_MODULES)))
+ALLTARGETS=$(foreach ver, $(ALLDIRS), $(addprefix $(ver)/, $(FRAMEWORK_MODULES) $(CARMEN_MODULES) $(THIRD_PARTY_MODULES) $(THIRD_PARTY_CARMEN_MODULES) $(FRAMEWORK_IMAGES)))
 
 CarmFirstTarget()
 
@@ -20,13 +23,4 @@ $(addsuffix /%, $(ALLDIRS)): %
 	    cp $< $(MODULEDIR)/$$pv; \
 	done
 
-XCOMM There is no single macro which both removes the suffix and installs.
-XCOMM Easiest to do by hand, as long as it is only one case.
-install:: /usr/local/bin/texttest.py
-/usr/local/bin/texttest: texttest.py
-	cp $< $@
-
-install:: /usr/local/bin/interpretcore.py
-/usr/local/bin/interpretcore.py: interpretcore.py
-	cp $< $@
-
+CopyFiles(install,$(EXECUTABLE_SCRIPTS),/usr/local/bin,ugo=rx)

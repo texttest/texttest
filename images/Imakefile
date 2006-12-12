@@ -1,0 +1,20 @@
+XCOMM Install test components in generally available place.
+XCOMM $Id: Imakefile,v 1.1 2006/12/12 11:05:30 geoff Exp $
+
+MODULEDIR=/usr/local/share/python
+IMAGES=throbber_inactive.png throbber_active.gif
+PYTHONVERSIONS=2.3 2.4
+ALLDIRS=$(addprefix $(MODULEDIR)/, $(PYTHONVERSIONS))
+ALLIMAGEDIRS=$(addsuffix /images, $(ALLDIRS))
+ALLTARGETS=$(foreach ver, $(ALLIMAGEDIRS), $(addprefix $(ver)/, $(IMAGES)))
+
+CarmFirstTarget()
+
+install:: $(ALLTARGETS)
+$(addsuffix /%, $(ALLIMAGEDIRS)): %
+	@set -xv; \
+	for pv in $(PYTHONVERSIONS); \
+	do  rm -f $(MODULEDIR)/$$pv/images/$<; \
+	    cp $< $(MODULEDIR)/$$pv/images; \
+	done
+

@@ -1,5 +1,7 @@
 XCOMM Install test components in generally available place.
-XCOMM $Id: Imakefile,v 1.54 2006/12/12 10:29:02 geoff Exp $
+XCOMM $Id: Imakefile,v 1.55 2006/12/12 11:05:30 geoff Exp $
+
+SUBMODULEDIRS   = images
 
 MODULEDIR=/usr/local/share/python
 FRAMEWORK_MODULES=batch.py bugzilla.py comparefile.py comparetest.py default.py engine.py guiplugins.py knownbugs.py lsf.py performance.py plugins.py queuesystem.py respond.py sge.py testmodel.py testoverview.py texttestgui.py traffic.py traffic_cmd.py unixonly.py
@@ -29,4 +31,6 @@ install:: /usr/local/bin/texttest.py
 install:: /usr/local/bin/interpretcore.py
 /usr/local/bin/interpretcore.py: interpretcore.py
 	cp $< $@
+
+AllSubDirRules($(SUBMODULEDIRS))
 

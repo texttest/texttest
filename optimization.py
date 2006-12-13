@@ -1030,7 +1030,7 @@ class PlotTestInGUI(guiplugins.SelectionAction):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
-    def inToolBar(self):
+    def isFrequentUse(self):
         return True
     def getDefaultAccelerator(self):
         return "<control>p"

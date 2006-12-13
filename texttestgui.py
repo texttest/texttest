@@ -413,7 +413,7 @@ class TextTestGUI(Responder, plugins.Observable):
         gtk.main_quit()
     def createActionGUIForTab(self, action):
         if len(action.getOptionGroups()) == 1 and action.canPerform():
-            return ActionGUI(action, self.uiManager, fromTab=True)
+            return ButtonGUI(action, fromTab=True)
     def createActionTabGUIs(self, actions):
         actionTabGUIs = []
         for action in actions:
@@ -475,13 +475,13 @@ class TextTestGUI(Responder, plugins.Observable):
             return "Test"
         
     def createButtonBarGUI(self, intvActions):
-        buttonBarGUIs = []
+        buttonGUIs = []
         for action in intvActions:
             if action.inButtonBar():
-                buttonBarGUI = ActionGUI(action, self.uiManager)
-                self.testTreeGUI.addObserver(buttonBarGUI)
-                buttonBarGUIs.append(buttonBarGUI)
-        return BoxGUI(buttonBarGUIs, horizontal=True, reversed=True)
+                buttonGUI = ButtonGUI(action)
+                self.testTreeGUI.addObserver(buttonGUI)
+                buttonGUIs.append(buttonGUI)
+        return BoxGUI(buttonGUIs, horizontal=True, reversed=True)
 
     def getNotebookScriptName(self, tabName):
         if tabName == "Top":
@@ -596,7 +596,7 @@ class TextTestGUI(Responder, plugins.Observable):
         toolBarActions = filter(lambda instance : instance.inToolBar(), intvActions)
         guilog.info("") # blank line for demarcation
         for action in toolBarActions:
-            toolBarGUI = ActionGUI(action, self.uiManager)
+            toolBarGUI = ToolbarActionGUI(action, self.uiManager)
             self.testTreeGUI.addObserver(toolBarGUI)
             toolBarGUI.describe()
     
@@ -1045,11 +1045,54 @@ class TestTreeGUI(SubGUI):
     def reFilter(self):
         self.filteredModel.refilter()
         self.visibilityChanged()
-           
+
 class ActionGUI(SubGUI):
-    def __init__(self, action, uiManager, fromTab=False):
+    def __init__(self, action):
         SubGUI.__init__(self)
         self.action = action
+    def typeDescription(self):
+        return "action"        
+    def describe(self):
+        message = "Viewing " + self.typeDescription() + " with title '" + self.action.getTitle() + "'"
+        message += self.detailDescription()
+        guilog.info(message)
+    def notifyNewTestSelection(self, tests):
+        if self.updateSensitivity():
+            newActive = self.actionOrButton().get_property("sensitive")
+            guilog.info("Setting sensitivity of button '" + self.action.getTitle() + "' to " + repr(newActive))
+    def updateSensitivity(self):
+        oldActive = self.actionOrButton().get_property("sensitive")
+        newActive = self.action.isActiveOnCurrent()
+        if oldActive != newActive:
+            self.actionOrButton().set_property("sensitive", newActive)
+            return True
+        else:
+            return False
+    def sensitivityDescription(self):
+        if self.actionOrButton().get_property("sensitive"):
+            return ""
+        else:
+            return " (greyed out)"
+    def runInteractive(self, *args):
+        if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
+            return        
+        doubleCheckMessage = self.action.getDoubleCheckMessage()
+        if doubleCheckMessage:
+            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, globalTopWindow)
+        else:
+            self._runInteractive()
+    def _runInteractive(self):
+        try:
+            self.action.perform()
+        except plugins.TextTestError, e:
+            showError(str(e), globalTopWindow)
+        except plugins.TextTestWarning, e:
+            showWarning(str(e), globalTopWindow)
+    
+           
+class ToolbarActionGUI(ActionGUI):
+    def __init__(self, action, uiManager):
+        ActionGUI.__init__(self, action)
         self.accelerator = self.getAccelerator()
         if self.action.isToggle():
             self.gtkAction = gtk.ToggleAction(self.action.getSecondaryTitle(), self.action.getTitle(), \
@@ -1065,10 +1108,10 @@ class ActionGUI(SubGUI):
         self.getActionGroup(uiManager).add_action_with_accel(self.gtkAction, self.accelerator)
         self.gtkAction.set_accel_group(uiManager.get_accel_group())
         self.gtkAction.connect_accelerator()
-        scriptEngine.connect(self.action.getScriptTitle(fromTab), "activate", self.gtkAction, self.runInteractive)
-        if not fromTab and not self.action.isActiveOnCurrent():
-            self.gtkAction.set_property("sensitive", False) # tab guis are always sensitive, we manage this by removing the tab!
-
+        scriptEngine.connect(self.action.getScriptTitle(False), "activate", self.gtkAction, self.runInteractive)
+        self.updateSensitivity()
+    def actionOrButton(self):
+        return self.gtkAction
     def getActionGroupIndex(self):
         return 0
     def getActionGroup(self, uiManager):
@@ -1088,53 +1131,41 @@ class ActionGUI(SubGUI):
             else:
                 plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
                                      + self.action.getSecondaryTitle() + "' is not valid, ignoring ...")
-    def describe(self):
-        type = "action"
+    def typeDescription(self):
         if self.action.isToggle():
-            type = "toggle action"
+            return "toggle action"
         elif self.action.isRadio():
-            type = "radio action"
-        message = "Viewing " + type + " with title '" + self.action.getTitle() + "'"
-
+            return "radio action"
+        else:
+            return "action"
+    def detailDescription(self):
+        message = ""
         stockId = self.getStockId()
         if stockId:
             message += ", stock id '" + repr(stockId) + "'"
         if self.accelerator:
             message += ", accelerator '" + repr(self.accelerator) + "'"
-        if not self.gtkAction.is_sensitive():
-            message += " (greyed out)"
-            
+        message += self.sensitivityDescription()            
         if self.action.isRadio() or self.action.isToggle():
             message += ". Start value is " + str(self.action.getStartValue())                
-        guilog.info(message)
-
-    def notifyNewTestSelection(self, tests):
-        oldActive = self.gtkAction.is_sensitive()
-        newActive = self.action.isActiveOnCurrent()
-        if oldActive != newActive:
-            self.gtkAction.set_property("sensitive", newActive)
-            guilog.info("Setting sensitivity of button '" + self.action.getTitle() + "' to " + repr(newActive))
+        return message
+    
+    
+class ButtonGUI(ActionGUI):
+    def __init__(self, action, fromTab=False):
+        ActionGUI.__init__(self, action)
+        self.scriptTitle = self.action.getScriptTitle(fromTab)
+        self.button = None
+    def actionOrButton(self):
+        return self.button
     def createView(self):
-        button = gtk.Button()
-        self.gtkAction.connect_proxy(button)
-        button.show()
-        return button
-    def runInteractive(self, *args):
-        if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
-            return        
-        doubleCheckMessage = self.action.getDoubleCheckMessage()
-        if doubleCheckMessage:
-            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, globalTopWindow)
-        else:
-            self._runInteractive()
-    def _runInteractive(self):
-        try:
-            self.action.perform()
-        except plugins.TextTestError, e:
-            showError(str(e), globalTopWindow)
-        except plugins.TextTestWarning, e:
-            showWarning(str(e), globalTopWindow)
-        
+        self.button = gtk.Button()
+        scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
+        self.updateSensitivity()
+        self.button.show()
+        return self.button
+    def detailDescription(self):
+        return self.sensitivityDescription()
 
 class ContainerGUI(SubGUI):
     def __init__(self, subguis):

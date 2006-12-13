@@ -240,7 +240,8 @@ class Config(CarmenConfig):
     def _getLocalPlanPath(self, test):
         # Key assumption : to avoid reading Carmen Resource system LocalPlanPath
         # If this does not hold changing the CARMUSR is needed
-        return os.path.join(getCarmdata(), "LOCAL_PLAN")
+        carmdataVar, carmdata = getCarmdata(test)
+        return os.path.join(carmdata, "LOCAL_PLAN")
     def _getSubPlanDirName(self, test):
         subPlan = self._subPlanName(test)
         if not subPlan:
@@ -253,20 +254,16 @@ class Config(CarmenConfig):
     def extraReadFiles(self, test):
         readDirs = CarmenConfig.extraReadFiles(self, test)
         if test.classId() == "test-case":
-            test.setUpEnvironment(parents=1)
+            subplan = self._getSubPlanDirName(test)
+            if subplan and os.path.isdir(subplan):
+                for title, fileName in self.filesFromSubplan(test, subplan):
+                    readDirs[title] = [ fileName ]
             try:
-                subplan = self._getSubPlanDirName(test)
-                if subplan and os.path.isdir(subplan):
-                    for title, fileName in self.filesFromSubplan(test, subplan):
-                        readDirs[title] = [ fileName ]
-                try:
-                    ruleset = self.getRuleSetName(test)
-                    if ruleset:
-                        readDirs["Ruleset"] = [ os.path.join(os.environ["CARMUSR"], "crc", "source", ruleset) ]
-                except plugins.TextTestError:
-                    pass
-            finally:
-                test.tearDownEnvironment(parents=1)
+                ruleset = self.getRuleSetName(test)
+                if ruleset:
+                    readDirs["Ruleset"] = [ os.path.join(test.getEnvironment("CARMUSR"), "crc", "source", ruleset) ]
+            except plugins.TextTestError:
+                pass
         elif test.environment.has_key("CARMUSR"):
             files = self.getResourceFiles(test)
             if len(files):
@@ -348,15 +345,13 @@ class CheckCarmVariables(plugins.Action):
                 print "CARMTMP", carmTmp, "did not exist, attempting to create it"
                 os.makedirs(os.environ["CARMTMP"])
         return 1
-
-def getCarmdataVar():
-    if os.getenv("CARMDATA"):
-        return "CARMDATA"
-    else:
-        return "CARMUSR"
     
-def getCarmdata():
-    return os.path.normpath(os.getenv(getCarmdataVar()))
+def getCarmdata(test):
+    carmdata = test.getEnvironment("CARMDATA")
+    if carmdata:
+        return "CARMDATA", os.path.normpath(carmdata)
+    else:
+        return "CARMUSR", os.path.normpath(test.getEnvironment("CARMUSR"))
 
 # Pick up a temporary CARMUSR. Used directly by Studio, and a derived form used by the optimizers,
 # that includes the raveparamters functionality
@@ -364,7 +359,10 @@ class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
     def __call__(self, test):
         default.PrepareWriteDirectory.__call__(self, test)
         # Collate the CARMUSR/CARMDATA. Hard to change config as we don't know which variable!
-        self.collatePath(test, "$" + getCarmdataVar(), self.partialCopyTestPath)
+        if os.environ.has_key("CARMDATA"):
+            self.collatePath(test, "$CARMDATA", self.partialCopyTestPath)
+        else:
+            self.collatePath(test, "$CARMUSR", self.partialCopyTestPath)
     
 class CleanupRules(plugins.Action):
     def __init__(self, getRuleSetName):

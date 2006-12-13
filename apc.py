@@ -179,8 +179,13 @@ class ApcConfig(optimization.OptimizationConfig):
         return subActions
     def getProgressComparisonClass(self):
         return ApcProgressTestComparison
+    def getStatusFilePath(self, test):
+        rawStatusFile = test.getWordsInFile("options")[1]
+        carmdataVar, carmdata = ravebased.getCarmdata(test)
+        statusFile = rawStatusFile.replace("$" + carmdataVar, carmdata).replace("${" + carmdataVar + "}", carmdata)
+        return os.path.normpath(statusFile)
     def _getSubPlanDirName(self, test):
-        statusFile = os.path.normpath(os.path.expandvars(test.getWordsInFile("options")[1]))
+        statusFile = self.getStatusFilePath(test)
         dirs = statusFile.split(os.sep)[:-2]
         return os.path.normpath(string.join(dirs, os.sep))
     def getRuleSetName(self, test):
@@ -1068,13 +1073,10 @@ class ImportTestSuite(ravebased.ImportTestSuite):
     
 # Graphical import
 class ImportTestCase(optimization.ImportTestCase):
-    def getSubplanPath(self, suite, subplan):
-        suite.setUpEnvironment(parents=1)
-        subplanPath = os.path.join(ravebased.getCarmdata(), "LOCAL_PLAN", subplan)
-        suite.tearDownEnvironment(parents=1)
-        return subplanPath
-    def findRuleset(self, suite, subplan):
-        subplanPath = self.getSubplanPath(suite, subplan)
+    def getSubplanPath(self, carmdata):
+        return os.path.join(carmdata, "LOCAL_PLAN", self.getSubplanName())
+    def findRuleset(self, carmdata):
+        subplanPath = self.getSubplanPath(carmdata)
         return self.getRuleSetName(subplanPath)
     # copied from TestCaseInformation...
     def getRuleSetName(self, absSubPlanDir):
@@ -1092,7 +1094,9 @@ class ImportTestCase(optimization.ImportTestCase):
                 return line.split(";")[3]
         return ""
     def writeResultsFiles(self, suite, testDir):
-        subPlanDir = self.getSubplanPath(suite, self.getSubplanName())
+        carmdataVar, carmdata = ravebased.getCarmdata(suite)
+        subPlanDir = self.getSubplanPath(carmdata)
+
         collationFiles = suite.app.getConfigValue("collate_file")
         for ttStem, relPath in collationFiles.items():
             origFile = os.path.join(subPlanDir, relPath)
@@ -1106,7 +1110,8 @@ class ImportTestCase(optimization.ImportTestCase):
         perfFile.close()
     def getEnvironment(self, suite):
         env = seqdict()
-        spDir = self.getSubplanPath(suite, self.getSubplanName())
+        carmdataVar, carmdata = ravebased.getCarmdata(suite)
+        spDir = self.getSubplanPath(carmdata)
         env["SP_ETAB_DIR"] = os.path.join(spDir, "etable")
         lpDir, local = os.path.split(spDir)
         env["LP_ETAB_DIR"] = os.path.join(lpDir, "etable")
@@ -1120,18 +1125,19 @@ class ImportTestCase(optimization.ImportTestCase):
         # Give some default that will not end it up in the short queue
         return "2500"
     def getOptions(self, suite):
+        carmdataVar, carmdata = ravebased.getCarmdata(suite)
         subplan = self.getSubplanName()
-        ruleset = self.findRuleset(suite, subplan)
+        ruleset = self.findRuleset(carmdata)
         application = self.getApplication(suite)
-        return self.buildOptions(subplan, ruleset, application)
+        return self.buildOptions(carmdataVar, subplan, ruleset, application)
     def getApplication(self, suite):
         application = suite.app.name
         if application == "cs":
             return "FANDANGO"
         else:
             return "APC"
-    def buildOptions(self, subplan, ruleSet, application):
-        path = os.path.join("$" + ravebased.getCarmdataVar(), "LOCAL_PLAN", subplan, "APC_FILES")
+    def buildOptions(self, carmdataVar, subplan, ruleSet, application):
+        path = os.path.join("$" + carmdataVar, "LOCAL_PLAN", subplan, "APC_FILES")
         statusFile = os.path.join(path, "run_status")
         ruleSetPath = os.path.join("${CARMTMP}", "crc", "rule_set", application, "PUTS_ARCH_HERE")
         ruleSetFile = os.path.join(ruleSetPath, ruleSet)

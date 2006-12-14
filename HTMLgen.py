@@ -1,4 +1,4 @@
-#'$Id: HTMLgen.py,v 1.1 2006/02/16 14:24:54 geoff Exp $'
+#'$Id: HTMLgen.py,v 1.2 2006/12/14 11:59:38 johani Exp $'
 
 # COPYRIGHT (C) 1996-9  ROBIN FRIEDRICH  email:Robin.Friedrich@pdq.net
 # Permission to use, copy, modify, and distribute this software and
@@ -924,7 +924,7 @@ class MailTo:
     def antispam(self, address):
         """Process a string with HTML encodings to defeat address spiders.
         """
-        from whrandom import choice
+        from random import choice
         buffer = map(None, address)
         for i in range(0, len(address), choice((2,3,4))):
             buffer[i] = '&#%d;' % ord(buffer[i])

@@ -1,6 +1,6 @@
 #
 # The Python Imaging Library.
-# $Id: ImagePaletteH.py,v 1.1 2006/02/16 14:24:54 geoff Exp $
+# $Id: ImagePaletteH.py,v 1.2 2006/12/14 11:59:38 johani Exp $
 #
 # image palette object
 #
@@ -70,7 +70,7 @@ def negative(mode = "RGB"):
     return ImagePalette(mode, palette * len(mode))
 
 def random(mode = "RGB"):
-    from whrandom import randint
+    from random import randint
     palette = map(lambda a: randint(0, 255), [0]*256*len(mode))
     return ImagePalette(mode, palette)
 

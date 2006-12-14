@@ -1159,7 +1159,7 @@ class ButtonGUI(ActionGUI):
     def actionOrButton(self):
         return self.button
     def createView(self):
-        self.button = gtk.Button()
+        self.button = gtk.Button(self.action.getTitle())
         scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
         self.updateSensitivity()
         self.button.show()

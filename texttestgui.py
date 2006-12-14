@@ -1309,6 +1309,7 @@ class ActionTabGUI(SubGUI):
         combobox = gtk.combo_box_entry_new_text()
         entry = combobox.child
         option.setPossibleValuesAppendMethod(combobox.append_text)
+        option.setClearMethod(combobox.get_model().clear)
         return combobox, entry
     
     def createOptionWidget(self, option):
@@ -1327,6 +1328,8 @@ class ActionTabGUI(SubGUI):
         entry.set_text(option.getValue())
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
         option.setMethods(entry.get_text, entry.set_text)
+        if option.changeMethod:
+            entry.connect("changed", option.changeMethod)
         return label, widget
     
     def createSwitchBox(self, switch):

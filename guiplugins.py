@@ -529,7 +529,7 @@ class ImportTest(InteractiveTestAction):
         self.optionGroup.addOption("desc", self.getDescTitle(), self.getDefaultDesc(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
         self.testImported = None
-        self.setPlacements()
+        self.setPlacements(self.currentTest)
     def correctTestClass(self):
         return self.currentTest.classId() == "test-suite"
     def getNameTitle(self):
@@ -541,17 +541,17 @@ class ImportTest(InteractiveTestAction):
     def updateOptionGroup(self, state):
         self.optionGroup.setOptionValue("name", self.getDefaultName())
         self.optionGroup.setOptionValue("desc", self.getDefaultDesc())
-        self.setPlacements()
+        self.setPlacements(self.currentTest)
         return True
-    def setPlacements(self):
-        suite = self.currentTest
+    def setPlacements(self, suite):
         if suite.classId() == "test-case":
             suite = suite.parent
         # Add suite and its children
         placements = [ "first in suite" ]
         for test in suite.testcases:
             placements = placements + [ "after " + test.name ]
-        self.optionGroup.setPossibleValues("testpos", placements)            
+        self.optionGroup.setPossibleValuesUpdate("testpos", placements)
+        self.optionGroup.getOption("testpos").reset()                    
     def getDefaultName(self):
         return ""
     def getDefaultDesc(self):
@@ -575,7 +575,7 @@ class ImportTest(InteractiveTestAction):
                   "Fill in the 'Adding " + self.testType() + "' tab below."
         if testName.find(" ") != -1:
             raise plugins.TextTestError, "The new " + self.testType() + " name is not permitted to contain spaces, please specify another"
-        suite = self.currentTest
+        suite = self.getDestinationSuite()
         for test in suite.testCaseList():
             if test.name == testName:
                 raise plugins.TextTestError, "A " + self.testType() + " with the name '" + testName + "' already exists, please choose another name"
@@ -584,6 +584,8 @@ class ImportTest(InteractiveTestAction):
         self.testImported = self.createTestContents(suite, testDir, self.optionGroup.getOptionValue("testpos"))
     def createTestContents(self, suite, testDir, placement):
         pass
+    def getDestinationSuite(self):
+        return self.currentTest
 
 class RecordTest(InteractiveTestAction):
     def __init__(self, test):
@@ -1118,8 +1120,21 @@ class RemoveTest(SelectionAction):
 
 class CopyTest(ImportTest):
     def __init__(self, rootSuites):
-        self.testToCopy = None 
+        self.rootSuites = rootSuites
+        self.testToCopy = None
+        self.remover = None
         ImportTest.__init__(self, rootSuites)
+        self.optionGroup.removeOption("testpos")
+        self.optionGroup.addOption("suite", "Copy to suite", "current", allocateNofValues = 2, description = "Which suite should the test be copied to?", changeMethod = self.updatePlacements)
+        self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues = 2, description = "Where in the test suite should the test be placed?")
+        self.optionGroup.addSwitch("keeporig", "Keep original", value = 1, description = "Should the original test be kept or removed?")
+    def getDoubleCheckMessage(self):
+        if not self.optionGroup.getSwitchValue("keeporig"):
+            self.remover = RemoveTest(self.rootSuites)
+            self.remover.notifyNewTestSelection([self.testToCopy])
+            return self.remover.getDoubleCheckMessage()
+        else:
+            return ""
     def isActiveOnCurrent(self):
         return self.testToCopy
     def testType(self):
@@ -1146,6 +1161,41 @@ class CopyTest(ImportTest):
         return "_Copy"
     def getScriptTitle(self, tab):
         return "Copy Test"
+    def updateOptionGroup(self, state):
+        self.optionGroup.setOptionValue("name", self.getDefaultName())
+        self.optionGroup.setOptionValue("desc", self.getDefaultDesc())
+        self.fillSuiteList()
+        self.setPlacements(self.currentTest)
+        return True
+    def updatePlacements(self, w):
+        # Get the suite from the 'suite' option, adjust placement possibilities
+        chosenSuite = self.optionGroup.getOptionValue("suite")
+        if chosenSuite: # We first catch an event for an empty gtk.Entry ..
+            suite = self.suiteMap[chosenSuite]
+            self.setPlacements(suite)
+    def fillSuiteList(self):
+        suiteNames = [ "current" ]
+        self.suiteMap = { "current" : self.currentTest }
+        root = self.currentTest       
+        while root.parent != None:
+            root = root.parent
+
+        toCheck = [ root ]
+        path = { root : root.name }
+        while len(toCheck) > 0:
+            suite = toCheck[len(toCheck) - 1]
+            toCheck = toCheck[0:len(toCheck) - 1]
+            if suite.classId() == "test-suite":
+                thisPath = path[suite]
+                suiteNames.append(thisPath)
+                self.suiteMap[thisPath] = suite
+                for i in xrange(len(suite.testcases) - 1, -1, -1):
+                    path[suite.testcases[i]] = path[suite] + "/" + suite.testcases[i].name
+                    toCheck.append(suite.testcases[i])
+        self.optionGroup.setPossibleValues("suite", suiteNames)
+        self.optionGroup.getOption("suite").reset()
+    def getDestinationSuite(self):
+        return self.suiteMap[self.optionGroup.getOptionValue("suite")]
     def notifyNewTestSelection(self, tests):
         # apply to parent
         ImportTest.notifyNewTestSelection(self, tests)
@@ -1173,8 +1223,12 @@ class CopyTest(ImportTest):
             targetPath = sourcePath.replace(self.testToCopy.getDirectory(), testDir)
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copyfile(sourcePath, targetPath)
-        return suite.addTestCase(os.path.basename(testDir), placement)
-
+        originalTest = self.testToCopy # Set to new test in call below ...
+        ret =  suite.addTestCase(os.path.basename(testDir), placement)
+        if self.remover:
+            self.remover.performOnCurrent()
+        return ret
+    
 class ReportBugs(InteractiveTestAction):
     def __init__(self, test):
         InteractiveTestAction.__init__(self, test)

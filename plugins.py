@@ -682,12 +682,13 @@ class BackgroundProcess(Process):
         return self.processHandler.hasTerminated(self.processId, childProcess=1)
     
 class Option:    
-    def __init__(self, name, value, description):
+    def __init__(self, name, value, description, changeMethod):
         self.name = name
         self.defaultValue = value
         self.valueMethod = None
         self.updateMethod = None
         self.description = description
+        self.changeMethod = changeMethod
     def getValue(self):
         if self.valueMethod:
             return self.valueMethod()
@@ -707,15 +708,17 @@ class Option:
             self.valueMethod = None
 
 class TextOption(Option):
-    def __init__(self, name, value, possibleValues, allocateNofValues, description):
-        Option.__init__(self, name, value, description)
+    def __init__(self, name, value, possibleValues, allocateNofValues, description, changeMethod):
+        Option.__init__(self, name, value, description, changeMethod)
         self.possibleValues = possibleValues
         self.possValMethod = None
         self.nofValues = allocateNofValues
+        self.clearMethod = None
     def setPossibleValuesAppendMethod(self, method):
-        self.possValMethod = method
-        for value in self.possibleValues:
-            method(value)
+        if method:
+            self.possValMethod = method
+            for value in self.possibleValues:
+                method(value)
     def addPossibleValue(self, value):
         self.possibleValues.append(value)
         self.possValMethod(value)
@@ -726,10 +729,15 @@ class TextOption(Option):
             return self.nofValues
         else:
             return len(self.possibleValues)
+    def setClearMethod(self, clearMethod):
+        self.clearMethod = clearMethod
+    def clear(self):
+        if self.clearMethod:
+            self.clearMethod()
 
 class Switch(Option):
-    def __init__(self, name, defaultValue, options, description):
-        Option.__init__(self, name, defaultValue, description)
+    def __init__(self, name, defaultValue, options, description, changeMethod):
+        Option.__init__(self, name, defaultValue, description, changeMethod)
         self.options = options
         self.resetMethod = None
     def reset(self):
@@ -779,20 +787,20 @@ class OptionGroup:
             return values
     def getEntryName(self, name):
         return name.lower().replace(" ", "_")
-    def addSwitch(self, key, name, value = 0, options = [], description = ""):
+    def addSwitch(self, key, name, value = 0, options = [], description = "", changeMethod = None):
         if self.switches.has_key(key):
             return False
         entryName = self.getEntryName(name)
         defaultValue = int(self.getDefault(entryName, value))
-        self.switches[key] = Switch(name, defaultValue, options, description)
+        self.switches[key] = Switch(name, defaultValue, options, description, changeMethod)
         return True
-    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, description = ""):
+    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, description = "", changeMethod = None):
         if self.options.has_key(key):
             return False
         entryName = self.getEntryName(name)
         defaultValue = self.getDefault(entryName, value)
         defaultPossValues = self.getDefaultPossiblilities(entryName, defaultValue, possibleValues)
-        self.options[key] = TextOption(name, defaultValue, defaultPossValues, allocateNofValues, description)
+        self.options[key] = TextOption(name, defaultValue, defaultPossValues, allocateNofValues, description, changeMethod)
         return True
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
@@ -812,6 +820,23 @@ class OptionGroup:
         if option:
             possValuesToUse = self.getDefaultPossiblilities(option.name, option.defaultValue, possibleValues)
             option.setPossibleValues(possValuesToUse)
+    def setPossibleValuesUpdate(self, key, possibleValues):
+        option = self.options.get(key)
+        if option:
+            possValuesToUse = self.getDefaultPossiblilities(option.name, option.defaultValue, possibleValues)
+            option.setPossibleValues(possValuesToUse)
+            option.clear()
+            option.setPossibleValuesAppendMethod(option.possValMethod)
+    def getOption(self, key):
+        if self.options.has_key(key):
+            return self.options[key]
+        else:
+            return None
+    def getSwitch(self, key):
+        if self.switches.has_key(key):
+            return self.switches[key]
+        else:
+            return None
     def removeOption(self, key):
         if self.options.has_key(key):
             del self.options[key]

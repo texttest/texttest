@@ -363,10 +363,14 @@ class SaveState(respond.SaveState):
         self.batchSession = optionMap["b"]
         self.dateString = self.calculateDate()
         self.repositories = {}
+        self.diag = plugins.getDiagnostics("Save Repository")
     def performSave(self, test):
         test.saveState()
         if self.repositories.has_key(test.app):
+            self.diag.info("Saving " + repr(test) + " to repository")
             self.saveToRepository(test)
+        else:
+            self.diag.info("No repositories for " + repr(test.app) + " in " + repr(self.repositories))
     def calculateDate(self):
         # The normal thing is that the tests starts before midnight.
         # However, this is not true sometimes, this tries to correct that.
@@ -386,6 +390,7 @@ class SaveState(respond.SaveState):
                 plugins.printWarning("Could not write file at " + targetFile)
     def addSuite(self, suite):
         testStateRepository = suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+        self.diag.info("Test state repository is " + repr(testStateRepository))
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
 

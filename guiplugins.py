@@ -123,7 +123,7 @@ class InteractiveAction(plugins.Observable):
     def getTitle(self):
         pass
     def getSecondaryTitle(self):
-        return self.getTitle()
+        return self.getTitle().replace("_", "")
     def getTooltip(self):
         return self.getScriptTitle(False)
     def messageBeforePerform(self):
@@ -352,8 +352,6 @@ class SaveTests(SelectionAction):
         return "<control>s"
     def getTitle(self):
         return "_Save"
-    def getSecondaryTitle(self):
-        return "Save"
     def _getScriptTitle(self):
         return "Save results for selected tests"
     def messageBeforePerform(self):
@@ -783,8 +781,6 @@ class SelectTests(SelectionAction):
         return "refresh"
     def getTitle(self):
         return "_Select"
-    def getSecondaryTitle(self):
-        return "Select"
     def _getScriptTitle(self):
         return "Select indicated tests"
     def getTabTitle(self):

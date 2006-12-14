@@ -462,17 +462,11 @@ class TextTestGUI(Responder, plugins.Observable):
                 else:
                     tabInfo[name] = notebookGUI
 
-            notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"), self.getDefaultPage())
+            notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"), "Selection")
             self.testTreeGUI.addObserver(notebookGUI)
             for subNotebookGUI in subNotebookGUIs.values():
                 self.testTreeGUI.addObserver(subNotebookGUI)
             return notebookGUI
-
-    def getDefaultPage(self):
-        if self.testTreeGUI.totalNofTests >= 10:
-            return "Selection"
-        else:
-            return "Test"
         
     def createButtonBarGUI(self, intvActions):
         buttonGUIs = []
@@ -709,7 +703,7 @@ class TestTreeGUI(SubGUI):
     def addSuite(self, suite):
         if not self.dynamic:
             self.collapseStatic = suite.getConfigValue("static_collapse_suites")
-        if self.totalNofTests == 0:
+        if self.dynamic and self.totalNofTests == 0:
             self.notify("NewTestSelection", [ suite ])
         size = suite.size()
         self.totalNofTests += size
@@ -1061,10 +1055,13 @@ class ActionGUI(SubGUI):
             newActive = self.actionOrButton().get_property("sensitive")
             guilog.info("Setting sensitivity of button '" + self.action.getTitle() + "' to " + repr(newActive))
     def updateSensitivity(self):
-        oldActive = self.actionOrButton().get_property("sensitive")
+        actionOrButton = self.actionOrButton()
+        if not actionOrButton:
+            return False
+        oldActive = actionOrButton.get_property("sensitive")
         newActive = self.action.isActiveOnCurrent()
         if oldActive != newActive:
-            self.actionOrButton().set_property("sensitive", newActive)
+            actionOrButton.set_property("sensitive", newActive)
             return True
         else:
             return False
@@ -1419,6 +1416,12 @@ class NotebookGUI(SubGUI):
         if self.currentPageName:
             self.tabInfo[self.currentPageName].contentsChanged()
 
+    def shouldShowCurrent(self):
+        for tabGUI in self.tabInfo.values():
+            if tabGUI.shouldShowCurrent():
+                return True
+        return False
+
     def createView(self):
         self.notebook = gtk.Notebook()
         for tabName, tabGUI in self.tabInfo.items():
@@ -1583,6 +1586,7 @@ class PaneGUI(ContainerGUI):
 
         self.paned.pack1(frames[0], resize=True)
         self.paned.pack2(frames[1], resize=True)
+        self.adjustSeparator()
         self.paned.show()
         return self.paned
         
@@ -1598,10 +1602,14 @@ class PaneGUI(ContainerGUI):
         else:
             return message + "top"
     def notifySetUpGUIComplete(self):
-        if self.active:
-            guilog.info("Pane separator moved to " + self.positionDescription(self.separatorPosition))
+        if self.paned:
+            if self.active:
+                guilog.info("Pane separator moved to " + self.positionDescription(self.separatorPosition))
+            self.adjustSeparator()
+    def adjustSeparator(self):
         pos = int(self.getSize() * self.separatorPosition)
-        self.paned.set_position(pos)                
+        if pos:
+            self.paned.set_position(pos)                
     
 class TextInfoGUI(SubGUI):
     def __init__(self):
@@ -1858,10 +1866,7 @@ class TestFileGUI(FileViewGUI):
         return len(tests) == 1
     
     def notifyNewTestSelection(self, tests):
-        if len(tests) == 0: 
-            return
-
-        if not self.dynamic and len(tests) > 1: # multiple tests in static GUI result in removal
+        if not self.dynamic and len(tests) != 1: # multiple tests in static GUI result in removal
             self.currentObject = None
             self.nameColumn = None
             self.selection = None
@@ -1870,7 +1875,7 @@ class TestFileGUI(FileViewGUI):
         if len(tests) > 1 and self.currentObject in tests:
             self.setName(tests)
             self.describeName()
-        else:
+        elif len(tests) > 0:
             self.currentObject = tests[0]
             self.currentObject.refreshFiles()
             self.setName(tests)

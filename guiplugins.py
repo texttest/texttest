@@ -1041,25 +1041,63 @@ class RunTests(SelectionAction):
             self.notifyIfMainThread("Status", "Done updating after dynamic run " + identifierString + ".")
             self.notifyIfMainThread("ActionStop", "")
 
-class EnableDiagnostics(InteractiveTestAction):
-    def __init__(self, test):
-        InteractiveTestAction.__init__(self, test)
+class CreateDefinitionFile(InteractiveTestAction):
+    def __init__(self, rootSuites):
+        InteractiveTestAction.__init__(self, rootSuites)
         configDir = self.currentTest.getConfigValue("diagnostics")
         self.configFile = None
         if configDir.has_key("configuration_file"):
             self.configFile = configDir["configuration_file"]
+            self.addSwitch("diag", "Affect diagnostic mode only")
+        defFiles = self.getDefinitionFiles()
+        self.addOption("type", "Type of definition file to create", defFiles[0], defFiles, allocateNofValues=2)
+    def correctTestClass(self):
+        return True
     def getTitle(self):
-        return "New _Diagnostics"
+        return "Create _File"
+    def getTabTitle(self):
+        return "New File" 
     def getScriptTitle(self, tab):
-        return "Enable Diagnostics"
-    def isActive(self):
-        return self.configFile
+        return "Create File"
+    def getDefinitionFiles(self):
+        defFiles = []
+        if self.configFile:
+            defFiles.append(self.configFile)
+        defFiles.append("environment")
+        if self.currentTest.classId() == "test-case":
+            defFiles.append("options")
+            recordMode = self.currentTest.getConfigValue("use_case_record_mode")
+            if recordMode == "disabled" or recordMode == "console":
+                defFiles.append("input")
+            else:
+                defFiles.append("usecase")
+        return defFiles + self.currentTest.app.getDataFileNames()
+    def updateOptionGroup(self, state):
+        self.optionGroup.setPossibleValues("type", self.getDefinitionFiles())
+        return True
+    def getFileName(self):
+        stem = self.optionGroup.getOptionValue("type")
+        if stem != self.configFile and stem in self.currentTest.getConfigValue("definition_file_stems"):
+            return stem + "." + self.currentTest.app.name
+        else:
+            return stem
+    def getTargetDirectory(self):
+        if self.optionGroup.getSwitchValue("diag"):
+            return self.currentTest.makeSubDirectory("Diagnostics")
+        else:
+            return self.currentTest.getDirectory()
+        
     def performOnCurrent(self):
-        diagDir = self.currentTest.makeSubDirectory("Diagnostics")
-        diagFile = os.path.join(self.currentTest.app.getDirectory(), self.configFile)
-        targetDiagFile = os.path.join(diagDir, self.configFile)
-        shutil.copyfile(diagFile, targetDiagFile)
-        self.viewFile(targetDiagFile, refreshFiles=True)
+        fileName = self.getFileName()
+        sourceFile = self.currentTest.makePathName(fileName)
+        targetFile = os.path.join(self.getTargetDirectory(), fileName)
+        plugins.ensureDirExistsForFile(targetFile)
+        if sourceFile:
+            guilog.info("Creating new file, copying " + sourceFile)
+            shutil.copyfile(sourceFile, targetFile)
+        else:
+            guilog.info("Creating new empty file...")
+        self.viewFile(targetFile, refreshFiles=True)
 
 class RemoveTest(SelectionAction):
     def notifyNewTestSelection(self, tests):
@@ -1325,8 +1363,8 @@ class InteractiveActionHandler:
     def __init__(self):
         self.actionPreClasses = [ Quit, ViewFile ]
         self.actionDynamicClasses = [ SaveTests, RecomputeTest ]
-        self.actionStaticClasses = [ RecordTest, EnableDiagnostics, CopyTest, \
-                                     ImportTestCase, ImportTestSuite, ReportBugs, SelectTests, \
+        self.actionStaticClasses = [ RecordTest, CopyTest, ImportTestCase, ImportTestSuite, \
+                                     CreateDefinitionFile, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups, RemoveTest ]
         self.actionPostClasses = [ SaveSelection ]
         self.optionGroupMap = {}

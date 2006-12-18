@@ -1193,7 +1193,7 @@ class RunTest(plugins.Action):
 class Killed(plugins.TestState):
     def __init__(self, briefText, freeText, prevState):
         plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
-                                   started=1, executionHosts=prevState.executionHosts)
+                                   started=1, completed=1, executionHosts=prevState.executionHosts)
         # Cache running information, it can be useful to have this available...
         self.prevState = prevState
     def getProcessCpuTime(self):

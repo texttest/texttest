@@ -364,6 +364,11 @@ class QueueSystemServer:
         queueSystem = self.getQueueSystem(test)
         jobId, jobName = self.jobs[test]
         return queueSystem.getJobFailureInfo(jobId)
+    def getJobId(self, test):
+        if not self.jobs.has_key(test):
+            return "NONE"
+        jobId, jobName = self.jobs[test]
+        return jobId             
     def killJob(self, test):
         if not self.jobs.has_key(test) or test in self.killedTests:
             return False, None, None
@@ -558,13 +563,15 @@ class Abandoned(plugins.TestState):
 class WaitForKill(plugins.Action):
     def __init__(self):
         self.testsWaitingForKill = {}
-    def __call__(self, test, postText=""):
+    def __call__(self, test):
         if test.state.isComplete():
             return
 
         attempt = self.getAttempt(test)
         if attempt > 600:
-            freeText = "Could not delete " + repr(test) + " in queuesystem: have abandoned it"
+            name = queueSystemName(test.app)
+            jobId = QueueSystemServer.instance.getJobId(test)
+            freeText = "Could not delete " + repr(test) + " in " + name + " (job " + jobId + "): have abandoned it"
             print test.getIndent() + freeText
             return test.changeState(Abandoned(freeText))
 

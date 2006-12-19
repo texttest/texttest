@@ -34,9 +34,9 @@ class Config(plugins.Configuration):
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 diagDict = app.getConfigValue("diagnostics")
-                if diagDict.has_key("configuration_file"):
+                if diagDict.get("configuration_file"):
                     group.addSwitch("diag", "Write target application diagnostics")
-                if diagDict.has_key("trace_level_variable"):
+                if diagDict.get("trace_level_variable"):
                     group.addOption("trace", "Target application trace level")
                 group.addSwitch("noperf", "Disable any performance testing")
                 if self.isolatesDataUsingCatalogues(app):
@@ -483,6 +483,34 @@ class Config(plugins.Configuration):
         dict["static"] = "pale green"
         dict["app_static"] = "purple"
         return dict
+    def getDefaultAccelerators(self):
+        dict = {}
+        dict["quit"] = "<control>q"
+        dict["select"] = "<control>s"
+        dict["save"] = "<control>s"
+        dict["reset"] = "<control>e"
+        dict["run"] = "<control>r"
+        return dict
+    def addWindowSettings(self, dict, entry, value):
+        dict["dynamic_" + entry] = value
+        dict["static_" + entry] = value
+    def getWindowSizeSettings(self):
+        dict = {}
+        self.addWindowSettings(dict, "maximize", 0)
+        self.addWindowSettings(dict, "horizontal_separator_position", 0.46)
+        self.addWindowSettings(dict, "vertical_separator_position", 0.5)
+        self.addWindowSettings(dict, "height_pixels", "<not set>")
+        self.addWindowSettings(dict, "width_pixels", "<not set>")
+        self.addWindowSettings(dict, "height_screen", float(5.0) / 6)
+        self.addWindowSettings(dict, "width_screen", 0.6)
+        return dict
+    def getDefaultDiagSettings(self):
+        dict = {}
+        dict["configuration_file"] = ""
+        dict["write_directory_variable"] = ""
+        dict["input_directory_variable"] = ""
+        dict["trace_level_variable"] = ""
+        return dict
     def setInterfaceDefaults(self, app):
         app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
         # Do this here rather than from the GUI: if applications can be run with the GUI
@@ -494,12 +522,12 @@ class Config(plugins.Configuration):
         app.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
         app.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
-        app.setConfigDefault("window_size", { "" : "" }, "To set the initial size of the dynamic/static GUI.")
+        app.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
         app.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
         app.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
-        app.setConfigDefault("gui_entry_overrides", {}, "Default settings for entries in the GUI")
-        app.setConfigDefault("gui_entry_options", { "" : [] }, "Default drop-down box options for GUI entries")
-        app.setConfigDefault("gui_accelerators", { "" : "" }, "Custom action accelerators.")
+        app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
+        app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
+        app.setConfigDefault("gui_accelerators", self.getDefaultAccelerators(), "Custom action accelerators.")
         app.setConfigDefault("static_gui_show_menubar", 1, "Show menubar in the static GUI?")
         app.setConfigDefault("static_gui_show_toolbar", 1, "Show toolbar in the static GUI?")
         app.setConfigDefault("dynamic_gui_show_menubar", 1, "Show menubar in the dynamic GUI?")
@@ -507,7 +535,7 @@ class Config(plugins.Configuration):
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
-        app.setConfigDefault("diagnostics", {}, "Dictionary to define how SUT diagnostics are used")
+        app.setConfigDefault("diagnostics", self.getDefaultDiagSettings(), "Dictionary to define how SUT diagnostics are used")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Directories to search for test-filter files")

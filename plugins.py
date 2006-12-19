@@ -710,20 +710,25 @@ class Option:
 class TextOption(Option):
     def __init__(self, name, value, possibleValues, allocateNofValues, description, changeMethod):
         Option.__init__(self, name, value, description, changeMethod)
-        self.possibleValues = possibleValues
         self.possValMethod = None
         self.nofValues = allocateNofValues
         self.clearMethod = None
+        self.setPossibleValues(possibleValues)
     def setPossibleValuesAppendMethod(self, method):
         if method:
             self.possValMethod = method
             for value in self.possibleValues:
                 method(value)
     def addPossibleValue(self, value):
-        self.possibleValues.append(value)
-        self.possValMethod(value)
+        if value not in self.possibleValues:
+            self.possibleValues.append(value)
+            if self.possValMethod:
+                self.possValMethod(value)
     def setPossibleValues(self, values):
-        self.possibleValues = values
+        if self.defaultValue in values:
+            self.possibleValues = values
+        else:
+            self.possibleValues = [ self.defaultValue ] + values
     def inqNofValues(self): 
         if self.nofValues > 0:
             return self.nofValues
@@ -752,12 +757,10 @@ class Switch(Option):
         return text
 
 class OptionGroup:
-    def __init__(self, name, defaultDict, possibleValueDict):
+    def __init__(self, name):
         self.name = name
         self.options = seqdict()
         self.switches = seqdict()
-        self.defaultDict = defaultDict
-        self.possibleValueDict = possibleValueDict
     def __repr__(self):
         return "OptionGroup " + self.name + "\n" + repr(self.options) + "\n" + repr(self.switches)
     def reset(self):
@@ -773,70 +776,47 @@ class OptionGroup:
             self.switches[key].defaultValue = value
             return 1
         return 0
-    def getDefault(self, name, value):
-        if self.defaultDict.has_key(name):
-            return self.defaultDict[name]
-        else:
-            return value
-    def getDefaultPossiblilities(self, name, defaultValue, values):
-        if self.possibleValueDict.has_key(name):
-            return [ defaultValue ] + self.possibleValueDict[name] + values
-        if not defaultValue in values:
-            return [ defaultValue ] + values
-        else:
-            return values
-    def getEntryName(self, name):
-        return name.lower().replace(" ", "_")
     def addSwitch(self, key, name, value = 0, options = [], description = "", changeMethod = None):
         if self.switches.has_key(key):
             return False
-        entryName = self.getEntryName(name)
-        defaultValue = int(self.getDefault(entryName, value))
-        self.switches[key] = Switch(name, defaultValue, options, description, changeMethod)
+        self.switches[key] = Switch(name, value, options, description, changeMethod)
         return True
     def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, description = "", changeMethod = None):
         if self.options.has_key(key):
             return False
-        entryName = self.getEntryName(name)
-        defaultValue = self.getDefault(entryName, value)
-        defaultPossValues = self.getDefaultPossiblilities(entryName, defaultValue, possibleValues)
-        self.options[key] = TextOption(name, defaultValue, defaultPossValues, allocateNofValues, description, changeMethod)
+        self.options[key] = TextOption(name, value, possibleValues, allocateNofValues, description, changeMethod)
         return True
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()
         else:
-            return self.getDefault(key, defValue)
+            return defValue
     def getOptionValue(self, key, defValue = None):
         if self.options.has_key(key):
             return self.options[key].getValue()
         else:
-            return self.getDefault(key, defValue)
+            return defValue
     def setSwitchValue(self, key, value):
         if self.switches.has_key(key):
             self.switches[key].setValue(value)
     def setPossibleValues(self, key, possibleValues):
         option = self.options.get(key)
         if option:
-            possValuesToUse = self.getDefaultPossiblilities(option.name, option.defaultValue, possibleValues)
-            option.setPossibleValues(possValuesToUse)
+            option.setPossibleValues(possibleValues)
+    def addPossibleValue(self, key, possibleValue):
+        option = self.options.get(key)
+        if option:
+            option.addPossibleValue(possibleValue)
     def setPossibleValuesUpdate(self, key, possibleValues):
         option = self.options.get(key)
         if option:
-            possValuesToUse = self.getDefaultPossiblilities(option.name, option.defaultValue, possibleValues)
-            option.setPossibleValues(possValuesToUse)
+            option.setPossibleValues(possibleValues)
             option.clear()
             option.setPossibleValuesAppendMethod(option.possValMethod)
     def getOption(self, key):
-        if self.options.has_key(key):
-            return self.options[key]
-        else:
-            return None
+        return self.options.get(key)
     def getSwitch(self, key):
-        if self.switches.has_key(key):
-            return self.switches[key]
-        else:
-            return None
+        return self.switches.get(key)
     def removeOption(self, key):
         if self.options.has_key(key):
             del self.options[key]

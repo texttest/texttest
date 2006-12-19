@@ -717,6 +717,8 @@ class Application:
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
         self.readConfigFiles(configModuleInitialised=True)
+        from guiplugins import interactiveActionHandler # yuck, we should make this work properly!
+        interactiveActionHandler.loadModules.append(self.getConfigValue("interactive_action_module"))
         personalFile = self.getPersonalConfigFile()
         if personalFile:
             self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
@@ -860,15 +862,11 @@ class Application:
             self.setConfigDefault("interpreter", "java -jar", interDoc)
         else:
             self.setConfigDefault("interpreter", "", interDoc)
-    def createOptionGroup(self, name):
-        defaultDict = self.getConfigValue("gui_entry_overrides")
-        optionDict = self.getConfigValue("gui_entry_options")
-        return plugins.OptionGroup(name, defaultDict, optionDict)
     def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "What to run", "How to run", "Side effects", "Invisible" ]
         optionGroups = []
         for name in groupNames:
-            group = self.createOptionGroup(name)
+            group = plugins.OptionGroup(name)
             self.addToOptionGroup(group)
             optionGroups.append(group)
         self.configObject.addToOptionGroups(self, optionGroups)

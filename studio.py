@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.39 2006/12/08 10:47:47 perb Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/Attic/studio.py,v 1.40 2006/12/19 15:55:17 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -148,12 +148,14 @@ class ImportTestSuite(ravebased.ImportTestSuite):
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
     newMacroString = "<Record new macro>"
-    def addDefinitionFileOption(self, suite):
-        guiplugins.ImportTestCase.addDefinitionFileOption(self, suite)
+    def addDefinitionFileOption(self):
+        guiplugins.ImportTestCase.addDefinitionFileOption(self)
         self.optionGroup.addOption("mac", "Macro to use", self.newMacroString)
-    def updateOptionGroup(self, state):
+    def updateForSelection(self):
+        guiplugins.ImportTestCase.updateForSelection(self)
         self.optionGroup.setOptionValue("mac", self.newMacroString)
         self.optionGroup.setPossibleValues("mac", self.getExistingMacros())
+        return True
     def getExistingMacros(self):
         carmUsr = self.currentTest.getEnvironment("CARMUSR")
         if not carmUsr:
@@ -177,12 +179,14 @@ class ImportTestCase(guiplugins.ImportTestCase):
             shutil.copyfile(fullMacroPath, usecaseFile)
 
 class RecordTest(guiplugins.RecordTest):
-    def __init__(self, test):
-        guiplugins.RecordTest.__init__(self, test)
+    def __init__(self):
+        guiplugins.RecordTest.__init__(self)
         self.optionGroup.addOption("rset", "Compile this ruleset first")
-    def updateOptionGroup(self, state):
+    def updateForSelection(self):
+        retValue = guiplugins.RecordTest.updateForSelection(self)
         self.optionGroup.setOptionValue("rset", "")
         self.optionGroup.setPossibleValues("rset", self.findRuleSets())
+        return retValue
     def findRuleSets(self):
         carmUsr = self.currentTest.getEnvironment("CARMUSR")
         if not carmUsr:

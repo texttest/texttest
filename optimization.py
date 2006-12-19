@@ -228,6 +228,8 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault("kpi_cost_margin", 0.0, "Cost margin for the KPI calculations")
         app.setConfigDefault("skip_comparison_if_not_present", "error", "List of files that are compared only if they are created by the test, i.e. they will not be reported as missing")
         app.addConfigEntry("definition_file_stems", "raveparameters")
+        app.addConfigEntry("plot_graph", "<control>p", "gui_accelerators")
+
 
 # Insert the contents of all raveparameters into the temporary rules file
 # Also assume the subplan will be changed, but nothing else.
@@ -939,7 +941,7 @@ class MakeProgressReport(TestReport):
 
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):
-    def addDefinitionFileOption(self, suite):
+    def addDefinitionFileOption(self):
         self.addOption("sp", "Subplan name")
     def getSubplanName(self):
         return self.optionGroup.getOptionValue("sp")
@@ -1020,20 +1022,18 @@ class GraphPlotResponder(Responder):
 
 # This is the action responsible for plotting from the GUI.
 class PlotTestInGUI(guiplugins.SelectionAction):
-    def __init__(self, dynamic, test):
-        guiplugins.SelectionAction.__init__(self, test)
+    def __init__(self, dynamic):
+        guiplugins.SelectionAction.__init__(self)
         self.dynamic = dynamic
         self.testGraph = TestGraph(self.optionGroup)
     def __repr__(self):
         return "Plotting Graph"
-    def getTitle(self):
+    def _getTitle(self):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
     def isFrequentUse(self):
         return True
-    def getDefaultAccelerator(self):
-        return "<control>p"
     def getStockId(self):
         return "clear"    
     def getTabTitle(self):
@@ -1165,7 +1165,7 @@ class TestGraph:
         self.diag = plugins.getDiagnostics("Test Graph")
         self.optionGroup = guiOptionGroup
         if not self.optionGroup:
-            self.optionGroup = plugins.OptionGroup("Plot", {}, {"" : []})
+            self.optionGroup = plugins.OptionGroup("Plot")
             self.optionGroup.addOption("tu", "Search for tmp files in user", "")
             self.optionGroup.addSwitch("oem", "Only plot exactly matching versions")
             self.optionGroup.addSwitch("nt", "Don't search for temporary files")
@@ -1877,17 +1877,19 @@ class SelectorWeekend(testoverview.Selector):
         return "Weekend"
     
 class StartStudio(guiplugins.InteractiveTestAction):
-    def __init__(self, test):
-        guiplugins.InteractiveTestAction.__init__(self, test)
-        self.addOption("sys", "Studio CARMSYS to use", self.currentTest.getEnvironment("CARMSYS"))
+    def __init__(self):
+        guiplugins.InteractiveTestAction.__init__(self)
+        self.addOption("sys", "Studio CARMSYS to use")
     def __repr__(self):
         return "Studio"
-    def getTitle(self):
+    def _getTitle(self):
         return "Studio"
     def getTabTitle(self):
         return "Studio"
     def getScriptTitle(self, tab):
         return "Start Studio"
+    def updateForSelection(self):
+        self.optionGroup.setOptionValue("sys", self.currentTest.getEnvironment("CARMSYS"))
     def performOnCurrent(self):
         self.currentTest.setUpEnvironment(parents=1)
         try:
@@ -1912,8 +1914,8 @@ class StartStudio(guiplugins.InteractiveTestAction):
 guiplugins.interactiveActionHandler.actionStaticClasses += [ StartStudio ]
 
 class CVSLogInGUI(guiplugins.InteractiveTestAction):
-    def __init__(self, dynamic, test):
-        guiplugins.InteractiveTestAction.__init__(self, test)
+    def __init__(self, dynamic):
+        guiplugins.InteractiveTestAction.__init__(self)
     def performOnCurrent(self):
         logFileStem = self.currentTest.app.getConfigValue("log_file")
         files = [ logFileStem ]
@@ -1925,7 +1927,7 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
             if fileName:
                 cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
         raise  plugins.TextTestError, "CVS Logs" + os.linesep + os.linesep + cvsInfo
-    def getTitle(self):
+    def _getTitle(self):
         return "CVS _Log"
     def getCVSInfo(self, path, file):
         info = os.path.basename(file) + ":" + os.linesep

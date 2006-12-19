@@ -291,7 +291,7 @@ class ViewApcLog(guiplugins.InteractiveTestAction):
             guiplugins.scriptEngine.monitorProcess("views the APC log", process)
         else:
             raise plugins.TextTestError, "APC log file not yet available"
-    def getTitle(self):
+    def _getTitle(self):
         return "View APC Log"
 
 #
@@ -1426,7 +1426,7 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
         currentSolFile = self.currentTest.makeTmpFileName("solution")
         shutil.copyfile(currentSolFile, bestSolFile)
         
-    def getTitle(self):
+    def _getTitle(self):
         return "Save best"
 
     def solutionIsBetter(self):
@@ -1474,8 +1474,8 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
 
 # Specialization of plotting in the GUI for APC
 class PlotTestInGUIAPC(optimization.PlotTestInGUI):
-    def __init__(self, dynamic, rootSuites):
-        optimization.PlotTestInGUI.__init__(self, dynamic, rootSuites)
+    def __init__(self, dynamic):
+        optimization.PlotTestInGUI.__init__(self, dynamic)
         self.addSwitch("kpi", "Plot kpi group")
     def describeTests(self):
         return str(self.numPlottedTests) + " tests"
@@ -1508,7 +1508,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
     
 
 guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC ]
-guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ] 
+guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ]
 
 # A script that mimics _PlotTest in optimization.py, but that is specialized for
 # APC to plot all (selected) KPI groups.

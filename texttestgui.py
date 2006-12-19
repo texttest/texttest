@@ -163,23 +163,23 @@ class SubGUI(plugins.Observable):
             window.add(widget)
 
 class ToggleVisibilityGUI(guiplugins.InteractiveAction):
-    def __init__(self, rootSuites, title, startValue):
-        guiplugins.InteractiveAction.__init__(self, rootSuites)
+    def __init__(self, title, startValue):
+        guiplugins.InteractiveAction.__init__(self)
         self.title = title
         self.startValue = startValue
     def getInterfaceDescription(self):
-        description = "<menubar>\n<menu action=\"viewmenu\">\n<menuitem action=\"" + self.getSecondaryTitle() + "\"/>\n</menu>\n</menubar>\n"
+        description = "<menubar>\n<menu action=\"viewmenu\">\n<menuitem action=\"" + self.getTitle() + "\"/>\n</menu>\n</menubar>\n"
         return description
     def getStartValue(self):
         return self.startValue
-    def getTitle(self):
+    def _getTitle(self):
         return self.title
-    def getScriptTitle(self, tab):
-        return "Toggle " + self.getTitle().replace("_", "").lower() + " visibility" 
+    def _getScriptTitle(self):
+        return "Toggle " + self.getTitle() + " visibility" 
     def isToggle(self):
         return True;
     def performOnCurrent(self):
-        self.notify("Toggle" + self.getTitle().replace("_", "").replace(" ", ""))
+        self.notify("Toggle" + self.getTitle().replace(" ", ""))
     def messageAfterPerform(self):
         pass
 
@@ -324,6 +324,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.progressMonitor = TestProgressMonitor(self.dynamic)
         self.progressBar = TestProgressBar()
         self.idleManager = IdleHandlerManager(self.dynamic)
+        self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic)
 
         self.setUpObservers() # uses the above 5
         self.topWindow = None
@@ -355,9 +356,9 @@ class TextTestGUI(Responder, plugins.Observable):
         if file:
             gtk.rc_add_default_file(file)
     def setUpScriptEngine(self):
-        guiplugins.setUpGuiLog(self.dynamic)
-        global guilog, scriptEngine
-        from guiplugins import guilog
+        guiplugins.setUpGlobals(self.dynamic)
+        global guilog, guiConfig, scriptEngine
+        from guiplugins import guilog, guiConfig
         scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
         self.scriptEngine = scriptEngine
     def needsTestRuns(self):
@@ -366,9 +367,12 @@ class TextTestGUI(Responder, plugins.Observable):
         self.rootSuites.append(suite)
         self.testTreeGUI.addSuite(suite)
         self.progressBar.addSuite(suite)
+        guiConfig.addSuite(suite)
+        for action in self.intvActions:
+            action.addSuite(suite)
     def createInteractiveActions(self):
         actions = self.createVisibilityActions()
-        actions += guiplugins.interactiveActionHandler.getInstances(self.dynamic, self.rootSuites)
+        actions += self.intvActions
         for action in actions:
             # These actions might change the tree view selection or the status bar, need to observe them
             action.addObserver(self.testTreeGUI)
@@ -383,11 +387,10 @@ class TextTestGUI(Responder, plugins.Observable):
                 self.appFileGUI.addObserver(action)
         return actions
     def createVisibilityActions(self):
-        toolbarVisible = (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or \
-                             (not self.dynamic and self.getConfigValue("static_gui_show_toolbar"))
-        toggleToolbar = ToggleVisibilityGUI(self.rootSuites, "_Toolbar", toolbarVisible)
-        toggleShortcutbar = ToggleVisibilityGUI(self.rootSuites, "_Shortcut bar", self.getConfigValue("add_shortcut_bar"))
-        toggleStatusbar = ToggleVisibilityGUI(self.rootSuites, "_Status bar", self.getConfigValue("add_status_bar"))
+        toolbarVisible = guiConfig.getValue("gui_show_toolbar", modeDependent=True)
+        toggleToolbar = ToggleVisibilityGUI("_Toolbar", toolbarVisible)
+        toggleShortcutbar = ToggleVisibilityGUI("_Shortcut bar", guiConfig.getValue("add_shortcut_bar"))
+        toggleStatusbar = ToggleVisibilityGUI("_Status bar", guiConfig.getValue("add_status_bar"))
         return [ toggleToolbar, toggleShortcutbar, toggleStatusbar ]
     
     def getConfigValue(self, configName):
@@ -425,20 +428,9 @@ class TextTestGUI(Responder, plugins.Observable):
                     self.addObserver(tabGUI) # pick up lifecycle changes
                     actionTabGUIs.append(tabGUI)
         return actionTabGUIs
-    def getSeparatorPosition(self, horizontal):
-        if horizontal:
-            return float(self.getWindowOption("vertical_separator_position", 0.5))
-        else:
-            return float(self.getWindowOption("horizontal_separator_position", 0.46))
-    def getWindowOption(self, name, default):
-        optionDir = self.getConfigValue("window_size")
-        if self.dynamic:
-            return optionDir.get("dynamic_" + name, default)
-        else:
-            return optionDir.get("static_" + name, default)
 
     def createPaned(self, gui1, gui2, horizontal):
-        paneGUI = PaneGUI([ gui1, gui2 ], self.getSeparatorPosition(horizontal), horizontal)
+        paneGUI = PaneGUI([ gui1, gui2 ], horizontal)
         self.addObserver(paneGUI)
         return paneGUI
 
@@ -551,11 +543,11 @@ class TextTestGUI(Responder, plugins.Observable):
         vbox.pack_start(mainWindowGUI.createView(), expand=True, fill=True)
         self.shortcutBar = scriptEngine.createShortcutBar()
         vbox.pack_start(self.shortcutBar, expand=False, fill=False)
-        if self.getConfigValue("add_shortcut_bar"):            
+        if guiConfig.getValue("add_shortcut_bar"):            
             self.shortcutBar.show()
             
         self.statusBar = statusMonitor.createStatusbar()
-        if self.getConfigValue("add_status_bar"):
+        if guiConfig.getValue("add_status_bar"):
             self.statusBar.show()
         vbox.pack_start(self.statusBar, expand=False, fill=False)
 
@@ -563,7 +555,7 @@ class TextTestGUI(Responder, plugins.Observable):
         return vbox
         
     def adjustSize(self):
-        if int(self.getWindowOption("maximize", 0)):
+        if guiConfig.getWindowOption("maximize"):
             guilog.info("Maximising top window...")
             self.topWindow.maximize()
         else:
@@ -614,11 +606,8 @@ class TextTestGUI(Responder, plugins.Observable):
         vbox.pack_start(menubar, expand=False, fill=False)
         hbox.pack_start(toolbarHandle, expand=True, fill=True)
 
-        showToolbar = (self.dynamic and self.getConfigValue("dynamic_gui_show_toolbar")) or \
-                      (not self.dynamic and self.getConfigValue("static_gui_show_toolbar"))
-        showMenu = (self.dynamic and self.getConfigValue("dynamic_gui_show_menubar")) or \
-                   (not self.dynamic and self.getConfigValue("static_gui_show_menubar"))
-
+        showToolbar = guiConfig.getValue("gui_show_toolbar", modeDependent=True)
+        showMenu = guiConfig.getValue("gui_show_menubar", modeDependent=True)
         if self.dynamic:
             progressBar = self.progressBar.createView()
             progressBar.show()
@@ -646,24 +635,17 @@ class TextTestGUI(Responder, plugins.Observable):
             toolbarHandle.hide()
         if not showMenu:
             menubar.hide()
-    def getConfigValue(self, configName):
-        return self.rootSuites[0].app.getConfigValue(configName)
     def getWindowDimension(self, dimensionName):
-        pixelDimension = self.getWindowOption(dimensionName + "_pixels", None)
-        if pixelDimension is not None:
+        pixelDimension = guiConfig.getWindowOption(dimensionName + "_pixels")
+        if pixelDimension != "<not set>":
             guilog.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.") 
             return int(pixelDimension)
         else:
             fullSize = eval("gtk.gdk.screen_" + dimensionName + "()")
-            defaultProportion = self.getDefaultWindowProportion(dimensionName)
-            proportion = float(self.getWindowOption(dimensionName + "_screen", defaultProportion))
+            proportion = float(guiConfig.getWindowOption(dimensionName + "_screen"))
             guilog.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
             return int(fullSize * proportion)
-    def getDefaultWindowProportion(self, dimensionName):
-        if dimensionName == "height":
-            return float(5.0) / 6
-        else:
-            return 0.6
+    
     def widgetToggleVisibility(self, widget):
         if widget.get_property('visible'):
             widget.hide()
@@ -1047,13 +1029,13 @@ class ActionGUI(SubGUI):
     def typeDescription(self):
         return "action"        
     def describe(self):
-        message = "Viewing " + self.typeDescription() + " with title '" + self.action.getTitle() + "'"
+        message = "Viewing " + self.typeDescription() + " with title '" + self.action.getTitle(includeMnemonics=True) + "'"
         message += self.detailDescription()
         guilog.info(message)
     def notifyNewTestSelection(self, tests):
         if self.updateSensitivity():
             newActive = self.actionOrButton().get_property("sensitive")
-            guilog.info("Setting sensitivity of button '" + self.action.getTitle() + "' to " + repr(newActive))
+            guilog.info("Setting sensitivity of button '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newActive))
     def updateSensitivity(self):
         actionOrButton = self.actionOrButton()
         if not actionOrButton:
@@ -1091,15 +1073,17 @@ class ToolbarActionGUI(ActionGUI):
     def __init__(self, action, uiManager):
         ActionGUI.__init__(self, action)
         self.accelerator = self.getAccelerator()
+        title = self.action.getTitle(includeMnemonics=True)
+        actionName = self.action.getTitle(includeMnemonics=False)
         if self.action.isToggle():
-            self.gtkAction = gtk.ToggleAction(self.action.getSecondaryTitle(), self.action.getTitle(), \
+            self.gtkAction = gtk.ToggleAction(actionName, title, \
                                               self.action.getTooltip(), self.getStockId())
             self.gtkAction.set_active(self.action.getStartValue())
         elif self.action.isRadio():
-            self.gtkAction = gtk.RadioAction(self.action.getSecondaryTitle(), self.action.getTitle(), \
+            self.gtkAction = gtk.RadioAction(actionName, title, \
                                              self.action.getTooltip(), self.getStockId(), self.getStartValue())
         else:
-            self.gtkAction = gtk.Action(self.action.getSecondaryTitle(), self.action.getTitle(), \
+            self.gtkAction = gtk.Action(actionName, title, \
                                         self.action.getTooltip(), self.getStockId())
 
         self.getActionGroup(uiManager).add_action_with_accel(self.gtkAction, self.accelerator)
@@ -1120,14 +1104,14 @@ class ToolbarActionGUI(ActionGUI):
             return "gtk-" + stockId 
         
     def getAccelerator(self):
-        realAcc = self.action.getAccelerator()
+        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.action.getTitle())
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
             if gtk.accelerator_valid(key, mod):
                 return realAcc
             else:
                 plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
-                                     + self.action.getSecondaryTitle() + "' is not valid, ignoring ...")
+                                     + self.action.getTitle() + "' is not valid, ignoring ...")
     def typeDescription(self):
         if self.action.isToggle():
             return "toggle action"
@@ -1156,7 +1140,7 @@ class ButtonGUI(ActionGUI):
     def actionOrButton(self):
         return self.button
     def createView(self):
-        self.button = gtk.Button(self.action.getTitle())
+        self.button = gtk.Button(self.action.getTitle(includeMnemonics=True))
         scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
         self.updateSensitivity()
         self.button.show()
@@ -1255,13 +1239,13 @@ class ActionTabGUI(SubGUI):
         return self.addScrollBars(self.createVBox())
 
     def notifyLifecycleChange(self, test, state, changeDesc):
-        if self.action.updateDefaults(test, state):
+        if self.action.updateForStateChange(test, state):
             self.updateView()
 
     def notifyNewTestSelection(self, tests):
         if len(tests) == 0:
             return
-        if self.action.updateDefaults(tests[0], tests[0].state):
+        if self.action.updateForSelectionChange():
             self.updateView()
             
     def updateView(self):
@@ -1282,6 +1266,12 @@ class ActionTabGUI(SubGUI):
             table.set_row_spacings(1)
             rowIndex = 0        
             for option in self.optionGroup.options.values():
+                newValue = self.updateForConfig(option)
+                if newValue:
+                    option.addPossibleValue(newValue)
+                for extraOption in self.getConfigOptions(option):
+                    option.addPossibleValue(extraOption)
+
                 label, entry = self.createOptionEntry(option)
                 if isinstance(label, gtk.Label):
                     label.set_alignment(1.0, 0.5)
@@ -1294,6 +1284,7 @@ class ActionTabGUI(SubGUI):
             self.vbox.pack_start(table, expand=False, fill=False)
         
         for switch in self.optionGroup.switches.values():
+            self.updateForConfig(switch)
             hbox = self.createSwitchBox(switch)
             self.vbox.pack_start(hbox, expand=False, fill=False)
         if self.buttonGUI:
@@ -1309,6 +1300,7 @@ class ActionTabGUI(SubGUI):
         combobox = gtk.combo_box_entry_new_text()
         entry = combobox.child
         option.setPossibleValuesAppendMethod(combobox.append_text)
+        
         option.setClearMethod(combobox.get_model().clear)
         return combobox, entry
     
@@ -1318,15 +1310,22 @@ class ActionTabGUI(SubGUI):
         else:
             entry = gtk.Entry()
             return entry, entry
-        
+    def getConfigOptions(self, option):
+        return guiConfig.getCompositeValue("gui_entry_options", option.name)    
+    def updateForConfig(self, option):
+        fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
+        if fromConfig != "<not set>":
+            option.setValue(fromConfig)
+            return fromConfig
+    
     def createOptionEntry(self, option):
         widget, entry = self.createOptionWidget(option)
         label = gtk.EventBox()
         label.add(gtk.Label(option.name + "  "))
         if option.description:
             self.tooltips.set_tip(label, option.description)
-        entry.set_text(option.getValue())
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
+        entry.set_text(option.getValue())
         option.setMethods(entry.get_text, entry.set_text)
         if option.changeMethod:
             entry.connect("changed", option.changeMethod)
@@ -1349,7 +1348,7 @@ class ActionTabGUI(SubGUI):
                 scriptEngine.registerToggleButton(radioButton, "choose " + option)
                 if not mainRadioButton:
                     mainRadioButton = radioButton
-                if count == switch.getValue():
+                if count == int(switch.getValue()):
                     radioButton.set_active(True)
                     switch.resetMethod = radioButton.set_active
                 else:
@@ -1362,7 +1361,7 @@ class ActionTabGUI(SubGUI):
             return hbox  
         else:
             checkButton = gtk.CheckButton(switch.name)
-            if switch.getValue():
+            if int(switch.getValue()):
                 checkButton.set_active(True)
             scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
             switch.setMethods(checkButton.get_active, checkButton.set_active)
@@ -1555,13 +1554,17 @@ class NotebookGUI(SubGUI):
             SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
           
 class PaneGUI(ContainerGUI):
-    def __init__(self, subguis, separatorPosition, horizontal):
+    def __init__(self, subguis, horizontal):
         SubGUI.__init__(self)
         self.subguis = subguis
         self.horizontal = horizontal
-        self.separatorPosition = separatorPosition
         self.panedTooltips = gtk.Tooltips()
         self.paned = None
+    def getSeparatorPosition(self):
+        if self.horizontal:
+            return float(guiConfig.getWindowOption("vertical_separator_position"))
+        else:
+            return float(guiConfig.getWindowOption("horizontal_separator_position"))
     def createPaned(self):
         if self.horizontal:
             return gtk.HPaned()
@@ -1605,12 +1608,15 @@ class PaneGUI(ContainerGUI):
         else:
             return message + "top"
     def notifySetUpGUIComplete(self):
-        if self.paned:
-            if self.active:
-                guilog.info("Pane separator moved to " + self.positionDescription(self.separatorPosition))
-            self.adjustSeparator()
+        if not self.paned:
+            return
+
+        separatorPosition = self.getSeparatorPosition()
+        if self.active:
+            guilog.info("Pane separator moved to " + self.positionDescription(separatorPosition))
+        self.adjustSeparator()
     def adjustSeparator(self):
-        pos = int(self.getSize() * self.separatorPosition)
+        pos = int(self.getSize() * self.getSeparatorPosition())
         if pos:
             self.paned.set_position(pos)                
     
@@ -2288,8 +2294,8 @@ class TestProgressMonitor(SubGUI):
 
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):
-    def addDefinitionFileOption(self, suite):
-        guiplugins.ImportTestCase.addDefinitionFileOption(self, suite)
+    def addDefinitionFileOption(self):
+        guiplugins.ImportTestCase.addDefinitionFileOption(self)
         self.addSwitch("GUI", "Use TextTest GUI", 1)
         self.addSwitch("sGUI", "Use TextTest Static GUI", 0)
     def getOptions(self, suite):

@@ -32,12 +32,12 @@ prepend_path_element()
 }
 
 abspath $0 fullpath
-prepend_path_element /users/geoff/pygtk_test/lib/ LD_LIBRARY_PATH $LD_LIBRARY_PATH
-prepend_path_element /users/geoff/pygtk_test/lib/python2.4/site-packages/gtk-2.0:/users/geoff/pygtk_test/lib/python2.3/site-packages PYTHONPATH $PYTHONPATH
+prepend_path_element /users/geoff/pygtk_test2/usr/lib/:/users/geoff/pygtk_test2/lib/ LD_LIBRARY_PATH $LD_LIBRARY_PATH
+prepend_path_element /users/geoff/pygtk_test2/usr/lib/python2.4/site-packages/gtk-2.0:/users/geoff/pygtk_test2/usr/lib/python2.4/site-packages PYTHONPATH $PYTHONPATH
 export LD_LIBRARY_PATH PYTHONPATH
-export GDK_PIXBUF_MODULE_FILE=/users/geoff/pygtk_test/lib/gtk-2.0/gdk-pixbuf.loaders
-export PANGO_RC_FILE=/users/geoff/pygtk_test/pango/pangorc
-export GTK2_RC_FILES=/users/geoff/pygtk_test/lib/gtk-2.0
+export GDK_PIXBUF_MODULE_FILE=/users/geoff/pygtk_test2/etc/gtk-2.0/gdk-pixbuf.loaders
+export PANGO_RC_FILE=/users/geoff/pygtk_test2/etc/pango/pangorc
+export GTK2_RC_FILES=/users/geoff/pygtk_test2/etc/gtk-2.0
 export TEXTTEST_SLAVE_CMD=$fullpath
 get_python python
 exec $python ${fullpath}.py "$@"

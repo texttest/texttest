@@ -742,9 +742,11 @@ class TextOption(Option):
 
 class Switch(Option):
     def __init__(self, name, defaultValue, options, description, changeMethod):
-        Option.__init__(self, name, defaultValue, description, changeMethod)
+        Option.__init__(self, name, int(defaultValue), description, changeMethod)
         self.options = options
         self.resetMethod = None
+    def setValue(self, value):
+        Option.setValue(self, int(value))
     def reset(self):
         if self.defaultValue == 0 and self.resetMethod:
             self.resetMethod(1)

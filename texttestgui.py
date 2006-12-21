@@ -1607,18 +1607,19 @@ class PaneGUI(ContainerGUI):
             return message + "left edge"
         else:
             return message + "top"
-    def notifySetUpGUIComplete(self):
-        if not self.paned:
-            return
-
-        separatorPosition = self.getSeparatorPosition()
-        if self.active:
-            guilog.info("Pane separator moved to " + self.positionDescription(separatorPosition))
-        self.adjustSeparator()
+    def contentsChanged(self):
+        self.subguis[0].contentsChanged()
+        if self.adjustSeparator():
+            guilog.info("")
+            guilog.info("Pane separator positioned " + self.positionDescription(self.getSeparatorPosition()))
+        self.subguis[1].contentsChanged()
     def adjustSeparator(self):
         pos = int(self.getSize() * self.getSeparatorPosition())
         if pos:
-            self.paned.set_position(pos)                
+            self.paned.set_position(pos)
+            return True
+        else:
+            return False
     
 class TextInfoGUI(SubGUI):
     def __init__(self):

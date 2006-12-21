@@ -457,9 +457,9 @@ class TextTest:
             if app.cleanMode & plugins.Configuration.CLEAN_SELF:
                 app.removeWriteDirectory()
     def setUpResponders(self, appSuites):
+        testSuites = [ testSuite for app, testSuite in appSuites.items() ]
         for responder in self.allResponders:
-            for app, testSuite in appSuites.items():
-                responder.addSuite(testSuite)
+            responder.addSuites(testSuites)
     def createActionRunner(self, appSuites):
         actionRunner = ActionRunner()
         actionRunner.setObservers(self.allResponders)
@@ -525,7 +525,7 @@ class TextTest:
         self.setUpResponders(acceptedAppSuites)
         if ownThreadResponder:
             actionThread = ActionThread(actionRunner)
-            ownThreadResponder.addObserver(actionThread)
+            ownThreadResponder.addActionThread(actionThread)
             ownThreadResponder.run()
         else:
             actionRunner.run()
@@ -567,13 +567,12 @@ class ActionThread(Thread):
     def __init__(self, actionRunner):
         Thread.__init__(self)
         self.actionRunner = actionRunner
+        self.start()
     def run(self):
         try:
             self.actionRunner.run()
         except KeyboardInterrupt:
             print "Terminated before tests complete: cleaning up..."
-    def notifySetUpGUIComplete(self):
-        self.start()
     def notifyExit(self):
         self.actionRunner.interrupt()
         self.join()

@@ -491,18 +491,15 @@ class Config(plugins.Configuration):
         dict["reset"] = "<control>e"
         dict["run"] = "<control>r"
         return dict
-    def addWindowSettings(self, dict, entry, value):
-        dict["dynamic_" + entry] = value
-        dict["static_" + entry] = value
     def getWindowSizeSettings(self):
         dict = {}
-        self.addWindowSettings(dict, "maximize", 0)
-        self.addWindowSettings(dict, "horizontal_separator_position", 0.46)
-        self.addWindowSettings(dict, "vertical_separator_position", 0.5)
-        self.addWindowSettings(dict, "height_pixels", "<not set>")
-        self.addWindowSettings(dict, "width_pixels", "<not set>")
-        self.addWindowSettings(dict, "height_screen", float(5.0) / 6)
-        self.addWindowSettings(dict, "width_screen", 0.6)
+        dict["maximize"] = 0
+        dict["horizontal_separator_position"] = 0.46
+        dict["vertical_separator_position"] = 0.5
+        dict["height_pixels"] = "<not set>"
+        dict["width_pixels"] = "<not set>"
+        dict["height_screen"] = float(5.0) / 6
+        dict["width_screen"] = 0.6
         return dict
     def getDefaultDiagSettings(self):
         dict = {}
@@ -511,27 +508,28 @@ class Config(plugins.Configuration):
         dict["input_directory_variable"] = ""
         dict["trace_level_variable"] = ""
         return dict
+    def getDefaultHideWidgets(self):
+        dict = {}
+        dict["status_bar"] = 0
+        dict["toolbar"] = 0
+        dict["shortcut_bar"] = 0
+        return dict
     def setInterfaceDefaults(self, app):
         app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
         # Do this here rather than from the GUI: if applications can be run with the GUI
         # anywhere it needs to be set up
-        app.setConfigDefault("add_shortcut_bar", 1, "Whether or not TextTest's shortcut bar will appear")
-        app.setConfigDefault("add_status_bar", 1, "Whether or not TextTest's status bar will appear")
         app.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
         app.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
         app.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
         app.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
         app.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
+        app.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
         app.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
-        app.setConfigDefault("query_kill_processes", { "" : [] }, "Ask about whether to kill these processes when exiting texttest.")
+        app.setConfigDefault("query_kill_processes", { "default" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
         app.setConfigDefault("gui_accelerators", self.getDefaultAccelerators(), "Custom action accelerators.")
-        app.setConfigDefault("static_gui_show_menubar", 1, "Show menubar in the static GUI?")
-        app.setConfigDefault("static_gui_show_toolbar", 1, "Show toolbar in the static GUI?")
-        app.setConfigDefault("dynamic_gui_show_menubar", 1, "Show menubar in the dynamic GUI?")
-        app.setConfigDefault("dynamic_gui_show_toolbar", 1, "Show toolbar in the dynamic GUI?")
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")

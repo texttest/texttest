@@ -440,20 +440,20 @@ class FeatureFilter(plugins.Filter):
             return False
 
 class SelectTests(guiplugins.SelectTests):
-    def __init__(self):
-        guiplugins.SelectTests.__init__(self)
+    def __init__(self, commandOptionGroup):
+        guiplugins.SelectTests.__init__(self, commandOptionGroup)
         self.features = []
-    def addSuite(self, suite):
-        guiplugins.SelectTests.addSuite(self, suite)
-        featureFile = suite.getFileName("features")
-        if not featureFile:
-            return
-        for line in open(featureFile).readlines():
-            parts = line.split()
-            if len(parts) > 0:
-                featureName = line.replace("\n", "")
-                self.addSwitch(featureName, featureName, 0)
-                self.features.append(featureName)
+    def addSuites(self, suites):
+        guiplugins.SelectTests.addSuites(self, suites)
+        for suite in suites:
+            featureFile = suite.getFileName("features")
+            if featureFile:
+                for line in open(featureFile).readlines():
+                    parts = line.split()
+                    if len(parts) > 0:
+                        featureName = line.replace("\n", "")
+                        self.addSwitch(featureName, featureName, 0)
+                        self.features.append(featureName)
     def getFilterList(self, app):
         filters = guiplugins.SelectTests.getFilterList(self, app)    
         selectedFeatures = self.getSelectedFeatures()

@@ -13,6 +13,9 @@ class Responder:
     def setUpScriptEngine(self):
         logger = plugins.getDiagnostics("Use-case log")
         self.scriptEngine = ScriptEngine(logger)
+    def addSuites(self, suites):
+        for suite in suites:
+            self.addSuite(suite)
     # Full suite of tests, get notified of it at the start...
     def addSuite(self, suite):
         pass

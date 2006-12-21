@@ -729,6 +729,7 @@ class Application:
         self.diag.info("Checkout set to " + self.checkout)
         self.setCheckoutVariable()
         self.optionGroups = self.createOptionGroups(inputOptions)
+        interactiveActionHandler.setCommandOptionGroups(self.optionGroups)
     def __repr__(self):
         return self.fullName
     def __hash__(self):
@@ -1051,7 +1052,7 @@ class Application:
         print header
         self.configObject.printHelpText()
     def getConfigValue(self, key, expandVars=True):
-        value = self.configDir[key]
+        value = self.configDir.get(key)
         if not expandVars:
             return value
         if type(value) == types.StringType:
@@ -1085,9 +1086,12 @@ class Application:
         if defValue is not None:
             if type(defValue) == types.ListType:
                 listVal += defValue
+                return listVal
             else:
                 return defValue
-        return listVal
+        else:
+            if len(listVal) > 0:
+                return listVal
     def addConfigEntry(self, key, value, sectionName = ""):
         self.configDir.addEntry(key, value, sectionName)
     def setConfigDefault(self, key, value, docString = ""):

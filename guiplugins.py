@@ -12,8 +12,8 @@ class GUIConfig:
     def __init__(self, dynamic):
         self.apps = []
         self.dynamic = dynamic
-    def addSuite(self, suite):
-        self.apps.append(suite.app)
+    def addSuites(self, suites):
+        self.apps = [ suite.app for suite in suites ]
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)
     def _compositeValue(self, app, sectionName, entryName):
@@ -27,26 +27,31 @@ class GUIConfig:
             else:
                 prevValue = currValue
         return prevValue
-    
+    def getModeName(self):
+        if self.dynamic:
+            return "dynamic"
+        else:
+            return "static"
     def getConfigName(self, name, modeDependent):
         formattedName = name.lower().replace(" ", "_")
         if modeDependent:
-            if self.dynamic:
-                return "dynamic_" + formattedName
+            if len(name) > 0:
+                return self.getModeName() + "_" + formattedName
             else:
-                return "static_" + formattedName
+                return self.getModeName()
         else:
             return formattedName
         
     def getValue(self, entryName, modeDependent=False):
-        if len(self.apps) == 0:
-            raise plugins.TextTestError, "Asked for entry " + entryName + " before loading applications!"
-
         nameToUse = self.getConfigName(entryName, modeDependent)
         return self._getFromApps(self._simpleValue, nameToUse)
     def getCompositeValue(self, sectionName, entryName, modeDependent=False):
         nameToUse = self.getConfigName(entryName, modeDependent)
-        return self._getFromApps(self._compositeValue, sectionName, nameToUse)
+        value = self._getFromApps(self._compositeValue, sectionName, nameToUse)
+        if modeDependent and value is None:
+            return self.getCompositeValue(sectionName, entryName)
+        else:
+            return value
     def getWindowOption(self, name):
         return self.getCompositeValue("window_size", name, modeDependent=True)
 
@@ -97,16 +102,6 @@ class ProcessTerminationMonitor:
 processTerminationMonitor = ProcessTerminationMonitor()
        
 class InteractiveAction(plugins.Observable):
-    stdInterfaceDescription = """
-<menubar>
-    <menu action=\"actionmenu\">
-       <menuitem action=\"%s\"/>
-    </menu>
-</menubar>
-<toolbar> 
-   <toolitem action=\"%s\"/>
-</toolbar>
-"""
     def __init__(self):
         plugins.Observable.__init__(self)
         self.optionGroup = None
@@ -118,7 +113,7 @@ class InteractiveAction(plugins.Observable):
             return self.optionGroup.name
         else:
             return self.getTitle()
-    def addSuite(self, suite):
+    def addSuites(self, suites):
         pass
     def getOptionGroups(self):
         if self.optionGroup:
@@ -138,18 +133,10 @@ class InteractiveAction(plugins.Observable):
         return True
     def canPerform(self):
         return True # do we activate this via performOnCurrent() ?
-    def getInterfaceDescription(self):
-        if self.inToolBar():
-            title = self.getTitle()
-            return self.stdInterfaceDescription % (title, title)    
-        else:
-            return ""
-    def isRadio(self):
+    def getMenu(self):
+        return "action"
+    def separateInToolBar(self):
         return False
-    def isToggle(self):
-        return False
-    def getStartValue(self): # For radio/toggle actions.
-        return 0
     def getStockId(self):
         pass
     def getTitle(self, includeMnemonics=False):
@@ -235,15 +222,9 @@ class SelectionAction(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currTestSelection = []
-    def getSelectionGroup(self):
-        selectionGroups = interactiveActionHandler.optionGroupMap.get(SelectTests)
-        if selectionGroups:
-            return selectionGroups[0]
-    def addFilterFile(self, fileName):
-        selectionGroup = self.getSelectionGroup()
-        if selectionGroup:
-            filterFileOption = selectionGroup.options["f"]
-            filterFileOption.addPossibleValue(os.path.basename(fileName))
+    def addFilterFile(self, selectionGroup, fileName):
+        filterFileOption = selectionGroup.options["f"]
+        filterFileOption.addPossibleValue(os.path.basename(fileName))
     def notifyNewTestSelection(self, tests):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def isActiveOnCurrent(self):
@@ -276,11 +257,10 @@ class SelectionAction(InteractiveAction):
 class Quit(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
-        self.dynamic = dynamic
-    def getInterfaceDescription(self): # override for separator in toolbar
-        description = "<menubar>\n<menu action=\"filemenu\">\n<menuitem action=\"" + self.getTitle() + "\"/>\n</menu>\n</menubar>\n"
-        description += "<toolbar>\n<toolitem action=\"" + self.getTitle() + "\"/>\n<separator/>\n</toolbar>\n"
-        return description
+    def getMenu(self):
+        return "file"
+    def separateInToolBar(self):
+        return True
     def getStockId(self):
         return "quit"
     def _getTitle(self):
@@ -292,23 +272,12 @@ class Quit(InteractiveAction):
         # Generate a window closedown, so that the quit button behaves the same as closing the window
         self.notify("Exit")
     def getDoubleCheckMessage(self):
-        processesToReport = self.processesToReport()
+        processesToReport = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         runningProcesses = processTerminationMonitor.listRunning(processesToReport)
         if len(runningProcesses) == 0:
             return ""
         else:
             return "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n"
-    def processesToReport(self):
-        queryValues = guiConfig.getValue("query_kill_processes")
-        processes = []
-        if queryValues.has_key("default"):
-            processes += queryValues["default"]
-        if self.dynamic and queryValues.has_key("dynamic"):
-            processes += queryValues["dynamic"]
-        elif queryValues.has_key("static"):        
-            processes += queryValues["static"]
-        return processes
-
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveTestAction(InteractiveAction):
@@ -809,7 +778,7 @@ class ImportTestSuite(ImportTest):
             file.write("# Dictionary of environment to variables to set in test suite\n")
 
 class SelectTests(SelectionAction):
-    def __init__(self):
+    def __init__(self, commandOptionGroups):
         SelectionAction.__init__(self)
         self.rootTestSuites = []
         self.diag = plugins.getDiagnostics("Select Tests")
@@ -817,19 +786,23 @@ class SelectTests(SelectionAction):
         self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0)
         self.addSwitch("current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
         
-        self.appSelectGroup = None
-    def addSuite(self, suite):
-        self.rootTestSuites.append(suite)
-        self.addPossibleVersion(suite.app)
-        if not self.appSelectGroup:
-            self.appSelectGroup = self.findSelectGroup(suite.app)
-            self.optionGroup.options += self.appSelectGroup.options
-            self.optionGroup.switches += self.appSelectGroup.switches
-    def addPossibleVersion(self, app):
-        appVer = app.getFullVersion()
+        self.appSelectGroup = commandOptionGroups[0]
+        self.optionGroup.options += self.appSelectGroup.options
+        self.optionGroup.switches += self.appSelectGroup.switches
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
+        possVersions = []
+        for suite in suites:
+            possVersion = self.getPossibleVersion(suite)
+            if possVersion not in possVersions:
+                possVersions.append(possVersion)
+        self.optionGroup.setPossibleValues("vs", possVersions)
+    def getPossibleVersion(self, suite):
+        appVer = suite.app.getFullVersion()
         if len(appVer) == 0:
-            appVer = "<default>"
-        self.optionGroup.addPossibleValue("vs", appVer)
+            return "<default>"
+        else:
+            return appVer
     def isActiveOnCurrent(self):
         return True
     def findSelectGroup(self, app):
@@ -870,7 +843,7 @@ class SelectTests(SelectionAction):
             newTests = self.combineWithPrevious(reqTests, strategy)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
-        self.notify("NewTestSelection", selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
+        self.notify("SetTestSelection", selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all
@@ -954,14 +927,13 @@ class ResetGroups(InteractiveAction):
     def _getScriptTitle(self):
         return "Reset running options"
     def performOnCurrent(self):
-        for optionGroups in interactiveActionHandler.optionGroupMap.values():
-            for group in optionGroups:
-                group.reset()
+        self.notify("Reset")
 
 class SaveSelection(SelectionAction):
-    def __init__(self, dynamic):
+    def __init__(self, commandOptionGroups, dynamic):
         self.dynamic = dynamic
         SelectionAction.__init__(self)
+        self.selectionGroup = commandOptionGroups[0]
         self.addOption("name", "Name to give selection")
         if not dynamic:
             self.addSwitch("tests", "Store actual tests selected", 1)
@@ -993,31 +965,28 @@ class SaveSelection(SelectionAction):
         if actualTests:
             return self.getCmdlineOption()
         else:
-            selectionGroup = self.getSelectionGroup()
-            return string.join(selectionGroup.getCommandLines())
+            return string.join(self.selectionGroup.getCommandLines())
     def performOnCurrent(self):
         fileName = self.getFileName()
         toWrite = self.getTextToSave()
         file = open(fileName, "w")
         file.write(toWrite + "\n")
         file.close()
-        self.addFilterFile(fileName)
+        self.addFilterFile(self.selectionGroup, fileName)
     def messageAfterPerform(self):
         return "Saved " + self.describeTests() + " in file '" + self.getFileName() + "'."
                   
 class RunTests(SelectionAction):
     runNumber = 1
-    def __init__(self):
+    def __init__(self, commandOptionGroups):
         SelectionAction.__init__(self)
         self.optionGroups = []
-        self.invisibleGroup = None
-    def addSuite(self, suite):
-        if len(self.optionGroups) > 0:
-            return
-        for group in suite.app.optionGroups:
+        for group in commandOptionGroups:
             if group.name.startswith("Invisible"):
                 self.invisibleGroup = group
-            elif not group.name.startswith("Select"):
+            elif group.name.startswith("Select"):
+                self.selectionGroup = group
+            else:
                 self.optionGroups.append(group)
     def getOptionGroups(self):
         return self.optionGroups
@@ -1077,7 +1046,7 @@ class RunTests(SelectionAction):
                 if not fileName in prelist:
                     self.notifyIfMainThread("Status", "Adding filter " + fileName + " ...")
                     self.notifyIfMainThread("ActionProgress", "")
-                    self.addFilterFile(fileName)
+                    self.addFilterFile(self.selectionGroup, fileName)
             for test in testSel:
                 self.notifyIfMainThread("Status", "Updating files for " + repr(test) + " ...")
                 self.notifyIfMainThread("ActionProgress", "")
@@ -1422,8 +1391,15 @@ class InteractiveActionHandler:
         self.loadModules = [] # derived configurations add to this on being imported...
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")
-    def storeOptionGroup(self, className, instance):
-        self.optionGroupMap[className] = instance.getOptionGroups()
+    def setCommandOptionGroups(self, optionGroups):
+        if len(self.optionGroupMap) > 0:
+            return
+
+        self.optionGroupMap[RunTests] = optionGroups
+        for group in optionGroups:
+            if group.name.startswith("Select"):
+                self.optionGroupMap[SelectTests] = [ group ]
+                self.optionGroupMap[SaveSelection] = [ group ]
     def getMode(self, dynamic):
         if dynamic:
             return "Dynamic"
@@ -1432,7 +1408,11 @@ class InteractiveActionHandler:
     def getListedInstances(self, list, *args):
         instances = []
         for intvActionClass in list:
-            instance = self.makeInstance(intvActionClass, *args)
+            commandOptionGroups = self.optionGroupMap.get(intvActionClass)
+            if commandOptionGroups:
+                instance = self.makeInstance(intvActionClass, commandOptionGroups, *args)
+            else:
+                instance = self.makeInstance(intvActionClass, *args)
             if instance:
                 instances.append(instance)
         return instances
@@ -1443,11 +1423,6 @@ class InteractiveActionHandler:
         instances += self.getListedInstances(self.actionPostClasses, dynamic, *args)
         return instances
     def makeInstance(self, intvActionClass, *args):
-        instance = self.makeInstanceObject(intvActionClass, *args)
-        if instance:
-            self.storeOptionGroup(intvActionClass, instance)
-        return instance
-    def makeInstanceObject(self, intvActionClass, *args):
         self.diag.info("Trying to create action for " + intvActionClass.__name__)
         for module in self.loadModules:
             command = "from " + module + " import " + intvActionClass.__name__ + " as realClassName"
@@ -1469,6 +1444,7 @@ class InteractiveActionHandler:
         except:
             # If some invalid interactive action is provided, need to know which
             print "Error with interactive action", actionClass.__name__, "ignoring..."
+            plugins.printException()
 
         
 interactiveActionHandler = InteractiveActionHandler()

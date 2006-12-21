@@ -211,7 +211,7 @@ class Action:
     def tearDownSuite(self, suite):
         pass
     def callDuringAbandon(self, test):
-        # set to True if even unrunnable tests should have this action called
+        # set to True if tests should have this action called even after all is reckoned complete (e.g. UNRUNNABLE)
         return False
     # Return the actions to replace the current one if run is interrupted
     def getInterruptActions(self, fetchResults):

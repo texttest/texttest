@@ -566,6 +566,7 @@ class ImportTest(InteractiveTestAction):
         placements = [ "first in suite" ]
         for test in suite.testcases:
             placements += [ "after " + test.name ]
+        placements.append("last in suite")
 
         self.optionGroup.setPossibleValuesUpdate("testpos", placements)
         self.optionGroup.getOption("testpos").reset()                    

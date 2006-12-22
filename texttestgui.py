@@ -134,7 +134,7 @@ class SubGUI(plugins.Observable):
         self.contentsChanged()
     def deactivate(self):
         self.setActive(False)
-    def contentsChanged(self):
+    def contentsChanged(self, *args):
         if self.active and self.shouldShowCurrent():
             guilog.info("") # blank line for demarcation
             self.describe()
@@ -218,9 +218,8 @@ class GUIStatusMonitor(SubGUI):
         return self.pixbuf != None
     def getWidgetName(self):
         return "_Status bar"
-    def contentsChanged(self):
-        pass # not yet integrated
-
+    def describe(self):
+        guilog.info("Changing GUI status to: '" + self.label.get_text() + "'")        
     def notifyActionStart(self, message=""):
         if self.throbber:
             if self.pixbuf: # We didn't do ActionStop ...
@@ -241,14 +240,14 @@ class GUIStatusMonitor(SubGUI):
         
     def notifyStatus(self, message):
         if self.label:
-            guilog.info("")
-            guilog.info("Changing GUI status to: '" + message + "'")
             self.label.set_markup(message)
+            self.contentsChanged()
             
     def createView(self):
         hbox = gtk.HBox()
         self.label = gtk.Label()
         self.label.set_use_markup(True)
+        self.label.set_markup("TextTest started at " + plugins.localtime() + ".")
         hbox.pack_start(self.label, expand=False, fill=False)
         imageDir = os.path.join(os.path.dirname(__file__), "images")
         try:
@@ -262,7 +261,6 @@ class GUIStatusMonitor(SubGUI):
         except Exception, e:
             plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + "\nAs a result, the throbber will be disabled.")
             self.throbber = None
-        self.notifyStatus("TextTest started at " + plugins.localtime() + ".")
         self.widget = gtk.Frame()
         self.widget.set_shadow_type(gtk.SHADOW_ETCHED_IN)
         self.widget.add(hbox)
@@ -530,16 +528,16 @@ class TopWindowGUI(ContainerGUI):
         else:
             self.topWindow.set_title("TextTest static GUI : management of tests for " + string.join(self.appNames, ","))
             
-        guilog.info("Top Window title set to " + self.topWindow.get_title())
         self.topWindow.add(self.subguis[0].createView())
         self.topWindow.show()
-        self.adjustSize()
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyExit)
         return self.topWindow
     def contentsChanged(self):
+        self.describe()
+        self.adjustSize()
         ContainerGUI.contentsChanged(self)
-        SubGUI.contentsChanged(self)
     def describe(self):
+        guilog.info("Top Window title is " + self.topWindow.get_title())
         guilog.info("Default widget is " + str(self.topWindow.get_focus().__class__))
     def notifyExit(self, *args):
         self.notify("Exit")
@@ -583,7 +581,8 @@ class MenuBarGUI(SubGUI):
                                   ("actionmenu", None, "_Actions")])
         self.uiManager.insert_action_group(self.actionGroup, 0)
         self.toggleActions = []
-    def contentsChanged(self):
+    def setActive(self, active):
+        SubGUI.setActive(self, active)
         self.widget.get_toplevel().add_accel_group(self.uiManager.get_accel_group())
         if self.shouldHide("menubar"):
             self.hide(self.widget, "Menubar")
@@ -613,7 +612,6 @@ class MenuBarGUI(SubGUI):
             description += "<menuitem action=\"" + actionName + "\"/>\n"
         return description + "</menu>\n"
     def createToggleActions(self):
-        guilog.info("")
         for observer in self.observers:
             actionTitle = observer.getWidgetName()
             actionName = actionTitle.replace("_", "")
@@ -622,7 +620,6 @@ class MenuBarGUI(SubGUI):
             self.actionGroup.add_action(gtkAction)
             gtkAction.connect("toggled", self.toggleVisibility, observer)
             scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
-            guilog.info("Viewing toggle action with title '" + actionTitle + "'")
             self.toggleActions.append(gtkAction)
     def getInterfaceDescription(self, actionsByMenu):
         description = "<ui>\n<menubar>\n"
@@ -644,13 +641,17 @@ class MenuBarGUI(SubGUI):
         self.createToggleActions()
         for actionGUI in self.actionGUIs:
             actionGUI.addToGroups(self.actionGroup, self.uiManager.get_accel_group())
-            actionGUI.describe()
 
         actionsByMenu = self.getActionNamesByMenu()
         self.uiManager.add_ui_from_string(self.getInterfaceDescription(actionsByMenu))
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/menubar")
         return self.widget
+    def describe(self):
+        for toggleAction in self.toggleActions:
+            guilog.info("Viewing toggle action with title '" + toggleAction.get_property("label") + "'")
+        for actionGUI in self.actionGUIs:
+            actionGUI.describe()
 
 class ToolBarGUI(SubGUI):
     def __init__(self, uiManager, actionGUIs, progressBarGUI):
@@ -658,8 +659,12 @@ class ToolBarGUI(SubGUI):
         self.uiManager = uiManager
         self.actionGUIs = actionGUIs
         self.progressBarGUI = progressBarGUI
+    def setActive(self, active):
+        SubGUI.setActive(self, active)
+        self.progressBarGUI.setActive(active)
     def contentsChanged(self):
-        pass # not yet integrated...
+        SubGUI.contentsChanged(self)
+        self.progressBarGUI.contentsChanged()
     def getWidgetName(self):
         return "_Toolbar"
     def ensureVisible(self, toolbar):
@@ -694,9 +699,10 @@ class ToolBarGUI(SubGUI):
             toolItem.set_expand(True)
             toolbar.insert(toolItem, -1)
             
-        guilog.info("UI layout: \n" + self.uiManager.get_ui())
         self.widget.show_all()
         return self.widget
+    def describe(self):
+        guilog.info("UI layout: \n" + self.uiManager.get_ui())
 
 class ShortcutBarGUI(SubGUI):
     def getWidgetName(self):
@@ -723,10 +729,19 @@ class TestTreeGUI(SubGUI):
         self.collapseStatic = False
         self.successPerSuite = {} # map from suite to number succeeded
         self.collapsedRows = {}
-    def contentsChanged(self):
+        self.testsColumn = None
+    def setActive(self, value):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
+        SubGUI.setActive(self, value)
         self.treeView.grab_focus()
-        # Not really integrated into the description mechanism
+    def describe(self):
+        guilog.info("Test Tree description...")
+        self.filteredModel.foreach(self.describeRow)
+    def describeRow(self, model, path, iter):
+        parentIter = model.iter_parent(iter)
+        if not parentIter or self.treeView.row_expanded(model.get_path(parentIter)):
+            test = model.get_value(iter, 2)
+            guilog.info("-> " + test.getIndent() + model.get_value(iter, 0))
     def addSuites(self, suites):
         if self.dynamic:
             self.notify("NewTestSelection", [ suites[0] ])
@@ -800,9 +815,8 @@ class TestTreeGUI(SubGUI):
         modelIndexer = TreeModelIndexer(self.filteredModel, self.testsColumn, 3)
         scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite", modelIndexer)
         self.treeView.connect('row-expanded', self.rowExpanded)
-        guilog.info("") # demarcation
-        guilog.info("Expanding tests in tree view...")
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
+        self.treeView.connect('row-expanded', self.contentsChanged) # later expansions should cause description...
         
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
         self.treeView.show()
@@ -935,7 +949,6 @@ class TestTreeGUI(SubGUI):
         model = view.get_model()
         while (iter != None):
             test = model.get_value(iter, 2)
-            guilog.info("-> " + test.getIndent() + "Added " + repr(test) + " to test tree view.")
             if recursive:
                 view.expand_row(model.get_path(iter), open_all=False)
              
@@ -988,9 +1001,9 @@ class TestTreeGUI(SubGUI):
     def notifyRemove(self, test):
         self.removeTest(test)
         self.totalNofTests -= test.size()
+        guilog.info("Removing test with path " + test.getRelPath())
         self.updateColumnTitle()
     def removeTest(self, test):
-        guilog.info("-> " + test.getIndent() + "Removed " + repr(test) + " from test tree view.")
         iter = self.itermap[test]
         filteredIter = self.findIter(test)
         if self.selection.iter_is_selected(filteredIter):
@@ -1001,7 +1014,6 @@ class TestTreeGUI(SubGUI):
         allSelected, selectedTests = self.getSelected()
         self.selecting = True
         self.selection.unselect_all()
-        guilog.info("-> " + suite.getIndent() + "Recreating contents of " + repr(suite) + ".")
         for test in suite.testcases:
             self.removeTest(test)
         for test in suite.testcases:
@@ -2018,6 +2030,8 @@ class ProgressBarGUI(SubGUI):
         self.widget = None
     def shouldShowCurrent(self):
         return self.dynamic
+    def describe(self):
+        guilog.info("Progress bar set to fraction " + str(self.widget.get_fraction()) + ", text '" + self.widget.get_text() + "'")
     def createView(self):
         self.widget = gtk.ProgressBar()
         self.resetBar()
@@ -2032,6 +2046,7 @@ class ProgressBarGUI(SubGUI):
             if failed:
                 self.nofFailedTests += 1
             self.resetBar()
+            self.contentsChanged()
         elif state.isComplete() and not failed: # test saved, possibly partially so still check 'failed'
             self.nofFailedTests -= 1
             self.adjustFailCount()
@@ -2040,7 +2055,6 @@ class ProgressBarGUI(SubGUI):
         message = self.getFractionMessage()
         message += self.getFailureMessage(self.nofFailedTests)
         fraction = float(self.nofCompletedTests) / float(self.totalNofTests)
-        guilog.info("Progress bar set to fraction " + str(fraction) + ", text '" + message + "'")
         self.widget.set_text(message)
         self.widget.set_fraction(fraction)
     def getFractionMessage(self):

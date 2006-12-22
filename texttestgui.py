@@ -589,7 +589,7 @@ class MenuBarGUI(SubGUI):
             self.hide(self.widget, "Menubar")
         for toggleAction in self.toggleActions:
             if self.shouldHide(toggleAction.get_name()):
-                toggleAction.toggled()
+                toggleAction.set_active(False)
 
     def shouldHide(self, name):
         return guiConfig.getCompositeValue("hide_gui_element", name, modeDependent=True)
@@ -618,6 +618,7 @@ class MenuBarGUI(SubGUI):
             actionTitle = observer.getWidgetName()
             actionName = actionTitle.replace("_", "")
             gtkAction = gtk.ToggleAction(actionName, actionTitle, None, None)
+            gtkAction.set_active(True)
             self.actionGroup.add_action(gtkAction)
             gtkAction.connect("toggled", self.toggleVisibility, observer)
             scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)

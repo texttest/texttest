@@ -986,10 +986,6 @@ class TestTreeGUI(SubGUI):
         suiteIter = self.itermap[test.parent]
         iter = self.addSuiteWithParent(test, suiteIter)
     def notifyRemove(self, test):
-        # This test is currently selected. View the suite (its parent) instead!
-        guilog.info("Selecting " + repr(test.parent) + " as test " + test.name + " removed")
-        self.notifySetTestSelection([ test.parent ])
-
         self.removeTest(test)
         self.totalNofTests -= test.size()
         self.updateColumnTitle()

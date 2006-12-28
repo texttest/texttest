@@ -349,9 +349,6 @@ class TestState(Observable):
             return ""
         else:
             return " :"
-    def notifyInMainThread(self):
-        # Hook to tell the state we're in the main thread, as some things can only be done there
-        pass
     def needsRecalculation(self):
         # Is some aspect of the state out of date
         return 0

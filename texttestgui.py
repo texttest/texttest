@@ -396,6 +396,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def addSuites(self, suites):
         guiConfig.addSuites(suites)
         self.testTreeGUI.addSuites(suites)
+        self.progressMonitor.addSuites(suites)
         self.progressBarGUI.addSuites(suites)
         self.topWindowGUI.addSuites(suites)
         for action in self.intvActions:
@@ -491,7 +492,9 @@ class TextTestGUI(Responder, plugins.Observable):
         return tabInfo
     def notifyLifecycleChange(self, test, state, changeDesc):
         # Working around python bug 853411: main thread must do all forking
-        state.notifyInMainThread()
+        if hasattr(state, "notifyInMainThread"):
+            state.notifyInMainThread()
+            return
 
         self.notify("LifecycleChange", test, state, changeDesc)
     def notifyFileChange(self, test):
@@ -729,7 +732,9 @@ class TestTreeGUI(SubGUI):
         self.collapseStatic = False
         self.successPerSuite = {} # map from suite to number succeeded
         self.collapsedRows = {}
+        self.filteredModel = None
         self.testsColumn = None
+        self.treeView = None
     def setActive(self, value):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         SubGUI.setActive(self, value)
@@ -752,11 +757,6 @@ class TestTreeGUI(SubGUI):
             self.totalNofTests += size
             if not self.dynamic or size > 0:
                 self.addSuiteWithParent(suite, None)
-    def visibleByDefault(self, suite, parent):
-        if parent == None or not self.dynamic:
-            return True
-        hideCategories = suite.getConfigValue("hide_test_category")
-        return "non_started" not in hideCategories
     def addSuiteWithParent(self, suite, parent, follower=None):    
         iter = self.model.insert_before(parent, follower)
         nodeName = suite.name
@@ -767,7 +767,7 @@ class TestTreeGUI(SubGUI):
         self.model.set_value(iter, 0, nodeName)
         self.model.set_value(iter, 2, suite)
         self.model.set_value(iter, 3, suite.uniqueName)
-        self.model.set_value(iter, 6, self.visibleByDefault(suite, parent))
+        self.model.set_value(iter, 6, True)
         storeIter = iter.copy()
         self.itermap[suite] = storeIter
         self.updateStateInModel(suite, iter, suite.state)
@@ -1034,7 +1034,7 @@ class TestTreeGUI(SubGUI):
             if newValue or not self.hasVisibleChildren(iterator):
                 changed |= self.setVisibility(iterator, newValue)
 
-        if changed:
+        if changed and self.treeView:
             self.reFilter()
             if newValue: # if things have become visible, expand everything
                 rootIter = self.filteredModel.get_iter_root()
@@ -1048,10 +1048,11 @@ class TestTreeGUI(SubGUI):
             return False
 
         test = self.model.get_value(iter, 2)
-        if newValue:
-            guilog.info("Making test visible : " + repr(test))
-        else:
-            guilog.info("Hiding test : " + repr(test))
+        if self.treeView:
+            if newValue:
+                guilog.info("Making test visible : " + repr(test))
+            else:
+                guilog.info("Hiding test : " + repr(test))
         self.model.set_value(iter, 6, newValue)
         return True
     def findVisibilityIterators(self, test):
@@ -2106,8 +2107,6 @@ class TestProgressMonitor(SubGUI):
         self.dynamic = dynamic
     def getTabTitle(self):
         return "Progress"
-    def contentsChanged(self):
-        pass # We don't worry about whether we're visible, we think we're important enough to write lots anyway!
     def shouldShowCurrent(self):
         return self.dynamic
     def createView(self):
@@ -2132,7 +2131,11 @@ class TestProgressMonitor(SubGUI):
         self.treeView.append_column(toggleColumn)
         self.treeView.show()
         return self.addScrollBars(self.treeView)
-            
+    def addSuites(self, suites):
+        if self.dynamic:
+            for suite in suites:
+                for test in suite.testCaseList():
+                    self.insertTest(test, test.state)
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
         tests = []
@@ -2185,6 +2188,7 @@ class TestProgressMonitor(SubGUI):
         classifiers = self.getClassifiers(state)
         nodeClassifier = classifiers.keys()[0]
         self.addTestForNode(test, state, nodeClassifier, classifiers)
+        self.notify("Visibility", test, self.shouldBeVisible(test))
     def addTestForNode(self, test, state, nodeClassifier, classifiers, parentIter=None):
         nodeIter = self.findIter(nodeClassifier, parentIter)
         if nodeIter:
@@ -2227,15 +2231,14 @@ class TestProgressMonitor(SubGUI):
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeTest(test)
         self.insertTest(test, state)
-        self.notify("Visibility", test, self.shouldBeVisible(test))
-        self.diagnoseTree()
+        self.contentsChanged()
     def shouldBeVisible(self, test):
         for nodeIter in self.classifications[test]:
             visible = self.treeModel.get_value(nodeIter, 2)
             if not visible:
                 return False
         return True
-    def diagnoseTree(self):
+    def describe(self):
         guilog.info("Test progress:")
         childIters = []
         childIter = self.treeModel.get_iter_root()

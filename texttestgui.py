@@ -456,7 +456,7 @@ class TextTestGUI(Responder, plugins.Observable):
                 else:
                     tabInfo[name] = notebookGUI
 
-            notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"), "Selection")
+            notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"))
             return [ notebookGUI ] + subNotebookGUIs.values(), notebookGUI        
 
     def getNotebookScriptName(self, tabName):
@@ -744,7 +744,7 @@ class TestTreeGUI(SubGUI):
             guilog.info("-> " + test.getIndent() + model.get_value(iter, 0))
     def addSuites(self, suites):
         if self.dynamic:
-            self.notify("NewTestSelection", [ suites[0] ])
+            self.notify("NewTestSelection", [ suites[0] ], False)
         else:
             self.collapseStatic = guiConfig.getValue("static_collapse_suites")
         for suite in suites:
@@ -799,7 +799,7 @@ class TestTreeGUI(SubGUI):
         self.treeView = gtk.TreeView(self.filteredModel)
         self.selection = self.treeView.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
-        self.selection.connect("changed", self.selectionChanged)
+        self.selection.connect("changed", self.userChangedSelection)
         testRenderer = gtk.CellRendererText()
         testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected"
         if self.dynamic:
@@ -869,14 +869,14 @@ class TestTreeGUI(SubGUI):
         except:
             pass
 
-    def selectionChanged(self, *args):
-        if self.selecting or hasattr(self.selection, "unseen_changes"):
-            return
-        
+    def userChangedSelection(self, *args):
+        if not self.selecting and not hasattr(self.selection, "unseen_changes"):
+            self.selectionChanged(direct=True)
+    def selectionChanged(self, direct):
         allSelected, selectedTests = self.getSelected()
         self.nofSelectedTests = len(selectedTests)
         self.updateColumnTitle(printToLog=True)
-        self.notify("NewTestSelection", allSelected)
+        self.notify("NewTestSelection", allSelected, direct)
     def visibilityChanged(self):
         self.totalNofTestsShown = 0
         self.filteredModel.foreach(self.countVisible)
@@ -913,7 +913,7 @@ class TestTreeGUI(SubGUI):
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
     def notifySetTestSelection(self, selTests, selectCollapsed=True):
         self.selectTestRows(selTests, selectCollapsed)
-        self.selectionChanged()
+        self.selectionChanged(direct=False) # Here it's been set via some indirect mechanism, might want to behave differently 
     def selectTestRows(self, selTests, selectCollapsed=True):
         self.selecting = True # don't respond to each individual programmatic change here
         self.selection.unselect_all()
@@ -1086,7 +1086,7 @@ class ActionGUI(SubGUI):
         message += self.detailDescription()
         message += self.sensitivityDescription()
         guilog.info(message)
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         if self.updateSensitivity():
             newActive = self.actionOrButton().get_property("sensitive")
             guilog.info("Setting sensitivity of button '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newActive))
@@ -1246,7 +1246,7 @@ class ActionTabGUI(SubGUI):
         if self.action.updateForStateChange(test, state):
             self.updateView()
 
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 0:
             return
         if self.action.updateForSelectionChange():
@@ -1404,13 +1404,13 @@ class ActionTabGUI(SubGUI):
         return text
 
 class NotebookGUI(SubGUI):
-    def __init__(self, tabInfo, scriptTitle, defaultPage=""):
+    def __init__(self, tabInfo, scriptTitle):
         SubGUI.__init__(self)
         self.scriptTitle = scriptTitle
         self.diag = plugins.getDiagnostics("GUI notebook")
         self.tabInfo = tabInfo
         self.notebook = None
-        self.currentPageName = defaultPage
+        self.currentPageName = ""
 
     def setActive(self, value):
         SubGUI.setActive(self, value)
@@ -1546,13 +1546,14 @@ class NotebookGUI(SubGUI):
             if self.tabInfo[name].forceVisible(tests):
                 self.notebook.set_current_page(allNames.index(name))
 
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         if not self.notebook:
             return 
 
         pagesAdded = self.insertNewPages()
         pagesRemoved = self.removeOldPages()
-        self.updateCurrentPage(tests)
+        if direct: # only change pages around if a test is directly selected
+            self.updateCurrentPage(tests)
   
         if pagesAdded or pagesRemoved:
             SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
@@ -1656,7 +1657,7 @@ class TextInfoGUI(SubGUI):
         guilog.info("---------- Text Info Window ----------")
         guilog.info(self.getActualText().strip())
         guilog.info("--------------------------------------")
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         if len(tests) > 0 and self.currentTest not in tests:
             self.currentTest = tests[0]
             if self.currentTest.classId() == "test-case":
@@ -1834,7 +1835,7 @@ class FileViewGUI(SubGUI):
         return self.currentObject.getConfigValue("file_colours")[name]
     
 class ApplicationFileGUI(FileViewGUI):
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         if len(tests) > 0 and self.currentObject != tests[0].app:
             self.currentObject = tests[0].app
             self.setName()
@@ -1878,7 +1879,7 @@ class TestFileGUI(FileViewGUI):
     def forceVisible(self, tests):
         return len(tests) == 1
     
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         if not self.dynamic and len(tests) != 1: # multiple tests in static GUI result in removal
             self.currentObject = None
             self.nameColumn = None

@@ -225,7 +225,7 @@ class SelectionAction(InteractiveAction):
     def addFilterFile(self, selectionGroup, fileName):
         filterFileOption = selectionGroup.options["f"]
         filterFileOption.addPossibleValue(os.path.basename(fileName))
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def isActiveOnCurrent(self):
         return len(self.currTestSelection) > 0
@@ -308,7 +308,7 @@ class InteractiveTestAction(InteractiveAction):
         # Trim the absolute filename to be relative to the application home dir
         # (TEXTTEST_HOME is more difficult to obtain, see testmodel.OptionFinder.getDirectoryName)
         return os.path.join(self.currentTest.getRelPath(), os.path.basename(filename))
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 1:
             self.currentTest = tests[0]
         elif len(tests) > 1:
@@ -476,7 +476,7 @@ class ViewFile(InteractiveTestAction):
             if not state.isComplete():
                 self.addSwitch("f", "Follow file rather than view it", followDefault)
         return len(self.optionGroup.switches) != origCount
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         if len(tests) > 0 and self.currentTest not in tests:
             self.currentTest = tests[0]
     def tmpFile(self, comparison):
@@ -1134,7 +1134,7 @@ class CreateDefinitionFile(InteractiveTestAction):
         self.viewFile(targetFile, refreshFiles=True)
 
 class RemoveTest(SelectionAction):
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def _getTitle(self):
         return "Remove"
@@ -1235,9 +1235,9 @@ class CopyTest(ImportTest):
         self.optionGroup.getOption("suite").reset()
     def getDestinationSuite(self):
         return self.suiteMap[self.optionGroup.getOptionValue("suite")]
-    def notifyNewTestSelection(self, tests):
+    def notifyNewTestSelection(self, tests, direct):
         # apply to parent
-        ImportTest.notifyNewTestSelection(self, tests)
+        ImportTest.notifyNewTestSelection(self, tests, direct)
         if self.currentTest and self.currentTest.classId() == "test-case":
             self.testToCopy = self.currentTest
             self.currentTest = self.currentTest.parent
@@ -1344,8 +1344,8 @@ class RecomputeTest(InteractiveTestAction):
     def isActiveOnCurrent(self):
         return InteractiveTestAction.isActiveOnCurrent(self) and \
                self.currentTest.state.hasStarted() and not self.currentTest.state.isComplete()
-    def notifyNewTestSelection(self, tests):
-        InteractiveTestAction.notifyNewTestSelection(self, tests)
+    def notifyNewTestSelection(self, tests, direct):
+        InteractiveTestAction.notifyNewTestSelection(self, tests, direct)
         if self.currentTest and self.currentTest.needsRecalculation():
             self.perform()
     def _getTitle(self):

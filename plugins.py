@@ -507,14 +507,29 @@ def rmtree(dir, attempts=100):
                 print "Problems removing directory", dir, "- waiting 1 second to retry..."
                 time.sleep(1)                
 
-def readList(filename, autosort=0):
+def readList(filename):
     items = []
     for longline in open(filename).readlines():
         line = longline.strip()
         if len(line) > 0 and not line.startswith("#"):
             items.append(line)
-    if autosort:
-        items.sort()
+    return items
+  
+def readListWithComments(filename, duplicateMethod=None):
+    items = seqdict()
+    currComment = ""
+    for longline in open(filename).readlines():
+        line = longline.strip()
+        if len(line) == 0:
+            continue
+        if line.startswith("#"):
+            currComment += longline[1:].lstrip()
+        else:
+            if items.has_key(line) and duplicateMethod:
+                duplicateMethod(line, filename)
+            else:
+                items[line] = currComment.strip()
+            currComment = ""
     return items
 
 def chdir(dir):

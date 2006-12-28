@@ -228,7 +228,8 @@ class Config(plugins.Configuration):
             sys.stderr.write("Rejected application " + repr(app) + " : filter file '" + filename + "' could not be found\n")
             return [ RejectFilter() ]
 
-        fileData = string.join(plugins.readList(fullPath), ",")
+        filterLines = plugins.readList(fullPath)
+        fileData = string.join(filterLines, ",")
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
         return self.getFiltersFromMap(optionFinder, app)
     def getFiltersFromMap(self, optionMap, app):

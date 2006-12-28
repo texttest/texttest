@@ -588,25 +588,32 @@ class ImportTest(InteractiveTestAction):
         return self.optionGroup.getOptionValue("name").strip()
     def performOnCurrent(self):
         testName = self.getNewTestName()
+        suite = self.getDestinationSuite()
+        self.checkName(suite, testName)
+            
+        guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + \
+                    repr(suite) + ", placed " + self.optionGroup.getOptionValue("testpos"))
+        placement = self.getPlacement()
+        description = self.optionGroup.getOptionValue("desc")
+        testDir = suite.writeNewTest(testName, description, placement)
+        self.testImported = self.createTestContents(suite, testDir, description, placement)
+    def getDestinationSuite(self):
+        return self.currentTest
+    def getPlacement(self):
+        option = self.optionGroup.getOption("testpos")
+        return option.possibleValues.index(option.getValue())
+    def checkName(self, suite, testName):
         if len(testName) == 0:
             raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + "\n" + \
                   "Fill in the 'Adding " + self.testType() + "' tab below."
         if testName.find(" ") != -1:
             raise plugins.TextTestError, "The new " + self.testType() + \
                   " name is not permitted to contain spaces, please specify another"
-        suite = self.getDestinationSuite()
         for test in suite.testCaseList():
             if test.name == testName:
                 raise plugins.TextTestError, "A " + self.testType() + " with the name '" + \
                       testName + "' already exists, please choose another name"
-        guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + \
-                    repr(suite) + ", placed " + self.optionGroup.getOptionValue("testpos"))
-        testDir = suite.writeNewTest(testName, self.optionGroup.getOptionValue("desc"), self.optionGroup.getOptionValue("testpos"))
-        self.testImported = self.createTestContents(suite, testDir, self.optionGroup.getOptionValue("testpos"))
-    def createTestContents(self, suite, testDir, placement):
-        pass
-    def getDestinationSuite(self):
-        return self.currentTest
+
 
 class RecordTest(InteractiveTestAction):
     def __init__(self):
@@ -723,11 +730,11 @@ class ImportTestCase(ImportTest):
         return "Test"
     def addDefinitionFileOption(self):
         self.addOption("opt", "Command line options")
-    def createTestContents(self, suite, testDir, placement):
+    def createTestContents(self, suite, testDir, description, placement):
         self.writeDefinitionFiles(suite, testDir)
         self.writeEnvironmentFile(suite, testDir)
         self.writeResultsFiles(suite, testDir)
-        return suite.addTestCase(os.path.basename(testDir), placement)
+        return suite.addTestCase(os.path.basename(testDir), description, placement)
     def getWriteFileName(self, name, suite, testDir):
         fileName = os.path.join(testDir, name + "." + suite.app.name)
         if os.path.isfile(fileName):
@@ -767,9 +774,9 @@ class ImportTestSuite(ImportTest):
         self.addEnvironmentFileOptions()
     def testType(self):
         return "Suite"
-    def createTestContents(self, suite, testDir, placement):
+    def createTestContents(self, suite, testDir, description, placement):
         self.writeEnvironmentFiles(suite, testDir)
-        return suite.addTestSuite(os.path.basename(testDir), placement)
+        return suite.addTestSuite(os.path.basename(testDir), description, placement)
     def addEnvironmentFileOptions(self):
         self.addSwitch("env", "Add environment file")
     def writeEnvironmentFiles(self, suite, testDir):
@@ -1148,40 +1155,16 @@ class RemoveTest(SelectionAction):
             return "You are about to remove " + repr(len(self.currTestSelection)) + \
                    " tests with associated files!\nAre you VERY sure you wish to proceed??"
     def performOnCurrent(self):
+        namesRemoved = []
         for test in self.currTestSelection:
             dir = test.getDirectory()
             if os.path.isdir(dir): # might have already removed the enclosing suite
-                plugins.rmtree(dir)
-                self.removeTest(test)
-    def removeTest(self, test):
-        suite = test.parent
-        testName = test.name
-        self.removeFromTestFile(suite, testName)
-        suite.removeTest(test)
-        self.notify("Status", "Removed test " + testName)
+                test.parent.removeTest(test)
+                namesRemoved.append(test.name)
+        self.notify("Status", "Removed test(s) " + string.join(namesRemoved, ","))
+        
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
-    def removeFromTestFile(self, suite, testName):
-        newFileName = os.path.join(suite.app.writeDirectory, "tmptestsuite")
-        newFile = plugins.openForWrite(newFileName)
-        description = ""
-        contentFileName = suite.getContentFileName()
-        for line in open(contentFileName).xreadlines():
-            stripLine = line.strip()
-            description += line
-            if line.startswith("#") or len(stripLine) == 0:
-                continue
-            
-            if stripLine != testName:
-                newFile.write(description)
-            description = ""
-        newFile.close()
-        if guilog.get_loglevel() >= LOGLEVEL_NORMAL:
-            difftool = suite.getConfigValue("text_diff_program")
-            diffInfo = os.popen(difftool + " " + contentFileName + " " + newFileName).read()
-            guilog.info("Changes made to testcase file : \n" + diffInfo)
-            guilog.info("") # blank line
-        plugins.movefile(newFileName, contentFileName)
 
 class CopyTest(ImportTest):
     def __init__(self):
@@ -1265,7 +1248,7 @@ class CopyTest(ImportTest):
             self.currentTest = self.currentTest.parent
         else:
             self.testToCopy = None
-    def createTestContents(self, suite, testDir, placement):
+    def createTestContents(self, suite, testDir, description, placement):
         stdFiles, defFiles = self.testToCopy.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
             dirname, local = os.path.split(sourceFile)
@@ -1280,7 +1263,7 @@ class CopyTest(ImportTest):
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copyfile(sourcePath, targetPath)
         originalTest = self.testToCopy # Set to new test in call below ...
-        ret =  suite.addTestCase(os.path.basename(testDir), placement)
+        ret =  suite.addTestCase(os.path.basename(testDir), description, placement)
         if self.remover:
             self.remover.performOnCurrent()
         return ret

@@ -157,10 +157,11 @@ class EnvironmentReader:
     
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
-    def __init__(self, name, dircache, app, parent = None):
+    def __init__(self, name, description, dircache, app, parent = None):
         # Should notify which test it is
         plugins.Observable.__init__(self, passSelf=True)
         self.name = name
+        self.description = description
         # There is nothing to stop several tests having the same name. Maintain another name known to be unique
         self.uniqueName = name
         self.app = app
@@ -369,8 +370,8 @@ class Test(plugins.Observable):
         self.notify("FileChange")    
 
 class TestCase(Test):
-    def __init__(self, name, abspath, app, parent):
-        Test.__init__(self, name, abspath, app, parent)
+    def __init__(self, name, description, abspath, app, parent):
+        Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
         self.writeDirectories = [ os.path.join(app.writeDirectory, self.getRelPath()) ]
     def __repr__(self):
@@ -472,8 +473,8 @@ class TestCase(Test):
         return filter.acceptsTestCase(self)
             
 class TestSuite(Test):
-    def __init__(self, name, dircache, app, parent=None, forTestRuns=0):
-        Test.__init__(self, name, dircache, app, parent)
+    def __init__(self, name, description, dircache, app, parent=None, forTestRuns=0):
+        Test.__init__(self, name, description, dircache, app, parent)
         self.testcases = []
         contentFile = self.getContentFileName()
         if not contentFile:
@@ -496,29 +497,20 @@ class TestSuite(Test):
                 return False
         return True
     def readTestNames(self, forTestRuns):
-        names = []
+        names = seqdict()
         # If we're not running tests, we're displaying information and should find all the sub-versions 
         for fileName in self.findTestSuiteFiles(forTestRuns):
-            newNames = self.readTestNamesFromFile(fileName)
-            self.diagnose("Test suite file " + fileName + " had " + str(len(newNames)) + " tests")
-            for name in newNames:
-                if not name in names:
-                    names.append(name)
+            for name, comment in plugins.readListWithComments(fileName, duplicateMethod=self.warnDuplicateTest).items():
+                self.diagnose("Read " + name)
+                if not self.fileExists(name):
+                    plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
+                    continue
+                if not names.has_key(name):
+                    names[name] = comment
         return names
-    def readTestNamesFromFile(self, fileName):
-        names = []
-        self.diagnose("Reading " + fileName)
-        for name in plugins.readList(fileName, self.getConfigValue("auto_sort_test_suites")):
-            self.diagnose("Read " + name)
-            if name in names:
-                plugins.printWarning("The test " + name + " was included several times in a test suite file.\nPlease check the file at " + fileName)
-                continue
-
-            if not self.fileExists(name):
-                plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
-                continue
-            names.append(name)
-        return names
+    def warnDuplicateTest(self, testName, fileName):
+        plugins.printWarning("The test " + testName + " was included several times in a test suite file.\n" + \
+                             "Please check the file at " + fileName)
     def fileExists(self, name):
         for dircache in self.dircaches:
             if dircache.exists(name):
@@ -566,13 +558,14 @@ class TestSuite(Test):
     def contentChanged(self):
         # Here we assume that only order can change...
         self.refreshFiles()
-        newList = []
-        for testName in self.readTestNamesFromFile(self.getContentFileName()):
-            for testcase in self.testcases:
-                if testcase.name == testName:
-                    newList.append(testcase)
-                    break
-        self.testcases = newList
+        if not self.getConfigValue("auto_sort_test_suites"):
+            newList = []
+            for testName in plugins.readList(self.getContentFileName()):
+                for testcase in self.testcases:
+                    if testcase.name == testName:
+                        newList.append(testcase)
+                        break
+            self.testcases = newList
         self.notify("ContentChange")
     def size(self):
         size = 0
@@ -582,66 +575,88 @@ class TestSuite(Test):
 # private:
     def getTestCases(self, filters, testNames, forTestRuns):
         testCaseList = []
-        for testName in testNames:
-            newTest = self.createTest(testName, filters, forTestRuns)
+        orderedTestNames = testNames.keys()
+        if self.getConfigValue("auto_sort_test_suites"):
+            orderedTestNames.sort()
+        for testName in orderedTestNames:
+            newTest = self.createTest(testName, testNames[testName], filters, forTestRuns)
             if newTest:
                 testCaseList.append(newTest)
         return testCaseList
-    def createTest(self, testName, filters = [], forTestRuns=0):
+    def createTest(self, testName, description, filters = [], forTestRuns=0):
         cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
         allFiles = cache.findAllFiles("testsuite", compulsory = [ self.app.name ])
         if len(allFiles) > 0:
-            return self.createTestSuite(testName, cache, filters, forTestRuns)
+            return self.createTestSuite(testName, description, cache, filters, forTestRuns)
         else:
-            return self.createTestCase(testName, cache, filters)
-    def createTestCase(self, testName, cache, filters):
-        newTest = TestCase(testName, cache, self.app, self)
+            return self.createTestCase(testName, description, cache, filters)
+    def createTestCase(self, testName, description, cache, filters):
+        newTest = TestCase(testName, description, cache, self.app, self)
         if newTest.isAcceptedByAll(filters):
             newTest.setObservers(self.observers)
             return newTest
-    def createTestSuite(self, testName, cache, filters, forTestRuns):
-        newSuite = TestSuite(testName, cache, self.app, self)
+    def createTestSuite(self, testName, description, cache, filters, forTestRuns):
+        newSuite = TestSuite(testName, description, cache, self.app, self)
         if not newSuite.isAcceptedByAll(filters):
             return
         newSuite.setObservers(self.observers)
         if newSuite.readContents(filters, forTestRuns):
             return newSuite
-    def writeNewTest(self, testName, description, placement):        
-        file = open(self.getContentFileName(), "r+")
-        lines = file.readlines()
-        if placement == "last in suite":
-            lines += [ "\n", "# " + description + "\n", testName + "\n"]
-        elif placement == "first in suite":
-            newLines = [ "# " + description + "\n", testName + "\n", "\n"]
-            newLines += lines
-            lines = newLines
-        else: # Find line equal to 'placement' minus initial 'after '
-            newLines = []
-            for line in lines:
-                newLines += line
-                if line.rstrip(' \n') == placement[6:len(placement)]:
-                    newLines += [ "\n", "# " + description + "\n", testName + "\n"]
-            lines = newLines
-        file.seek(0, 0)
-        file.writelines(lines)
-        file.close()
+    def writeNewTest(self, testName, description, placement):
+        contentFileName = self.getContentFileName()
+        currContent = plugins.readListWithComments(contentFileName) # have to re-read, we might have sorted
+        newEntry = seqdict()
+        newEntry[testName] = description
+        currContent.insert(placement, newEntry)
+        self.writeNewTestSuiteFile(contentFileName, currContent)
         return self.makeSubDirectory(testName)
-    def addTestCase(self, testName, placement):
-        return self.addTest(testName, placement, TestCase)
-    def addTestSuite(self, testName, placement):
-        return self.addTest(testName, placement, TestSuite)
-    def addTest(self, testName, placement, className):
+    def addTestCase(self, testName, description, placement):
+        return self.addTest(testName, description, placement, TestCase)
+    def addTestSuite(self, testName, description, placement):
+        return self.addTest(testName, description, placement, TestSuite)
+    def addTest(self, testName, description, placement, className):
         cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
-        test = className(testName, cache, self.app, self)
+        test = className(testName, description, cache, self.app, self)
         test.setObservers(self.observers)
-        self.testcases.append(test) # Reordered in contentChanged below ...
+        self.testcases.insert(placement, test) 
         test.readEnvironment()
         test.notify("Add")
-        self.contentChanged()     
         return test
+    def getFollower(self, test):
+        position = self.testcases.index(test)
+        try:
+            return self.testcases[position + 1]
+        except IndexError:
+            return None
     def removeTest(self, test):
+        plugins.rmtree(test.getDirectory())
         self.testcases.remove(test)
+        self.removeFromTestFile(test.name)
         test.notify("Remove")
+    def writeNewTestSuiteFile(self, fileName, content):
+        testEntries = self.makeWriteEntries(content)
+        output = string.join(testEntries, "\n")
+        if not output.endswith("\n"):
+            output += "\n"
+        newFile = plugins.openForWrite(fileName)
+        newFile.write(output.lstrip())
+        newFile.close()
+    def makeWriteEntries(self, content):
+        entries = []
+        for testName, comment in content.items():
+            entries.append(self.testOutput(testName, comment))
+        return entries
+    def testOutput(self, testName, comment):
+        if len(comment) == 0:
+            return testName
+        else:
+            return "\n# " + comment.replace("\n", "\n# ") + "\n" + testName
+    def removeFromTestFile(self, testName):
+        contentFileName = self.getContentFileName()
+        currContent = plugins.readListWithComments(contentFileName) # have to re-read, we might have sorted
+        del currContent[testName]
+
+        self.writeNewTestSuiteFile(contentFileName, currContent)
     
 class BadConfigError(RuntimeError):
     pass
@@ -936,7 +951,7 @@ class Application:
         for filter in filters:
             if not filter.acceptsApplication(self):
                 success = 0
-        suite = TestSuite(os.path.basename(self.dircache.dir), self.dircache, self)
+        suite = TestSuite(os.path.basename(self.dircache.dir), "Root test suite", self.dircache, self)
         suite.setObservers(responders)
         suite.readContents(filters, forTestRuns)
         if success:

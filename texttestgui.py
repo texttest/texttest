@@ -757,8 +757,8 @@ class TestTreeGUI(SubGUI):
             return True
         hideCategories = suite.getConfigValue("hide_test_category")
         return "non_started" not in hideCategories
-    def addSuiteWithParent(self, suite, parent):    
-        iter = self.model.insert_before(parent, None)
+    def addSuiteWithParent(self, suite, parent, follower=None):    
+        iter = self.model.insert_before(parent, follower)
         nodeName = suite.name
         if parent == None:
             appName = suite.app.name + suite.app.versionSuffix()
@@ -995,9 +995,13 @@ class TestTreeGUI(SubGUI):
             self.totalNofTests += 1
         guilog.info("Selecting new test " + test.name)
         self.notifySetTestSelection([ test ])
+        self.contentsChanged()
     def addTest(self, test):
-        suiteIter = self.itermap[test.parent]
-        iter = self.addSuiteWithParent(test, suiteIter)
+        suite = test.parent
+        suiteIter = self.itermap[suite]
+        follower = suite.getFollower(test)
+        followIter = self.itermap.get(follower)
+        iter = self.addSuiteWithParent(test, suiteIter, followIter)
     def notifyRemove(self, test):
         self.removeTest(test)
         self.totalNofTests -= test.size()

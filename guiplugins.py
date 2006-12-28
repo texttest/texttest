@@ -1170,18 +1170,10 @@ class CopyTest(ImportTest):
     def __init__(self):
         ImportTest.__init__(self)
         self.testToCopy = None
-        self.remover = None
         self.optionGroup.removeOption("testpos")
         self.optionGroup.addOption("suite", "Copy to suite", "current", allocateNofValues = 2, description = "Which suite should the test be copied to?", changeMethod = self.updatePlacements)
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues = 2, description = "Where in the test suite should the test be placed?")
         self.optionGroup.addSwitch("keeporig", "Keep original", value = 1, description = "Should the original test be kept or removed?")
-    def getDoubleCheckMessage(self):
-        if not self.optionGroup.getSwitchValue("keeporig"):
-            self.remover = RemoveTest()
-            self.remover.notifyNewTestSelection([self.testToCopy])
-            return self.remover.getDoubleCheckMessage()
-        else:
-            return ""
     def isActiveOnCurrent(self):
         return self.testToCopy
     def testType(self):
@@ -1263,9 +1255,10 @@ class CopyTest(ImportTest):
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copyfile(sourcePath, targetPath)
         originalTest = self.testToCopy # Set to new test in call below ...
+        originalSuite = self.currentTest # Also reset
         ret =  suite.addTestCase(os.path.basename(testDir), description, placement)
-        if self.remover:
-            self.remover.performOnCurrent()
+        if not self.optionGroup.getSwitchValue("keeporig"):
+            originalSuite.removeTest(originalTest)
         return ret
     
 class ReportBugs(InteractiveTestAction):

@@ -1193,7 +1193,10 @@ class CopyTest(ImportTest):
             return ""
     def getDefaultDesc(self):
         if self.testToCopy:
-            return "Copy of " + self.testToCopy.name
+            if len(self.testToCopy.description) > 0:
+                return self.testToCopy.description
+            else:
+                return "Copy of " + self.testToCopy.name
         else:
             return ""
     def _getTitle(self):

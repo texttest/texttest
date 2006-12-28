@@ -755,6 +755,7 @@ class TestTreeGUI(SubGUI):
         for suite in suites:
             size = suite.size()
             self.totalNofTests += size
+            self.totalNofTestsShown += size
             if not self.dynamic or size > 0:
                 self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent, follower=None):    
@@ -822,7 +823,7 @@ class TestTreeGUI(SubGUI):
         self.treeView.show()
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)
-            self.reFilter()
+            self.filteredModel.refilter()
 
         return self.addScrollBars(self.treeView)
     
@@ -839,7 +840,6 @@ class TestTreeGUI(SubGUI):
     def rowInserted(self, model, path, iter):
         realPath = self.filteredModel.convert_path_to_child_path(path)
         self.expandRow(self.filteredModel.iter_parent(iter), False)
-        self.visibilityChanged()
     def expandRow(self, iter, recurse):
         if iter == None:
             return
@@ -875,13 +875,9 @@ class TestTreeGUI(SubGUI):
     def selectionChanged(self, direct):
         allSelected, selectedTests = self.getSelected()
         self.nofSelectedTests = len(selectedTests)
-        self.updateColumnTitle(printToLog=True)
+        self.updateColumnTitle()
         self.notify("NewTestSelection", allSelected, direct)
-    def visibilityChanged(self):
-        self.totalNofTestsShown = 0
-        self.filteredModel.foreach(self.countVisible)
-        self.updateColumnTitle(printToLog=False)        
-    def updateColumnTitle(self, printToLog=True):
+    def updateColumnTitle(self):
         title = "Tests: "
         if self.nofSelectedTests == self.totalNofTests:
             title += "All " + str(self.totalNofTests) + " selected"
@@ -893,8 +889,7 @@ class TestTreeGUI(SubGUI):
             else:
                 title += ", " + str(self.totalNofTestsShown) + " visible"
         self.testsColumn.set_title(title)
-        if printToLog:
-            guilog.info(title)
+        guilog.info(title)
     def getSelected(self):
         # add self as an observer
         allSelected, selectedTests = [], []
@@ -933,14 +928,6 @@ class TestTreeGUI(SubGUI):
             self.selection.get_tree_view().scroll_to_cell(firstPath, None, True, 0.1)
         guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
         self.selecting = False
-    def countVisible(self, model, path, iter):
-        # When rows are added, they are first empty, and asking for
-        # classId on NoneType gives an error. See e.g.
-        # http://www.async.com.br/faq/pygtk/index.py?req=show&file=faq13.028.htp
-        if model.get_value(iter, 2) == None:
-            return
-        if model.get_value(iter, 2).classId() == "test-case":
-            self.totalNofTestsShown = self.totalNofTestsShown + 1
     def expandLevel(self, view, iter, recursive=True):
         # Make sure expanding expands everything, better than just one level as default...
         # Avoid using view.expand_row(path, open_all=True), as the open_all flag
@@ -1024,7 +1011,28 @@ class TestTreeGUI(SubGUI):
             self.addTest(test)
         self.expandRow(self.findIter(suite), True)
         self.selectTestRows(allSelected) # don't notify observers as nothing has changed except order
-    def notifyVisibility(self, test, newValue):
+    def notifyVisibility(self, tests, newValue):
+        if not newValue:
+            self.selecting = True
+        changed = False
+        for test in tests:
+            changed |= self.updateVisibilityInModel(test, newValue)
+
+        self.selecting = False
+        if changed and self.treeView:
+            self.updateVisibilityInViews(newValue)
+    def updateVisibilityInViews(self, newValue):
+        self.filteredModel.refilter()
+        if newValue: # if things have become visible, expand everything
+            rootIter = self.filteredModel.get_iter_root()
+            while rootIter != None:
+                self.expandRow(rootIter, True)
+                rootIter = self.filteredModel.iter_next(rootIter)
+            self.updateColumnTitle()
+        else:
+            self.selectionChanged(direct=False)
+
+    def updateVisibilityInModel(self, test, newValue):
         allIterators = self.findVisibilityIterators(test) # returns leaf-to-root order, good for hiding
         if newValue:
             allIterators.reverse()  # but when showing, we want to go root-to-leaf
@@ -1033,14 +1041,12 @@ class TestTreeGUI(SubGUI):
         for iterator in allIterators:
             if newValue or not self.hasVisibleChildren(iterator):
                 changed |= self.setVisibility(iterator, newValue)
-
-        if changed and self.treeView:
-            self.reFilter()
-            if newValue: # if things have become visible, expand everything
-                rootIter = self.filteredModel.get_iter_root()
-                while rootIter != None:
-                    self.expandRow(rootIter, True)
-                    rootIter = self.filteredModel.iter_next(rootIter)
+        if changed:
+            if newValue:
+                self.totalNofTestsShown += 1
+            else:
+                self.totalNofTestsShown -= 1
+        return changed
         
     def setVisibility(self, iter, newValue):
         oldValue = self.model.get_value(iter, 6)
@@ -1073,10 +1079,6 @@ class TestTreeGUI(SubGUI):
             else:
                 child = self.model.iter_next(child)
         return False
-    
-    def reFilter(self):
-        self.filteredModel.refilter()
-        self.visibilityChanged()
 
 class ActionGUI(SubGUI):
     def __init__(self, action):
@@ -2113,6 +2115,7 @@ class TestProgressMonitor(SubGUI):
         self.treeView = gtk.TreeView(self.treeModel)
         selection = self.treeView.get_selection()
         selection.set_mode(gtk.SELECTION_MULTIPLE)
+        selection.set_select_function(self.canSelect)
         selection.connect("changed", self.selectionChanged)
         textRenderer = gtk.CellRendererText()
         numberRenderer = gtk.CellRendererText()
@@ -2131,6 +2134,9 @@ class TestProgressMonitor(SubGUI):
         self.treeView.append_column(toggleColumn)
         self.treeView.show()
         return self.addScrollBars(self.treeView)
+    def canSelect(self, path):
+        pathIter = self.treeModel.get_iter(path)
+        return self.treeModel.get_value(pathIter, 2)
     def addSuites(self, suites):
         if self.dynamic:
             for suite in suites:
@@ -2188,7 +2194,8 @@ class TestProgressMonitor(SubGUI):
         classifiers = self.getClassifiers(state)
         nodeClassifier = classifiers.keys()[0]
         self.addTestForNode(test, state, nodeClassifier, classifiers)
-        self.notify("Visibility", test, self.shouldBeVisible(test))
+        self.notify("Visibility", [ test ], self.shouldBeVisible(test))
+
     def addTestForNode(self, test, state, nodeClassifier, classifiers, parentIter=None):
         nodeIter = self.findIter(nodeClassifier, parentIter)
         if nodeIter:
@@ -2232,12 +2239,14 @@ class TestProgressMonitor(SubGUI):
         self.removeTest(test)
         self.insertTest(test, state)
         self.contentsChanged()
+
     def shouldBeVisible(self, test):
         for nodeIter in self.classifications[test]:
             visible = self.treeModel.get_value(nodeIter, 2)
-            if not visible:
-                return False
-        return True
+            if visible:
+                return True
+        return False
+
     def describe(self):
         guilog.info("Test progress:")
         childIters = []
@@ -2299,10 +2308,12 @@ class TestProgressMonitor(SubGUI):
         for childIter in self.getAllChildIters(iter):
             self.treeModel.set_value(childIter, 2, newValue)
 
-        # Now, re-filter the main treeview to be consistent with
-        # the chosen progress report options.
+        changedTests = []
         for test in self.treeModel.get_value(iter, 5):
-            self.notify("Visibility", test, newValue)
+            if self.shouldBeVisible(test) == newValue:
+                changedTests.append(test)
+        self.notify("Visibility", changedTests, newValue)
+
 
 # Class for importing self tests
 class ImportTestCase(guiplugins.ImportTestCase):

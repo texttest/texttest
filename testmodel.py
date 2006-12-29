@@ -629,10 +629,17 @@ class TestSuite(Test):
         except IndexError:
             return None
     def removeTest(self, test):
-        plugins.rmtree(test.getDirectory())
-        self.testcases.remove(test)
-        self.removeFromTestFile(test.name)
-        test.notify("Remove")
+        try:
+            shutil.rmtree(test.getDirectory())
+            self.testcases.remove(test)
+            self.removeFromTestFile(test.name)
+            test.notify("Remove")
+        except OSError, e:
+            errorStr = str(e)
+            if errorStr.find("Permission") != -1:
+                raise plugins.TextTestError, "Failed to remove test: didn't have sufficient write permission to the test files"
+            else:
+                raise plugins.TextTestError, errorStr
     def writeNewTestSuiteFile(self, fileName, content):
         testEntries = self.makeWriteEntries(content)
         output = string.join(testEntries, "\n")

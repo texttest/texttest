@@ -623,7 +623,7 @@ class TestEnvironmentCreator:
             propFile = self.diagDict["properties_file"]
             if not self.test.properties.has_key(propFile):
                 self.test.properties.addEntry(propFile, {}, insert=1)
-            self.test.properties.addEntry(entryName, entry.replace(os.sep, "/"), sectionName = propFile, insert=1)
+            self.test.properties.addEntry(entryName, entry, sectionName = propFile, insert=1)
         elif entryName:
             self.test.setEnvironment(entryName, entry)
     def setUseCaseEnvironment(self):

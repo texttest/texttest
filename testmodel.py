@@ -217,6 +217,7 @@ class Test(plugins.Observable):
             defFiles += self.listStdFilesWithStem(stem, allowedExtensions, allVersions)
         for stem in self.resultFileStems():
             resultFiles += self.listStdFilesWithStem(stem, allowedExtensions, allVersions)
+        self.diagnose("Found " + repr(resultFiles) + " and " + repr(defFiles))
         return resultFiles, defFiles
     def listStdFilesWithStem(self, stem, allowedExtensions, allVersions):
         self.diagnose("Getting files for stem " + stem)
@@ -314,9 +315,7 @@ class Test(plugins.Observable):
 
         self.notify("Complete")
     def getRelPath(self):
-        # We standardise communication around UNIX paths, it's all much easier that way
-        relPath = plugins.relpath(self.getDirectory(), self.app.getDirectory())
-        return relPath.replace(os.sep, "/")
+        return plugins.relpath(self.getDirectory(), self.app.getDirectory())
     def getDirectory(self, temporary=False, forFramework=False):
         return self.dircaches[0].dir
     def setUpEnvVariable(self, var, value):
@@ -411,8 +410,10 @@ class TestCase(Test):
     def readSubDirectory(self, subdir):
         # This registers some subdirectory to be regarded as part of the test (used by diagnostics mechanism)
         fullPath = self.dircaches[0].pathName(subdir)
+        self.diagnose("Reading sub-directory at " + fullPath)
         if os.path.isdir(fullPath):
             self.dircaches.append(DirectoryCache(fullPath))
+
         writeSubDir = os.path.join(self.writeDirectories[0], subdir)
         self.writeDirectories.append(writeSubDir)
     def getTestRelPath(self, file):
@@ -931,7 +932,7 @@ class Application:
             if os.name == "posix":
                 os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
             else:
-                os.environ["TEXTTEST_TMP"] = os.environ["TEMP"]
+                os.environ["TEXTTEST_TMP"] = os.environ["TEMP"].replace("\\", "/")
         return os.path.expanduser(os.environ["TEXTTEST_TMP"])
     def getStandardWriteDirectoryName(self):
         timeStr = plugins.startTimeString().replace(":", "")
@@ -1144,7 +1145,7 @@ class Application:
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):
         plugins.OptionFinder.__init__(self, sys.argv[1:])
-        self.directoryName = os.path.normpath(self.findDirectoryName())
+        self.directoryName = os.path.normpath(self.findDirectoryName()).replace("\\", "/")
         os.environ["TEXTTEST_HOME"] = self.directoryName
         self.envReadDir = os.getenv("TEXTTEST_DIAGNOSTICS")
         self.envWriteDir = os.getenv("TEXTTEST_DIAGDIR")

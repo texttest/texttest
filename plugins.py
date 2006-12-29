@@ -6,6 +6,28 @@ from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
 
+# We standardise around UNIX paths, it's all much easier that way. They work fine,
+# and they don't run into weird issues in being confused with escape characters
+
+# basically posixpath.join, adapted to be portable...
+def joinpath(a, *p):
+    path = a
+    for b in p:
+        if os.path.isabs(b):
+            path = b
+        elif path == '' or path.endswith('/'):
+            path +=  b
+        else:
+            path += '/' + b
+    return path
+
+os.path.join = joinpath
+if os.name == "nt":
+    import posixpath
+    os.sep = posixpath.sep
+    os.path.sep = posixpath.sep
+    os.path.normpath = posixpath.normpath
+
 # Useful utility...
 def localtime(format= "%d%b%H:%M:%S", seconds=None):
     if not seconds:
@@ -844,7 +866,7 @@ class OptionGroup:
         commandLines = []
         for key, option in self.options.items():
             if len(option.getValue()):
-                commandLines.append("-" + key + " \"" + option.getValue() + "\"")
+                commandLines.append("-" + key + " \"" + os.path.expandvars(option.getValue()) + "\"")
         for key, switch in self.switches.items():
             if switch.getValue():
                 commandLines.append("-" + key)

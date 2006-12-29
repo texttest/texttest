@@ -536,7 +536,8 @@ class ViewFile(InteractiveTestAction):
         tmpFile = self.tmpFile(comparison)
         description = diffProgram + " " + stdFile + "\n                                   " + tmpFile
         guilog.info("Comparing file " + os.path.basename(tmpFile) + " with previous version using '" + diffProgram + "'")
-        process = self.startExternalProgram(diffProgram + " '" + stdFile + "' '" + tmpFile + "' " + plugins.nullRedirect(), description=description)
+        commandLine = diffProgram + ' "' + stdFile + '" "' + tmpFile + '" ' + plugins.nullRedirect()
+        process = self.startExternalProgram(commandLine, description=description)
         scriptEngine.monitorProcess("shows graphical differences in test files", process)
 
 # And a generic import test. Note acts on test suites

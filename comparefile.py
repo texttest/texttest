@@ -115,7 +115,7 @@ class FileComparison:
                           " and re-run to see the difference in this text view.\n"
                 return self.previewGenerator.getWrappedLine(message)
             
-            cmdLine = self.textDiffTool + " '" + self.stdCmpFile + "' '" + self.tmpCmpFile + "'"
+            cmdLine = self.textDiffTool + ' "' + self.stdCmpFile + '" "' + self.tmpCmpFile + '"'
             stdout = os.popen(cmdLine)
             return self.previewGenerator.getPreview(stdout)
         else:

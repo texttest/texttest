@@ -1353,9 +1353,9 @@ class RecomputeTest(InteractiveTestAction):
         if self.currentTest and self.currentTest.needsRecalculation():
             self.perform()
     def _getTitle(self):
-        return "Progress"
+        return "_Update Info"
     def _getScriptTitle(self):
-        return "Recompute progress"
+        return "Update test progress information and compare test files so far"
     def messageBeforePerform(self):
         return "Recomputing status of " + repr(self.currentTest) + " ..."
     def messageAfterPerform(self):

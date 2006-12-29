@@ -300,7 +300,7 @@ class ProgressTestComparison(BaseTestComparison):
     def progressText(self):
         perc = self.calculatePercentage()
         if perc > 0:
-            return "\nReckoned to be " + str(perc) + "% complete."
+            return "\nReckoned to be " + str(perc) + "% complete at " + plugins.localtime() + "."
         else:
             return ""
     def getSize(self, fileName):

@@ -1175,10 +1175,12 @@ class ButtonGUI(ActionGUI):
         ActionGUI.__init__(self, action)
         self.scriptTitle = self.action.getScriptTitle(fromTab)
         self.button = None
+        self.tooltips = gtk.Tooltips()
     def actionOrButton(self):
         return self.button
     def createView(self):
         self.button = gtk.Button(self.action.getTitle(includeMnemonics=True))
+        self.tooltips.set_tip(self.button, self.scriptTitle)
         scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
         self.updateSensitivity()
         self.button.show()

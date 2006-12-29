@@ -1963,6 +1963,8 @@ class TestFileGUI(FileViewGUI):
         return dict
     def getRelDir(self, file):
         relPath = self.currentObject.getTestRelPath(file)
+        if relPath is None:
+            print "Warning: unrelated", file, "and", self.currentObject.getDirectory()
         if relPath.find(os.sep) != -1:
             dir, local = os.path.split(relPath)
             return dir

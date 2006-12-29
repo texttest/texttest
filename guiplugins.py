@@ -121,14 +121,14 @@ class InteractiveAction(plugins.Observable):
         else:
             return []
     def updateForStateChange(self, test, state):
-        return False
+        return False, False
     def updateForSelectionChange(self):
         if self.isActiveOnCurrent():
             return self.updateForSelection()
         else:
-            return False
+            return False, False
     def updateForSelection(self):
-        return False
+        return False, False
     def isActiveOnCurrent(self):
         return True
     def canPerform(self):
@@ -361,15 +361,15 @@ class SaveTests(SelectionAction):
     def updateForSelection(self):
         apps = self.getSelectedApps()
         if apps == self.currApps:
-            return False
+            return False, False
         self.currApps = apps
         self.optionGroup.setOptionValue("v", self.getDefaultSaveOption(apps))
         self.optionGroup.setPossibleValues("v", self.getPossibleVersions(apps))
         if self.hasPerformance(apps) and not self.optionGroup.switches.has_key("ex"):
             self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
-            return True
+            return True, True
         else:
-            return False
+            return False, True
     def getDefaultSaveOption(self, apps):
         saveVersions = self.getSaveVersions(apps)
         if saveVersions.find(",") != -1:
@@ -457,12 +457,12 @@ class ViewFile(InteractiveTestAction):
         if test is self.currentTest:
             return self.updateForState(state)
         else:
-            return False
+            return False, False
     def updateForSelection(self):
         return self.updateForState(self.currentTest.state)
     def updateForState(self, state):
         if not self.dynamic:
-            return False
+            return False, False
 
         origCount = len(self.optionGroup.switches)
         if self.isActiveOnCurrent():
@@ -475,7 +475,8 @@ class ViewFile(InteractiveTestAction):
                 self.addDifferenceSwitches()
             if not state.isComplete():
                 self.addSwitch("f", "Follow file rather than view it", followDefault)
-        return len(self.optionGroup.switches) != origCount
+        changed = len(self.optionGroup.switches) != origCount
+        return changed, changed
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) > 0 and self.currentTest not in tests:
             self.currentTest = tests[0]
@@ -558,7 +559,7 @@ class ImportTest(InteractiveTestAction):
         self.optionGroup.setOptionValue("name", self.getDefaultName())
         self.optionGroup.setOptionValue("desc", self.getDefaultDesc())
         self.setPlacements(self.currentTest)
-        return True
+        return False, True
     def setPlacements(self, suite):
         if suite.classId() == "test-case":
             suite = suite.parent
@@ -640,9 +641,9 @@ class RecordTest(InteractiveTestAction):
         self.optionGroup.setOptionValue("c", self.currentTest.app.checkout)
         if self.getRecordMode() == "console" and not self.optionGroup.switches.has_key("hold"):
             self.addSwitch("hold", "Hold record shell after recording")
-            return True
+            return True, True
         else:
-            return False
+            return False, False
     def updateRecordTime(self, test):
         if self.updateRecordTimeForFile(test, "usecase", "USECASE_RECORD_SCRIPT", "target_record"):
             return True
@@ -1102,13 +1103,15 @@ class CreateDefinitionFile(InteractiveTestAction):
         return defFiles + self.currentTest.app.getDataFileNames()
     def updateForSelection(self):
         self.configFile = self.getDiagConfigFileName()
-        if self.configFile:
-            self.addSwitch("diag", "Affect diagnostic mode only")
-
         defFiles = self.getDefinitionFiles()
         self.optionGroup.setValue("type", defFiles[0])
         self.optionGroup.setPossibleValues("type", defFiles)
-        return True
+
+        if self.configFile and not self.optionGroup.switches.has_key("diag"):
+            self.addSwitch("diag", "Affect diagnostic mode only")
+            return True, True
+        else:
+            return False, True
     def getFileName(self):
         stem = self.optionGroup.getOptionValue("type")
         if stem != self.configFile and stem in self.currentTest.getConfigValue("definition_file_stems"):
@@ -1290,7 +1293,7 @@ class ReportBugs(InteractiveTestAction):
         self.optionGroup.setOptionValue("search_file", self.currentTest.app.getConfigValue("log_file"))
         self.optionGroup.setPossibleValues("search_file", self.getPossibleFileStems())
         self.optionGroup.setOptionValue("version", self.currentTest.app.getFullVersion())
-        return False
+        return False, False
     def getPossibleFileStems(self):
         stems = []
         for test in self.currentTest.testCaseList():

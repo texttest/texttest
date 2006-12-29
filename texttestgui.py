@@ -1246,16 +1246,20 @@ class ActionTabGUI(SubGUI):
     def notifyReset(self):
         self.optionGroup.reset()
     def notifyLifecycleChange(self, test, state, changeDesc):
-        if self.action.updateForStateChange(test, state):
-            self.updateView()
-
+        changedContents, changedValues = self.action.updateForStateChange(test, state)
+        self.handleChanges(changedContents, changedValues)     
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 0:
             return
-        if self.action.updateForSelectionChange():
-            self.updateView()
-            
-    def updateView(self):
+        changedContents, changedValues = self.action.updateForSelectionChange()
+        self.handleChanges(changedContents, changedValues)
+        
+    def handleChanges(self, changedContents, changedValues):
+        if changedContents:
+            self.recreateContents()
+        if changedContents or changedValues:
+            self.contentsChanged()
+    def recreateContents(self):
         if not self.vbox:
             return
         container = self.vbox.get_parent()
@@ -1263,7 +1267,6 @@ class ActionTabGUI(SubGUI):
             container.remove(self.vbox)
             container.add(self.createVBox())
             container.show()
-            self.contentsChanged()
         
     def createVBox(self):
         self.vbox = gtk.VBox()

@@ -1890,6 +1890,7 @@ class StartStudio(guiplugins.InteractiveTestAction):
         return "Start Studio"
     def updateForSelection(self):
         self.optionGroup.setOptionValue("sys", self.currentTest.getEnvironment("CARMSYS"))
+        return False, False
     def performOnCurrent(self):
         self.currentTest.setUpEnvironment(parents=1)
         try:

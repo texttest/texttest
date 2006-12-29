@@ -232,6 +232,10 @@ class MailSender:
             self.sendMail(app, mailContents)
             sys.stdout.write("done.")
         sys.stdout.write("\n")
+    def exceptionOutput(self):
+        exctype, value = sys.exc_info()[:2]
+        from traceback import format_exception_only
+        return string.join(format_exception_only(exctype, value), "")       
     def sendMail(self, app, mailContents):
         smtpServer = app.getConfigValue("smtp_server")
         fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
@@ -242,14 +246,14 @@ class MailSender:
             smtp.connect(smtpServer)
         except:
             sys.stdout.write("FAILED.\nCould not connect to SMTP server at " + smtpServer + "\n" + \
-                             str(sys.exc_type) + ": " + str(sys.exc_value) + "\n" + \
+                             self.exceptionOutput() + \
                              "Trying to store mail contents instead ...")
             return self.storeMail(app, mailContents)
         try:
             smtp.sendmail(fromAddress, toAddresses, mailContents)
         except:
             sys.stdout.write("FAILED.\nMail could not be sent\n" + \
-                             str(sys.exc_type) + ": " + str(sys.exc_value) + "\n" + \
+                             self.exceptionOutput() + \
                              "Trying to store mail contents instead ...")
             return self.storeMail(app, mailContents)
         smtp.quit()

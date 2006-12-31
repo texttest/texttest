@@ -800,6 +800,8 @@ class TestTreeGUI(SubGUI):
         self.treeView = gtk.TreeView(self.filteredModel)
         self.selection = self.treeView.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
+        if self.dynamic:
+            self.selection.set_select_function(self.canSelect)
         self.selection.connect("changed", self.userChangedSelection)
         testRenderer = gtk.CellRendererText()
         testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected"
@@ -826,7 +828,9 @@ class TestTreeGUI(SubGUI):
             self.filteredModel.refilter()
 
         return self.addScrollBars(self.treeView)
-    
+    def canSelect(self, path):
+        pathIter = self.filteredModel.get_iter(path)
+        return not self.filteredModel.iter_has_child(pathIter)
     def rowCollapsed(self, treeview, iter, path):
         if self.dynamic:
             realPath = self.filteredModel.convert_path_to_child_path(path)
@@ -1797,6 +1801,7 @@ class FileViewGUI(SubGUI):
         view = gtk.TreeView(self.model)
         self.selection = view.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
+        self.selection.set_select_function(self.canSelect)
         renderer = gtk.CellRendererText()
         self.nameColumn = gtk.TreeViewColumn(self.getName(), renderer, text=0, background=1)
         self.nameColumn.set_cell_data_func(renderer, renderParentsBold)
@@ -1810,6 +1815,9 @@ class FileViewGUI(SubGUI):
         view.show()
         return self.addScrollBars(view)
         # only used in test view
+    def canSelect(self, path):
+        pathIter = self.model.get_iter(path)
+        return not self.model.iter_has_child(pathIter)
     def makeDetailsColumn(self, renderer):
         if self.dynamic:
             return gtk.TreeViewColumn("Details", renderer, text=4)

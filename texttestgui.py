@@ -319,18 +319,18 @@ class TextTestGUI(Responder, plugins.Observable):
         plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
 
-        self.testTreeGUI = TestTreeGUI(self.dynamic)
-        self.testFileGUI = TestFileGUI(self.dynamic)
         self.appFileGUI = ApplicationFileGUI(self.dynamic)
         self.textInfoGUI = TextInfoGUI()
         self.progressMonitor = TestProgressMonitor(self.dynamic)
         self.progressBarGUI = ProgressBarGUI(self.dynamic)
         self.idleManager = IdleHandlerManager(self.dynamic)
         self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic)
-        self.toolBarActionGUIs, self.buttonBarGUIs = self.createActionGUIs()
+        self.defaultActionGUIs, self.buttonBarGUIs = self.createActionGUIs()
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI = self.createMenuAndToolBarGUIs()
+        self.testTreeGUI = TestTreeGUI(self.dynamic, testPopupGUI)
+        self.testFileGUI = TestFileGUI(self.dynamic)
         self.actionTabGUIs = self.createActionTabGUIs()
         self.notebookGUIs, rightWindowGUI = self.createRightWindowGUI()
-        self.menuBarGUI, self.toolBarGUI = self.createMenuAndToolBarGUIs()
         self.shortcutBarGUI = ShortcutBarGUI()
         self.topWindowGUI = self.createTopWindowGUI(rightWindowGUI)
 
@@ -340,7 +340,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getTestTreeObservers(self):
         selectionActions = filter(lambda action: hasattr(action, "notifyNewTestSelection"), self.intvActions)
         return  selectionActions + [ self.testFileGUI, self.appFileGUI ] + self.buttonBarGUIs + \
-               [ self.textInfoGUI ] + self.actionTabGUIs + self.notebookGUIs + self.toolBarActionGUIs
+               [ self.textInfoGUI ] + self.actionTabGUIs + self.notebookGUIs + self.defaultActionGUIs
     def getLifecycleObservers(self):
         return [ self.textInfoGUI, self.testTreeGUI, self.testFileGUI, \
                  self.progressBarGUI, self.progressMonitor ] + self.actionTabGUIs  
@@ -416,19 +416,25 @@ class TextTestGUI(Responder, plugins.Observable):
         return TopWindowGUI(boxGUI, self.dynamic)
     def createMenuAndToolBarGUIs(self):
         uiManager = gtk.UIManager()
-        return MenuBarGUI(uiManager, self.toolBarActionGUIs), ToolBarGUI(uiManager, self.toolBarActionGUIs, self.progressBarGUI)
+        menu = MenuBarGUI(self.dynamic, uiManager, self.defaultActionGUIs)
+        toolbar = ToolBarGUI(uiManager, self.defaultActionGUIs, self.progressBarGUI)
+        popup = TestPopupMenuGUI(uiManager, self.defaultActionGUIs)
+        return menu, toolbar, popup
     def createActionGUIs(self):
-        toolbarGUIs, buttonGUIs = [], []
+        defaultGUIs, buttonGUIs = [], []
         for action in self.intvActions:
-            if action.inToolBar():
-                toolbarGUIs.append(ToolbarActionGUI(action))
-            elif action.inButtonBar():
-                buttonGUIs.append(ButtonGUI(action))
-        return toolbarGUIs, buttonGUIs
+            if not action.inMenuOrToolBar():
+                continue
+
+            if action.inButtonBar():
+                buttonGUIs.append(ButtonActionGUI(action))
+            else:
+                defaultGUIs.append(DefaultActionGUI(action))
+        return defaultGUIs, buttonGUIs
 
     def createActionGUIForTab(self, action):
         if len(action.getOptionGroups()) == 1 and action.canPerform():
-            return ButtonGUI(action, fromTab=True)
+            return ButtonActionGUI(action, fromTab=True)
     def createActionTabGUIs(self):
         actionTabGUIs = []
         for action in self.intvActions:
@@ -573,15 +579,13 @@ class TopWindowGUI(ContainerGUI):
 
 
 class MenuBarGUI(SubGUI):
-    def __init__(self, uiManager, actionGUIs):
+    def __init__(self, dynamic, uiManager, actionGUIs):
         SubGUI.__init__(self)
         # Create GUI manager, and a few default action groups
+        self.dynamic = dynamic
         self.uiManager = uiManager
         self.actionGUIs = actionGUIs
-        self.actionGroup = gtk.ActionGroup("Basic")
-        self.actionGroup.add_actions([("filemenu", None, "_File"),
-                                  ("viewmenu", None, "_View"),
-                                  ("actionmenu", None, "_Actions")])
+        self.actionGroup = gtk.ActionGroup("AllActions")
         self.uiManager.insert_action_group(self.actionGroup, 0)
         self.toggleActions = []
     def setActive(self, active):
@@ -609,12 +613,8 @@ class MenuBarGUI(SubGUI):
     def show(self, widget, name):
         widget.show()
         guilog.info("Showing the " + name)
-    def menuDescription(self, menuName, actionNames):
-        description = "<menu action=\"" + menuName + "menu\">\n"
-        for actionName in actionNames:
-            description += "<menuitem action=\"" + actionName + "\"/>\n"
-        return description + "</menu>\n"
     def createToggleActions(self):
+        self.actionGroup.add_action(gtk.Action("viewmenu", "_View", None, None))
         for observer in self.observers:
             actionTitle = observer.getWidgetName()
             actionName = actionTitle.replace("_", "")
@@ -624,29 +624,55 @@ class MenuBarGUI(SubGUI):
             gtkAction.connect("toggled", self.toggleVisibility, observer)
             scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
             self.toggleActions.append(gtkAction)
-    def getInterfaceDescription(self, actionsByMenu):
+    def getInterfaceDescription(self):
         description = "<ui>\n<menubar>\n"
-        for menuName, actionNames in actionsByMenu.items():
-            description += self.menuDescription(menuName, actionNames)
-        description += "</menubar>\n</ui>\n"
+        # Ensure that the basic menus come in the standard order ...
+        description += "<menu action=\"filemenu\"/>\n"
+        if not self.dynamic:
+            description += "<menu action=\"editmenu\"/>\n"
+        description += "<menu action=\"viewmenu\"/>\n"
+        description += "<menu action=\"actionsmenu\"/>\n"
+        for action in self.actionGUIs:
+            description += self.getMenuDescription(action)
+        # Special treatment for View menu ...
+        description += "<menu action=\"viewmenu\">\n"
+        for action in self.toggleActions:
+            description += "<menuitem action=\"" + action.get_name() + "\"/>\n"
+        description += "</menu>\n"
+        description += "</menubar></ui>\n"        
         return description
-    def getActionNamesByMenu(self):
-        dict = seqdict()
-        dict["file"] = self.getActionNames("file")
-        dict["view"] = [ action.get_name() for action in self.toggleActions ]
-        dict["action"] = self.getActionNames("action")
-        return dict
-    def getActionNames(self, menuName):
-        actionGUIs = filter(lambda actionGUI: actionGUI.action.getMenu() == menuName, self.actionGUIs)
-        return [ actionGUI.action.getTitle() for actionGUI in actionGUIs ]
+    def getMenuDescription(self, action):
+        menuPath = action.action.getMainMenuPath()
+        if menuPath == "-":
+            return ""
+        pre = []
+        post = []
+        if menuPath != "":
+            for item in menuPath.split("/"):
+                itemName = item.replace("_", "").lower() + "menu"
+                if not self.actionGroup.get_action(itemName):
+                    self.actionGroup.add_action(gtk.Action(itemName, item, None, None))
+                thisAction = self.actionGroup.get_action(itemName)
+                pre.append("<menu action=\"" + thisAction.get_name() + "\">")
+                post.append("</menu>")
+        if action.action.separatorBeforeInMainMenu():
+            pre.append("<separator/>\n")
+        pre.append("<menuitem action=\"" + action.action.getTitle() + "\"/>")
+        if action.action.separatorAfterInMainMenu():
+            pre.append("<separator/>\n")
+        description = ""
+        for s in pre:
+            description += s + "\n"
+        for i in xrange(len(post) - 1, -1, -1):
+            description += post[i] + "\n"
+        return description
     def createView(self):
         # Initialize
         self.createToggleActions()
         for actionGUI in self.actionGUIs:
             actionGUI.addToGroups(self.actionGroup, self.uiManager.get_accel_group())
 
-        actionsByMenu = self.getActionNamesByMenu()
-        self.uiManager.add_ui_from_string(self.getInterfaceDescription(actionsByMenu))
+        self.uiManager.add_ui_from_string(self.getInterfaceDescription())
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/menubar")
         return self.widget
@@ -660,7 +686,7 @@ class ToolBarGUI(SubGUI):
     def __init__(self, uiManager, actionGUIs, progressBarGUI):
         SubGUI.__init__(self)
         self.uiManager = uiManager
-        self.actionGUIs = actionGUIs
+        self.actionGUIs = filter(lambda a: a.action.inToolBar(), actionGUIs)
         self.progressBarGUI = progressBarGUI
     def setActive(self, active):
         SubGUI.setActive(self, active)
@@ -676,8 +702,10 @@ class ToolBarGUI(SubGUI):
     def getInterfaceDescription(self):
         description = "<ui>\n<toolbar>\n"
         for actionGUI in self.actionGUIs:
+            if actionGUI.action.separatorBeforeInToolBar():
+                description += "<separator/>\n"
             description += "<toolitem action=\"" + actionGUI.action.getTitle() + "\"/>\n"
-            if actionGUI.action.separateInToolBar():
+            if actionGUI.action.separatorAfterInToolBar():
                 description += "<separator/>\n"
         description += "</toolbar>\n</ui>\n"
         return description
@@ -707,6 +735,53 @@ class ToolBarGUI(SubGUI):
     def describe(self):
         guilog.info("UI layout: \n" + self.uiManager.get_ui())
 
+class TestPopupMenuGUI(SubGUI):
+    def __init__(self, uiManager, actionGUIs):
+        SubGUI.__init__(self)
+        self.uiManager = uiManager
+        self.actionGUIs = actionGUIs
+        self.actionGroup = uiManager.get_action_groups()[0]
+    def getWidgetName(self):
+        return "_TestPopupMenu"
+    def getInterfaceDescription(self):
+        description = "<ui>\n<popup>\n"
+        for action in self.actionGUIs:
+            description += self.getMenuDescription(action)
+        description += "</popup></ui>\n"        
+        return description
+    def getMenuDescription(self, action):
+        menuPath = action.action.getTestPopupMenuPath()
+        if menuPath == "-":
+            return ""
+        pre = []
+        post = []
+        if menuPath != "":
+            for item in menuPath.split("/"):
+                itemName = item.replace("_", "").lower() + "menu"
+                if not self.actionGroup.get_action(itemName):
+                    self.actionGroup.add_action(gtk.Action(itemName, item, None, None))
+                thisAction = self.actionGroup.get_action(itemName)
+                pre.append("<menu action=\"" + thisAction.get_name() + "\">")
+                post.append("</menu>")
+
+        if action.action.separatorBeforeInTestPopupMenu():
+            pre.append("<separator/>\n")
+        pre.append("<menuitem action=\"" + action.action.getTitle() + "\"/>")
+        if action.action.separatorAfterInTestPopupMenu():
+            pre.append("<separator/>\n")
+        description = ""
+        for s in pre:
+            description += s + "\n"
+        for i in xrange(len(post) - 1, -1, -1):
+            description += post[i] + "\n"
+        return description
+    def createView(self):
+        self.uiManager.add_ui_from_string(self.getInterfaceDescription())
+        self.uiManager.ensure_update()
+        self.widget = self.uiManager.get_widget("/popup")
+        self.widget.show_all()
+        return self.widget
+
 class ShortcutBarGUI(SubGUI):
     def getWidgetName(self):
         return "_Shortcut bar"
@@ -718,10 +793,11 @@ class ShortcutBarGUI(SubGUI):
         pass # not yet integrated
         
 class TestTreeGUI(SubGUI):
-    def __init__(self, dynamic):
+    def __init__(self, dynamic, popupGUI):
         SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
+        self.popupGUI = popupGUI
         self.itermap = seqdict()
         self.selection = None
         self.selecting = False
@@ -820,6 +896,7 @@ class TestTreeGUI(SubGUI):
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
         self.treeView.connect('row-expanded', self.contentsChanged) # later expansions should cause description...
+        self.treeView.connect("button_press_event", self.showPopupMenu)
         
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
         self.treeView.show()
@@ -827,10 +904,29 @@ class TestTreeGUI(SubGUI):
             self.filteredModel.connect('row-inserted', self.rowInserted)
             self.filteredModel.refilter()
 
+        self.popupGUI.createView()
         return self.addScrollBars(self.treeView)
+
+    def showPopupMenu(self, treeview, event):
+        if event.button == 3:
+            if len(self.popupGUI.widget.get_children()) == 0:
+                return 0
+            x = int(event.x)
+            y = int(event.y)
+            time = event.time
+            pathInfo = treeview.get_path_at_pos(x, y)
+            if pathInfo is not None:
+                path, col, cellx, celly = pathInfo
+                treeview.grab_focus()
+                treeview.set_cursor(path, col, 0)
+                self.popupGUI.widget.popup(None, None, None, event.button, time)
+                return 1
+        return 0
+
     def canSelect(self, path):
         pathIter = self.filteredModel.get_iter(path)
         return not self.filteredModel.iter_has_child(pathIter)
+
     def rowCollapsed(self, treeview, iter, path):
         if self.dynamic:
             realPath = self.filteredModel.convert_path_to_child_path(path)
@@ -1132,7 +1228,7 @@ class ActionGUI(SubGUI):
             showWarning(str(e), globalTopWindow)
     
            
-class ToolbarActionGUI(ActionGUI):
+class DefaultActionGUI(ActionGUI):
     def __init__(self, action):
         ActionGUI.__init__(self, action)
         self.accelerator = None
@@ -1157,7 +1253,7 @@ class ToolbarActionGUI(ActionGUI):
             return "gtk-" + stockId 
         
     def getAccelerator(self):
-        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.action.getTitle())
+        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.action.getTitle().rstrip("."))
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
             if gtk.accelerator_valid(key, mod):
@@ -1174,7 +1270,7 @@ class ToolbarActionGUI(ActionGUI):
             message += ", accelerator '" + repr(self.accelerator) + "'"
         return message            
     
-class ButtonGUI(ActionGUI):
+class ButtonActionGUI(ActionGUI):
     def __init__(self, action, fromTab=False):
         ActionGUI.__init__(self, action)
         self.scriptTitle = self.action.getScriptTitle(fromTab)
@@ -1739,7 +1835,6 @@ class TextInfoGUI(SubGUI):
                             "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
                             "replacement. Showing error message instead.")
                 return "Failed to encode Unicode string."
-
 
         
 class FileViewGUI(SubGUI):

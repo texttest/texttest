@@ -133,34 +133,54 @@ class InteractiveAction(plugins.Observable):
         return True
     def canPerform(self):
         return True # do we activate this via performOnCurrent() ?
-    def getMenu(self):
-        return "action"
-    def separateInToolBar(self):
+
+    # Should we create a gtk.Action? (or connect to button directly ...)
+    def inMenuOrToolBar(self): 
+        return self.getMainMenuPath() != "-" or self.inToolBar() or self.getTestPopupMenuPath() != "-" or self.inButtonBar()
+    # Put the action in a menu/submenu? Use / to separate submenus.
+    def getMainMenuPath(self):
+        return "_Actions" # '-' is special, and means 'don't put in menu'.
+    # Put the action in the test popup menu?  Use / to separate submenus.
+    def getTestPopupMenuPath(self):
+        return "-" # '-' is special, and means 'don't put in popup menu'.
+    # Put the action in the (main) toolbar?
+    def inToolBar(self): 
+        return True
+    # Put the action in a button bar?
+    def inButtonBar(self):
         return False
-    def getStockId(self):
+    def separatorBeforeInToolBar(self):
+        return False
+    def separatorAfterInToolBar(self):
+        return False
+    def separatorBeforeInMainMenu(self):
+        return False
+    def separatorAfterInMainMenu(self):
+        return False
+    def separatorBeforeInTestPopupMenu(self):
+        return False
+    def separatorAfterInTestPopupMenu(self):
+        return False
+    def getStockId(self): # The stock ID for the action, in toolbar and menu.
         pass
+    def getTooltip(self):
+        return self.getScriptTitle(False)
+    def getDialogType(self): # The dialog type to launch on action execution.
+        return ""
+
     def getTitle(self, includeMnemonics=False):
         title = self._getTitle()
         if includeMnemonics:
             return title
         else:
             return title.replace("_", "")
-    def getTooltip(self):
-        return self.getScriptTitle(False)
     def messageBeforePerform(self):
         # Don't change this by default, most of these things don't take very long
         pass
     def messageAfterPerform(self):
         return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
-    def isFrequentUse(self):
-        # Decides how accessible to make it...
-        return False
     def getDoubleCheckMessage(self):
         return ""
-    def inButtonBar(self):
-        return False
-    def inToolBar(self):
-        return True
     def getTabTitle(self):
         return ""
     def getGroupTabTitle(self):
@@ -168,7 +188,7 @@ class InteractiveAction(plugins.Observable):
         return "Test"
     def getScriptTitle(self, tab):
         baseTitle = self._getScriptTitle()
-        if tab and self.isFrequentUse():
+        if tab and self.inMenuOrToolBar():
             return baseTitle + " from tab"
         else:
             return baseTitle
@@ -238,8 +258,6 @@ class SelectionAction(InteractiveAction):
         return test in self.currTestSelection
     def isNotSelected(self, test):
         return not self.isSelected(test)
-    def inToolBar(self):
-        return self.isFrequentUse() or len(self.getOptionGroups()) == 0
     def getCmdlineOption(self):
         selTestPaths = []
         for test in self.currTestSelection:
@@ -257,9 +275,9 @@ class SelectionAction(InteractiveAction):
 class Quit(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
-    def getMenu(self):
-        return "file"
-    def separateInToolBar(self):
+    def getMainMenuPath(self):
+        return "_File"
+    def separatorAfterInToolBar(self):
         return True
     def getStockId(self):
         return "quit"
@@ -336,8 +354,6 @@ class SaveTests(SelectionAction):
         self.currFileSelection = []
         self.currApps = []
         self.currTestDescription = ""
-    def isFrequentUse(self):
-        return True
     def getStockId(self):
         return "save"
     def getTabTitle(self):
@@ -442,6 +458,8 @@ class ViewFile(InteractiveTestAction):
         self.dynamic = dynamic
         if dynamic:
             self.addDifferenceSwitches()
+    def inMenuOrToolBar(self):
+        return False
     def isActiveOnCurrent(self):
         return not self.dynamic or InteractiveTestAction.isActiveOnCurrent(self)
     def getTabTitle(self):
@@ -548,6 +566,8 @@ class ImportTest(InteractiveTestAction):
         self.optionGroup.addOption("desc", self.getDescTitle(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
         self.testImported = None
+    def inMenuOrToolBar(self):
+        return False
     def correctTestClass(self):
         return self.currentTest.classId() == "test-suite"
     def getNameTitle(self):
@@ -625,6 +645,8 @@ class RecordTest(InteractiveTestAction):
         self.addOption("c", "Checkout to use for recording") 
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
         self.addSwitch("repgui", "", defaultValue = 0, options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])            
+    def inMenuOrToolBar(self):
+        return False
     def getTabTitle(self):
         return "Recording"
     def messageAfterPerform(self):
@@ -834,8 +856,6 @@ class SelectTests(SelectionAction):
     def messageAfterPerform(self):
         return "Selected " + self.describeTests() + "."    
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
-    def isFrequentUse(self):
-        return True
     def getFilterList(self, app):
         app.configObject.updateOptions(self.appSelectGroup)
         return app.configObject.getFilterList(app)
@@ -928,6 +948,8 @@ class SelectTests(SelectionAction):
         return newTestList
 
 class ResetGroups(InteractiveAction):
+    def separatorAfterInToolBar(self):
+        return True
     def getStockId(self):
         return "revert-to-saved"
     def _getTitle(self):
@@ -947,6 +969,8 @@ class SaveSelection(SelectionAction):
         self.addOption("name", "Name to give selection")
         if not dynamic:
             self.addSwitch("tests", "Store actual tests selected", 1)
+    def inMenuOrToolBar(self):
+        return False
     def _getTitle(self):
         return "S_ave selection"
     def _getScriptTitle(self):
@@ -1010,8 +1034,6 @@ class RunTests(SelectionAction):
         return "Running"
     def messageAfterPerform(self):
         return "Started " + self.describeTests() + " at " + plugins.localtime() + "."
-    def isFrequentUse(self):
-        return True
     def getUseCaseName(self):
         if self.runNumber == 1:
             return "dynamic"
@@ -1079,6 +1101,8 @@ class CreateDefinitionFile(InteractiveTestAction):
         InteractiveTestAction.__init__(self)
         self.configFile = None
         self.addOption("type", "Type of definition file to create", allocateNofValues=2)
+    def inMenuOrToolBar(self):
+        return False
     def correctTestClass(self):
         return True
     def _getTitle(self):
@@ -1140,8 +1164,12 @@ class CreateDefinitionFile(InteractiveTestAction):
 class RemoveTest(SelectionAction):
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
+    def getMainMenuPath(self):
+        return "_Edit"
+    def getTestPopupMenuPath(self): # Put the action in the test popup menu?
+        return ""
     def _getTitle(self):
-        return "Remove"
+        return "Remove..."
     def getStockId(self):
         return "delete"
     def _getScriptTitle(self):
@@ -1282,6 +1310,8 @@ class ReportBugs(InteractiveTestAction):
         self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
         self.addSwitch("internal_error", "Trigger even if other files differ (report as internal error)")
         self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
+    def inMenuOrToolBar(self):
+        return False
     def correctTestClass(self):
         return True
     def _getTitle(self):
@@ -1352,6 +1382,8 @@ class RecomputeTest(InteractiveTestAction):
         InteractiveTestAction.notifyNewTestSelection(self, tests, direct)
         if self.currentTest and self.currentTest.needsRecalculation():
             self.perform()
+    def inButtonBar(self):
+        return True
     def _getTitle(self):
         return "_Update Info"
     def _getScriptTitle(self):

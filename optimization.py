@@ -1032,8 +1032,10 @@ class PlotTestInGUI(guiplugins.SelectionAction):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
-    def isFrequentUse(self):
+    def separatorBeforeInToolBar(self):
         return True
+    def getMainMenuPath(self):
+        return "_Optimization"
     def getStockId(self):
         return "clear"    
     def getTabTitle(self):
@@ -1881,7 +1883,9 @@ class StartStudio(guiplugins.InteractiveTestAction):
         guiplugins.InteractiveTestAction.__init__(self)
         self.addOption("sys", "Studio CARMSYS to use")
     def __repr__(self):
-        return "Studio"
+        return "Studio"    
+    def inMenuOrToolBar(self):
+        return False
     def _getTitle(self):
         return "Studio"
     def getTabTitle(self):

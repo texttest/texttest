@@ -176,7 +176,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return baseRunner
     def isExecutable(self, process, parentProcess, test):
         binaryName = os.path.basename(test.getConfigValue("binary"))
-        return binaryName.startswith(parentProcess) and process.find(".") == -1 and process.find("arch") == -1 and process.find("crsutil") == -1 and process.find("CMD") == -1
+        return binaryName.startswith(parentProcess) and not process.startswith(".") and process.find("arch") == -1 and process.find("crsutil") == -1 and process.find("CMD") == -1
     def getFileExtractor(self):
         baseExtractor = queuesystem.QueueSystemConfig.getFileExtractor(self)
         if self.optionMap.has_key("lprof"):

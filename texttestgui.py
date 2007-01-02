@@ -596,7 +596,6 @@ class MenuBarGUI(SubGUI):
         for toggleAction in self.toggleActions:
             if self.shouldHide(toggleAction.get_name()):
                 toggleAction.set_active(False)
-
     def shouldHide(self, name):
         return guiConfig.getCompositeValue("hide_gui_element", name, modeDependent=True)
     def toggleVisibility(self, action, observer, *args):
@@ -614,7 +613,6 @@ class MenuBarGUI(SubGUI):
         widget.show()
         guilog.info("Showing the " + name)
     def createToggleActions(self):
-        self.actionGroup.add_action(gtk.Action("viewmenu", "_View", None, None))
         for observer in self.observers:
             actionTitle = observer.getWidgetName()
             actionName = actionTitle.replace("_", "")
@@ -625,20 +623,10 @@ class MenuBarGUI(SubGUI):
             scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
             self.toggleActions.append(gtkAction)
     def getInterfaceDescription(self):
-        description = "<ui>\n<menubar>\n"
-        # Ensure that the basic menus come in the standard order ...
-        description += "<menu action=\"filemenu\"/>\n"
-        if not self.dynamic:
-            description += "<menu action=\"editmenu\"/>\n"
-        description += "<menu action=\"viewmenu\"/>\n"
-        description += "<menu action=\"actionsmenu\"/>\n"
+        description = "<ui>\n<menubar name=\"MainMenuBar\">\n"
         for action in self.actionGUIs:
             description += self.getMenuDescription(action)
         # Special treatment for View menu ...
-        description += "<menu action=\"viewmenu\">\n"
-        for action in self.toggleActions:
-            description += "<menuitem action=\"" + action.get_name() + "\"/>\n"
-        description += "</menu>\n"
         description += "</menubar></ui>\n"        
         return description
     def getMenuDescription(self, action):
@@ -655,6 +643,8 @@ class MenuBarGUI(SubGUI):
                 thisAction = self.actionGroup.get_action(itemName)
                 pre.append("<menu action=\"" + thisAction.get_name() + "\">")
                 post.append("</menu>")
+        if action.action.hasExternalGUIDescription():
+            return "" # We create the actions, but don't add anything to the description ..
         if action.action.separatorBeforeInMainMenu():
             pre.append("<separator/>\n")
         pre.append("<menuitem action=\"" + action.action.getTitle() + "\"/>")
@@ -668,13 +658,24 @@ class MenuBarGUI(SubGUI):
         return description
     def createView(self):
         # Initialize
+        self.actionGroup.add_action(gtk.Action("filemenu", "_File", None, None))
+        self.actionGroup.add_action(gtk.Action("editmenu", "_Edit", None, None))
+        self.actionGroup.add_action(gtk.Action("viewmenu", "_View", None, None))
+        self.actionGroup.add_action(gtk.Action("actionsmenu", "_Actions", None, None))
         self.createToggleActions()
         for actionGUI in self.actionGUIs:
             actionGUI.addToGroups(self.actionGroup, self.uiManager.get_accel_group())
+            
+        # Also creates default actions, so we msut do this before reading the file ...
+        description = self.getInterfaceDescription() 
+        if self.dynamic:
+            self.uiManager.add_ui_from_file(os.path.join(os.path.dirname(__file__), "standard_gui_dynamic.xml"))
+        else:
+            self.uiManager.add_ui_from_file(os.path.join(os.path.dirname(__file__), "standard_gui_static.xml"))
 
-        self.uiManager.add_ui_from_string(self.getInterfaceDescription())
+        self.uiManager.add_ui_from_string(description)
         self.uiManager.ensure_update()
-        self.widget = self.uiManager.get_widget("/menubar")
+        self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
     def describe(self):
         for toggleAction in self.toggleActions:
@@ -700,8 +701,10 @@ class ToolBarGUI(SubGUI):
         for item in toolbar.get_children(): 
             item.set_is_important(True) # Or newly added children without stock ids won't be visible in gtk.TOOLBAR_BOTH_HORIZ style
     def getInterfaceDescription(self):
-        description = "<ui>\n<toolbar>\n"
+        description = "<ui>\n<toolbar name=\"MainToolBar\">\n"
         for actionGUI in self.actionGUIs:
+            if actionGUI.action.hasExternalGUIDescription():
+                continue
             if actionGUI.action.separatorBeforeInToolBar():
                 description += "<separator/>\n"
             description += "<toolitem action=\"" + actionGUI.action.getTitle() + "\"/>\n"
@@ -712,7 +715,7 @@ class ToolBarGUI(SubGUI):
     def createView(self):
         self.uiManager.add_ui_from_string(self.getInterfaceDescription())
         self.uiManager.ensure_update()
-        toolbar = self.uiManager.get_widget("/toolbar")
+        toolbar = self.uiManager.get_widget("/MainToolBar")
         self.ensureVisible(toolbar)
   
         self.widget = gtk.HandleBox()
@@ -744,7 +747,7 @@ class TestPopupMenuGUI(SubGUI):
     def getWidgetName(self):
         return "_TestPopupMenu"
     def getInterfaceDescription(self):
-        description = "<ui>\n<popup>\n"
+        description = "<ui>\n<popup name=\"TestPopupMenu\">\n"
         for action in self.actionGUIs:
             description += self.getMenuDescription(action)
         description += "</popup></ui>\n"        
@@ -764,6 +767,8 @@ class TestPopupMenuGUI(SubGUI):
                 pre.append("<menu action=\"" + thisAction.get_name() + "\">")
                 post.append("</menu>")
 
+        if action.action.hasExternalGUIDescription(): # We create the actions, but don't add anything to the description ..
+            return ""
         if action.action.separatorBeforeInTestPopupMenu():
             pre.append("<separator/>\n")
         pre.append("<menuitem action=\"" + action.action.getTitle() + "\"/>")
@@ -778,7 +783,7 @@ class TestPopupMenuGUI(SubGUI):
     def createView(self):
         self.uiManager.add_ui_from_string(self.getInterfaceDescription())
         self.uiManager.ensure_update()
-        self.widget = self.uiManager.get_widget("/popup")
+        self.widget = self.uiManager.get_widget("/TestPopupMenu")
         self.widget.show_all()
         return self.widget
 

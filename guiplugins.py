@@ -136,7 +136,11 @@ class InteractiveAction(plugins.Observable):
 
     # Should we create a gtk.Action? (or connect to button directly ...)
     def inMenuOrToolBar(self): 
-        return self.getMainMenuPath() != "-" or self.inToolBar() or self.getTestPopupMenuPath() != "-" or self.inButtonBar()
+        return self.hasExternalGUIDescription() or self.getMainMenuPath() != "-" or self.inToolBar() or self.getTestPopupMenuPath() != "-" or self.inButtonBar()
+    # Is this a built-in action? If so, we'll assume the appropriate XML code
+    # is given by an outside definition file.
+    def hasExternalGUIDescription(self):
+        return False
     # Put the action in a menu/submenu? Use / to separate submenus.
     def getMainMenuPath(self):
         return "_Actions" # '-' is special, and means 'don't put in menu'.
@@ -275,9 +279,8 @@ class SelectionAction(InteractiveAction):
 class Quit(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
-    def getMainMenuPath(self):
-        return "_File"
-    def separatorAfterInToolBar(self):
+    # We'll assume the appropriate XML code is given by an outside definition file.
+    def hasExternalGUIDescription(self):
         return True
     def getStockId(self):
         return "quit"
@@ -354,6 +357,9 @@ class SaveTests(SelectionAction):
         self.currFileSelection = []
         self.currApps = []
         self.currTestDescription = ""
+    # We'll assume the appropriate XML code is given by an outside definition file.
+    def hasExternalGUIDescription(self):
+        return True
     def getStockId(self):
         return "save"
     def getTabTitle(self):
@@ -840,7 +846,10 @@ class SelectTests(SelectionAction):
     def findSelectGroup(self, app):
         for group in app.optionGroups:
             if group.name.startswith("Select"):
-                return group
+                return group        
+    # We'll assume the appropriate XML code is given by an outside definition file.
+    def hasExternalGUIDescription(self):
+        return True
     def getStockId(self):
         return "refresh"
     def _getTitle(self):
@@ -948,7 +957,8 @@ class SelectTests(SelectionAction):
         return newTestList
 
 class ResetGroups(InteractiveAction):
-    def separatorAfterInToolBar(self):
+    # We'll assume the appropriate XML code is given by an outside definition file.
+    def hasExternalGUIDescription(self):
         return True
     def getStockId(self):
         return "revert-to-saved"
@@ -1024,6 +1034,9 @@ class RunTests(SelectionAction):
                 self.optionGroups.append(group)
     def getOptionGroups(self):
         return self.optionGroups
+    # We'll assume the appropriate XML code is given by an outside definition file.
+    def hasExternalGUIDescription(self):
+        return True
     def _getTitle(self):
         return "_Run"
     def getStockId(self):
@@ -1164,10 +1177,9 @@ class CreateDefinitionFile(InteractiveTestAction):
 class RemoveTest(SelectionAction):
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
-    def getMainMenuPath(self):
-        return "_Edit"
-    def getTestPopupMenuPath(self): # Put the action in the test popup menu?
-        return ""
+    # We'll assume the appropriate XML code is given by an outside definition file.
+    def hasExternalGUIDescription(self):
+        return True
     def _getTitle(self):
         return "Remove..."
     def getStockId(self):

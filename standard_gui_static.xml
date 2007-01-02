@@ -1,0 +1,36 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+    <menu name="filemenu" action="filemenu">
+      <menuitem name="Quit" action="Quit"/>
+    </menu>
+    <menu name="editmenu" action="editmenu">
+      <menuitem name="Remove..." action="Remove..."/>
+    </menu>
+    <menu name="viewmenu" action="viewmenu">
+      <menuitem name="Toolbar" action="Toolbar"/>
+      <menuitem name="Shortcut bar" action="Shortcut bar"/>
+      <menuitem name="Status bar" action="Status bar"/>
+    </menu>
+    <menu name="actionsmenu" action="actionsmenu">
+      <menuitem name="Select" action="Select"/>
+      <menuitem name="Run" action="Run"/>
+      <menuitem name="Reset" action="Reset"/>
+    </menu>
+  </menubar>
+
+  <toolbar name="MainToolBar">
+    <toolitem name="Quit" action="Quit"/>
+    <separator/>
+    <toolitem name="Select" action="Select"/>
+    <toolitem name="Run" action="Run"/>
+    <toolitem name="Reset" action="Reset"/>
+    <separator/>
+    <toolitem name="Remove..." action="Remove..."/>
+  </toolbar>
+
+  <popup name="TestPopupMenu">
+    <menuitem name="Remove..." action="Remove..."/>
+  </popup>
+
+</ui>

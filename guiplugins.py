@@ -33,7 +33,7 @@ class GUIConfig:
         else:
             return "static"
     def getConfigName(self, name, modeDependent):
-        formattedName = name.lower().replace(" ", "_")
+        formattedName = name.lower().replace(" ", "_").replace(":", "_")
         if modeDependent:
             if len(name) > 0:
                 return self.getModeName() + "_" + formattedName

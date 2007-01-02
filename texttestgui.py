@@ -1401,7 +1401,6 @@ class ActionTabGUI(SubGUI):
             self.vbox.pack_start(table, expand=False, fill=False)
         
         for switch in self.optionGroup.switches.values():
-            self.updateForConfig(switch)
             hbox = self.createSwitchBox(switch)
             self.vbox.pack_start(hbox, expand=False, fill=False)
         if self.buttonGUI:
@@ -1459,13 +1458,16 @@ class ActionTabGUI(SubGUI):
             count = 0
             buttons = []
             mainRadioButton = None
-            for option in switch.options:
+            for index in range(len(switch.options)):
+                option = switch.options[index]
+                if guiConfig.getCompositeValue("gui_entry_overrides", switch.name + option) == "1":
+                    switch.setValue(index)
                 radioButton = gtk.RadioButton(mainRadioButton, option)
                 buttons.append(radioButton)
                 scriptEngine.registerToggleButton(radioButton, "choose " + option)
                 if not mainRadioButton:
                     mainRadioButton = radioButton
-                if count == int(switch.getValue()):
+                if switch.getValue() == index:
                     radioButton.set_active(True)
                     switch.resetMethod = radioButton.set_active
                 else:
@@ -1477,6 +1479,7 @@ class ActionTabGUI(SubGUI):
             hbox.show_all()
             return hbox  
         else:
+            self.updateForConfig(switch)
             checkButton = gtk.CheckButton(switch.name)
             if int(switch.getValue()):
                 checkButton.set_active(True)

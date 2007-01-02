@@ -1164,14 +1164,20 @@ class CreateDefinitionFile(InteractiveTestAction):
         
     def performOnCurrent(self):
         fileName = self.getFileName()
-        sourceFile = self.currentTest.makePathName(fileName)
+        # Use the file from the level above, if possible
+        if self.currentTest.parent and not self.optionGroup.getSwitchValue("diag"):
+            sourceFile = self.currentTest.parent.makePathName(fileName)
+        else:
+            sourceFile = self.currentTest.makePathName(fileName)
         targetFile = os.path.join(self.getTargetDirectory(), fileName)
         plugins.ensureDirExistsForFile(targetFile)
         if sourceFile:
             guilog.info("Creating new file, copying " + sourceFile)
             shutil.copyfile(sourceFile, targetFile)
-        else:
+        elif not os.path.exists(targetFile):
             guilog.info("Creating new empty file...")
+        else:
+            raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile 
         self.viewFile(targetFile, refreshFiles=True)
 
 class RemoveTest(SelectionAction):

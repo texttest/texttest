@@ -1,9 +1,10 @@
 XCOMM Install test components in generally available place.
-XCOMM $Id: Imakefile,v 1.56 2007/01/02 11:22:29 mattias Exp $
+XCOMM $Id: Imakefile,v 1.57 2007/01/02 16:38:26 geoff Exp $
 
 SUBMODULEDIRS   = images
 
 MODULEDIR=/usr/local/share/python
+FRAMEWORK_EXECUTABLES=interpretcore.py texttest.py
 FRAMEWORK_MODULES=batch.py bugzilla.py comparefile.py comparetest.py default.py engine.py guiplugins.py knownbugs.py lsf.py performance.py plugins.py queuesystem.py respond.py sge.py testmodel.py testoverview.py texttestgui.py traffic.py traffic_cmd.py unixonly.py standard_gui_static.xml standard_gui_dynamic.xml
 CARMEN_MODULES=carmenqueuesystem.py ddts.py ravebased.py optimization.py apc.py apcinfo.py KPI.py matador.py studio.py fleet.py mpssolver.py
 THIRD_PARTY_MODULES=HTMLgen.py HTMLcolors.py ImageH.py ImagePaletteH.py imgsize.py
@@ -11,6 +12,7 @@ THIRD_PARTY_CARMEN_MODULES=barchart.py
 PYTHONVERSIONS=2.2 2.3 2.4
 ALLDIRS=$(addprefix $(MODULEDIR)/, $(PYTHONVERSIONS))
 ALLTARGETS=$(foreach ver, $(ALLDIRS), $(addprefix $(ver)/, $(FRAMEWORK_MODULES) $(CARMEN_MODULES) $(THIRD_PARTY_MODULES) $(THIRD_PARTY_CARMEN_MODULES)))
+ALLEXECUTABLES=$(addprefix /usr/local/bin/, $(FRAMEWORK_EXECUTABLES))
 
 CarmFirstTarget()
 
@@ -22,14 +24,8 @@ $(addsuffix /%, $(ALLDIRS)): %
 	    cp $< $(MODULEDIR)/$$pv; \
 	done
 
-XCOMM There is no single macro which both removes the suffix and installs.
-XCOMM Easiest to do by hand, as long as it is only one case.
-install:: /usr/local/bin/texttest.py
-/usr/local/bin/texttest: texttest.py
-	cp $< $@
-
-install:: /usr/local/bin/interpretcore.py
-/usr/local/bin/interpretcore.py: interpretcore.py
+install:: $(ALLEXECUTABLES)
+/usr/local/bin/%: %
 	cp $< $@
 
 AllSubDirRules($(SUBMODULEDIRS))

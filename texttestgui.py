@@ -28,78 +28,10 @@ from ndict import seqdict
 from respond import Responder
 from copy import copy
 
+import guidialogs
+from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog, DoubleCheckDialog
+
 import traceback
-
-def destroyDialog(dialog, *args):
-    dialog.destroy()
-
-def createDialogMessage(message, stockIcon, scrollBars=False):
-    buffer = gtk.TextBuffer()
-    buffer.set_text(message)
-    textView = gtk.TextView(buffer)
-    textView.set_editable(False)
-    textView.set_cursor_visible(False)
-    textView.set_left_margin(5)
-    textView.set_right_margin(5)
-    hbox = gtk.HBox()
-    imageBox = gtk.VBox()
-    imageBox.pack_start(gtk.image_new_from_stock(stockIcon, gtk.ICON_SIZE_DIALOG), expand=False)
-    hbox.pack_start(imageBox, expand=False)
-    scrolledWindow = gtk.ScrolledWindow()
-    # What we would like is that the dialog expands without scrollbars
-    # until it reaches some maximum size, and then adds scrollbars. At
-    # the moment I cannot make this happen without setting a fixed window
-    # size, so I'll set the scrollbar policy to never instead.
-    if scrollBars:
-        scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-    else:
-        scrolledWindow.set_policy(gtk.POLICY_NEVER, gtk.POLICY_NEVER)
-    scrolledWindow.add(textView)
-    scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
-    hbox.pack_start(scrolledWindow, expand=True, fill=True)
-    alignment = gtk.Alignment()
-    alignment.set_padding(5, 5, 0, 5)
-    alignment.add(hbox)
-    return alignment
-
-def showError(message, parent=None):
-    guilog.info("ERROR: " + message)
-    dialog = gtk.Dialog("TextTest Error", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
-    dialog.set_modal(True)
-    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_ERROR), expand=True, fill=True)
-    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
-    dialog.show_all()
-    dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
-
-def showWarning(message, parent=None):
-    guilog.info("WARNING: " + message)
-    dialog = gtk.Dialog("TextTest Warning", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
-    dialog.set_modal(True)
-    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_WARNING), expand=True, fill=True)
-    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
-    dialog.show_all()
-    dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
-
-class DoubleCheckDialog:
-    def __init__(self, message, yesMethod, parent=None):
-        self.dialog = gtk.Dialog("TextTest Query", parent, flags=gtk.DIALOG_MODAL)
-        self.yesMethod = yesMethod
-        guilog.info("QUERY: " + message)
-        noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
-        yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        self.dialog.set_modal(True)
-        self.dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_QUESTION), expand=True, fill=True)
-        # ScriptEngine cannot handle different signals for the same event (e.g. response
-        # from gtk.Dialog), so we connect the individual buttons instead ...
-        scriptEngine.connect("answer no to texttest query", "clicked", noButton, self.respond, gtk.RESPONSE_NO, False)
-        scriptEngine.connect("answer yes to texttest query", "clicked", yesButton, self.respond, gtk.RESPONSE_YES, True)
-        self.dialog.show_all()
-        self.dialog.action_area.get_children()[len(self.dialog.action_area.get_children()) - 1].grab_focus()
-
-    def respond(self, button, saidYes, *args):
-        if saidYes:
-            self.yesMethod()
-        self.dialog.destroy()
 
 def renderParentsBold(column, cell, model, iter):
     if model.iter_has_child(iter):
@@ -303,7 +235,7 @@ class IdleHandlerManager:
             try:
                 process.runExitHandler()
             except plugins.TextTestError, e:
-                showError(str(e), globalTopWindow)
+                showErrorDialog(str(e), globalTopWindow)
         
         # We must sleep for a bit, or we use the whole CPU (busy-wait)
         time.sleep(0.1)
@@ -391,6 +323,7 @@ class TextTestGUI(Responder, plugins.Observable):
         from guiplugins import guilog, guiConfig
         scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
         self.scriptEngine = scriptEngine
+        guidialogs.setupScriptEngine(scriptEngine)
     def needsTestRuns(self):
         return self.dynamic
     def addSuites(self, suites):
@@ -1218,19 +1151,30 @@ class ActionGUI(SubGUI):
             return " (greyed out)"
     def runInteractive(self, *args):
         if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
-            return        
+            return
         doubleCheckMessage = self.action.getDoubleCheckMessage()
         if doubleCheckMessage:
-            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, globalTopWindow)
+            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, self._dontRun, globalTopWindow)
         else:
-            self._runInteractive()
+            dialogType = self.action.getDialogType()
+            if dialogType:
+                dialogClass = eval(dialogType)
+                dialog = dialogClass(globalTopWindow, self._runInteractive, self._dontRun, self.action)
+                dialog.run()
+            else:
+                self._runInteractive()
+
+    def _dontRun(self):
+        statusMonitor.notifyStatus("Action cancelled.")
     def _runInteractive(self):
         try:
             self.action.perform()
         except plugins.TextTestError, e:
-            showError(str(e), globalTopWindow)
+            showErrorDialog(str(e), globalTopWindow)
         except plugins.TextTestWarning, e:
-            showWarning(str(e), globalTopWindow)
+            showWarningDialog(str(e), globalTopWindow)
+        except plugins.TextTestInformation, e:
+            showInformationDialog(str(e), globalTopWindow)
     
            
 class DefaultActionGUI(ActionGUI):
@@ -1934,7 +1878,7 @@ class FileViewGUI(SubGUI):
         try:
             self.notify("ViewFile", comparison, fileName)
         except plugins.TextTestError, e:
-            showError(str(e), globalTopWindow)
+            showErrorDialog(str(e), globalTopWindow)
 
         self.selection.unselect_all()
     def addFileToModel(self, iter, name, comp, colour):

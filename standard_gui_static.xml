@@ -27,10 +27,12 @@
     <toolitem name="Reset" action="Reset"/>
     <separator/>
     <toolitem name="Remove..." action="Remove..."/>
+    <separator/>
   </toolbar>
 
   <popup name="TestPopupMenu">
     <menuitem name="Remove..." action="Remove..."/>
+    <separator/>
   </popup>
 
 </ui>

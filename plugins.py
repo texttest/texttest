@@ -631,6 +631,10 @@ class TextTestError(RuntimeError):
 class TextTestWarning(RuntimeError):
     pass
 
+# Sort of a workaround to get e.g. CVSLogInGUI to show a message in a simple info dialog
+class TextTestInformation(RuntimeError): 
+    pass
+
 # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
 class OptionFinder(seqdict):
     def __init__(self, args, defaultKey = "default"):

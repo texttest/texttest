@@ -15,8 +15,8 @@
 
   <toolbar name="MainToolBar">
     <toolitem name="Quit" action="Quit"/>
-    <separator/>
     <toolitem name="Save" action="Save"/>
+    <separator/>
   </toolbar>
 
   <popup name="TestPopupMenu">

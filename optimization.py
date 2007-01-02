@@ -1032,8 +1032,6 @@ class PlotTestInGUI(guiplugins.SelectionAction):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
-    def separatorBeforeInToolBar(self):
-        return True
     def getMainMenuPath(self):
         return "_Optimization"
     def getStockId(self):
@@ -1931,7 +1929,7 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
             fileName = self.currentTest.getFileName(file)
             if fileName:
                 cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
-        raise  plugins.TextTestError, "CVS Logs" + os.linesep + os.linesep + cvsInfo
+        raise  plugins.TextTestInformation, "CVS Logs" + os.linesep + os.linesep + cvsInfo
     def _getTitle(self):
         return "CVS _Log"
     def getCVSInfo(self, path, file):

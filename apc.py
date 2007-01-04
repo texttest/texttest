@@ -1413,6 +1413,61 @@ class CopyMPSFiles(plugins.Action):
             shutil.copyfile(fileName, newFileName)
             os.system("gzip " + newFileName)
 
+class CreateSCSolverTestSuite(plugins.Action):
+    def __init__(self, args):
+        self.source = args[0]
+        if not os.path.isdir(self.source):
+            raise plugins.TextTestError, "Source directory " + self.source + " does not exist."
+        self.newTS = args[1]
+        if not os.path.isdir(self.newTS):
+            os.makedirs(self.newTS)
+        self.testSuiteTree = seqdict()
+        self.suffix = ".sc"
+    def __del__(self):
+        self.writeTestSuiteFiles(self.testSuiteTree, self.newTS)
+    def writeTestSuiteFiles(self, parent, dir):
+        if len(parent.keys()) == 0:
+            return
+        testSuiteFile = open(dir + os.sep + "testsuite" + self.suffix, "w+")
+        for p in parent.keys():
+            testSuiteFile.write(p + os.linesep)
+            self.writeTestSuiteFiles(parent[p], os.path.join(dir, p))
+        testSuiteFile.close()
+    def addToTree(self, parts, parent):
+        if not parent.has_key(parts[0]):
+            parent[parts[0]] = seqdict()
+        if len(parts) >= 2:
+            self.addToTree(parts[1:], parent[parts[0]])
+    def __call__(self, test):
+        relPath = test.getRelPath()
+        rotFileDirForTest = os.path.join(self.source, relPath)
+        if os.path.isdir(rotFileDirForTest):
+            isFirst = True
+            for file in os.listdir(rotFileDirForTest):
+                if not file.find("APC_rot") == -1:
+                    if isFirst:
+                        rootTestDir = os.path.join(self.newTS, relPath)
+                        if not os.path.isdir(rootTestDir):
+                            os.makedirs(rootTestDir)
+                        testsuite = []
+                        self.addToTree(relPath.split(os.sep), self.testSuiteTree)
+                        isFirst = False
+                    testName = file.split("_")[0] + "_" + file.split("_")[-1]
+                    testsuite.append(testName)
+                    testDir = os.path.join(rootTestDir, testName)
+                    # We might run this on an already existing testsuite.
+                    # If testDir already is there, we assume the test to be created.
+                    if not os.path.isdir(testDir):
+                        os.mkdir(testDir)
+                        optionsFile = open(os.path.join(testDir, "options" + self.suffix), "w+")
+                        optionsFile.write("${SCDATA}/" + relPath + "/" + file)
+                        optionsFile.close()
+            if isFirst == False:
+                testsuiteFile = open(os.path.join(rootTestDir, "testsuite" + self.suffix), "w+")
+                for t in testsuite:
+                    testsuiteFile.write(t + os.linesep)
+                testsuiteFile.close()
+
 class SaveBestSolution(guiplugins.InteractiveTestAction):
     def performOnCurrent(self):
         import shutil
@@ -1600,9 +1655,9 @@ try:
     from matplotlib import *
     use('TkAgg')
     from matplotlib.pylab import *
-    mplDefined = 1
+    mplDefined = True
 except:
-    pass
+    mplDefined = False
 
 class PlotEngineMPLTimeDiv(optimization.PlotEngineMPL):
     def plot(self, writeDir):

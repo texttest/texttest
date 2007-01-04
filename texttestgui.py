@@ -863,7 +863,8 @@ class TestTreeGUI(SubGUI):
 
     def canSelect(self, path):
         pathIter = self.filteredModel.get_iter(path)
-        return not self.filteredModel.iter_has_child(pathIter)
+        test = self.filteredModel.get_value(pathIter, 2)
+        return test.classId() == "test-case"
 
     def rowCollapsed(self, treeview, iter, path):
         if self.dynamic:

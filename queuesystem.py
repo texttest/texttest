@@ -148,7 +148,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getTextDisplayResponderClass(self)
     def getTestRunner(self):
         if self.slaveRun():
-            return RunTestInSlave()
+            return RunTestInSlave(self.hasAutomaticCputimeChecking)
         else:
             return default.Config.getTestRunner(self)
     def runsTests(self):

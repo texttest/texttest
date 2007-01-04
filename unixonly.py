@@ -3,9 +3,10 @@
 import default, plugins, os
                 
 class RunTest(default.RunTest):
-    def __init__(self):
+    def __init__(self, hasAutomaticCputimeChecking):
         default.RunTest.__init__(self)
         self.realDisplay = os.getenv("DISPLAY")
+        self.hasAutomaticCputimeChecking = hasAutomaticCputimeChecking
     def __call__(self, test, inChild=0):
         if os.environ.has_key("TEXTTEST_VIRTUAL_DISPLAY"):
             os.environ["DISPLAY"] = os.environ["TEXTTEST_VIRTUAL_DISPLAY"]
@@ -17,7 +18,7 @@ class RunTest(default.RunTest):
         testCommand = default.RunTest.getExecuteCommand(self, test)
         selfTestStdin = self.shellTitle and os.environ.has_key("USECASE_REPLAY_SCRIPT")
             
-        if not selfTestStdin and len(test.getCompositeConfigValue("performance_test_machine", "cputime")) == 0:
+        if not selfTestStdin and not self.hasAutomaticCputimeChecking(test.app):
             return testCommand # Don't bother with this if we aren't measuring CPU time!
         
         # put the command in a file to avoid quoting problems,

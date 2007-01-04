@@ -267,7 +267,7 @@ class Config(plugins.Configuration):
             # Use Xvfb to suppress GUIs, cmd files to prevent shell-quote problems,
             # UNIX time to collect system performance info.
             from unixonly import RunTest as UNIXRunTest
-            return UNIXRunTest()
+            return UNIXRunTest(self.hasAutomaticCputimeChecking)
         else:
             return RunTest()
     def isReconnectingFast(self):

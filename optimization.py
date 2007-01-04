@@ -1591,7 +1591,7 @@ class PlotEngineMPL(PlotEngineCommon):
         new = []
         for ent in [0, 1]:
             if entries[ent]:
-                new.append(entries[ent])
+                new.append(float(entries[ent]))
             else:
                 new.append(currentLim[ent])
         return new

@@ -14,15 +14,22 @@ def createSocket():
 def sendServerState(stateDesc):
     sock = createSocket()
     if sock:
-        sock.sendall("SUT_SERVER:" + stateDesc + os.linesep)
+        sock.sendall("SUT_SERVER:" + stateDesc + "\n")
         sock.close()
+
+def getResponse(sock):
+    response = sock.recv(2048)
+    if len(response) < 2048 and not response.endswith("|TT_CMD_SEP|"):
+        return response
+    else:
+        return response + getResponse(sock)
 
 if __name__ == "__main__":
     sock = createSocket()
     text = "SUT_COMMAND_LINE:" + repr(sys.argv) + ":SUT_ENVIRONMENT:" + repr(os.environ)
     sock.sendall(text)
     sock.shutdown(1)
-    response = sock.recv(1000000, socket.MSG_WAITALL)
+    response = getResponse(sock)
     sock.close()
     try:
         stdout, stderr, exitStr = response.split("|TT_CMD_SEP|")

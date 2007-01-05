@@ -132,11 +132,17 @@ class CommandLineTraffic(InTraffic):
                 recLine = line.replace(oldVal, "$" + var)
             recStr += recLine
         return realStr, recStr
+    def getQuoteChar(self, char):
+        if char == "\"" and os.name == "posix":
+            return "'"
+        else:
+            return '"'
     def quote(self, arg):
-        quoteChars = "|* "
+        quoteChars = "'\"|* "
         for char in quoteChars:
             if char in arg:
-                return "'" + arg + "'"
+                quoteChar = self.getQuoteChar(char)
+                return quoteChar + arg + quoteChar
         return arg
     def forwardToDestination(self):
         realCmd = self.findRealCommand()
@@ -206,9 +212,15 @@ class ClientSocketTraffic(ResponseTraffic):
         sock.connect(self.destination)
         sock.sendall(self.text)
         sock.shutdown(1)
-        response = sock.recv(1000000, socket.MSG_WAITALL)
+        response = self.getResponse(sock)
         sock.close()
         return [ ServerTraffic(response, self.responseFile) ]
+    def getResponse(self, sock):
+        response = sock.recv(4096)
+        if len(response) < 4096:
+            return response
+        else:   
+            return response + self.getResponse(sock)
 
 class TrafficRequestHandler(StreamRequestHandler):
     parseDict = { "SUT_SERVER" : ServerStateTraffic, "SUT_COMMAND_LINE" : CommandLineTraffic }
@@ -294,8 +306,8 @@ class TrafficServer(TCPServer):
         if not traffic.hasInfo():
             return
         desc = traffic.getDescription()
-        if not desc.endswith(os.linesep):
-            desc += os.linesep
+        if not desc.endswith("\n"):
+            desc += "\n"
         self.diag.info("Recording " + repr(traffic.__class__) + " " + desc)
         writeFile = open(self.recordFile, "a")
         writeFile.write(desc)

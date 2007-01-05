@@ -418,7 +418,7 @@ class TestCase(Test):
         self.writeDirectories.append(writeSubDir)
     def getTestRelPath(self, file):
         parts = file.split(self.getRelPath() + "/")
-        if len(parts) == 2:
+        if len(parts) >= 2:
             return parts[-1]
     def listTmpFiles(self):
         tmpFiles = []

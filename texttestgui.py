@@ -2304,7 +2304,9 @@ class TestProgressMonitor(SubGUI):
         self.contentsChanged()
 
     def shouldBeVisible(self, test):
-        for nodeIter in self.classifications[test]:
+        for nodeIter in self.findTestIterators(test):
+            if self.treeModel.iter_has_child(nodeIter):
+                continue # ignore the parent nodes where visibility is concerned
             visible = self.treeModel.get_value(nodeIter, 2)
             if visible:
                 return True

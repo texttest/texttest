@@ -5,6 +5,7 @@ from copy import deepcopy
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
+from types import StringType
 
 class MethodWrap:
     def __init__(self, method, firstArg):
@@ -67,7 +68,9 @@ class Traffic:
     def hasInfo(self):
         return len(self.text) > 0
     def getDescription(self):
-        return self.direction + self.typeId + ":" + self.text
+        return self.direction + self.typeId + ":" + self.getText()
+    def getText(self):
+        return self.text
     def forwardToDestination(self):
         if self.responseFile:
             self.responseFile.write(self.text)
@@ -81,6 +84,54 @@ class InTraffic(Traffic):
     
 class ResponseTraffic(Traffic):
     direction = "->"
+
+class StdoutTraffic(ResponseTraffic):
+    typeId = "OUT"
+    def forwardToDestination(self):
+        if self.responseFile:
+            self.responseFile.write(self.text + "|TT_CMD_SEP|")
+        return []
+
+class StderrTraffic(ResponseTraffic):
+    typeId = "ERR"
+    def forwardToDestination(self):
+        if self.responseFile:
+            self.responseFile.write(self.text + "|TT_CMD_SEP|")
+        return []
+
+class SysExitTraffic(ResponseTraffic):
+    typeId = "EXC"
+    def __init__(self, status, responseFile):
+        ResponseTraffic.__init__(self, str(status), responseFile)
+        self.exitStatus = int(status)
+        if os.name == "posix" and type(status) == StringType: # from reading replay
+            self.exitStatus *= 256 # encode for os.system calls
+            self.text = str(self.exitStatus)
+    def hasInfo(self):
+        return self.exitStatus != 0
+    def getText(self):
+        if os.name == "posix":
+            return str(os.WEXITSTATUS(self.exitStatus)) # for recording
+        else:
+            return self.text
+
+class ClientSocketTraffic(ResponseTraffic):
+    destination = None
+    typeId = "CLI"
+    def forwardToDestination(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(self.destination)
+        sock.sendall(self.text)
+        sock.shutdown(1)
+        response = self.getResponse(sock)
+        sock.close()
+        return [ ServerTraffic(response, self.responseFile) ]
+    def getResponse(self, sock):
+        response = sock.recv(4096)
+        if len(response) < 4096:
+            return response
+        else:   
+            return response + self.getResponse(sock)
 
 class ServerTraffic(InTraffic):
     typeId = "SRV"
@@ -158,10 +209,10 @@ class CommandLineTraffic(InTraffic):
             os.remove(cerrFile)
             return self.makeResponse(output, errors, exitCode)
         else:
-            return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH", 256)
+            return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH", 1)
     def makeResponse(self, output, errors, exitCode):
         return [ StdoutTraffic(output, self.responseFile), StderrTraffic(errors, self.responseFile), \
-                 SysExitTraffic(str(exitCode), self.responseFile) ]
+                 SysExitTraffic(exitCode, self.responseFile) ]
     def findRealCommand(self):
         # If we found a link already, use that, otherwise look on the path
         if self.realCommands.has_key(self.commandName):
@@ -185,43 +236,6 @@ class CommandLineTraffic(InTraffic):
             extraTraffic.responseFile = None
         return trafficList
                                
-class StdoutTraffic(ResponseTraffic):
-    typeId = "OUT"
-    def forwardToDestination(self):
-        if self.responseFile:
-            self.responseFile.write(self.text + "|TT_CMD_SEP|")
-        return []
-
-class StderrTraffic(ResponseTraffic):
-    typeId = "ERR"
-    def forwardToDestination(self):
-        if self.responseFile:
-            self.responseFile.write(self.text + "|TT_CMD_SEP|")
-        return []
-
-class SysExitTraffic(ResponseTraffic):
-    typeId = "EXC"
-    def hasInfo(self):
-        return self.text != "0"
-
-class ClientSocketTraffic(ResponseTraffic):
-    destination = None
-    typeId = "CLI"
-    def forwardToDestination(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(self.destination)
-        sock.sendall(self.text)
-        sock.shutdown(1)
-        response = self.getResponse(sock)
-        sock.close()
-        return [ ServerTraffic(response, self.responseFile) ]
-    def getResponse(self, sock):
-        response = sock.recv(4096)
-        if len(response) < 4096:
-            return response
-        else:   
-            return response + self.getResponse(sock)
-
 class TrafficRequestHandler(StreamRequestHandler):
     parseDict = { "SUT_SERVER" : ServerStateTraffic, "SUT_COMMAND_LINE" : CommandLineTraffic }
     def handle(self):

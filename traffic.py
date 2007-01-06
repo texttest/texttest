@@ -158,31 +158,29 @@ class CommandLineTraffic(InTraffic):
         self.fullCommand = argv[0]
         self.commandName = os.path.basename(self.fullCommand)
         self.argStr = string.join(map(self.quote, argv[1:]))
-        self.envStr, recEnvStr = self.getEnvStrings(cmdEnviron)
+        self.environ = self.filterEnvironment(cmdEnviron)
         self.diag = plugins.getDiagnostics("Traffic Server")
         self.path = cmdEnviron.get("PATH")
-        text = recEnvStr + self.commandName + " " + self.argStr
+        text = self.getEnvString() + self.commandName + " " + self.argStr
         InTraffic.__init__(self, text, responseFile)
-    def getEnvStrings(self, cmdEnviron):
+    def filterEnvironment(self, cmdEnviron):
         interestingEnviron = []
         for var in self.envVarMethod(self.commandName):
             value = cmdEnviron.get(var)
             if value is not None:
                 interestingEnviron.append((var, value))
-        return self.convertToEnvStrings(interestingEnviron)
-    def convertToEnvStrings(self, envVars):
-        if len(envVars) == 0:
-            return "", ""
-        realStr, recStr = "env ", "env "
-        for var, value in envVars:
-            line = "'" + var + "=" + value + "' "
-            realStr += line
+        return interestingEnviron
+    def getEnvString(self):
+        if len(self.environ) == 0:
+            return ""
+        recStr = "env "
+        for var, value in self.environ:
+            recLine = "'" + var + "=" + value + "' "
             oldVal = self.origEnviron.get(var)
-            recLine = line
             if oldVal and oldVal != value:
-                recLine = line.replace(oldVal, "$" + var)
+                recLine = recLine.replace(oldVal, "$" + var)
             recStr += recLine
-        return realStr, recStr
+        return recStr
     def getQuoteChar(self, char):
         if char == "\"" and os.name == "posix":
             return "'"
@@ -195,14 +193,28 @@ class CommandLineTraffic(InTraffic):
                 quoteChar = self.getQuoteChar(char)
                 return quoteChar + arg + quoteChar
         return arg
+    def setUpEnvironment(self):
+        for var, value in self.environ:
+            os.putenv(var, value) # don't assign to os.environ, that might screw up other threads
+    def restoreEnvironment(self):
+        for var, value in self.environ:
+            oldVal = self.origEnviron.get(var)
+            if oldVal:
+                os.putenv(var, oldVal)
+            elif hasattr(os, "unsetenv"):
+                os.unsetenv(var)
+            else:
+                os.putenv(var, "")
     def forwardToDestination(self):
         realCmd = self.findRealCommand()
         if realCmd:
-            realCmdLine = self.envStr + realCmd + " " + self.argStr
+            realCmdLine = realCmd + " " + self.argStr
             TrafficServer.instance.diag.info("Executing real command : " + realCmdLine)
             fd, coutFile = tempfile.mkstemp()
             fd, cerrFile = tempfile.mkstemp()
+            self.setUpEnvironment()
             exitCode = os.system(realCmdLine + " > " + coutFile + " 2> " + cerrFile)
+            self.restoreEnvironment()
             output = open(coutFile).read()
             errors = open(cerrFile).read()
             os.remove(coutFile)

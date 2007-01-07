@@ -1206,11 +1206,18 @@ class DefaultActionGUI(ActionGUI):
         realAcc = guiConfig.getCompositeValue("gui_accelerators", self.action.getTitle().rstrip("."))
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
-            if gtk.accelerator_valid(key, mod):
+            if self.isValid(key, mod):
                 return realAcc
             else:
                 plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
                                      + self.action.getTitle() + "' is not valid, ignoring ...")
+    def isValid(self, key, mod):
+        if os.name == "nt":
+            # gtk.accelerator_valid appears utterly broken on Windows
+            name = gtk.accelerator_name(key, mod)
+            return len(name) > 0 and name != "VoidSymbol"
+        else:
+            return gtk.accelerator_valid(key, mod)
     def detailDescription(self):
         message = ""
         stockId = self.getStockId()

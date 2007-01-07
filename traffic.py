@@ -30,7 +30,7 @@ class SetUpTrafficHandlers(plugins.Action):
         recordFile = test.makeTmpFileName("traffic")
         envVarMethod = MethodWrap(test.getCompositeConfigValue, "collect_traffic_environment")
         if self.record:
-            self.setServerState(recordFile, None, envVarMethod)
+            self.setServerState(recordFile, None, envVarMethod, test.makeTmpFileName("traffic_tmp", forFramework=1))
             return True
         else:
             trafficReplay = test.getFileName("traffic")
@@ -40,20 +40,21 @@ class SetUpTrafficHandlers(plugins.Action):
             else:
                 self.setServerState(None, None, envVarMethod)
                 return False
-    def setServerState(self, recordFile, replayFile, envVarMethod):
+    def setServerState(self, recordFile, replayFile, envVarMethod, tmpFileName=None):
         if recordFile or replayFile and not TrafficServer.instance:
             TrafficServer.instance = TrafficServer()
         if TrafficServer.instance:
-            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod)
+            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod, tmpFileName)
     def makeIntercepts(self, test):
         for cmd in test.getConfigValue("collect_traffic"):
             linkName = test.makeTmpFileName(cmd, forComparison=0)
-            self.intercept(linkName)
-    def intercept(self, linkName):
-        if os.path.islink(linkName):
+            self.intercept(test, linkName)
+    def intercept(self, test, linkName):
+        if os.path.exists(linkName):
             # We might have written a fake version - store what it points to so we can
             # call it later, and remove the link
-            TrafficServer.instance.setRealVersion(os.path.basename(linkName), os.path.realpath(linkName))
+            localName = os.path.basename(linkName)
+            TrafficServer.instance.setRealVersion(localName, test.makePathName(localName))
             os.remove(linkName)
         # Linking doesn't exist on windows!
         if os.name == "posix":
@@ -151,11 +152,12 @@ class CommandLineTraffic(InTraffic):
     envVarMethod = None
     origEnviron = {}
     realCommands = {}
+    tmpFileName = None
     def __init__(self, inText, responseFile):
         cmdText, environText = inText.split(":SUT_ENVIRONMENT:")
         argv = eval(cmdText)
         cmdEnviron = eval(environText)
-        self.fullCommand = argv[0]
+        self.fullCommand = argv[0].replace("\\", "/")
         self.commandName = os.path.basename(self.fullCommand)
         self.argStr = string.join(map(self.quote, argv[1:]))
         self.environ = self.filterEnvironment(cmdEnviron)
@@ -210,10 +212,11 @@ class CommandLineTraffic(InTraffic):
         if realCmd:
             realCmdLine = realCmd + " " + self.argStr
             TrafficServer.instance.diag.info("Executing real command : " + realCmdLine)
-            fd, coutFile = tempfile.mkstemp()
-            fd, cerrFile = tempfile.mkstemp()
+            coutFile = self.tmpFileName + ".out"
+            cerrFile = self.tmpFileName + ".err"
             self.setUpEnvironment()
             exitCode = os.system(realCmdLine + " > " + coutFile + " 2> " + cerrFile)
+            TrafficServer.instance.diag.info("Completed with status : " + repr(exitCode))
             self.restoreEnvironment()
             output = open(coutFile).read()
             errors = open(cerrFile).read()
@@ -230,13 +233,15 @@ class CommandLineTraffic(InTraffic):
         if self.realCommands.has_key(self.commandName):
             return self.realCommands[self.commandName]
         # Find the first one in the path that isn't us :)
+        TrafficServer.instance.diag.info("Finding real command to replace " + self.fullCommand)
         for currDir in self.path.split(os.pathsep):
+            TrafficServer.instance.diag.info("Searching " + currDir)
             fullPath = os.path.join(currDir, self.commandName)
             if self.isRealCommand(fullPath):
                 return fullPath
     def isRealCommand(self, fullPath):
         return os.path.isfile(fullPath) and os.access(fullPath, os.X_OK) and \
-               not os.path.samefile(fullPath, self.fullCommand)
+               not plugins.samefile(fullPath, self.fullCommand)
     def filterReplay(self, trafficList):
         if len(trafficList) == 0 or not isinstance(trafficList[0], StdoutTraffic):
             trafficList.insert(0, StdoutTraffic("", self.responseFile))
@@ -282,7 +287,7 @@ class TrafficServer(TCPServer):
     def setRealVersion(self, command, realCommand):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
-    def setState(self, recordFile, replayFile, envVarMethod):
+    def setState(self, recordFile, replayFile, envVarMethod, tmpFileName):
         self.recordFile = recordFile
         if replayFile:
             self.readReplayFile(replayFile)
@@ -294,6 +299,7 @@ class TrafficServer(TCPServer):
             os.environ["TEXTTEST_MIM_SERVER"] = ""
         CommandLineTraffic.envVarMethod = envVarMethod
         CommandLineTraffic.origEnviron = deepcopy(os.environ)
+        CommandLineTraffic.tmpFileName = tmpFileName
         ClientSocketTraffic.destination = None
     def readReplayFile(self, replayFile):
         self.replayInfo = seqdict()

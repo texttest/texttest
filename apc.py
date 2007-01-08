@@ -121,7 +121,7 @@ class ApcConfig(optimization.OptimizationConfig):
     def addToOptionGroups(self, app, groups):
         optimization.OptimizationConfig.addToOptionGroups(self, app, groups)
         for group in groups:
-            if group.name.startswith("How"):
+            if group.name.startswith("Basic"):
                 group.addOption("rundebug", "Run debugger")
                 group.addOption("extractlogs", "Extract Apc Logs")
             if group.name.startswith("Invisible"):
@@ -140,6 +140,8 @@ class ApcConfig(optimization.OptimizationConfig):
             listKPIs = [KPI.cSimplePairingOptTimeKPI]
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         return optimization.OptimizationConfig.getActionSequence(self)
+    def getSlaveSwitches(self):
+        return optimization.OptimizationConfig.getSlaveSwitches(self) + [ "rundebug", "extractlogs" ]
     def useQueueSystem(self):
         if self.optionMap.has_key("rundebug"):
             return 0

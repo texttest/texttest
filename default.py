@@ -25,12 +25,10 @@ class Config(plugins.Configuration):
                 group.addOption("grep", "Result files containing")
                 group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
-            elif group.name.startswith("What"):
+            elif group.name.startswith("Basic"):
                 group.addOption("c", "Use checkout", app.checkout)
                 group.addOption("reconnect", "Reconnect to", description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
-            elif group.name.startswith("How"):
-                group.addOption("b", "Run batch mode session")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 diagDict = app.getConfigValue("diagnostics")
@@ -38,10 +36,13 @@ class Config(plugins.Configuration):
                     group.addSwitch("diag", "Write target application diagnostics")
                 if diagDict.get("trace_level_variable"):
                     group.addOption("trace", "Target application trace level")
-                group.addSwitch("noperf", "Disable any performance testing")
                 if self.isolatesDataUsingCatalogues(app):
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
+            elif group.name.startswith("Advanced"):
+                group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
+                group.addSwitch("keeptmp", "Keep temporary write-directories")
+                group.addSwitch("noperf", "Disable any performance testing")
             elif group.name.startswith("Invisible"):
                 # Only relevant without the GUI
                 group.addSwitch("g", "use dynamic GUI", 1)
@@ -55,8 +56,6 @@ class Config(plugins.Configuration):
                 if recordsUseCases:
                     group.addSwitch("record", "Record usecase rather than replay what is present")
                     group.addSwitch("holdshell", "Hold shells running system under test...")
-            elif group.name.startswith("Side"):
-                group.addSwitch("keeptmp", "Keep temporary write-directories")
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
             batchSession = self.optionValue("b")

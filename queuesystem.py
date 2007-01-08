@@ -86,14 +86,14 @@ class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
         default.Config.addToOptionGroups(self, app, groups)
         queueSystem = queueSystemName(app)
-        queueSystemGroup = plugins.OptionGroup(queueSystem)
-        queueSystemGroup.addSwitch("l", "", value = 0, options = ["Submit tests to " + queueSystem, "Run tests locally"])
-        queueSystemGroup.addSwitch("perf", "Run on performance machines only")
-        queueSystemGroup.addOption("R", "Request " + queueSystem + " resource", possibleValues = self.getPossibleResources(queueSystem))
-        queueSystemGroup.addOption("q", "Request " + queueSystem + " queue", possibleValues = self.getPossibleQueues(queueSystem))
-        groups.insert(3, queueSystemGroup)
         for group in groups:
-            if group.name.startswith("Invisible"):
+            if group.name.startswith("Basic"):
+                group.addSwitch("l", "", value = 0, options = ["Submit tests to " + queueSystem, "Run tests locally"])
+            elif group.name.startswith("Advanced"):
+                group.addOption("R", "Request " + queueSystem + " resource", possibleValues = self.getPossibleResources(queueSystem))
+                group.addOption("q", "Request " + queueSystem + " queue", possibleValues = self.getPossibleQueues(queueSystem))
+                group.addSwitch("perf", "Run on performance machines only")
+            elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
     def getPossibleQueues(self, queueSystem):
@@ -127,8 +127,10 @@ class QueueSystemConfig(default.Config):
         if not self.useQueueSystem() or self.slaveRun():
             return baseProcessor
 
-        submitter = SubmitTest(self.getSubmissionRules, self.optionMap)
+        submitter = SubmitTest(self.getSubmissionRules, self.optionMap, self.getSlaveSwitches())
         return [ submitter, WaitForCompletion(), CheckForUnrunnableBugs() ]
+    def getSlaveSwitches(self):
+        return [ "diag", "ignorecat", "noperf", "actrep", "rectraffic", "keeptmp" ]
     def getExecHostFinder(self):
         if self.slaveRun():
             return FindExecutionHosts()
@@ -389,10 +391,11 @@ class QueueSystemServer:
         return system
                                  
 class SubmitTest(plugins.Action):
-    def __init__(self, submitRuleFunction, optionMap):
+    def __init__(self, submitRuleFunction, optionMap, slaveSwitches):
         self.loginShell = None
         self.submitRuleFunction = submitRuleFunction
         self.optionMap = optionMap
+        self.slaveSwitches = slaveSwitches
         self.runOptions = ""
         self.diag = plugins.getDiagnostics("Queue System Submit")
         self.slaveEnv = {}
@@ -439,26 +442,20 @@ class SubmitTest(plugins.Action):
             QueueSystemServer.instance = QueueSystemServer()
     def setRunOptions(self, app):
         runOptions = []
-        runGroup = self.findRunGroup(app)
-        for switch in runGroup.switches.keys():
-            if self.optionMap.has_key(switch):
-                runOptions.append("-" + switch)
-        for option in runGroup.options.keys():
-            if self.optionMap.has_key(option):
-                runOptions.append("-" + option)
-                runOptions.append(self.optionMap[option])
-        if self.optionMap.has_key("keeptmp"):
-            runOptions.append("-keeptmp")
+        for slaveSwitch in self.slaveSwitches:
+            value = self.optionMap.get(slaveSwitch)
+            if value is not None:
+                option = "-" + slaveSwitch
+                if len(value) > 0:
+                    option += " " + value
+                runOptions.append(option)
+
         if self.optionMap.diagsEnabled():
             runOptions.append("-x")
             runOptions.append("-xr " + self.optionMap.getDiagReadDir())
             slaveWriteDir = os.path.join(self.optionMap.getDiagWriteDir(), self.slaveType())
             runOptions.append("-xw " + slaveWriteDir)
         return string.join(runOptions)
-    def findRunGroup(self, app):
-        for group in app.optionGroups:
-            if group.name.startswith("How"):
-                return group
     def getPostText(self, test, submissionRules):
         name = queueSystemName(test.app)
         return submissionRules.getSubmitSuffix(name)

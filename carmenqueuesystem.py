@@ -161,7 +161,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def addToOptionGroups(self, app, groups):
         queuesystem.QueueSystemConfig.addToOptionGroups(self, app, groups)
         for group in groups:
-            if group.name.startswith("How"):
+            if group.name.startswith("Advanced"):
                 group.addSwitch("lprof", "Run with LProf profiler")
     def getPossibleQueues(self, queuesystem):
         if queuesystem == "SGE":

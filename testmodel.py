@@ -887,7 +887,7 @@ class Application:
         else:
             self.setConfigDefault("interpreter", "", interDoc)
     def createOptionGroups(self, inputOptions):
-        groupNames = [ "Select Tests", "What to run", "How to run", "Side effects", "Invisible" ]
+        groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]
         optionGroups = []
         for name in groupNames:
             group = plugins.OptionGroup(name)
@@ -911,9 +911,9 @@ class Application:
     def hasPerformance(self):
         return self.configObject.hasPerformance(self)
     def addToOptionGroup(self, group):
-        if group.name.startswith("What"):
+        if group.name.startswith("Basic"):
             group.addOption("v", "Run this version", self.getFullVersion())
-        elif group.name.startswith("Side"):
+        elif group.name.startswith("Advanced"):
             group.addOption("xr", "Configure self-diagnostics from", self.inputOptions.getDiagReadDir())
             group.addOption("xw", "Write self-diagnostics to", self.inputOptions.getDiagWriteDir())
             group.addSwitch("x", "Enable self-diagnostics")

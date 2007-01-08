@@ -132,14 +132,12 @@ class Config(CarmenConfig):
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("u", "CARMUSRs containing")
-            elif group.name.startswith("What"):
+            elif group.name.startswith("Advanced"):
                 group.addSwitch("rulecomp", "Build all rulesets")
+                group.addOption("build", "Build application target")
                 group.addSwitch("skip", "Build no rulesets")
-            elif group.name.startswith("How"):
                 group.addSwitch("debug", "Use debug rulesets")
                 group.addSwitch("raveexp", "Run with RAVE Explorer")
-            elif group.name.startswith("Side"):
-                group.addOption("build", "Build application target")
             elif group.name.startswith("Invisible"):
                 group.addOption("raveslave", "Private: used for submitting slaves to compile rulesets")
     def getFilterClasses(self):
@@ -167,6 +165,8 @@ class Config(CarmenConfig):
                  CarmenConfig._getActionSequence(self, makeDirs = 0)
     def raveSlave(self):
         return self.optionMap.has_key("raveslave")
+    def getSlaveSwitches(self):
+        return CarmenConfig.getSlaveSwitches(self) + [ "debug", "lprof", "raveexp" ]
     def getWriteDirectoryName(self, app):
         slaveDir = self.optionMap.get("raveslave")
         if slaveDir:
@@ -205,7 +205,7 @@ class Config(CarmenConfig):
     def getRealRuleActions(self):
         filterer = self.getRuleBuildFilterer()
         if self.useQueueSystem():
-            submitter = SubmitRuleCompilations(self.getRaveSubmissionRules, self.optionMap)
+            submitter = SubmitRuleCompilations(self.getRaveSubmissionRules, self.optionMap, self.getSlaveSwitches())
             waiter = WaitForRuleCompile(self.getRuleSetName)
             return [ filterer, submitter, waiter ]
         else:

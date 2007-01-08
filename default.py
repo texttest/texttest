@@ -1352,8 +1352,7 @@ class CreateCatalogue(plugins.Action):
             return oldInfo != newInfo
         else:
             try:
-                # Allow one second error margin, seems necessary on Windows...
-                return newInfo - oldInfo > 1
+                return newInfo - oldInfo > 0
             except:
                 # Handle the case where a link becomes a normal file
                 return oldInfo != newInfo

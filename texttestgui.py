@@ -66,9 +66,13 @@ class SubGUI(plugins.Observable):
         self.contentsChanged()
     def deactivate(self):
         self.setActive(False)
-    def contentsChanged(self, *args):
-        if self.active and self.shouldShowCurrent():
-            guilog.info("") # blank line for demarcation
+    def writeSeparator(self):
+        guilog.info("") # blank line for demarcation
+    def shouldDescribe(self):
+        return self.active and self.shouldShowCurrent()
+    def contentsChanged(self):
+        if self.shouldDescribe():
+            self.writeSeparator()
             self.describe()
     def describe(self):
         pass
@@ -111,18 +115,16 @@ class ContainerGUI(SubGUI):
             if not subgui.shouldShowCurrent():
                 return False
         return True
-    
+    def shouldDescribe(self):
+        return self.active
     def setActive(self, value):
         SubGUI.setActive(self, value)
         for subgui in self.subguis:
             subgui.setActive(value)
     def contentsChanged(self):
+        SubGUI.contentsChanged(self)
         for subgui in self.subguis:
             subgui.contentsChanged()
-    def describe(self):
-        for subgui in self.subguis:
-            subgui.describe()
-
     
 def getGtkRcFile():
     configDir = plugins.getPersonalConfigDir()
@@ -259,7 +261,8 @@ class TextTestGUI(Responder, plugins.Observable):
         self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic)
         self.defaultActionGUIs, self.buttonBarGUIs = self.createActionGUIs()
         self.menuBarGUI, self.toolBarGUI, testPopupGUI = self.createMenuAndToolBarGUIs()
-        self.testTreeGUI = TestTreeGUI(self.dynamic, testPopupGUI)
+        self.testColumnGUI = TestColumnGUI(self.dynamic)
+        self.testTreeGUI = TestTreeGUI(self.dynamic, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = TestFileGUI(self.dynamic)
         self.actionTabGUIs = self.createActionTabGUIs()
         self.notebookGUIs, rightWindowGUI = self.createRightWindowGUI()
@@ -271,10 +274,10 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI.addObserver(actionThread) # window closing
     def getTestTreeObservers(self):
         selectionActions = filter(lambda action: hasattr(action, "notifyNewTestSelection"), self.intvActions)
-        return  selectionActions + [ self.testFileGUI, self.appFileGUI ] + self.buttonBarGUIs + \
+        return  selectionActions + [ self.testColumnGUI, self.testFileGUI, self.appFileGUI ] + self.buttonBarGUIs + \
                [ self.textInfoGUI ] + self.actionTabGUIs + self.notebookGUIs + self.defaultActionGUIs
     def getLifecycleObservers(self):
-        return [ self.textInfoGUI, self.testTreeGUI, self.testFileGUI, \
+        return [ self.textInfoGUI, self.testColumnGUI, self.testTreeGUI, self.testFileGUI, \
                  self.progressBarGUI, self.progressMonitor ] + self.actionTabGUIs  
     def getActionObservers(self):
         # These actions might change the tree view selection or the status bar, need to observe them
@@ -328,6 +331,7 @@ class TextTestGUI(Responder, plugins.Observable):
         return self.dynamic
     def addSuites(self, suites):
         guiConfig.addSuites(suites)
+        self.testColumnGUI.addSuites(suites)
         self.testTreeGUI.addSuites(suites)
         self.progressMonitor.addSuites(suites)
         self.progressBarGUI.addSuites(suites)
@@ -456,6 +460,7 @@ class TopWindowGUI(ContainerGUI):
         self.dynamic = dynamic
         self.topWindow = None
         self.appNames = []
+        self.windowSizeDescriptor = ""
     def addSuites(self, suites):
         for suite in suites:
             if not suite.app.fullName in self.appNames:
@@ -473,36 +478,37 @@ class TopWindowGUI(ContainerGUI):
         self.topWindow.add(self.subguis[0].createView())
         self.topWindow.show()
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyExit)
+        self.windowSizeDescriptor = self.adjustSize()
         return self.topWindow
-    def contentsChanged(self):
-        self.describe()
-        self.adjustSize()
-        ContainerGUI.contentsChanged(self)
+    def writeSeparator(self):
+        pass # Don't bother, we're at the top
     def describe(self):
         guilog.info("Top Window title is " + self.topWindow.get_title())
         guilog.info("Default widget is " + str(self.topWindow.get_focus().__class__))
+        guilog.info(self.windowSizeDescriptor)
     def notifyExit(self, *args):
         self.notify("Exit")
         self.topWindow.destroy()
 
     def adjustSize(self):
         if guiConfig.getWindowOption("maximize"):
-            guilog.info("Maximising top window...")
             self.topWindow.maximize()
+            return "Maximising top window..."
         else:
-            width = self.getWindowDimension("width")
-            height = self.getWindowDimension("height")
+            width, widthDescriptor = self.getWindowDimension("width")
+            height, heightDescriptor  = self.getWindowDimension("height")
             self.topWindow.resize(width, height)
+            return widthDescriptor + "\n" + heightDescriptor
     def getWindowDimension(self, dimensionName):
         pixelDimension = guiConfig.getWindowOption(dimensionName + "_pixels")
         if pixelDimension != "<not set>":
-            guilog.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.") 
-            return int(pixelDimension)
+            descriptor = "Setting window " + dimensionName + " to " + pixelDimension + " pixels."
+            return int(pixelDimension), descriptor
         else:
             fullSize = eval("gtk.gdk.screen_" + dimensionName + "()")
             proportion = float(guiConfig.getWindowOption(dimensionName + "_screen"))
-            guilog.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
-            return int(fullSize * proportion)
+            descriptor = "Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen."
+            return int(fullSize * proportion), descriptor
 
     def getDefaultWindowProportion(self, dimensionName):
         if dimensionName == "height":
@@ -616,18 +622,11 @@ class MenuBarGUI(SubGUI):
         for actionGUI in self.actionGUIs:
             actionGUI.describe()
 
-class ToolBarGUI(SubGUI):
-    def __init__(self, uiManager, actionGUIs, progressBarGUI):
-        SubGUI.__init__(self)
+class ToolBarGUI(ContainerGUI):
+    def __init__(self, uiManager, actionGUIs, subgui):
+        ContainerGUI.__init__(self, [ subgui ])
         self.uiManager = uiManager
         self.actionGUIs = filter(lambda a: a.action.inToolBar(), actionGUIs)
-        self.progressBarGUI = progressBarGUI
-    def setActive(self, active):
-        SubGUI.setActive(self, active)
-        self.progressBarGUI.setActive(active)
-    def contentsChanged(self):
-        SubGUI.contentsChanged(self)
-        self.progressBarGUI.contentsChanged()
     def getWidgetName(self):
         return "_Toolbar"
     def ensureVisible(self, toolbar):
@@ -654,8 +653,9 @@ class ToolBarGUI(SubGUI):
         self.widget = gtk.HandleBox()
         self.widget.add(toolbar)
         toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
-        if self.progressBarGUI.shouldShowCurrent():
-            progressBar = self.progressBarGUI.createView()
+        progressBarGUI = self.subguis[0]
+        if progressBarGUI.shouldShowCurrent():
+            progressBar = progressBarGUI.createView()
             width = 7 # Looks good, same as gtk.Paned border width
             alignment = gtk.Alignment()
             alignment.set(1.0, 1.0, 1.0, 1.0)
@@ -729,10 +729,66 @@ class ShortcutBarGUI(SubGUI):
         return self.widget
     def contentsChanged(self):
         pass # not yet integrated
-        
-class TestTreeGUI(SubGUI):
-    def __init__(self, dynamic, popupGUI):
+
+class TestColumnGUI(SubGUI):
+    def __init__(self, dynamic):
         SubGUI.__init__(self)
+        self.totalNofTests = 0
+        self.nofSelectedTests = 0
+        self.totalNofTestsShown = 0
+        self.column = None
+        self.dynamic = dynamic
+    def addSuites(self, suites):
+        size = sum([ suite.size() for suite in suites ])
+        self.totalNofTests += size
+        self.totalNofTestsShown += size
+    def createView(self):
+        testRenderer = gtk.CellRendererText()
+        self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)
+        self.column.set_cell_data_func(testRenderer, renderSuitesBold)
+        return self.column
+    def getTitle(self):
+        title = "Tests: "
+        if self.nofSelectedTests == self.totalNofTests:
+            title += "All " + str(self.totalNofTests) + " selected"
+        else:
+            title += str(self.nofSelectedTests) + "/" + str(self.totalNofTests) + " selected"
+        if self.dynamic:
+            if self.totalNofTestsShown == self.totalNofTests:
+                title += ", all visible"
+            else:
+                title += ", " + str(self.totalNofTestsShown) + " visible"
+        return title
+    def updateTitle(self):
+        if self.column:
+            self.column.set_title(self.getTitle())
+            self.contentsChanged()
+    def describe(self):
+        guilog.info("Test column header set to '" + self.column.get_title() + "'")
+    def notifyAdd(self, test):
+        if test.classId() == "test-case":
+            self.totalNofTests += 1
+            self.updateTitle()
+    def notifyRemove(self, test):
+        self.totalNofTests -= test.size()
+        self.updateTitle()
+    def notifyNewTestSelection(self, tests, direct):
+        testcases = filter(lambda test: test.classId() == "test-case", tests)
+        newCount = len(testcases)
+        if self.nofSelectedTests != newCount:
+            self.nofSelectedTests = newCount
+            self.updateTitle()
+    def notifyVisibility(self, tests, newValue):
+        if newValue:
+            self.totalNofTestsShown += len(tests)
+        else:
+            self.totalNofTestsShown -= len(tests)
+        self.updateTitle()
+    
+        
+class TestTreeGUI(ContainerGUI):
+    def __init__(self, dynamic, popupGUI, subGUI):
+        ContainerGUI.__init__(self, [ subGUI ])
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
         self.popupGUI = popupGUI
@@ -740,18 +796,14 @@ class TestTreeGUI(SubGUI):
         self.selection = None
         self.selecting = False
         self.dynamic = dynamic
-        self.totalNofTests = 0
-        self.nofSelectedTests = 0
-        self.totalNofTestsShown = 0
         self.collapseStatic = False
         self.successPerSuite = {} # map from suite to number succeeded
         self.collapsedRows = {}
         self.filteredModel = None
-        self.testsColumn = None
         self.treeView = None
     def setActive(self, value):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
-        SubGUI.setActive(self, value)
+        ContainerGUI.setActive(self, value)
         self.treeView.grab_focus()
     def describe(self):
         guilog.info("Test Tree description...")
@@ -768,8 +820,6 @@ class TestTreeGUI(SubGUI):
             self.collapseStatic = guiConfig.getValue("static_collapse_suites")
         for suite in suites:
             size = suite.size()
-            self.totalNofTests += size
-            self.totalNofTestsShown += size
             if not self.dynamic or size > 0:
                 self.addSuiteWithParent(suite, None)
     def addSuiteWithParent(self, suite, parent, follower=None):    
@@ -817,23 +867,18 @@ class TestTreeGUI(SubGUI):
         if self.dynamic:
             self.selection.set_select_function(self.canSelect)
         self.selection.connect("changed", self.userChangedSelection)
-        testRenderer = gtk.CellRendererText()
-        testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected"
-        if self.dynamic:
-            testsColumnTitle = "Tests: 0/" + str(self.totalNofTests) + " selected, all visible"
-        self.testsColumn = gtk.TreeViewColumn(testsColumnTitle, testRenderer, text=0, background=1)
-        self.testsColumn.set_cell_data_func(testRenderer, renderSuitesBold)
-        self.treeView.append_column(self.testsColumn)
+        testsColumn = self.subguis[0].createView()
+        self.treeView.append_column(testsColumn)
         if self.dynamic:
             detailsRenderer = gtk.CellRendererText()
             perfColumn = gtk.TreeViewColumn("Details", detailsRenderer, text=4, background=5)
             self.treeView.append_column(perfColumn)
 
-        modelIndexer = TreeModelIndexer(self.filteredModel, self.testsColumn, 3)
+        modelIndexer = TreeModelIndexer(self.filteredModel, testsColumn, 3)
         scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite", modelIndexer)
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
-        self.treeView.connect('row-expanded', self.contentsChanged) # later expansions should cause description...
+        self.treeView.connect('row-expanded', self.describeTree) # later expansions should cause description...
         self.treeView.connect("button_press_event", self.showPopupMenu)
         
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
@@ -844,6 +889,8 @@ class TestTreeGUI(SubGUI):
 
         self.popupGUI.createView()
         return self.addScrollBars(self.treeView)
+    def describeTree(self, *args):
+        SubGUI.contentsChanged(self) # don't describe the column too...
 
     def showPopupMenu(self, treeview, event):
         if event.button == 3:
@@ -912,34 +959,13 @@ class TestTreeGUI(SubGUI):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):
             self.selectionChanged(direct=True)
     def selectionChanged(self, direct):
-        allSelected, selectedTests = self.getSelected()
-        self.nofSelectedTests = len(selectedTests)
-        self.updateColumnTitle()
-        self.notify("NewTestSelection", allSelected, direct)
-    def updateColumnTitle(self):
-        title = "Tests: "
-        if self.nofSelectedTests == self.totalNofTests:
-            title += "All " + str(self.totalNofTests) + " selected"
-        else:
-            title += str(self.nofSelectedTests) + "/" + str(self.totalNofTests) + " selected"
-        if self.dynamic:
-            if self.totalNofTestsShown == self.totalNofTests:
-                title += ", all visible"
-            else:
-                title += ", " + str(self.totalNofTestsShown) + " visible"
-        self.testsColumn.set_title(title)
-        guilog.info(title)
+        self.notify("NewTestSelection", self.getSelected(), direct)
     def getSelected(self):
-        # add self as an observer
-        allSelected, selectedTests = [], []
-        self.selection.selected_foreach(self.addSelTest, (allSelected, selectedTests))
-        return allSelected, selectedTests
-    def addSelTest(self, model, path, iter, lists, *args):
-        test = model.get_value(iter, 2)
-        allSelected, selectedTests = lists
-        allSelected.append(test)
-        if test.classId() == "test-case":
-            selectedTests.append(test)
+        allSelected = []
+        self.selection.selected_foreach(self.addSelTest, allSelected)
+        return allSelected
+    def addSelTest(self, model, path, iter, selected, *args):
+        selected.append(model.get_value(iter, 2))
     def findIter(self, test):
         try:
             return self.filteredModel.convert_child_iter_to_iter(self.itermap[test])
@@ -1017,11 +1043,9 @@ class TestTreeGUI(SubGUI):
             
     def notifyAdd(self, test):
         self.addTest(test)
-        if test.classId() == "test-case":
-            self.totalNofTests += 1
         guilog.info("Selecting new test " + test.name)
         self.notifySetTestSelection([ test ])
-        self.contentsChanged()
+        self.describeTree()
     def addTest(self, test):
         suite = test.parent
         suiteIter = self.itermap[suite]
@@ -1030,9 +1054,7 @@ class TestTreeGUI(SubGUI):
         iter = self.addSuiteWithParent(test, suiteIter, followIter)
     def notifyRemove(self, test):
         self.removeTest(test)
-        self.totalNofTests -= test.size()
         guilog.info("Removing test with path " + test.getRelPath())
-        self.updateColumnTitle()
     def removeTest(self, test):
         iter = self.itermap[test]
         filteredIter = self.findIter(test)
@@ -1041,7 +1063,7 @@ class TestTreeGUI(SubGUI):
         self.model.remove(iter)
         del self.itermap[test]
     def notifyContentChange(self, suite):
-        allSelected, selectedTests = self.getSelected()
+        allSelected = self.getSelected()
         self.selecting = True
         self.selection.unselect_all()
         for test in suite.testcases:
@@ -1053,13 +1075,16 @@ class TestTreeGUI(SubGUI):
     def notifyVisibility(self, tests, newValue):
         if not newValue:
             self.selecting = True
-        changed = False
+        changedTests = []
         for test in tests:
-            changed |= self.updateVisibilityInModel(test, newValue)
+            if self.updateVisibilityInModel(test, newValue):
+                changedTests.append(test)
 
-        self.selecting = False
-        if changed and self.treeView:
-            self.updateVisibilityInViews(newValue)
+        if len(changedTests) > 0:
+            self.selecting = False
+            self.notify("Visibility", changedTests, newValue)
+            if self.treeView:
+                self.updateVisibilityInViews(newValue)
     def updateVisibilityInViews(self, newValue):
         self.filteredModel.refilter()
         if newValue: # if things have become visible, expand everything
@@ -1067,7 +1092,6 @@ class TestTreeGUI(SubGUI):
             while rootIter != None:
                 self.expandRow(rootIter, True)
                 rootIter = self.filteredModel.iter_next(rootIter)
-            self.updateColumnTitle()
         else:
             self.selectionChanged(direct=False)
 
@@ -1080,11 +1104,6 @@ class TestTreeGUI(SubGUI):
         for iterator in allIterators:
             if newValue or not self.hasVisibleChildren(iterator):
                 changed |= self.setVisibility(iterator, newValue)
-        if changed:
-            if newValue:
-                self.totalNofTestsShown += 1
-            else:
-                self.totalNofTestsShown -= 1
         return changed
         
     def setVisibility(self, iter, newValue):
@@ -1270,11 +1289,16 @@ class BoxGUI(ContainerGUI):
     def getExpandWidgets(self):
         return [ gtk.HPaned, gtk.ScrolledWindow ]
     def contentsChanged(self):
-        if self.horizontal:
-            SubGUI.contentsChanged(self)
-        else:
-            ContainerGUI.contentsChanged(self)
+        if not self.active:
+            return
         
+        if self.horizontal:
+            guilog.info("")
+            for subgui in self.subguis:
+                subgui.describe()
+        else:
+            for subgui in self.subguis:
+                subgui.contentsChanged()
     def createView(self):
         box = self.createBox()
         packMethod = self.getPackMethod(box)

@@ -305,6 +305,11 @@ class InteractiveTestAction(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currentTest = None
+    def getCompositeConfigValue(self, section, name):
+        if self.currentTest:
+            return self.currentTest.getCompositeConfigValue(section, name)
+        else:
+            return guiConfig.getCompositeValue(section, name)
     def isActiveOnCurrent(self):
         return self.currentTest is not None and self.correctTestClass()
     def correctTestClass(self):
@@ -317,7 +322,7 @@ class InteractiveTestAction(InteractiveAction):
         return len(self.getOptionGroups()) == 0
     def getViewCommand(self, fileName):
         stem = os.path.basename(fileName).split(".")[0]
-        viewProgram = self.currentTest.getCompositeConfigValue("view_program", stem)
+        viewProgram = self.getCompositeConfigValue("view_program", stem)
         if not plugins.canExecute(viewProgram):
             raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
                   "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
@@ -328,7 +333,11 @@ class InteractiveTestAction(InteractiveAction):
     def getRelativeFilename(self, filename):
         # Trim the absolute filename to be relative to the application home dir
         # (TEXTTEST_HOME is more difficult to obtain, see testmodel.OptionFinder.getDirectoryName)
-        return os.path.join(self.currentTest.getRelPath(), os.path.basename(filename))
+        baseName = os.path.basename(filename)
+        if self.currentTest:
+            return os.path.join(self.currentTest.getRelPath(), baseName)
+        else:
+            return baseName
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 1:
             self.currentTest = tests[0]

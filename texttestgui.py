@@ -274,7 +274,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI.addObserver(actionThread) # window closing
     def getTestTreeObservers(self):
         selectionActions = filter(lambda action: hasattr(action, "notifyNewTestSelection"), self.intvActions)
-        return  selectionActions + [ self.testColumnGUI, self.testFileGUI, self.appFileGUI ] + self.buttonBarGUIs + \
+        return  selectionActions + [ self.testColumnGUI, self.testFileGUI ] + self.buttonBarGUIs + \
                [ self.textInfoGUI ] + self.actionTabGUIs + self.notebookGUIs + self.defaultActionGUIs
     def getLifecycleObservers(self):
         return [ self.textInfoGUI, self.testColumnGUI, self.testTreeGUI, self.testFileGUI, \
@@ -290,6 +290,9 @@ class TextTestGUI(Responder, plugins.Observable):
         return [ self, self.idleManager ]
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
+    def getAddSuitesObservers(self):
+        return [ guiConfig, self.testColumnGUI, self.testTreeGUI, self.progressMonitor, \
+                 self.appFileGUI, self.progressBarGUI, self.topWindowGUI ] + self.intvActions
 
     def setUpObservers(self):    
         for observer in self.getTestTreeObservers():
@@ -330,15 +333,9 @@ class TextTestGUI(Responder, plugins.Observable):
     def needsTestRuns(self):
         return self.dynamic
     def addSuites(self, suites):
-        guiConfig.addSuites(suites)
-        self.testColumnGUI.addSuites(suites)
-        self.testTreeGUI.addSuites(suites)
-        self.progressMonitor.addSuites(suites)
-        self.progressBarGUI.addSuites(suites)
-        self.topWindowGUI.addSuites(suites)
-        for action in self.intvActions:
-            action.addSuites(suites)
-
+        for observer in self.getAddSuitesObservers():
+            observer.addSuites(suites)
+            
         self.topWindowGUI.createView()
         self.topWindowGUI.activate()
         self.idleManager.enableHandler()
@@ -382,7 +379,7 @@ class TextTestGUI(Responder, plugins.Observable):
         return actionTabGUIs
 
     def createRightWindowGUI(self):
-        tabGUIs = [ self.textInfoGUI, self.progressMonitor ] + self.actionTabGUIs
+        tabGUIs = [ self.appFileGUI, self.textInfoGUI, self.progressMonitor ] + self.actionTabGUIs
         buttonBarGUI = BoxGUI(self.buttonBarGUIs, horizontal=True, reversed=True)
         topTestViewGUI = BoxGUI([ self.testFileGUI, buttonBarGUI ], horizontal=False)
 
@@ -395,8 +392,6 @@ class TextTestGUI(Responder, plugins.Observable):
             for name, notebookGUI in subNotebookGUIs.items():
                 if name == "Test":
                     tabInfo[name] = PaneGUI(topTestViewGUI, notebookGUI, horizontal=False)
-                elif name == "Running":
-                    tabInfo[name] = PaneGUI(self.appFileGUI, notebookGUI, horizontal=False)
                 else:
                     tabInfo[name] = notebookGUI
 
@@ -1826,7 +1821,6 @@ class FileViewGUI(SubGUI):
         SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
-        self.currentObject = None
         self.dynamic = dynamic
         self.selection = None
         self.nameColumn = None
@@ -1869,11 +1863,6 @@ class FileViewGUI(SubGUI):
                 self.describeLevel(subIter, self.model.get_value(currIter, 0))
             currIter = self.model.iter_next(currIter)
         
-    def getName(self, tests=[]):
-        if len(tests) > 1:
-            return "Sample from " + repr(len(tests)) + " tests"
-        else:
-            return self.currentObject.name.replace("_", "__")
     def createView(self):
         self.model.clear()
         self.addFilesToModel(self.getState())
@@ -1926,37 +1915,43 @@ class FileViewGUI(SubGUI):
             if len(details) > 0:
                 self.model.set_value(fciter, 4, details)
         return fciter
-    def getColour(self, name):
-        return self.currentObject.getConfigValue("file_colours")[name]
     
 class ApplicationFileGUI(FileViewGUI):
-    def notifyNewTestSelection(self, tests, direct):
-        if len(tests) > 0 and self.currentObject != tests[0].app:
-            self.currentObject = tests[0].app
-            self.setName()
-            self.recreateModel(self.getState())
+    def __init__(self, dynamic):
+        FileViewGUI.__init__(self, dynamic)
+        self.allApps = []
+    def addSuites(self, suites):
+        self.allApps = [ suite.app for suite in suites ]
+    def shouldShowCurrent(self):
+        return not self.dynamic
+    def getGroupTabTitle(self):
+        return "Config"
+    def getName(self):
+        return "Configuration Files"
     def monitorEvents(self, indexer):
         scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated, indexer)
     def addFilesToModel(self, state):
-        confiter = self.model.insert_before(None, None)
-        self.model.set_value(confiter, 0, "Application Files")
-        colour = self.getColour("app_static")
-        for file in self.getConfigFiles():
-            self.addFileToModel(confiter, file, None, colour)
-
+        colour = guiConfig.getCompositeValue("file_colours", "app_static")
         personalFiles = self.getPersonalFiles()
         if len(personalFiles) > 0:
             persiter = self.model.insert_before(None, None)
             self.model.set_value(persiter, 0, "Personal Files")
             for file in personalFiles:
                 self.addFileToModel(persiter, file, None, colour)
-    def getConfigFiles(self):
-        configFiles = self.currentObject.dircache.findAllFiles("config", [ self.currentObject.name ])
+
+        for app in self.allApps:
+            confiter = self.model.insert_before(None, None)
+            self.model.set_value(confiter, 0, "Files for " + app.fullName)
+            for file in self.getConfigFiles(app):
+                self.addFileToModel(confiter, file, None, colour)
+
+    def getConfigFiles(self, app):
+        configFiles = app.dircache.findAllFiles("config", [ app.name ])
         configFiles.sort()
         return configFiles
     def getPersonalFiles(self):
         personalFiles = []
-        personalFile = self.currentObject.getPersonalConfigFile()
+        personalFile = self.allApps[0].getPersonalConfigFile()
         if personalFile:
             personalFiles.append(personalFile)
         gtkRcFile = getGtkRcFile()
@@ -1965,33 +1960,43 @@ class ApplicationFileGUI(FileViewGUI):
         return personalFiles
 
 class TestFileGUI(FileViewGUI):
+    def __init__(self, dynamic):
+        FileViewGUI.__init__(self, dynamic)
+        self.currentTest = None
     def notifyFileChange(self, test):
-        if test is self.currentObject:
+        if test is self.currentTest:
             self.recreateModel(test.state)
     def notifyLifecycleChange(self, test, state, changeDesc):
-        if test is self.currentObject:
+        if test is self.currentTest:
             self.recreateModel(state)
     def forceVisible(self, tests):
         return len(tests) == 1
     
     def notifyNewTestSelection(self, tests, direct):
         if not self.dynamic and len(tests) != 1: # multiple tests in static GUI result in removal
-            self.currentObject = None
+            self.currentTest = None
             self.nameColumn = None
             self.selection = None
             return
 
-        if len(tests) > 1 and self.currentObject in tests:
+        if len(tests) > 1 and self.currentTest in tests:
             self.setName(tests)
             self.describeName()
         elif len(tests) > 0:
-            self.currentObject = tests[0]
-            self.currentObject.refreshFiles()
+            self.currentTest = tests[0]
+            self.currentTest.refreshFiles()
             self.setName(tests)
             self.recreateModel(self.getState())
+    def getName(self, tests=[]):
+        if len(tests) > 1:
+            return "Sample from " + repr(len(tests)) + " tests"
+        else:
+            return self.currentTest.name.replace("_", "__")
+    def getColour(self, name):
+        return self.currentTest.getConfigValue("file_colours")[name]
 
     def shouldShowCurrent(self):
-        return self.currentObject is not None
+        return self.currentTest is not None
             
     def addFilesToModel(self, state):
         if state.hasStarted():
@@ -2015,7 +2020,7 @@ class TestFileGUI(FileViewGUI):
     def fileSelected(self, treemodel, path, iter, filelist):
         filelist.append(self.model.get_value(iter, 0))
     def getState(self):
-        return self.currentObject.state
+        return self.currentTest.state
     def addComparisonsToModel(self, state):
         self.addComparisons(state.correctResults + state.changedResults, "Comparison Files")
         self.addComparisons(state.newResults, "New Files")
@@ -2051,18 +2056,18 @@ class TestFileGUI(FileViewGUI):
             dict[relDir].append(file)
         return dict
     def getRelDir(self, file):
-        relPath = self.currentObject.getTestRelPath(file)
+        relPath = self.currentTest.getTestRelPath(file)
         if relPath is None:
-            print "Warning: unrelated", file, "and", self.currentObject.getDirectory()
+            print "Warning: unrelated", file, "and", self.currentTest.getDirectory()
         if relPath.find(os.sep) != -1:
             dir, local = os.path.split(relPath)
             return dir
         else:
             return ""
     def getComparisonColour(self, fileComp):
-        if not self.currentObject.state.hasStarted():
+        if not self.currentTest.state.hasStarted():
             return self.getStaticColour()
-        if not self.currentObject.state.isComplete():
+        if not self.currentTest.state.isComplete():
             return self.getColour("running")
         if fileComp.hasSucceeded():
             return self.getColour("success")
@@ -2074,13 +2079,13 @@ class TestFileGUI(FileViewGUI):
         else:
             return self.getColour("static")
     def addTmpFilesToModel(self):
-        tmpFiles = self.currentObject.listTmpFiles()
+        tmpFiles = self.currentTest.listTmpFiles()
         tmpIter = self.model.insert_before(None, None)
         self.model.set_value(tmpIter, 0, "Temporary Files")
         self.addStandardFilesUnderIter(tmpIter, tmpFiles)
     def addStaticFilesToModel(self):
-        stdFiles, defFiles = self.currentObject.listStandardFiles(allVersions=True)
-        if self.currentObject.classId() == "test-case":
+        stdFiles, defFiles = self.currentTest.listStandardFiles(allVersions=True)
+        if self.currentTest.classId() == "test-case":
             stditer = self.model.insert_before(None, None)
             self.model.set_value(stditer, 0, "Standard Files")
             if len(stdFiles):
@@ -2092,14 +2097,14 @@ class TestFileGUI(FileViewGUI):
         self.addStaticDataFilesToModel()
     def getDisplayDataFiles(self):
         try:
-            return self.currentObject.app.configObject.extraReadFiles(self.currentObject).items()
+            return self.currentTest.app.configObject.extraReadFiles(self.currentTest).items()
         except:
-            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentObject.app.configObject.moduleName + \
+            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentTest.app.configObject.moduleName + \
                              "' configuration while requesting extra data files, not displaying any such files")
             plugins.printException()
             return seqdict()
     def addStaticDataFilesToModel(self):
-        dataFiles = self.currentObject.listDataFiles()
+        dataFiles = self.currentTest.listDataFiles()
         displayDataFiles = self.getDisplayDataFiles()
         if len(dataFiles) == 0 and len(displayDataFiles) == 0:
             return
@@ -2113,7 +2118,7 @@ class TestFileGUI(FileViewGUI):
             for file in filelist:
                 self.addFileToModel(exiter, file, None, colour)
     def addDataFilesUnderIter(self, iter, files, colour):
-        dirIters = { self.currentObject.getDirectory() : iter }
+        dirIters = { self.currentTest.getDirectory() : iter }
         parentIter = iter
         for file in files:
             parent, local = os.path.split(file)

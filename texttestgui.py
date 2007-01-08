@@ -750,9 +750,11 @@ class TestColumnGUI(SubGUI):
             title += str(self.nofSelectedTests) + "/" + str(self.totalNofTests) + " selected"
         if self.dynamic:
             if self.totalNofTestsShown == self.totalNofTests:
-                title += ", all visible"
+                title += ", none hidden"
+            elif self.totalNofTestsShown == 0:
+                title += ", all hidden"
             else:
-                title += ", " + str(self.totalNofTestsShown) + " visible"
+                title += ", " + str(self.totalNofTests - self.totalNofTestsShown) + " hidden"
         return title
     def updateTitle(self):
         if self.column:

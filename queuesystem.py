@@ -115,8 +115,8 @@ class QueueSystemConfig(default.Config):
             return slaveDir
         else:
             return default.Config.getWriteDirectoryName(self, app)
-    def useExtraVersions(self):
-        return not self.slaveRun()
+    def useExtraVersions(self, app):
+        return default.Config.useExtraVersions(self, app) and not self.slaveRun()
     def getCleanMode(self):
         if self.slaveRun():
             return self.CLEAN_NONE

@@ -73,6 +73,8 @@ class Config(plugins.Configuration):
                (not self.hasExplicitInterface() and app.getConfigValue("default_interface") == "static_gui")
     def useConsole(self):
         return self.optionMap.has_key("con")
+    def useExtraVersions(self, app):
+        return not self.useStaticGUI(app)
     def getDefaultInterface(self, allApps):
         defaultIntf = None
         for app in allApps:

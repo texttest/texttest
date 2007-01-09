@@ -840,16 +840,17 @@ class SelectTests(SelectionAction):
         self.rootTestSuites = suites
         possVersions = []
         for suite in suites:
-            possVersion = self.getPossibleVersion(suite)
-            if possVersion not in possVersions:
-                possVersions.append(possVersion)
+            for possVersion in self.getPossibleVersions(suite.app):
+                if possVersion not in possVersions:
+                    possVersions.append(possVersion)
         self.optionGroup.setPossibleValues("vs", possVersions)
-    def getPossibleVersion(self, suite):
-        appVer = suite.app.getFullVersion()
-        if len(appVer) == 0:
-            return "<default>"
+    def getPossibleVersions(self, app):
+        fullVersion = app.getFullVersion()
+        extraVersions = app.getExtraVersions(forUse=False)
+        if len(fullVersion) == 0:
+            return [ "<default>" ] + extraVersions
         else:
-            return appVer
+            return [ fullVersion ] + [ fullVersion + "." + extra for extra in extraVersions ]
     def isActiveOnCurrent(self):
         return True
     def findSelectGroup(self, app):

@@ -142,8 +142,8 @@ class Config(CarmenConfig):
                 group.addOption("raveslave", "Private: used for submitting slaves to compile rulesets")
     def getFilterClasses(self):
         return CarmenConfig.getFilterClasses(self) + [ UserFilter ]
-    def useExtraVersions(self):
-        return CarmenConfig.useExtraVersions(self) and not self.raveSlave()
+    def useExtraVersions(self, app):
+        return CarmenConfig.useExtraVersions(self, app) and not self.raveSlave()
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true"
     def getResponderClasses(self, allApps):

@@ -198,8 +198,8 @@ class Configuration:
         return ""
     def getFilterFilePath(self, app, localName, forWrite):
         return localName
-    def useExtraVersions(self):
-        return 1
+    def useExtraVersions(self, app):
+        return True
     def printHelpText(self):
         pass
     def extraReadFiles(self, test):

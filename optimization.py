@@ -1706,12 +1706,20 @@ class PlotLine:
         cnt = 0
         for solution in optRun.solutions:
             if solution.has_key(item) and solution.has_key(xItem):
-                if cnt > 0 and (self.min == None or self.min > solution[item]):
-                    self.min = solution[item]
+                try:
+                    y = float(solution[item])
+                except ValueError:
+                    raise plugins.TextTestError, "Extracted value '" + solution[item] + "' for plot item '" + item + "' is not a float."
+                # We prefer having y as int if possible...
+                yInt = int(y)
+                if yInt == y:
+                    y = yInt
+                if cnt > 0 and (self.min == None or self.min > y):
+                    self.min = y
                 if plotAgainstSolution:
-                    self.graph[cnt] = solution[item]
+                    self.graph[cnt] = y
                 else:
-                    self.graph[solution[xItem]*timeScaleFactor] = solution[item]
+                    self.graph[solution[xItem]*timeScaleFactor] = y
             cnt = cnt + 1
     def writeFile(self, xScaleFactor, min):
         dir, localName = os.path.split(self.plotFileName)

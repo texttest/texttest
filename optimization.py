@@ -1142,18 +1142,22 @@ class TestGraph:
         self.xScaleFactor = 1
         # This is the options and switches that are common
         # both for the GUI and command line.
-        options = [ ("r", "Horizontal range", "0:"),
-                    ("yr", "Vertical range", ""),
-                    ("ts", "Time scale to use", "minutes"),
-                    ("p", "Absolute file to print to", ""),
-                    ("pr", "Printer to print to", ""),
-                    ("i", "Log file item to plot", costEntryName),
-                    ("ix", "Log file item to plot against", timeEntryName),
-                    ("v", "Extra versions to plot", ""),
-                    ("title", "Title of the plot", ""),
-                    ("size", "size of the plot", ""),
-                    ("terminal", "gnuplot terminal to use", "postscript"),
-                    ("engine", "Plot engine to use", "gnuplot") ]
+        options = [ ("r", "Horizontal range", ["0:"]),
+                    ("yr", "Vertical range", [""]),
+                    ("ts", "Time scale to use", ["minutes", "hours", "days"]),
+                    ("p", "Absolute file to print to", [""]),
+                    ("pr", "Printer to print to", [""]),
+                    ("i", "Log file item to plot", [costEntryName, "APC total rule cost", "extra overcover cost", \
+                                                    "global constraint excess cost", "base constraint excess cost", \
+                                                    "global constraint excess cost,base constraint excess cost", \
+                                                    "overcovers", "uncovered legs\.\.", "illegal trips........................", \
+                                                    "overcovers,uncovered legs\.\.,illegal trips........................","apctimes"]),
+                    ("ix", "Log file item to plot against", [timeEntryName, "Colgen iterations"]),
+                    ("v", "Extra versions to plot", [""]),
+                    ("title", "Title of the plot", [""]),
+                    ("size", "size of the plot", [""]),
+                    ("terminal", "gnuplot print terminal", ["postscript", "png", "svg"]),
+                    ("engine", "Plot engine to use", ["gnuplot", "mpl"]) ]
         switches = [ ("per", "Plot percentage"),
                      ("pc", "Print in colour"),
                      ("pa3", "Print in A3"),
@@ -1170,8 +1174,8 @@ class TestGraph:
             self.optionGroup.addSwitch("oem", "Only plot exactly matching versions")
             self.optionGroup.addSwitch("nt", "Don't search for temporary files")
         # Create the options and read the command line arguments.
-        for name, expl, value in options:
-            self.optionGroup.addOption(name, expl, value)
+        for name, expl, values in options:
+            self.optionGroup.addOption(name, expl, values[0], possibleValues = values)
         for name, expl in switches:
             self.optionGroup.addSwitch(name, expl)
     def readCommandLine(self, args):

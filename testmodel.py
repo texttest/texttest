@@ -73,10 +73,12 @@ class DirectoryCache:
             if len(versionList) > 0 and not stem in stems:
                 stems.append(stem)
         return stems
-    def findAllFiles(self, stem, compulsory = [], forbidden = []):
+    def findAllFiles(self, stem, compulsory = [], forbidden = [], priorityFunction=None):
         versionLists, versionInfo = self.findVersionLists(stem)
         if len(compulsory) or len(forbidden):
             versionLists = filter(lambda vlist: self.matchVersions(vlist, compulsory, forbidden), versionLists)
+        if priorityFunction:
+            versionLists.sort(priorityFunction)
         return map(lambda vlist: self.pathName(versionInfo[string.join(vlist, ".")]), versionLists)
     def allVersionsAllowed(self, vlist, allowed):
         for version in vlist:
@@ -533,18 +535,20 @@ class TestSuite(Test):
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
     def findTestSuiteFiles(self, forTestRuns=0):
-        allFiles = [ self.getContentFileName() ]
+        contentFile = self.getContentFileName()
         if forTestRuns:
-            return allFiles
+            return [ contentFile ]
+        
         compulsoryExts = [ self.app.name ] + self.app.versions
-        # Don't do this for extra versions, they appear anyway...
-        ignoreExts = self.app.getExtraVersions() + self.app.getExtraBaseVersions()
-        self.diagnose("Finding test suite files, using all versions in " + repr(compulsoryExts) + " and none in " + repr(ignoreExts))
+        self.diagnose("Finding test suite files, using all versions in " + repr(compulsoryExts))
+        versionFiles = []
         for dircache in self.dircaches:
-            for newFile in dircache.findAllFiles("testsuite", compulsoryExts, ignoreExts):
-                if newFile != allFiles[0]: # the content file
-                    allFiles.append(newFile)
-        return allFiles
+            allFiles = dircache.findAllFiles("testsuite", compulsoryExts, priorityFunction=self.app.compareVersionLists)
+            allFiles.reverse() # sort function works the wrong way round for us...
+            for newFile in allFiles:
+                if newFile != contentFile:
+                    versionFiles.append(newFile)
+        return [ contentFile ] + versionFiles
     def getContentFileName(self):
         return self.getFileName("testsuite")
     def createContentFile(self):
@@ -846,16 +850,6 @@ class Application:
             if extra in self.versions:
                 return []
         return extraVersions
-    def getExtraBaseVersions(self):
-        if not self.configObject.useExtraVersions(self):
-            return []
-
-        extraBases = []
-        for extra in self.extras:
-            for extraBase in extra.getConfigValue("base_version"):
-                if not extraBase in extraBases:
-                    extraBases.append(extraBase)
-        return extraBases
     def setConfigDefaults(self):
         self.setConfigDefault("binary", "", "Full path to the System Under Test")
         self.setConfigDefault("config_module", "default", "Configuration module to use")
@@ -983,24 +977,28 @@ class Application:
     def getFileExtensions(self):
         return [ self.name ] + self.getConfigValue("base_version") + self.versions
     def compareVersionLists(self, vlist1, vlist2):
+        explicitVersions = [ self.name ] + self.versions
+        versionCount1 = self.intersectionCount(vlist1, explicitVersions)
+        versionCount2 = self.intersectionCount(vlist2, explicitVersions)
+        if versionCount1 != versionCount2:
+            # More explicit versions implies higher priority
+            return cmp(versionCount1, versionCount2)
+
+        baseVersions = self.getConfigValue("base_version")
+        baseCount1 = self.intersectionCount(vlist1, baseVersions)
+        baseCount2 = self.intersectionCount(vlist2, baseVersions)
+        if baseCount1 != baseCount2:
+            # More base versions implies higher priority
+            return cmp(baseCount1, baseCount2)
+
         priority1 = self.getVersionListPriority(vlist1)
         priority2 = self.getVersionListPriority(vlist2)
-        if priority1 != priority2:
-            # Low number implies higher priority...
-            return cmp(priority2, priority1)
-        versionCount1 = len(vlist1)
-        versionCount2 = len(vlist2)
-        if versionCount1 != versionCount2:
-            # More versions implies higher priority
-            return cmp(versionCount1, versionCount2)
-        baseCount1 = self.getBaseVersionCount(vlist1)
-        baseCount2 = self.getBaseVersionCount(vlist2)
-        # Less base versions implies higher priority
-        return cmp(baseCount2, baseCount1)
-    def getBaseVersionCount(self, vlist):
+        # Low number implies higher priority...
+        return cmp(priority2, priority1)
+    def intersectionCount(self, vlist1, vlist2):
         count = 0
-        for ver in self.getConfigValue("base_version"):
-            if ver in vlist:
+        for ver in vlist1:
+            if ver in vlist2:
                 count += 1
         return count
     def getVersionListPriority(self, vlist):

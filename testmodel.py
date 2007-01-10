@@ -841,8 +841,10 @@ class Application:
             if appName != self.name and not appName in names:
                 names.append(appName)
         return names
+    def useExtraVersions(self):
+        return self.configObject.useExtraVersions(self)
     def getExtraVersions(self, forUse=True):
-        if forUse and not self.configObject.useExtraVersions(self):
+        if forUse and not self.useExtraVersions():
             return []
         
         extraVersions = self.getConfigValue("extra_version")

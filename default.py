@@ -1059,9 +1059,24 @@ class GrepFilter(TextFilter):
         TextFilter.__init__(self, filterText)
         self.fileStem = fileStem
     def acceptsTestCase(self, test):
-        logFile = test.getFileName(self.fileStem)
-        if not logFile:
-            return False
+        for logFile in self.findAllLogFiles(test):
+            if self.matches(logFile):
+                return True
+        return False
+    def getVersions(self, test):
+        versions = [ None ]
+        if test.app.useExtraVersions():
+            return versions
+        else:
+            return versions + test.app.getExtraVersions(forUse=False)
+    def findAllLogFiles(self, test):
+        logFiles = []
+        for version in self.getVersions(test):
+            logFile = test.getFileName(self.fileStem, version)
+            if logFile and logFile not in logFiles:
+                logFiles.append(logFile)
+        return logFiles
+    def matches(self, logFile):
         for line in open(logFile).xreadlines():
             if self.stringContainsText(line):
                 return True

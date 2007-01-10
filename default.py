@@ -92,7 +92,8 @@ class Config(plugins.Configuration):
         else:
             raise plugins.TextTestError, "Invalid value for default_interface '" + defaultInterface + "'"
     def hasExplicitInterface(self):
-        return self.useGUI() or self.batchMode() or self.useConsole() or self.optionMap.has_key("o")
+        return self.useGUI() or self.batchMode() or self.useConsole() or \
+               self.optionMap.has_key("o") or self.optionMap.has_key("s")
     def getResponderClasses(self, allApps):
         classes = []
         if not self.hasExplicitInterface():

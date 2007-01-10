@@ -1325,6 +1325,7 @@ class ActionTabGUI(SubGUI):
         return self.addScrollBars(self.createVBox())
     def notifyReset(self):
         self.optionGroup.reset()
+        self.contentsChanged()
     def notifyLifecycleChange(self, test, state, changeDesc):
         changedContents, changedValues = self.action.updateForStateChange(test, state)
         self.handleChanges(changedContents, changedValues)     

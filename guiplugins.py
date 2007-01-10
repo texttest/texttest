@@ -269,13 +269,7 @@ class SelectionAction(InteractiveAction):
             if not relPath in selTestPaths:
                 selTestPaths.append(relPath)
         return "-tp " + string.join(selTestPaths, ",")
-    def getCmdlineOptionForApps(self):
-        apps = []
-        for test in self.currTestSelection:
-            if not test.app.name in apps:
-                apps.append(test.app.name)
-        return "-a " + string.join(apps, ",")
-
+    
 class Quit(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
@@ -1038,39 +1032,18 @@ class SaveSelection(SelectionAction):
         self.addFilterFile(self.selectionGroup, fileName)
     def messageAfterPerform(self):
         return "Saved " + self.describeTests() + " in file '" + self.getFileName() + "'."
-                  
-class RunTests(SelectionAction):
+
+class RunningAction(SelectionAction):
     runNumber = 1
     def __init__(self, commandOptionGroups):
         SelectionAction.__init__(self)
-        self.optionGroups = []
         for group in commandOptionGroups:
             if group.name.startswith("Invisible"):
                 self.invisibleGroup = group
             elif group.name.startswith("Select"):
                 self.selectionGroup = group
-            else:
-                self.optionGroups.append(group)
-    def getOptionGroups(self):
-        return self.optionGroups
-    # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasExternalGUIDescription(self):
-        return True
-    def _getTitle(self):
-        return "_Run"
-    def getStockId(self):
-        return "execute"
-    def _getScriptTitle(self):
-        return "Run selected tests"
-    def getGroupTabTitle(self):
-        return "Running"
     def messageAfterPerform(self):
-        return "Started " + self.describeTests() + " at " + plugins.localtime() + "."
-    def getUseCaseName(self):
-        if self.runNumber == 1:
-            return "dynamic"
-        else:
-            return "dynamic_" + str(self.runNumber)
+        return self.performedDescription() + " " + self.describeTests() + " at " + plugins.localtime() + "."
     def performOnCurrent(self):
         writeDir = os.path.join(self.currTestSelection[0].app.writeDirectory, "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
@@ -1095,12 +1068,18 @@ class RunTests(SelectionAction):
     def getTextTestOptions(self, filterFile):
         ttOptions = [ self.getCmdlineOptionForApps() ]
         ttOptions += self.invisibleGroup.getCommandLines()
-        for group in self.optionGroups:
+        for group in self.getOptionGroups():
             ttOptions += group.getCommandLines()
         filterDir, filterFileName = os.path.split(filterFile)
         ttOptions.append("-f " + filterFileName)
         ttOptions.append("-fd " + filterDir)
         return string.join(ttOptions)
+    def getCmdlineOptionForApps(self):
+        apps = []
+        for test in self.currTestSelection:
+            if not test.app.name in apps:
+                apps.append(test.app.name)
+        return "-a " + string.join(apps, ",")
     def checkTestRun(self, identifierString, errFile, testSel):
         try:
             self.notifyIfMainThread("ActionStart", "")
@@ -1116,10 +1095,7 @@ class RunTests(SelectionAction):
                 self.notifyIfMainThread("ActionProgress", "")
                 test.filesChanged()
             runNumber = int(os.path.basename(writeDir).replace("dynamic_run", ""))
-            if runNumber == 1:
-                scriptEngine.applicationEvent("dynamic GUI to be closed")
-            else:
-                scriptEngine.applicationEvent("dynamic GUI " + str(runNumber) + " to be closed")
+            scriptEngine.applicationEvent(self.getUseCaseName() + " GUI to be closed")
             if os.path.isfile(errFile):
                 errText = open(errFile).read()
                 if len(errText):
@@ -1127,6 +1103,53 @@ class RunTests(SelectionAction):
         finally:
             self.notifyIfMainThread("Status", "Done updating after dynamic run " + identifierString + ".")
             self.notifyIfMainThread("ActionStop", "")
+
+
+class ReconnectToTests(RunningAction):
+    def __init__(self, commandOptionGroups):
+        RunningAction.__init__(self, commandOptionGroups)
+        self.addOption("v", "Version to reconnect to")
+        self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP"), description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
+        self.addSwitch("reconnfull", "Results:", 0, ["Display as they were", "Recompute from files"])
+    def getGroupTabTitle(self):
+        return "Running"
+    def inMenuOrToolBar(self):
+        return False
+    def _getTitle(self):
+        return "Re_connect"
+    def _getScriptTitle(self):
+        return "Reconnect to previously run tests"
+    def getTabTitle(self):
+        return "Reconnect"
+    def performedDescription(self):
+        return "Reconnected to"
+    def getUseCaseName(self):
+        return "reconnect"
+
+class RunTests(RunningAction):
+    def __init__(self, commandOptionGroups):
+        RunningAction.__init__(self, commandOptionGroups)
+        self.optionGroups = []
+        for group in commandOptionGroups:
+            if not group.name.startswith("Invisible") and not group.name.startswith("Select"):
+                self.optionGroups.append(group)
+    def getOptionGroups(self):
+        return self.optionGroups
+    # We'll assume the appropriate XML code is given by an outside definition file.
+    def hasExternalGUIDescription(self):
+        return True
+    def _getTitle(self):
+        return "_Run"
+    def getStockId(self):
+        return "execute"
+    def _getScriptTitle(self):
+        return "Run selected tests"
+    def getGroupTabTitle(self):
+        return "Running"
+    def performedDescription(self):
+        return "Started"
+    def getUseCaseName(self):
+        return "dynamic"
 
 class CreateDefinitionFile(InteractiveTestAction):
     def __init__(self):
@@ -1439,7 +1462,7 @@ class InteractiveActionHandler:
         self.actionDynamicClasses = [ SaveTests, RecomputeTest ]
         self.actionStaticClasses = [ RecordTest, CopyTest, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
-                                     RunTests, ResetGroups, RemoveTest ]
+                                     RunTests, ResetGroups, RemoveTest, ReconnectToTests ]
         self.actionPostClasses = [ SaveSelection ]
         self.loadModules = [] # derived configurations add to this on being imported...
         self.optionGroupMap = {}
@@ -1449,6 +1472,7 @@ class InteractiveActionHandler:
             return
 
         self.optionGroupMap[RunTests] = optionGroups
+        self.optionGroupMap[ReconnectToTests] = optionGroups
         for group in optionGroups:
             if group.name.startswith("Select"):
                 self.optionGroupMap[SelectTests] = [ group ]

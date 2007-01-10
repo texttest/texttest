@@ -27,8 +27,6 @@ class Config(plugins.Configuration):
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("Basic"):
                 group.addOption("c", "Use checkout", app.checkout)
-                group.addOption("reconnect", "Reconnect to", description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
-                group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 diagDict = app.getConfigValue("diagnostics")
@@ -52,6 +50,8 @@ class Config(plugins.Configuration):
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addOption("fd", "Private: Directory to search for filter files in")
+                group.addOption("reconnect", "Reconnect to previous run")
+                group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
                 group.addSwitch("n", "Create new results files (overwrite everything)")
                 if recordsUseCases:
                     group.addSwitch("record", "Record usecase rather than replay what is present")

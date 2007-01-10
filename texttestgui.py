@@ -367,7 +367,7 @@ class TextTestGUI(Responder, plugins.Observable):
         return defaultGUIs, buttonGUIs
 
     def createActionGUIForTab(self, action):
-        if len(action.getOptionGroups()) == 1 and action.canPerform():
+        if action.canPerform():
             return ButtonActionGUI(action, fromTab=True)
     def createActionTabGUIs(self):
         actionTabGUIs = []

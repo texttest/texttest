@@ -539,13 +539,22 @@ class ViewFile(InteractiveTestAction):
         title = self.currentTest.name + " (" + baseName + ")"
         process = self.startExternalProgram(followProgram + " " + fileName, description=description, shellTitle=title)
         scriptEngine.monitorProcess("follows progress of test files", process)
+    def isTestDefinition(self, stem, fileName):
+        if not self.currentTest:
+            return False
+        defFile = self.currentTest.getFileName(stem)
+        if defFile:
+            return plugins.samefile(fileName, defFile)
+        else:
+            return False
     def notifyViewFile(self, comparison, fileName):
         if self.optionGroup.getSwitchValue("f"):
             return self.followFile(self.fileToFollow(comparison, fileName))
         if not comparison:
-            baseName = os.path.basename(fileName)
-            refreshContents = baseName.startswith("testsuite.") # re-read which tests we have
-            refreshFiles = baseName.startswith("options.") # options file can change appearance of test (environment refs etc.)
+            # refresh order of tests if this edited
+            refreshContents = self.isTestDefinition("testsuite", fileName)
+            # options file can change appearance of test (environment refs etc.)
+            refreshFiles = self.isTestDefinition("options", fileName)
             return self.viewFile(fileName, refreshContents, refreshFiles)
         if self.shouldTakeDiff(comparison):
             self.takeDiff(comparison)

@@ -1441,9 +1441,10 @@ class ActionTabGUI(SubGUI):
                 scriptEngine.registerToggleButton(radioButton, "choose " + option)
                 if not mainRadioButton:
                     mainRadioButton = radioButton
+                if switch.defaultValue == index:
+                    switch.resetMethod = radioButton.set_active
                 if switch.getValue() == index:
                     radioButton.set_active(True)
-                    switch.resetMethod = radioButton.set_active
                 else:
                     radioButton.set_active(False)
                 hbox.pack_start(radioButton, expand=True, fill=True)

@@ -649,7 +649,7 @@ class ImportTest(InteractiveTestAction):
         if testName.find(" ") != -1:
             raise plugins.TextTestError, "The new " + self.testType() + \
                   " name is not permitted to contain spaces, please specify another"
-        for test in suite.testCaseList():
+        for test in suite.testcases:
             if test.name == testName:
                 raise plugins.TextTestError, "A " + self.testType() + " with the name '" + \
                       testName + "' already exists, please choose another name"

@@ -1075,7 +1075,11 @@ class GrepFilter(TextFilter):
         for fileName in test.findAllStdFiles(self.fileStem):
             fileVersions = os.path.basename(fileName).split(".")[2:]
             if self.allAllowed(fileVersions, versions):
-                logFiles.append(fileName)
+                if os.path.isfile(fileName):
+                    logFiles.append(fileName)
+                else:
+                    test.refreshFiles()
+                    return self.findAllLogFiles(test)
         return logFiles
     def allAllowed(self, fileVersions, versions):
         for version in fileVersions:

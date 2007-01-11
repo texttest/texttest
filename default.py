@@ -316,6 +316,20 @@ class Config(plugins.Configuration):
     def optionValue(self, option):
         return self.optionMap.get(option, "")
     def getCheckoutPath(self, app):
+        if self.isReconnecting():
+            return "" # don't care about checkouts
+        
+        checkoutPath = self.getGivenCheckoutPath(app)
+        # Allow empty checkout, means no checkout is set, basically
+        if len(checkoutPath) > 0:
+            self.verifyCheckoutValid(checkoutPath)
+        return checkoutPath
+    def verifyCheckoutValid(self, checkoutPath):
+        if not os.path.isabs(checkoutPath):
+            raise plugins.TextTestError, "could not create absolute checkout from relative path '" + checkoutPath + "'"
+        elif not os.path.isdir(checkoutPath):
+            raise plugins.TextTestError, "checkout '" + checkoutPath + "' does not exist"
+    def getGivenCheckoutPath(self, app):
         checkout = self.getCheckout(app)
         if os.path.isabs(checkout):
             return checkout

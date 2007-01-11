@@ -400,7 +400,7 @@ class TextTest:
             try:
                 for version in versionList:
                     appList += self.addApplications(appName, dircache, version)
-            except testmodel.BadConfigError:
+            except (testmodel.BadConfigError, plugins.TextTestError):
                 sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + "\n")
                 raisedError = True
         return raisedError, appList

@@ -1122,15 +1122,7 @@ class Application:
         if len(docString) > 0:
             self.configDocs[key] = docString
     def makeCheckout(self):
-        absCheckout = self.configObject.getCheckoutPath(self)
-        if len(absCheckout) == 0: # default, allow this, means no checkout is set, basically
-            return ""
-        if not os.path.isabs(absCheckout):
-            raise BadConfigError, "could not create absolute checkout from relative path '" + absCheckout + "'"
-        elif not os.path.isdir(absCheckout):
-            raise BadConfigError, "checkout '" + absCheckout + "' does not exist"
-        else:
-            return absCheckout
+        return self.configObject.getCheckoutPath(self)
     def checkBinaryExists(self):
         binary = self.getConfigValue("binary")
         if not binary:

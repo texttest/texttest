@@ -1077,8 +1077,8 @@ class TestTreeGUI(ContainerGUI):
             if self.updateVisibilityInModel(test, newValue):
                 changedTests.append(test)
 
+        self.selecting = False
         if len(changedTests) > 0:
-            self.selecting = False
             self.notify("Visibility", changedTests, newValue)
             if self.treeView:
                 self.updateVisibilityInViews(newValue)

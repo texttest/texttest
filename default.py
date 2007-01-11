@@ -1064,18 +1064,24 @@ class GrepFilter(TextFilter):
                 return True
         return False
     def getVersions(self, test):
-        versions = [ None ]
+        versions = test.app.versions
         if test.app.useExtraVersions():
             return versions
         else:
             return versions + test.app.getExtraVersions(forUse=False)
     def findAllLogFiles(self, test):
         logFiles = []
-        for version in self.getVersions(test):
-            logFile = test.getFileName(self.fileStem, version)
-            if logFile and logFile not in logFiles:
-                logFiles.append(logFile)
+        versions = self.getVersions(test)
+        for fileName in test.findAllStdFiles(self.fileStem):
+            fileVersions = os.path.basename(fileName).split(".")[2:]
+            if self.allAllowed(fileVersions, versions):
+                logFiles.append(fileName)
         return logFiles
+    def allAllowed(self, fileVersions, versions):
+        for version in fileVersions:
+            if version not in versions:
+                return False
+        return True
     def matches(self, logFile):
         for line in open(logFile).xreadlines():
             if self.stringContainsText(line):

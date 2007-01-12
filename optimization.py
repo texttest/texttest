@@ -1083,14 +1083,16 @@ class PlotTestInGUI(guiplugins.SelectionAction):
     def getRunningTmpFile(self, test, logFileStem):
         return test.makeTmpFileName(logFileStem)
     def plotGraph(self, writeDirectory):
-        plotProcess = self.testGraph.plot(writeDirectory)
-        if plotProcess:
-            # Should really monitor this and close it when GUI closes,
-            # but it isn't a child process so this means ps and load on the machine
-            #self.processes.append(plotProcess)
-            guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
-        # The TestGraph is "used", create a new one so that the user can do another plot.
-        self.testGraph = TestGraph(self.optionGroup)
+        try:
+            plotProcess = self.testGraph.plot(writeDirectory)
+            if plotProcess:
+                # Should really monitor this and close it when GUI closes,
+                # but it isn't a child process so this means ps and load on the machine
+                #self.processes.append(plotProcess)
+                guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
+        finally:
+            # The TestGraph is "used", create a new one so that the user can do another plot.
+            self.testGraph = TestGraph(self.optionGroup)
 
 plotSubplanDone = None
 

@@ -1562,13 +1562,14 @@ class NotebookGUI(SubGUI):
                 return child
 
     def getTabNames(self):
-        return map(self.notebook.get_tab_label_text, self.notebook.get_children())
+        visibleChildren = filter(lambda child: child.get_property("visible"), self.notebook.get_children())
+        return map(self.notebook.get_tab_label_text, visibleChildren)
 
-    def removePage(self, name):
+    def hidePage(self, name):
         oldPage = self.findPage(name)
         if oldPage:
-            self.diag.info("Removing page " + name)
-            self.notebook.remove(oldPage)
+            self.diag.info("Hiding page " + name)
+            oldPage.hide_all()
 
     def insertNewPage(self, name, insertPosition=0):
         if self.notebook.get_n_pages() == 0:
@@ -1587,19 +1588,23 @@ class NotebookGUI(SubGUI):
             if tabName not in pageNamesRemoved:
                 return tabName
     
-    def insertNewPages(self):
-        currTabNames = self.getTabNames()
+    def showNewPages(self):
+        currChildren = self.notebook.get_children()
+        currTabNames = map(self.notebook.get_tab_label_text, currChildren)
         insertIndex = 0
         changed = False
         for name, tabGUI in self.tabInfo.items():
-            if name in currTabNames:
+            page = self.findPage(name)
+            if page:
                 insertIndex += 1
+                if tabGUI.shouldShowCurrent() and not page.get_property("visible"):
+                    page.show_all()
+                    changed = True
             elif tabGUI.shouldShowCurrent():
                 self.insertNewPage(name, insertIndex)
-                insertIndex += 1
+                insertIndex += 1                
                 changed = True
         return changed
-
     def setCurrentPage(self, newName):
         self.diag.info("Resetting for current page " + self.currentPageName + " to page " + repr(newName))
         try:
@@ -1611,25 +1616,25 @@ class NotebookGUI(SubGUI):
         except ValueError:
             return False
 
-    def findPagesToRemove(self):
+    def findPagesToHide(self):
         return filter(lambda name: not self.tabInfo[name].shouldShowCurrent(), self.getTabNames())
         
-    def removeOldPages(self):
+    def hideOldPages(self):
         # Must reset the current page before removing it if we're viewing a removed page
         # otherwise we can output lots of pages we don't really look at
-        pageNamesRemoved = self.findPagesToRemove()
-        if len(pageNamesRemoved) == 0:
+        pagesToHide = self.findPagesToHide()
+        if len(pagesToHide) == 0:
             return False
 
-        if self.currentPageName in pageNamesRemoved:
-            newCurrentPageName = self.findFirstRemaining(pageNamesRemoved)
+        if self.currentPageName in pagesToHide:
+            newCurrentPageName = self.findFirstRemaining(pagesToHide)
             if newCurrentPageName:
                 self.setCurrentPage(newCurrentPageName)
             
         # remove from the back, so we don't momentarily view them all if removing everything
-        pageNamesRemoved.reverse()
-        for name in pageNamesRemoved:
-            self.removePage(name)
+        pagesToHide.reverse()
+        for name in pagesToHide:
+            self.hidePage(name)
         return True
     def updateCurrentPage(self, tests):
         allNames = self.getTabNames()
@@ -1641,12 +1646,12 @@ class NotebookGUI(SubGUI):
         if not self.notebook:
             return 
 
-        pagesAdded = self.insertNewPages()
-        pagesRemoved = self.removeOldPages()
+        pagesShown = self.showNewPages()
+        pagesHidden = self.hideOldPages()
         if direct: # only change pages around if a test is directly selected
             self.updateCurrentPage(tests)
   
-        if pagesAdded or pagesRemoved:
+        if pagesShown or pagesHidden:
             SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
           
 class PaneGUI(ContainerGUI):
@@ -1979,8 +1984,6 @@ class TestFileGUI(FileViewGUI):
     def notifyNewTestSelection(self, tests, direct):
         if not self.dynamic and len(tests) != 1: # multiple tests in static GUI result in removal
             self.currentTest = None
-            self.nameColumn = None
-            self.selection = None
             return
 
         if len(tests) > 1 and self.currentTest in tests:

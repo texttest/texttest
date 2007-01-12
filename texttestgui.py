@@ -278,7 +278,7 @@ class TextTestGUI(Responder, plugins.Observable):
                [ self.textInfoGUI ] + self.actionTabGUIs + self.defaultActionGUIs + self.notebookGUIs
     def getLifecycleObservers(self):
         return [ self.textInfoGUI, self.testColumnGUI, self.testTreeGUI, self.testFileGUI, \
-                 self.progressBarGUI, self.progressMonitor ] + self.actionTabGUIs  
+                 self.progressBarGUI, self.progressMonitor ] + self.actionTabGUIs + self.buttonBarGUIs
     def getActionObservers(self):
         # These actions might change the tree view selection or the status bar, need to observe them
         return [ self.testTreeGUI, statusMonitor, self.idleManager, self.topWindowGUI ] + self.actionTabGUIs
@@ -786,6 +786,7 @@ class TestTreeGUI(ContainerGUI):
         self.itermap = seqdict()
         self.selection = None
         self.selecting = False
+        self.selectedTests = []
         self.dynamic = dynamic
         self.collapseStatic = False
         self.successPerSuite = {} # map from suite to number succeeded
@@ -948,7 +949,10 @@ class TestTreeGUI(ContainerGUI):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):
             self.selectionChanged(direct=True)
     def selectionChanged(self, direct):
-        self.notify("NewTestSelection", self.getSelected(), direct)
+        newSelection = self.getSelected()
+        if newSelection != self.selectedTests:
+            self.selectedTests = newSelection
+            self.notify("NewTestSelection", newSelection, direct)
     def getSelected(self):
         allSelected = []
         self.selection.selected_foreach(self.addSelTest, allSelected)
@@ -1052,7 +1056,6 @@ class TestTreeGUI(ContainerGUI):
         self.model.remove(iter)
         del self.itermap[test]
     def notifyContentChange(self, suite):
-        allSelected = self.getSelected()
         self.selecting = True
         self.selection.unselect_all()
         for test in suite.testcases:
@@ -1060,7 +1063,7 @@ class TestTreeGUI(ContainerGUI):
         for test in suite.testcases:
             self.addTest(test)
         self.expandRow(self.findIter(suite), True)
-        self.selectTestRows(allSelected) # don't notify observers as nothing has changed except order
+        self.selectTestRows(self.selectedTests) # don't notify observers as nothing has changed except order
     def notifyVisibility(self, tests, newValue):
         if not newValue:
             self.selecting = True
@@ -1136,7 +1139,11 @@ class ActionGUI(SubGUI):
         message += self.detailDescription()
         message += self.sensitivityDescription()
         guilog.info(message)
-    def notifyNewTestSelection(self, tests, direct):
+    def notifyNewTestSelection(self, *args):
+        self.checkSensitivity()
+    def notifyLifecycleChange(self, *args):
+        self.checkSensitivity()
+    def checkSensitivity(self):
         if self.updateSensitivity():
             newActive = self.actionOrButton().get_property("sensitive")
             guilog.info("Setting sensitivity of button '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newActive))
@@ -1968,9 +1975,6 @@ class TestFileGUI(FileViewGUI):
         if len(tests) == 0 or (not self.dynamic and len(tests) > 1): # multiple tests in static GUI result in removal
             self.currentTest = None
             return
-
-        if len(tests) == 1 and tests[0] is self.currentTest:
-            return # no change, don't regenerate
 
         if len(tests) > 1 and self.currentTest in tests:
             self.setName(tests)

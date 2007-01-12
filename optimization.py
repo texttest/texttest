@@ -1039,10 +1039,7 @@ class PlotTestInGUI(guiplugins.SelectionAction):
     def getTabTitle(self):
         return "Graph"
     def getGroupTabTitle(self):
-        if self.dynamic:
-            return "Test" # 'Test' gives us no group tab ...
-        else:
-            return "Graph"
+        return "Graph"
     def messageBeforePerform(self):
         return "Plotting tests ..."
     def messageAfterPerform(self):

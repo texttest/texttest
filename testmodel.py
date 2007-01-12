@@ -170,13 +170,18 @@ class Test(plugins.Observable):
         self.parent = parent
         self.dircaches = [ dircache ]
         # Test suites never change state, but it's convenient that they have one
-        self.state = plugins.TestState("not_started")
+        self.state = plugins.TestState("not_started", freeText=self.getDisplayDescription())
         self.paddedName = self.name
         self.previousEnv = {}
         self.environment = MultiEntryDictionary()
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
         self.diag = plugins.getDiagnostics("test objects")
+    def getDisplayDescription(self):
+        if len(self.description):
+            return self.description
+        else:
+            return "<No description provided>"
     def readEnvironment(self):
         envReader = EnvironmentReader(self.app)
         envReader.read(self)

@@ -275,7 +275,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getTestTreeObservers(self):
         selectionActions = filter(lambda action: hasattr(action, "notifyNewTestSelection"), self.intvActions)
         return  selectionActions + [ self.testColumnGUI, self.testFileGUI ] + self.buttonBarGUIs + \
-               [ self.textInfoGUI ] + self.actionTabGUIs + self.notebookGUIs + self.defaultActionGUIs
+               [ self.textInfoGUI ] + self.actionTabGUIs + self.defaultActionGUIs + self.notebookGUIs
     def getLifecycleObservers(self):
         return [ self.textInfoGUI, self.testColumnGUI, self.testTreeGUI, self.testFileGUI, \
                  self.progressBarGUI, self.progressMonitor ] + self.actionTabGUIs  
@@ -383,21 +383,17 @@ class TextTestGUI(Responder, plugins.Observable):
         buttonBarGUI = BoxGUI(self.buttonBarGUIs, horizontal=True, reversed=True)
         topTestViewGUI = BoxGUI([ self.testFileGUI, buttonBarGUI ], horizontal=False)
 
-        if self.dynamic:
-            notebookGUI = NotebookGUI(self.classifyByTitle(tabGUIs), self.getNotebookScriptName("Top"))
-            return [ notebookGUI ], PaneGUI(topTestViewGUI, notebookGUI, horizontal=False)
-        else:
-            subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
-            tabInfo = seqdict()
-            for name, notebookGUI in subNotebookGUIs.items():
-                if name == "Test":
-                    tabInfo[name] = PaneGUI(topTestViewGUI, notebookGUI, horizontal=False)
-                else:
-                    tabInfo[name] = notebookGUI
+        subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
+        tabInfo = seqdict()
+        for name, notebookGUI in subNotebookGUIs.items():
+            if name == "Test":
+                tabInfo[name] = PaneGUI(topTestViewGUI, notebookGUI, horizontal=False)
+            else:
+                tabInfo[name] = notebookGUI
 
-            notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"))
-            return [ notebookGUI ] + subNotebookGUIs.values(), notebookGUI        
-
+        notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"))
+        return [ notebookGUI ] + subNotebookGUIs.values(), notebookGUI
+    
     def getNotebookScriptName(self, tabName):
         if tabName == "Top":
             return "view options for"
@@ -425,8 +421,6 @@ class TextTestGUI(Responder, plugins.Observable):
                 tabInfo[tabName] = notebookGUI
             elif len(currTabGUIs) == 1:
                 tabInfo[tabName] = currTabGUIs[0]
-            else:
-                raise plugins.TextTestError, "No contents at all found for " + tabName 
         return tabInfo
     def notifyLifecycleChange(self, test, state, changeDesc):
         # Working around python bug 853411: main thread must do all forking
@@ -811,9 +805,7 @@ class TestTreeGUI(ContainerGUI):
             test = model.get_value(iter, 2)
             guilog.info("-> " + test.getIndent() + model.get_value(iter, 0))
     def addSuites(self, suites):
-        if self.dynamic:
-            self.notify("NewTestSelection", [ suites[0] ], False)
-        else:
+        if not self.dynamic:
             self.collapseStatic = guiConfig.getValue("static_collapse_suites")
         for suite in suites:
             size = suite.size()
@@ -1733,7 +1725,7 @@ class TextInfoGUI(SubGUI):
         return "Text Info"
     def forceVisible(self, tests):
         return len(tests) == 1
-    def resetText(self, test, state):
+    def resetText(self, state):
         self.text = ""
         if state.isComplete():
             self.text = "Test " + repr(state) + "\n"
@@ -1756,10 +1748,7 @@ class TextInfoGUI(SubGUI):
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) > 0 and self.currentTest not in tests:
             self.currentTest = tests[0]
-            if self.currentTest.classId() == "test-case":
-                self.resetText(self.currentTest, self.currentTest.state)
-            else:
-                self.text = ""
+            self.resetText(self.currentTest.state)
             self.updateView()
     def updateView(self):
         if self.view:
@@ -1768,7 +1757,7 @@ class TextInfoGUI(SubGUI):
     def notifyLifecycleChange(self, test, state, changeDesc):
         if not test is self.currentTest:
             return
-        self.resetText(test, state)
+        self.resetText(state)
         self.updateView()
     def createView(self):
         if not self.shouldShowCurrent():
@@ -1826,18 +1815,14 @@ class TextInfoGUI(SubGUI):
 
         
 class FileViewGUI(SubGUI):
-    def __init__(self, dynamic):
+    def __init__(self, dynamic, title = ""):
         SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.dynamic = dynamic
+        self.title = title
         self.selection = None
         self.nameColumn = None
-
-    def setName(self, tests=[]):
-        if self.nameColumn:
-            title = self.getName(tests)
-            self.nameColumn.set_title(title)
 
     def recreateModel(self, state):
         if not self.nameColumn:
@@ -1880,7 +1865,7 @@ class FileViewGUI(SubGUI):
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         self.selection.set_select_function(self.canSelect)
         renderer = gtk.CellRendererText()
-        self.nameColumn = gtk.TreeViewColumn(self.getName(), renderer, text=0, background=1)
+        self.nameColumn = gtk.TreeViewColumn(self.title, renderer, text=0, background=1)
         self.nameColumn.set_cell_data_func(renderer, renderParentsBold)
         view.append_column(self.nameColumn)
         detailsColumn = self.makeDetailsColumn(renderer)
@@ -1927,7 +1912,7 @@ class FileViewGUI(SubGUI):
     
 class ApplicationFileGUI(FileViewGUI):
     def __init__(self, dynamic):
-        FileViewGUI.__init__(self, dynamic)
+        FileViewGUI.__init__(self, dynamic, "Configuration Files")
         self.allApps = []
     def addSuites(self, suites):
         self.allApps = [ suite.app for suite in suites ]
@@ -1935,8 +1920,6 @@ class ApplicationFileGUI(FileViewGUI):
         return not self.dynamic
     def getGroupTabTitle(self):
         return "Config"
-    def getName(self):
-        return "Configuration Files"
     def monitorEvents(self, indexer):
         scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated, indexer)
     def addFilesToModel(self, state):
@@ -1982,18 +1965,24 @@ class TestFileGUI(FileViewGUI):
         return len(tests) == 1
     
     def notifyNewTestSelection(self, tests, direct):
-        if not self.dynamic and len(tests) != 1: # multiple tests in static GUI result in removal
+        if len(tests) == 0 or (not self.dynamic and len(tests) > 1): # multiple tests in static GUI result in removal
             self.currentTest = None
             return
 
         if len(tests) > 1 and self.currentTest in tests:
             self.setName(tests)
-            self.describeName()
-        elif len(tests) > 0:
+            if self.active:
+                self.describeName()
+        else:
             self.currentTest = tests[0]
             self.currentTest.refreshFiles()
             self.setName(tests)
             self.recreateModel(self.getState())
+    def setName(self, tests=[]):
+        self.title = self.getName(tests)
+        if self.nameColumn:
+            self.nameColumn.set_title(self.title)
+
     def getName(self, tests=[]):
         if len(tests) > 1:
             return "Sample from " + repr(len(tests)) + " tests"
@@ -2213,8 +2202,10 @@ class TestProgressMonitor(SubGUI):
         self.progressReport = None
         self.treeView = None
         self.dynamic = dynamic
+    def getGroupTabTitle(self):
+        return "Selection"
     def getTabTitle(self):
-        return "Progress"
+        return "Select Tests"
     def shouldShowCurrent(self):
         return self.dynamic
     def createView(self):

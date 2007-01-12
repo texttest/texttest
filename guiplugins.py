@@ -986,8 +986,8 @@ class ResetGroups(InteractiveAction):
 
 class SaveSelection(SelectionAction):
     def __init__(self, commandOptionGroups, dynamic):
-        self.dynamic = dynamic
         SelectionAction.__init__(self)
+        self.dynamic = dynamic
         self.selectionGroup = commandOptionGroups[0]
         self.addOption("name", "Name to give selection")
         if not dynamic:
@@ -999,15 +999,9 @@ class SaveSelection(SelectionAction):
     def _getScriptTitle(self):
         return "Save selected tests in file"
     def getTabTitle(self):
-        if self.dynamic:
-            return "Save Selection"
-        else:
-            return "Saving"
+        return "Saving"
     def getGroupTabTitle(self):
-        if self.dynamic:
-            return "Test" # 'Test' gives us no group tab ...
-        else:
-            return "Selection"
+        return "Selection"
     def getFileName(self):
         localName = self.optionGroup.getOptionValue("name")
         if not localName:

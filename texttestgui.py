@@ -1969,6 +1969,9 @@ class TestFileGUI(FileViewGUI):
             self.currentTest = None
             return
 
+        if len(tests) == 1 and tests[0] is self.currentTest:
+            return # no change, don't regenerate
+
         if len(tests) > 1 and self.currentTest in tests:
             self.setName(tests)
             if self.active:

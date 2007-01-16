@@ -406,10 +406,6 @@ class Config(plugins.Configuration):
         # Sample to show that values are lists
         app.setConfigDefault("batch_use_version_filtering", { "default" : "false" }, "Which batch sessions use the version filtering mechanism")
         app.setConfigDefault("batch_version", { "default" : [] }, "List of versions to allow if batch_use_version_filtering enabled")
-        # Use batch session as a base version
-        batchSession = self.optionValue("b")
-        if batchSession:
-            app.addConfigEntry("base_version", batchSession)
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")

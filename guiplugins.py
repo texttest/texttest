@@ -1016,7 +1016,7 @@ class SaveSelection(SelectionAction):
         if actualTests:
             return self.getCmdlineOption()
         else:
-            return string.join(self.selectionGroup.getCommandLines())
+            return string.join(self.selectionGroup.getCommandLines(useQuotes=False))
     def performOnCurrent(self):
         fileName = self.getFileName()
         toWrite = self.getTextToSave()
@@ -1061,9 +1061,9 @@ class RunningAction(SelectionAction):
         return filterFileName
     def getTextTestOptions(self, filterFile):
         ttOptions = [ self.getCmdlineOptionForApps() ]
-        ttOptions += self.invisibleGroup.getCommandLines()
+        ttOptions += self.invisibleGroup.getCommandLines(useQuotes=True)
         for group in self.getOptionGroups():
-            ttOptions += group.getCommandLines()
+            ttOptions += group.getCommandLines(useQuotes=True)
         filterDir, filterFileName = os.path.split(filterFile)
         ttOptions.append("-f " + filterFileName)
         ttOptions.append("-fd " + filterDir)

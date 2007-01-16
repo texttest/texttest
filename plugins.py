@@ -866,15 +866,21 @@ class OptionGroup:
     def setOptionValue(self, key, value):
         if self.options.has_key(key):
             return self.options[key].setValue(value)
-    def getCommandLines(self):
+    def getCommandLines(self, useQuotes):
         commandLines = []
         for key, option in self.options.items():
             if len(option.getValue()):
-                commandLines.append("-" + key + " \"" + option.getValue() + "\"")
+                quotedValue = self.getQuotedValue(option.getValue(), useQuotes)
+                commandLines.append("-" + key + " " + quotedValue)
         for key, switch in self.switches.items():
             if switch.getValue():
                 commandLines.append("-" + key)
         return commandLines
+    def getQuotedValue(self, value, useQuotes):
+        if useQuotes:
+            return '"' + value + '"'
+        else:
+            return value
     def readCommandLineArguments(self, args):
         for arg in args:
             if arg.find("=") != -1:

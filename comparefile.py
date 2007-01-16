@@ -221,8 +221,8 @@ class RunDependentTextFilter(plugins.Observable):
             filter.reset()
     def getFilteredLine(self, line, lineNumber):
         origOsLine = self.getOrigOsFilteredLine(line, lineNumber)
-        if self.osChange and origOsLine:
-            return origOsLine.rstrip() + "\n"
+        if self.osChange and origOsLine and os.name == "posix":
+            return origOsLine.replace("\r", "")
         else:
             return origOsLine
     def getOrigOsFilteredLine(self, line, lineNumber):

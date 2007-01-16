@@ -220,6 +220,12 @@ class RunDependentTextFilter(plugins.Observable):
         for filter in self.orderFilters.keys():
             filter.reset()
     def getFilteredLine(self, line, lineNumber):
+        origOsLine = self.getOrigOsFilteredLine(line, lineNumber)
+        if self.osChange and origOsLine:
+            return origOsLine.rstrip() + "\n"
+        else:
+            return origOsLine
+    def getOrigOsFilteredLine(self, line, lineNumber):
         for contentFilter in self.contentFilters:
             changed, filteredLine = contentFilter.applyTo(line, lineNumber)
             if changed:

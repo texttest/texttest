@@ -20,8 +20,11 @@ class DirectoryCache:
         self.contents = []
         self.refresh()
     def refresh(self):
-        self.contents = os.listdir(self.dir)
-        self.contents.sort()
+        try:
+            self.contents = os.listdir(self.dir)
+            self.contents.sort()
+        except OSError: # usually caused by people removing stuff externally
+            self.contents = []
     def exists(self, fileName):
         if fileName.find("/") != -1:
             return os.path.exists(self.pathName(fileName))

@@ -130,7 +130,7 @@ class QueueSystemConfig(default.Config):
         submitter = SubmitTest(self.getSubmissionRules, self.optionMap, self.getSlaveSwitches())
         return [ submitter, WaitForCompletion(), CheckForUnrunnableBugs() ]
     def getSlaveSwitches(self):
-        return [ "diag", "ignorecat", "noperf", "actrep", "rectraffic", "keeptmp" ]
+        return [ "diag", "ignorecat", "actrep", "rectraffic", "keeptmp" ]
     def getExecHostFinder(self):
         if self.slaveRun():
             return FindExecutionHosts()

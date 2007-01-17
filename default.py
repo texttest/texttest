@@ -40,7 +40,6 @@ class Config(plugins.Configuration):
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
-                group.addSwitch("noperf", "Disable any performance testing")
             elif group.name.startswith("Invisible"):
                 # Only relevant without the GUI
                 group.addSwitch("g", "use dynamic GUI", 1)
@@ -277,9 +276,7 @@ class Config(plugins.Configuration):
     def getTestEvaluator(self):
         return [ self.getFileExtractor(), self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
-        if self.optionMap.has_key("noperf"):
-            return
-        elif self.optionMap.has_key("diag"):
+        if self.optionMap.has_key("diag"):
             print "Note: Running with Diagnostics on, so performance checking is disabled!"
             return [ self.getPerformanceExtractor() ] 
         else:

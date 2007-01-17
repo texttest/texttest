@@ -1537,7 +1537,10 @@ class NotebookGUI(SubGUI):
     def handlePageSwitch(self, notebook, ptr, pageNum, *args):
         if not self.active:
             return
-        self.currentPageName = self.getPageName(pageNum)
+        newPageName = self.getPageName(pageNum)
+        if newPageName == self.currentPageName:
+            return
+        self.currentPageName = newPageName 
         self.diag.info("Switching to page " + self.currentPageName)
         for tabName, tabGUI in self.tabInfo.items():
             if tabName == self.currentPageName:
@@ -1597,6 +1600,7 @@ class NotebookGUI(SubGUI):
             if page:
                 insertIndex += 1
                 if tabGUI.shouldShowCurrent() and not page.get_property("visible"):
+                    self.diag.info("Showing page " + name)
                     page.show_all()
                     changed = True
             elif tabGUI.shouldShowCurrent():

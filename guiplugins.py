@@ -1211,6 +1211,8 @@ class CreateDefinitionFile(InteractiveTestAction):
             guilog.info("Creating new file, copying " + sourceFile)
             shutil.copyfile(sourceFile, targetFile)
         elif not os.path.exists(targetFile):
+            file = open(targetFile, "w")
+            file.close()
             guilog.info("Creating new empty file...")
         else:
             raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile 

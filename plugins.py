@@ -59,6 +59,10 @@ def getNumberOfSeconds(timeString):
                 seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)                
         return seconds 
 
+# Same as above, but gives minutes instead of seconds ...
+def getNumberOfMinutes(timeString):
+    return getNumberOfSeconds(timeString) / 60
+
 def printWarning(message):
     print "WARNING: " + message
 
@@ -540,6 +544,7 @@ def readListWithComments(filename, duplicateMethod=None):
     for longline in open(filename).readlines():
         line = longline.strip()
         if len(line) == 0:
+            currComment = ""
             continue
         if line.startswith("#"):
             currComment += longline[1:].lstrip()

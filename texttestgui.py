@@ -1146,7 +1146,7 @@ class ActionGUI(SubGUI):
     def checkSensitivity(self):
         if self.updateSensitivity():
             newActive = self.actionOrButton().get_property("sensitive")
-            guilog.info("Setting sensitivity of button '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newActive))
+            guilog.info("Setting sensitivity of action '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newActive))
     def updateSensitivity(self):
         actionOrButton = self.actionOrButton()
         if not actionOrButton:

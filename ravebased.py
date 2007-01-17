@@ -881,7 +881,7 @@ class BuildCode(plugins.Action):
             else:
                 return "brockville"
     def getRemoteCommandLine(self, arch, absPath, makeCommand):
-        commandLine = "cd " + absPath + "; " + makeCommand
+        commandLine = makeCommand + " -C " + absPath
         if arch == "sparc_64" or arch == "x86_64_linux":
             commandLine = "setenv BITMODE 64; " + commandLine
         return commandLine
@@ -892,11 +892,11 @@ class BuildCode(plugins.Action):
         extra = ""
         if app.configObject.target.raveMode() == "-debug":
             extra = "VERSION=debug "
-        makeCommand = "gmake " + extra + makeTargets + " >& " + buildFile
+        makeCommand = "gmake " + extra + makeTargets
         commandLine = self.getRemoteCommandLine(arch, absPath, makeCommand)
         machine = self.getMachine(app, arch)
         print "Building", app, "in", absPath, "on", machine, "..."
-        os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
+        os.system("rsh " + machine + " '" + commandLine + "' < /dev/null > " + buildFile + " 2>&1")
         if self.checkBuildFile(buildFile):
             self.buildFailedDirs[arch].append(absPath)
             raise plugins.TextTestError, "BUILD ERROR: Product " + repr(app) + " did not build!" + os.linesep + \
@@ -905,9 +905,9 @@ class BuildCode(plugins.Action):
         self.builtDirs[arch].append(absPath)
         os.remove(buildFile)
         if os.environ.has_key("CARMSYS"):
-            makeCommand = "gmake install " + extra + "CARMSYS=" + os.environ["CARMSYS"] + " >& /dev/null"
+            makeCommand = "gmake install " + extra + "CARMSYS=" + os.environ["CARMSYS"]
             commandLine = self.getRemoteCommandLine(arch, absPath, makeCommand)
-            os.system("rsh " + machine + " '" + commandLine + "' < /dev/null")
+            os.system("rsh " + machine + " '" + commandLine + "' < /dev/null > /dev/null 2>&1")
             print "Making install from", absPath ,"to", os.environ["CARMSYS"]
     def checkBuildFile(self, buildFile):
         for line in open(buildFile).xreadlines():

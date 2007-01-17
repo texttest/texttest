@@ -635,6 +635,8 @@ class GenHTML(plugins.Action):
         tableRuleChecks = 0
         tableRuleFailures = 0
         logFile = test.getFileName(test.app.getConfigValue("log_file"))
+        if not logFile:
+            return
         ruleFailureItems = ["Rule checks\.", "Failed due to rule violation\."]
         optRun = optimization.OptimizationRun(test.app,  [ optimization.timeEntryName, optimization.activeMethodEntryName, optimization.dateEntryName, optimization.costEntryName], ["uncovered legs\.", "overcovers", "^\ illegal trips"] + self.definingValues + self.interestingValues + ruleFailureItems, logFile)
         if not len(optRun.solutions) == 0:
@@ -655,6 +657,7 @@ class GenHTML(plugins.Action):
                 self.currentSuitePage["group"][group]["rulecheckfailureavg"] += avg
             tableRuleStr = "%d/%d (%.2f)" % (tableRuleChecks, tableRuleFailures, avg)
         else:
+            tableRuleStr = "NaN"
             print "Warning, no solution in OptimizationRun!"
 
         self.extractProfiling(test, group)

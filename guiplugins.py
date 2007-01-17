@@ -1207,7 +1207,7 @@ class CreateDefinitionFile(InteractiveTestAction):
             sourceFile = self.currentTest.makePathName(fileName)
         targetFile = os.path.join(self.getTargetDirectory(), fileName)
         plugins.ensureDirExistsForFile(targetFile)
-        if sourceFile:
+        if sourceFile and os.path.isfile(sourceFile):
             guilog.info("Creating new file, copying " + sourceFile)
             shutil.copyfile(sourceFile, targetFile)
         elif not os.path.exists(targetFile):

@@ -31,6 +31,13 @@ helpOptions = """-rundebug <options>
                Instruct valgrind to attach to a debugger when encountering
                a memory problem. Note that this option means that output will
                not be redirected.
+-goprof <options>
+           - (only APC) Applies the Google profiler to the test, output is a profile file including
+              both a flat and call graph profile, and profiledata that contains the rawdata for
+              further processing. It is assumed that that binary that is supposed to be profiled
+              is linked against the profile library, see also exppreload.
+              - exppreload
+                Experimental preload of profile library in order to avoid linking.
                
 -extractlogs <option>
            - (only APC) Executes the command specified by the config value extract_logs_<option>,
@@ -124,6 +131,7 @@ class ApcConfig(optimization.OptimizationConfig):
             if group.name.startswith("Basic"):
                 group.addOption("rundebug", "Run debugger")
                 group.addOption("extractlogs", "Extract Apc Logs")
+                group.addOption("goprof", "Run with the Google profiler")
             if group.name.startswith("Invisible"):
                 # These need a better interface before they can be plugged in, really
                 group.addOption("prrepgraphical", "Run graphical KPI progress report")
@@ -141,7 +149,7 @@ class ApcConfig(optimization.OptimizationConfig):
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         return optimization.OptimizationConfig.getActionSequence(self)
     def getSlaveSwitches(self):
-        return optimization.OptimizationConfig.getSlaveSwitches(self) + [ "rundebug", "extractlogs" ]
+        return optimization.OptimizationConfig.getSlaveSwitches(self) + [ "rundebug", "extractlogs", "goprof" ]
     def useQueueSystem(self):
         if self.optionMap.has_key("rundebug"):
             return 0
@@ -154,7 +162,11 @@ class ApcConfig(optimization.OptimizationConfig):
         else:
             return MakeProgressReport(self.optionValue("prrep"))
     def getTestRunner(self):
-        return [ CheckFilesForApc(), self._getApcTestRunner() ]
+        runners = []
+        if self.optionMap.has_key("goprof"):
+            runners.append(GoogleProfilePrepare(self.optionMap["goprof"]))
+        runners += [ CheckFilesForApc(), self._getApcTestRunner() ]
+        return runners
     def _getApcTestRunner(self):
         if self.optionMap.has_key("rundebug"):
             return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
@@ -173,6 +185,8 @@ class ApcConfig(optimization.OptimizationConfig):
     def getFileExtractor(self):
         baseExtractor = optimization.OptimizationConfig.getFileExtractor(self)
         subActions = [ baseExtractor, CreateHTMLFiles(), FetchApcCore() ]
+        if self.optionMap.has_key("goprof"):
+            subActions.append(GoogleProfileExtract())
         if self.slaveRun():
             useExtractLogs = self.optionValue("extractlogs")
             if useExtractLogs == "":
@@ -216,6 +230,12 @@ class ApcConfig(optimization.OptimizationConfig):
         app.setConfigDefault("apcinfo", {})
     def getDefaultCollations(self):
         return { "stacktrace" : "apc_tmp_dir/core*" }
+
+class CheckFilesForApc(plugins.Action):
+    def __call__(self, test):
+        verifyAirportFile(getArchitecture(test.app))
+        verifyLogFileDir(getArchitecture(test.app))
+        os.environ["TEXTTEST_TEST_RELPATH"] = test.getRelPath()
 
 def verifyAirportFile(arch):
     diag = plugins.getDiagnostics("APC airport")
@@ -273,12 +293,7 @@ class ApcProgressTestComparison(ProgressTestComparison):
                 return "Error opening/reading " + runStatusHeadFile                 
         else:
             return "Run status file is not available yet."
-
-class CheckFilesForApc(plugins.Action):
-    def __call__(self, test):
-        verifyAirportFile(getArchitecture(test.app))
-        verifyLogFileDir(getArchitecture(test.app))
-        os.environ["TEXTTEST_TEST_RELPATH"] = test.getRelPath()
+        
 
 class ViewApcLog(guiplugins.InteractiveTestAction):
     def __repr__(self):
@@ -488,6 +503,26 @@ class CreateHTMLFiles(plugins.Action):
             os.system("ln -s " + imagesDir)
             os.system("cd framework_tmp; ln -s " + imagesDir)
 
+class GoogleProfilePrepare(plugins.Action):
+    def __init__(self, arg):
+        self.arg = arg
+    def __call__(self, test):
+        os.environ["LD_LIBRARY_PATH"] += ";/users/johani/lib/"
+        os.environ["CPUPROFILE"] = test.makeTmpFileName("profiledata", forFramework=0)
+        if self.arg.startswith("exppreload"):
+            os.environ["LD_PRELOAD"] = "/users/johani/lib/libprofiler.so"
+
+
+class GoogleProfileExtract(plugins.Action):
+    def __call__(self, test):
+        datafile = test.makeTmpFileName("profiledata", forFramework=0)
+        profilefile = test.makeTmpFileName("profile", forFramework=0)
+        opts = test.getWordsInFile("options")
+        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
+        command = "/users/johani/bin/pprof --text " + binName + " " + datafile + " > " + profilefile
+        # Have to make sure it runs on a 32-bit machine.
+        os.system("rsh abbeville \"" + command + "\"")
+        
 class MarkApcLogDir(RunWithParallelAction):
     def __init__(self, baseRunner, isExecutable, keepLogs):
         RunWithParallelAction.__init__(self, baseRunner, isExecutable)

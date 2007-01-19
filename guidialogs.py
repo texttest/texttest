@@ -131,3 +131,31 @@ class ActionConfirmDialog:
     def run(self):
         self.addContents()
         self.dialog.show_all()
+
+# It's a bit unfortunate that this has to be here, but unfortunately texttestgui
+# cannot load dialogs from matador without some additional work. Also, having it
+# here avoids matador importing guidialogs, and hence gtk.
+class CreatePerformanceReportDialog(ActionConfirmDialog):
+    def addContents(self):
+        # A simple entry for the path, and one for the versions ...
+        self.dirEntry = gtk.Entry()
+        self.versionsEntry = gtk.Entry()
+        self.dirEntry.set_text(self.plugin.rootDir)
+        self.versionsEntry.set_text(",".join(self.plugin.versions).rstrip(","))
+        
+        table = gtk.Table(2, 2, homogeneous=False)
+        table.set_row_spacings(1)
+        table.attach(gtk.Label("Save in directory:"), 0, 1, 0, 1, xoptions=gtk.FILL, xpadding=1)
+        table.attach(gtk.Label("Compare versions:"), 0, 1, 1, 2, xoptions=gtk.FILL, xpadding=1)
+        table.attach(self.dirEntry, 1, 2, 0, 1)
+        table.attach(self.versionsEntry, 1, 2, 1, 2)
+        scriptEngine.registerEntry(self.dirEntry, "choose directory ")
+        scriptEngine.registerEntry(self.versionsEntry, "choose versions ")
+        table.show_all()
+        self.dialog.vbox.pack_start(table, expand = True, fill = True)
+        
+    def respond(self, button, saidOK, *args):
+        if saidOK:
+            self.plugin.rootDir = os.path.abspath(self.dirEntry.get_text())
+            self.plugin.versions = self.versionsEntry.get_text().replace(" ", "").split(",")
+        ActionConfirmDialog.respond(self, button, saidOK, *args)

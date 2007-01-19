@@ -1110,6 +1110,40 @@ class ImportTestSuite(ravebased.ImportTestSuite):
     
 # Graphical import
 class ImportTestCase(optimization.ImportTestCase):
+    def __init__(self):
+        optimization.ImportTestCase.__init__(self)
+        self.addOption("perm", "Import KPI group permutations", "aan,aat,adn,adt,dan,dat,ddn,ddt",
+                       possibleValues = ["aan,aat,adn,adt"])
+        self.addSwitch("kpi", "Import KPI group", 0)
+        self.perm = ""
+    def performOnCurrent(self):
+        if not self.optionGroup.getSwitchValue("kpi"):
+            optimization.ImportTestCase.performOnCurrent(self)
+        else:
+            self.importKPIGroup()
+    def importKPIGroup(self):
+        testNameSteam = self.getNewTestName()
+        permutations = self.optionGroup.getOptionValue("perm").split(",")
+        testNames = []
+        suite = self.getDestinationSuite()
+        for perm in permutations:
+            testNames.append(testNameSteam + "_" + perm)
+            self.checkName(suite, testNames[-1])
+        # Two loops since I don't want to import half of the tests
+        # and then get a failure from CheckName.
+        isFirst = True
+        for newTestName in testNames:
+            if isFirst:
+                placement = self.getPlacement()
+                description = self.optionGroup.getOptionValue("desc")
+                isFirst = False
+            self.perm = "_" + newTestName.split("_")[-1]
+            testDir = suite.writeNewTest(newTestName, description, placement)
+            self.testImported = self.createTestContents(suite, testDir, description, placement)
+            description = ""
+            placement += 1
+    def getSubplanName(self):
+        return optimization.ImportTestCase.getSubplanName(self) + self.perm
     def getSubplanPath(self, carmdata):
         return os.path.join(carmdata, "LOCAL_PLAN", self.getSubplanName())
     def findRuleset(self, carmdata):

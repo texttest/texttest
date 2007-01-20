@@ -33,7 +33,7 @@ prepend_path_element()
 
 abspath $0 fullpath
 prepend_path_element /usr/local/pygtk-tt/gtk2.6/lib/:/usr/local/pygtk-tt/gtk2.6/lib/ LD_LIBRARY_PATH $LD_LIBRARY_PATH
-prepend_path_element /usr/local/pygtk-tt/gtk2.6/lib/python2.4/site-packages/gtk-2.0:/usr/local/pygtk-tt/gtk2.6/lib/python2.4/site-packages PYTHONPATH $PYTHONPATH
+prepend_path_element /usr/local/pygtk-tt/gtk2.6/lib/python2.4/site-packages/gtk-2.0:/usr/local/pygtk-tt/gtk2.6/lib/python2.4/site-packages/Numeric:/usr/local/pygtk-tt/gtk2.6/lib/python2.4/site-packages PYTHONPATH $PYTHONPATH
 export LD_LIBRARY_PATH PYTHONPATH
 export GDK_PIXBUF_MODULE_FILE=/usr/local/pygtk-tt/gtk2.6/etc/gtk-2.0/gdk-pixbuf.loaders
 #export PANGO_RC_FILE=/usr/local/pygtk-tt/gtk2.6/etc/pango/pangorc

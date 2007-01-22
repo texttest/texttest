@@ -446,8 +446,8 @@ class LogFileFinder:
             version = string.join(app.versions, ".")
         versionMod = ""
         if version:
-            versionMod = "." + version + "."
-        searchString = app.name + versionMod 
+            versionMod = version + "."
+        searchString = app.name + "." + versionMod 
         try:
             root = app.getPreviousWriteDirInfo(self.searchInUser)
         except plugins.TextTestError:
@@ -460,7 +460,7 @@ class LogFileFinder:
                 return fromThisRun, app.writeDirectory
         for subDir in os.listdir(root):
             fullDir = os.path.join(root, subDir)
-            if os.path.isdir(fullDir) and subDir.startswith(searchString):
+            if os.path.isdir(fullDir) and subDir.startswith(searchString) and len(subDir.replace(searchString, "").split(".")) <= 1:
                 testDir = os.path.join(fullDir, self.test.getRelPath())
                 if os.path.isdir(testDir):
                     for file in os.listdir(testDir):

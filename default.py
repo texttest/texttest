@@ -306,7 +306,8 @@ class Config(plugins.Configuration):
         testEnvironmentCreator = TestEnvironmentCreator(test, self.optionMap)
         testEnvironmentCreator.setUp(self.runsTests())
     def runsTests(self):
-        return not self.optionMap.has_key("gx")
+        return not self.optionMap.has_key("gx") and not self.optionMap.has_key("s") and \
+               not self.isReconnecting()
     def getTextResponder(self):
         return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes

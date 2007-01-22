@@ -38,15 +38,20 @@ class RunTest(default.RunTest):
         return cmdFile
 
 class VirtualDisplayFinder:
+    checkedDisplay = None
     def __init__(self, app):
         self.machines = app.getConfigValue("virtual_display_machine")
         self.diag = plugins.getDiagnostics("virtual display")
     def getDisplay(self):
+        if self.checkedDisplay:
+            return self.checkedDisplay
+        
         if len(self.machines) == 0:
             return
 
         usableDisplay, emptyMachine = self.classifyMachines()
         if usableDisplay:
+            VirtualDisplayFinder.checkedDisplay = usableDisplay
             return usableDisplay
         elif emptyMachine:
             return self.startServer(emptyMachine)

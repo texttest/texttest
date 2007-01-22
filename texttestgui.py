@@ -2011,9 +2011,9 @@ class TestFileGUI(FileViewGUI):
                 # failed on comparison
                 self.addComparisonsToModel(state)
             elif not state.isComplete():
-                self.addTmpFilesToModel()
+                self.addTmpFilesToModel(state)
         else:
-            self.addStaticFilesToModel()
+            self.addStaticFilesToModel(state)
 
     def monitorEvents(self, indexer):
         scriptEngine.connect("select file", "row_activated", self.selection.get_tree_view(), self.fileActivated, indexer)
@@ -2029,10 +2029,10 @@ class TestFileGUI(FileViewGUI):
     def getState(self):
         return self.currentTest.state
     def addComparisonsToModel(self, state):
-        self.addComparisons(state.correctResults + state.changedResults, "Comparison Files")
-        self.addComparisons(state.newResults, "New Files")
-        self.addComparisons(state.missingResults, "Missing Files")
-    def addComparisons(self, compList, title):
+        self.addComparisons(state, state.correctResults + state.changedResults, "Comparison Files")
+        self.addComparisons(state, state.newResults, "New Files")
+        self.addComparisons(state, state.missingResults, "Missing Files")
+    def addComparisons(self, state, compList, title):
         if len(compList) == 0:
             return
         iter = self.model.insert_before(None, None)
@@ -2044,15 +2044,15 @@ class TestFileGUI(FileViewGUI):
             fileCompMap[file] = comp
             filelist.append(file)
         filelist.sort()
-        self.addStandardFilesUnderIter(iter, filelist, fileCompMap)    
-    def addStandardFilesUnderIter(self, iter, files, compMap = {}):
+        self.addStandardFilesUnderIter(state, iter, filelist, fileCompMap)    
+    def addStandardFilesUnderIter(self, state, iter, files, compMap = {}):
         for relDir, relDirFiles in self.classifyByRelDir(files).items():
             iterToUse = iter
             if relDir:
                 iterToUse = self.addFileToModel(iter, relDir, None, self.getStaticColour())
             for file in relDirFiles:
                 comparison = compMap.get(file)
-                colour = self.getComparisonColour(comparison)
+                colour = self.getComparisonColour(state, comparison)
                 self.addFileToModel(iterToUse, file, comparison, colour)
     def classifyByRelDir(self, files):
         dict = {}
@@ -2071,10 +2071,10 @@ class TestFileGUI(FileViewGUI):
             return dir
         else:
             return ""
-    def getComparisonColour(self, fileComp):
-        if not self.currentTest.state.hasStarted():
+    def getComparisonColour(self, state, fileComp):
+        if not state.hasStarted():
             return self.getStaticColour()
-        if not self.currentTest.state.isComplete():
+        if not state.isComplete():
             return self.getColour("running")
         if fileComp.hasSucceeded():
             return self.getColour("success")
@@ -2085,22 +2085,22 @@ class TestFileGUI(FileViewGUI):
             return self.getColour("not_started")
         else:
             return self.getColour("static")
-    def addTmpFilesToModel(self):
+    def addTmpFilesToModel(self, state):
         tmpFiles = self.currentTest.listTmpFiles()
         tmpIter = self.model.insert_before(None, None)
         self.model.set_value(tmpIter, 0, "Temporary Files")
-        self.addStandardFilesUnderIter(tmpIter, tmpFiles)
-    def addStaticFilesToModel(self):
+        self.addStandardFilesUnderIter(state, tmpIter, tmpFiles)
+    def addStaticFilesToModel(self, state):
         stdFiles, defFiles = self.currentTest.listStandardFiles(allVersions=True)
         if self.currentTest.classId() == "test-case":
             stditer = self.model.insert_before(None, None)
             self.model.set_value(stditer, 0, "Standard Files")
             if len(stdFiles):
-                self.addStandardFilesUnderIter(stditer, stdFiles)
+                self.addStandardFilesUnderIter(state, stditer, stdFiles)
 
         defiter = self.model.insert_before(None, None)
         self.model.set_value(defiter, 0, "Definition Files")
-        self.addStandardFilesUnderIter(defiter, defFiles)
+        self.addStandardFilesUnderIter(state, defiter, defFiles)
         self.addStaticDataFilesToModel()
     def getDisplayDataFiles(self):
         try:

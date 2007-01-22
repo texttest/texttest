@@ -1615,16 +1615,17 @@ class PlotEngineMPL(PlotEngineCommon):
             return self.colors[int(plotLine.lineType) % len(self.colors)]
     def getPlotArgument(self, plotLine):
         return "-" + self.getMarker(plotLine)
-    def getPlotSize(self, plotSize):
+    def getPlotSize(self, plotSize, sizeA3):
         if plotSize:
             nums = plotSize.split(",")
             if len(nums) == 2:
                 return (nums[0], nums[1])
-        else:
-            return None
-    def createFigure(self, plotSize):
+        elif sizeA3:
+            return (18,13)
+        return None
+    def createFigure(self, plotSize, printA3):
         global mplFigureNumber
-        figure(mplFigureNumber, facecolor = 'w', figsize = self.getPlotSize(plotSize))
+        figure(mplFigureNumber, facecolor = 'w', figsize = self.getPlotSize(plotSize, printA3))
         mplFigureNumber += 1
         axes(axisbg = '#f6f6f6')
     def showOrSave(self, targetFile, writeDir, printer, printA3):
@@ -1635,14 +1636,19 @@ class PlotEngineMPL(PlotEngineCommon):
                 os.makedirs(writeDir)
             os.chdir(writeDir)
             absTargetFile = os.path.expanduser(targetFile)
-            savefig(absTargetFile)
+            orient = 'portrait'
+            paper = 'a4'
+            if printA3:
+                orient = 'landscape'
+                paper = 'a3'
+            savefig(absTargetFile, orientation = orient, papertype = paper)
             if printer:
                 self.doPrint(printer, printA3, absTargetFile)
         else:
             show()
     def plot(self, writeDir):
         xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()
-        self.createFigure(plotSize)
+        self.createFigure(plotSize, targetFile and printA3)
         min = None
         if plotPercentage:
             min = self.testGraph.findMinOverPlotLines()

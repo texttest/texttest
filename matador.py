@@ -39,7 +39,8 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
                             making the changes it has shown, and writing an options.<app> file.
 """
 
-import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins, datetime
+import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins
+from time import time, ctime
 from optimization import GenerateWebPages
 
 def getConfig(optionMap):
@@ -494,7 +495,7 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
     def initialize(self):
         self.apps = {}
         self.testPaths = []
-        self.timeStamp = datetime.datetime.now()
+        self.timeStamp = time()
         self.createStyleFile()
     def performOnCurrent(self):
         self.initialize()
@@ -552,13 +553,13 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
         file = open(self.mainIndexFile, "w")
         file.write("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">\n")
         file.write("<html>\n <head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\">\n")
-        file.write("  <title>Performance report created " + self.timeStamp.ctime() + "</title>\n  <link rel=\"stylesheet\" href=\"" + self.styleFilePath + "\" type=\"text/css\">\n </head>\n")
+        file.write("  <title>Performance report created " + ctime(self.timeStamp) + "</title>\n  <link rel=\"stylesheet\" href=\"" + self.styleFilePath + "\" type=\"text/css\">\n </head>\n")
         file.write(" <body>\n")
         file.write("  <center><table width=\"80%\" border=\"0\"><tr><td align=\"center\">\n")
         file.write("   <div id=\"mainheader\"><h2>Performance report</h2><b>Applications:</b> ")
         for app in self.apps:
             file.write(app + " ")            
-        file.write("<br><b>Created:</b> " + self.timeStamp.ctime() + "<br></div>\n")
+        file.write("<br><b>Created:</b> " + ctime(self.timeStamp) + "<br></div>\n")
 
         file.write("   <div id=\"mainpage\"><table width=\"100%\" border=\"0\">\n")        
         file.write("    <tr><td><div id=\"maintableheader\">&nbsp</div></td>")
@@ -617,7 +618,7 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
         if pathToNext:
             file.write("<a href=\"" + pathToNext[1] + "\">" + pathToNext[0].getRelPath() + " >></a>")
         file.write("</td></tr></table></div>\n")
-        file.write("   <div id=\"testheader\"><h2>Performance report</h2><b>Test:</b> " + pathToTest[0].getRelPath() + "</b><br><b>Created:</b> " + self.timeStamp.ctime() + "</div>\n")
+        file.write("   <div id=\"testheader\"><h2>Performance report</h2><b>Test:</b> " + pathToTest[0].getRelPath() + "</b><br><b>Created:</b> " + ctime(self.timeStamp) + "</div>\n")
 
         self.outputGraphs(file, os.path.split(pathToTest[1])[0], performance)
         kpi = self.outputPerformance(file, performance)

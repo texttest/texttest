@@ -1733,7 +1733,7 @@ except:
 class PlotEngineMPLTimeDiv(optimization.PlotEngineMPL):
     def plot(self, writeDir):
         xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()
-        self.createFigure(plotSize, targetFile and printA3)
+        self.createFigure(plotSize, (targetFile or printer) and printA3)
         clf()
 
         descAndColours = [ ('Network','brown'),  ('Generation','deepskyblue'), ('PAQS', 'green'),

@@ -1648,7 +1648,7 @@ class PlotEngineMPL(PlotEngineCommon):
             show()
     def plot(self, writeDir):
         xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()
-        self.createFigure(plotSize, targetFile and printA3)
+        self.createFigure(plotSize, (targetFile or printer) and printA3) # pa3 flag should have effect for both p and pr, but not otherwise.
         min = None
         if plotPercentage:
             min = self.testGraph.findMinOverPlotLines()

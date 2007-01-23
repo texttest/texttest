@@ -42,4 +42,4 @@ export GTK_PATH=/usr/local/pygtk-tt/gtk2.6/lib/gtk-2.0
 export GTK_DATA_PREFIX=/usr/local/pygtk-tt/gtk2.6
 export TEXTTEST_SLAVE_CMD=$fullpath
 get_python python
-exec $python ${fullpath}.py "$@"
+exec $python -u ${fullpath}.py "$@"

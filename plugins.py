@@ -767,6 +767,9 @@ class TextOption(Option):
             self.possibleValues.append(value)
             if self.possValMethod:
                 self.possValMethod(value)
+            return True
+        else:
+            return False
     def setPossibleValues(self, values):
         if self.defaultValue in values:
             self.possibleValues = values
@@ -851,7 +854,9 @@ class OptionGroup:
     def addPossibleValue(self, key, possibleValue):
         option = self.options.get(key)
         if option:
-            option.addPossibleValue(possibleValue)
+            return option.addPossibleValue(possibleValue)
+        else:
+            return False
     def setPossibleValuesUpdate(self, key, possibleValues):
         option = self.options.get(key)
         if option:

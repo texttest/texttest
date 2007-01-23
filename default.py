@@ -182,6 +182,8 @@ class Config(plugins.Configuration):
                     filterFiles.append(filename)
         return filterFiles
     def getFilterFilePath(self, app, filename, forWrite):
+        if os.path.isabs(filename):
+            return filename
         filterDirs = self.getFilterDirs(app, forWrite)
         if forWrite and len(filterDirs) == 0:
             raise plugins.TextTestError, "Cannot find path for filter file " + filename + ": no directories described.\n" + \
@@ -193,20 +195,29 @@ class Config(plugins.Configuration):
         else:
             return app.getFileName(filterDirs, filename)
     def getFilterDirs(self, app, forWrite=False):
+        allDirs = self.getOrderedFilterDirs(app)
+        if forWrite:
+            return allDirs
+        else:
+            return filter(os.path.isdir, allDirs)
+    def getOrderedFilterDirs(self, app):
+        configFilters = self.getConfigFilterDirs(app)
+        tmpFilters = [ self.getTmpFilterDir(app) ]
+        # auto-save temporary from dynamic GUI (if started from static GUI)
+        # and permanent if started from command line
+        if self.optionMap.has_key("fd"):
+            return tmpFilters + configFilters
+        else:
+            return configFilters + tmpFilters
+    def getTmpFilterDir(self, app):
         cmdLineDir = self.optionValue("fd")
         if cmdLineDir:
-            return [ cmdLineDir ]
-        return self.getConfigFilterDirs(app, forWrite) + self.getTmpFilterDirs(app) 
-    def getTmpFilterDirs(self, app):
-        return glob.glob(os.path.join(app.writeDirectory, "dynamic_run*"))
-    def getConfigFilterDirs(self, app, forWrite):
-        rawDirs = app.getConfigValue("test_list_files_directory")
-        allDirs = map(lambda dir: os.path.join(app.getDirectory(), dir), rawDirs)
-        existingDirs = filter(os.path.isdir, allDirs)
-        if len(existingDirs) > 0 or not forWrite:
-            return existingDirs
+            return cmdLineDir
         else:
-            return allDirs
+            return os.path.join(app.writeDirectory, "temporary_filter_files")
+    def getConfigFilterDirs(self, app):
+        rawDirs = app.getConfigValue("test_list_files_directory")
+        return map(lambda dir: os.path.join(app.getDirectory(), dir), rawDirs)
     def getFilterClasses(self):
         return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
                  batch.BatchFilter, performance.TimeFilter ]

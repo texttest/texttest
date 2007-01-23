@@ -248,7 +248,7 @@ class SelectionAction(InteractiveAction):
         self.currTestSelection = []
     def addFilterFile(self, selectionGroup, fileName):
         filterFileOption = selectionGroup.options["f"]
-        filterFileOption.addPossibleValue(os.path.basename(fileName))
+        return filterFileOption.addPossibleValue(os.path.basename(fileName))
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def isActiveOnCurrent(self):
@@ -1039,10 +1039,11 @@ class RunningAction(SelectionAction):
     def messageAfterPerform(self):
         return self.performedDescription() + " " + self.describeTests() + " at " + plugins.localtime() + "."
     def performOnCurrent(self):
-        writeDir = os.path.join(self.currTestSelection[0].app.writeDirectory, "dynamic_run" + str(self.runNumber))
+        app = self.currTestSelection[0].app
+        writeDir = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.writeFilterFile(writeDir)
-        ttOptions = self.getTextTestOptions(filterFile)
+        ttOptions = self.getTextTestOptions(filterFile, app)
         logFile = os.path.join(writeDir, "output.log")
         errFile = os.path.join(writeDir, "errors.log")
         usecase = self.getUseCaseName()
@@ -1059,15 +1060,16 @@ class RunningAction(SelectionAction):
         writeFile.write(self.getCmdlineOption() + "\n")
         writeFile.close()
         return filterFileName
-    def getTextTestOptions(self, filterFile):
+    def getTextTestOptions(self, filterFile, app):
         ttOptions = [ self.getCmdlineOptionForApps() ]
         ttOptions += self.invisibleGroup.getCommandLines(useQuotes=True)
         for group in self.getOptionGroups():
             ttOptions += group.getCommandLines(useQuotes=True)
-        filterDir, filterFileName = os.path.split(filterFile)
-        ttOptions.append("-f " + filterFileName)
-        ttOptions.append("-fd " + filterDir)
+        ttOptions.append("-f " + filterFile)
+        ttOptions.append("-fd " + self.getTmpFilterDir(app))
         return string.join(ttOptions)
+    def getTmpFilterDir(self, app):
+        return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
         apps = []
         for test in self.currTestSelection:
@@ -1077,18 +1079,16 @@ class RunningAction(SelectionAction):
     def checkTestRun(self, identifierString, errFile, testSel):
         try:
             self.notifyIfMainThread("ActionStart", "")
-            writeDir, local = os.path.split(errFile)
-            prelist = [ "output.log", "errors.log", "gui_select" ]
-            for fileName in os.listdir(writeDir):
-                if not fileName in prelist:
-                    self.notifyIfMainThread("Status", "Adding filter " + fileName + " ...")
-                    self.notifyIfMainThread("ActionProgress", "")
-                    self.addFilterFile(self.selectionGroup, fileName)
+            filterDir = self.getTmpFilterDir(testSel[0].app)
+            if os.path.isdir(filterDir):
+                for fileName in os.listdir(filterDir):
+                    if self.addFilterFile(self.selectionGroup, fileName):
+                        self.notifyIfMainThread("Status", "Adding filter " + fileName + " ...")
+                        self.notifyIfMainThread("ActionProgress", "")
             for test in testSel:
                 self.notifyIfMainThread("Status", "Updating files for " + repr(test) + " ...")
                 self.notifyIfMainThread("ActionProgress", "")
                 test.filesChanged()
-            runNumber = int(os.path.basename(writeDir).replace("dynamic_run", ""))
             scriptEngine.applicationEvent(self.getUseCaseName() + " GUI to be closed")
             if os.path.isfile(errFile):
                 errText = open(errFile).read()

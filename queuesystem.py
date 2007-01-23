@@ -23,9 +23,9 @@ def queueSystemName(app):
 class RunTestInSlave(unixonly.RunTest):
     def runTest(self, test, inChild=0):
         command = self.getExecuteCommand(test)
-        self.describe(test)
-        self.diag.info("Running test with command '" + command + "'")
         if not inChild:
+            self.describe(test)
+            self.diag.info("Running test with command '" + command + "'")
             self.changeToRunningState(test, None)
         os.system(command)
     def getBriefText(self, execMachines):

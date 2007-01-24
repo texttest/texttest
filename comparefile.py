@@ -36,6 +36,7 @@ class FileComparison:
     def ensureCompatible(self):
         if not hasattr(self, "differenceCache"):
             self.differenceCache = self.differenceId
+        self.diag = plugins.getDiagnostics("FileComparison")
     def modifiedDates(self):
         files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
         return string.join(map(self.modifiedDate, files), " : ")
@@ -50,12 +51,21 @@ class FileComparison:
     def needsRecalculation(self):
         # A test that has been saved doesn't need recalculating
         if self.tmpCmpFile == self.stdCmpFile or self.stdCmpFile == self.stdFile:
-            return 0
+            self.diag.info("Saved file, no recalculation")
+            return False
         
         if self.tmpFile and (plugins.modifiedTime(self.tmpCmpFile) < plugins.modifiedTime(self.tmpFile)):
-            return 1
-        return not self.newResult() and not self.missingResult() and \
-               (plugins.modifiedTime(self.stdCmpFile) <= plugins.modifiedTime(self.stdFile))
+            self.diag.info("Filter for tmp file out of date")
+            return True
+
+        if self.newResult() or self.missingResult():
+            self.diag.info("No comparison, no recalculation")
+            return False
+
+        self.diag.info("Comparing timestamps for standard files")
+        cmpModTime = plugins.modifiedTime(self.stdCmpFile)
+        stdModTime = plugins.modifiedTime(self.stdFile)
+        return  cmpModTime is not None and stdModTime is not None and cmpModTime <= stdModTime
     def getType(self):
         return "failure"
     def getDisplayFileName(self):

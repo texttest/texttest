@@ -92,8 +92,8 @@ class TestComparison(BaseTestComparison):
         # If loaded from old pickle files, can get out of date objects...
         if not hasattr(self, "missingResults"):
             self.missingResults = []
-        if not hasattr(self, "diag"):
-            self.diag = plugins.getDiagnostics("TestComparison")
+
+        self.diag = plugins.getDiagnostics("TestComparison")
         for fileComparison in self.allResults:
             fileComparison.ensureCompatible()
     def updateAbsPath(self, newPath):

@@ -1191,15 +1191,22 @@ class CreateDefinitionFile(InteractiveTestAction):
             return self.currentTest.makeSubDirectory("Diagnostics")
         else:
             return self.currentTest.getDirectory()
-        
+
+    def getSourceFile(self, fileName, targetFile):
+        # Use the file from the level above, if possible
+        if not self.currentTest.parent:
+            return None
+
+        if self.optionGroup.getSwitchValue("diag"):
+            thisTestName = self.currentTest.makePathName(fileName)
+            if not plugins.samefile(thisTestName, targetFile):
+                return thisTestName
+
+        return self.currentTest.parent.makePathName(fileName)            
     def performOnCurrent(self):
         fileName = self.getFileName()
-        # Use the file from the level above, if possible
-        if self.currentTest.parent and not self.optionGroup.getSwitchValue("diag"):
-            sourceFile = self.currentTest.parent.makePathName(fileName)
-        else:
-            sourceFile = self.currentTest.makePathName(fileName)
         targetFile = os.path.join(self.getTargetDirectory(), fileName)
+        sourceFile = self.getSourceFile(fileName, targetFile)
         plugins.ensureDirExistsForFile(targetFile)
         if sourceFile and os.path.isfile(sourceFile):
             guilog.info("Creating new file, copying " + sourceFile)

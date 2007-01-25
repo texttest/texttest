@@ -104,7 +104,7 @@ class DoubleCheckDialog:
 # option tab page layout. I think this will only add a minor overhead,
 # but will make it much easier to make the dialogs look nice.
 # 
-class ActionConfirmDialog:
+class ActionConfirmationDialog:
     def __init__(self, parent, okMethod, cancelMethod, plugin):
         self.parent = parent
         self.plugin = plugin
@@ -131,11 +131,97 @@ class ActionConfirmDialog:
     def run(self):
         self.addContents()
         self.dialog.show_all()
+        
+class SaveSelectionDialog(ActionConfirmationDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin):
+        self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_SAVE)
+        self.plugin = plugin
+        self.folders = self.plugin.getDirectories()
+        self.startFolder = os.getcwd() # Just to make sure we always have some dir ...
+        if len(self.folders) > 0 and os.path.isdir(os.path.abspath(self.folders[0][1])):
+            self.startFolder = os.path.abspath(self.folders[0][1])
+        self.enableOptions = self.plugin.dialogEnableOptions()
+        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        self.dialog.set_modal(True)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+    def createButtons(self):
+        self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
+        self.okButton = self.dialog.add_button(gtk.STOCK_SAVE, gtk.RESPONSE_ACCEPT)
+        scriptEngine.registerFileChooser("choose to save in file ", self.fileChooser, self.okButton, self.folders)
+        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
+        scriptEngine.connect("press save", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
+
+    def addContents(self):
+        alignment = gtk.Alignment()
+        alignment.set(1.0, 1.0, 1.0, 1.0)
+        alignment.set_padding(5, 5, 5, 5)
+        vbox = gtk.VBox()
+        alignment.add(vbox)
+        self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
+
+        # We want a filechooser dialog to let the user choose where, and
+        # with which name, to save the selection.
+        self.fileChooser.set_current_folder(self.startFolder)
+        for i in xrange(len(self.folders) - 1, -1, -1):
+            self.fileChooser.add_shortcut_folder(self.folders[i][1])
+        self.fileChooser.set_local_only(True)
+        vbox.pack_start(self.fileChooser, expand=True, fill=True)
+
+        # In the static GUI case, we also want radiobuttons specifying 
+        # whether we want to save the actual tests, or the selection criteria.
+        frame = gtk.Frame("Save")
+        frameBox = gtk.VBox()
+        self.radio1 = gtk.RadioButton(label="_List of selected tests", use_underline=True)
+        self.radio2 = gtk.RadioButton(self.radio1, label="C_riteria entered in the Selection tab\n(Might not match current selection, if it has been modified)", use_underline=True) # Letting C be mnemonic conflicts with cancel button ...
+        scriptEngine.registerToggleButton(self.radio1, "choose to save list of selected tests")
+        scriptEngine.registerToggleButton(self.radio2, "choose to save selection criteria")
+        frameBox.pack_start(self.radio1)
+        frameBox.pack_start(self.radio2)
+        frame.add(frameBox)
+        if not self.enableOptions:
+            frame.set_sensitive(False)
+        self.fileChooser.set_extra_widget(frame)
+
+    def run(self):
+        self.addContents()
+        self.dialog.show_all()
+
+    def respond(self, button, saidOK, *args):
+        if saidOK:
+            if not self.fileChooser.get_filename():
+                self.fileChooser.set_current_name("filename_mandatory")
+                return
+            if os.path.isdir(self.fileChooser.get_filename()):
+                self.fileChooser.set_current_folder(self.fileChooser.get_filename())
+                self.fileChooser.set_current_name("filename_mandatory")
+                return                
+            if os.path.exists(self.fileChooser.get_filename()):
+                confirmation = DoubleCheckDialog("\nThe file \n" + self.fileChooser.get_filename() + "\nalready exists.\n\nDo you want to overwrite it?\n", lambda : self.setOptionsAndExit(saidOK))
+            else:
+                self.setOptionsAndExit(saidOK)
+        else:
+            self.doExit(saidOK)
+
+    def setOptionsAndExit(self, saidOK):
+        # Transfer file name and options back to plugin
+        self.plugin.fileName = self.fileChooser.get_filename()
+        if self.enableOptions:
+            self.plugin.saveTestList = self.radio1.get_active()
+        self.doExit(saidOK)
+        
+    def doExit(self, saidOK):
+        self.dialog.hide()
+        self.dialog.response(gtk.RESPONSE_NONE)
+        if saidOK:
+            self.okMethod()
+        else:
+            self.cancelMethod()
 
 # It's a bit unfortunate that this has to be here, but unfortunately texttestgui
 # cannot load dialogs from matador without some additional work. Also, having it
 # here avoids matador importing guidialogs, and hence gtk.
-class CreatePerformanceReportDialog(ActionConfirmDialog):
+class CreatePerformanceReportDialog(ActionConfirmationDialog):
     def addContents(self):
         # A simple entry for the path, and one for the versions ...
         self.dirEntry = gtk.Entry()
@@ -158,4 +244,4 @@ class CreatePerformanceReportDialog(ActionConfirmDialog):
         if saidOK:
             self.plugin.rootDir = os.path.abspath(self.dirEntry.get_text())
             self.plugin.versions = self.versionsEntry.get_text().replace(" ", "").split(",")
-        ActionConfirmDialog.respond(self, button, saidOK, *args)
+        ActionConfirmationDialog.respond(self, button, saidOK, *args)

@@ -171,13 +171,14 @@ class InteractiveAction(plugins.Observable):
         return self.getScriptTitle(False)
     def getDialogType(self): # The dialog type to launch on action execution.
         return ""
-
     def getTitle(self, includeMnemonics=False):
         title = self._getTitle()
         if includeMnemonics:
             return title
         else:
             return title.replace("_", "")
+    def getDirectories(self, inputDirs=[], name=""):
+	return []
     def messageBeforePerform(self):
         # Don't change this by default, most of these things don't take very long
         pass
@@ -246,9 +247,6 @@ class SelectionAction(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currTestSelection = []
-    def addFilterFile(self, selectionGroup, fileName):
-        filterFileOption = selectionGroup.options["f"]
-        return filterFileOption.addPossibleValue(os.path.basename(fileName))
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def isActiveOnCurrent(self):
@@ -856,11 +854,6 @@ class SelectTests(SelectionAction):
             return [ fullVersion ] + [ fullVersion + "." + extra for extra in extraVersions ]
     def isActiveOnCurrent(self):
         return True
-    def findSelectGroup(self, app):
-        for group in app.optionGroups:
-            if group.name.startswith("Select"):
-                return group        
-    # We'll assume the appropriate XML code is given by an outside definition file.
     def hasExternalGUIDescription(self):
         return True
     def getStockId(self):
@@ -873,6 +866,15 @@ class SelectTests(SelectionAction):
         return "Select Tests"
     def getGroupTabTitle(self):
         return "Selection"
+    def getDirectories(self, name=""):
+        if name == "Tests listed in file":
+            apps = guiConfig.apps
+            if len(apps) > 0:
+                return apps[0].configObject.getFilterFileDirectories(apps)
+            else:
+                return []
+        else:
+            return []
     def messageBeforePerform(self):
         return "Selecting tests ..."
     def messageAfterPerform(self):
@@ -880,8 +882,8 @@ class SelectTests(SelectionAction):
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def getFilterList(self, app):
         app.configObject.updateOptions(self.appSelectGroup)
-        return app.configObject.getFilterList(app)
-    def performOnCurrent(self):
+        return app.configObject.getFilterList(app, False)
+    def performOnCurrent(self): 
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")
         selectedTests = []                
@@ -985,32 +987,28 @@ class ResetGroups(InteractiveAction):
         self.notify("Reset")
 
 class SaveSelection(SelectionAction):
-    def __init__(self, commandOptionGroups, dynamic):
+    def __init__(self, commandOptionGroups):
         SelectionAction.__init__(self)
-        self.dynamic = dynamic
         self.selectionGroup = commandOptionGroups[0]
-        self.addOption("name", "Name to give selection")
-        if not dynamic:
-            self.addSwitch("tests", "Store actual tests selected", 1)
-    def inMenuOrToolBar(self):
-        return False
+        self.fileName = ""
+        self.saveTestList = ""
+    def hasExternalGUIDescription(self):
+        return True
+    def getStockId(self):
+        return "save-as"
+    def getDialogType(self):
+        return "guidialogs.SaveSelectionDialog" # Since guiplugins cannot depend on gtk, we cannot call dialog ourselves ...
     def _getTitle(self):
-        return "S_ave selection"
+        return "S_ave Selection..."
     def _getScriptTitle(self):
         return "Save selected tests in file"
-    def getTabTitle(self):
-        return "Saving"
-    def getGroupTabTitle(self):
-        return "Selection"
-    def getFileName(self):
-        localName = self.optionGroup.getOptionValue("name")
-        if not localName:
-            raise plugins.TextTestError, "Please provide a file name to save the selection to."
-        
-        app = self.getAnyApp()
-        return app.configObject.getFilterFilePath(app, localName, True)
+    def dialogEnableOptions(self):
+        return not guiConfig.dynamic
+    def getDirectories(self, name=""):
+        apps = guiConfig.apps
+        return apps[0].configObject.getFilterFileDirectories(apps)        
     def saveActualTests(self):
-        return self.dynamic or self.optionGroup.getSwitchValue("tests")
+        return guiConfig.dynamic or self.saveTestList
     def getTextToSave(self):
         actualTests = self.saveActualTests()
         if actualTests:
@@ -1018,14 +1016,16 @@ class SaveSelection(SelectionAction):
         else:
             return string.join(self.selectionGroup.getCommandLines(useQuotes=False))
     def performOnCurrent(self):
-        fileName = self.getFileName()
         toWrite = self.getTextToSave()
-        file = open(fileName, "w")
-        file.write(toWrite + "\n")
-        file.close()
-        self.addFilterFile(self.selectionGroup, fileName)
+        try:
+            file = open(self.fileName, "w")
+            file.write(toWrite + "\n")
+            file.close()
+        except IOError, e:
+            raise plugins.TextTestError, "\nFailed to save selection:\n" + str(e) + "\n"
     def messageAfterPerform(self):
-        return "Saved " + self.describeTests() + " in file '" + self.getFileName() + "'."
+        return "Saved " + self.describeTests() + " in file '" + self.fileName+ "'."
+
 
 class RunningAction(SelectionAction):
     runNumber = 1
@@ -1079,12 +1079,6 @@ class RunningAction(SelectionAction):
     def checkTestRun(self, identifierString, errFile, testSel):
         try:
             self.notifyIfMainThread("ActionStart", "")
-            filterDir = self.getTmpFilterDir(testSel[0].app)
-            if os.path.isdir(filterDir):
-                for fileName in os.listdir(filterDir):
-                    if self.addFilterFile(self.selectionGroup, fileName):
-                        self.notifyIfMainThread("Status", "Adding filter " + fileName + " ...")
-                        self.notifyIfMainThread("ActionProgress", "")
             for test in testSel:
                 self.notifyIfMainThread("Status", "Updating files for " + repr(test) + " ...")
                 self.notifyIfMainThread("ActionProgress", "")
@@ -1455,11 +1449,12 @@ class RecomputeTest(InteractiveTestAction):
 class InteractiveActionHandler:
     def __init__(self):
         self.actionPreClasses = [ Quit, ViewFile ]
-        self.actionDynamicClasses = [ SaveTests, RecomputeTest ]
+        self.actionDynamicClasses = [ SaveTests, SaveSelection, RecomputeTest ]
         self.actionStaticClasses = [ RecordTest, CopyTest, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
-                                     RunTests, ResetGroups, RemoveTest, ReconnectToTests ]
-        self.actionPostClasses = [ SaveSelection ]
+                                     RunTests, ResetGroups, RemoveTest, ReconnectToTests, \
+                                     SaveSelection ]
+        self.actionPostClasses = []
         self.loadModules = [] # derived configurations add to this on being imported...
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")

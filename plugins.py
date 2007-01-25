@@ -751,10 +751,12 @@ class Option:
             self.valueMethod = None
 
 class TextOption(Option):
-    def __init__(self, name, value, possibleValues, allocateNofValues, description, changeMethod):
+    def __init__(self, name, value, possibleValues, allocateNofValues, selectDir, selectFile, description, changeMethod):
         Option.__init__(self, name, value, description, changeMethod)
         self.possValMethod = None
         self.nofValues = allocateNofValues
+        self.selectDir = selectDir
+        self.selectFile = selectFile
         self.clearMethod = None
         self.setPossibleValues(possibleValues)
     def setPossibleValuesAppendMethod(self, method):
@@ -829,10 +831,10 @@ class OptionGroup:
             return False
         self.switches[key] = Switch(name, value, options, description, changeMethod)
         return True
-    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, description = "", changeMethod = None):
+    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, selectDir = False, selectFile = False, description = "", changeMethod = None):
         if self.options.has_key(key):
             return False
-        self.options[key] = TextOption(name, value, possibleValues, allocateNofValues, description, changeMethod)
+        self.options[key] = TextOption(name, value, possibleValues, allocateNofValues, selectDir, selectFile, description, changeMethod)
         return True
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
@@ -843,7 +845,11 @@ class OptionGroup:
         if self.options.has_key(key):
             return self.options[key].getValue()
         else:
-            return defValue
+	    return defValue
+    def getOption(self, key):
+        return self.options[key]
+    def getSwitch(self, key):
+        return self.switches[key]
     def setSwitchValue(self, key, value):
         if self.switches.has_key(key):
             self.switches[key].setValue(value)
@@ -906,4 +912,4 @@ class OptionGroup:
                     self.switches[arg].defaultValue = 1 - oldValue
                 else:
                     raise TextTestError, self.name + " does not support switch '" + arg + "'"
- 
+

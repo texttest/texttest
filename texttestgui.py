@@ -21,7 +21,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, os, string, time, sys, locale
+import guiplugins, plugins, os, string, time, sys, locale, paths
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
@@ -61,9 +61,11 @@ class SubGUI(plugins.Observable):
         self.widget = None
     def setActive(self, newValue):
         self.active = newValue
+
     def activate(self):
         self.setActive(True)
         self.contentsChanged()
+
     def deactivate(self):
         self.setActive(False)
     def writeSeparator(self):
@@ -74,18 +76,25 @@ class SubGUI(plugins.Observable):
         if self.shouldDescribe():
             self.writeSeparator()
             self.describe()
+
     def describe(self):
         pass
+
     def createView(self):
         pass
+
     def shouldShowCurrent(self):
         return True # sometimes these things don't have anything to display
+
     def getTabTitle(self):
         return "Need Title For Tab!"
+
     def getGroupTabTitle(self):
         return "Test"
+
     def forceVisible(self, tests):
         return False
+
     def addScrollBars(self, view):
         window = gtk.ScrolledWindow()
         window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
@@ -98,7 +107,7 @@ class SubGUI(plugins.Observable):
             window.add_with_viewport(widget)
         else:
             window.add(widget)
-
+            
 # base class for managing containers
 class ContainerGUI(SubGUI):
     def __init__(self, subguis):
@@ -125,7 +134,7 @@ class ContainerGUI(SubGUI):
         SubGUI.contentsChanged(self)
         for subgui in self.subguis:
             subgui.contentsChanged()
-    
+            
 def getGtkRcFile():
     configDir = plugins.getPersonalConfigDir()
     if not configDir:
@@ -1190,8 +1199,7 @@ class ActionGUI(SubGUI):
         except plugins.TextTestWarning, e:
             showWarningDialog(str(e), globalTopWindow)
         except plugins.TextTestInformation, e:
-            showInformationDialog(str(e), globalTopWindow)
-    
+            showInformationDialog(str(e), globalTopWindow)    
            
 class DefaultActionGUI(ActionGUI):
     def __init__(self, action):
@@ -1201,7 +1209,6 @@ class DefaultActionGUI(ActionGUI):
         actionName = self.action.getTitle(includeMnemonics=False)
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.action.getTooltip(), self.getStockId())
-
         scriptEngine.connect(self.action.getScriptTitle(False), "activate", self.gtkAction, self.runInteractive)
         self.updateSensitivity()
     def addToGroups(self, actionGroup, accelGroup):
@@ -1392,15 +1399,29 @@ class ActionTabGUI(SubGUI):
         
         option.setClearMethod(combobox.get_model().clear)
         return combobox, entry
-    
+
     def createOptionWidget(self, option):
+        box = gtk.HBox()
         if option.inqNofValues() > 1:
-            return self.createComboBox(option)
+            (widget, entry) = self.createComboBox(option)
+            box.pack_start(widget, expand=True, fill=True)
         else:
             entry = gtk.Entry()
-            return entry, entry
+            box.pack_start(entry, expand=True, fill=True)
+            
+        if option.selectDir:
+            button = gtk.Button("...")
+            box.pack_start(button, expand=False, fill=False)
+            button.connect("clicked", self.showDirectoryChooser, entry, option.name)
+        elif option.selectFile:
+            button = gtk.Button("...")
+            box.pack_start(button, expand=False, fill=False)
+            button.connect("clicked", self.showFileChooser, entry, option.name)
+        return (box, entry)
+  
     def getConfigOptions(self, option):
         return guiConfig.getCompositeValue("gui_entry_options", option.name)    
+
     def updateForConfig(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
         if fromConfig != "<not set>":
@@ -1462,6 +1483,44 @@ class ActionTabGUI(SubGUI):
             checkButton.show()
             return checkButton
 
+    def showDirectoryChooser(self, widget, entry, name):
+        dialog = gtk.FileChooserDialog("Select a directory",
+                                       globalTopWindow,
+                                       gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
+                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+        self.startChooser(dialog, entry, name)
+
+    def showFileChooser(self, widget, entry, name):
+        dialog = gtk.FileChooserDialog("Select a file",
+                                       globalTopWindow,
+                                       gtk.FILE_CHOOSER_ACTION_OPEN,
+                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
+                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+        self.startChooser(dialog, entry, name)
+
+    def startChooser(self, dialog, entry, name):
+        # Folders is a list of pairs (short name, absolute path),
+        # where 'short name' means the name given in the config file, e.g.
+        # 'temporary_filter_files' or 'filter_files' ...
+        folders = self.action.getDirectories(name)
+        # If current entry forms a valid path, set that as default
+        currPath = paths.getAbsolutePath(folders, entry.get_text())
+        currDir, currFile = os.path.split(currPath)
+        if os.path.isdir(currDir):
+            dialog.set_current_folder(currDir)
+        elif len(folders) > 0 and os.path.isdir(os.path.abspath(folders[0][1])):
+            dialog.set_current_folder(os.path.abspath(folders[0][1]))
+        for i in xrange(len(folders) - 1, -1, -1):
+            dialog.add_shortcut_folder(folders[i][1])
+        dialog.set_default_response(gtk.RESPONSE_OK)
+        response = dialog.run()
+        if response == gtk.RESPONSE_OK:
+            entry.set_text(paths.getRelativeOrAbsolutePath(folders, dialog.get_filename()))
+            entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
+            entry.activate() # Necessary (?) for pyusecase to catch the set text ...
+        dialog.destroy()
+        
     def describe(self):
         guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
         for option in self.optionGroup.options.values():
@@ -1648,7 +1707,6 @@ class NotebookGUI(SubGUI):
     def notifyNewTestSelection(self, tests, direct):
         if not self.notebook:
             return 
-
         pagesShown = self.showNewPages()
         pagesHidden = self.hideOldPages()
         if direct: # only change pages around if a test is directly selected
@@ -1673,11 +1731,13 @@ class PaneGUI(ContainerGUI):
             return gtk.HPaned()
         else:
             return gtk.VPaned()
+
     def getSize(self):
         if self.horizontal:
             return self.paned.allocation.width
         else:
             return self.paned.allocation.height
+        
     def createView(self):
         self.paned = self.createPaned()
         self.paned.connect('notify', self.paneHasChanged)
@@ -2214,9 +2274,7 @@ class TestProgressMonitor(SubGUI):
         self.treeView = None
         self.dynamic = dynamic
     def getGroupTabTitle(self):
-        return "Selection"
-    def getTabTitle(self):
-        return "Select Tests"
+        return "Status"
     def shouldShowCurrent(self):
         return self.dynamic
     def createView(self):

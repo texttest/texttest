@@ -672,7 +672,7 @@ class KillRuleBuildSubmission(queuesystem.KillTestSubmission):
     def setKilledPending(self, test):
         timeStr =  plugins.localtime("%H:%M")
         briefText = "killed pending rule compilation at " + timeStr
-        freeText = "Rule compilation job was killed (while still pending in " + queueSystemName(test.app) +\
+        freeText = "Rule compilation job was killed (while still pending in " + queuesystem.queueSystemName(test.app) +\
                    ") at " + timeStr
         test.changeState(RuleBuildFailed(freeText, briefText))
     def setSlaveLost(self, test):

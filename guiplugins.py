@@ -104,22 +104,19 @@ processTerminationMonitor = ProcessTerminationMonitor()
 class InteractiveAction(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
-        self.optionGroup = None
-        optionName = self.getTabTitle()
-        if optionName:
-            self.optionGroup = plugins.OptionGroup(optionName)
+        self.optionGroup = plugins.OptionGroup(self.getTabTitle())
     def __repr__(self):
-        if self.optionGroup != None:
+        if self.optionGroup.name:
             return self.optionGroup.name
         else:
             return self.getTitle()
     def addSuites(self, suites):
         pass
     def getOptionGroups(self):
-        if self.optionGroup:
-            return [ self.optionGroup ]
-        else:
+        if self.optionGroup.empty():
             return []
+        else:
+            return [ self.optionGroup ]
     def updateForStateChange(self, test, state):
         return False, False
     def updateForSelectionChange(self):
@@ -187,7 +184,7 @@ class InteractiveAction(plugins.Observable):
     def getDoubleCheckMessage(self):
         return ""
     def getTabTitle(self):
-        return ""
+        return self.getGroupTabTitle()
     def getGroupTabTitle(self):
         # Default behaviour is not to create a group tab, override to get one...
         return "Test"
@@ -862,8 +859,6 @@ class SelectTests(SelectionAction):
         return "_Select"
     def _getScriptTitle(self):
         return "Select indicated tests"
-    def getTabTitle(self):
-        return "Select Tests"
     def getGroupTabTitle(self):
         return "Selection"
     def getDirectories(self, name=""):

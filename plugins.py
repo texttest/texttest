@@ -813,6 +813,8 @@ class OptionGroup:
         self.switches = seqdict()
     def __repr__(self):
         return "OptionGroup " + self.name + "\n" + repr(self.options) + "\n" + repr(self.switches)
+    def empty(self):
+        return len(self.options) == 0 and len(self.switches) == 0
     def reset(self):
         for option in self.options.values():
             option.reset()

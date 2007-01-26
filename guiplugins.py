@@ -342,7 +342,7 @@ class InteractiveTestAction(InteractiveAction):
         commandLine, descriptor = self.getViewCommand(fileName)
         description = descriptor + " " + self.getRelativeFilename(fileName)
         refresh = str(int(refreshContents or refreshFiles))
-        guilog.info("Viewing file " + fileName.replace(os.sep, "/") + " using '" + descriptor + "', refresh set to " + str(refresh))
+        guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
         process = self.startExternalProgram(commandLine, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     
@@ -566,7 +566,9 @@ class ViewFile(InteractiveTestAction):
         stdFile = self.stdFile(comparison)
         tmpFile = self.tmpFile(comparison)
         description = diffProgram + " " + stdFile + "\n                                   " + tmpFile
-        guilog.info("Comparing file " + os.path.basename(tmpFile) + " with previous version using '" + diffProgram + "'")
+        guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
+        guilog.info("-- original file : " + stdFile)
+        guilog.info("--  current file : " + tmpFile)
         commandLine = diffProgram + ' "' + stdFile + '" "' + tmpFile + '" ' + plugins.nullRedirect()
         process = self.startExternalProgram(commandLine, description=description)
         scriptEngine.monitorProcess("shows graphical differences in test files", process)

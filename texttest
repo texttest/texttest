@@ -1,14 +1,5 @@
 #!/bin/sh
 
-get_python()
-{
-    if [ -f /usr/bin/python2.4.i386 ]; then
-        eval "$1=/usr/bin/python2.4.i386"
-    else
-        eval "$1=python"
-    fi
-}
-
 abspath()
 {
     case "$1" in
@@ -23,23 +14,11 @@ abspath()
     esac
 }
 
-prepend_path_element()
-{
-    echo $3 | grep -q $1
-    if [ $? = 1 ]; then
-        eval $2=$1:$3
-    fi
-}
-
 abspath $0 fullpath
-prepend_path_element /usr/local/pygtk-tt/gtk2.6/lib/:/usr/local/pygtk-tt/gtk2.6/lib/ LD_LIBRARY_PATH $LD_LIBRARY_PATH
-prepend_path_element /usr/local/pygtk-tt/gtk2.6/lib/python2.4/site-packages/gtk-2.0:/usr/local/pygtk-tt/gtk2.6/lib/python2.4/site-packages/Numeric:/usr/local/pygtk-tt/gtk2.6/lib/python2.4/site-packages PYTHONPATH $PYTHONPATH
-export LD_LIBRARY_PATH PYTHONPATH
-export GDK_PIXBUF_MODULE_FILE=/usr/local/pygtk-tt/gtk2.6/etc/gtk-2.0/gdk-pixbuf.loaders
-#export PANGO_RC_FILE=/usr/local/pygtk-tt/gtk2.6/etc/pango/pangorc
-export GTK2_RC_FILES=/usr/local/pygtk-tt/gtk2.6/etc/gtk-2.0/gtkrc
-export GTK_PATH=/usr/local/pygtk-tt/gtk2.6/lib/gtk-2.0
-export GTK_DATA_PREFIX=/usr/local/pygtk-tt/gtk2.6
 export TEXTTEST_SLAVE_CMD=$fullpath
-get_python python
-exec $python -u ${fullpath}.py "$@"
+
+# Sets gtk/pygtk environment variables and sets PYTHON_TO_RUN 
+# to point to the full name of the python binary to run.
+. /usr/local/pygtk-tt/gtk2.6/bin/setup_python_gtk.sh
+
+exec $PYTHON_TO_RUN -u ${fullpath}.py "$@"

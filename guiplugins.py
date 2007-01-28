@@ -1335,14 +1335,14 @@ class CopyTest(ImportTest):
             dirname, local = os.path.split(sourceFile)
             if dirname == self.testToCopy.getDirectory():
                 targetFile = os.path.join(testDir, local)
-                shutil.copyfile(sourceFile, targetFile)
+                shutil.copy2(sourceFile, targetFile)
         dataFiles = self.testToCopy.listDataFiles()
         for sourcePath in dataFiles:
             if os.path.isdir(sourcePath):
                 continue
             targetPath = sourcePath.replace(self.testToCopy.getDirectory(), testDir)
             plugins.ensureDirExistsForFile(targetPath)
-            shutil.copyfile(sourcePath, targetPath)
+            shutil.copy2(sourcePath, targetPath)
         originalTest = self.testToCopy # Set to new test in call below ...
         originalSuite = self.currentTest # Also reset
         ret =  suite.addTestCase(os.path.basename(testDir), description, placement)

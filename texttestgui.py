@@ -1503,14 +1503,14 @@ class ActionTabGUI(SubGUI):
         # Folders is a list of pairs (short name, absolute path),
         # where 'short name' means the name given in the config file, e.g.
         # 'temporary_filter_files' or 'filter_files' ...
-        folders = self.action.getDirectories(name)
+        folders, defaultFolder = self.action.getDirectories(name)
         # If current entry forms a valid path, set that as default
         currPath = paths.getAbsolutePath(folders, entry.get_text())
         currDir, currFile = os.path.split(currPath)
         if os.path.isdir(currDir):
             dialog.set_current_folder(currDir)
-        elif len(folders) > 0 and os.path.isdir(os.path.abspath(folders[0][1])):
-            dialog.set_current_folder(os.path.abspath(folders[0][1]))
+        elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
+            dialog.set_current_folder(os.path.abspath(defaultFolder))
         for i in xrange(len(folders) - 1, -1, -1):
             dialog.add_shortcut_folder(folders[i][1])
         dialog.set_default_response(gtk.RESPONSE_OK)

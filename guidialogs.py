@@ -136,10 +136,10 @@ class SaveSelectionDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
         self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_SAVE)
         self.plugin = plugin
-        self.folders = self.plugin.getDirectories()
+        self.folders, defaultFolder = self.plugin.getDirectories()
         self.startFolder = os.getcwd() # Just to make sure we always have some dir ...
-        if len(self.folders) > 0 and os.path.isdir(os.path.abspath(self.folders[0][1])):
-            self.startFolder = os.path.abspath(self.folders[0][1])
+        if defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
+            self.startFolder = os.path.abspath(defaultFolder)
         self.enableOptions = self.plugin.dialogEnableOptions()
         ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
         self.dialog.set_modal(True)

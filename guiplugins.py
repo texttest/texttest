@@ -175,7 +175,7 @@ class InteractiveAction(plugins.Observable):
         else:
             return title.replace("_", "")
     def getDirectories(self, inputDirs=[], name=""):
-	return []
+	return ([], None)
     def messageBeforePerform(self):
         # Don't change this by default, most of these things don't take very long
         pass
@@ -867,11 +867,17 @@ class SelectTests(SelectionAction):
         if name == "Tests listed in file":
             apps = guiConfig.apps
             if len(apps) > 0:
-                return apps[0].configObject.getFilterFileDirectories(apps)
+                dirs = apps[0].configObject.getFilterFileDirectories(apps)
+                # Set first non-empty dir as default ...)
+                for dir in dirs:
+                    if os.path.isdir(os.path.abspath(dir[1])) and \
+                       len(os.listdir(os.path.abspath(dir[1]))) > 0:
+                        return (dirs, dir[1])
+                return (dirs, dirs[0][1])
             else:
-                return []
+                return ([], None)
         else:
-            return []
+            return ([], None)
     def messageBeforePerform(self):
         return "Selecting tests ..."
     def messageAfterPerform(self):
@@ -1003,7 +1009,11 @@ class SaveSelection(SelectionAction):
         return not guiConfig.dynamic
     def getDirectories(self, name=""):
         apps = guiConfig.apps
-        return apps[0].configObject.getFilterFileDirectories(apps)        
+        dirs = apps[0].configObject.getFilterFileDirectories(apps)
+        if len(dirs) > 0:
+            return (dirs, dirs[0][1])
+        else:
+            return (dirs, None)
     def saveActualTests(self):
         return guiConfig.dynamic or self.saveTestList
     def getTextToSave(self):

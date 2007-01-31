@@ -1412,8 +1412,8 @@ class TestGraph:
                     stdin, stdout, stderr = os.popen3("cvs -q upd -p -D " + date + " " + originalLogFileName + " > " + CVSLogFileName)
                     if len(stderr.readlines()) > 0:
                         print os.path.basename(originalLogFileName), "is not in the CVS repository at", date
-                    else:
-                        self.createPlotObjects("CVS " + date, CVSLogFileName, test, None)
+                        continue
+                self.createPlotObjects("CVS " + date, CVSLogFileName, test, None)
             else:
                 if not noTmp:
                     logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)

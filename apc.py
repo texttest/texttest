@@ -221,6 +221,7 @@ class ApcConfig(optimization.OptimizationConfig):
     def setApplicationDefaults(self, app):
         optimization.OptimizationConfig.setApplicationDefaults(self, app)
         self.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
+        self.itemNamesInFile[optimization.timeEntryName] = "cpu time|cpu-tid"
         self.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
         if app.name == "cas_apc":
             self.itemNamesInFile[optimization.costEntryName] = "rule cost"

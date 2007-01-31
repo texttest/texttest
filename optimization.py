@@ -648,7 +648,7 @@ class OptimizationValueCalculator:
         for index in range(len(entries)):
             entry = entries[index].strip()
             if entry == "MB" or entry == "Mb" or entry == "Mb)":
-                memNum = entries[index - 1]
+                memNum = entries[index - 1].replace(",",".")
                 if memNum.find(".") == -1:
                     return int(memNum)
                 else:
@@ -1150,7 +1150,8 @@ class TestGraph:
                                                     "global constraint excess cost", "base constraint excess cost", \
                                                     "global constraint excess cost,base constraint excess cost", \
                                                     "overcovers", "uncovered legs\.\.", "illegal trips........................", \
-                                                    "overcovers,uncovered legs\.\.,illegal trips........................","apctimes"]),
+                                                    "overcovers,uncovered legs\.\.,illegal trips........................",
+                                                    "apctimes","memory"]),
                     ("ix", "Log file item to plot against", [timeEntryName, "Colgen iterations"]),
                     ("v", "Extra versions to plot", [""]),
                     ("title", "Title of the plot", [""]),

@@ -19,6 +19,6 @@ export TEXTTEST_SLAVE_CMD=$fullpath
 
 # Sets gtk/pygtk environment variables and sets PYTHON_TO_RUN 
 # to point to the full name of the python binary to run.
-. /usr/local/pygtk-tt/gtk2.6/bin/setup_python_gtk.sh
+. /usr/local/tt-env/gtk2.6/bin/setup_python_gtk.sh
 
 exec $PYTHON_TO_RUN -u ${fullpath}.py "$@"

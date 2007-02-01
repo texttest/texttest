@@ -184,51 +184,51 @@ class GenerateWebPages:
 
 class TestTable:
     def generate(self, categoryHandler, pageVersion, version, loggedTests, tagsFound):
-        t = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
-        t.append(self.generateTableHead(pageVersion, version, tagsFound))
-
-        table = []
+        table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
+        table.append(self.generateTableHead(pageVersion, version, tagsFound))
+        table.append(categoryHandler.generateSummaries(pageVersion, version, tagsFound))
         extraVersions = loggedTests.keys()
         for extraVersion in extraVersions:
-            tests = loggedTests[extraVersion].keys()
-            tests.sort()
             # Add an extra line in the table only if there are several versions.
             if len(extraVersions) > 1:
-                if extraVersion != "None":
-                    extraVersionName = version + "." + extraVersion
-                else:
-                    extraVersionName = version
-                bgColour = colourFinder.find("column_header_bg")
-                table.append(HTMLgen.TR() + [HTMLgen.TH(extraVersionName, colspan = len(tagsFound) + 1,
-                                                    bgcolor=bgColour )])
+                table.append(self.generateExtraVersionHeader(extraVersion, version, tagsFound))
+
+            tests = loggedTests[extraVersion].keys()
+            tests.sort()
             for test in tests:
                 results = loggedTests[extraVersion][test]
-                bgColour = colourFinder.find("row_header_bg")
-                row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + extraVersion), test), bgcolor=bgColour) ]
-                for tag in tagsFound:
-                    if results.has_key(tag):
-                        state = results[tag]
-                        type, detail = state.getTypeBreakdown()
-                        category = state.category # Strange but correct..... (getTypeBreakdown gives "wrong" category)
-                        fgcol, bgcol = self.getColors(category, detail)
-                        filteredState = self.filterState(repr(state))
-                        if category == "success":
-                            cellContaint =  HTMLgen.Font(filteredState + detail, color = fgcol)
-                        else:
-                            cellContaint = HTMLgen.Href(getDetailPageName(pageVersion, tag) + "#" + version + test + extraVersion,
-                                                        HTMLgen.Font(filteredState + detail, color = fgcol))
-                    else:
-                        bgcol = colourFinder.find("no_results_bg")
-                        cellContaint = "N/A"
-                    row.append(HTMLgen.TD(cellContaint, bgcolor = bgcol))
-                body = HTMLgen.TR()
-                body = body + row
-                table.append(body)
-        table = categoryHandler.generateSummaries(pageVersion, version, tagsFound) + table
-        t.append(table)
-        t.append(HTMLgen.BR())
-        return t
-    
+                table.append(self.generateTestRow(test, pageVersion, version, extraVersion, results, tagsFound))
+
+        table.append(HTMLgen.BR())
+        return table
+    def generateExtraVersionHeader(self, extraVersion, version, tagsFound):
+        if extraVersion != "None":
+            extraVersionName = version + "." + extraVersion
+        else:
+            extraVersionName = version
+        bgColour = colourFinder.find("column_header_bg")
+        columnHeader = HTMLgen.TH(extraVersionName, colspan = len(tagsFound) + 1, bgcolor=bgColour)
+        return HTMLgen.TR(columnHeader)
+    def generateTestRow(self, test, pageVersion, version, extraVersion, results, tagsFound):
+        bgColour = colourFinder.find("row_header_bg")
+        row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + extraVersion), test), bgcolor=bgColour) ]
+        for tag in tagsFound:
+            if results.has_key(tag):
+                state = results[tag]
+                type, detail = state.getTypeBreakdown()
+                category = state.category # Strange but correct..... (getTypeBreakdown gives "wrong" category)
+                fgcol, bgcol = self.getColors(category, detail)
+                filteredState = self.filterState(repr(state))
+                if category == "success":
+                    cellContaint =  HTMLgen.Font(filteredState + detail, color = fgcol)
+                else:
+                    cellContaint = HTMLgen.Href(getDetailPageName(pageVersion, tag) + "#" + version + test + extraVersion,
+                                                HTMLgen.Font(filteredState + detail, color = fgcol))
+            else:
+                bgcol = colourFinder.find("no_results_bg")
+                cellContaint = "N/A"
+            row.append(HTMLgen.TD(cellContaint, bgcolor = bgcol))
+        return HTMLgen.TR(*row)
     def filterState(self, cellContent):
         result = cellContent
         result = re.sub(r'CRASHED.*( on .*)', r'CRASH\1', result)
@@ -348,7 +348,7 @@ class CategoryHandler:
         for tag in tags:
             summary = self.generateSummaryHTML(tag, pageVersion, version, self.testsInCategory[tag])
             row.append(HTMLgen.TD(summary, bgcolor = bgColour))
-        return HTMLgen.TR() + row
+        return HTMLgen.TR(*row)
     def generateSummaryHTML(self, tag, pageVersion, version, categories):
         summary = HTMLgen.Container()
         numTests = 0

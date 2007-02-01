@@ -1445,6 +1445,7 @@ class RecomputeTest(InteractiveTestAction):
     def notifyNewTestSelection(self, tests, direct):
         InteractiveTestAction.notifyNewTestSelection(self, tests, direct)
         if self.currentTest and self.currentTest.needsRecalculation():
+            self.currentTest.refreshFiles()
             self.perform()
     def inButtonBar(self):
         return True

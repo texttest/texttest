@@ -79,6 +79,8 @@ class TestComparison(BaseTestComparison):
         self.failedPrediction = None
         if previousInfo.category == "killed":
             self.setFailedPrediction(previousInfo)
+        if hasattr(previousInfo, "failedPrediction") and previousInfo.failedPrediction:
+            self.setFailedPrediction(previousInfo.failedPrediction)
         # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved
         self.appAbsPath = app.getDirectory()
         self.appWriteDir = app.writeDirectory

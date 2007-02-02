@@ -2273,6 +2273,7 @@ class TestProgressMonitor(SubGUI):
         self.progressReport = None
         self.treeView = None
         self.dynamic = dynamic
+        self.diag = plugins.getDiagnostics("Progress Monitor")
     def getGroupTabTitle(self):
         return "Status"
     def shouldShowCurrent(self):
@@ -2332,6 +2333,7 @@ class TestProgressMonitor(SubGUI):
 
         if not state.isSaveable(): # If it's not saveable, don't classify it by the files
             overall, details = state.getTypeBreakdown()
+            self.diag.info("Adding unsaveable : " + catDesc + " " + details)
             classifiers.addClassification([ "Failed", catDesc, details ])
             return classifiers
 
@@ -2363,6 +2365,7 @@ class TestProgressMonitor(SubGUI):
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
     def addTestForNode(self, test, state, nodeClassifier, classifiers, parentIter=None):
+        self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier)
         nodeIter = self.findIter(nodeClassifier, parentIter)
         if nodeIter:
             self.insertTestAtIter(nodeIter, test, state.category)

@@ -633,7 +633,7 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
         for version in self.versions:            
             defaultFileName = test.getFileName("output", "master")
             fileName = test.getFileName("output", version)
-            if fileName == defaultFileName and version != "master":
+            if not fileName or (fileName == defaultFileName and version != "master"):
                 continue # Same as master, empty result vector ...
 
             file = open(fileName, "r")
@@ -784,7 +784,7 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
         # Get output file for this version
         defaultFileName = test.getFileName("output", "master")
         fileName = test.getFileName("output", version)
-        if fileName == defaultFileName and version != "master":
+        if not fileName or (fileName == defaultFileName and version != "master"):
             return "Same as master"
         
         # Get lines from (but excluding) '----------Timers'

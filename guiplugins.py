@@ -196,8 +196,12 @@ class InteractiveAction(plugins.Observable):
             return baseTitle
     def _getScriptTitle(self):
         return self.getTitle()
-    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, description = ""):
-        self.optionGroup.addOption(key, name, value, possibleValues, allocateNofValues, description)
+    def addOption(self, key, name, value = "", possibleValues = [],
+                  allocateNofValues = -1, description = "",
+                  selectDir = False, selectFile = False):
+        self.optionGroup.addOption(key, name, value, possibleValues,
+                                   allocateNofValues, selectDir,
+                                   selectFile, description)
     def addSwitch(self, key, name, defaultValue = 0, options = [], description = ""):
         self.optionGroup.addSwitch(key, name, defaultValue, options, description)
     def startExternalProgram(self, commandLine, description = "", shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):

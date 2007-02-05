@@ -591,9 +591,19 @@ class ImportTest(InteractiveTestAction):
         self.checkName(suite, testName)
         newDir = os.path.join(suite.getDirectory(), testName)
         if os.path.isdir(newDir):
+            if self.testFilesExist(newDir, suite.app):
+                raise plugins.TextTestError, "Test already exists for application " + suite.app.fullName + \
+                      " : " + os.path.basename(newDir)
+            
             return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
         else:
             return ""
+    def testFilesExist(self, dir, app):
+        for fileName in os.listdir(dir):
+            parts = fileName.split(".")
+            if len(parts) > 1 and parts[1] == app.name:
+                return True
+        return False
     def inMenuOrToolBar(self):
         return False
     def correctTestClass(self):
@@ -787,10 +797,7 @@ class ImportTestCase(ImportTest):
         self.writeResultsFiles(suite, testDir)
         return suite.addTestCase(os.path.basename(testDir), description, placement)
     def getWriteFileName(self, name, suite, testDir):
-        fileName = os.path.join(testDir, name + "." + suite.app.name)
-        if os.path.isfile(fileName):
-            raise plugins.TextTestError, "Test already exists for application " + suite.app.fullName + " : " + os.path.basename(testDir)
-        return fileName
+        return os.path.join(testDir, name + "." + suite.app.name)
     def getWriteFile(self, name, suite, testDir):
         return open(self.getWriteFileName(name, suite, testDir), "w")
     def writeEnvironmentFile(self, suite, testDir):

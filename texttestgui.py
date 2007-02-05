@@ -1174,26 +1174,26 @@ class ActionGUI(SubGUI):
             return ""
         else:
             return " (greyed out)"
-    def _runInteractive(self, *args):
+    def runInteractive(self, *args):
         if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
             return
         doubleCheckMessage = self.action.getDoubleCheckMessage()
         if doubleCheckMessage:
-            self.dialog = DoubleCheckDialog(doubleCheckMessage, self.action.perform, self._dontRun, globalTopWindow)
+            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, self._dontRun, globalTopWindow)
         else:
             dialogType = self.action.getDialogType()
             if dialogType:
                 dialogClass = eval(dialogType)
-                dialog = dialogClass(globalTopWindow, self.action.perform, self._dontRun, self.action)
+                dialog = dialogClass(globalTopWindow, self._runInteractive, self._dontRun, self.action)
                 dialog.run()
             else:
-                self.action.perform()
+                self._runInteractive()
 
     def _dontRun(self):
         statusMonitor.notifyStatus("Action cancelled.")
-    def runInteractive(self, *args):
+    def _runInteractive(self):
         try:
-            self._runInteractive()
+            self.action.perform()
         except plugins.TextTestError, e:
             showErrorDialog(str(e), globalTopWindow)
         except plugins.TextTestWarning, e:

@@ -70,6 +70,8 @@ class QueueSystem:
             acctOutput = self.getAccountInfo(jobId)
             if acctOutput is not None:
                 return acctOutput
+            else:
+                print "Waiting", sleepTime, "seconds before retrying account info for job", jobId
     def getAccountInfoOldFiles(self, jobId):
         for logNum in range(5):
             # try at most 5 accounting files for now - assume jobs don't run longer than 5 days!

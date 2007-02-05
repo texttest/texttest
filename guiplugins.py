@@ -585,6 +585,15 @@ class ImportTest(InteractiveTestAction):
         self.optionGroup.addOption("desc", self.getDescTitle(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
         self.testImported = None
+    def getDoubleCheckMessage(self):
+        testName = self.getNewTestName()
+        suite = self.getDestinationSuite()
+        self.checkName(suite, testName)
+        newDir = os.path.join(suite.getDirectory(), testName)
+        if os.path.isdir(newDir):
+            return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
+        else:
+            return ""
     def inMenuOrToolBar(self):
         return False
     def correctTestClass(self):
@@ -630,7 +639,6 @@ class ImportTest(InteractiveTestAction):
     def performOnCurrent(self):
         testName = self.getNewTestName()
         suite = self.getDestinationSuite()
-        self.checkName(suite, testName)
             
         guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + \
                     repr(suite) + ", placed " + self.optionGroup.getOptionValue("testpos"))

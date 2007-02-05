@@ -1851,14 +1851,14 @@ class ReplaceText(plugins.ScriptWithArgs):
     scriptDoc = "Perform a search and replace on all files with the given stem"
     def __init__(self, args):
         argDict = self.parseArguments(args)
-        self.oldText = argDict["old"]
+        self.oldTextTrigger = plugins.TextTrigger(argDict["old"])
         self.newText = argDict["new"].replace("\\n", "\n")
         self.logFile = None
         if argDict.has_key("file"):
             self.logFile = argDict["file"]
         self.textDiffTool = None
     def __repr__(self):
-        return "Replacing " + self.oldText + " with " + self.newText + " for"
+        return "Replacing " + self.oldTextTrigger.text + " with " + self.newText + " for"
     def __call__(self, test):
         logFile = test.getFileName(self.logFile)
         if not logFile:
@@ -1868,7 +1868,7 @@ class ReplaceText(plugins.ScriptWithArgs):
         newLogFile = logFile + "_new"
         writeFile = open(newLogFile, "w")
         for line in open(logFile).xreadlines():
-            writeFile.write(line.replace(self.oldText, self.newText))
+            writeFile.write(self.oldTextTrigger.replace(line, self.newText))
         writeFile.close()
         os.system(self.textDiffTool + " " + logFile + " " + newLogFile)
         os.remove(logFile)

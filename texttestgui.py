@@ -974,6 +974,7 @@ class TestTreeGUI(ContainerGUI):
     def selectTestRows(self, selTests, selectCollapsed=True):
         self.selecting = True # don't respond to each individual programmatic change here
         self.selection.unselect_all()
+        treeView = self.selection.get_tree_view()
         firstPath = None
         for test in selTests:
             iter = self.findIter(test)
@@ -983,11 +984,14 @@ class TestTreeGUI(ContainerGUI):
             if not firstPath:
                 firstPath = path
             if selectCollapsed:
-                self.selection.get_tree_view().expand_to_path(path)
+                treeView.expand_to_path(path)
             self.selection.select_iter(iter)
-        self.selection.get_tree_view().grab_focus()
+        treeView.grab_focus()
         if firstPath is not None:
-            self.selection.get_tree_view().scroll_to_cell(firstPath, None, True, 0.1)
+            cellArea = treeView.get_cell_area(firstPath, treeView.get_columns()[0])
+            visibleArea = treeView.get_visible_rect()
+            if cellArea.y < 0 or cellArea.y > visibleArea.height:
+                treeView.scroll_to_cell(firstPath, use_align=True, row_align=0.1)
         guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
         self.selecting = False
     def expandLevel(self, view, iter, recursive=True):

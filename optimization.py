@@ -1393,7 +1393,9 @@ class TestGraph:
             return None
         return dateEntry[0]
     def createPlotObjects(self, lineName, version, logFile, test, scaling):
-        dir = test.getDirectory(temporary=1, forFramework = 1)
+        # Using a relative path for dir allows us to use only one writeDir when
+        # plotting several versions/applications.
+        dir = test.getDirectory(temporary=1, forFramework = 1).replace(test.app.writeDirectory, ".")
         description = self.getPlotLineDescriptionForTest(test, version)
         self.createPlotObjectsForItems(lineName, logFile, description, scaling, dir, test.app)
     def createPlotObjectsForTest(self, test):

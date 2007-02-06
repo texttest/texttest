@@ -1690,14 +1690,23 @@ class TestGraphTimeDiv(optimization.TestGraph):
         else:
             raise plugins.TextTestError, "Only plot engine matplotlib supports time division - aborting plotting."
         return engine.plot(writeDir)
-    def createPlotObjects(self, lineName, logFile, test, scaling):
+    def createPlotObjects(self, lineName, version, logFile, test, scaling):
+        identifier = ""
+        if version:
+            identifier += version
+        if lineName:
+            if identifier:
+                identifier += "."
+            identifier += lineName
+        if not identifier:
+            identifier = "std result"
         times = self.extractColgenData(test.app, logFile)
-        if not self.groupTimes.has_key(lineName):
-            self.groupTimes[lineName] = times
-            self.numTests[lineName] = 1
+        if not self.groupTimes.has_key(identifier):
+            self.groupTimes[identifier] = times
+            self.numTests[identifier] = 1
         else:
-            self.groupTimes[lineName] = map(lambda x,y:x+y, self.groupTimes[lineName], times)
-            self.numTests[lineName] += 1
+            self.groupTimes[identifier] = map(lambda x,y:x+y, self.groupTimes[identifier], times)
+            self.numTests[identifier] += 1
     def extractColgenData(self, app, statusFile):
         tsValues =  [ "Network generation time", "Generation time", "Coordination time", "DH post processing", "Conn fixing time", "OC to DH time"]
         optRun = optimization.OptimizationRun(app,  [ optimization.timeEntryName, optimization.activeMethodEntryName], tsValues, statusFile)

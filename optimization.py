@@ -1053,17 +1053,17 @@ class PlotTestInGUI(guiplugins.SelectionAction):
         if self.dynamic:
             tmpFile = self.getTmpFile(test, logFileStem)
             if tmpFile:
-                self.testGraph.createPlotObjects("this run", tmpFile, test, None)
+                self.testGraph.createPlotObjects("this run", None, tmpFile, test, None)
 
         stdFile = test.getFileName(logFileStem)
         if stdFile:
-            self.testGraph.createPlotObjects("std result", stdFile, test, None)
+            self.testGraph.createPlotObjects(None, None, stdFile, test, None)
     
         if not self.dynamic:
             for version in self.testGraph.getExtraVersions():
                 plotFile = test.getFileName(logFileStem, version)
                 if plotFile and plotFile.endswith(test.app.name + "." + version):
-                    self.testGraph.createPlotObjects(version, plotFile, test, None)
+                    self.testGraph.createPlotObjects(None, version, plotFile, test, None)
 
     def getTmpFile(self, test, logFileStem):
         if test.state.isComplete():
@@ -1134,6 +1134,7 @@ class TestGraph:
         self.lineTypes = {}
         self.pointTypeCounter = 1
         self.users = []
+        self.versions = []
         self.apps = []
         self.gnuplotFile = None
         self.plotAveragers = {}
@@ -1220,8 +1221,10 @@ class TestGraph:
     def addLine(self, plotLine):
         self.plotLines.append(plotLine)
         description = plotLine.description
-        if not description["app"] in self.apps:
+        if not description["app"].fullName in [app.fullName for app in self.apps]:
             self.apps.append(description["app"])
+        if not description["version"] in self.versions:
+            self.versions.append(description["version"])
         if not description["user"] in self.users:
             self.users.append(description["user"])
         if not description["test"] in self.pointTypes.keys():
@@ -1231,20 +1234,21 @@ class TestGraph:
         else:
             plotLine.pointType = self.pointTypes[description["test"]]
         # Fill in the map for later deduction
-        self.lineTypes[description["name"]] = 0
+        self.lineTypes[description["identifier"]] = 0
     def deduceLineTypes(self, nextLineType):
         self.multipleApps = len(self.apps) > 1
+        self.multipleVersions = len(self.versions) > 1
         self.multipleUsers = len(self.users) > 1
         self.multipleTests = len(self.pointTypes) > 1
         self.multipleLineTypes = len(self.lineTypes) > 1
         plotArguments = []
         for plotLine in self.plotLines:
             if not plotLine.plotLineRepresentant:
-                if not self.multipleTests or not self.multipleLineTypes or self.lineTypes[plotLine.description["name"]] == 0:
+                if not self.multipleTests or not self.multipleLineTypes or self.lineTypes[plotLine.description["identifier"]] == 0:
                     plotLine.lineType = str(nextLineType())
-                    self.lineTypes[plotLine.description["name"]] = plotLine.lineType
+                    self.lineTypes[plotLine.description["identifier"]] = plotLine.lineType
                 else:
-                    plotLine.lineType = self.lineTypes[plotLine.description["name"]]
+                    plotLine.lineType = self.lineTypes[plotLine.description["identifier"]]
     def getYAxisLabel(self):
         label = None
         for plotLine in self.plotLines:
@@ -1261,32 +1265,53 @@ class TestGraph:
         if onlyLegendAverage and not plotLine.plotLineRepresentant:
             return None
         if plotLine.plotLineRepresentant:
-            return plotLine.plotLineRepresentant.description["name"]
+            return plotLine.plotLineRepresentant.description["identifier"] # ?? or name?
         title = ""
         if self.multipleApps:
             title += plotLine.description["app"].fullName
         if self.multipleUsers:
             title += plotLine.description["user"]
         if self.multipleTests:
-            title += plotLine.description["test"] + "."
-        title += plotLine.description["name"]
+            title += plotLine.description["test"]
+        if self.multipleVersions and plotLine.description["version"]:
+            if title:
+                title += "."
+            title += plotLine.description["version"]
+        if plotLine.description["name"]:
+            if title:
+                title += "."
+            title += plotLine.description["name"]
+        if not title:
+            title = "std result"
         return title
     def getPlotLineDescriptionForSubplan(self, testName, app):
         description = {}
         description["test"] = testName
         description["user"] = "unknown"
+        description["version"] = ""
         description["app"]  = app
         return description
-    def getPlotLineDescriptionForTest(self, test):
+    def getPlotLineDescriptionForTest(self, test, version):
         description = {}
         description["test"] = test.name
         description["user"] = test.getRelPath().split(os.sep)[0]
+        if version:
+            description["version"] =  version
+        else:
+            description["version"] = test.app.getFullVersion(forSave = 1)
         description["app"]  = test.app
         return description
     def addItemToDescription(self, description, lineName, item):
-        description["name"] = lineName
+        description["name"] = ""
+        if lineName:
+            description["name"] += lineName
         if item != costEntryName:
-            description["name"] += "." + item
+            if description["name"]:
+                description["name"] += "."
+            description["name"] += item
+        description["identifier"] = description["version"] + description["name"]
+        if not description["identifier"]:
+            description["identifier"] = "std result"
     def makeTitle(self, title):
         if title:
             return title;
@@ -1294,9 +1319,10 @@ class TestGraph:
         if len(self.apps) == 1:
             firstApp = self.apps[0]
             title += firstApp.fullName + " "
-            version = firstApp.getFullVersion(forSave=1)
-            if version:
-                title += "Version " + version + " "
+        if len(self.versions) == 1:
+            firstVersion = self.versions[0]
+            if firstVersion:
+                title += "Version " + firstVersion + " "
         if len(self.users) == 1:
             firstUser = self.users[0]
             title += "(in user " + firstUser + ") " 
@@ -1347,15 +1373,15 @@ class TestGraph:
         for item in plotItems:
             desc = copy.copy(description)
             self.addItemToDescription(desc, lineName, item)
-            plotFile = os.path.join(dir, "plot-" + desc["name"].replace(" ", "-"))
+            plotFile = os.path.join(dir, "plot-" + desc["identifier"].replace(" ", "-"))
             plotLine = PlotLine(plotFile, desc , xItem, item, optRun, self.optionGroup.getSwitchValue("s"), scaling)
             self.addLine(plotLine)
             # Average
             if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
-                if not self.plotAveragers.has_key(lineName+item):
-                    averager = self.plotAveragers[lineName+item] = PlotAverager(app.writeDirectory)
+                if not self.plotAveragers.has_key(desc["identifier"]):
+                    averager = self.plotAveragers[desc["identifier"]] = PlotAverager(app.writeDirectory)
                 else:
-                    averager = self.plotAveragers[lineName+item]
+                    averager = self.plotAveragers[desc["identifier"]]
                 averager.addGraph(plotLine.graph)
                 if not averager.plotLineRepresentant:
                     averager.plotLineRepresentant = plotLine
@@ -1366,9 +1392,9 @@ class TestGraph:
 	if len(dateEntry) == 0:
             return None
         return dateEntry[0]
-    def createPlotObjects(self, lineName, logFile, test, scaling):
+    def createPlotObjects(self, lineName, version, logFile, test, scaling):
         dir = test.getDirectory(temporary=1, forFramework = 1)
-        description = self.getPlotLineDescriptionForTest(test)
+        description = self.getPlotLineDescriptionForTest(test, version)
         self.createPlotObjectsForItems(lineName, logFile, description, scaling, dir, test.app)
     def createPlotObjectsForTest(self, test):
         # for command-line plotting only
@@ -1380,10 +1406,10 @@ class TestGraph:
             logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
             foundTmp, logFile = logFileFinder.findFile()
             if foundTmp:
-                self.createPlotObjects("this run", logFile, test, None)
+                self.createPlotObjects("this run", None, logFile, test, None)
         stdFile = test.getFileName(logFileStem)
         if stdFile:
-            self.createPlotObjects("std result", stdFile, test, None)
+            self.createPlotObjects(None, None, stdFile, test, None)
         for versionItem in self.getExtraVersions():
             if versionItem.find(":") == -1:
                 versionName = version = versionItem
@@ -1414,19 +1440,19 @@ class TestGraph:
                     if len(stderr.readlines()) > 0:
                         print os.path.basename(originalLogFileName), "is not in the CVS repository at", date
                         continue
-                self.createPlotObjects("CVS " + date, CVSLogFileName, test, None)
+                self.createPlotObjects(None, "CVS " + date, CVSLogFileName, test, None)
             else:
                 if not noTmp:
                     logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
                     foundTmp, logFile = logFileFinder.findFile(version)
                     if foundTmp:
-                        self.createPlotObjects(versionName + "run", logFile, test, scaling)
+                        self.createPlotObjects("run", versionName, logFile, test, scaling)
                 logFile = test.getFileName(logFileStem, version)
                 isExactMatch = logFile.endswith(version)
                 if not onlyExactMatch and not isExactMatch:
                     print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
                 if not (onlyExactMatch and not isExactMatch):
-                    self.createPlotObjects(versionName, logFile, test, scaling)
+                    self.createPlotObjects(None, versionName, logFile, test, scaling)
 
 class PlotEngineCommon:
     def __init__(self, testGraph):

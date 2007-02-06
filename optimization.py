@@ -1529,7 +1529,7 @@ class PlotEngine(PlotEngineCommon):
                                                            self.testGraph.xScaleFactor, min, onlyAverage,
                                                            noLegend, onlyLegendAverage)
         relPlotArgs = [ arg.replace(writeDir, ".") for arg in plotArguments ]
-        self.writePlot("plot " + string.join(relPlotArgs, ", "))
+        self.writePlot("plot " + string.join(relPlotArgs, ", \\" + os.linesep))
         if not absTargetFile:
             self.gnuplotFile.flush()
             gnuplotProcess = self.findGnuplotProcess()

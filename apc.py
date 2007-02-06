@@ -305,7 +305,7 @@ class ViewApcLog(guiplugins.InteractiveTestAction):
             file = open(viewLogScript)
             command = file.readlines()[0].strip()
             file.close()
-            process = self.startExternalProgram(command)
+            process = self.startViewer(command, "APC log viewer")
             guiplugins.scriptEngine.monitorProcess("views the APC log", process)
         else:
             raise plugins.TextTestError, "APC log file not yet available"

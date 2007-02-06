@@ -204,9 +204,8 @@ class InteractiveAction(plugins.Observable):
                                    selectFile, description)
     def addSwitch(self, key, name, defaultValue = 0, options = [], description = ""):
         self.optionGroup.addSwitch(key, name, defaultValue, options, description)
-    def startExternalProgram(self, commandLine, description = "", shellTitle = None, holdShell = 0, exitHandler=None, exitHandlerArgs=()):
-        process = plugins.BackgroundProcess(commandLine, description=description, shellTitle=shellTitle, \
-                                            holdShell=holdShell, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+    def startExternalProgram(self, *args):
+        process = plugins.BackgroundProcess(*args)
         processTerminationMonitor.addMonitoring(process)
         return process
     def startExtProgramNewUsecase(self, commandLine, usecase, \
@@ -223,7 +222,7 @@ class InteractiveAction(plugins.Observable):
                 os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
             else:
                 del os.environ["USECASE_REPLAY_SCRIPT"]
-        process = self.startExternalProgram(commandLine, description, shellTitle, holdShell, exitHandler, exitHandlerArgs)
+        process = self.startExternalProgram(commandLine, description, exitHandler, exitHandlerArgs, shellTitle, holdShell)
         if recScript:
             os.environ["USECASE_RECORD_SCRIPT"] = recScript
         if repScript:
@@ -323,14 +322,6 @@ class InteractiveTestAction(InteractiveAction):
         if os.name == "posix":
             cmd = "exec " + cmd # best to avoid shell messages etc.
         return cmd, viewProgram
-    def getRelativeFilename(self, filename):
-        # Trim the absolute filename to be relative to the application home dir
-        # (TEXTTEST_HOME is more difficult to obtain, see testmodel.OptionFinder.getDirectoryName)
-        baseName = os.path.basename(filename)
-        if self.currentTest:
-            return os.path.join(self.currentTest.getRelPath(), baseName)
-        else:
-            return baseName
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 1:
             self.currentTest = tests[0]
@@ -344,12 +335,24 @@ class InteractiveTestAction(InteractiveAction):
             exitHandler = self.currentTest.contentChanged
 
         commandLine, descriptor = self.getViewCommand(fileName)
-        description = descriptor + " " + self.getRelativeFilename(fileName)
+        description = descriptor + " " + os.path.basename(fileName)
         refresh = str(int(refreshContents or refreshFiles))
         guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
-        process = self.startExternalProgram(commandLine, description=description, exitHandler=exitHandler)
+        process = self.startViewer(commandLine, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
-    
+    def startViewer(self, commandLine, description = "", exitHandler=None, exitHandlerArgs=(), \
+                    shellTitle = None, holdShell = 0):
+        testDesc = self.testDescription()
+        fullDesc = description + testDesc
+        process = self.startExternalProgram(commandLine, fullDesc, exitHandler, exitHandlerArgs, shellTitle, holdShell)
+        self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
+        return process
+    def testDescription(self):
+        if self.currentTest:
+            return " (from test " + self.currentTest.uniqueName + ")"
+        else:
+            return ""
+        
 # Plugin for saving tests (standard)
 class SaveTests(SelectionAction):
     def __init__(self):
@@ -527,10 +530,10 @@ class ViewFile(InteractiveTestAction):
             raise plugins.TextTestError, "Cannot find file-following program '" + followProgram + \
                   "'\nPlease install it somewhere on your PATH or point the follow_program setting at a different tool"
         guilog.info("Following file " + fileName + " using '" + followProgram + "'")
-        description = followProgram + " " + self.getRelativeFilename(fileName)
+        description = followProgram + " " + os.path.basename(fileName)
         baseName = os.path.basename(fileName)
         title = self.currentTest.name + " (" + baseName + ")"
-        process = self.startExternalProgram(followProgram + " " + fileName, description=description, shellTitle=title)
+        process = self.startViewer(followProgram + " " + fileName, description=description, shellTitle=title)
         scriptEngine.monitorProcess("follows progress of test files", process)
     def isTestDefinition(self, stem, fileName):
         if not self.currentTest:
@@ -569,12 +572,12 @@ class ViewFile(InteractiveTestAction):
                   "'\nPlease install it somewhere on your PATH or point the diff_program setting at a different tool"
         stdFile = self.stdFile(comparison)
         tmpFile = self.tmpFile(comparison)
-        description = diffProgram + " " + stdFile + "\n                                   " + tmpFile
+        description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
         guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
         guilog.info("-- original file : " + stdFile)
         guilog.info("--  current file : " + tmpFile)
         commandLine = diffProgram + ' "' + stdFile + '" "' + tmpFile + '" ' + plugins.nullRedirect()
-        process = self.startExternalProgram(commandLine, description=description)
+        process = self.startViewer(commandLine, description=description)
         scriptEngine.monitorProcess("shows graphical differences in test files", process)
 
 # And a generic import test. Note acts on test suites

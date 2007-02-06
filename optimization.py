@@ -1927,7 +1927,7 @@ class StartStudio(guiplugins.InteractiveTestAction):
                 raise plugins.TextTestError, "Cannot start studio, no file at " + studio
             commandLine = "exec " + studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
                             "\",0)'" + plugins.nullRedirect() 
-            process = self.startExternalProgram(commandLine)
+            process = self.startViewer(commandLine, description="Studio on " + subPlan)
             guiplugins.scriptEngine.monitorProcess("runs studio", process)
         finally:
             self.currentTest.tearDownEnvironment(parents=1)

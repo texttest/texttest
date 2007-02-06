@@ -49,23 +49,32 @@ class FileComparison:
         else:
             return "---"
     def needsRecalculation(self):
-        # A test that has been saved doesn't need recalculating
-        if self.tmpCmpFile == self.stdCmpFile or self.stdCmpFile == self.stdFile:
-            self.diag.info("Saved file, no recalculation")
-            return False
-        
-        if self.tmpFile and (plugins.modifiedTime(self.tmpCmpFile) < plugins.modifiedTime(self.tmpFile)):
-            self.diag.info("Filter for tmp file out of date")
-            return True
-
-        if self.newResult() or self.missingResult():
+        if not self.stdFile or not self.tmpFile:
             self.diag.info("No comparison, no recalculation")
             return False
 
-        self.diag.info("Comparing timestamps for standard files")
-        cmpModTime = plugins.modifiedTime(self.stdCmpFile)
+        # A test that has been saved doesn't need recalculating
+        if self.tmpCmpFile == self.stdCmpFile:
+            self.diag.info("Saved file, no recalculation")
+            return False
+
         stdModTime = plugins.modifiedTime(self.stdFile)
-        return  cmpModTime is not None and stdModTime is not None and cmpModTime <= stdModTime
+        tmpModTime = plugins.modifiedTime(self.tmpFile)
+        if stdModTime is not None and tmpModTime is not None and stdModTime >= tmpModTime:
+            self.diag.info("Standard result newer than generated result")
+            return True
+
+        if self.stdFile == self.stdCmpFile: # no filters
+            return False
+        
+        stdCmpModTime = plugins.modifiedTime(self.stdCmpFile)
+        tmpCmpModTime = plugins.modifiedTime(self.tmpCmpFile)
+        if tmpModTime > tmpCmpModTime:
+            self.diag.info("Filter for tmp file out of date")
+            return True
+
+        self.diag.info("Comparing timestamps for standard files")
+        return stdCmpModTime is not None and stdModTime is not None and stdModTime >= stdCmpModTime
     def getType(self):
         return "failure"
     def getDisplayFileName(self):

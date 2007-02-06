@@ -1135,17 +1135,6 @@ class RejectFilter(plugins.Filter):
     def acceptsApplication(self, app):
         return False
 
-# Workaround for python bug 853411: tell main thread to start the process
-# if we aren't it...
-class Pending(plugins.TestState):
-    def __init__(self, process, execHosts):
-        plugins.TestState.__init__(self, "pending", executionHosts=execHosts, lifecycleChange="become pending")
-        self.process = process
-        if currentThread().getName() == "MainThread":
-            self.notifyInMainThread()
-    def notifyInMainThread(self):
-        self.process.doFork()
-
 class Running(plugins.TestState):
     def __init__(self, execMachines, bkgProcess = None, freeText = "", briefText = ""):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
@@ -1221,11 +1210,7 @@ class RunTest(plugins.Action):
             return
 
         self.diag.info("Running test with command : " + testCommand)
-        process = plugins.BackgroundProcess(testCommand, testRun=1, shellTitle=self.shellTitle, holdShell=self.holdShell)
-        # Working around Python bug
-        test.changeState(Pending(process, test.state.executionHosts))
-        self.diag.info("Waiting for process start...")
-        process.waitForStart()
+        process = plugins.BackgroundProcess(testCommand, shellTitle=self.shellTitle, holdShell=self.holdShell)
         if not inChild:
             self.changeToRunningState(test, process)
         return self.RETRY

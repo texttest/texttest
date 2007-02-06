@@ -688,7 +688,7 @@ class TextTrigger:
 # Generally useful class to encapsulate a background process, of which TextTest creates
 # a few...
 class BackgroundProcess(Process):
-    def __init__(self, commandLine, description = "", testRun=0, exitHandler=None, exitHandlerArgs=(), shellTitle=None, holdShell=0):
+    def __init__(self, commandLine, description = "", exitHandler=None, exitHandlerArgs=(), shellTitle=None, holdShell=0):
         Process.__init__(self, None)
         self.commandLine = commandLine
         self.description = description
@@ -699,8 +699,7 @@ class BackgroundProcess(Process):
         self.exitHandler = exitHandler
         self.exitHandlerArgs = exitHandlerArgs
         self.processHandle = None
-        if not testRun:
-            self.doFork()
+        self.doFork()
     def __repr__(self):
         return self.commandLine.split()[0].lstrip()
     def doFork(self):

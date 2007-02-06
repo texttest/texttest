@@ -432,11 +432,6 @@ class TextTestGUI(Responder, plugins.Observable):
                 tabInfo[tabName] = currTabGUIs[0]
         return tabInfo
     def notifyLifecycleChange(self, test, state, changeDesc):
-        # Working around python bug 853411: main thread must do all forking
-        if hasattr(state, "notifyInMainThread"):
-            state.notifyInMainThread()
-            return
-
         self.notify("LifecycleChange", test, state, changeDesc)
     def notifyFileChange(self, test):
         self.notify("FileChange", test)

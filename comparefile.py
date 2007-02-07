@@ -54,7 +54,7 @@ class FileComparison:
             return False
 
         # A test that has been saved doesn't need recalculating
-        if self.tmpCmpFile == self.stdCmpFile:
+        if self.tmpFile == self.stdFile:
             self.diag.info("Saved file, no recalculation")
             return False
 
@@ -175,7 +175,7 @@ class FileComparison:
         # Try to get everything to behave normally after a save...
         self.differenceCache = False
         self.tmpFile = self.stdFile
-        self.tmpCmpFile = self.stdCmpFile
+        self.tmpCmpFile = self.stdFile
     def saveResults(self, destFile):
         copyfile(self.tmpFile, destFile)
         

@@ -860,7 +860,6 @@ class TestTreeGUI(ContainerGUI):
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         if self.dynamic:
             self.selection.set_select_function(self.canSelect)
-        self.selection.connect("changed", self.userChangedSelection)
         testsColumn = self.subguis[0].createView()
         self.treeView.append_column(testsColumn)
         if self.dynamic:
@@ -876,6 +875,7 @@ class TestTreeGUI(ContainerGUI):
         self.treeView.connect("button_press_event", self.showPopupMenu)
         
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
+        self.selection.connect("changed", self.userChangedSelection)
         self.treeView.show()
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)
@@ -2222,7 +2222,7 @@ class ProgressBarGUI(SubGUI):
                 self.nofFailedTests += 1
             self.resetBar()
             self.contentsChanged()
-        elif state.isComplete() and not failed: # test saved, possibly partially so still check 'failed'
+        elif state.isComplete() and not failed and self.nofFailedTests > 0: # test saved, possibly partially so still check 'failed'
             self.nofFailedTests -= 1
             self.adjustFailCount()
             

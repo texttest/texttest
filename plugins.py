@@ -323,15 +323,19 @@ class Observable:
         methodName = "notify" + name
         for observer in self.observers:
             if hasattr(observer, methodName):
-                # doesn't matter if only some of the observers have the method
-                method = eval("observer." + methodName)
-                # unpickled objects have not called __init__, and
-                # hence do not have self.passSelf ...
-                if hasattr(self, "passSelf") and self.passSelf:
-                    method(self, *args)
-                else:
-                    method(*args)
-
+                retValue = self.notifyObserver(observer, methodName, *args)
+                if retValue is not None: # break off the chain if we get a non-None value back
+                    break
+    def notifyObserver(self, observer, methodName, *args):
+        # doesn't matter if only some of the observers have the method
+        method = eval("observer." + methodName)
+        # unpickled objects have not called __init__, and
+        # hence do not have self.passSelf ...
+        if hasattr(self, "passSelf") and self.passSelf:
+            return method(self, *args)
+        else:
+            return method(*args)
+            
 # Generic state which tests can be in, should be overridden by subclasses
 # Acts as a static state for tests which have not run (yet)
 # Free text is text of arbitrary length: it will appear in the "Text Info" GUI window when the test is viewed

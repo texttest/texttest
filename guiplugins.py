@@ -1461,14 +1461,27 @@ class ReportBugs(InteractiveTestAction):
         self.currentTest.filesChanged()
 
 class RecomputeTest(InteractiveTestAction):
+    def __init__(self):
+        InteractiveTestAction.__init__(self)
+        self.recomputing = False
+        self.chainReaction = False
     def isActiveOnCurrent(self):
         return InteractiveTestAction.isActiveOnCurrent(self) and \
                self.currentTest.state.hasStarted() and not self.currentTest.state.isComplete()
     def notifyNewTestSelection(self, tests, direct):
         InteractiveTestAction.notifyNewTestSelection(self, tests, direct)
+        # Prevent recomputation triggering more...
+        if self.recomputing:
+            self.chainReaction = True
+            return
         if self.currentTest and self.currentTest.needsRecalculation():
+            self.recomputing = True
             self.currentTest.refreshFiles()
             self.perform()
+            self.recomputing = False
+            if self.chainReaction:
+                self.chainReaction = False
+                return "Recomputation chain reaction!"
     def inButtonBar(self):
         return True
     def _getTitle(self):

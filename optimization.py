@@ -1379,7 +1379,7 @@ class TestGraph:
             # Average
             if self.optionGroup.getSwitchValue("av") or self.optionGroup.getSwitchValue("oav"):
                 if not self.plotAveragers.has_key(desc["identifier"]):
-                    averager = self.plotAveragers[desc["identifier"]] = PlotAverager(app.writeDirectory)
+                    averager = self.plotAveragers[desc["identifier"]] = PlotAverager()
                 else:
                     averager = self.plotAveragers[desc["identifier"]]
                 averager.addGraph(plotLine.graph)
@@ -1494,10 +1494,10 @@ class PlotEngine(PlotEngineCommon):
             return " notitle "
     def getPlotArgument(self, plotLine, multipleLines, noLegend, onlyLegendAverage):
         return "'" + plotLine.plotFileName + "' " + self.getPlotLineTitle(plotLine, noLegend, onlyLegendAverage) + self.getStyle(plotLine, multipleLines)
-    def writeLinesAndGetPlotArguments(self, plotLines, xScaleFactor, min, onlyAverage, noLegend, onlyLegendAverage):
+    def writeLinesAndGetPlotArguments(self, plotLines, xScaleFactor, min, onlyAverage, noLegend, onlyLegendAverage, writeDir):
         plotArguments = []
         for plotLine in plotLines:
-            plotLine.writeFile(xScaleFactor, min)
+            plotLine.writeFile(xScaleFactor, min, writeDir)
             if not onlyAverage or (onlyAverage and plotLine.plotLineRepresentant):
                 plotArguments.append(self.getPlotArgument(plotLine, len(plotLines) > 1,
                                                           noLegend, onlyLegendAverage))
@@ -1555,7 +1555,7 @@ class PlotEngine(PlotEngineCommon):
             self.writePlot("set ylabel \"" + self.testGraph.getYAxisLabel() + "\\n% above " + str(min) + "\"")
         plotArguments = self.writeLinesAndGetPlotArguments(self.testGraph.plotLines,
                                                            self.testGraph.xScaleFactor, min, onlyAverage,
-                                                           noLegend, onlyLegendAverage)
+                                                           noLegend, onlyLegendAverage, writeDir)
         relPlotArgs = [ arg.replace(writeDir, ".") for arg in plotArguments ]
         self.writePlot("plot " + string.join(relPlotArgs, ", \\" + os.linesep))
         if not absTargetFile:
@@ -1755,11 +1755,12 @@ class PlotLine:
                 else:
                     self.graph[solution[xItem]*timeScaleFactor] = y
             cnt = cnt + 1
-    def writeFile(self, xScaleFactor, min):
-        dir, localName = os.path.split(self.plotFileName)
+    def writeFile(self, xScaleFactor, min, writeDir):
+        fullPlotFileName = os.path.join(writeDir, self.plotFileName)
+        dir, localName = os.path.split(fullPlotFileName)
         if not os.path.isdir(dir):
             os.makedirs(dir)
-        plotFile = open(self.plotFileName, "w")
+        plotFile = open(fullPlotFileName, "w")
         x, y = self.getGraph(xScaleFactor, min)
         for xx in x:
             yy = y.pop(0)
@@ -1866,13 +1867,12 @@ class Averager:
 plotAveragerCount = 0
 
 class PlotAverager(Averager):
-    def __init__(self, tmpFileDirectory = None):
+    def __init__(self):
         Averager.__init__(self)
         self.plotLineRepresentant = None
-        self.tmpFileDirectory = tmpFileDirectory
-    def writeFile(self, xScaleFactor, min):
+    def writeFile(self, xScaleFactor, min, writeDir):
         global plotAveragerCount
-        self.plotFileName = os.path.join(self.tmpFileDirectory, "average." + str(plotAveragerCount))
+        self.plotFileName = os.path.join(writeDir, "average." + str(plotAveragerCount))
         plotAveragerCount += 1
         plotFile = open(self.plotFileName, "w")
         x, y = self.getGraph(xScaleFactor, min)

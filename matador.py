@@ -437,7 +437,7 @@ class FeatureFilter(plugins.Filter):
     def __init__(self, features):
         self.grepCommand = "grep -E '" + string.join(features, "|") + "'"
     def acceptsTestCase(self, test):    
-        logFile = test.getFileName("output")
+        logFile = test.getFileName("features")
         if logFile:
             commandLine = "tail -100 " + logFile + " | " + self.grepCommand + " > /dev/null 2>&1"
             return os.system(commandLine) == 0
@@ -472,6 +472,39 @@ class SelectTests(guiplugins.SelectTests):
             if self.optionGroup.getSwitchValue(feature, 0):
                 result.append(feature)
         return result
+
+class MigrateFeatures(plugins.Action):
+    def __call__(self, test):
+        logFile = test.getFileName("output")
+        if not logFile:
+            return
+
+        testDir = test.getDirectory()
+        featuresFileName = os.path.join(testDir, "features." + test.app.name)
+        if os.path.isfile(featuresFileName):
+            return
+        featuresFile = open(featuresFileName, "w")
+        self.migrateFile(logFile, featuresFile)
+        featuresFile.close()
+        os.system("cvs add " + featuresFileName)
+        import glob
+        for versionFile in glob.glob(os.path.join(testDir, "output." + test.app.name + ".*")):
+            self.migrateFile(versionFile)
+    def migrateFile(self, logFile, featuresFile=None):
+        newLogFileName = "output.new" 
+        newLogFile = open(newLogFileName, "w")
+        inSection = False
+        for line in open(logFile).readlines():
+            if line.find("---------Features") != -1:
+                inSection = not inSection
+            elif inSection:
+                if featuresFile:
+                    featuresFile.write(line)
+            else:
+                newLogFile.write(line)
+        newLogFile.close()
+        os.rename(newLogFileName, logFile)
+
     
 class CreatePerformanceReport(guiplugins.SelectionAction):
     def __init__(self):

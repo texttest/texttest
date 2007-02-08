@@ -1613,7 +1613,9 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
         for test in tests:
             self.createGUIPlotObjects(test)
             self.numPlottedTests += 1
-        if self.optionGroup.getSwitchValue("per") and self.optionGroup.getSwitchValue("kpiscale") and percscale:
+        if self.optionGroup.getSwitchValue("per") and self.optionGroup.getSwitchValue("kpiscale"):
+            if not percscale:
+                percscale = "0:2"
             self.testGraph.optionGroup.setOptionValue("yr", percscale)
         self.plotGraph(self.currTestSelection[0].app.writeDirectory)
     def findAllTests(self):

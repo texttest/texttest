@@ -1604,31 +1604,35 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
     def __init__(self, dynamic):
         optimization.PlotTestInGUI.__init__(self, dynamic)
         self.addSwitch("kpi", "Plot kpi group")
+        self.addSwitch("kpiscale", "Use kpi group percentage scale")
     def describeTests(self):
         return str(self.numPlottedTests) + " tests"
     def performOnCurrent(self):
         self.numPlottedTests = 0
-        for test in self.findAllTests():
+        tests, percscale = self.findAllTests()
+        for test in tests:
             self.createGUIPlotObjects(test)
             self.numPlottedTests += 1
+        if self.optionGroup.getSwitchValue("per") and self.optionGroup.getSwitchValue("kpiscale") and percscale:
+            self.testGraph.optionGroup.setOptionValue("yr", percscale)
         self.plotGraph(self.currTestSelection[0].app.writeDirectory)
     def findAllTests(self):
         if not self.optionGroup.getSwitchValue("kpi"):
-            return self.currTestSelection
+            return self.currTestSelection, None
         if len(self.currTestSelection) > 1:
             print "Only one test allowed to be selected when plotting KPI group."
             print "Ignoring 'Plot kpi group' setting and plot selected tests."
-            return self.currTestSelection
+            return self.currTestSelection, None
         # Plot KPI group
         currentTest = self.currTestSelection[0] # Only one test!
         suite = currentTest.parent
-        kpiGroupForTest, kpiGroups, dummy = readKPIGroupFileCommon(suite)
+        kpiGroupForTest, kpiGroups, percscale = readKPIGroupFileCommon(suite)
         if not kpiGroupForTest.has_key(currentTest.name):
             print "Test", currentTest.name, "is not in an KPI group."
-            return [ currentTest ]
+            return [ currentTest ], None
 
         kpiGroup = kpiGroupForTest[currentTest.name]
-        return filter(lambda test: kpiGroupForTest.get(test.name) == kpiGroup, suite.testcases)
+        return filter(lambda test: kpiGroupForTest.get(test.name) == kpiGroup, suite.testcases), percscale[kpiGroup]
                 
     def getRunningTmpFile(self, test, logFileStem):
         return test.makeTmpFileName("APC_FILES/" + logFileStem, forComparison=0)

@@ -453,12 +453,9 @@ class SelectTests(guiplugins.SelectTests):
         for suite in suites:
             featureFile = suite.getFileName("features")
             if featureFile:
-                for line in open(featureFile).readlines():
-                    parts = line.split()
-                    if len(parts) > 0:
-                        featureName = line.replace("\n", "")
-                        self.addSwitch(featureName, featureName, 0)
-                        self.features.append(featureName)
+                for featureName in plugins.readList(featureFile):
+                    self.addSwitch(featureName, featureName, 0)
+                    self.features.append(featureName)
     def getFilterList(self, app):
         filters = guiplugins.SelectTests.getFilterList(self, app)    
         selectedFeatures = self.getSelectedFeatures()
@@ -505,6 +502,25 @@ class MigrateFeatures(plugins.Action):
         newLogFile.close()
         os.rename(newLogFileName, logFile)
 
+class CollectFeatures(plugins.Action):
+    def __init__(self):
+        self.allFeatures = []
+        self.fileToWrite = None
+    def __call__(self, test):
+        logFile = test.getFileName("features")
+        if not logFile:
+            return
+        for feature in plugins.readList(logFile):
+            if feature not in self.allFeatures:
+                self.allFeatures.append(feature)
+    def setUpApplication(self, app):
+        if not self.fileToWrite:
+            self.fileToWrite = os.path.join(app.getDirectory(), "features." + app.name)
+    def __del__(self):
+        self.allFeatures.sort()
+        file = open(self.fileToWrite, "w")
+        for feature in self.allFeatures:
+            file.write(feature + "\n")
     
 class CreatePerformanceReport(guiplugins.SelectionAction):
     def __init__(self):

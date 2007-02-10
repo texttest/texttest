@@ -172,16 +172,16 @@ class Test(plugins.Observable):
         self.app = app
         self.parent = parent
         self.dircaches = [ dircache ]
-        # Test suites never change state, but it's convenient that they have one
-        self.state = plugins.TestState("not_started", freeText=self.getDisplayDescription())
         self.paddedName = self.name
         self.previousEnv = {}
         self.environment = MultiEntryDictionary()
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
         self.diag = plugins.getDiagnostics("test objects")
-    def getDisplayDescription(self):
-        if len(self.description):
+        # Test suites never change state, but it's convenient that they have one
+        self.state = plugins.TestState("not_started", freeText=self.getDescription())
+    def getDescription(self):
+        if self.description:
             return self.description
         else:
             return "<No description provided>"
@@ -382,7 +382,7 @@ class TestCase(Test):
     def __init__(self, name, description, abspath, app, parent):
         Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
-        self.writeDirectories = [ os.path.join(app.writeDirectory, self.getRelPath()) ]
+        self.writeDirectories = [ os.path.join(app.writeDirectory, self.getRelPath()) ]        
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -397,6 +397,29 @@ class TestCase(Test):
                 return self.writeDirectories[0]
         else:
             return self.dircaches[0].dir
+    def getDescription(self):
+        performanceFileName = self.getFileName("performance")
+        if performanceFileName:
+            performanceFile = open(performanceFileName, "r")
+            lines = performanceFile.readlines()
+            if len(lines) >= 2:
+                performanceDescription = "\n\nExpected running time for the default version:\n" + lines[0] + lines[1]
+            else:
+                performanceDescription = "\n\nExpected running time for the default version:\n" + "".join(lines)
+            performanceFile.close()
+        else:
+            performanceDescription = ""
+        memoryFileName = self.getFileName("memory")
+        if memoryFileName:
+            memoryFile = open(memoryFileName, "r")
+            memoryDescription = "\nExpected memory consumption for the default version:\n" + memoryFile.read()
+            memoryFile.close()
+        else:
+            memoryDescription = ""
+        desc = Test.getDescription(self)
+        return "\nDescription:\n" + desc + \
+               performanceDescription + \
+               memoryDescription    
     def needsRecalculation(self):
         return self.state.isComplete() and self.state.needsRecalculation() and \
                os.path.isdir(self.getDirectory(temporary=1))
@@ -490,6 +513,8 @@ class TestSuite(Test):
         contentFile = self.getContentFileName()
         if not contentFile:
             self.createContentFile()
+    def getDescription(self):
+        return "\nDescription:\n" + Test.getDescription(self)
     def readContents(self, filters, forTestRuns):
         testNames = self.readTestNames(forTestRuns)
         self.testcases = self.getTestCases(filters, testNames, forTestRuns)

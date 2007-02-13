@@ -594,6 +594,7 @@ class MenuBarGUI(SubGUI):
         self.actionGroup.add_action(gtk.Action("editmenu", "_Edit", None, None))
         self.actionGroup.add_action(gtk.Action("viewmenu", "_View", None, None))
         self.actionGroup.add_action(gtk.Action("actionsmenu", "_Actions", None, None))
+        self.actionGroup.add_action(gtk.Action("reorderpopupmenu", "_Reorder", None, None))
         self.createToggleActions()
         for actionGUI in self.actionGUIs:
             actionGUI.addToGroups(self.actionGroup, self.uiManager.get_accel_group())
@@ -957,6 +958,10 @@ class TestTreeGUI(ContainerGUI):
         if newSelection != self.selectedTests:
             self.selectedTests = newSelection
             self.notify("NewTestSelection", newSelection, direct)
+    def notifyRefreshTestSelection(self):
+        # The selection hasn't changed, but we want to e.g.
+        # recalculate the action sensitiveness.
+        self.notify("NewTestSelection", self.selectedTests, True)
     def getSelected(self):
         allSelected = []
         self.selection.selected_foreach(self.addSelTest, allSelected)

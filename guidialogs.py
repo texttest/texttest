@@ -217,11 +217,59 @@ class SaveSelectionDialog(ActionConfirmationDialog):
             self.okMethod()
         else:
             self.cancelMethod()
+            
+class RenameDialog(ActionConfirmationDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin):
+        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        
+    def addContents(self):        
+        alignment = gtk.Alignment()
+        alignment.set(1.0, 1.0, 1.0, 1.0)
+        alignment.set_padding(5, 5, 5, 5)
+        vbox = gtk.VBox()
+        alignment.add(vbox)
+        self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
 
+        header = gtk.Label()
+        header.set_markup("<b>" + self.plugin.oldName + "</b>")
+        vbox.pack_start(header)
+        hbox2 = gtk.HBox()
+        hbox2.pack_start(gtk.Label("\nNew name:"), expand=False, fill=False)        
+        vbox.pack_start(hbox2)
+        self.entry = gtk.Entry()
+        self.entry.set_text(self.plugin.newName)
+        scriptEngine.registerEntry(self.entry, "enter new name ")
+        vbox.pack_start(self.entry)
+        hbox3 = gtk.HBox()
+        hbox3.pack_start(gtk.Label("\nNew description:"), expand=False, fill=False)
+        vbox.pack_start(hbox3)
+        self.descriptionEntry = gtk.Entry()
+        self.descriptionEntry.set_text(self.plugin.newDescription)
+        scriptEngine.registerEntry(self.descriptionEntry, "enter new description ")
+        vbox.pack_start(self.descriptionEntry)
+        
+    def respond(self, button, saidOK, *args):
+        if saidOK:
+            self.plugin.newName = self.entry.get_text()
+            self.plugin.newDescription = self.descriptionEntry.get_text()
+            message, error = self.plugin.checkNewName()
+            if error:
+                showErrorDialog(message, self.dialog)
+                return
+            elif message:
+                dialog = DoubleCheckDialog(message, lambda: ActionConfirmationDialog.respond(self, button, saidOK, *args))
+                return
+        ActionConfirmationDialog.respond(self, button, saidOK, *args)
+        
 # It's a bit unfortunate that this has to be here, but unfortunately texttestgui
 # cannot load dialogs from matador without some additional work. Also, having it
 # here avoids matador importing guidialogs, and hence gtk.
 class CreatePerformanceReportDialog(ActionConfirmationDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin):
+        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
     def addContents(self):
         # A simple entry for the path, and one for the versions ...
         self.dirEntry = gtk.Entry()

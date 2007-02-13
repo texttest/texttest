@@ -1248,10 +1248,12 @@ class CreateDefinitionFile(InteractiveTestAction):
             raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile 
         self.viewFile(targetFile, refreshFiles=True)
 
-class RemoveTest(SelectionAction):
+class RemoveTests(SelectionAction):
+    def __init__(self):
+        SelectionAction.__init__(self)
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
-    # We'll assume the appropriate XML code is given by an outside definition file.
+    # We'll assume the appropriate XML code is given by an outside definition file.        
     def hasExternalGUIDescription(self):
         return True
     def _getTitle(self):
@@ -1494,7 +1496,206 @@ class RecomputeTest(InteractiveTestAction):
         return "Done recomputing status of " + repr(self.currentTest) + "."
     def performOnCurrent(self):
         self.currentTest.app.configObject.recomputeProgress(self.currentTest, self.observers)
+
+class SortTestsAscending(InteractiveAction):
+    def __init__(self):
+        InteractiveAction.__init__(self)
+        self.currTestSelection = []
+    def hasExternalGUIDescription(self):
+        return True
+    def notifyNewTestSelection(self, tests, direct):
+        self.currTestSelection = tests # interested in suites, unlike most SelectionActions
+    def isActiveOnCurrent(self):
+        return len(self.currTestSelection) == 1 and \
+               self.currTestSelection[0].classId() == "test-suite" and \
+               not self.currTestSelection[0].getConfigValue("auto_sort_test_suites")
+    def getStockId(self):
+        return "sort-ascending"
+    def _getTitle(self):
+        return "_Sort Suite"
+    def messageAfterPerform(self):
+        return "Sorted " + repr(self.currTestSelection[0]) + " in alphabetical order."
+    def _getScriptTitle(self):
+        return "sort selected test suite in alphabetical order"
+    def performOnCurrent(self):
+        self.performRecursively(self.currTestSelection[0], True)
+    def performRecursively(self, suite, ascending):        
+        # First ask all sub-suites to sort themselves
+        errors = ""
+        if self.currTestSelection[0].getConfigValue("sort_test_suites_recursively"):
+            for test in suite.testcases:
+                if test.classId() == "test-suite":
+                    try:
+                        self.performRecursively(test, ascending)
+                    except Exception, e:
+                        errors += str(e) + "\n" 
+
+        self.notify("Status", "Sorting " + repr(suite))
+        self.notify("ActionProgress", "")
+        try:
+            suite.sortTests(ascending)
+        except Exception, e:
+            errors += str(e) + "\n" 
+        if errors:
+            raise plugins.TextTestWarning, errors
+
+class SortTestsDescending(SortTestsAscending):
+    def getStockId(self):
+        return "sort-descending"
+    def _getTitle(self):
+        return "_Reversed Sort Suite"
+    def messageAfterPerform(self):
+        return "Sorted " + repr(self.currTestSelection[0]) + " in reversed alphabetical order."
+    def _getScriptTitle(self):
+        return "sort selected test suite in reversed alphabetical order"
+    def performOnCurrent(self):
+        self.performRecursively(self.currTestSelection[0], False)
+
+class RepositionTest(InteractiveAction):
+    def __init__(self, position):
+        InteractiveAction.__init__(self)
+        self.position = position
+        self.currTestSelection = []
+        self.testToMove = None
+    def hasExternalGUIDescription(self):
+        return True
+    def notifyNewTestSelection(self, tests, direct):
+        self.currTestSelection = tests # interested in suites, unlike most SelectionActions
+        if len(tests) == 1:
+            self.testToMove = tests[0]
+        else:
+            self.testToMove = None
+    def _isActiveOnCurrent(self):
+        return len(self.currTestSelection) == 1 and \
+               self.currTestSelection[0].parent and \
+               not self.currTestSelection[0].parent.getConfigValue("auto_sort_test_suites")
+    def performOnCurrent(self):
+        self.testToMove.parent.repositionTest(self.testToMove, self.position)
+        self.notify("RefreshTestSelection")
     
+class RepositionTestDown(RepositionTest):
+    def __init__(self):
+        RepositionTest.__init__(self, "down")
+    def getStockId(self):
+        return "go-down"
+    def _getTitle(self):
+        return "Move down"
+    def messageAfterPerform(self):
+        return "Moved " + repr(self.testToMove) + " one step down in suite."
+    def _getScriptTitle(self):
+        return "Move selected test down in suite"
+    def isActiveOnCurrent(self):
+        if not self._isActiveOnCurrent():
+            return False
+        return self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1] != self.currTestSelection[0]
+
+class RepositionTestUp(RepositionTest):
+    def __init__(self):
+        RepositionTest.__init__(self, "up")
+    def getStockId(self):
+        return "go-up"
+    def _getTitle(self):
+        return "Move up"
+    def messageAfterPerform(self):
+        return "Moved " + repr(self.testToMove) + " one step up in suite."
+    def _getScriptTitle(self):
+        return "Move selected test up in suite"
+    def isActiveOnCurrent(self):
+        if not self._isActiveOnCurrent():
+            return False
+        return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
+
+class RepositionTestFirst(RepositionTest):
+    def __init__(self):
+        RepositionTest.__init__(self, "first")
+    def getStockId(self):
+        return "goto-top"
+    def _getTitle(self):
+        return "Move to first"
+    def messageAfterPerform(self):
+        return "Moved " + repr(self.testToMove) + " to first in suite."
+    def _getScriptTitle(self):
+        return "Move selected test to first in suite"
+    def isActiveOnCurrent(self):
+        if not self._isActiveOnCurrent():
+            return False
+        return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
+
+class RepositionTestLast(RepositionTest):
+    def __init__(self):
+        RepositionTest.__init__(self, "last")
+    def getStockId(self):
+        return "goto-bottom"
+    def _getTitle(self):
+        return "Move to last"
+    def messageAfterPerform(self):
+        return "Moved " + repr(self.testToMove) + " to last in suite."
+    def _getScriptTitle(self):
+        return "Move selected test to last in suite"
+    def isActiveOnCurrent(self):
+        if not self._isActiveOnCurrent():
+            return False
+        return self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1] != self.currTestSelection[0]
+    
+class RenameTest(InteractiveAction):
+    def __init__(self):
+        InteractiveAction.__init__(self)
+        self.currTestSelection = []
+        self.newName = ""
+        self.oldName = ""
+        self.newDescription = ""
+        self.oldDescription = ""
+    def hasExternalGUIDescription(self):
+        return True
+    def notifyNewTestSelection(self, tests, direct):
+        self.currTestSelection = tests # interested in suites, unlike most SelectionActions
+    def isActiveOnCurrent(self):
+        return len(self.currTestSelection) == 1 and \
+               self.currTestSelection[0].parent and \
+               self.currTestSelection[0].classId() == "test-case"
+    def getDialogType(self):
+        if len(self.currTestSelection) == 1:
+            self.newName = self.currTestSelection[0].name
+            self.newDescription = self.currTestSelection[0].description
+        else:
+            self.newName = ""
+            self.newDescription = ""
+        self.oldName = self.newName
+        self.oldDescription = self.newDescription
+        return "guidialogs.RenameDialog"
+    def getStockId(self):
+        return "italic"
+    def _getTitle(self):
+        return "_Rename..."
+    def _getScriptTitle(self):
+        return "Rename selected test"
+    def messageAfterPerform(self):
+        message = "Renamed test " + self.oldName + " to " + self.newName
+        if self.oldDescription != self.newDescription:
+            message += " and changed description"
+        return message
+    def checkNewName(self):
+        if self.newName == self.currTestSelection[0].name:
+            return ("", False)
+        if len(self.newName) == 0:
+            return ("Please enter a new name.", True)
+        if self.newName.find(" ") != -1:
+            return ("The new name must not contain spaces, please choose another name.", True)
+        for test in self.currTestSelection[0].parent.testCaseList():
+            if test.name == self.newName:
+                return ("The name '" + self.newName + "' is already taken, please choose another name.", True)
+        newDir = os.path.join(self.currTestSelection[0].parent.getDirectory(), self.newName)
+        if os.path.isdir(newDir):
+            return ("The directory '" + newDir + "' already exists.\n\nDo you want to overwrite it?", False)
+        return ("", False)
+    def performOnCurrent(self):
+        try:
+            self.currTestSelection[0].rename(self.newName, self.newDescription)
+        except IOError, e:
+            raise plugins.TextTestError, "Failed to rename test:\n" + str(e)
+        except OSError, e:
+            raise plugins.TextTestError, "Failed to rename test:\n" + str(e)
+   
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
@@ -1502,8 +1703,11 @@ class InteractiveActionHandler:
         self.actionDynamicClasses = [ SaveTests, SaveSelection, RecomputeTest ]
         self.actionStaticClasses = [ RecordTest, CopyTest, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
-                                     RunTests, ResetGroups, RemoveTest, ReconnectToTests, \
-                                     SaveSelection ]
+                                     RunTests, ResetGroups, RenameTest, RemoveTests, \
+                                     SortTestsAscending, SortTestsDescending, \
+                                     RepositionTestFirst, RepositionTestUp, \
+                                     RepositionTestDown, RepositionTestLast, \
+                                     ReconnectToTests, SaveSelection ]
         self.actionPostClasses = []
         self.loadModules = [] # derived configurations add to this on being imported...
         self.optionGroupMap = {}

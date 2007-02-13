@@ -328,6 +328,49 @@ class Test(plugins.Observable):
         return plugins.relpath(self.getDirectory(), self.app.getDirectory())
     def getDirectory(self, temporary=False, forFramework=False):
         return self.dircaches[0].dir
+    def rename(self, newName, newDescription):
+        # Correct all testsuite files ...
+        for testSuiteFileName in self.parent.findTestSuiteFiles():
+            tests = plugins.readListWithComments(testSuiteFileName)            
+            try:
+                thisIndex = tests.index(self.name)
+                newEntry = seqdict()
+                newEntry[newName] = newDescription
+                del tests[self.name]
+                tests.insert(thisIndex, newEntry)
+                self.parent.writeNewTestSuiteFile(testSuiteFileName, tests)
+            except:
+                pass # The test wasn't present in this version ...
+
+        # Create new directory, copy files ...
+        # (we don't want to rename dir, that can confuse CVS ...)
+        newDir = self.parent.makeSubDirectory(newName)
+        stdFiles, defFiles = self.listStandardFiles(allVersions=True)
+        for sourceFile in stdFiles + defFiles:
+            dirname, local = os.path.split(sourceFile)
+            if dirname == self.getDirectory():
+                targetFile = os.path.join(newDir, local)
+                shutil.copy2(sourceFile, targetFile)
+        dataFiles = self.listDataFiles()
+        for sourcePath in dataFiles:
+            if os.path.isdir(sourcePath):
+                continue
+            targetPath = sourcePath.replace(self.getDirectory(), newDir)
+            plugins.ensureDirExistsForFile(targetPath)
+            shutil.copy2(sourcePath, targetPath)
+
+        # Administration to get the new test in the GUI ...
+        cache = DirectoryCache(newDir)
+        if self.classId() == "test-case":
+            test = TestCase(newName, newDescription, cache, self.app, self.parent)
+        else:
+            test = TestSuite(newName, newDescription, cache, self.app, self.parent)
+        test.setObservers(self.observers)
+        currIndex = self.parent.testcases.index(self)
+        self.parent.testcases.insert(currIndex, test)
+        test.readEnvironment()
+        test.notify("Add")
+        self.parent.removeTest(self, False)
     def setUpEnvVariable(self, var, value):
         if os.environ.has_key(var):
             self.previousEnv[var] = os.environ[var]
@@ -532,13 +575,17 @@ class TestSuite(Test):
                 self.diagnose("Contents rejected due to " + repr(filter))
                 return False
         return True
-    def readTestNames(self, forTestRuns):
+    def readTestNames(self, forTestRuns, warn = True):
         names = seqdict()
         # If we're not running tests, we're displaying information and should find all the sub-versions 
         for fileName in self.findTestSuiteFiles(forTestRuns):
+            if warn:
+                method = self.warnDuplicateTest
+            else:
+                method = None
             for name, comment in plugins.readListWithComments(fileName, duplicateMethod=self.warnDuplicateTest).items():
                 self.diagnose("Read " + name)
-                if not self.fileExists(name):
+                if warn and not self.fileExists(name):
                     plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
                     continue
                 if not names.has_key(name):
@@ -611,10 +658,10 @@ class TestSuite(Test):
             size += testcase.size()
         return size
 # private:
-    def getTestCases(self, filters, testNames, forTestRuns):
+    def getTestCases(self, filters, testNames, forTestRuns, doSortIfDesired = True):
         testCaseList = []
         orderedTestNames = testNames.keys()
-        if self.getConfigValue("auto_sort_test_suites"):
+        if doSortIfDesired and self.getConfigValue("auto_sort_test_suites"):
             orderedTestNames.sort()
         for testName in orderedTestNames:
             newTest = self.createTest(testName, testNames[testName], filters, forTestRuns)
@@ -640,6 +687,95 @@ class TestSuite(Test):
         newSuite.setObservers(self.observers)
         if newSuite.readContents(filters, forTestRuns):
             return newSuite
+    def repositionTest(self, test, position):
+        # Find test in list
+        testSuiteFileName = self.getContentFileName()
+        tests = plugins.readListWithComments(testSuiteFileName)
+        try:
+            currIndex = tests.index(test.name)
+        except:
+            raise plugins.TextTestWarning, "\nThe test\n'" + test.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
+
+        # Depending on 'position', move test in list
+        if position == "first":
+            newIndex = 0
+        elif position == "up":
+            newIndex = currIndex - 1
+        elif position == "down":
+            newIndex = currIndex + 1
+        else:
+            newIndex = len(tests) - 1
+
+        # To be on the safe side, check for out-of-bounds indices
+        if newIndex < 0:
+            newIndex = 0
+        if newIndex >= len(tests):
+            newIndex = len(tests) - 1
+
+        # Delete old entry
+        newEntry = seqdict()
+        newEntry[test.name] = tests[test.name]
+        del tests[test.name]
+        tests.insert(newIndex, newEntry)
+                
+        # Write back to file, set new order and notify GUI
+        self.writeNewTestSuiteFile(testSuiteFileName, tests)
+        testNamesInOrder = self.readTestNames(False, False)
+        newList = []
+        for testName in testNamesInOrder.keys():
+            for test in self.testcases:
+                if test.name == testName:
+                    newList.append(test)
+                    break
+        self.testcases = newList
+        self.notify("ContentChange")
+    def sortTests(self, ascending = True):
+        testsFirst = self.getConfigValue("sort_test_suites_tests_first")
+        # Get testsuite list, sort in the desired order. Test
+        # cases always end up before suites, regardless of name.
+        warning = ""
+        for testSuiteFileName in self.findTestSuiteFiles():
+            tests = plugins.readListWithComments(testSuiteFileName)
+            if testSuiteFileName == self.getContentFileName() and \
+               len(tests) < len(self.testcases):
+                warning = "\nThe test suite\n'" + self.name + "'\ncontains tests which are not present in the default version.\nTests which are only present in some versions will not be\nmixed with tests in the default version, which might lead to\nthe suite not looking entirely sorted."
+            if testsFirst:
+                testNames = map(lambda t: t.name, filter(lambda t: t.classId() == "test-case", self.testcases))
+            else:
+                testNames = map(lambda t: t.name, self.testcases)
+            tests.sort(lambda a, b: self.compareTests(ascending, testNames, a, b))
+
+            # Save back, notify change
+            self.writeNewTestSuiteFile(testSuiteFileName, tests)
+
+        testNamesInOrder = self.readTestNames(False, False)
+        newList = []
+        for testName in testNamesInOrder.keys():
+            for test in self.testcases:
+                if test.name == testName:
+                    newList.append(test)
+                    break
+        self.testcases = newList
+        self.notify("ContentChange")
+        if warning:
+            raise plugins.TextTestWarning, warning
+    def compareTests(self, ascending, testNames, a, b):
+        if a in testNames:
+            if b in testNames:
+                if ascending:
+                    return cmp(a.lower(), b.lower())
+                else:
+                    return cmp(b.lower(), a.lower())
+            else:
+                return -1
+        else:
+            if b in testNames:
+                return 1
+            else:
+                if ascending:
+                    return cmp(a.lower(), b.lower())        
+                else:
+                    return cmp(b.lower(), a.lower())        
     def writeNewTest(self, testName, description, placement):
         contentFileName = self.getContentFileName()
         currContent = plugins.readListWithComments(contentFileName) # have to re-read, we might have sorted
@@ -666,11 +802,12 @@ class TestSuite(Test):
             return self.testcases[position + 1]
         except IndexError:
             return None
-    def removeTest(self, test):
-        try:
+    def removeTest(self, test, removeFromTestFile = True):
+        try: 
             shutil.rmtree(test.getDirectory())
             self.testcases.remove(test)
-            self.removeFromTestFile(test.name)
+            if removeFromTestFile:
+                self.removeFromTestFile(test.name)
             test.notify("Remove")
         except OSError, e:
             errorStr = str(e)
@@ -697,11 +834,15 @@ class TestSuite(Test):
         else:
             return "\n# " + comment.replace("\n", "\n# ") + "\n" + testName
     def removeFromTestFile(self, testName):
-        contentFileName = self.getContentFileName()
-        currContent = plugins.readListWithComments(contentFileName) # have to re-read, we might have sorted
-        del currContent[testName]
-
-        self.writeNewTestSuiteFile(contentFileName, currContent)
+        # Remove from all versions, since we've removed the actual
+        # test dir, it's useless to keep the test anywhere ... 
+        for contentFileName in self.findTestSuiteFiles():
+            currContent = plugins.readListWithComments(contentFileName) # have to re-read, we might have sorted
+            try:
+                del currContent[testName]
+                self.writeNewTestSuiteFile(contentFileName, currContent)
+            except:
+                pass # The test wasn't present in this version
     
 class BadConfigError(RuntimeError):
     pass

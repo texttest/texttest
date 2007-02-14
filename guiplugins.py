@@ -133,10 +133,10 @@ class InteractiveAction(plugins.Observable):
 
     # Should we create a gtk.Action? (or connect to button directly ...)
     def inMenuOrToolBar(self): 
-        return self.hasExternalGUIDescription() or self.getMainMenuPath() != "-" or self.inToolBar() or self.getTestPopupMenuPath() != "-" or self.inButtonBar()
+        return self.hasBuiltInGUIDescription() or self.getMainMenuPath() != "-" or self.inToolBar() or self.getTestPopupMenuPath() != "-" or self.inButtonBar()
     # Is this a built-in action? If so, we'll assume the appropriate XML code
     # is given by an outside definition file.
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return False
     # Put the action in a menu/submenu? Use / to separate submenus.
     def getMainMenuPath(self):
@@ -272,7 +272,7 @@ class Quit(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
     # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def getStockId(self):
         return "quit"
@@ -363,7 +363,7 @@ class SaveTests(SelectionAction):
         self.currApps = []
         self.currTestDescription = ""
     # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def getStockId(self):
         return "save"
@@ -879,7 +879,7 @@ class SelectTests(SelectionAction):
             return [ fullVersion ] + [ fullVersion + "." + extra for extra in extraVersions ]
     def isActiveOnCurrent(self):
         return True
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def getStockId(self):
         return "refresh"
@@ -1002,7 +1002,7 @@ class SelectTests(SelectionAction):
 
 class ResetGroups(InteractiveAction):
     # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def getStockId(self):
         return "revert-to-saved"
@@ -1021,7 +1021,7 @@ class SaveSelection(SelectionAction):
         self.selectionGroup = commandOptionGroups[0]
         self.fileName = ""
         self.saveTestList = ""
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def getStockId(self):
         return "save-as"
@@ -1134,8 +1134,10 @@ class ReconnectToTests(RunningAction):
         self.addSwitch("reconnfull", "Results:", 0, ["Display as they were", "Recompute from files"])
     def getGroupTabTitle(self):
         return "Running"
-    def inMenuOrToolBar(self):
-        return False
+    def hasBuiltInGUIDescription(self):
+        return True
+    def getStockId(self):
+        return "connect"
     def _getTitle(self):
         return "Re_connect"
     def _getScriptTitle(self):
@@ -1157,7 +1159,7 @@ class RunTests(RunningAction):
     def getOptionGroups(self):
         return self.optionGroups
     # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def _getTitle(self):
         return "_Run"
@@ -1258,7 +1260,7 @@ class RemoveTests(SelectionAction):
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     # We'll assume the appropriate XML code is given by an outside definition file.        
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def _getTitle(self):
         return "Remove..."
@@ -1505,7 +1507,7 @@ class SortTestsAscending(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currTestSelection = []
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
@@ -1561,7 +1563,7 @@ class RepositionTest(InteractiveAction):
         self.position = position
         self.currTestSelection = []
         self.testToMove = None
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
@@ -1649,7 +1651,7 @@ class RenameTest(InteractiveAction):
         self.oldName = ""
         self.newDescription = ""
         self.oldDescription = ""
-    def hasExternalGUIDescription(self):
+    def hasBuiltInGUIDescription(self):
         return True
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions

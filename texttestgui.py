@@ -575,7 +575,7 @@ class MenuBarGUI(SubGUI):
                 thisAction = self.actionGroup.get_action(itemName)
                 pre.append("<menu action=\"" + thisAction.get_name() + "\">")
                 post.append("</menu>")
-        if action.action.hasExternalGUIDescription():
+        if action.action.hasBuiltInGUIDescription():
             return "" # We create the actions, but don't add anything to the description ..
         if action.action.separatorBeforeInMainMenu():
             pre.append("<separator/>\n")
@@ -599,17 +599,48 @@ class MenuBarGUI(SubGUI):
         for actionGUI in self.actionGUIs:
             actionGUI.addToGroups(self.actionGroup, self.uiManager.get_accel_group())
             
-        # Also creates default actions, so we msut do this before reading the file ...
-        description = self.getInterfaceDescription() 
-        if self.dynamic:
-            self.uiManager.add_ui_from_file(os.path.join(os.path.dirname(__file__), "standard_gui_dynamic.xml"))
-        else:
-            self.uiManager.add_ui_from_file(os.path.join(os.path.dirname(__file__), "standard_gui_static.xml"))
-
+        # The all below also creates default actions, so we must do this before reading the file ...
+        description = self.getInterfaceDescription()
+        try:
+            file = self.getGUIDescriptionFileName()
+            self.uiManager.add_ui_from_file(file)        
+        except Exception, e: 
+            raise plugins.TextTestError, "Failed to parse GUI description file '" + file + "': " + str(e)
         self.uiManager.add_ui_from_string(description)
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
+    def getGUIDescriptionFileName(self):
+        userFileName = self.getUserGUIDescriptionFileName()
+        if not userFileName:
+            if self.dynamic:
+                return os.path.join(os.path.dirname(__file__), "standard_gui_dynamic.xml")
+            else:
+                return os.path.join(os.path.dirname(__file__), "standard_gui_static.xml")
+        else:
+            return userFileName
+    def getUserGUIDescriptionFileName(self):
+        file = guiConfig.getValue("gui_description_file", True)
+        # Now we must find the file. It should either be an absolute
+        # path, or a path relative to TEXTTEST_HOME.
+        if not file:
+            return file
+        elif os.path.isabs(file):
+            if os.path.isfile(file):
+                return file
+            else:
+                plugins.printWarning("The GUI description file '" + file + "' does not exist. Using default GUI layout.")
+        else:
+            homeDirPath = os.path.abspath(os.path.join(plugins.getPersonalConfigDir(), file))
+            if os.path.isfile(homeDirPath):
+                return homeDirPath
+            else:
+                absPath = os.path.abspath(os.path.join(os.environ["TEXTTEST_HOME"], file))
+                if os.path.isfile(absPath):
+                    return absPath
+                
+        plugins.printWarning("The GUI description file '" + file + "' could not be found in $TEXTTEST_PERSONAL_CONFIG/$HOME or in $TEXTTEST_HOME. Using default GUI layout.")
+        return ""
     def describe(self):
         for toggleAction in self.toggleActions:
             guilog.info("Viewing toggle action with title '" + toggleAction.get_property("label") + "'")
@@ -629,7 +660,7 @@ class ToolBarGUI(ContainerGUI):
     def getInterfaceDescription(self):
         description = "<ui>\n<toolbar name=\"MainToolBar\">\n"
         for actionGUI in self.actionGUIs:
-            if actionGUI.action.hasExternalGUIDescription():
+            if actionGUI.action.hasBuiltInGUIDescription():
                 continue
             if actionGUI.action.separatorBeforeInToolBar():
                 description += "<separator/>\n"
@@ -694,7 +725,7 @@ class TestPopupMenuGUI(SubGUI):
                 pre.append("<menu action=\"" + thisAction.get_name() + "\">")
                 post.append("</menu>")
 
-        if action.action.hasExternalGUIDescription(): # We create the actions, but don't add anything to the description ..
+        if action.action.hasBuiltInGUIDescription():
             return ""
         if action.action.separatorBeforeInTestPopupMenu():
             pre.append("<separator/>\n")

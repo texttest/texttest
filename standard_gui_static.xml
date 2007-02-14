@@ -27,6 +27,7 @@
     <menu name="actionsmenu" action="actionsmenu">
       <menuitem name="Select" action="Select"/>
       <menuitem name="Run" action="Run"/>
+      <menuitem name="Reconnect" action="Reconnect"/>
       <menuitem name="Reset" action="Reset"/>
     </menu>
   </menubar>

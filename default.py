@@ -524,6 +524,7 @@ class Config(plugins.Configuration):
         dict["save"] = "<control>s"
         dict["save_selection"] = "<control><shift>s"
         dict["reset"] = "<control>e"
+        dict["reconnect"] = "<control><shift>r"
         dict["run"] = "<control>r"
         dict["rename"] = "<control>m"
         dict["move_down"] = "<control>Page_Down"
@@ -572,6 +573,8 @@ class Config(plugins.Configuration):
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
         app.setConfigDefault("gui_accelerators", self.getDefaultAccelerators(), "Custom action accelerators.")
+        app.setConfigDefault("static_gui_description_file", "", "Custom XML GUI description for the static GUI. Absolute path, or relative to TEXTTEST_HOME.")
+        app.setConfigDefault("dynamic_gui_description_file", "", "Custom XML GUI description for the dynamic GUI. Absolute path, or relative to TEXTTEST_HOME.")
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")

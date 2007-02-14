@@ -656,7 +656,7 @@ class TestEnvironmentCreator:
             inVarName = self.diagDict.get("input_directory_variable")
             self.addDiagVariable(inVarName, os.path.join(self.test.getDirectory(temporary=0), "Diagnostics"))
             outVarName = self.diagDict.get("write_directory_variable")
-            self.addDiagVariable(outVarName, os.path.join(self.test.getDirectory(temporary=1), "Diagnostics"))
+            self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
             self.test.readSubDirectory("Diagnostics")
     def addDiagVariable(self, entryName, entry):
         # Diagnostics are usually controlled from the environment, but in Java they have to work with properties...

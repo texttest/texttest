@@ -609,8 +609,7 @@ class ExtractApcLogs(plugins.Action):
         self.describe(test)
         # Extract from the apclog
         test.readSubDirectory("Diagnostics")
-        extractToFile = test.makeTmpFileName("Diagnostics/" + saveName + "." + test.app.name)
-        plugins.ensureDirExistsForFile(extractToFile)
+        extractToFile = test.makeTmpFileName(saveName)
         cmdLine = "cd " + apcTmpDir + "; " + extractCommand + " > " + extractToFile
         os.system(cmdLine)
         # We sometimes have problems with an empty file extracted.
@@ -642,7 +641,11 @@ class ExtractApcLogs(plugins.Action):
         return "Extracting APC logfile for"
     def getInterruptActions(self, fetchResults):
         return []
-        
+
+class SaveTests(guiplugins.SaveTests):
+    def diagnosticMode(self, apps):
+        return guiplugins.SaveTests.diagnosticMode(self, apps) or apps[0].inputOptions.has_key("extractlogs")
+
 #
 # TODO: Check Sami's stuff in /users/sami/work/Matador/Doc/Progress
 #

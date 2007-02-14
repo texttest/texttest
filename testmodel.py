@@ -113,7 +113,7 @@ class EnvironmentReader:
             # Always include the working directory of the test in PATH, to pick up fake
             # executables provided as test data. Allow for later expansion...
             for pathVar in self.pathVars:
-                test.setEnvironment(pathVar, test.writeDirectories[0] + os.pathsep + "$" + pathVar)
+                test.setEnvironment(pathVar, test.writeDirectory + os.pathsep + "$" + pathVar)
 
         self.app.readValues(test.environment, "environment", test.dircaches[0])
         for key, value in test.environment.items():
@@ -425,7 +425,7 @@ class TestCase(Test):
     def __init__(self, name, description, abspath, app, parent):
         Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
-        self.writeDirectories = [ os.path.join(app.writeDirectory, self.getRelPath()) ]        
+        self.writeDirectory = os.path.join(app.writeDirectory, self.getRelPath())       
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -435,9 +435,9 @@ class TestCase(Test):
     def getDirectory(self, temporary=False, forFramework=False):
         if temporary:
             if forFramework:
-                return os.path.join(self.writeDirectories[0], "framework_tmp")
+                return os.path.join(self.writeDirectory, "framework_tmp")
             else:
-                return self.writeDirectories[0]
+                return self.writeDirectory
         else:
             return self.dircaches[0].dir
     def getDescription(self):
@@ -476,11 +476,10 @@ class TestCase(Test):
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
     def setWriteDirectory(self, newDir):
-        self.writeDirectories = [ newDir ]        
+        self.writeDirectory = newDir        
     def makeWriteDirectories(self):
-        for dir in self.writeDirectories:
-            self.diagnose("Created writedir at " + dir)
-            plugins.ensureDirectoryExists(dir)
+        self.diagnose("Created writedir at " + self.writeDirectory)
+        plugins.ensureDirectoryExists(self.writeDirectory)
         frameworkTmp = self.getDirectory(temporary=1, forFramework=True)
         plugins.ensureDirectoryExists(frameworkTmp)
     def readSubDirectory(self, subdir):
@@ -489,35 +488,30 @@ class TestCase(Test):
         self.diagnose("Reading sub-directory at " + fullPath)
         if os.path.isdir(fullPath):
             self.dircaches.append(DirectoryCache(fullPath))
-
-        writeSubDir = os.path.join(self.writeDirectories[0], subdir)
-        self.writeDirectories.append(writeSubDir)
     def getTestRelPath(self, file):
         parts = file.split(self.getRelPath() + "/")
         if len(parts) >= 2:
             return parts[-1]
     def listTmpFiles(self):
         tmpFiles = []
-        for dir in self.writeDirectories:
-            filelist = os.listdir(dir)
-            filelist.sort()
-            for file in filelist:
-                if file.endswith("." + self.app.name):
-                    tmpFiles.append(os.path.join(dir, file))
+        filelist = os.listdir(self.writeDirectory)
+        filelist.sort()
+        for file in filelist:
+            if file.endswith("." + self.app.name):
+                tmpFiles.append(os.path.join(self.writeDirectory, file))
         return tmpFiles
     def listUnownedTmpPaths(self):
         paths = []
-        filelist = os.listdir(self.writeDirectories[0])
+        filelist = os.listdir(self.writeDirectory)
         filelist.sort()
         for file in filelist:
             if file == "framework_tmp" or file.endswith("." + self.app.name):
                 continue
-            fullPath = os.path.join(self.writeDirectories[0], file)
-            if not fullPath in self.writeDirectories:
-                paths += self.listFiles(fullPath, file)
+            fullPath = os.path.join(self.writeDirectory, file)
+            paths += self.listFiles(fullPath, file)
         return paths
     def grabWorkingDirectory(self):
-        os.chdir(self.writeDirectories[0])
+        os.chdir(self.writeDirectory)
     def loadState(self, file):
         loaded, state = self.getNewState(file)
         self.changeState(state)

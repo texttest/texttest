@@ -235,13 +235,6 @@ class TestComparison(BaseTestComparison):
     def getFreeTextInfo(self):
         texts = [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
         return string.join(texts, "")
-    def savePartial(self, fileNames, saveDir, exact = 1, versionString = ""):
-        for fileName in fileNames:
-            stem = fileName.split(".")[0]
-            comparison, storageList = self.findComparison(stem)
-            if comparison:
-                self.diag.info("Saving single file for stem " + stem)
-                comparison.overwrite(saveDir, exact, versionString)
     def findComparison(self, stem, includeSuccess=False):
         lists = [ self.changedResults, self.newResults, self.missingResults ]
         if includeSuccess:
@@ -252,30 +245,34 @@ class TestComparison(BaseTestComparison):
                 if comparison.stem == stem:
                     return comparison, list
         return None, None
-    def save(self, test, exact = 1, versionString = "", overwriteSuccessFiles = 0):
-        # Force exactness unless there is only one difference : otherwise
-        # performance is averaged when results have changed as well
-        resultCount = len(self.changedResults) + len(self.newResults)
+    def save(self, test, exact=True, versionString="", overwriteSuccessFiles=False, newFilesAsDiags=False, onlyStems=[]):
+        self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
+        for comparison in self.filterComparisons(self.changedResults, onlyStems):
+            self.updateStatus(test, comparison, versionString)
+            comparison.overwrite(test, exact, versionString)
+        for comparison in self.filterComparisons(self.newResults, onlyStems):
+            self.updateStatus(test, comparison, versionString)
+            comparison.saveNew(test, versionString, newFilesAsDiags)
+        for comparison in self.filterComparisons(self.missingResults, onlyStems):
+            self.updateStatus(test, comparison, versionString)
+            comparison.removeStandard()
+        if overwriteSuccessFiles:
+            for comparison in self.filterComparisons(self.correctResults, onlyStems):
+                self.updateStatus(test, comparison, versionString)
+                comparison.overwrite(test, exact, versionString)
+    def filterComparisons(self, resultList, onlyStems):
+        if len(onlyStems) == 0:
+            return resultList
+        else:
+            return filter(lambda comp: comp.stem in onlyStems, resultList)
+    def updateStatus(self, test, comparison, versionString):
         testRepr = "Saving " + repr(test) + " : "
         if versionString != "":
             versionRepr = ", version " + versionString
         else:
             versionRepr = ", no version"
-        if resultCount > 1:
-            exact = 1
-        for comparison in self.changedResults:
-            self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
-            self.notifyIfMainThread("ActionProgress", "")
-            comparison.overwrite(test, exact, versionString)
-        for comparison in self.newResults + self.missingResults:
-            self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
-            self.notifyIfMainThread("ActionProgress", "")
-            comparison.overwrite(test, 1, versionString)
-        if overwriteSuccessFiles:
-            for comparison in self.correctResults:
-                self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
-                self.notifyIfMainThread("ActionProgress", "")
-                comparison.overwrite(test, exact, versionString)
+        self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
+        self.notifyIfMainThread("ActionProgress", "")
     def makeNewState(self, app):
         newState = TestComparison(self, app, "be saved")
         for comparison in self.allResults:

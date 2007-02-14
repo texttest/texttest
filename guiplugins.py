@@ -392,11 +392,16 @@ class SaveTests(SelectionAction):
         self.currApps = apps
         self.optionGroup.setOptionValue("v", self.getDefaultSaveOption(apps))
         self.optionGroup.setPossibleValues("v", self.getPossibleVersions(apps))
-        if self.hasPerformance(apps) and not self.optionGroup.switches.has_key("ex"):
+        if self.diagnosticMode(apps):
+            self.addSwitch("newdiag", "Save all new files as diagnostics", 1)
+            return True, True
+        elif self.hasPerformance(apps) and not self.optionGroup.switches.has_key("ex"):
             self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
             return True, True
         else:
             return False, True
+    def diagnosticMode(self, apps):
+        return apps[0].inputOptions.has_key("diag")
     def getDefaultSaveOption(self, apps):
         saveVersions = self.getSaveVersions(apps)
         if saveVersions.find(",") != -1:
@@ -436,6 +441,8 @@ class SaveTests(SelectionAction):
             return versionString
     def notifyNewFileSelection(self, files):
         self.currFileSelection = files
+    def newFilesAsDiags(self):
+        return int(self.optionGroup.getSwitchValue("newdiag", 0))
     def performOnCurrent(self):
         saveDesc = ", exactness " + str(self.getExactness())
         if len(self.currFileSelection) > 0:
@@ -444,7 +451,7 @@ class SaveTests(SelectionAction):
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
 
-        fileSel = copy(self.currFileSelection) # Saving can cause it to be updated, meaning we don't save what we intend
+        stemsToSave = [ fileName.split(".")[0] for fileName in self.currFileSelection ] 
         for test in self.currTestSelection:
             if not test.state.isSaveable():
                 continue
@@ -454,10 +461,7 @@ class SaveTests(SelectionAction):
             testComparison = test.state
             testComparison.setObservers(self.observers)
             if testComparison:
-                if len(fileSel) > 0:
-                    testComparison.savePartial(fileSel, test, self.getExactness(), version)
-                else:
-                    testComparison.save(test, self.getExactness(), version, overwriteSuccess)
+                testComparison.save(test, self.getExactness(), version, overwriteSuccess, self.newFilesAsDiags(), stemsToSave)
                 newState = testComparison.makeNewState(test.app)
                 test.changeState(newState)
           

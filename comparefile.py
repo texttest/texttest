@@ -146,17 +146,31 @@ class FileComparison:
         if self.tmpFile:
             self.tmpCmpFile = self.tmpCmpFile.replace(oldAbsPath, newAbsPath)
             self.tmpFile = self.tmpFile.replace(oldAbsPath, newAbsPath)
-    def getSaveFileName(self, test, versionString):
-        self.diag.info("save file from " + self.tmpFile)
-        relPath = test.getTestRelPath(self.tmpFile)
-        stdFile = os.path.join(test.getDirectory(), relPath)
+    def versionise(self, fileName, versionString):
         if len(versionString):
-            stdFile += "." + versionString
-        return stdFile
-    def saveTmpFile(self, test, exact, versionString):
-        self.stdFile = self.getSaveFileName(test, versionString)
+            return fileName + "." + versionString
+        else:
+            return fileName
+    def overwrite(self, test, exact, versionString):
+        self.diag.info("save file from " + self.tmpFile)
+        dirname, local = os.path.split(self.stdFile)
+        localRoot = string.join(local.split(".")[:2], ".")
+        self.stdFile = os.path.join(dirname, self.versionise(localRoot, versionString))
         if os.path.isfile(self.stdFile):
             os.remove(self.stdFile)
+
+        self.saveTmpFile(exact)
+    def getNewFileSubDir(self, diags):
+        if diags:
+            return "Diagnostics"
+        else:
+            return ""
+    def saveNew(self, test, versionString, diags):
+        self.stdFile = os.path.join(test.getDirectory(), self.getNewFileSubDir(diags), \
+                                    self.versionise(self.stem + "." + test.app.name, versionString))
+        self.saveTmpFile()
+    def saveTmpFile(self, exact=True):
+        self.diag.info("Saving tmp file to " + self.stdFile)
         plugins.ensureDirExistsForFile(self.stdFile)
         # Allow for subclasses to differentiate between a literal overwrite and a
         # more intelligent save, e.g. for performance. Default is the same for exact
@@ -165,17 +179,14 @@ class FileComparison:
             copyfile(self.tmpFile, self.stdFile)
         else:
             self.saveResults(self.stdFile)
-    def overwrite(self, test, exact, versionString = ""):
-        if self.missingResult():
-            os.remove(self.stdFile)
-            self.stdFile = None
-        else:
-            self.saveTmpFile(test, exact, versionString)
-            
         # Try to get everything to behave normally after a save...
         self.differenceCache = False
         self.tmpFile = self.stdFile
         self.tmpCmpFile = self.stdFile
+    def removeStandard(self):
+        os.remove(self.stdFile)
+        self.stdFile = None
+        self.stdCmpFile = None
     def saveResults(self, destFile):
         copyfile(self.tmpFile, destFile)
         

@@ -98,13 +98,15 @@ class VirtualDisplayFinder:
         return True
     def getSysCommand(self, server, command, background=1):
         if background:
-            command = "'" + command + plugins.nullRedirect() + " &' < /dev/null" + plugins.nullRedirect() + " &"
+            command = "'" + command + " &' < /dev/null" + plugins.nullRedirect() + " &"
         else:
             command = "'" + command + "'"
         return "rsh " + server + " " + command
     def startServer(self, server):
         print "Starting Xvfb on machine", server
-        os.system(self.getSysCommand(server, "Xvfb :42"))
+        startCommand = self.getSysCommand(server, "Xvfb :42")
+        self.diag.info("Starting Xvfb using command " + startCommand)
+        os.system(startCommand)
         #
         # The Xvfb server needs a running X-client and 'xhost +' if it is to receive X clients from
         # remote hosts.

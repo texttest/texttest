@@ -562,7 +562,7 @@ class Config(plugins.Configuration):
         app.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
         app.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
         app.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
-        app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order")
+        app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
         app.setConfigDefault("sort_test_suites_tests_first", 1, "When sorting test suites, put tests before suites regardless of names")
         app.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")

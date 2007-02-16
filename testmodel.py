@@ -662,15 +662,26 @@ class TestSuite(Test):
     def getTestCases(self, filters, testNames, forTestRuns, doSortIfDesired = True):
         testCaseList = []
         orderedTestNames = testNames.keys()
-        if doSortIfDesired and self.getConfigValue("auto_sort_test_suites"):
-            orderedTestNames.sort()
+        testCaches = {}
         for testName in orderedTestNames:
-            newTest = self.createTest(testName, testNames[testName], filters, forTestRuns)
+            testCaches[testName] = self.createTestCache(testName)
+        if doSortIfDesired and self.getConfigValue("auto_sort_test_suites"):
+            if self.getConfigValue("sort_test_suites_tests_first"):
+                testCaseNames = filter(lambda l: len(testCaches[l].findAllFiles("testsuite", compulsory = [ self.app.name ])) == 0, orderedTestNames)
+            else:
+                testCaseNames = []
+            if self.getConfigValue("auto_sort_test_suites") == 1:
+                orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
+            else:
+                orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
+        for testName in orderedTestNames:
+            newTest = self.createTest(testName, testNames[testName], testCaches[testName], filters, forTestRuns)
             if newTest:
                 testCaseList.append(newTest)
         return testCaseList
-    def createTest(self, testName, description, filters = [], forTestRuns=0):
-        cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
+    def createTestCache(self, testName):
+        return DirectoryCache(os.path.join(self.getDirectory(), testName))
+    def createTest(self, testName, description, cache, filters = [], forTestRuns=0):
         allFiles = cache.findAllFiles("testsuite", compulsory = [ self.app.name ])
         if len(allFiles) > 0:
             return self.createTestSuite(testName, description, cache, filters, forTestRuns)
@@ -743,7 +754,7 @@ class TestSuite(Test):
             if testsFirst:
                 testNames = map(lambda t: t.name, filter(lambda t: t.classId() == "test-case", self.testcases))
             else:
-                testNames = map(lambda t: t.name, self.testcases)
+                testNames = []
             tests.sort(lambda a, b: self.compareTests(ascending, testNames, a, b))
 
             # Save back, notify change

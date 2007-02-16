@@ -301,12 +301,19 @@ class Test(plugins.Observable):
         for dircache in self.dircaches:
             allFiles += dircache.findFilesMatching(pattern, allowedExtensions)
         return allFiles
-    def getFileName(self, stem, refVersion = None):
+    def getFileName(self, stem, refVersion = None, subDir=""):
         self.diagnose("Getting file from " + stem)
         appToUse = self.app
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
-        return appToUse._getFileName(self.dircaches, stem)
+        return appToUse._getFileName([ self.getDirCache(subDir) ], stem)
+    def getDirCache(self, subDir):
+        if len(subDir) == 0:
+            return self.dircaches[0]
+        else:
+            for dircache in self.dircaches:
+                if os.path.basename(dircache.dir) == subDir:
+                    return dircache
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
@@ -1078,8 +1085,8 @@ class Application:
         if group.name.startswith("Basic"):
             group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("Advanced"):
-            group.addOption("xr", "Configure self-diagnostics from", self.inputOptions.getDiagReadDir())
-            group.addOption("xw", "Write self-diagnostics to", self.inputOptions.getDiagWriteDir())
+            group.addOption("xr", "Configure self-diagnostics from", self.inputOptions.getSelfDiagFile())
+            group.addOption("xw", "Write self-diagnostics to", self.inputOptions.getSelfDiagWriteDir())
             group.addSwitch("x", "Enable self-diagnostics")
         elif group.name.startswith("Invisible"):
             # Options that don't make sense with the GUI should be invisible there...
@@ -1307,36 +1314,45 @@ class OptionFinder(plugins.OptionFinder):
         plugins.OptionFinder.__init__(self, sys.argv[1:])
         self.directoryName = os.path.normpath(self.findDirectoryName()).replace("\\", "/")
         os.environ["TEXTTEST_HOME"] = self.directoryName
-        self.envReadDir = os.getenv("TEXTTEST_DIAGNOSTICS")
-        self.envWriteDir = os.getenv("TEXTTEST_DIAGDIR")
-        self._setUpLogging()
+        self.diagConfigFile = None
+        self.diagWriteDir = None
+        self.setUpLogging()
         self.diag = plugins.getDiagnostics("option finder")
         self.diag.info("Replaying from " + repr(os.getenv("USECASE_REPLAY_SCRIPT")))
         self.diag.info(repr(self))
-    def _setUpLogging(self):
+    def setUpLogging(self):
+        if self.has_key("x"):
+            self.diagConfigFile = self.getSelfDiagFile()
+            self.diagWriteDir = self.getSelfDiagWriteDir()
+        elif os.environ.has_key("TEXTTEST_LOGCONFIG"):
+            self.diagConfigFile = os.getenv("TEXTTEST_LOGCONFIG")
+            self.diagWriteDir = os.getenv("TEXTTEST_DIAGDIR")
+
+        if self.diagConfigFile and not os.path.isfile(self.diagConfigFile):
+            print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"
+            self.diagConfigFile = None
+            self.diagWriteDir = None
+
+        if self.diagWriteDir:
+            plugins.ensureDirectoryExists(self.diagWriteDir)
+            if self.has_key("x"):
+                for file in os.listdir(self.diagWriteDir):
+                    if file.endswith(".diag"):
+                        os.remove(os.path.join(self.diagWriteDir, file))
+
+        self.configureLog4py()
+    def configureLog4py(self):
         # Don't use the default locations, particularly current directory causes trouble
         del log4py.CONFIGURATION_FILES[1]
-        if self.diagsEnabled():
-            diagFile = os.path.join(self.getDiagReadDir(), "log4py.conf")
-            if os.path.isfile(diagFile):
-                writeDir = self.getDiagWriteDir()
-                if not os.environ.has_key("TEXTTEST_DIAGDIR"):
-                    os.environ["TEXTTEST_DIAGDIR"] = writeDir
-                plugins.ensureDirectoryExists(writeDir)
-                print "TextTest will write diagnostics in", writeDir, "based on file at", diagFile
-                for file in os.listdir(writeDir):
-                    if file.endswith(".diag"):
-                        os.remove(os.path.join(writeDir, file))
-                # To set new config files appears to require a constructor...
-                rootLogger = log4py.Logger(log4py.TRUE, diagFile)
-            else:
-                print "Could not find diagnostic file at", diagFile, ": cannot run with diagnostics"
-                self._disableDiags()
+        if self.diagConfigFile:
+            # Assume log4py's configuration file refers to files relative to TEXTTEST_DIAGDIR
+            os.environ["TEXTTEST_DIAGDIR"] = self.diagWriteDir
+            print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile
+            # To set new config files appears to require a constructor...
+            rootLogger = log4py.Logger(log4py.TRUE, self.diagConfigFile)
         else:
-            self._disableDiags()
-    def _disableDiags(self):
-        rootLogger = log4py.Logger().get_root()        
-        rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
+            rootLogger = log4py.Logger().get_root()        
+            rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
     def findVersionList(self):
         versionList = []
         for version in plugins.commasplit(self.get("v", "")):
@@ -1369,17 +1385,12 @@ class OptionFinder(plugins.OptionFinder):
         return self.has_key("help")
     def runScript(self):
         return self.get("s")
-    def diagsEnabled(self):
-        return self.has_key("x") or self.envReadDir
-    def getDiagReadDir(self):
-        return self.get("xr", self._defaultDiagDir(self.envReadDir))
-    def getDiagWriteDir(self):
-        return self.get("xw", self._defaultDiagDir(self.envWriteDir))
-    def _defaultDiagDir(self, envDir):
-        if envDir:
-            return envDir
-        else:            
-            return os.path.join(self.directoryName, "Diagnostics")
+    def getSelfDiagFile(self):
+        return self.get("xr", os.path.join(self.getDefaultSelfDiagDir(), "log4py.conf"))
+    def getSelfDiagWriteDir(self):
+        return self.get("xw", self.getDefaultSelfDiagDir())
+    def getDefaultSelfDiagDir(self):
+        return os.path.join(self.directoryName, "Diagnostics")
     def findDirectoryName(self):
         if self.has_key("d"):
             return plugins.abspath(self["d"])

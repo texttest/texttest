@@ -450,10 +450,10 @@ class SubmitTest(plugins.Action):
                     option += " " + value
                 runOptions.append(option)
 
-        if self.optionMap.diagsEnabled():
+        if self.optionMap.diagConfigFile:
             runOptions.append("-x")
-            runOptions.append("-xr " + self.optionMap.getDiagReadDir())
-            slaveWriteDir = os.path.join(self.optionMap.getDiagWriteDir(), self.slaveType())
+            runOptions.append("-xr " + self.optionMap.diagConfigFile)
+            slaveWriteDir = os.path.join(self.optionMap.diagWriteDir, self.slaveType())
             runOptions.append("-xw " + slaveWriteDir)
         return string.join(runOptions)
     def getPostText(self, test, submissionRules):

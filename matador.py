@@ -126,8 +126,7 @@ class MatadorConfig(optimization.OptimizationConfig):
         print helpScripts
     def getDiagnosticSettings(self):
         diagDir = {}
-        diagDir["configuration_file"] = "diagnostics.etab"
-        diagDir["input_directory_variable"] = "DIAGNOSTICS_IN"
+        diagDir["configuration_file_variable"] = "DIAGNOSTICS_FILE"
         diagDir["write_directory_variable"] = "DIAGNOSTICS_OUT"
         return diagDir
     def setApplicationDefaults(self, app):
@@ -501,6 +500,12 @@ class MigrateFeatures(plugins.Action):
                 newLogFile.write(line)
         newLogFile.close()
         os.rename(newLogFileName, logFile)
+
+class MigrateDiagnostics(plugins.Action):
+    def __call__(self, test):
+        os.chdir(test.getDirectory())
+        if os.path.isfile("diagnostics.etab"):
+            os.system("cvsmv.py diagnostics.etab logging." + test.app.name)
 
 class CollectFeatures(plugins.Action):
     def __init__(self):

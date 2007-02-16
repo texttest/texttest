@@ -30,7 +30,7 @@ class Config(plugins.Configuration):
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 diagDict = app.getConfigValue("diagnostics")
-                if diagDict.get("configuration_file"):
+                if diagDict.get("configuration_file_variable"):
                     group.addSwitch("diag", "Write target application diagnostics")
                 if diagDict.get("trace_level_variable"):
                     group.addOption("trace", "Target application trace level")
@@ -544,9 +544,8 @@ class Config(plugins.Configuration):
         return dict
     def getDefaultDiagSettings(self):
         dict = {}
-        dict["configuration_file"] = ""
         dict["write_directory_variable"] = ""
-        dict["input_directory_variable"] = ""
+        dict["configuration_file_variable"] = ""
         dict["trace_level_variable"] = ""
         return dict
     def getDefaultHideWidgets(self):
@@ -587,6 +586,7 @@ class Config(plugins.Configuration):
         app.addConfigEntry("definition_file_stems", "traffic")
         app.addConfigEntry("definition_file_stems", "input")
         app.addConfigEntry("definition_file_stems", "knownbugs")
+        app.addConfigEntry("definition_file_stems", "logging")
     def setApplicationDefaults(self, app):
         self.setComparisonDefaults(app)
         self.setExternalToolDefaults(app)
@@ -632,35 +632,31 @@ class TestEnvironmentCreator:
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
             self.setTraceDiagnostics()
-        configFile = self.diagDict.get("configuration_file")
-        if configFile and self.test.parent is None:
-            self.diag.info("Adding definition file stem " + configFile)
-            self.test.app.addConfigEntry("definition_file_stems", configFile)
+        if self.diagDict.has_key("configuration_file_variable"):
+            self.setLog4xDiagnostics()
+    def setLog4xDiagnostics(self):
         # Read the temporary diagnostics in the static GUI also
         if self.optionMap.has_key("diag") or self.optionMap.has_key("gx"):
-            self.setTemporaryDiagnostics()
-        elif self.diagDict.has_key("input_directory_variable"):
-            self.setPermanentDiagnostics(configFile)
+            self.test.readSubDirectory("Diagnostics")
+        
+        diagConfigFile = self.getLoggingFile()
+        if diagConfigFile:
+            inVarName = self.diagDict.get("configuration_file_variable")
+            self.addDiagVariable(inVarName, diagConfigFile)
+        outVarName = self.diagDict.get("write_directory_variable")
+        if outVarName and self.testCase():
+            self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
     def setTraceDiagnostics(self):
         if self.topLevel:
             envVarName = self.diagDict.get("trace_level_variable")
             self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
             self.test.setEnvironment(envVarName, self.optionMap["trace"])
-    def setPermanentDiagnostics(self, configFile):
-        diagConfigFile = self.test.getFileName(configFile)
-        if diagConfigFile:
-            inVarName = self.diagDict.get("input_directory_variable")
-            self.addDiagVariable(inVarName, self.test.getDirectory())
-        outVarName = self.diagDict.get("write_directory_variable")
-        if outVarName and self.testCase():
-            self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
-    def setTemporaryDiagnostics(self):
-        if self.testCase():
-            inVarName = self.diagDict.get("input_directory_variable")
-            self.addDiagVariable(inVarName, os.path.join(self.test.getDirectory(temporary=0), "Diagnostics"))
-            outVarName = self.diagDict.get("write_directory_variable")
-            self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
-            self.test.readSubDirectory("Diagnostics")
+    def getLoggingFile(self):
+        if self.optionMap.has_key("diag"):
+            if self.testCase():
+                return self.test.getFileName("logging", subDir="Diagnostics")
+        else:
+            return self.test.getFileName("logging")
     def addDiagVariable(self, entryName, entry):
         # Diagnostics are usually controlled from the environment, but in Java they have to work with properties...
         if self.diagDict.has_key("properties_file"):

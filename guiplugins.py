@@ -1177,7 +1177,7 @@ class RunTests(RunningAction):
 class CreateDefinitionFile(InteractiveTestAction):
     def __init__(self):
         InteractiveTestAction.__init__(self)
-        self.configFile = None
+        self.diagsEnabled = False
         self.addOption("type", "Type of definition file to create", allocateNofValues=2)
     def inMenuOrToolBar(self):
         return False
@@ -1189,12 +1189,13 @@ class CreateDefinitionFile(InteractiveTestAction):
         return "New File" 
     def getScriptTitle(self, tab):
         return "Create File"
-    def getDiagConfigFileName(self):
-        return self.currentTest.getCompositeConfigValue("diagnostics", "configuration_file")
+    def checkDiagsEnabled(self):
+        varName = self.currentTest.getCompositeConfigValue("diagnostics", "configuration_file_variable")
+        return len(varName) > 0
     def getDefinitionFiles(self):
         defFiles = []
-        if self.configFile:
-            defFiles.append(self.configFile)
+        if self.diagsEnabled:
+            defFiles.append("logging")
         defFiles.append("environment")
         if self.currentTest.classId() == "test-case":
             defFiles.append("options")
@@ -1205,19 +1206,19 @@ class CreateDefinitionFile(InteractiveTestAction):
                 defFiles.append("usecase")
         return defFiles + self.currentTest.app.getDataFileNames()
     def updateForSelection(self):
-        self.configFile = self.getDiagConfigFileName()
+        self.diagsEnabled = self.checkDiagsEnabled()
         defFiles = self.getDefinitionFiles()
         self.optionGroup.setValue("type", defFiles[0])
         self.optionGroup.setPossibleValues("type", defFiles)
 
-        if self.configFile and not self.optionGroup.switches.has_key("diag"):
+        if self.diagsEnabled and not self.optionGroup.switches.has_key("diag"):
             self.addSwitch("diag", "Affect diagnostic mode only")
             return True, True
         else:
             return False, True
     def getFileName(self):
         stem = self.optionGroup.getOptionValue("type")
-        if stem != self.configFile and stem in self.currentTest.getConfigValue("definition_file_stems"):
+        if stem in self.currentTest.getConfigValue("definition_file_stems"):
             return stem + "." + self.currentTest.app.name
         else:
             return stem

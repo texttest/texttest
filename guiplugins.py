@@ -1259,7 +1259,11 @@ class RemoveTests(SelectionAction):
         SelectionAction.__init__(self)
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
-    # We'll assume the appropriate XML code is given by an outside definition file.        
+    def isActiveOnCurrent(self):
+        for test in self.currTestSelection:
+            if test.parent:
+                return True
+        return False
     def hasBuiltInGUIDescription(self):
         return True
     def _getTitle(self):
@@ -1282,12 +1286,18 @@ class RemoveTests(SelectionAction):
                    " tests with associated files!\nAre you VERY sure you wish to proceed??"
     def performOnCurrent(self):
         namesRemoved = []
+        warnings = ""
         for test in self.currTestSelection:
-            dir = test.getDirectory()
-            if os.path.isdir(dir): # might have already removed the enclosing suite
-                test.parent.removeTest(test)
-                namesRemoved.append(test.name)
+            if not test.parent:
+                warnings += "\nThe root suite\n'" + test.name + " (" + test.app.name + ")'\ncannot be removed.\n"
+            else:
+                dir = test.getDirectory()
+                if os.path.isdir(dir): # might have already removed the enclosing suite
+                    test.parent.removeTest(test)
+                    namesRemoved.append(test.name)
         self.notify("Status", "Removed test(s) " + string.join(namesRemoved, ","))
+        if warnings:
+            raise plugins.TextTestWarning, warnings
         
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!

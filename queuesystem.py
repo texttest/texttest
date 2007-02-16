@@ -354,8 +354,10 @@ class QueueSystemServer:
         errorMessage = plugins.retryOnInterrupt(queueSystem.findSubmitError, stderr)
         if errorMessage:
             self.submitDiag.info("Job not created : " + errorMessage)
-            raise plugins.TextTestError, "Failed to submit to " + queueSystemName(test.app) \
-                  + " (" + errorMessage.strip() + ")"
+            qname = queueSystemName(test.app)
+            fullError = "Failed to submit to " + qname + " (" + errorMessage.strip() + ")\n" + \
+                        "Submission command was '" + submitCommand + " ... '\n"
+            raise plugins.TextTestError, fullError
 
         jobId = queueSystem.findJobId(stdout)
         self.submitDiag.info("Job created with id " + jobId)

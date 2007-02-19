@@ -232,7 +232,7 @@ class RenameDialog(ActionConfirmationDialog):
         self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
 
         header = gtk.Label()
-        header.set_markup("<b>" + self.plugin.oldName + "</b>")
+        header.set_markup("<b>" + plugins.convertForMarkup(self.plugin.oldName) + "</b>")
         vbox.pack_start(header)
         hbox2 = gtk.HBox()
         hbox2.pack_start(gtk.Label("\nNew name:"), expand=False, fill=False)        

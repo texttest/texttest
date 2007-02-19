@@ -173,6 +173,10 @@ def parseBytes(text):
     except:
         raise "Illegal byte format '" + text + "'"
 
+# pango markup doesn't like <,>,& ...
+def convertForMarkup(message):
+    return message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            
 # Generic configuration class
 class Configuration:
     CLEAN_NONE = 0

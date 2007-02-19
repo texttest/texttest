@@ -183,14 +183,14 @@ class GUIStatusMonitor(SubGUI):
         
     def notifyStatus(self, message):
         if self.label:
-            self.label.set_markup(message)
+            self.label.set_markup(plugins.convertForMarkup(message))
             self.contentsChanged()
-            
+
     def createView(self):
         hbox = gtk.HBox()
         self.label = gtk.Label()
         self.label.set_use_markup(True)
-        self.label.set_markup("TextTest started at " + plugins.localtime() + ".")
+        self.label.set_markup(plugins.convertForMarkup("TextTest started at " + plugins.localtime() + "."))
         hbox.pack_start(self.label, expand=False, fill=False)
         imageDir = os.path.join(os.path.dirname(__file__), "images")
         try:

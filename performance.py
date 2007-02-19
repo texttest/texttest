@@ -110,11 +110,14 @@ class PerformanceComparison:
         self.newPerformance = newPerf
         self.percentageChange = self.calculatePercentageIncrease()
         self.descriptor = self.getDescriptor(stem)
-    def calculatePercentageIncrease(self):
+    def calculatePercentageIncrease(self):        
         largest = max(self.oldPerformance, self.newPerformance)
         smallest = min(self.oldPerformance, self.newPerformance)
         if smallest == 0.0:
-            return 0.0
+            if largest == 0.0:
+                return 0
+            else:
+                return -1
         return ((largest - smallest) / smallest) * 100
     def getDescriptor(self, stem):
         improvement = self.newPerformance < self.oldPerformance
@@ -138,13 +141,15 @@ class PerformanceComparison:
         perc = int(self.percentageChange)
         if perc == 0:
             return ""
+        elif perc == -1:
+            return "infinitely " + self.descriptor
         elif includeNumbers:
             return str(perc) + "% " + self.descriptor
         else:
             return self.descriptor
     def isSignificant(self, minPerf, minVar):
         longEnough = self.newPerformance > minPerf or self.oldPerformance > minPerf
-        varianceEnough = self.percentageChange > minVar
+        varianceEnough = self.percentageChange < 0 or self.percentageChange > minVar
         return longEnough and varianceEnough
     def getAverage(self):
         return round((self.oldPerformance + self.newPerformance) / 2.0, 2)

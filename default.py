@@ -336,9 +336,11 @@ class Config(plugins.Configuration):
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         return self.optionMap.get(option, "")
+    def ignoreCheckouts(self):
+        return self.isReconnecting()
     def getCheckoutPath(self, app):
-        if self.isReconnecting():
-            return "" # don't care about checkouts
+        if self.ignoreCheckouts():
+            return "" 
         
         checkoutPath = self.getGivenCheckoutPath(app)
         # Allow empty checkout, means no checkout is set, basically

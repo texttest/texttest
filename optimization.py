@@ -186,6 +186,8 @@ class OptimizationConfig(ravebased.Config):
                self.optionMap.has_key("kpiData") or self.optionMap.has_key("prrep"):
             return False
         return ravebased.Config.useQueueSystem(self)
+    def ignoreCheckouts(self):
+        return self.optionMap.has_key("plot") or ravebased.Config.ignoreCheckouts(self)
     def getResponderClasses(self, allApps):
         if self.optionMap.has_key("plot"):
             return [ GraphPlotResponder ]

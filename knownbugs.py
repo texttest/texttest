@@ -130,8 +130,9 @@ class FileBugData:
             self.diag.info("File not changed, ignoring")
             return
         if not os.path.isfile(fileName):
-            self.diag.info("File doesn't exist, ignoring")
-            return
+            self.diag.info("File doesn't exist, checking only for absence bugs")
+            return self.findAbsenceBug(self.absentList, execHosts, isChanged, multipleDiffs)
+        
         return self.findBugInText(open(fileName).readlines(), execHosts, isChanged, multipleDiffs)
     def findBugInText(self, lines, execHosts, isChanged=True, multipleDiffs=False):
         currAbsent = copy(self.absentList)
@@ -144,7 +145,10 @@ class FileBugData:
                 if bugTrigger.matchesText(line):
                     currAbsent.remove(bugTrigger)
                     break
-        for bugTrigger in currAbsent:
+
+        return self.findAbsenceBug(currAbsent, execHosts, isChanged, multipleDiffs)
+    def findAbsenceBug(self, absentList, execHosts, isChanged, multipleDiffs):
+        for bugTrigger in absentList:
             bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs)
             if bug:
                 return bug

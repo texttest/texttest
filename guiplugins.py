@@ -663,6 +663,7 @@ class ImportTest(InteractiveTestAction):
         description = self.optionGroup.getOptionValue("desc")
         testDir = suite.writeNewTest(testName, description, placement)
         self.testImported = self.createTestContents(suite, testDir, description, placement)
+        suite.contentChanged()
     def getDestinationSuite(self):
         return self.currentTest
     def getPlacement(self):

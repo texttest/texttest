@@ -380,6 +380,7 @@ class Test(plugins.Observable):
         test.readEnvironment()
         test.notify("Add")
         self.parent.removeTest(self, False)
+        self.parent.contentChanged()
     def setUpEnvVariable(self, var, value):
         if os.environ.has_key(var):
             self.previousEnv[var] = os.environ[var]
@@ -646,28 +647,41 @@ class TestSuite(Test):
     def contentChanged(self):
         # Here we assume that only order can change...
         self.refreshFiles()
-        if not self.getConfigValue("auto_sort_test_suites"):
-            newList = []
-            for testName in plugins.readList(self.getContentFileName()):
-                for testcase in self.testcases:
-                    if testcase.name == testName:
-                        newList.append(testcase)
-                        break
+        orderedTestNames = self.getOrderedTestNames()
+        newList = []
+        for testName in orderedTestNames:
+            for testcase in self.testcases:
+                if testcase.name == testName:
+                    newList.append(testcase)
+                    break
+        if newList != self.testcases:
             self.testcases = newList
-        self.notify("ContentChange")
+            self.notify("ContentChange")
     def size(self):
         size = 0
         for testcase in self.testcases:
             size += testcase.size()
         return size
 # private:
-    def getTestCases(self, filters, testNames, forTestRuns, doSortIfDesired = True):
+    def getOrderedTestNames(self): # We assume that tests exists, we just want to re-order ...
+        orderedTestNames = self.readTestNames(False, False)
+        if self.getConfigValue("auto_sort_test_suites"):
+            if self.getConfigValue("sort_test_suites_tests_first"):
+                testCaseNames = map(lambda l: l.name, filter(lambda l: l.classId() == "test-case", self.testcases))
+            else:
+                testCaseNames = []
+            if self.getConfigValue("auto_sort_test_suites") == 1:
+                orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
+            else:
+                orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
+        return orderedTestNames.keys()
+    def getTestCases(self, filters, testNames, forTestRuns):
         testCaseList = []
         orderedTestNames = testNames.keys()
         testCaches = {}
         for testName in orderedTestNames:
             testCaches[testName] = self.createTestCache(testName)
-        if doSortIfDesired and self.getConfigValue("auto_sort_test_suites"):
+        if self.getConfigValue("auto_sort_test_suites"):
             if self.getConfigValue("sort_test_suites_tests_first"):
                 testCaseNames = filter(lambda l: len(testCaches[l].findAllFiles("testsuite", compulsory = [ self.app.name ])) == 0, orderedTestNames)
             else:

@@ -306,7 +306,9 @@ class Test(plugins.Observable):
         appToUse = self.app
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
-        return appToUse._getFileName([ self.getDirCache(subDir) ], stem)
+        dirCache = self.getDirCache(subDir)
+        if dirCache:
+            return appToUse._getFileName([ dirCache ], stem)
     def getDirCache(self, subDir):
         if len(subDir) == 0:
             return self.dircaches[0]

@@ -297,6 +297,8 @@ class TextTestGUI(Responder, plugins.Observable):
         return hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile")
     def getExitObservers(self):
         return [ self, self.idleManager ]
+    def getTestColumnObservers(self):
+        return [ self.testTreeGUI, statusMonitor, self.idleManager ]
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
@@ -306,6 +308,9 @@ class TextTestGUI(Responder, plugins.Observable):
     def setUpObservers(self):    
         for observer in self.getTestTreeObservers():
             self.testTreeGUI.addObserver(observer)
+
+        for observer in self.getTestColumnObservers():
+            self.testColumnGUI.addObserver(observer)
 
         for observer in self.getFileViewObservers():
             self.testFileGUI.addObserver(observer)
@@ -763,15 +768,66 @@ class TestColumnGUI(SubGUI):
         self.totalNofTestsShown = 0
         self.column = None
         self.dynamic = dynamic
+        self.allSuites = []
     def addSuites(self, suites):
         size = sum([ suite.size() for suite in suites ])
         self.totalNofTests += size
         self.totalNofTestsShown += size
+        for suite in suites:
+            if not suite in self.allSuites:
+                self.allSuites.append(suite)
     def createView(self):
         testRenderer = gtk.CellRendererText()
-        self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)
+        self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)        
         self.column.set_cell_data_func(testRenderer, renderSuitesBold)
+        if not self.dynamic:
+            self.column.set_clickable(True)
+            scriptEngine.connect("toggle test sorting order", "clicked", self.column, self.columnClicked)
+        if guiConfig.getValue("auto_sort_test_suites") == 1:
+            guilog.info("Initially sorting tests in alphabetical order.")
+            self.column.set_sort_indicator(True)
+            self.column.set_sort_order(gtk.SORT_ASCENDING)
+        elif guiConfig.getValue("auto_sort_test_suites") == -1:
+            guilog.info("Initially sorting tests in descending alphabetical order.")
+            self.column.set_sort_indicator(True)
+            self.column.set_sort_order(gtk.SORT_DESCENDING)                
         return self.column
+    def columnClicked(self, treeviewcolumn):
+        if not self.column.get_sort_indicator():
+            self.column.set_sort_indicator(True)
+            self.column.set_sort_order(gtk.SORT_ASCENDING)
+            order = 1
+        else:
+            order = self.column.get_sort_order()
+            if order == gtk.SORT_ASCENDING:
+                self.column.set_sort_order(gtk.SORT_DESCENDING)
+                order = -1
+            else:
+                self.column.set_sort_indicator(False)
+                order = 0
+        
+        self.notify("ActionStart", "")
+        self.setSortingOrder(order)
+        if order == 1:
+            self.notify("Status", "Tests sorted in alphabetical order.")
+        elif order == -1:
+            self.notify("Status", "Tests sorted in descending alphabetical order.")
+        else:
+            self.notify("Status", "Tests sorted according to testsuite file.")
+        self.notify("RefreshTestSelection")
+        self.notify("ActionStop", "")
+    def setSortingOrder(self, order, suite = None):
+        if not suite:
+            for suite in self.allSuites:
+                self.setSortingOrder(order, suite)
+        else:
+            self.notify("Status", "Sorting suite " + suite.name + " ...")
+            self.notify("ActionProgress", "")
+            suite.autoSortOrder = order
+            suite.updateOrder(order == 0) # Re-read testsuite files if order is 0 ...
+            for test in suite.testcases:
+                if test.classId() == "test-suite":
+                    self.setSortingOrder(order, test)
     def getTitle(self):
         title = "Tests: "
         if self.nofSelectedTests == self.totalNofTests:

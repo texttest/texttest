@@ -15,8 +15,8 @@
       <menuitem name="Move down" action="Move down"/>
       <menuitem name="Move to last" action="Move to last"/>
       <separator/>
-      <menuitem name="Sort Suite" action="Sort Suite"/>
-      <menuitem name="Reversed Sort Suite" action="Reversed Sort Suite"/>
+      <menuitem name="Sort Test Suite File" action="Sort Test Suite File"/>
+      <menuitem name="Reversed Sort Test Suite File" action="Reversed Sort Test Suite File"/>
       <separator/>
     </menu>
     <menu name="viewmenu" action="viewmenu">
@@ -56,8 +56,8 @@
       <menuitem name="Move down" action="Move down"/>
       <menuitem name="Move to last" action="Move to last"/>
       <separator/>
-      <menuitem name="Sort Suite" action="Sort Suite"/>
-      <menuitem name="Reversed Sort Suite" action="Reversed Sort Suite"/>
+      <menuitem name="Sort Test Suite File" action="Sort Test Suite File"/>
+      <menuitem name="Reversed Sort Test Suite File" action="Reversed Sort Test Suite File"/>
       <separator/>
     </menu>
   </popup>

@@ -1515,7 +1515,7 @@ class RecomputeTest(InteractiveTestAction):
     def performOnCurrent(self):
         self.currentTest.app.configObject.recomputeProgress(self.currentTest, self.observers)
 
-class SortTestsAscending(InteractiveAction):
+class SortTestSuiteFileAscending(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currTestSelection = []
@@ -1526,15 +1526,15 @@ class SortTestsAscending(InteractiveAction):
     def isActiveOnCurrent(self):
         return len(self.currTestSelection) == 1 and \
                self.currTestSelection[0].classId() == "test-suite" and \
-               not self.currTestSelection[0].getConfigValue("auto_sort_test_suites")
+               not self.currTestSelection[0].autoSortOrder
     def getStockId(self):
         return "sort-ascending"
     def _getTitle(self):
-        return "_Sort Suite"
+        return "_Sort Test Suite File"
     def messageAfterPerform(self):
-        return "Sorted " + repr(self.currTestSelection[0]) + " in alphabetical order."
+        return "Sorted testsuite file for " + repr(self.currTestSelection[0]) + " in alphabetical order."
     def _getScriptTitle(self):
-        return "sort selected test suite in alphabetical order"
+        return "sort testsuite file for the selected test suite in alphabetical order"
     def performOnCurrent(self):
         self.performRecursively(self.currTestSelection[0], True)
     def performRecursively(self, suite, ascending):        
@@ -1557,15 +1557,15 @@ class SortTestsAscending(InteractiveAction):
         if errors:
             raise plugins.TextTestWarning, errors
 
-class SortTestsDescending(SortTestsAscending):
+class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
     def getStockId(self):
         return "sort-descending"
     def _getTitle(self):
-        return "_Reversed Sort Suite"
+        return "_Reversed Sort Test Suite File"
     def messageAfterPerform(self):
-        return "Sorted " + repr(self.currTestSelection[0]) + " in reversed alphabetical order."
+        return "Sorted testsuite file for " + repr(self.currTestSelection[0]) + " in reversed alphabetical order."
     def _getScriptTitle(self):
-        return "sort selected test suite in reversed alphabetical order"
+        return "sort testsuite file for the selected test suite in reversed alphabetical order"
     def performOnCurrent(self):
         self.performRecursively(self.currTestSelection[0], False)
 
@@ -1586,7 +1586,7 @@ class RepositionTest(InteractiveAction):
     def _isActiveOnCurrent(self):
         return len(self.currTestSelection) == 1 and \
                self.currTestSelection[0].parent and \
-               not self.currTestSelection[0].parent.getConfigValue("auto_sort_test_suites")
+               not self.currTestSelection[0].parent.autoSortOrder
     def performOnCurrent(self):
         self.testToMove.parent.repositionTest(self.testToMove, self.position)
         self.notify("RefreshTestSelection")
@@ -1722,7 +1722,7 @@ class InteractiveActionHandler:
         self.actionStaticClasses = [ RecordTest, CopyTest, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups, RenameTest, RemoveTests, \
-                                     SortTestsAscending, SortTestsDescending, \
+                                     SortTestSuiteFileAscending, SortTestSuiteFileDescending, \
                                      RepositionTestFirst, RepositionTestUp, \
                                      RepositionTestDown, RepositionTestLast, \
                                      ReconnectToTests, SaveSelection ]

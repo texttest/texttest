@@ -162,6 +162,7 @@ class BatchResponder(respond.Responder):
     def __init__(self, optionMap):
         respond.Responder.__init__(self, optionMap)
         self.sessionName = optionMap["b"]
+        self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.batchAppData = seqdict()
         self.allApps = seqdict()
     def notifyComplete(self, test):
@@ -177,7 +178,7 @@ class BatchResponder(respond.Responder):
         else:
             self.allApps[app.name].append(app)
     def notifyAllComplete(self):
-        mailSender = MailSender(self.sessionName)
+        mailSender = MailSender(self.sessionName, self.runId)
         for appList in self.allApps.values():
             batchDataList = map(lambda x: self.batchAppData[x], appList)
             mailSender.send(batchDataList)
@@ -185,8 +186,9 @@ class BatchResponder(respond.Responder):
 sectionHeaders = [ "Summary of all Unsuccessful tests", "Details of all Unsuccessful tests", "Summary of all Successful tests" ]
 
 class MailSender:
-    def __init__(self, sessionName):
+    def __init__(self, sessionName, runId=""):
         self.sessionName = sessionName
+        self.runId = runId
         self.diag = plugins.getDiagnostics("Mail Sender")
     def send(self, batchDataList):
         if len(batchDataList) == 0:
@@ -267,21 +269,20 @@ class MailSender:
     
     def createMailHeaderSection(self, title, app, batchDataList):
         if self.useCollection(app):
-            return self.getMachineTitle(app, batchDataList) + "\n" + \
+            return self.getMachineTitle(app, batchDataList) + "\n" + self.runId + "\n" + \
                    title + "\n\n" # blank line separating headers from body
         else:
-            return self.createMailHeaderForSend(title, app)
-    def createMailHeaderForSend(self, title, app):
+            return self.createMailHeaderForSend(self.runId, title, app)
+    def createMailHeaderForSend(self, runId, title, app):
         fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
         toAddress = app.getCompositeConfigValue("batch_recipients", self.sessionName)
         return "From: " + fromAddress + "\nTo: " + toAddress + "\n" + \
-               "Subject: " + title + "\n\n"
+               "Subject: " + runId + " " + title + "\n\n"
     def useCollection(self, app):
         return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
     def getMailHeader(self, app, batchDataList):
-        title = time.strftime("%y%m%d") + " " + repr(app)
         versions = self.findCommonVersions(app, batchDataList)
-        return title + self.getVersionString(versions) + " : "
+        return repr(app) + self.getVersionString(versions) + " : "
     def getCategoryNames(self, batchDataList):
         names = []
         for resp in batchDataList:
@@ -360,12 +361,18 @@ class MailSender:
                 return False
         return True
 
+def calculateBatchDate():
+    # Batch mode uses a standardised date that give a consistent answer for night-jobs.
+    # Hence midnight is a bad cutover point. The day therefore starts and ends at 8am :)
+    timeinseconds = plugins.globalStartTime - 8*60*60
+    return time.strftime("%d%b%Y", time.localtime(timeinseconds))
+
 # Allow saving results to a historical repository
 class SaveState(respond.SaveState):
     def __init__(self, optionMap):
         respond.SaveState.__init__(self, optionMap)
         self.batchSession = optionMap["b"]
-        self.dateString = self.calculateDate()
+        self.dateString = calculateBatchDate()
         self.repositories = {}
         self.diag = plugins.getDiagnostics("Save Repository")
     def performSave(self, test):
@@ -375,11 +382,6 @@ class SaveState(respond.SaveState):
             self.saveToRepository(test)
         else:
             self.diag.info("No repositories for " + repr(test.app) + " in " + repr(self.repositories))
-    def calculateDate(self):
-        # The normal thing is that the tests starts before midnight.
-        # However, this is not true sometimes, this tries to correct that.
-        timeinseconds = plugins.globalStartTime - 12*60*60
-        return time.strftime("%d%b%Y", time.localtime(timeinseconds))
     def saveToRepository(self, test):
         testRepository = self.repositories[test.app]
         targetFile = os.path.join(testRepository, test.app.name, test.app.getFullVersion(), \
@@ -527,6 +529,7 @@ class CollectFiles(plugins.ScriptWithArgs):
         argDict = self.parseArguments(args)
         batchSession = argDict.get("batch", "default")
         self.mailSender = MailSender(batchSession)
+        self.runId = "" # depends on what we pick up from collected files
         self.diag = plugins.getDiagnostics("batch collect")
         self.userName = argDict.get("tmp", "")
         if self.userName:
@@ -548,7 +551,7 @@ class CollectFiles(plugins.ScriptWithArgs):
             return
         
         mailTitle = self.getTitle(app, totalValues)
-        mailContents = self.mailSender.createMailHeaderForSend(mailTitle, app)
+        mailContents = self.mailSender.createMailHeaderForSend(self.runId, mailTitle, app)
         mailContents += self.getBody(fileBodies)
         self.mailSender.sendOrStoreMail(app, mailContents)
     def parseDirectory(self, fullDir, app, totalValues):
@@ -568,7 +571,14 @@ class CollectFiles(plugins.ScriptWithArgs):
         localName = os.path.basename(fullname)
         print "Found file called", localName
         file = open(fullname)
-        catValues = plugins.commasplit(file.readline().strip())
+        valuesLine = file.readline()
+        self.runId = file.readline().strip()
+        self.addValuesToTotal(localName, valuesLine, totalValues)
+        fileBody = self.runId + " " + file.read()
+        file.close()
+        return fileBody
+    def addValuesToTotal(self, localName, valuesLine, totalValues):
+        catValues = plugins.commasplit(valuesLine.strip())
         try:
             for value in catValues:
                 catName, count = value.split("=")
@@ -577,9 +587,6 @@ class CollectFiles(plugins.ScriptWithArgs):
                 totalValues[catName] += int(count)
         except ValueError:
             plugins.printWarning("Found truncated or old format batch report (" + localName + ") - could not parse result correctly.")
-        fileBody = file.read()
-        file.close()
-        return fileBody
     def getTitle(self, app, totalValues):
         title = self.mailSender.getMailHeader(app, [])
         total = 0

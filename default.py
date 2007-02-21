@@ -49,6 +49,7 @@ class Config(plugins.Configuration):
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addOption("fd", "Private: Directory to search for filter files in")
+                group.addOption("name", "Batch run not identified by date, but by name")
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
                 group.addSwitch("n", "Create new results files (overwrite everything)")

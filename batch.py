@@ -372,9 +372,15 @@ class SaveState(respond.SaveState):
     def __init__(self, optionMap):
         respond.SaveState.__init__(self, optionMap)
         self.batchSession = optionMap["b"]
-        self.dateString = calculateBatchDate()
+        self.fileName = self.createFileName(optionMap.get("name"))
         self.repositories = {}
         self.diag = plugins.getDiagnostics("Save Repository")
+    def createFileName(self, nameGiven):
+        # include the date and the name, if any. Date is used for archiving, name for display
+        parts = [ "teststate", calculateBatchDate() ]
+        if nameGiven:
+            parts.append(nameGiven)
+        return string.join(parts, "_")
     def performSave(self, test):
         test.saveState()
         if self.repositories.has_key(test.app):
@@ -385,7 +391,7 @@ class SaveState(respond.SaveState):
     def saveToRepository(self, test):
         testRepository = self.repositories[test.app]
         targetFile = os.path.join(testRepository, test.app.name, test.app.getFullVersion(), \
-                                  test.getRelPath(), "teststate_" + self.dateString)
+                                  test.getRelPath(), self.fileName)
         if os.path.isfile(targetFile):
             plugins.printWarning("File already exists at " + targetFile + " - not overwriting!")
         else:
@@ -456,7 +462,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
     def shouldArchive(self, file):
         if not file.startswith("teststate"):
             return False
-        teststate, dateStr = file.split("_")
+        dateStr = file.split("_")[1]
         date = self.dateInSeconds(dateStr)
         if self.beforeDate and date >= self.beforeDate:
             return False

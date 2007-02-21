@@ -32,6 +32,13 @@ class ColourFinder:
 
 colourFinder = ColourFinder()
 
+def getDisplayText(tag):
+    displayText = string.join(tag.split("_")[1:], "_")
+    if displayText:
+        return displayText
+    else:
+        return tag
+
 class GenerateWebPages:
     def __init__(self, pageAppName, pageVersion, pageDir, extraVersions):
         self.pageAppName = pageAppName
@@ -92,16 +99,12 @@ class GenerateWebPages:
             for testStateFile in self.findTestStateFiles(dir):
                 self.processTestStateFile(testStateFile, categoryHandler, loggedTests, tagsFound, dir)
     def findTestStateFiles(self, dir):
-        files = []
-        filelist = os.listdir(dir)
-        filelist.sort()
-        for file in filelist:
-            fullPath = os.path.join(dir, file)
-            if os.path.isdir(fullPath):
-                files += self.findTestStateFiles(fullPath)
-            elif os.path.isfile(fullPath) and file.startswith("teststate"):
-                files.append(fullPath)
-        return files
+        allFiles = []
+        for root, dirs, files in os.walk(dir):
+            currFiles = filter(lambda file: file.startswith("teststate"), files)
+            currFiles.sort()
+            allFiles += [ os.path.join(root, file) for file in currFiles ]
+        return allFiles
     def removePageVersion(self, version):
         leftVersions = []
         pageSubVersions = self.pageVersion.split(".")
@@ -112,10 +115,10 @@ class GenerateWebPages:
     def processTestStateFile(self, stateFile, categoryHandler, loggedTests, tagsFound, repository):
         state = self.readState(stateFile)
         if not state:
-            print "Ignoring file at", stateFile.replace(os.sep, "/")
+            print "Ignoring file at", stateFile
             return
 
-        tag = os.path.basename(stateFile).split("_")[-1]
+        tag = os.path.basename(stateFile).replace("teststate_", "")
         if tagsFound.count(tag) == 0:
             tagsFound.append(tag)
         key = self.getTestIdentifier(stateFile, repository)
@@ -153,9 +156,11 @@ class GenerateWebPages:
     def addDetailPages(self, details):
         for tag in details.keys():
             if not self.pagesDetails.has_key(tag):
-                pageDetailTitle = "Detailed test results for " + self.pageAppName + " - version " + self.pageVersion + ": " + tag
+                tagText = getDisplayText(tag)
+                pageDetailTitle = "Detailed test results for " + self.pageAppName + " - version " + \
+                                  self.pageVersion + ": " + tagText
                 self.pagesDetails[tag] = HTMLgen.SimpleDocument(title = pageDetailTitle)
-                self.pagesDetails[tag].append(HTMLgen.Heading(1, tag + " - detailed test results for ", self.pageAppName, align = 'center'))
+                self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageAppName, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
     def writePages(self):
         print "Writing overview pages..."
@@ -172,13 +177,14 @@ class GenerateWebPages:
         dir = os.path.dirname(stateFile)
         return dir.replace(repository + os.sep, "").replace(os.sep, " ")
     def getTagTimeInSeconds(self, tag):
+        timePart = tag.split("_")[0]
         try:
-            return time.mktime(time.strptime(tag, "%d%b%Y"))
+            return time.mktime(time.strptime(timePart, "%d%b%Y"))
         except ValueError:
             # As the Python docs say, strptime is buggy on some platforms (e.g. parisc)
             # Seems to work if you insert spaces though...
-            spacedTag = tag[:2] + " " + tag[2:5] + " " + tag[5:]
-            return time.mktime(time.strptime(spacedTag, "%d %b %Y"))
+            spacedTimePart = timePart[:2] + " " + timePart[2:5] + " " + timePart[5:]
+            return time.mktime(time.strptime(spacedTimePart, "%d %b %Y"))
     def getOverviewPageName(self, sel):
         return "test_" + self.pageVersion + sel + ".html"
 
@@ -260,7 +266,7 @@ class TestTable:
         head = [ HTMLgen.TH("Test") ]
         for tag in tagsFound:
             tagColour = self.findTagColour(tag)
-            head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(pageVersion, tag), HTMLgen.Font(tag, color=tagColour))))
+            head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(pageVersion, tag), HTMLgen.Font(getDisplayText(tag), color=tagColour))))
         heading = HTMLgen.TR()
         heading = heading + head
         cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))

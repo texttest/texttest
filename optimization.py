@@ -127,7 +127,7 @@ optimization.PlotSubplans
 """
 
 
-import ravebased, os, sys, string, shutil, KPI, plugins, math, re, unixonly, guiplugins, copy, testoverview, time, testmodel
+import ravebased, os, sys, string, shutil, plugins, math, re, unixonly, guiplugins, copy, testoverview, time, testmodel
 from ndict import seqdict
 from time import sleep
 from respond import Responder
@@ -163,27 +163,15 @@ class OptimizationConfig(ravebased.Config):
             if group.name.startswith("Invisible"):
                 # These need a better interface before they can be plugged in, really
                 group.addOption("prrep", "Run KPI progress report")
-                group.addOption("kpiData", "Output KPI curve data etc.")
-                group.addOption("kpi", "Run Henrik's old KPI")
                 group.addOption("plot", "Plot Graph of selected runs")
     def getActionSequence(self):
         if self.optionMap.has_key("plot"):
             return [ self.getWriteDirectoryMaker(), DescribePlotTest() ]
-        if self.optionMap.has_key("kpi"):
-            listKPIs = [KPI.cSimpleRosteringOptTimeKPI,
-                        KPI.cFullRosteringOptTimeKPI,
-                        KPI.cWorstBestRosteringOptTimeKPI,
-                        KPI.cRosteringQualityKPI]
-            return [ CalculateKPIs(self.optionValue("kpi"), listKPIs) ]
-        if self.optionMap.has_key("kpiData"):
-            listKPIs = [KPI.cSimpleRosteringOptTimeKPI]
-            return [ WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         if self.optionMap.has_key("prrep"):
             return [ self.getProgressReportBuilder() ]
         return ravebased.Config.getActionSequence(self)
     def useQueueSystem(self):
-        if self.optionMap.has_key("plot") or self.optionMap.has_key("kpi") or \
-               self.optionMap.has_key("kpiData") or self.optionMap.has_key("prrep"):
+        if self.optionMap.has_key("plot") or self.optionMap.has_key("prrep"):
             return False
         return ravebased.Config.useQueueSystem(self)
     def ignoreCheckouts(self):
@@ -739,14 +727,36 @@ class TableTest(plugins.Action):
                 return str(value).strip()
         else:
             return "N/A"
-      
-class TestReport(plugins.Action):
-    def __init__(self, versionString):
-        versions = versionString.split(",")
+              
+class MakeProgressReport(plugins.Action):
+    def __init__(self, referenceVersion):
+        versions = referenceVersion.split(",")
         self.referenceVersion = versions[0]
         self.currentVersion = None
         if len(versions) > 1:
             self.currentVersion = versions[1]
+        self.totalKpi = 1.0
+        self.testCount = 0
+        self.bestKpi = 1.0
+        self.worstKpi = 0.00001
+    def __del__(self):
+        if self.testCount > 0:
+            avg = math.pow(self.totalKpi, 1.0 / float(self.testCount))
+            print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
+            print "Best KPI with respect to version", self.referenceVersion, "=", self.percent(self.bestKpi)
+            print "Worst KPI with respect to version", self.referenceVersion, "=", self.percent(self.worstKpi)
+    def __repr__(self):
+        return "Comparison on"
+    def setUpApplication(self, app):
+        currentText = ""
+        if self.currentVersion != None:
+            currentText = " Version " + self.currentVersion
+        header = "Progress Report for " + repr(app) + currentText + ", compared to version " + self.referenceVersion
+        underline = ""
+        for i in range(len(header)):
+            underline += "-"
+        print os.linesep + header
+        print underline
     def __call__(self, test):
         # Values that must be present for a solution to be considered
         definingValues = [ costEntryName, timeEntryName ]
@@ -772,98 +782,6 @@ class TestReport(plugins.Action):
         return currentLogFile, refLogFile
     def getConstantItemsToExtract(self):
         return []
-
-class CalculateKPIs(TestReport):
-    def __init__(self, referenceVersion, listKPIs):
-        TestReport.__init__(self, referenceVersion)
-        self.KPIHandler = KPI.KPIHandler()
-        self.listKPIs = listKPIs
-        print '\nKPI order:\n'
-        for aKPIconst in listKPIs:
-            print self.KPIHandler.getKPIname(aKPIconst)
-        print ''
-    def __del__(self):
-        if self.KPIHandler.getNrOfKPIs() > 0:
-            print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, ":", os.linesep, self.KPIHandler.getAllGroupsKPIAverageText()
-        else:
-            print os.linesep, "No KPI tests were found with respect to version " + self.referenceVersion
-    def __repr__(self):
-        return "KPI calc. for"
-    def compare(self, test, referenceRun, currentRun):
-        referenceFile = referenceRun.logFile
-        currentFile = currentRun.logFile
-        floatRefPerfScale = getTestPerformance(test, self.referenceVersion) / 60
-        floatNowPerfScale = getTestPerformance(test, self.currentVersion) / 60
-        aKPI = None
-        listKPIs = []
-        for aKPIConstant in self.listKPIs:
-            aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile, floatRefPerfScale, floatNowPerfScale)
-            self.KPIHandler.addKPI(aKPI)
-            listKPIs.append(aKPI.getTextKPI())
-        self.describe(test, ' vs ver. %s, (%d sol. KPIs: %s)' %(self.referenceVersion, aKPI.getNofSolutions(), ', '.join(listKPIs)))
-    def setUpSuite(self, suite):
-        self.describe(suite)
-
-class WriteKPIData(TestReport):
-    def __init__(self, referenceVersion, listKPIs):
-        TestReport.__init__(self, referenceVersion)
-        self.KPIHandler = KPI.KPIHandler()
-        self.listKPIs = listKPIs
-    def __del__(self):
-        if self.KPIHandler.getNrOfKPIs() > 0:
-            print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, ":", os.linesep, self.KPIHandler.getAllGroupsKPIAverageText()
-        else:
-            print os.linesep, "No KPI tests were found with respect to version " + self.referenceVersion
-    def __repr__(self):
-        return ""
-    def compare(self, test, referenceRun, currentRun):
-        strCarmusr = '(Carmusr)%s' %(os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1])
-        listThisKPI = [strCarmusr]
-        referenceFile = referenceRun.logFile
-        currentFile = currentRun.logFile
-        floatRefPerfScale = getTestPerformance(test, self.referenceVersion) / 60
-        floatNowPerfScale = getTestPerformance(test, self.currentVersion) / 60
-        aKPI = None
-        listKPIData = []
-        for aKPIConstant in self.listKPIs:
-            aKPI = self.KPIHandler.createKPI(aKPIConstant, referenceFile, currentFile, floatRefPerfScale, floatNowPerfScale)
-            self.KPIHandler.addKPI(aKPI)
-            strCurve = 'REF(Curve)%s\nNOW(Curve)%s' %(aKPI.getTextCurve())
-            listThisKPI.append(strCurve)
-            strUncovered = 'REF(Uncovered)%s\nNOW(Uncovered)%s' %(aKPI.getTupFinalUncovered())
-            listThisKPI.append(strUncovered)
-            strDate = 'REF(Date)%s\nNOW(Date)%s' %(aKPI.getTupRunDate())
-            listThisKPI.append(strDate)
-            listKPIData.append(listThisKPI)
-        self.describe(test, os.linesep + string.join(listKPIData[0], os.linesep))
-    def setUpSuite(self, suite):
-        self.describe(suite)
-
-class MakeProgressReport(TestReport):
-    def __init__(self, referenceVersion):
-        TestReport.__init__(self, referenceVersion)
-        self.totalKpi = 1.0
-        self.testCount = 0
-        self.bestKpi = 1.0
-        self.worstKpi = 0.00001
-    def __del__(self):
-        if self.testCount > 0:
-            avg = math.pow(self.totalKpi, 1.0 / float(self.testCount))
-            print os.linesep, "Overall average KPI with respect to version", self.referenceVersion, "=", self.percent(avg)
-            print "Best KPI with respect to version", self.referenceVersion, "=", self.percent(self.bestKpi)
-            print "Worst KPI with respect to version", self.referenceVersion, "=", self.percent(self.worstKpi)
-    def __repr__(self):
-        return "Comparison on"
-    def setUpApplication(self, app):
-        currentText = ""
-        if self.currentVersion != None:
-            currentText = " Version " + self.currentVersion
-        header = "Progress Report for " + repr(app) + currentText + ", compared to version " + self.referenceVersion
-        underline = ""
-        for i in range(len(header)):
-            underline += "-"
-        print os.linesep + header
-        print underline
     def percent(self, fValue):
         if fValue != 0:
             return str(int(round(100.0 * fValue))) + "% or x" + str(round(1.0 / fValue, 2))

@@ -8,7 +8,10 @@ except ImportError:
     pass
 
 import sys, os
-sys.path.insert(0, os.path.dirname(sys.argv[0]))
+install_root = os.path.dirname(os.path.dirname(sys.argv[0]))
+libDir = os.path.join(install_root, "lib")
+if os.path.isdir(libDir):
+    sys.path.insert(0, libDir)
 
 from engine import TextTest
 program = TextTest()

@@ -5,7 +5,7 @@ and StackedBarChart class to deal with multiple data plotting
 for web pages. Only works for positive data values.
 Also provides a DataList class to support the data handling needed.
 """
-__version__ = '$Id: barchart.py,v 1.1 2006/05/19 10:33:05 johani Exp $'
+__version__ = '$Id: barchart.py,v 1.1 2007/02/22 17:02:50 geoff Exp $'
 __author__ = 'Robin Friedrich'
 __date__ = 'June 30, 1997'
 # barchart.py

@@ -1,4 +1,4 @@
-#'$Id: imgsize.py,v 1.1 2006/02/16 14:24:55 geoff Exp $'
+#'$Id: imgsize.py,v 1.1 2007/02/22 17:02:50 geoff Exp $'
 
 # COPYRIGHT (C) 1998  ROBIN FRIEDRICH  email:Robin.Friedrich@pdq.net
 # Permission to use, copy, modify, and distribute this software and

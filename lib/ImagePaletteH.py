@@ -1,6 +1,6 @@
 #
 # The Python Imaging Library.
-# $Id: ImagePaletteH.py,v 1.2 2006/12/14 11:59:38 johani Exp $
+# $Id: ImagePaletteH.py,v 1.1 2007/02/22 17:02:49 geoff Exp $
 #
 # image palette object
 #

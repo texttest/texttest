@@ -42,6 +42,10 @@ def startTimeString():
 
 textTestName = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0])
 
+def installationDir(name):
+    installationRoot = os.path.dirname(os.path.dirname(__file__))
+    return os.path.join(installationRoot, name)
+
 # Parse a time string, either a HH:MM:SS string, or a single int/float,
 # which is interpreted as a number of minutes, for backwards compatibility.
 # Observe that in either 'field' in the HH:MM:SS case, any number is allowed,

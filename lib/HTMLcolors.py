@@ -20,7 +20,7 @@ without dithering.  Numbered colors get darker as their numbers increase.
 There are 256 such colors in Netscape's colorcube but only visually distinct colors
 are set here.
 """
-__version__ = '$Id: HTMLcolors.py,v 1.1 2006/02/16 14:24:54 geoff Exp $'
+__version__ = '$Id: HTMLcolors.py,v 1.1 2007/02/22 17:02:49 geoff Exp $'
 GREY1,     GREY2,    GREY3,     GREY4,   GREY5,    GREY6 = \
 GRAY1,     GRAY2,    GRAY3,     GRAY4,   GRAY5,    GRAY6 = \
 '#EEEEEE','#DDDDDD','#CCCCCC','#BBBBBB','#AAAAAA','#999999'

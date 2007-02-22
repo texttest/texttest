@@ -192,7 +192,7 @@ class GUIStatusMonitor(SubGUI):
         self.label.set_use_markup(True)
         self.label.set_markup(plugins.convertForMarkup("TextTest started at " + plugins.localtime() + "."))
         hbox.pack_start(self.label, expand=False, fill=False)
-        imageDir = os.path.join(os.path.dirname(__file__), "images")
+        imageDir = plugins.installationDir("images")
         try:
             staticIcon = os.path.join(imageDir, "throbber_inactive.png")
             temp = gtk.gdk.pixbuf_new_from_file(staticIcon)
@@ -618,10 +618,11 @@ class MenuBarGUI(SubGUI):
     def getGUIDescriptionFileName(self):
         userFileName = self.getUserGUIDescriptionFileName()
         if not userFileName:
+            layoutDir = plugins.installationDir("layout")
             if self.dynamic:
-                return os.path.join(os.path.dirname(__file__), "standard_gui_dynamic.xml")
+                return os.path.join(layoutDir, "standard_gui_dynamic.xml")
             else:
-                return os.path.join(os.path.dirname(__file__), "standard_gui_static.xml")
+                return os.path.join(layoutDir, "standard_gui_static.xml")
         else:
             return userFileName
     def getUserGUIDescriptionFileName(self):

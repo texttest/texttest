@@ -1,6 +1,6 @@
 #
 # The Python Imaging Library.
-# $Id: ImageH.py,v 1.1 2006/02/16 14:24:54 geoff Exp $
+# $Id: ImageH.py,v 1.1 2007/02/22 17:02:49 geoff Exp $
 #
 # the Image class wrapper
 #

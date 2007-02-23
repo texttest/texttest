@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, string, types, time
+import plugins, os, sys, shutil, string, types, time, paths
 from copy import copy
 from threading import Thread
 from glob import glob
@@ -117,6 +117,8 @@ class InteractiveAction(plugins.Observable):
             return []
         else:
             return [ self.optionGroup ]
+    def createOptionGroupTab(self, optionGroup):
+        return optionGroup.switches or optionGroup.options
     def updateForStateChange(self, test, state):
         return False, False
     def updateForSelectionChange(self):
@@ -1038,9 +1040,10 @@ class SaveSelection(SelectionAction):
         apps = guiConfig.apps
         dirs = apps[0].configObject.getFilterFileDirectories(apps)
         if len(dirs) > 0:
-            return (dirs, dirs[0][1])
+            self.folders = (dirs, dirs[0][1])
         else:
-            return (dirs, None)
+            self.folders = (dirs, None)
+        return self.folders
     def saveActualTests(self):
         return guiConfig.dynamic or self.saveTestList
     def getTextToSave(self):
@@ -1058,8 +1061,49 @@ class SaveSelection(SelectionAction):
         except IOError, e:
             raise plugins.TextTestError, "\nFailed to save selection:\n" + str(e) + "\n"
     def messageAfterPerform(self):
-        return "Saved " + self.describeTests() + " in file '" + self.fileName+ "'."
+        nameToPresent = paths.getRelativeOrAbsolutePath(self.folders[0], self.fileName)
+        return "Saved " + self.describeTests() + " in file '" + nameToPresent + "'."
 
+class LoadSelection(SelectTests):
+    def __init__(self, commandOptionGroups):
+        SelectTests.__init__(self, commandOptionGroups)
+        self.fileName = ""
+    def hasBuiltInGUIDescription(self):
+        return True
+    def getStockId(self):
+        return "open"
+    def _getTitle(self):
+        return "_Load Selection..."
+    def _getScriptTitle(self):
+        return "Load test selection from file"
+    def getGroupTabTitle(self):
+        return ""
+    def createOptionGroupTab(self, optionGroup):
+        return False
+    def getDialogType(self):
+        return "guidialogs.LoadSelectionDialog"
+    def getDirectories(self):
+        self.folders = SelectTests.getDirectories(self, "Tests listed in file")
+        return self.folders
+    def performOnCurrent(self):
+        if self.fileName:
+            oldFileName = self.optionGroup.getOption("f").getValue()
+            oldSwitchValue = self.optionGroup.getSwitch("select_in_collapsed_suites").getValue()
+            try:
+                self.optionGroup.getOption("f").setValue(paths.getRelativeOrAbsolutePath(self.folders[0], self.fileName))
+                self.optionGroup.getSwitch("select_in_collapsed_suites").setValue(1)        
+                SelectTests.performOnCurrent(self)
+            finally:
+                self.optionGroup.getOption("f").setValue(oldFileName)
+                self.optionGroup.getSwitch("select_in_collapsed_suites").setValue(oldSwitchValue)        
+    def messageBeforePerform(self):
+        return "Loading test selection ..."
+    def messageAfterPerform(self):
+        if self.fileName:
+            nameToPresent = paths.getRelativeOrAbsolutePath(self.folders[0], self.fileName)
+            return "Loaded test selection from file '" + nameToPresent + "'."
+        else:
+            return "No test selection loaded."
 
 class RunningAction(SelectionAction):
     runNumber = 1
@@ -1725,7 +1769,7 @@ class InteractiveActionHandler:
                                      SortTestSuiteFileAscending, SortTestSuiteFileDescending, \
                                      RepositionTestFirst, RepositionTestUp, \
                                      RepositionTestDown, RepositionTestLast, \
-                                     ReconnectToTests, SaveSelection ]
+                                     ReconnectToTests, LoadSelection, SaveSelection ]
         self.actionPostClasses = []
         self.loadModules = [] # derived configurations add to this on being imported...
         self.optionGroupMap = {}
@@ -1739,6 +1783,7 @@ class InteractiveActionHandler:
         for group in optionGroups:
             if group.name.startswith("Select"):
                 self.optionGroupMap[SelectTests] = [ group ]
+                self.optionGroupMap[LoadSelection] = [ group ]
                 self.optionGroupMap[SaveSelection] = [ group ]
     def getMode(self, dynamic):
         if dynamic:

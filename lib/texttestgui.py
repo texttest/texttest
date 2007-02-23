@@ -388,7 +388,7 @@ class TextTestGUI(Responder, plugins.Observable):
         for action in self.intvActions:
             actionGUI = self.createActionGUIForTab(action)
             for optionGroup in action.getOptionGroups():
-                if optionGroup.switches or optionGroup.options:
+                if action.createOptionGroupTab(optionGroup):
                     actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
         return actionTabGUIs
 
@@ -465,7 +465,12 @@ class TopWindowGUI(ContainerGUI):
                 self.appNames.append(suite.app.fullName)
     def createView(self):
         # Create toplevel window to show it all.
-        self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)        
+        try:
+            import stockitems
+            stockitems.register(self.topWindow)
+        except:
+            printWarning("Failed to register texttest stock icons.")
         global globalTopWindow
         globalTopWindow = self.topWindow
         if self.dynamic:

@@ -217,7 +217,71 @@ class SaveSelectionDialog(ActionConfirmationDialog):
             self.okMethod()
         else:
             self.cancelMethod()
-            
+
+class LoadSelectionDialog(ActionConfirmationDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin):
+        self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_OPEN)
+        self.plugin = plugin
+        self.folders, defaultFolder = self.plugin.getDirectories()
+        self.startFolder = os.getcwd() # Just to make sure we always have some dir ...
+        if defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
+            self.startFolder = os.path.abspath(defaultFolder)
+        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        self.dialog.set_modal(True)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+    def createButtons(self):
+        self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
+        self.okButton = self.dialog.add_button("texttest-stock-load", gtk.RESPONSE_ACCEPT)
+        scriptEngine.registerFileChooser("choose to load from file ", self.fileChooser, self.okButton, self.folders)
+        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
+        scriptEngine.connect("press load", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
+        self.fileChooser.connect("file-activated", self.simulateOKClick)
+
+        # The OK button is what we monitor in the scriptEngine, so simulate that it is pressed ...
+    def simulateOKClick(self, filechooser):
+        self.okButton.clicked()
+
+    def addContents(self):
+        alignment = gtk.Alignment()
+        alignment.set(1.0, 1.0, 1.0, 1.0)
+        alignment.set_padding(5, 5, 5, 5)
+        vbox = gtk.VBox()
+        alignment.add(vbox)
+        self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
+
+        # We want a filechooser dialog to let the user choose where, and
+        # with which name, to save the selection.
+        self.fileChooser.set_current_folder(self.startFolder)
+        for i in xrange(len(self.folders) - 1, -1, -1):
+            self.fileChooser.add_shortcut_folder(self.folders[i][1])
+        self.fileChooser.set_local_only(True)
+        vbox.pack_start(self.fileChooser, expand=True, fill=True)
+        parentSize = self.parent.get_size()
+        self.dialog.resize(int(parentSize[0] / 1.2), int(parentSize[0] / 1.7))
+
+    def run(self):
+        self.addContents()
+        self.dialog.show_all()
+
+    def respond(self, button, saidOK, *args):
+        if saidOK:
+            self.setOptionsAndExit(saidOK)
+        else:
+            self.doExit(saidOK)
+
+    def setOptionsAndExit(self, saidOK):
+        self.plugin.fileName = self.fileChooser.get_filename()
+        self.doExit(saidOK)
+        
+    def doExit(self, saidOK):
+        self.dialog.hide()
+        self.dialog.response(gtk.RESPONSE_NONE)
+        if saidOK:
+            self.okMethod()
+        else:
+            self.cancelMethod()
+           
 class RenameDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
         ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)

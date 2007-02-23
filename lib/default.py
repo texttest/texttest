@@ -526,6 +526,7 @@ class Config(plugins.Configuration):
         dict["select"] = "<control>s"
         dict["save"] = "<control>s"
         dict["save_selection"] = "<control><shift>s"
+        dict["load_selection"] = "<control><shift>o"
         dict["reset"] = "<control>e"
         dict["reconnect"] = "<control><shift>r"
         dict["run"] = "<control>r"

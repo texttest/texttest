@@ -2,6 +2,8 @@
 
   <menubar name="MainMenuBar">
     <menu name="filemenu" action="filemenu">
+      <menuitem name="Load Selection..." action="Load Selection..."/>
+      <separator/>
       <menuitem name="Save Selection..." action="Save Selection..."/>
       <separator/>
       <menuitem name="Quit" action="Quit"/>

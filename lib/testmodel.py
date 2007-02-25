@@ -181,8 +181,9 @@ class Test(plugins.Observable):
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started", freeText=self.getDescription())
     def getDescription(self):
-        if self.description:
-            return self.description
+        description = plugins.extractComment(self.description)
+        if description:
+            return description
         else:
             return "<No description provided>"
     def readEnvironment(self):
@@ -343,43 +344,44 @@ class Test(plugins.Observable):
             tests = plugins.readListWithComments(testSuiteFileName)            
             try:
                 thisIndex = tests.index(self.name)
-                newEntry = seqdict()
-                newEntry[newName] = newDescription
+                newEntry = seqdict()                
+                newEntry[newName] = plugins.replaceComment(tests[self.name], newDescription)
                 del tests[self.name]
                 tests.insert(thisIndex, newEntry)
                 self.parent.writeNewTestSuiteFile(testSuiteFileName, tests)
             except:
                 pass # The test wasn't present in this version ...
 
-        # Create new directory, copy files ...
-        # (we don't want to rename dir, that can confuse CVS ...)
-        newDir = self.parent.makeSubDirectory(newName)
-        stdFiles, defFiles = self.listStandardFiles(allVersions=True)
-        for sourceFile in stdFiles + defFiles:
-            dirname, local = os.path.split(sourceFile)
-            if dirname == self.getDirectory():
-                targetFile = os.path.join(newDir, local)
-                shutil.copy2(sourceFile, targetFile)
-        dataFiles = self.listDataFiles()
-        for sourcePath in dataFiles:
-            if os.path.isdir(sourcePath):
-                continue
-            targetPath = sourcePath.replace(self.getDirectory(), newDir)
-            plugins.ensureDirExistsForFile(targetPath)
-            shutil.copy2(sourcePath, targetPath)
+        # Create new directory, copy files if the new name is new (we might have
+        # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
+        if self.name != newName:
+            newDir = self.parent.makeSubDirectory(newName)
+            stdFiles, defFiles = self.listStandardFiles(allVersions=True)
+            for sourceFile in stdFiles + defFiles:
+                dirname, local = os.path.split(sourceFile)
+                if dirname == self.getDirectory():
+                    targetFile = os.path.join(newDir, local)
+                    shutil.copy2(sourceFile, targetFile)
+            dataFiles = self.listDataFiles()
+            for sourcePath in dataFiles:
+                if os.path.isdir(sourcePath):
+                    continue
+                targetPath = sourcePath.replace(self.getDirectory(), newDir)
+                plugins.ensureDirExistsForFile(targetPath)
+                shutil.copy2(sourcePath, targetPath)
 
-        # Administration to get the new test in the GUI ...
-        cache = DirectoryCache(newDir)
-        if self.classId() == "test-case":
-            test = TestCase(newName, newDescription, cache, self.app, self.parent)
-        else:
-            test = TestSuite(newName, newDescription, cache, self.app, self.parent)
-        test.setObservers(self.observers)
-        currIndex = self.parent.testcases.index(self)
-        self.parent.testcases.insert(currIndex, test)
-        test.readEnvironment()
-        test.notify("Add")
-        self.parent.removeTest(self, False)
+            # Administration to get the new test in the GUI ...
+            cache = DirectoryCache(newDir)
+            if self.classId() == "test-case":
+                test = TestCase(newName, newDescription, cache, self.app, self.parent)
+            else:
+                test = TestSuite(newName, newDescription, cache, self.app, self.parent)
+            test.setObservers(self.observers)
+            currIndex = self.parent.testcases.index(self)
+            self.parent.testcases.insert(currIndex, test)
+            test.readEnvironment()
+            test.notify("Add")
+            self.parent.removeTest(self, False)
         self.parent.contentChanged()
     def setUpEnvVariable(self, var, value):
         if os.environ.has_key(var):
@@ -870,7 +872,7 @@ class TestSuite(Test):
         if len(comment) == 0:
             return testName
         else:
-            return "\n# " + comment.replace("\n", "\n# ") + "\n" + testName
+            return "\n# " + comment.replace("\n", "\n# ").replace("# __EMPTYLINE__", "") + "\n" + testName
     def removeFromTestFile(self, testName):
         # Remove from all versions, since we've removed the actual
         # test dir, it's useless to keep the test anywhere ... 

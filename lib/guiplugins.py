@@ -1376,7 +1376,7 @@ class CopyTest(ImportTest):
     def getDefaultDesc(self):
         if self.testToCopy:
             if len(self.testToCopy.description) > 0:
-                return self.testToCopy.description
+                return plugins.extractComment(self.testToCopy.description)
             else:
                 return "Copy of " + self.testToCopy.name
         else:
@@ -1718,7 +1718,7 @@ class RenameTest(InteractiveAction):
     def getDialogType(self):
         if len(self.currTestSelection) == 1:
             self.newName = self.currTestSelection[0].name
-            self.newDescription = self.currTestSelection[0].description
+            self.newDescription = plugins.extractComment(self.currTestSelection[0].description)
         else:
             self.newName = ""
             self.newDescription = ""
@@ -1732,9 +1732,16 @@ class RenameTest(InteractiveAction):
     def _getScriptTitle(self):
         return "Rename selected test"
     def messageAfterPerform(self):
-        message = "Renamed test " + self.oldName + " to " + self.newName
-        if self.oldDescription != self.newDescription:
-            message += " and changed description"
+        if self.oldName != self.newName:
+            message = "Renamed test " + self.oldName + " to " + self.newName
+            if self.oldDescription != self.newDescription:
+                message += " and changed description."
+            else:
+                message += "."
+        elif self.newDescription != self.oldDescription:
+            message = "Changed description of test " + self.oldName + "."
+        else:
+            message = "Nothing changed."
         return message
     def checkNewName(self):
         if self.newName == self.currTestSelection[0].name:
@@ -1752,7 +1759,8 @@ class RenameTest(InteractiveAction):
         return ("", False)
     def performOnCurrent(self):
         try:
-            self.currTestSelection[0].rename(self.newName, self.newDescription)
+            if self.newName != self.oldName or self.newDescription != self.oldDescription:
+                self.currTestSelection[0].rename(self.newName, self.newDescription)
         except IOError, e:
             raise plugins.TextTestError, "Failed to rename test:\n" + str(e)
         except OSError, e:

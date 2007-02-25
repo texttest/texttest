@@ -549,6 +549,8 @@ def readList(filename):
         if len(line) > 0 and not line.startswith("#"):
             items.append(line)
     return items
+
+emptyLineSymbol = "__EMPTYLINE__"
   
 def readListWithComments(filename, duplicateMethod=None):
     items = seqdict()
@@ -556,7 +558,8 @@ def readListWithComments(filename, duplicateMethod=None):
     for longline in open(filename).readlines():
         line = longline.strip()
         if len(line) == 0:
-            currComment = ""
+            if currComment:
+                currComment += emptyLineSymbol + "\n"
             continue
         if line.startswith("#"):
             currComment += longline[1:].lstrip()
@@ -566,7 +569,31 @@ def readListWithComments(filename, duplicateMethod=None):
             else:
                 items[line] = currComment.strip()
             currComment = ""
+    # Rescue dangling comments in the end (but put them before last test ...)
+    if currComment and len(items) > 0:
+        lastPos = len(items) - 1
+        items[items.keys()[lastPos]] = currComment + items[items.keys()[lastPos]]
     return items
+
+# comment can contain lines with __EMPTYLINE__ (see above) as a separator
+# from free comments, or commented out tests. This method extracts the comment
+# after any __EMPTYLINE__s.
+def extractComment(comment):
+    lastEmptyLinePos = comment.rfind(emptyLineSymbol)
+    if lastEmptyLinePos == -1:
+        return comment
+    else:
+        return comment[lastEmptyLinePos + len(emptyLineSymbol) + 1:]
+
+# comment can contain lines with __EMPTYLINE__ (see above) as a separator
+# from free comments, or commented out tests. This method replaces the real
+# comment for this test with newComment
+def replaceComment(comment, newComment):
+    lastEmptyLinePos = comment.rfind(emptyLineSymbol)
+    if lastEmptyLinePos == -1:
+        return newComment
+    else:
+        return comment[0:lastEmptyLinePos + len(emptyLineSymbol) + 1] + newComment
 
 def chdir(dir):
     ensureDirectoryExists(dir)

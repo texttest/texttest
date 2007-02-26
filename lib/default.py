@@ -608,7 +608,6 @@ class TestEnvironmentCreator:
         self.test = test
         self.optionMap = optionMap
         self.usecaseFile = self.test.getFileName("usecase")
-        self.inputFile = self.test.getFileName("input")
         self.diagDict = self.test.getConfigValue("diagnostics")
         self.diag = plugins.getDiagnostics("Environment Creator")
     def setUp(self, runsTests):
@@ -680,9 +679,9 @@ class TestEnvironmentCreator:
         usecaseFile = self.findReplayUseCase()
         if usecaseFile:
             self.setReplay(usecaseFile)
-        if self.usecaseFile or self.isRecording() or self.inputFile:
+        if self.usecaseFile or self.isRecording():
             # Re-record if recorded files are already present or recording explicitly requested
-            self.setRecord(self.test.makeTmpFileName("usecase"), self.test.makeTmpFileName("input"))
+            self.setRecord(self.test.makeTmpFileName("usecase"))
     def isRecording(self):
         return self.optionMap.has_key("record")
     def findReplayUseCase(self):
@@ -712,18 +711,13 @@ class TestEnvironmentCreator:
                 self.addJusecaseProperty("delay", str(replaySpeed))
             else:
                 self.test.setEnvironment("USECASE_REPLAY_DELAY", str(replaySpeed))
-    def setRecord(self, recordScript, recinpScript = None):
+    def setRecord(self, recordScript):
         self.diag.info("Enabling recording")
         if recordScript:
             if self.useJavaRecorder():
                 self.addJusecaseProperty("record", recordScript)
             else:
                 self.test.setEnvironment("USECASE_RECORD_SCRIPT", recordScript)
-        if recinpScript:
-            if self.useJavaRecorder():
-                self.addJusecaseProperty("record_stdin", recinpScript)
-            else:
-                self.test.setEnvironment("USECASE_RECORD_STDIN", recinpScript)
     
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
@@ -1182,8 +1176,6 @@ class RunTest(plugins.Action):
         runningClass = WindowsRunning
     def __init__(self):
         self.diag = plugins.getDiagnostics("run test")
-        self.shellTitle = None
-        self.holdShell = False
     def __repr__(self):
         return "Running"
     def __call__(self, test, inChild=0):
@@ -1220,7 +1212,7 @@ class RunTest(plugins.Action):
             return
 
         self.diag.info("Running test with command : " + testCommand)
-        process = plugins.BackgroundProcess(testCommand, shellTitle=self.shellTitle, holdShell=self.holdShell)
+        process = plugins.BackgroundProcess(testCommand)
         if not inChild:
             self.changeToRunningState(test, process)
         return self.RETRY
@@ -1236,14 +1228,6 @@ class RunTest(plugins.Action):
         if interpreter:
             testCommand = interpreter + " " + testCommand
         testCommand += self.getOptions(test)
-        if self.shellTitle:
-            if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
-                # self-testing... rather cheating really...
-                dir, file = os.path.split(os.environ["USECASE_REPLAY_SCRIPT"])
-                stem, ext = file.split(".", 1)
-                testCommand += " < " + os.path.join(dir, "target_input." + ext)
-            # Replaying in a shell, need everything visible...
-            return testCommand
         testCommand += " < " + self.getInputFile(test)
         outfile = test.makeTmpFileName("output")
         testCommand += " > " + outfile
@@ -1255,21 +1239,14 @@ class RunTest(plugins.Action):
         inputFileName = test.getFileName("input")
         if inputFileName:
             return inputFileName
-        if os.name == "posix":
-            return "/dev/null"
         else:
-            return "nul"
+            return plugins.nullFileName()
     def getInterruptActions(self, fetchResults):
         return [ KillTest() ]
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
         app.checkBinaryExists()
-        if app.inputOptions.has_key("record"):
-            recordMode = app.getConfigValue("use_case_record_mode")
-            if recordMode == "console":
-                self.shellTitle = "Running " + app.fullName + " in order to capture user actions..."
-                self.holdShell = app.inputOptions.has_key("holdshell")
 
 class Killed(plugins.TestState):
     def __init__(self, briefText, freeText, prevState):

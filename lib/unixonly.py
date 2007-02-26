@@ -16,19 +16,15 @@ class RunTest(default.RunTest):
         return retValue
     def getExecuteCommand(self, test):
         testCommand = default.RunTest.getExecuteCommand(self, test)
-        selfTestStdin = self.shellTitle and os.environ.has_key("USECASE_REPLAY_SCRIPT")
             
-        if not selfTestStdin and not self.hasAutomaticCputimeChecking(test.app):
+        if not self.hasAutomaticCputimeChecking(test.app):
             return testCommand # Don't bother with this if we aren't measuring CPU time!
         
         # put the command in a file to avoid quoting problems,
         cmdFile = test.makeTmpFileName("cmd", forFramework=1)
         self.buildCommandFile(test, cmdFile, testCommand)
         unixPerfFile = test.makeTmpFileName("unixperf", forFramework=1)
-        if selfTestStdin:
-            return 'sh ' + cmdFile
-        else:
-            return '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
+        return '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
     def buildCommandFile(self, test, cmdFile, testCommand):
         f = plugins.openForWrite(cmdFile)
         f.write(testCommand + "\n")

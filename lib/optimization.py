@@ -273,14 +273,32 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         overrides = self.getAllOverrides()
         if len(overrides) == 0:
             return False
-        
+
+        overridesWithSections = self.pairWithSections(overrides)
         file = open(targetFile, 'w')
+        activeOverrides = []
         for line in open(sourceFile).xreadlines():
-            if line.find("<SETS>") != -1:
-                for override in overrides:
+            if self.isSection(line.strip()):
+                for override in activeOverrides:
                     file.write(override)
+                activeOverrides = overridesWithSections.get(line.strip(), [])
+                self.diag.info("Found section " + line.strip() + ", contains overrides " + repr(activeOverrides))
             file.write(line)
         return True
+    def isSection(self, line):
+        return line.startswith("SECTION ") or (line.startswith("<") and line.endswith(">"))
+    def pairWithSections(self, overrides):
+        results = seqdict()
+        activeSection = "<PARAMETERS>"
+        results[activeSection] = []
+        for override in overrides:
+            if self.isSection(override):
+                activeSection = override.strip()
+                results[activeSection] = []
+            else:
+                results[activeSection].append(override)
+                self.diag.info("Adding '" + override + "' to section " + activeSection)
+        return results
     def getAllOverrides(self):
         allOverrides = []
         for overrideItems in self.raveParameters:

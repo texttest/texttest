@@ -102,8 +102,8 @@ class GenerateWebPages:
         allFiles = []
         for root, dirs, files in os.walk(dir):
             currFiles = filter(lambda file: file.startswith("teststate"), files)
-            currFiles.sort()
             allFiles += [ os.path.join(root, file) for file in currFiles ]
+        allFiles.sort()
         return allFiles
     def removePageVersion(self, version):
         leftVersions = []

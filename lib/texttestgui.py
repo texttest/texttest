@@ -29,7 +29,7 @@ from respond import Responder
 from copy import copy
 
 import guidialogs
-from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog, DoubleCheckDialog
+from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog
 
 import traceback
 
@@ -1274,18 +1274,14 @@ class ActionGUI(SubGUI):
     def runInteractive(self, *args):
         if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
             return
-        doubleCheckMessage = self.catchErrorsFor(self.action.getDoubleCheckMessage)
-        if doubleCheckMessage:
-            self.dialog = DoubleCheckDialog(doubleCheckMessage, self._runInteractive, self._dontRun, globalTopWindow)
-        elif doubleCheckMessage is not None:
-            dialogType = self.action.getDialogType()
+        dialogType = self.catchErrorsFor(self.action.getDialogType)
+        if dialogType is not None:
             if dialogType:
                 dialogClass = eval(dialogType)
                 dialog = dialogClass(globalTopWindow, self._runInteractive, self._dontRun, self.action)
                 dialog.run()
             else:
                 self._runInteractive()
-
     def _dontRun(self):
         statusMonitor.notifyStatus("Action cancelled.")
     def _runInteractive(self):

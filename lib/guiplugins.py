@@ -169,7 +169,11 @@ class InteractiveAction(plugins.Observable):
     def getTooltip(self):
         return self.getScriptTitle(False)
     def getDialogType(self): # The dialog type to launch on action execution.
-        return ""
+        self.confirmationMessage = self.getConfirmationMessage()
+        if self.confirmationMessage:
+            return "guidialogs.YesNoDialog"
+        else:
+            return ""
     def getTitle(self, includeMnemonics=False):
         title = self._getTitle()
         if includeMnemonics:
@@ -183,7 +187,7 @@ class InteractiveAction(plugins.Observable):
         pass
     def messageAfterPerform(self):
         return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
-    def getDoubleCheckMessage(self):
+    def getConfirmationMessage(self):
         return ""
     def getTabTitle(self):
         return self.getGroupTabTitle()
@@ -286,7 +290,7 @@ class Quit(InteractiveAction):
     def performOnCurrent(self):
         # Generate a window closedown, so that the quit button behaves the same as closing the window
         self.notify("Exit")
-    def getDoubleCheckMessage(self):
+    def getConfirmationMessage(self):
         processesToReport = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         runningProcesses = processTerminationMonitor.listRunning(processesToReport)
         if len(runningProcesses) == 0:
@@ -594,7 +598,7 @@ class ImportTest(InteractiveTestAction):
         self.optionGroup.addOption("desc", self.getDescTitle(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
         self.testImported = None
-    def getDoubleCheckMessage(self):
+    def getConfirmationMessage(self):
         testName = self.getNewTestName()
         suite = self.getDestinationSuite()
         self.checkName(suite, testName)
@@ -1318,7 +1322,7 @@ class RemoveTests(SelectionAction):
         return "delete"
     def _getScriptTitle(self):
         return "Remove selected tests"
-    def getDoubleCheckMessage(self):
+    def getConfirmationMessage(self):
         if len(self.currTestSelection) == 1:
             currTest = self.currTestSelection[0]
             if currTest.classId() == "test-case":

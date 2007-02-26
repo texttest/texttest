@@ -50,7 +50,7 @@ def showErrorDialog(message, parent=None):
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_ERROR), expand=True, fill=True)
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show_all()
-    dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
+    dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
 def showWarningDialog(message, parent=None):
     guilog.info("WARNING: " + message)
@@ -59,7 +59,7 @@ def showWarningDialog(message, parent=None):
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_WARNING), expand=True, fill=True)
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show_all()
-    dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
+    dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
 def showInformationDialog(message, parent=None):
     guilog.info("INFORMATION: " + message)
@@ -68,33 +68,7 @@ def showInformationDialog(message, parent=None):
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_INFO), expand=True, fill=True)
     scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show_all()
-    dialog.action_area.get_children()[len(dialog.action_area.get_children()) - 1].grab_focus()
-
-class DoubleCheckDialog:
-    def __init__(self, message, yesMethod, noMethod=None, parent=None):
-        self.dialog = gtk.Dialog("TextTest Query", parent, flags=gtk.DIALOG_MODAL)
-        self.yesMethod = yesMethod
-        self.noMethod = noMethod
-        guilog.info("QUERY: " + message)
-        noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
-        yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        self.dialog.set_modal(True)
-        self.dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_QUESTION), expand=True, fill=True)
-        # ScriptEngine cannot handle different signals for the same event (e.g. response
-        # from gtk.Dialog), so we connect the individual buttons instead ...
-        scriptEngine.connect("answer no to texttest query", "clicked", noButton, self.respond, gtk.RESPONSE_NO, False)
-        scriptEngine.connect("answer yes to texttest query", "clicked", yesButton, self.respond, gtk.RESPONSE_YES, True)
-        self.dialog.show_all()
-        self.dialog.set_default_response(gtk.RESPONSE_NO)
-        self.dialog.action_area.get_children()[len(self.dialog.action_area.get_children()) - 1].grab_focus()
-
-    def respond(self, button, saidYes, *args):
-        self.dialog.hide()
-        self.dialog.response(gtk.RESPONSE_NONE)
-        if saidYes:
-            self.yesMethod()
-        elif self.noMethod:
-            self.noMethod()
+    dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
 #
 # A skeleton for a dialog which can replace the 'tab options' of
@@ -110,9 +84,12 @@ class ActionConfirmationDialog:
         self.plugin = plugin
         self.okMethod = okMethod
         self.cancelMethod = cancelMethod
-        self.dialog = gtk.Dialog(self.plugin.getScriptTitle(None), parent, flags=gtk.DIALOG_MODAL)
+        self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL)
         self.createButtons()
         self.dialog.set_modal(True)
+
+    def getDialogTitle(self):
+        return self.plugin.getScriptTitle(None)
         
     def createButtons(self):
         self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
@@ -131,7 +108,30 @@ class ActionConfirmationDialog:
     def run(self):
         self.addContents()
         self.dialog.show_all()
-        
+       
+class YesNoDialog(ActionConfirmationDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin, message = None):
+        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        if self.plugin:
+            self.message = self.plugin.confirmationMessage
+        else:
+            self.message = message
+        guilog.info("QUERY: " + self.message)
+        self.dialog.set_default_response(gtk.RESPONSE_NO)
+
+    def getDialogTitle(self):
+        return "TextTest Query"
+
+    def createButtons(self):
+        noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
+        yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
+        scriptEngine.connect("answer no to texttest query", "clicked", noButton, self.respond, gtk.RESPONSE_NO, False)
+        scriptEngine.connect("answer yes to texttest query", "clicked", yesButton, self.respond, gtk.RESPONSE_YES, True)
+
+    def addContents(self):
+        self.dialog.vbox.pack_start(createDialogMessage(self.message,
+                                                        gtk.STOCK_DIALOG_QUESTION), expand=True, fill=True)        
+
 class SaveSelectionDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
         self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_SAVE)
@@ -197,7 +197,8 @@ class SaveSelectionDialog(ActionConfirmationDialog):
                 self.fileChooser.set_current_name("filename_mandatory")
                 return                
             if os.path.exists(self.fileChooser.get_filename()):
-                confirmation = DoubleCheckDialog("\nThe file \n" + self.fileChooser.get_filename() + "\nalready exists.\n\nDo you want to overwrite it?\n", lambda : self.setOptionsAndExit(saidOK))
+                confirmation = YesNoDialog(lambda : self.setOptionsAndExit(saidOK), None, None, "\nThe file \n" + self.fileChooser.get_filename() + "\nalready exists.\n\nDo you want to overwrite it?\n")
+                confirmation.run()
             else:
                 self.setOptionsAndExit(saidOK)
         else:
@@ -322,7 +323,8 @@ class RenameDialog(ActionConfirmationDialog):
                 showErrorDialog(message, self.dialog)
                 return
             elif message:
-                dialog = DoubleCheckDialog(message, lambda: ActionConfirmationDialog.respond(self, button, saidOK, *args))
+                dialog = YesNoDialog(lambda: ActionConfirmationDialog.respond(self, button, saidOK, *args), None, None, message)
+                dialog.run()
                 return
         ActionConfirmationDialog.respond(self, button, saidOK, *args)
         

@@ -156,15 +156,19 @@ class ApplicationRunner:
         self.actionSequence = newActionSequence
     def setUpApplications(self, sequence):
         self.testSuite.setUpEnvironment()
-        for action in sequence:
-            self.diag.info("Performing " + str(action) + " set up on " + repr(self.testSuite.app))
-            try:
-                action.setUpApplication(self.testSuite.app)
-            except KeyboardInterrupt:
-                raise
-            except:
-                self.handleFailedSetup()
-        self.testSuite.tearDownEnvironment()
+        try:
+            for action in sequence:
+                self.setUpApplicationFor(action)
+        finally:
+            self.testSuite.tearDownEnvironment()
+    def setUpApplicationFor(self, action):
+        self.diag.info("Performing " + str(action) + " set up on " + repr(self.testSuite.app))
+        try:
+            action.setUpApplication(self.testSuite.app)
+        except KeyboardInterrupt:
+            raise
+        except:
+            self.handleFailedSetup()
     def handleFailedSetup(self):
         message = str(sys.exc_value)
         if sys.exc_type != plugins.TextTestError:

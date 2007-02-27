@@ -100,9 +100,9 @@ class ActionConfirmationDialog:
     def respond(self, button, saidOK, *args):
         self.dialog.hide()
         self.dialog.response(gtk.RESPONSE_NONE)
-        if saidOK:
+        if saidOK and self.okMethod:
             self.okMethod()
-        else:
+        elif self.cancelMethod:
             self.cancelMethod()
 
     def run(self):
@@ -197,7 +197,7 @@ class SaveSelectionDialog(ActionConfirmationDialog):
                 self.fileChooser.set_current_name("filename_mandatory")
                 return                
             if os.path.exists(self.fileChooser.get_filename()):
-                confirmation = YesNoDialog(lambda : self.setOptionsAndExit(saidOK), None, None, "\nThe file \n" + self.fileChooser.get_filename() + "\nalready exists.\n\nDo you want to overwrite it?\n")
+                confirmation = YesNoDialog(self.dialog, lambda : self.setOptionsAndExit(saidOK), None, None, "\nThe file \n" + self.fileChooser.get_filename() + "\nalready exists.\n\nDo you want to overwrite it?\n")
                 confirmation.run()
             else:
                 self.setOptionsAndExit(saidOK)
@@ -323,7 +323,7 @@ class RenameDialog(ActionConfirmationDialog):
                 showErrorDialog(message, self.dialog)
                 return
             elif message:
-                dialog = YesNoDialog(lambda: ActionConfirmationDialog.respond(self, button, saidOK, *args), None, None, message)
+                dialog = YesNoDialog(self.dialog, lambda: ActionConfirmationDialog.respond(self, button, saidOK, *args), None, None, message)
                 dialog.run()
                 return
         ActionConfirmationDialog.respond(self, button, saidOK, *args)

@@ -131,16 +131,9 @@ class MatadorConfig(optimization.OptimizationConfig):
         return diagDir
     def setApplicationDefaults(self, app):
         optimization.OptimizationConfig.setApplicationDefaults(self, app)
-        self.itemNamesInFile[optimization.memoryEntryName] = "Memory"
+        self.itemNamesInFile[optimization.memoryEntryName] = "Memory consumption"
         self.itemNamesInFile[optimization.newSolutionMarker] = "Creating solution"
         self.itemNamesInFile[optimization.solutionName] = "Solution\."
-        self.itemNamesInFile["unassigned slots"] = "slots \(unassigned\)"
-        # Add here list of entries that should not increase, paired with the methods not to check
-        self.noIncreaseExceptMethods[optimization.costEntryName] = [ "SolutionLegaliser", "initial" ]
-        self.noIncreaseExceptMethods["crew with illegal rosters"] = []
-        self.noIncreaseExceptMethods["broken hard trip constraints"] = [ "MaxRoster" ]
-        self.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
-        self.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]
         app.setConfigDefault("diagnostics", self.getDiagnosticSettings())
     def getCarmenEnvironment(self, app):
         envVars = optimization.OptimizationConfig.getCarmenEnvironment(self, app)

@@ -229,6 +229,7 @@ class ApcConfig(optimization.OptimizationConfig):
         app.setConfigDefault("link_libs", "")
         app.setConfigDefault("extract_logs", {})
         app.setConfigDefault("apcinfo", {})
+        app.addConfigEntry("select_kpi_group", "<control>k", "gui_accelerators")
     def getDefaultCollations(self):
         return { "stacktrace" : "apc_tmp_dir/core*" }
     def setEnvironment(self, test):
@@ -1605,6 +1606,46 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
         tests.sort()
         return tests[0]
 
+# This is the action responsible for selecting a KPI group in the GUI.
+class SelectKPIGroup(guiplugins.InteractiveTestAction):
+    def __init__(self, dynamic):
+        guiplugins.InteractiveTestAction.__init__(self)
+    def __repr__(self):
+        return "Select KPI group"
+    def _getTitle(self):
+        return "_Select KPI group"
+    def getMainMenuPath(self):
+        return "_Optimization"
+    def getStockId(self):
+        return "index"
+    def inToolBar(self):
+        return True
+    def inButtonBar(self):
+        return False
+    def getTabTitle(self):
+        return "KPI group"
+    def getGroupTabTitle(self):
+        return "Select KPI group"
+    def messageBeforePerform(self):
+        return "Selecting tests in KPI group..."
+    def messageAfterPerform(self):
+        return self.message
+    def performOnCurrent(self):
+        tests = self.getTestsToSelect()
+        if tests:
+            self.notify("SetTestSelection", tests)
+    def getTestsToSelect(self):
+        suite = self.currentTest.parent
+        kpiGroupForTest, kpiGroups, percscale = readKPIGroupFileCommon(suite)
+        if not kpiGroupForTest.has_key(self.currentTest.name):
+            self.message = "Test " + self.currentTest.name +  " is not in an KPI group."
+            return [ self.currentTest ]
+
+        kpiGroup = kpiGroupForTest[self.currentTest.name]
+        tests = filter(lambda test: kpiGroupForTest.get(test.name) == kpiGroup, suite.testcases)
+        self.message = "Selected " + str(len(tests)) + " tests in KPI group " + kpiGroup + "."
+        return tests
+
 # Specialization of plotting in the GUI for APC
 class PlotTestInGUIAPC(optimization.PlotTestInGUI):
     def __init__(self, dynamic):
@@ -1646,7 +1687,7 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
         return test.makeTmpFileName("APC_FILES/" + logFileStem, forComparison=0)
     
 
-guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC ]
+guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC, SelectKPIGroup ]
 guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ]
 
 # A script that mimics _PlotTest in optimization.py, but that is specialized for

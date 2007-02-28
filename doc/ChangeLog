@@ -1,0 +1,705 @@
+Version 0.1:
+
+    - initial release
+
+Version 0.2:
+
+    - bug fixes
+	(1) Core file handling deals with core.<pid> files
+	(2) Overwrite with version (-o -v) works correctly
+	(3) Versioned runs do not clean files for non-versioned runs
+	(4) Order of selection fixed for "base versions"
+    - updated UserGuide.html with information about TextTest test suite
+      for itself, and a few new features introduced shortly before version 0.1
+
+Version 1.0:
+
+    - LSF development (lsf.py)
+	Now plugs nicely into LSF's parallel functionality using the LSF_PROCESSES
+	environment variable. Also exit correctly if lsf submission fails, and provide
+	LSF_RESOURCE variable.
+    - Batch mode development (batch.py)
+	Can now "collect" several batch runs with use_collection:true to avoid multiple
+	emails being sent.
+    - Performance development (performance.py)
+	Will now examine what's happening on the other processor of multi-processor 
+	machines and print a little message. This has been found to affect the performance
+	due to competition for the memory bus.
+    - "extra versions" development (texttest.py)
+	Ability to say that a version is a default part of the application's test suite
+	via the "extra_version" option
+    - predictive specification development (predict.py)
+	Now you can specify text that must be present using internal_compulsory_text,
+	as well as text that may not be.
+    - removed version inference functionality
+	It was error prone. Better to infer the environment setup from the version
+	than vice versa.
+    - bug fixes
+	(1) Handling of paths containing the "-" character
+	(2) Handling of spaces in command line comma-separated lists
+	(3) Removed infinite loop when "null characters" present in testsuite file
+	(4) Improved error messages when no applications or no tests are found
+	(5) Prevent internal environment variables from "leaking" outside where they are set
+	(6) Some bug fixes for aggregated versions (-v a.b etc.)
+	(7) Improved error handling when incorrect scripts given to -s option
+	
+Version 2.0:
+
+    - Default configuration development (default.py)
+	Added generic test suite filter
+    - generic collation added (default.py/unixConfig.py)
+	Should be very easy to add own files for comparison by creating CollateFile objects
+	in configurations
+    - GUI added! (texttestgui.py)
+	For anyone with PyGTK installed this should make life a lot easier. It is essentially 
+	for monitoring the tests (rather than starting them) and is enabled with the new -g option.
+    - major refactoring
+	To accommodate the GUI, tests are now regarded as having various states: this makes them
+	easier to observe and also removes a lot of global data.
+
+Version 2.1:
+   
+    - Major GUI development (texttestgui.py)
+	Monitoring of tests as they run, configurable plugin tools for file viewing, extendable plugin
+	tools and a lot more besides...
+    - Self test suite improved greatly (gtkscript.py)
+	GUI can now be self-tested via the above script engine. Most functionality now self-tested.
+    - Write directory behaviour changed
+	Does not write to the current directory any more or require write permission to the tests. All
+	temporary files are written to a separate tree. Of course, still need write permission to save
+	the tests!
+    - generic collation now in config file (default.py)
+	Now collates all files from the config list "collate_file:source->target" instead of needing
+	Python code
+    - generic memory measurement added (default.py)
+	Relies on applications reporting on their own memory usage in their log file
+    - performance measurement available on UNIX (unixConfig.py)
+	Doesn't require LSF any more, but works in the same way
+    - run-dependent text collection improved greatly (comparetest.py)
+	Can now filter out sections between markers and remove particular words from lines
+    - bug fixes (it's been a while so I don't remember them all...)
+
+Version 3.0:
+
+    - Compatibility changes in config file format. If you are upgrading from TextTest 2.x, read the
+        MigrationNotes file for details (otherwise just read the documentation). You will need to change
+        your config files!
+    - All config file entries now default sensibly (texttest.py)
+	The only compulsory one (that will cause error if not present) is "binary" now.
+	Unrecognised entries will produce warnings now too.
+    - Static GUI added (texttestgui.py)
+	This allows use of TextTest without messing with lots of command line options. Run with -gx option
+	and experiment. It also provides a convenient means for adding new tests.
+    - Improved record/replay layer (usecase.py/gtkusecase.py)
+	Can now record use cases for non-GUI scenarios as well, and also record signals received by the
+	process. This allows for testing for correct behaviour when the application receives signals.
+    - Removed waiting behaviour from text interface (texttest.py)
+	It works more like the GUI, constantly monitoring and reporting on tests as they finish, rather than
+	proceeding in a particular order. This generally means things are reported sooner.
+    - -grep filter added (default.py)
+	Can now select tests by looking for text in their logfiles
+    - sub-process management introduced
+	Any processes started by TextTest (tkdiff, emacs etc.) are terminated when TextTest is terminated.
+    - Integration with Xvfb (unixConfig.py)
+	Useful if testing a GUI, by setting the list entry virtual_display_machine can prevent the GUI popping
+	up.
+    - Can specify unsaveable_version in config file (texttest.py)
+	This means that certain versions can be marked as never wanting separate results saved for them. This
+	saves a certain amount of time.
+    - .texttest personal configuration file introduced (texttest.py)
+	Config entries can be provided globally for individuals now.
+    - Can now filter unordered text, as well as just run-dependent text (comparetest.py)
+	The unordered_text entry works much like the run_dependent_text entry, except that matching lines
+	are stored, sorted and produced in a section at the end.
+    - various bug fixes and many more self-tests, including a suite for the LSF module.
+	
+Version 3.1:
+
+    - Plug-in for bugzilla command line interface (bugzilla.py) 
+	Makes use of bugcli program to allow linking test failures to known bugs in bugzilla, thus
+	saving time and being clearer when problems not immediately fixed.
+    - Record/replay layer heading for independence (usecase.py/gtkusecase.py)
+	Shortly available on sourceforge as PyUseCase a separate product! Already used in other programs
+	than TextTest.
+    - Record/replay layer enhancements (usecase.py/gtkusecase.py)
+	Support for use-case script name changes and shortcut recording (see documentation), as well
+	as automatic insertion of shortcuts
+    - Can now wipe config file lists (texttest.py)
+	Can be useful in overriding versions, use the syntax "base_version:{CLEAR LIST}"
+    - Can force long tests on performance machines when using LSF (performance.py/lsf.py)
+	Generally very long tests are there to test performance... "force_on_performance_machines"
+    - Can change GUI defaults in config file (texttestgui.py)
+	By changing text to lower case and inserting underscores: 
+	[gui_entry_overrides]
+	follow_file_rather_than_view_it:0
+    - Improving interface between static and dynamic GUI (texttestgui.py)
+	Static GUI now displays errors on failed dynamic runs
+    	Separated temporary directories for the two
+	Where tests have same name, reduced instances of more tests than requested being started.
+    - Refresh abilities in static GUI (texttestgui.py)
+	Will now handle some live updates, e.g. options file and re-ordering in testsuite file.
+    - Various bug fixes
+	A couple to do with the "Save All" button, clean up of extra write directories and some
+	inconsistency fixed with the "slowdown job" feature of the LSF module.
+	
+Version 3.1.1:
+
+    - PyUseCase now released separately (usecase.py/gtkusecase.py)
+	But still packaged with TextTest along with ndict, ndiff and log4py
+    - Magical 'checkout prepend' removed (texttest.py)
+	Instead of this TextTest exports the environment variable TEXTTEST_CHECKOUT, and also allows configurations to export
+	other application environment variables. This may require migration.
+    - Login shell made configurable (unixConfig.py)
+	Previously Bourne Shell (/bin/sh) was hardcoded. Now configurations can set their own: useful if all your setup
+	is in C-shell starter scripts.
+    - Added "quick start" guide for those too lazy to read the full documentation, see quickstart.txt in this directory.
+
+Version 3.2:
+
+    - Replaced dynamic GUI "performance" column with "details" column (texttestgui.py)
+	This gives a better indication of roughly what happened in a test without having to click on each one individually.
+	Also new config file entry "failure_severity" dictionary, which enables telling the GUI that certain files are less
+	important and when they differ only the details column will go red, not the whole test.
+    - Details column also present per file (texttestgui.py)
+	Where several files differ this can be useful, e.g. to see performance percentages
+    - GUI widgets improved (texttestgui.py)
+	Now get radio buttons for some options and configurable drop-down lists for all text boxes
+    - Improved GUI definition file concept (texttestgui.py,texttest.py)
+	New config file entry "definition_file_stems" added so that custom files can be declared as definition files. 
+	Added diagnostic definitions as definition files.
+    - Generic diagnostics plugin provided (texttest.py)
+	Can now configure what is output via diagnostic configuration files placed anywhere in the test subtree, and also
+	provide ability to turn on optional extra diagnostics for failure finding. Supports log4py and log4cpp, at least,
+	as well as global "trace-level" style logging.
+    - Can now save individual files in GUI (texttestgui.py)
+	When several files change and only some of the changes are correct. Works via drop-down box in "Saving" tab.
+    - Support slow motion replays for GUI tests (texttestgui.py)
+	Where the target app is a GUI, it's fun to run the tests with the GUI popping up and a delay between, assuming
+	the use-case recorder supports this (PyUseCase does). Enable via switch in GUI and "slow_motion_replay_speed" config
+	file entry.
+    - GUI settings generally preserved between tests now (texttestgui.py)
+	Useful if similar actions want performing on several tests
+    - GUI refreshing improved when files change external to tests (texttestgui.py)
+	For example a cvs update of the tests while the GUI is running, or a file shared between tests being updated via
+	a save of another test : the GUI will notice and recalculate differences when tests are selected.
+    - Batch report summary includes brief details (batch.py)
+	In fact, the same info that appears in the new GUI 'details' column.
+    - Ordering improved in batch reports (batch.py)
+	Most useful information now nearest the top
+    - Dump state info when in batch mode (batch.py)
+	This means that anything can be reconnected to and reported as in the batch report
+    - Batch report message subjects made briefer (batch.py)
+	For the sake of those with limiting line-length news readers...
+    - Reconnection performance improved (default.py)
+	Does not regenerate file filters by default, special option for this now
+    - Added filter script comparetest.RemoveObsoleteVersions (comparetest.py)
+	Useful for pruning away obsolete version files (identical to base) if these have accumulated
+    - Improved handling of unrunnable tests, especially when machines fail (comparetest.py)
+	No results does not mean 'green' in GUI any more...
+    - Performance test machines in LSF now based on bsub -m, not bsub -R (lsf.py)
+	This makes things more flexible as host groups can be used, and less error prone in combining with other ways of
+	specifying LSF resources.
+    - LSF information now collected via a separate daemon thread (lsf.py)
+	This improves response time to LSF changes and also puts less of a load on the LSF server, as all tests can be
+	updated via one LSF call rather than one per test. Also more reliable as uses unique job IDs to identify them.
+    - Framework handles temporary files being removed externally (texttest.py)
+	giving error messages rather than crashing
+    - --help improved when no apps found (texttest.py)
+	Will now say something intelligible, anyway.
+    - lots of more minor bugfixes
+
+Version 3.3:
+    - LSF module now faster and more reliable (lsf.py)
+	TextTest submits itself remotely to run as a slave and report back. This stops the master process spending a long
+	time comparing lots of files, and prevents NFS update race conditions causing trouble.
+    - Reconnection improvements (default.py)
+	Now reads the same objects as the normal remote operation, so will more reliably show the same things
+    - Machine names collected more reliably (unixConfig.py)
+	Should now report machine names in most cases on UNIX
+    - JUseCase integration (texttest.py)
+	Can now test Swing GUIs also if JUseCase used.
+    - log4j integration (texttest.py)
+	Via a similar mechanism to the support for log4cpp and log4py
+    - Environment variables referencing each other should work better (texttest.py)
+	There were some problems when variables at general levels of the test tree referenced variables
+	set at specific levels.
+    - 'extra_versions' config file setting now a list (texttest.py)
+	This allows for several apps to be grouped easily, for API testing.
+    - Can now use 'save single file' option with the 'Save All' button (texttestgui.py)
+	This combination crashed before...
+    - Can now use 'link_test_path' feature in config file together with 'recompute file filters on reconnection' option.
+	This combination also didn't work before.
+    - Minor bug fixes as follows:
+    - Viewing filtered files after saving now shows the new file (comparetest.py)
+    - Versions and 'permanent' diagnostics now work together (comparetest.py)
+    - Fixed crash monitoring background processes (texttestgui.py)
+    - Fixed bug with creating a test suite before creating any tests (texttestgui.py)
+    - Saving copies files rather than removing them (comparetest.py)
+
+Version 3.4:
+    - Integration with Sun Grid Engine (sge.py)
+	SGE is similar to LSF but is free and open source. The features of the LSF plugin are now also available
+	in SGE. Several of these have been renamed to be more generic, see the migration notes.
+    - Improved difference reporting in GUI (comparetest.py)
+	A textual representation of the differences appears under the Text Info tab now. For simple differences,
+	this saves firing up graphical difference tools on small files.
+    - Can now specify performance machines in a queue system via resources rather than hosts or host groups (queuesystem.py)
+	This is done by the new config file setting "performance_test_resource". Indeed it is the only way in SGE.
+    - Introduced line wrapping for long output lines (comparetest.py)
+	This is useful for example in batch mode where newsgroups reject TextTest reports due to 
+	long lines. Config file setting called 'max_width_text_difference' defaulting to 900.
+    - Unfolding tests in the tree view in GUI now unfolds all (texttestgui.py)
+	This is deemed to be more useful as it reverses the folding procedure
+    - Date of run now printed in window title (texttestgui.py)
+	Helps to distinguish between different runs
+    - Minor bugs as follows:
+    - Leading and trailing spaces now work in run_dependent_text (comparetest.py)
+    - Numeric comparison requirements now work for LSF (lsf.py)
+    - Viewing files after saving them now always shows the correct one (guiplugins.py)
+    - Composite versions now work correctly when one of them has extra_version set (texttest.py)
+    - Signal recording now disabled for queue system slave processes (lsf.py,sge.py)
+    - Temporary directories no longer contain colons, this causes problems for the Java classpath (texttest.py)
+
+Version 3.5:
+    - Support for Windows XP introduced (default.py)
+	All features supported on UNIX are available in some form on Windows where appropriate. This has 
+	meant the demise of the 'unixConfig' configuration, which is now inferred by using the default
+	configuration on UNIX.
+    - Performance-related functionality overhauled and generalised (performance.py)
+	Can now extract any system-performance related number from available log files. See
+	migration notes for details.
+    - Can now copy tests from static GUI (texttestgui.py)
+	New tests are often slight tweaks of existing ones, this speeds things up.
+    - Wildcard characters now allowed in config entries for grouping similar-format files (default.py)
+	The file stems in the [run_dependent_text], [unordered_text], [failure_severity] and
+	[collate_file] sections can all contain '*' to avoid repetition where many similar
+	files are produced.
+    - Version handling in static GUI greatly improved (guiplugins.py)
+	All tests are shown, even if not present in default version, can now select based
+	on version and sensible defaults for version-related fields.
+    - Changed batch mode collection behaviour (batch.py)
+	Files for collection now written to temporary directories, and if mail cannot be sent
+	better diagnosis is present.
+    - Catalogue file functionality overhauled (default.py)
+	Only reports changes now rather than all files present, which was a bit volatile.
+    - Can now mark tests as 'known bug' without needing to link them to bugzilla (knownbugs.py)
+	A simple description is often enough and not everybody has bugzilla...
+    - Minor bugfixes as follows
+    - 'Save All' in dynamic GUI now ignores tests marked as 'known bug' (texttestgui.py)
+    - Static GUI informs the user better when collecting standard files after recording a usecase file. (texttestgui.py)
+    - Error conditions when creating tests in static GUI handled much better (texttestgui.py)
+    - Viewing new files now works correctly from text interface (respond.py)
+    - Error message now given when incompatibile test/version combinations started from GUI (texttest.py)
+    - Filtering words beyond the end of lines now works better (comparetest.py)
+    - -keeptmp option also keeps UNIX core files now (unixonly.py)
+    - Removed unnecessary check for refresh on test creation (texttestgui.py)
+    - log4py version upgraded to 1.3.1 to get fixes for Windows (log4py.py)
+    - Disabled search of directory structure under test directory, which can waste lots of time (comparetest.py)
+
+Version 3.5.1
+    - Bugfixes for Windows XP from 3.5:
+	Recording usecases now works properly
+	Self-tests stabilised a bit
+	"Baretail" introduced as default for 'follow_program' (see readme file)
+    - SGE plugin speeded up considerably (sge.py)
+	Removed calls to qacct which were extremely time-consuming.
+    - Simplified test filter logic to do only one pass through tests (texttest.py)
+	The main consequence is that exact matches on test names no longer eliminate sub-text matches.
+	Regular expressions can be used to achieve exact matches.
+    - Added summary line to 'Text Info' window in dynamic GUI (texttestgui.py)
+	This lists the execution host and state of the test
+    - Can now filter multiple words from a line in run_dependent_text (comparetest.py)
+	Using the syntax some_line{WORD 4+} will remove word 4 onwards from the matched line
+    - Performance extraction from log files now parses the format hh:mm:ss (default.py)
+    - Minor bugfixes as follows:
+	Reconnect with -reconnfull option and -b option cleaned previous tmp dirs (default.py)
+	Reconnect with -reconnfull option sometimes reconnected to itself (default.py)
+	GUIs from the system under test sometimes got sent to the real display if tests run together 
+	with a non-GUI application (unixonly.py) 
+
+Version 3.5.2
+    - More bugfixes for Windows XP (plugins.py)
+	Finding child processes no longer crashes occasionally
+	No longer have to have administrator rights in order to run the static GUI (!)
+	Doesn't consume CPU while monitoring processes any more
+    - Self-tests enhanced to no longer mock out external processes (guiplugins.py)
+	Enhanced experience viewing them, less corners that can't be tested, and less
+	suspectible to platform specific tool problems being missed by the tests
+	(like the xterm one on Windows fixed in 3.5.1.)
+    - Usability bugfixes based around newbie usage at XP2005 and Europython (texttestgui.py)
+	No longer stack traces if you start the static GUI with no or invalid apps
+	Sensible error message if you try to run an application as if it were a test
+    - SGE plugin fixes (sge.py)
+	Takes account of SGE's file rotation scheme for finding exit status of jobs
+	Lengthened the sleep between polls to check job status, makes it less prone to busy-wait under load
+	
+Version 3.5.3
+    - Added ability to specify directory for finding test list files in (testmodel.py)
+	Now use the "test_list_files_directory" config file setting to configure this.
+    - Increased maximum allowed size of stack trace print out (predict.py)
+	It's now 50000 characters after complaints that 10000 wasn't enough...
+    - Static GUI now writes the output of each dynamic run to a different file (guiplugins.py)
+	This prevents confusion and allows simultaneous dynamic runs on Windows
+    - Banned test names from containing spaces (guiplugins.py)
+	This was previously allowed but produced tests that could not be run due to quoting problems.
+    - Minor bug fixes:
+	Removed most of the deprecation warnings produced by the GUI in GTK 2.6.8 (texttestgui.py)
+	Fixed crash on double clicking the "Comparison Files" lines in the dynamic GUI (texttestgui.py)
+
+Version 3.6
+===========
+Major Enhancements:
+    - New webpage generation for batch reporting (testoverview.py)
+	Gives possibility to see long-term trends in the tests, as well as a convenient way to navigate static results
+    - Run dependent text syntax extended (comparetest.py)
+	Can now both replace matched text and match on TextTest's own temporary paths
+    - Enhanced comparison to report missing files properly (comparetest.py)
+	Instead of generating fake files only when collating, actually report missing files as missing now.
+    - Test data handling for UNIX improved (default.py)
+	For programs that can potentially edit large amounts of test data, a new config
+	entry "partial_copy_test_path" is provided. This means that you can copy just the
+	parts of the data structure that are going to change and link the rest, instead of
+	copying all of it.
+GUI Enhancements:
+    - GUI now collapses test suites automatically when every test succeeds (texttestgui.py)
+	This can be configured via the config file entry "auto_collapse_successful"
+    - Can now remove tests via the static GUI (texttestgui.py)
+    - GUI displays how many tests are currently selected (texttestgui.py)
+    - When tests are selected via the select dialogue, GUI will scroll to the first one (texttestgui.py)
+    - Can now save a selection of tests (texttestgui.py)
+	instead of saving one by one or saving all
+    - Keyboard shortcuts added for most GUI actions (texttestgui.py)
+    - Can save selections of tests to file from the GUI (texttestgui.py)
+	Both the actual tests selected or the criteria used to select them.
+	Useful for defining subsets of tests, for example for nightjobs.
+    - Static GUI title now more informative (texttestgui.py)
+    - Specific GTK resource file for texttest now provided (texttestgui.py)
+	Now read .texttest_gtk as well as .gtkrc-2.0 so that look and feel can be configured separately from other GTK apps.
+    - Test suites now rendered in bold (texttestgui.py)
+	Seems to make it easier to read the test view
+Framework Enhancements:
+    - ndiff.py removed as default comparator on Windows (comparetest.py)
+	diff is now default everywhere as it is provided with tkdiff anyway. ndiff was shown to be very slow for larger files.
+    - Behaviour of Test Suites Containing field (-ts flag) changed (default.py)
+	It now searches on the whole path of the testsuite, eliminating some unexpected behaviour
+    - test filter files can contain filtering operations (default.py)
+	The files used by the -f option are no longer restricted to long lists of tests.
+	Application/version specific ones can also be created.
+    - catalogue functionality now reports file/directory edits (default.py)
+	Previously it only reported file creation and deletion.
+    - "checkout_location" config file entry is now a list (testmodel.py)
+	This makes it easier to share a testsuite between users who check out the system and those who don't
+    - More syntax supported by mechanism for requesting tests based on execution time (default.py)
+	The '-r' flag will now accept syntax of the form hh:mm as well as ranges such as "<=10:00"
+    - TEXTTEST_HOME variable is always set internally (testmodel.py)
+	This means it can be referred to in environment and config settings, even if not set from the command line
+Grid Engine (LSF/SGE) enhancements:
+    - Major refactoring of queuesystem module (queuesystem.py)
+	Slaves now communicate with the master process via sockets rather than relying
+	on master polling the queuesystem. Makes it much easier to add new grid engines 
+	besides SGE/LSF, and less prone to the vagaries of these products.
+    - Tests that hit LSF/SGE queue limits handled in a better way (queuesystem.py)
+	They are reported as 'killed' and partial results are collected
+    - No longer hang forever if the grid engine refuses to delete jobs (queuesystem.py)
+	We abandon if the job isn't deleted the 600th time we check...
+Bug Fixes:
+    - Fixed race condition starting tests on Windows (plugins.py)
+	If test completed before TextTest found the process info, hangs occasionally resulted
+    - Fixed excessively long command lines starting dynamic GUI on Windows (texttestgui.py)
+	Starting very large numbers of tests at once could lead to exceeding maximum command lengths
+    - Static GUI no longer picks up files with extra text appended to the name (testmodel.py)
+	The classic symptom of this was emacs backup files being read.
+    - Fixed crash doing Save All with a single file (texttestgui.py)
+	It crashed if some test had the single file as the only difference
+    - Errors produced when recording GUI tests are now shown in a nice dialogue box (guiplugins.py)
+    - Collating multiple files fixed for multiple locally run tests (default.py)
+    - Fixed bug where reconnection could trigger recalculation of results even when recalculation not requested
+    - Fixed bug in reconnection with recalculation (default.py)
+	It failed when the teststate files were not present at all
+    - Batch runs no longer fail if removing previous runs not possible (batch.py)
+    - Bug fixed with the known bugs feature (knownbugs.py)
+	Differences in one file could trigger known bugs on another
+    - Fixed crash when a known bug coincides with the test being killed in the grid
+	engine (queuesystem.py,knownbugs.py)
+
+Version 3.7
+===========
+Major Enhancements:
+    - GUI layout revamped after various usability complaints (texttestgui.py)
+	This is described in more detail in the migration notes.
+    - Recording tab enhanced (guiplugins.py)
+	Various improvements for flexibility and stability. See migration notes for details.
+    - Directory caching introduced in core framework (testmodel.py)
+	This means TextTest is nicer to file servers and tends to start up somewhat quicker on large test suites
+    - New mechanism for prioritising version files against each other (testmodel.py)
+	By using the config file entry "version_priority" can now get round the old undefined behaviour
+	of deciding whether to use .a or .b files if version a.b is run.
+    - Redundant config file syntax introduced (testmodel.py)
+	If a dictionary entry only wants to change the default key, it is OK to pretend it is a simple entry
+GUI Enhancements:
+    - All development moved to PyGTK 2.4.13 (texttestgui.py)
+	Previous used PyGTK 2.2.4 which was old. ComboBox deprecation warnings should be gone now.
+    - Progress Bar added to dynamic GUI (texttestgui.py)
+	So you can see at a glance how many tests are completed if they don't fit on one screen
+    - Selection dialogue enhancements (guiplugins.py)
+	It now allows multi-stage selection, by allowing you to extend and refine existing selections
+    - Can now configure whether TextTest kills all started processes on terminating (texttestgui.py)
+	It will still do this by default but you can tell it to ask you first via the new config file entry "query_kill_processes".
+    - Status bar added at the buttom of the GUI (texttestgui.py)
+	This informs you what TextTest is doing if it takes a little while
+    - "Use checkout" dialogue displays default value and reads command line -c options (guiplugins.py)
+	Should be more obvious what is being tested
+    - Can now view and edit personal configuration files ".texttest" and ".texttest_gtk" from GUI
+	This is present in the application view in static GUI
+    - Can now configure file viewers per file type
+	Essentially "view_program" is now a dictionary with keys as the file stems
+    - Copying tests now also copies log definition files and data files (guiplugins.py)
+    - Static GUI now refreshes test views when tests are run (texttestgui.py)
+	New files can always be saved by the dynamic GUI and should be shown automatically
+    - Remove button now has an "Are you sure?" dialog (guiplugins.py)
+	Hopefully less people will remove their tests by mistake...
+    - Can now run static GUI in the background (guiplugins.py)
+	Removed stdin links to the started dynamic GUIs
+    - Can now configure the window size from .texttest (texttestgui.py)
+	Using the new config file entry "window_size"
+    - "Quit" button is no longer the default widget (texttestgui.py)
+	This tended to cause unwanted exits if the GUI took a while to start up
+    - Set-up failure in one of several apps in the dynamic GUI now displays better (texttestgui.py)
+	New "set-up failed" category for this instead of just remaining white
+    - Various cosmetic changes (texttestgui.py)
+	For example scrollbars are only displayed if they are necessary, and it's now possible to adjust the size
+	of the panes
+Framework Enhancements:
+    - Now possible to collate files using a plugin script instead of just copying them (default.py)
+	New config file entry "collate_script" makes this easy to do. 
+    - Virtual display (Xvfb) handling much more sophisticated (unixonly.py)
+	It is now properly tested, and handles a few more cases: machines being down, only local connections being accepted,
+	VNC connection errors, failure to kill unusable servers etc.
+    - No longer assumes console is the default interface (default.py)
+	There is a config file setting "default_interface" which defaults to the static GUI.
+    - Can now generically ignore some parts of test data structures (testmodel.py)
+	The "test_data_ignore" config setting allows this. Side-effect is that catalogue files are sorted alphabetically. 
+    - Added external "search path" for test data (testmodel.py)
+	Besides finding test data via environment variables or directly from the test tree, can now specify extra 
+	locations to act as default via "test_data_searchpath" config file setting
+    - Overwrite option (-o) has reverted to its version 3.5.3 behaviour (respond.py)
+	It now saves the full version specified again. In version 3.6 this was changed to try to fix the version problem
+	in the recording dialogue, but that is now fixed properly - see elsewhere.
+    - Empty test suites handled much better (testmodel.py)
+	Correctly identify when testsuite files contain only nonsense, don't display empty suites except in static GUI
+    - TEXTTEST_CHECKOUT setting set much earlier (testmodel.py)
+	This means it can be referenced by most other config file settings and all environment files
+    - Allow automatic sorting of test suites (testmodel.py)
+	There is a config file setting "auto_sort_test_suites" now. If this is set the order in testsuite
+	files is ignored and everything is displayed alphabetically.
+    - Core file collection enhanced for UNIX (default.py)
+	Uses the new collate_script entry above and is now a separate script interpretcore.py. Handles many
+	more platforms and core formats correctly.
+    - Java application fixes (testmodel.py)
+	If a Java class is being tested, don't test if the file exists. Also infer java as interpreter where possible.
+    - Filter for TextTest's own temporary paths "{INTERNAL writedir}" now delimited by quotes as well as spaces (comparetest.py)
+	It tended to match too much if the path was quoted
+    - batch.ArchiveRepository script picks up deleted tests (batch.py)
+	It now operates on found files, not on the tests that exist today
+Grid Engine (LSF/SGE) enhancements:
+    - Can now set priorities for SGE jobs (sge.py)
+	Typical usage is to ensure that they can be submitted in some sort of execution-time order: fastest first
+    - Job names in SGE/LSF easier to read (queuesystem.py)
+	They don't include the user name and time any more and the test name comes first
+    - Save dialogue correctly provides average performance radio button (guiplugins.py)
+	It didn't do this before if performance was enabled via "performance_test_resource"
+    - "Ignore catalogue when isolating data" option now works with queuesystem module (queuesystem.py)
+    - Will now work correctly if master and slave processes run with different locales (testmodel.py)
+	Ensure a common temporary directory and hence that running processes can be viewed
+    - SGE lists owners of other jobs correctly in performance file (sge.py)
+	Previously it claimed everything was owned by the owner of the first job
+    - Explicit shell login ("login_shell" config file setting) moved to queuesystem configuration (queuesystem.py)
+	It was also present in local mode but seemed mainly useful for grid engines. 
+	It occasionally caused environment settings to be overridden.
+Bug Fixes:
+    - Fixed problems on Windows when pslist doesn't work properly (texttestgui.py)
+	Seems to occasionally decide that something else is using its file.
+    - Missing filter files (-f option) no longer cause all tests to be selected (default.py)
+	Instead of printing a warning we now consider this an error and select no tests
+    - "partial_copy_test_path" isolation now preserves local symbolic links (default.py)
+	Previously it replaced them with links to the master data
+    - Quote user input when generating dynamic GUI command lines (guiplugins.py)
+	You never know what illegal command-line characters the user might write.
+    - Webpage generation now displays differences in HTML/XML files correctly (testoverview.py)
+	Use <PRE> to stop it interpreting this as tags in the page
+    - Diagnostic files always have correct version identifiers displayed in GUI (texttestgui.py)
+    - Fixed GUI-testing bug: don't set up for record unless record requested or a usecase already exists (texttestgui.py)
+    - Fixed crash in execution-time based selection (-r option) when blank hours/minutes/seconds provided (default.py)
+    - Fixed annoying stack trace popups when dynamic GUI quit while tests were still being set up (engine.py)
+    - Fixed crash selecting all tests immediately after a test removal (texttestgui.py)
+    - Adding a test no longer causes manually collapsed test suites to re-expand (guiplugins.py)
+    - If tests only exist in an "extra_version", don't warn about non-existent tests on the main version (engine.py)
+    - Collating multiple files with "." characters in the name doesn't get confused any more (default.py)
+    - Ctrl-C from console interface no longer causes test dialog to be repeated (respond.py)
+
+Version 3.7.1
+=============
+Framework enhancements:
+    - Plugin scripts (-s option) will no longer be rejected by the framework if no tests are found (engine.py)
+	- sometimes they only act on the application anyway.
+    - A couple of config file defaults changed: 
+	"view_program" now defaults to "emacs" rather than "xemacs" on UNIX, as it is slightly more universally available
+	"slow_motion_replay_speed" defaults to 3 instead of 0 (this was more or less a bug)
+LSF/SGE enhancements:
+    - Unrunnable tests will always report the machine they run on (engine.py)
+	Previously some "hard" failures could cause the machine not to be reported
+    - performance_test_resource entry now works when machine names in SGE are 'short' (sge.py)
+	Previously it only worked if the full domain name was in SGE.
+    - If tests report as running but then get terminated hard (e.g. SIGKILL), report them as "killed" (queuesystem.py)
+	Previously reported confusingly as "abandoned" - but there was nothing to abandon
+    - Finding information in older accounting files in SGE now works (sge.py)
+	There has been code lying around to do this for some time but it's never worked until now...
+Bug Fixes:
+    - Fixed crash on removing tests after starting static GUI from scratch (texttestgui.py,testmodel.py)
+	Showed up if the GUI was started with only a config file available.
+    - Removing last test from a test suite now removes it from the GUI display also (texttestgui.py)
+    - Test completion time on progress bar is now always correct (texttestgui.py)
+	It tended to update itself to the current time when clicking around...
+    - Collation of files to names containing "." characters is now forbidden (default.py)
+	It violates TextTest's naming conventions and hence causes trouble
+    - 'Text Info' and 'Viewing' tabs now always appear in the same order (guiplugins.py)
+	Viewing tests that were pending in SGE/LSF could cause them to switch before.
+    - No longer show spurious files in the static GUI if full temporary path contains "." characters (testmodel.py)
+    - External viewers can be started even if the path to the file contains spaces (guiplugins.py)
+    - If the script for interpreting core files on UNIX fails, it no longer causes a TextTest crash (predict.py)
+    - Fixed crash when an extra_version is rejected for a batch run via batch_version (engine.py)
+    - Test data identified by environment variables can now be used as keys in "test_data_searchpath" (default.py)
+    - Disable interactive dialogue in console interface after ^C has been pressed (respond.py)
+Test Fixes:
+    - A certain amount of work done stablising the self-tests and reducing the probability of occasional failures, 
+      particularly the tests for SGE/LSF.
+
+Version 3.8
+===========
+System requirements:
+    - To run GUI, now need at least Python 2.3 and PyGTK 2.4. Support dropped for Python 2.2 and PyGTK 2.2.
+	Console interface still supported with Python 2.2.
+Major Enhancements:
+    - GUI layout revamped for usability and standardisation (texttestgui.py)
+	Looks more like a "normal" GUI now. This is described in more detail in the migration notes.
+    - Test selection mechanism added to dynamic GUI (texttestgui.py)
+	Can now both select and hide groups of tests that are in similar states. Can also save the selections made.
+    - "Known bugs" functionality overhauled and integrated with "Internal errors" (knownbugs.py)
+	See migration notes for more details. Many more things are now possible.
+    - New "traffic interception mechanism" introduced (traffic.py)
+	Can record and replay the results (stdout/stderr/exit status) of command-line programs. 
+	Can also intercept network textual traffic and replay it, allowing client/server tests 
+	without the whole system present.
+General GUI Enhancements:
+    - Tests are now selected with single-click instead of double-click (texttestgui.py)
+	Cannot now have different "viewed test" and "selected test" causing confusion.
+    - Test tree header now shows total number of tests and total visible as well as total selected (texttestgui.py)
+    - Status bar is now more informative and accurate (texttestgui.py)
+	Even has a Firefox "throbber" to show you when something is happening
+    - Buttons/tool items are greyed out and tabs hidden in contexts where they don't make sense (texttestgui.py)
+    - Tooltips widely introduced (texttestgui.py)
+	Especially for elements that are hard to understand
+    - Text in error/message dialog boxes is now copyable (texttestgui.py)
+    - Can now hide and show menubar/toolbar/status bar/shortcut bar via a "View" menu (texttestgui.py)
+	Also standardised the config file settings for these into a single "hide_gui_element".
+    - Configurable keyboard accelerators now added (texttestgui.py)
+	Use the "gui_accelerators" section to change or add more.
+    - Text boxes in tabs are now the same width as each other (texttestgui.py)
+    - Layout configuration enhanced (texttestgui.py)
+	New entries in [window_size] section of config file allow maximising window and configuring pane separator 
+	positions.
+Static GUI Enhancements:
+    - Test tree is now tests and suites only, and each only appears once (texttestgui.py)
+	Previously had "application" lines, and several versions would mean showing the same test several times.
+	Can now access config files via a separate "Config" tab.
+    - When adding or copying tests, can now select positions other than the end of the suite (guiplugins.py)
+    - Tests can now be moved to other suites or renamed in place (guiplugins.py)
+    - Removing tests now operates on all selected tests, so can remove several at once (texttestgui.py)
+    - Can now create standard TextTest files via the static GUI (guiplugins.py)
+	New tab replaces and generalises old "New Diagnostics" button
+    - Now uses Text Info tab to display test description (texttestgui.py)
+    - Can now "report known bugs" directly from the GUI ("Bugs" tab) (guiplugins.py)
+    - "Reconnecting" to previous results separated from "running" in the static GUI (texttestgui.py)
+	Now has its own tab and button, making it easier to use and configure separate from running.
+    - Can now configure to start with all subsuites collapsed (texttestgui.py)
+	New config file entry "static_collapse_suites". Good for users who work on a small part of a large suite.
+    - Can check a box in selection tab to also select in subsuites that are collapsed (texttestgui.py)
+Dynamic GUI Enhancements:
+    - "Save single file" drop-down list replaced with selecting multiple files in file view (texttestgui.py)
+	Means that more than one, but not all, files can be saved when saving tests in the dynamic GUI.
+    - Improved how running tests are viewed (texttestgui.py)
+	Rather than dynamic info updating running info when test is selected, request it explicitly via new
+	"Update Info" button. 
+    - Unicode handling improved in Text Info tab (texttestgui.py)
+	Should now be able to display non-ASCII characters written by tests OK
+    - Cannot select test suites or file view header lines any more (texttestgui.py)
+	Nothing useful happened anyway.
+    - Can now configure the order in which files get displayed in the Text Info tab (texttestgui.py)
+	New config entry "failure_display_priority", see online docs.
+Framework Enhancements:
+    - Checkout mechanism enhanced (default.py)
+	Can now infer them from batch sessions and identify checkouts using other than the last path element.
+	See online docs (e.g. link to -c option) for details.
+    - Can now share information between different applications' config files (testmodel.py)
+	New config option "import_config_module"
+    - Can now associated batch sessions with filter files (batch.py)
+	This makes it much easier to define a subselection of test suites for batch runs, if things like timelimit
+	cannot be used
+    - "batch_version" mechanism for not running versions in batch mode now disabled by default (batch.py)
+	New setting "batch_use_version_filtering". All versions are allowed unless this is set.
+    - Reconnecting to previous results now works with any directory (default.py)
+	Previously assumed another user's of the standard format only.
+    - Reconnecting to previous results now automatically recomputes if a saved state file can't be found (default.py)
+	Should save some effort in restarting with the recompute file filters flag.
+    - File collation automatically ignores files that have not been changed by the test (default.py)
+	This to avoid irrelevant data in the test baseline.
+    - Can now configure a max file size to allow file comparison (comparetest.py)
+	"text_diff_program_max_file_size" config file entry. Very large files can take forever to compare with diff.
+    - Temporary directory name format simplified (default.py)
+	No longer contains the user name, which should be irrelevant.
+    - Allow faking of Python modules and Java classes as well as command line programs (testmodel.py)
+	Now set PYTHONPATH and CLASSPATH to include the test directory.
+    - Behaviour of "performance_test_minimum" setting changed (performance.py)
+	Performance differences now triggered if either stored or generated performance is above the minimum
+	Previously it had to be both.
+Grid Engine (LSF/SGE) enhancements:
+    - When grid engine jobs are abandoned by TextTest, it now says what the job ID was (queuesystem.py)
+Bug Fixes:
+    - Reset button is better at radio buttons now (texttestgui.py)
+	Previously tended to not reset them in some circumstances
+    - Selecting by version in the static GUI now works better (guiplugins.py)
+	Problems before when trying to select an "extra_version".
+    - Don't use the last selection criteria when running tests from static GUI (guiplugins.py)
+	This tended to cause the wrong tests to be run sometimes
+    - Large test selections can now be run on Windows XP (guiplugins.py) 
+	Previously all tests were written to command line and Windows has a max command line length. 
+	Now use a temporary file instead.
+    - Directory for saving selections is now created on demand if it doesn't exist (guiplugins.py)
+	By default the "filter_files" subdirectory of the application directory
+    - Reconnecting to a test that was killed no longer causes test to complete twice (default.py)
+	...which led to some strange GUI effects, like the progress bar exceeding its maximum
+    - Reconnecting to previous results now ignores checkout, even if invalid (default.py)
+	After all, it doesn't get used.
+    - Multi-OS test suites will now work even if they "live" on Windows(!) (comparefile.py)
+	"home_operating_system" worked fine if it was "posix" but not if it was anything else...
+    - When dynamic GUI run with several apps, if some can't be run they aren't displayed any more (texttestgui.py)
+	Previously got lots of rows that just stayed white
+    - When batch mode run with several apps, if some can't be run they get left out of the reports (batch.py)
+	Previously got a report saying 0 tests ran.
+    - GUI doesn't start with the focus on the Quit button any more, making accidental quitting harder (texttestgui.py)
+    - "Extend" option in Select Tests tab works even if no common test suite with previously selected tests (guiplugins.py)
+    - Can now view file names with spaces in also in diff/tkdiff (guiplugins.py)
+    - If there is no file permission to remove a test, give error dialogue rather than looping (guiplugins.py)
+    - Status message for recording use-cases end up in the status bar rather than the Text Info window. (texttestgui.py)
+    - Saving partial results now updates the Text Info tab properly (texttestgui.py)
+    - "gui_entry_override" setting now works for radio buttons in groups larger than 2 (texttestgui.py)
+    - Fixed problem where one application having an invalid filter_files directory caused others not to run (default.py)
+    - No longer reject test names if the name exists in a subsuite: only check the local suite (guiplugins.py)
+    - Dialogs are now transient for the main window and cannot be hidden by it (texttestgui.py)
+    - Stack trace no longer given if a version is repeated on the command line (testmodel.py)
+    - Stack trace no longer given if a lone dash is given on the command line (testmodel.py)
+    - Stack trace fixed when a test's relative path to TEXTTEST_HOME also exists in TEXTTEST_HOME (testmodel.py)
+    - Stack trace no longer given when trying to view a data file which has a TextTest standard name (texttestgui.py)
+    - If parts of the test suite are externally removed, selecting tests will not stacktrace any more (guiplugins.py)
+    - When running batch mode and GUI simultaneously with multiple apps, fixed default save version(!) (batch.py)
+

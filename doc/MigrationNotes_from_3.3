@@ -1,0 +1,11 @@
+This only applies to users of the LSF module.
+
+TextTest now integrates with Sun Grid Engine as well as LSF. This has caused the renaming of a few
+variables to more generic names than they had before.
+
+In the config file, the
+'lsf_queue' entry becomes 'default_queue'
+
+The environment variables
+LSF_RESOURCE and LSF_PROCESSES become
+QUEUE_SYSTEM_RESOURCE and QUEUE_SYSTEM_PROCESSES respectively. 

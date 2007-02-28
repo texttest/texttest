@@ -1,0 +1,148 @@
+Following on from the GUI changes in 3.7, version 3.8 is also a release which emphasises GUI
+improvements. TextTest hopefully looks more like other GUIs than it used to: it has a proper
+menubar, a proper toolbar and even some icons.
+
+First, we should discuss compulsory migration though, then the GUI differences are discussed 
+below.
+
+=============================================================================================
+COMPULSORY MIGRATION
+=============================================================================================
+
+(1) System requirements for GUI
+===============================
+GUI now requires at least Python 2.3 and PyGTK 2.4. (3.7.1 supported Python 2.2 and PyGTK 2.2)
+
+(2) Config file changes
+=======================
+
+a) The "batch_version" setting now has no effect by default. You need to also set 
+"batch_use_version_filtering:true" before anything will happen. This is because this mechanism
+is only needed in a few circumstances (typically multi-release, multi-platform testing)
+and it isn't really expected when batch sessions fail just because you run a version it wasn't
+expecting.
+
+b) "add_status_bar" and "add_shortcut_bar" are removed. In their place is a generic section
+[hide_gui_element] (note it has the opposite sense!). This can have keys "menubar", "toolbar",
+"shortcut_bar" and "status_bar" to achieve the same thing. Note these can also be hidden
+at runtime using the View menu now so the need for them should be reduced.
+
+c) "internal_error_text" and "internal_compulsory_text" are removed (see Section 3)
+
+(3) Knownbugs files
+===================
+
+The format of these has been completely changed as it became unwieldy as more and more features
+were added (and the files can now be generated directly from the GUI). A migration script 
+is provided: if you have any knownbugs files you should run it
+on your whole suite to convert them all to the new format:
+
+texttest.py -s knownbugs.MigrateFiles
+
+Each "bug" now gets a section to itself. It's probably easiest to use the static GUI to
+report them in future rather than learning the new format though.
+
+(4) Internal error settings
+===========================
+
+As reported above, the old Internal Errors mechanism is removed. The functionality is now covered
+entirely by the Known Bugs mechanism. There is a migration script for this too:
+
+texttest.py -s knownbugs.MigrateInternalErrors
+
+Unfortunately, the relevant config file entries will simply be rejected by TextTest 3.8 though, so to use
+this migration you'll need to temporarily re-insert them. Edit default.py, search for the setConfigDefault
+statements and add there
+
+app.setConfigDefault("internal_error_text", [])
+app.setConfigDefault("internal_compulsory_text", [])
+
+=============================================================================================
+CHANGES IN BEHAVIOUR OF EXISTING FEATURES
+=============================================================================================
+
+(1) GUI layout
+==============
+
+In the past months TextTest has begun to be used by a lot of people who aren't developers. This
+led to quite a few further usability enhancement requests.
+
+General: Unifying the "viewed test" and the "selected tests"
+------------------------------------------------------------
+In TextTest 3.7.1 and earlier tests needed to be double clicked in the tree view to be viewed,
+while they could be selected via a single click. It was quite possible to be viewing a different
+test than the one(s) that were selected. As some actions acted on the viewed test and others
+on the selected tests this caused confusion.
+
+Therefore there is no longer any separate concept. Selecting a single test (single-clicking it)
+will also view it. Good news for those who got RSI from all the double-clicking in TextTest :)
+
+All the elements relating to the test that is being viewed are placed under a separate "Test" tab.
+This tab is hidden when no tests are selected, but automatically chosen when tests are viewed. It
+is also hidden in the static GUI when multiple tests are selected, though in the dynamic GUI it
+remains as a "sample", as when saving multiple tests this information is often useful.
+
+Changes in the static GUI 
+-------------------------
+(a) Viewing the config files in the static GUI
+
+The old purple "application" rows are removed from the test tree view altogether now.
+There is now a separate tab "Config" which displays the config files for all applications
+together and also the personal configuration files, if any.
+
+(b) Running options
+
+Previously the Running options were subdivided into 4 groups, "What to Run", "How to Run",
+"Side Effects" and "SGE/LSF". These are now regrouped into 2 tabs, "Basic" and "Advanced".
+Hopefully the important stuff is easier to find.
+
+(c) Reconnecting to previous results
+
+Reconnecting to previously run results has previously been done by setting the "reconnect"
+options in the running tabs and then pressing "Run". This is now separated and has its
+own tab and button under the Running tab and is hopefully easier to use and more intuitive.
+
+(d) New Files tab (replaces New Diagnostics button)
+
+If you'd enabled TextTest's integration with log4x you'd have seen a "New Diagnostics" button
+before, that helped create new log4x configuration files in the test structure. This is now
+generalised and can create any sort of file of interest to TextTest. (It still works by
+copying from more general places in the test suite and opening an editor). There is a tab
+"New Files" under the Test tab.
+
+Changes in the dynamic GUI
+--------------------------
+(a) Viewing running tests
+
+Previously, whenever a yellow running test was selected, TextTest went off and gathered dynamic
+information on how far through it was reckoned to be and created a partial comparison based on this.
+This made it unwieldly to navigate the test tree view with the keyboard, as each test passed
+over tried to get this information.
+
+It is therefore no longer collected by default. A button called "Update Info" will perform this task
+when requested. Note that running tests cannot be compared in tkdiff or equivalent until this
+button is pressed now.
+
+(b) Saving partial results
+
+In version 3.7 there was a "Save Singel file" drop-down list under the Saving tab which could be used 
+to save a single file from a test result without needing to save them all. This is now removed. Instead, 
+(multi-)select the files from the file view. This also means that several files can be saved at once 
+without needing to save them all.
+
+If no files are selected in the file view then all with be saved anyway.
+
+(c) Cannot select test suites any more.
+
+There wasn't much useful information from test suites in the dynamic GUI, so they've been made unclickable.
+This does mean there is no way to view testsuite files or testsuite related data though. Use the static GUI
+for this.
+
+(2) performance_test_minimum behaviour changed
+==============================================
+
+Previously this setting caused performance figures not to be compared if either the stored or the produced
+result was less than it. This behaviour is changed/fixed such that failure is triggered if either is
+above it. On upgrading to TextTest 3.8 you may suddenly get tests that are 1000% slower/faster that
+you hadn't noticed until now... (if using this setting)
+

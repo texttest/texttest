@@ -1,0 +1,122 @@
+It should not be necessary to explicitly migrate anything on upgrading to version 3.7, but note 
+that the following behaviour is changed as default:
+
+(1) GUI layout
+==============
+
+Version 3.7 includes the biggest GUI changes for some time. The rising tide of complaints that the interface
+was non-intuitive and inconvenient in some respects caused me to rethink a few things.
+
+The key aims of the redesign are:
+
+(1) Make common functionality (like "Run Tests") always accessible.
+(2) Put related functionality close together on the screen.
+(3) Reduce GUI clutter where possible
+(4) Improve API testing (where multiple applications are present together)
+(5) Reduce the probability of doing something unintentional (Removing a test when trying to run it, for example...)
+(6) Improve the code structure
+
+Not bad for simultaneous ambitions!
+
+Changes in the static GUI:
+--------------------------
+Previously all selection and running functionality has only been available while 
+viewing an "application" i.e. the purple lines in the GUI. This made the existence 
+of the "View App" button necessary for navigating quickly there. It wasn't very 
+intuitive and it led to important functionality being hidden some of the time. 
+It could also only be carried out for one application at a time.
+
+It has basically now moved to global, always-visible scope. The buttons "Select", 
+"Run Tests" and "Reset" have shifted leftwards to be above the test window (tree view). 
+The associated tabs are mixed in with the tabs for whatever is being viewed at the time 
+and can also always be seen irrespective of what is being viewed. To avoid massive 
+"tab overload", this is achieved by having two hierarchical rows of tabs. So the ones 
+associated with the viewed test are under "Test", while the ones that previously could 
+only be found from the application are under "Selection" and "Running" respectively.
+
+You can still look at the application rows, but the only major point is to view the 
+config files (and now also your personal configuration). The "view app" button is removed.
+
+Where more than one application is run at once, it's worth knowing that selections made 
+from the Selection tab now have global scope. There are no longer separate selections per 
+application. This is hopefully easier to use.
+
+Previously, all functionality, however obscure, has been blessed with a button in the toolbar. 
+This is no longer the case. Only interactive actions that are "frequent use" (as defined by the 
+method isFrequentUse) have this quality. The others have their buttons at the bottom of their
+respective tabs. The ones that are "frequent use" also have a button at the bottom of the tabs, 
+which does the same thing as the one on the toolbar. The basic point is to reduce clutter. At 
+present, buttons that do not have associated tabs are on the toolbar whether they are frequent 
+use or not though.
+
+Changes in the dynamic GUI
+--------------------------
+In version 3.6, there were three buttons in TextTest : "Save", "Save All" and "Save Selected". In 
+version 3.7 this duplication is removed and there is only one button called "Save". It behaves roughly
+like the "Save Selected" button used to: i.e., it will save whichever tests you have selected at 
+the time.
+
+"Save All" can be achieved by either selecting all the tests with the mouse, or pressing ctrl-A in 
+the test-tree window. That will select all the tests, and you can then press "Save".
+
+The "Saving" tab can still be found where it used to be found, but the difference is that it now 
+applies to all tests for all applications. That meant some changes were necessary to its behaviour. 
+In particular
+
+- It wasn't possible to keep the behaviour for the "Exact/Average" radio button when saving 
+performance (which used to be to default to Exact if other files were different and Average otherwise). 
+It now defaults to Exact all the time. I thought that was less confusing as averaging is not always 
+expected. If you want to change it to Average, however, you can change it once in one place and
+it will stay changed until you change it back again...
+
+- You'll generally see more options in the "Save Single File" drop-down box, as it now takes all the 
+files the application can generate, rather than all that are different for that particular test.
+
+- Versions: if you run several different versions in the same GUI the default option will be 
+something like <default> - 2,3: meaning that tests will be saved with the version they are run with. 
+Changing this to an actual number will cause all to be saved with the same version irrespective of what 
+they were run with.
+
+Hopefully this will remove some clutter, anyway. 
+
+(2) Changes to the "Record use-case" functionality
+==================================================
+
+- There are two extra fields to allow you to specify which version you wish to record and which checkout to
+use. Previously this could only be controlled from the command line.
+
+- The catalogue file is now always ignored when re-recording a test. This will hopefully avoid the problem
+where recording is aborted, a catalogue is created saying "no changes" and the test is then re-recorded to edit data.
+
+- It is no longer necessary to have an options file for a test to be recognised as a test. Any directory referred
+in the testsuite file is now considered to be a test, and if the options file is not present, no options will be given.
+This means that empty options files are no longer needed and will not be created. 
+
+- All use-case recording now works via the dynamic GUI rather than directly on the system under test. The main reason 
+for this is to make it more user friendly when mistakes are made in recording. Essentially, the record session is run 
+via the dynamic GUI, new files are presented and can be saved as desired, and if nothing is saved, nothing changes and
+no auto-replay is run.
+
+- I did some work with the self-tests for this so that recording self-tests that do recording themselves is neater
+and more stable. 
+
+(3) Catalogue functionality will sort all files found
+=====================================================
+
+So it might change your catalogues if you're using this functionality. Hopefully only
+the order in the file will change and it will then be the same.
+
+(4) Default interface is now the static GUI
+===========================================
+
+Previously no options meant the console interface. It no longer does unless you set
+default_interface:console. It is therefore no longer necessary to explicitly say -gx
+on the command line to start the static GUI.
+
+(5) Local links in test data structures that point outside the data
+===================================================================
+
+A bug has been fixed whereby local links within test data structures are preserved rather
+than made to point to the master copy. A side-effect of this is that links that are local
+but point outside the structure (typically via ../ at the top level) will no longer work. 
+These will need to be changed to the absolute target location.

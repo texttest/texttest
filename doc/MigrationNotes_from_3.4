@@ -1,0 +1,65 @@
+(1) Due to resurrected support on Windows, the configuration 'unixConfig'
+is no longer present or necessary. The few UNIX-specific things left
+are inferrred by running the configuration 'default' on a UNIX system.
+
+In other words, if your config file says
+config_module:unixConfig
+
+delete this line.
+
+(2) This applies to anyone who was tried to measure CPU time or memory consumption
+with texttest. The config file format of most settings has changed.
+
+Because any number of resource-related files can now be extracted, the settings are 
+now more like the batch settings, each is a section, with type names. So, for example,
+instead of
+
+performance_test_resource:model=Opteron250
+
+you would now write
+
+[performance_test_resource]
+cputime:model=Opteron250
+
+Likewise, minimum_cputime_for_test and minimum_memory_for_test are replaced by
+
+[performance_test_minimum]
+cputime:10
+memory:5
+
+The name 'cputime' for UNIX time-generated CPU time is hardcoded. The rest you can 
+set yourself. Use the entry
+
+[performance_logfile_extractor]
+memory:Memory Usage Is
+
+to tell TextTest how to create the file from your log file. (This replaces 'string_before_memory'.) The file name 'memory' no longer has any special meaning.
+
+There is also a new entry, that can tell it to use a file other than the one indicated by log_file
+for this purpose: as follows.
+
+[performance_logfile]
+memory:output
+
+In summary, the changes are follows:
+
+Old names                               New Names
+=========                               =========
+performance_test_machine (list)         performance_test_machine (section)
+performance_test_resource (list)        performance_test_resource (section)
+<cputime|memory>_variation_% (int)      performance_variation_% (section)
+minimum_<cputime|memory>_for_test (int) performance_test_minimum (section)
+string_before_memory (string)           performance_logfile_extractor (section)
+
+Note for migrators (or checkers): check your sections end correctly. If you have global level 
+settings after a section, an [end] marker will be needed to make sure that they don't end up 
+in the section! Otherwise they will not be included.
+
+(example)
+
+[performance_test_machine]
+cputime:apple
+
+config_module:default
+
+(This will not work as config_module will be entered in the section [performance_test_machine]. Use an [end] marker after the section.) 

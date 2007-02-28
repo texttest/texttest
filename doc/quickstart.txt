@@ -1,0 +1,95 @@
+To get started quickly, take a look in the self-tests. There are various "TargetApp" directories
+to be found. Each of these contains a test-suite for a simple program (which are in turn part
+of the larger test suite for TextTest, as it tests itself testing these programs)
+
+To run these apps by hand, go to the TargetApp directory in question and call it, via
+
+texttest -gx  (static GUI - allows management of tests and starting dynamic GUI)
+texttest -g   (dynamic GUI - runs tests and shows results in GUI)
+texttest -con (console interface)
+
+To understand the test suite, there is always a file called config.<app> (and maybe a few more for 
+versions). This tells texttest about the application in question. If nothing else it will have an 
+entry called "binary" to tell you what executable is being tested.
+
+There will also be a file called testsuite.<app>. This lists subdirectories to be considered either 
+as test cases or test suites themselves. Applies recursively you can find the directories which 
+represent tests.
+
+A test can define command-line options via the options.<app> file, and also standard input contents 
+via the input.<app> file. For GUIs it can define use-case style actions to be performed on the GUI via
+the usecase.<app> file. Anything else under the test is "standard results", for example output.<app> 
+for the standard output and errors.<app> for the standard error. When the test is run these will be 
+compared with the actual results from running the program with the input as defined.
+
+What there is to find:
+
+./TestSelf/RunDependentText/TargetApp        : useful for understanding the run-dependent text filtering
+
+./TestSelf/EnvironmentFile/TargetApp         : useful for understanding how environment variables are 
+                                               set and unset
+
+./TestSelf/DiagnosticHandling/TargetApp      : useful for understanding integration with log4py, log4j 
+                                               and log4cpp to enable swift enabling and disabling of
+                                               debugging information.
+
+./TestSelf/TestData/TargetApp                : useful for understanding how TextTest handles test data, and
+                                               the differences between data that is only to be read and that
+                                               which can also be written.
+
+./TestSelf/CollateFiles/TargetApp            : useful for understanding how TextTest collects files of any
+                                               name written by an application
+
+./TestSelf/Checkouts/TargetApp               : useful for understanding how the checkout mechanism for 
+                                               version control integration works.
+
+./TestSelf/MemoryTests/TargetApp             : useful for understanding how memory consumption is compared
+
+./TestSelf/PerformanceTests/TargetApp        : useful for understanding how test performance is compared 
+                                               (via \time on UNIX, 'pslist' on Windows and using extraction                                                                              from logfiles)
+
+./TestSelf/KnownBugs/TargetApp               : useful for finding out how textual patterns are identified
+                                               as known bugs, and also linked to bugs in Bugzilla
+
+./TestSelf/RunningTests/TargetApp            : shows how you can view your tests before
+                                               they compmlete in the dynamic GUI
+
+./TestSelf/BaseVersions/TargetApp            : shows how to get version settings to inherit from each other.
+
+./TestSelf/ExtraVersions/TargetApp           : shows how to automatically run other versions than the default
+                                               when running normally.
+
+./GUI/StaticGUI/StartFromScratch/TargetApp   : useful for getting a handle on what a totally empty test suite
+                                               should look like
+
+./GUI/StaticGUI/UseCaseRecording/TargetApp   : useful for understadning TextTest's integration with Use Case
+                                               Recorders such as PyUseCase and JUseCase for GUI testing.
+
+./TestSelf/TrafficInterception/TargetApp     : useful for understanding how TextTest can record and replay
+                                               results from "third-party" programs run on the command line
+                                               and thus produce repeatable results.
+
+./TestSelf/TrafficInterception/ClientServer/TargetApp
+                                             : useful for undestanding how TextTest can record and replay 
+                                               textual traffic on a network connection, allowing creation
+                                               of component tests for client/server systems.
+
+./TargetApp                                  : used by default as it's a bit more advanced, this app is 
+                                               an adjudicator for the popular board game "diplomacy"
+
+./TestSelf/BatchTests/CollectFiles/TargetApp : useful for understanding how batch reporting works.
+
+./TestSelf/EmptyTestSuites/TargetApp         : useful for understanding how TextTest handles various unusual
+                                               things in the testsuite files.
+
+./TestSelf/CollateFiles/UnixOnly/TargetApp   : (UNIX only) useful for understanding core file processing
+
+./TestSelf/Miscellaneous/UnixOnly/TargetApp  : (UNIX only) useful for understanding how the virtual display
+                                               integration with Xvfb works (to prevent application GUIs popping up)
+
+./QueueSystems/TargetApp                     : useful for understanding the queuesystem configuration and
+                                               the associated plugin for LSF and Sun Grid Engine
+
+
+Once you've browsed these a bit and can read them, you might start using the actual self-tests to see how 
+TextTest itself works and what features it has...

@@ -1,0 +1,12 @@
+Version 3.1.1 finally removes the "magical" pre-pend of checkout to relative paths in the environment and 
+some config file values. Instead, it exports the environment variable TEXTTEST_CHECKOUT so you can
+be explicit about when you want this.
+
+For example, where before you might have said in the config file
+
+binary:source/myprogram
+
+assuming this would be interpreted relative to the checkout, you now need to say
+
+binary:${TEXTTEST_CHECKOUT}/source/myprogram
+

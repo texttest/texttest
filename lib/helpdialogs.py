@@ -101,13 +101,12 @@ class CreditsDialog(guidialogs.ActionResultDialog):
         return "TextTest Credits"
 
     def addContents(self):
-        #authorFile = open(os.path.join(plugins.installationDir("docs"), "AUTHORS"))
-        #unicodeInfo = plugins.decodeText("".join(authorFile.readlines()))           
-        #authorFile.close()
-        #creditsText = plugins.encodeToUTF(unicodeInfo)
-
-        creditsText = "Add author info here, e.g. from the AUTHORS file."
+        authorFile = open(os.path.join(plugins.installationDir("doc"), "AUTHORS"))
+        unicodeInfo = plugins.decodeText("".join(authorFile.readlines()))           
+        authorFile.close()
+        creditsText = plugins.encodeToUTF(unicodeInfo)
         guidialogs.guilog.info("Showing credits:\n" + creditsText)
+
         buffer = gtk.TextBuffer()
         buffer.set_text(creditsText)
         textView = gtk.TextView(buffer)
@@ -124,13 +123,12 @@ class LicenseDialog(guidialogs.ActionResultDialog):
         return "TextTest License"
 
     def addContents(self):
-        #licenseFile = open(os.path.join(plugins.installationDir("docs"), "LICENSE"))
-        #unicodeInfo = plugins.decodeText("".join(licenseFile.readlines()))           
-        #licenseFile.close()
-        #licenseText = plugins.encodeToUTF(unicodeInfo)
-
-        licenseText = "Add license info here, e.g. from the LICENSE file."
+        licenseFile = open(os.path.join(plugins.installationDir("doc"), "LICENSE"))
+        unicodeInfo = plugins.decodeText("".join(licenseFile.readlines()))           
+        licenseFile.close()
+        licenseText = plugins.encodeToUTF(unicodeInfo)
         guidialogs.guilog.info("Showing license:\n" + licenseText)
+
         buffer = gtk.TextBuffer()
         buffer.set_text(licenseText)
         textView = gtk.TextView(buffer)

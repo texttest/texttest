@@ -1,6 +1,7 @@
 <ui>
 
   <menubar name="MainMenuBar">
+
     <menu name="filemenu" action="filemenu">
       <menuitem name="Load Selection..." action="Load Selection..."/>
       <separator/>
@@ -8,6 +9,7 @@
       <separator/>
       <menuitem name="Quit" action="Quit"/>
     </menu>
+
     <menu name="editmenu" action="editmenu">
       <menuitem name="Rename..." action="Rename..."/>
       <menuitem name="Remove..." action="Remove..."/>
@@ -21,17 +23,20 @@
       <menuitem name="Reversed Sort Test Suite File" action="Reversed Sort Test Suite File"/>
       <separator/>
     </menu>
+
     <menu name="viewmenu" action="viewmenu">
       <menuitem name="Toolbar" action="Toolbar"/>
       <menuitem name="Shortcut bar" action="Shortcut bar"/>
       <menuitem name="Status bar" action="Status bar"/>
     </menu>
+
     <menu name="actionsmenu" action="actionsmenu">
       <menuitem name="Select" action="Select"/>
       <menuitem name="Run" action="Run"/>
       <menuitem name="Reconnect" action="Reconnect"/>
       <menuitem name="Reset" action="Reset"/>
     </menu>
+
   </menubar>
 
   <toolbar name="MainToolBar">

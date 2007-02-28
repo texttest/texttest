@@ -63,12 +63,38 @@ def showWarningDialog(message, parent=None):
 
 def showInformationDialog(message, parent=None):
     guilog.info("INFORMATION: " + message)
-    dialog = gtk.Dialog("TextTest Information", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    dialog = gtk.Dialog("TextTest Information", parent, buttons=(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE))
     dialog.set_modal(True)
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_INFO), expand=True, fill=True)
-    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
+    scriptEngine.connect("press close", "response", dialog, destroyDialog, gtk.RESPONSE_CLOSE)
     dialog.show_all()
-    dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+    dialog.set_default_response(gtk.RESPONSE_CLOSE)
+
+#
+# A generic action dialog, containing stuff which is shared between ActionConfirmationDialog
+# and ActionResultDialog. It is recommended to inherit from those instead of directly
+# from this class.
+#
+class GenericActionDialog:
+    def __init__(self, parent, plugin):
+        self.parent = parent
+        self.plugin = plugin
+
+    def getDialogTitle(self):
+        return self.plugin.getScriptTitle(None)        
+
+    def isModal(self):
+        return True
+    
+    def run(self):
+        self.addContents()
+        self.dialog.show_all()
+
+    def getStockIcon(self, stockItem):
+        imageBox = gtk.VBox()
+        imageBox.pack_start(gtk.image_new_from_stock(stockItem, gtk.ICON_SIZE_DIALOG), expand=False)
+        return imageBox
+
 
 #
 # A skeleton for a dialog which can replace the 'tab options' of
@@ -78,19 +104,18 @@ def showInformationDialog(message, parent=None):
 # option tab page layout. I think this will only add a minor overhead,
 # but will make it much easier to make the dialogs look nice.
 # 
-class ActionConfirmationDialog:
+class ActionConfirmationDialog(GenericActionDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
-        self.parent = parent
-        self.plugin = plugin
+        GenericActionDialog.__init__(self, parent, plugin)
         self.okMethod = okMethod
         self.cancelMethod = cancelMethod
-        self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL)
+        if self.isModal():
+            self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL) 
+            self.dialog.set_modal(True)
+        else:
+            self.dialog = gtk.Dialog(self.plugin.getScriptTitle(None))             
         self.createButtons()
-        self.dialog.set_modal(True)
 
-    def getDialogTitle(self):
-        return self.plugin.getScriptTitle(None)
-        
     def createButtons(self):
         self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         self.okButton = self.dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)       
@@ -105,9 +130,35 @@ class ActionConfirmationDialog:
         elif self.cancelMethod:
             self.cancelMethod()
 
-    def run(self):
-        self.addContents()
-        self.dialog.show_all()
+
+# A skeleton for a dialog which can show results of actions. 
+class ActionResultDialog(GenericActionDialog):
+    def __init__(self, parent, okMethod, plugin):
+        GenericActionDialog.__init__(self, parent, plugin)
+        self.okMethod = okMethod
+        if self.isModal():
+            self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL) 
+            self.dialog.set_modal(True)
+        else:
+            self.dialog = gtk.Dialog(self.getDialogTitle())             
+        self.createButtons()
+
+    def createButtons(self):
+        self.okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)       
+        scriptEngine.connect("press close", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+    def respond(self, button, saidOK, *args):
+        self.dialog.hide()
+        self.dialog.response(gtk.RESPONSE_NONE)
+        if self.okMethod:
+            self.okMethod()
+
+#
+#
+# Put specific dialog implementations below.
+#
+#
        
 class YesNoDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin, message = None):
@@ -130,8 +181,9 @@ class YesNoDialog(ActionConfirmationDialog):
 
     def addContents(self):
         self.dialog.vbox.pack_start(createDialogMessage(self.message,
-                                                        gtk.STOCK_DIALOG_QUESTION), expand=True, fill=True)        
+                                                        gtk.STOCK_DIALOG_QUESTION), expand=True, fill=True)
 
+        
 class SaveSelectionDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
         self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_SAVE)
@@ -351,7 +403,6 @@ class CreatePerformanceReportDialog(ActionConfirmationDialog):
         table.attach(self.versionsEntry, 1, 2, 1, 2)
         scriptEngine.registerEntry(self.dirEntry, "choose directory ")
         scriptEngine.registerEntry(self.versionsEntry, "choose versions ")
-        table.show_all()
         self.dialog.vbox.pack_start(table, expand = True, fill = True)
         
     def respond(self, button, saidOK, *args):

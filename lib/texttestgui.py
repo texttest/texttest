@@ -28,7 +28,7 @@ from ndict import seqdict
 from respond import Responder
 from copy import copy
 
-import guidialogs
+import guidialogs, helpdialogs
 from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog
 
 import traceback
@@ -52,6 +52,40 @@ def getTestColour(test, category):
     else:
         # Everything unknown is assumed to be a new type of failure...
         return colours["failure"]
+
+class PluginHandler:
+    def __init__(self):
+        self.modules = []
+    def getInstance(self, className, *args):
+        for module in self.modules:
+            command = "from " + module + " import " + className + " as realClassName"
+            try:
+                exec command
+                guilog.info("Loaded class '" + className + "' from module '" + module + "'")
+            except ImportError:
+                continue
+            
+            actionObject = self.tryMakeObject(realClassName, *args)
+            if actionObject:
+                return actionObject
+
+        dotPos = className.find(".")
+        if dotPos != -1:
+            module = className[0:dotPos]
+            theClassName = className[dotPos + 1:]
+            exec "from " + module + " import " + theClassName + " as realClassName"
+            return self.tryMakeObject(realClassName, *args)
+
+        return self.tryMakeObject(className, *args)
+    def tryMakeObject(self, className, *args):
+        try:
+            return className(*args)
+        except:
+            # If some invalid interactive action is provided, need to know which
+            plugins.printWarning("Problem with class " + className.__name__ + ", ignoring...")
+            plugins.printException()
+
+pluginHandler = PluginHandler()
 
 # base class for all "GUI" classes which manage parts of the display
 class SubGUI(plugins.Observable):
@@ -261,7 +295,7 @@ class TextTestGUI(Responder, plugins.Observable):
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
-
+        
         self.appFileGUI = ApplicationFileGUI(self.dynamic)
         self.textInfoGUI = TextInfoGUI()
         self.progressMonitor = TestProgressMonitor(self.dynamic)
@@ -470,7 +504,8 @@ class TopWindowGUI(ContainerGUI):
             import stockitems
             stockitems.register(self.topWindow)
         except:
-            printWarning("Failed to register texttest stock icons.")
+            plugins.printWarning("Failed to register texttest stock icons.")
+            plugins.printException()
         global globalTopWindow
         globalTopWindow = self.topWindow
         if self.dynamic:
@@ -568,7 +603,6 @@ class MenuBarGUI(SubGUI):
         description = "<ui>\n<menubar name=\"MainMenuBar\">\n"
         for action in self.actionGUIs:
             description += self.getMenuDescription(action)
-        # Special treatment for View menu ...
         description += "</menubar></ui>\n"        
         return description
     def getMenuDescription(self, action):
@@ -604,6 +638,9 @@ class MenuBarGUI(SubGUI):
         self.actionGroup.add_action(gtk.Action("editmenu", "_Edit", None, None))
         self.actionGroup.add_action(gtk.Action("viewmenu", "_View", None, None))
         self.actionGroup.add_action(gtk.Action("actionsmenu", "_Actions", None, None))
+        # To make sure the Help menu ends up last, we cannot have it in the xml files :-(
+        # The reason seems to be that the 'position' tag only specifies position w.r.t.
+        # the currently added items, and thus doesn't work properly when merging uis ...
         self.actionGroup.add_action(gtk.Action("reorderpopupmenu", "_Reorder", None, None))
         self.createToggleActions()
         for actionGUI in self.actionGUIs:
@@ -1277,15 +1314,24 @@ class ActionGUI(SubGUI):
         dialogType = self.catchErrorsFor(self.action.getDialogType)
         if dialogType is not None:
             if dialogType:
-                dialogClass = eval(dialogType)
-                dialog = dialogClass(globalTopWindow, self._runInteractive, self._dontRun, self.action)
+                dialog = pluginHandler.getInstance(dialogType, globalTopWindow,
+                                                   self._runInteractive, self._dontRun, self.action)
                 dialog.run()
             else:
                 self._runInteractive()
     def _dontRun(self):
         statusMonitor.notifyStatus("Action cancelled.")
     def _runInteractive(self):
-        return self.catchErrorsFor(self.action.perform)
+        return self.catchErrorsFor(self._tryRunInteractive)
+    def _tryRunInteractive(self):
+        try:
+            self.action.startPerform()
+            resultDialogType = self.action.getResultDialogType()
+            if resultDialogType:
+                resultDialog = pluginHandler.getInstance(resultDialogType, globalTopWindow, None, self.action)
+                resultDialog.run()
+        finally:
+            self.action.endPerform()
     def catchErrorsFor(self, method):
         try:
             return method()
@@ -1898,18 +1944,10 @@ class TextInfoGUI(SubGUI):
             if len(state.freeText) == 0:
                 self.text = self.text.replace(" :", "")
         self.text += str(state.freeText)
-    def getActualText(self):
-        buffer = self.view.get_buffer()
-        utf8Text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter())
-        localeEncoding = locale.getdefaultlocale()[1]
-        if not localeEncoding:
-            return utf8Text
-
-        unicodeInfo = unicode(utf8Text, "utf-8", errors="strict")
-        return unicodeInfo.encode(localeEncoding, "strict")
     def describe(self):
         guilog.info("---------- Text Info Window ----------")
-        guilog.info(self.getActualText().strip())
+        buffer = self.view.get_buffer()
+        guilog.info(plugins.encodeToLocale(buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter()), guilog).strip())
         guilog.info("--------------------------------------")
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) > 0 and self.currentTest not in tests:
@@ -1942,42 +1980,8 @@ class TextInfoGUI(SubGUI):
     def getTextForView(self):
         # Encode to UTF-8, necessary for gtk.TextView
         # First decode using most appropriate encoding ...
-        unicodeInfo = self.decodeText()
-        return self.encodeToUTF(unicodeInfo)
-    def decodeText(self):
-        localeEncoding = locale.getdefaultlocale()[1]
-        if localeEncoding:
-            try:
-                return unicode(self.text, localeEncoding, errors="strict")
-            except:
-                guilog.info("WARNING: Failed to decode string '" + self.text + \
-                            "' using default locale encoding " + repr(localeEncoding) + \
-                            ". Trying strict UTF-8 encoding ...")
-            
-        return self.decodeUtf8Text(localeEncoding)
-    def decodeUtf8Text(self, localeEncoding):
-        try:
-            return unicode(self.text, 'utf-8', errors="strict")
-        except:
-            guilog.info("WARNING: Failed to decode string '" + self.text + \
-                        "' both using strict UTF-8 and " + repr(localeEncoding) + \
-                        " encodings.\nReverting to non-strict UTF-8 encoding but " + \
-                        "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-            return unicode(self.text, 'utf-8', errors="replace")
-    def encodeToUTF(self, unicodeInfo):
-        try:
-            return unicodeInfo.encode('utf-8', 'strict')
-        except:
-            try:
-                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                            "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
-                            "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-                return unicodeInfo.encode('utf-8', 'replace')
-            except:
-                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                            "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
-                            "replacement. Showing error message instead.")
-                return "Failed to encode Unicode string."
+        unicodeInfo = plugins.decodeText(self.text, guilog)
+        return plugins.encodeToUTF(unicodeInfo, guilog)
 
         
 class FileViewGUI(SubGUI):
@@ -2594,3 +2598,4 @@ class ImportTestCase(guiplugins.ImportTestCase):
         elif self.optionGroup.getSwitchValue("GUI"):
             options += " -g"
         return options
+

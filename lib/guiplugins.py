@@ -174,6 +174,8 @@ class InteractiveAction(plugins.Observable):
             return "guidialogs.YesNoDialog"
         else:
             return ""
+    def getResultDialogType(self): # The dialog type to launch when the action has finished execution.
+        return ""
     def getTitle(self, includeMnemonics=False):
         title = self._getTitle()
         if includeMnemonics:
@@ -236,18 +238,22 @@ class InteractiveAction(plugins.Observable):
         return process
     def describe(self, testObj, postText = ""):
         guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
-    def perform(self):
+    def startPerform(self):
         message = self.messageBeforePerform()
         if message != None:
             self.notify("Status", message)
         self.notify("ActionStart", message)
+        self.performOnCurrent()
+        message = self.messageAfterPerform()
+        if message != None:
+            self.notify("Status", message)
+    def endPerform(self):
+        self.notify("ActionStop", "")
+    def perform(self):
         try:
-            self.performOnCurrent()
-            message = self.messageAfterPerform()
-            if message != None:
-                self.notify("Status", message)
+            self.startPerform()
         finally:
-            self.notify("ActionStop", message)
+            self.endPerform()
     
 class SelectionAction(InteractiveAction):
     def __init__(self):
@@ -483,6 +489,8 @@ class ViewFile(InteractiveTestAction):
         return False
     def isActiveOnCurrent(self):
         return not self.dynamic or InteractiveTestAction.isActiveOnCurrent(self)
+    def _getTitle(self):
+        return "ViewFile"
     def getTabTitle(self):
         return "Viewing"
     def canPerform(self):
@@ -1769,7 +1777,47 @@ class RenameTest(InteractiveAction):
             raise plugins.TextTestError, "Failed to rename test:\n" + str(e)
         except OSError, e:
             raise plugins.TextTestError, "Failed to rename test:\n" + str(e)
-   
+
+class VersionInformation(InteractiveAction):
+    def __init__(self, dynamic):
+        InteractiveAction.__init__(self)
+    def inToolBar(self): 
+        return False
+    def getMainMenuPath(self):
+        return "_Help"
+    def _getTitle(self):
+        return "Component _Versions"
+    def messageAfterPerform(self):
+        return ""
+    def _getScriptTitle(self):
+        return "show component version information"
+    def getResultDialogType(self):
+        return "helpdialogs.VersionsDialog"
+    def performOnCurrent(self):
+        pass # The only result is the result popup dialog ...
+
+class AboutTextTest(InteractiveAction):
+    def __init__(self, dynamic):
+        InteractiveAction.__init__(self)
+    def inToolBar(self): 
+        return False
+    def getMainMenuPath(self):
+        return "_Help"
+    def separatorBeforeInMainMenu(self):
+        return True
+    def getStockId(self):
+        return "about"
+    def _getTitle(self):
+        return "_About TextTest"
+    def messageAfterPerform(self):
+        return ""
+    def _getScriptTitle(self):
+        return "show information about texttest"
+    def getResultDialogType(self):
+        return "helpdialogs.AboutTextTestDialog"
+    def performOnCurrent(self):
+        pass # The only result is the result popup dialog ...
+     
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
@@ -1782,7 +1830,8 @@ class InteractiveActionHandler:
                                      RepositionTestFirst, RepositionTestUp, \
                                      RepositionTestDown, RepositionTestLast, \
                                      ReconnectToTests, LoadSelection, SaveSelection ]
-        self.actionPostClasses = []
+        self.actionExternalClasses = []
+        self.actionPostClasses = [ VersionInformation, AboutTextTest ]
         self.loadModules = [] # derived configurations add to this on being imported...
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")
@@ -1817,6 +1866,7 @@ class InteractiveActionHandler:
         instances = self.getListedInstances(self.actionPreClasses, dynamic, *args)
         modeClassList = eval("self.action" + self.getMode(dynamic) + "Classes")
         instances += self.getListedInstances(modeClassList, *args)
+        instances += self.getListedInstances(self.actionExternalClasses, dynamic, *args)
         instances += self.getListedInstances(self.actionPostClasses, dynamic, *args)
         return instances
     def makeInstance(self, intvActionClass, *args):

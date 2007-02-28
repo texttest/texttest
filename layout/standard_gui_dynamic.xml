@@ -1,6 +1,7 @@
 <ui>
 
   <menubar name="MainMenuBar">
+
     <menu name="filemenu" action="filemenu">
       <menuitem name="Save Selection..." action="Save Selection..."/>
       <separator/>
@@ -8,11 +9,13 @@
       <separator/>
       <menuitem name="Quit" action="Quit"/>
     </menu>
+
     <menu name="viewmenu" action="viewmenu">
       <menuitem name="Toolbar" action="Toolbar"/>
       <menuitem name="Shortcut bar" action="Shortcut bar"/>
       <menuitem name="Status bar" action="Status bar"/>
     </menu>
+
   </menubar>
 
   <toolbar name="MainToolBar">

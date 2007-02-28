@@ -926,4 +926,4 @@ class PerformanceReportScript(plugins.ScriptWithArgs):
         self.creator.createMainIndexFile()
 
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CreatePerformanceReport)
-guiplugins.interactiveActionHandler.actionPostClasses.append(optimization.PlotTestInGUI)
+guiplugins.interactiveActionHandler.actionExternalClasses.append(optimization.PlotTestInGUI)

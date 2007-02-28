@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, time, re, stat
+import sys, os, log4py, string, shutil, time, re, stat, locale
 from ndict import seqdict
 from process import Process
 from traceback import format_exception
@@ -952,4 +952,56 @@ class OptionGroup:
                     self.switches[arg].defaultValue = 1 - oldValue
                 else:
                     raise TextTestError, self.name + " does not support switch '" + arg + "'"
+ 
+def decodeText(text, log = None):
+    localeEncoding = locale.getdefaultlocale()[1]
+    if localeEncoding:
+        try:
+            return unicode(text, localeEncoding, errors="strict")
+        except:
+            if log:
+                log.info("WARNING: Failed to decode string '" + text + \
+                         "' using default locale encoding " + repr(localeEncoding) + \
+                         ". Trying strict UTF-8 encoding ...")
+                
+    return decodeUtf8Text(text, localeEncoding, log)
 
+def decodeUtf8Text(text, localeEncoding, log = None):
+    try:
+        return unicode(text, 'utf-8', errors="strict")
+    except:
+        if log:
+            log.info("WARNING: Failed to decode string '" + text + \
+                     "' both using strict UTF-8 and " + repr(localeEncoding) + \
+                     " encodings.\nReverting to non-strict UTF-8 encoding but " + \
+                     "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+        return unicode(text, 'utf-8', errors="replace")
+
+def encodeToUTF(unicodeInfo, log = None):
+    try:
+        return unicodeInfo.encode('utf-8', 'strict')
+    except:
+        try:
+            if log:
+                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
+                         "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
+                         "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+            return unicodeInfo.encode('utf-8', 'replace')
+        except:
+            if log:
+                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
+                         "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
+                         "replacement. Showing error message instead.")
+            return "Failed to encode Unicode string."
+        
+def encodeToLocale(unicodeInfo, log = None):
+    localeEncoding = locale.getdefaultlocale()[1]
+    if localeEncoding:
+        try:
+            return unicodeInfo.encode(localeEncoding, 'strict')
+        except:
+            if log:
+                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
+                         "' using strict '" + localeEncoding + "' encoding.\nReverting to non-strict UTF-8 " + \
+                         "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+    return unicodeInfo.encode('utf-8', 'replace')

@@ -11,28 +11,9 @@ import os, string, optimization, matador, plugins, shutil
 def getConfig(optionMap):
     return FleetConfig(optionMap)
 
-def usingOptionFile():
-    if os.environ.has_key("FLEET_SUBPLAN_IN_INPUT"):
-        return 0
-    else:
-        return 1
-
-def subPlanInput(inputFile):
-    for line in open(inputFile).xreadlines():
-        entries = line.split()
-        if entries[0] == "loadsp":
-            return string.join(entries[1:], os.sep)
-
+# This seems to exist entirely for Tail Assignment plotting graphs.
+# Fleet/RollingStock don't work here anyway...
 class FleetConfig(matador.MatadorConfig):
-    def _subPlanName(self, test):
-        if usingOptionFile():
-          subPlan = matador.MatadorConfig._subPlanName(self, test)
-        else:
-          subPlan = subPlanInput(test.inputFile)
-        if subPlan == None:
-            # print help information and exit:
-            return "" 
-        return subPlan
     def printHelpDescription(self):
         print helpDescription
         matador.MatadorConfig.printHelpDescription(self)

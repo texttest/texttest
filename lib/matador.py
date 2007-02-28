@@ -142,11 +142,20 @@ class MatadorConfig(optimization.OptimizationConfig):
         self.noIncreaseExceptMethods["broken hard leg constraints"] = [ "MaxRoster" ]
         self.noIncreaseExceptMethods["broken hard global constraints"] = [ "MaxRoster" ]
         app.setConfigDefault("diagnostics", self.getDiagnosticSettings())
+    def getCarmenEnvironment(self, app):
+        envVars = optimization.OptimizationConfig.getCarmenEnvironment(self, app)
+        envVars += [ ("CARMEN_PRODUCT", self.getProductName(app)) ]
+        return envVars
+    def getProductName(self, app):
+        if app.name in [ "rso", "rot", "depot" ]:
+            return "RailFleet"
+        else:
+            return "standard_gpc"
     def setEnvironment(self, test):
         optimization.OptimizationConfig.setEnvironment(self, test)
         if test.parent is None:
             test.setEnvironment("MATADOR_CRS_NAME", ravebased.getBasicRaveName(test))
-
+        
 class MakeComparisons(comparetest.MakeComparisons):
     def __init__(self, testComparisonClass, getRuleSetting):
         comparetest.MakeComparisons.__init__(self, testComparisonClass)

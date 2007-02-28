@@ -1787,6 +1787,8 @@ class VersionInformation(InteractiveAction):
         return "_Help"
     def _getTitle(self):
         return "Component _Versions"
+    def separatorBeforeInMainMenu(self):
+        return True
     def messageAfterPerform(self):
         return ""
     def _getScriptTitle(self):
@@ -1817,6 +1819,24 @@ class AboutTextTest(InteractiveAction):
         return "helpdialogs.AboutTextTestDialog"
     def performOnCurrent(self):
         pass # The only result is the result popup dialog ...
+
+class MigrationNotes(InteractiveAction):
+    def __init__(self, dynamic):
+        InteractiveAction.__init__(self)
+    def inToolBar(self): 
+        return False
+    def getMainMenuPath(self):
+        return "_Help"
+    def _getTitle(self):
+        return "_Migration Notes"
+    def messageAfterPerform(self):
+        return ""
+    def _getScriptTitle(self):
+        return "show texttest migration notes"
+    def getResultDialogType(self):
+        return "helpdialogs.MigrationNotesDialog"
+    def performOnCurrent(self):
+        pass # The only result is the result popup dialog ...
      
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
@@ -1831,7 +1851,7 @@ class InteractiveActionHandler:
                                      RepositionTestDown, RepositionTestLast, \
                                      ReconnectToTests, LoadSelection, SaveSelection ]
         self.actionExternalClasses = []
-        self.actionPostClasses = [ VersionInformation, AboutTextTest ]
+        self.actionPostClasses = [ MigrationNotes, VersionInformation, AboutTextTest ]
         self.loadModules = [] # derived configurations add to this on being imported...
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")

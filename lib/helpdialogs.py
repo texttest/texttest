@@ -180,7 +180,7 @@ class MigrationNotesDialog(guidialogs.ActionResultDialog):
             notebook.append_page(scrolledWindow, gtk.Label(notesVersion))
 
         if notebook.get_n_pages() == 0:
-            raise plugins.TextTestWarning, "\nNo migration notes could be found in\n" + plugins.installationDir("doc") + "\n"
+            raise plugins.TextTestError, "\nNo migration notes could be found in\n" + plugins.installationDir("doc") + "\n"
         else:
             guidialogs.scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
             parentSize = self.parent.get_size()

@@ -151,11 +151,15 @@ class FileComparison:
             return fileName + "." + versionString
         else:
             return fileName
-    def overwrite(self, test, exact, versionString):
-        self.diag.info("save file from " + self.tmpFile)
+    def getStdRootVersionFile(self):
+        # drop version identifiers
         dirname, local = os.path.split(self.stdFile)
         localRoot = string.join(local.split(".")[:2], ".")
-        self.stdFile = os.path.join(dirname, self.versionise(localRoot, versionString))
+        return os.path.join(dirname, localRoot)
+    def overwrite(self, test, exact, versionString):
+        self.diag.info("save file from " + self.tmpFile)
+        stdRoot = self.getStdRootVersionFile()
+        self.stdFile = self.versionise(stdRoot, versionString)
         if os.path.isfile(self.stdFile):
             os.remove(self.stdFile)
 
@@ -183,10 +187,19 @@ class FileComparison:
         self.differenceCache = False
         self.tmpFile = self.stdFile
         self.tmpCmpFile = self.stdFile
-    def removeStandard(self):
-        os.remove(self.stdFile)
+    def saveMissing(self, versionString, autoGenText):
+        stdRoot = self.getStdRootVersionFile()
+        targetFile = self.versionise(stdRoot, versionString)
+        if os.path.isfile(targetFile):
+            os.remove(targetFile)
+
         self.stdFile = None
         self.stdCmpFile = None
+        if stdRoot != targetFile and os.path.isfile(stdRoot):
+            # Create a "versioned-missing" file
+            newFile = open(targetFile, "w")
+            newFile.write(autoGenText)
+            newFile.close()
     def saveResults(self, destFile):
         copyfile(self.tmpFile, destFile)
         

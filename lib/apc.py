@@ -229,6 +229,7 @@ class ApcConfig(optimization.OptimizationConfig):
         app.setConfigDefault("link_libs", "")
         app.setConfigDefault("extract_logs", {})
         app.setConfigDefault("apcinfo", {})
+        app.setConfigDefault("quit_ask_for_confirm", -1)
         app.addConfigEntry("select_kpi_group", "<control>k", "gui_accelerators")
     def getDefaultCollations(self):
         return { "stacktrace" : "apc_tmp_dir/core*" }
@@ -1686,6 +1687,21 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
     def getRunningTmpFile(self, test, logFileStem):
         return test.makeTmpFileName("APC_FILES/" + logFileStem, forComparison=0)
     
+class Quit(guiplugins.Quit):
+    def __init__(self, dynamic):
+        self.dynamic = dynamic
+        guiplugins.InteractiveAction.__init__(self)
+    def getConfirmationMessage(self):
+        if self.dynamic:
+            firstApp = guiplugins.guiConfig.apps[0]
+            confirmTime = firstApp.getConfigValue("quit_ask_for_confirm")
+            if confirmTime >= 0:
+                start = plugins.globalStartTime
+                now = time.time()
+                elapsedTime = (now-start)/60.0
+                if  elapsedTime >= confirmTime:
+                    return "Tests have been runnning for %d minutes,\n are you sure you want to quit?" % elapsedTime
+        return ""
 
 guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC, SelectKPIGroup ]
 guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ]

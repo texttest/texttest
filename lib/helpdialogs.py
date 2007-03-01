@@ -101,14 +101,18 @@ class CreditsDialog(guidialogs.ActionResultDialog):
         return "TextTest Credits"
 
     def addContents(self):
-        authorFile = open(os.path.join(plugins.installationDir("doc"), "AUTHORS"))
-        unicodeInfo = plugins.decodeText("".join(authorFile.readlines()))           
-        authorFile.close()
-        creditsText = plugins.encodeToUTF(unicodeInfo)
-        guidialogs.guilog.info("Showing credits:\n" + creditsText)
+        try:
+            authorFile = open(os.path.join(plugins.installationDir("doc"), "AUTHORS"))
+            unicodeInfo = plugins.decodeText("".join(authorFile.readlines()))           
+            authorFile.close()
+            creditsText = plugins.encodeToUTF(unicodeInfo)
+            guidialogs.guilog.info("Showing credits:\n" + creditsText)
+            buffer = gtk.TextBuffer()
+            buffer.set_text(creditsText)
+        except Exception, e:
+            guidialogs.showErrorDialog("Failed to show AUTHORS file:\n" + str(e), self.parent)
+            return
 
-        buffer = gtk.TextBuffer()
-        buffer.set_text(creditsText)
         textView = gtk.TextView(buffer)
         textView.set_editable(False)
         textView.set_cursor_visible(False)
@@ -123,14 +127,18 @@ class LicenseDialog(guidialogs.ActionResultDialog):
         return "TextTest License"
 
     def addContents(self):
-        licenseFile = open(os.path.join(plugins.installationDir("doc"), "LICENSE"))
-        unicodeInfo = plugins.decodeText("".join(licenseFile.readlines()))           
-        licenseFile.close()
-        licenseText = plugins.encodeToUTF(unicodeInfo)
-        guidialogs.guilog.info("Showing license:\n" + licenseText)
+        try:
+            licenseFile = open(os.path.join(plugins.installationDir("doc"), "LICENSE"))
+            unicodeInfo = plugins.decodeText("".join(licenseFile.readlines()))           
+            licenseFile.close()
+            licenseText = plugins.encodeToUTF(unicodeInfo)
+            guidialogs.guilog.info("Showing license:\n" + licenseText)
+            buffer = gtk.TextBuffer()
+            buffer.set_text(licenseText)
+        except Exception, e:
+            guidialogs.showErrorDialog("Failed to show LICENSE file:\n" + str(e), self.parent)
+            return
 
-        buffer = gtk.TextBuffer()
-        buffer.set_text(licenseText)
         textView = gtk.TextView(buffer)
         textView.set_editable(False)
         textView.set_cursor_visible(False)
@@ -155,7 +163,7 @@ class MigrationNotesDialog(guidialogs.ActionResultDialog):
             unicodeInfo = plugins.decodeText("".join(notesFile.readlines()))           
             notesFile.close()
             notesText = plugins.encodeToUTF(unicodeInfo)
-            guidialogs.guilog.info("Adding migration notes from file '" + note + "':\n" + notesText)
+            guidialogs.guilog.info("Adding migration notes from file '" + os.path.basename(note) + "':\n" + notesText)
 
             buffer = gtk.TextBuffer()
             buffer.set_text(notesText)
@@ -171,7 +179,10 @@ class MigrationNotesDialog(guidialogs.ActionResultDialog):
             notesVersion = os.path.basename(note).replace("MigrationNotes_", "").replace("_", " ")
             notebook.append_page(scrolledWindow, gtk.Label(notesVersion))
 
-        guidialogs.scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
-        parentSize = self.parent.get_size()
-        self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
-        self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
+        if notebook.get_n_pages() == 0:
+            raise plugins.TextTestWarning, "\nNo migration notes could be found in\n" + plugins.installationDir("doc") + "\n"
+        else:
+            guidialogs.scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
+            parentSize = self.parent.get_size()
+            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
+            self.dialog.vbox.pack_start(notebook, expand=True, fill=True)

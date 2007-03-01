@@ -88,7 +88,10 @@ class GenericActionDialog:
     
     def run(self):
         self.addContents()
-        self.dialog.show_all()
+        # Show if we've added something. This'll let us leave the dialog
+        # empty and e.g. pop up an error dialog if that is more suitable ...
+        if len(self.dialog.vbox.get_children()) > 2: # Separator and buttonbox are always there ...
+            self.dialog.show_all()
 
     def getStockIcon(self, stockItem):
         imageBox = gtk.VBox()
@@ -235,10 +238,6 @@ class SaveSelectionDialog(ActionConfirmationDialog):
             frame.set_sensitive(False)
         self.fileChooser.set_extra_widget(frame)
 
-    def run(self):
-        self.addContents()
-        self.dialog.show_all()
-
     def respond(self, button, saidOK, *args):
         if saidOK:
             if not self.fileChooser.get_filename():
@@ -312,10 +311,6 @@ class LoadSelectionDialog(ActionConfirmationDialog):
         vbox.pack_start(self.fileChooser, expand=True, fill=True)
         parentSize = self.parent.get_size()
         self.dialog.resize(int(parentSize[0] / 1.2), int(parentSize[0] / 1.7))
-
-    def run(self):
-        self.addContents()
-        self.dialog.show_all()
 
     def respond(self, button, saidOK, *args):
         if saidOK:

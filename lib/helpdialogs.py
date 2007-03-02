@@ -157,7 +157,8 @@ class MigrationNotesDialog(guidialogs.ActionResultDialog):
         notebook.set_scrollable(True)
         notebook.popup_enable()
         notes = glob.glob(os.path.join(plugins.installationDir("doc"), "MigrationNotes*"))
-        notes.reverse() # We want the most resent file first ...
+        notes.sort()
+        notes.reverse() # We want the most recent file first ...
         for note in notes:
             notesFile = open(note)
             unicodeInfo = plugins.decodeText("".join(notesFile.readlines()))           

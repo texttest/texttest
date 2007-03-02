@@ -2,7 +2,7 @@
 import gtk
 import gobject
 
-import guiplugins, guidialogs, plugins, os, string, sys, glob
+import guiplugins, guidialogs, plugins, texttest_version, os, string, sys, glob
 from gtkusecase import ScriptEngine
 
 # Show useful info about TextTest.
@@ -30,7 +30,7 @@ class AboutTextTestDialog(guidialogs.ActionResultDialog):
         logoFrame.set_padding(10, 10, 10, 10)
         logoFrame.add(logo)
         mainLabel = gtk.Label()
-        mainLabel.set_markup("<span size='xx-large'>TextTest 3.9</span>\n")
+        mainLabel.set_markup("<span size='xx-large'>TextTest " + texttest_version.version + "</span>\n")
         messageLabel = gtk.Label()
         messageLabel.set_markup("<i>TextTest is an application-independent tool for text-based\nfunctional testing. This means running a batch-mode binary\nin lots of different ways, and using the text output produced\nas a means of controlling the behaviour of that application.</i>\n")
         messageLabel.set_justify(gtk.JUSTIFY_CENTER)
@@ -63,7 +63,7 @@ class VersionsDialog(guidialogs.ActionResultDialog):
         return "Version Information"
 
     def addContents(self):
-        textTestVersion = "3.9"
+        textTestVersion = texttest_version.version
         pythonVersion = ".".join(map(lambda l: str(l), sys.version_info))
         gtkVersion = ".".join(map(lambda l: str(l), gtk.gtk_version))
         pygtkVersion = ".".join(map(lambda l: str(l), gtk.pygtk_version))

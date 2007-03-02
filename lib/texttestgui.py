@@ -3,18 +3,23 @@
 # GUI for TextTest written with PyGTK
 # First make sure we can import the GUI modules: if we can't, throw appropriate exceptions
 
+import texttest_version
+
 def raiseException(msg):
     from plugins import TextTestError
-    raise TextTestError, "Could not start TextTest GUI due to PyGTK GUI library problems :\n" + msg
+    raise TextTestError, "Could not start TextTest " + texttest_version.version + " GUI due to PyGTK GUI library problems :\n" + msg
 
 try:
     import gtk
 except:
     raiseException("Unable to import module 'gtk'")
 
-major, minor, debug = gtk.pygtk_version
-if major < 2 or minor < 4:
-    raiseException("TextTest GUI requires at least PyGTK 2.4 : found version " + str(major) + "." + str(minor))
+pygtkVersion = gtk.pygtk_version
+requiredPygtkVersion = texttest_version.required_pygtk_version
+if pygtkVersion < requiredPygtkVersion:
+    raiseException("TextTest " + texttest_version.version + " GUI requires at least PyGTK " +
+                   ".".join(map(lambda l: str(l), requiredPygtkVersion)) + ": found version " +
+                   ".".join(map(lambda l: str(l), pygtkVersion)))
 
 try:
     import gobject

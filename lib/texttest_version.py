@@ -4,6 +4,10 @@
 
 version = "3.8.current"
 
+# Which python version do we require
+
+required_python_version = (2, 4, 3)
+
 # Which pygtk version do we require?
 
 required_pygtk_version = (2, 6, 3)

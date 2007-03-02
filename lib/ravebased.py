@@ -516,23 +516,19 @@ class CompileRules(plugins.Action):
         ruleset = RuleSet(self.getRuleSetName(test), raveNames, arch, self.modeString)
         self.describe(test, " - ruleset " + ruleset.name)
 
-        # Fix to be able to run crc_compile for apc also on Carmen 8.
-        # crc_compile provides backward compability, so we can always have the '-'.
-        extra = ""
-        if test.app.name == "apc":
-            extra = "-"
-        commandLine = "crc_compile " + extra + string.join(raveNames) + " " + self.getModeString() \
-                          + " -archs " + arch + " " + ruleset.sourceFile
-        self.performCompile(test, ruleset.name, commandLine)
-    def getModeString(self):
-        if os.environ.has_key("TEXTTEST_RAVE_MODE"):
-            return self.modeString + " " + os.environ["TEXTTEST_RAVE_MODE"]
+        commandArgs = [ "crc_compile" ] + raveNames + self.getModeArgs() \
+                      + [ "-archs", arch, ruleset.sourceFile ]
+        self.performCompile(test, ruleset.name, commandArgs)
+    def getModeArgs(self):
+        raveMode = os.getenv("TEXTTEST_RAVE_MODE")
+        if raveMode:
+            return [ self.modeString, raveMode ]
         else:
-            return self.modeString
-    def performCompile(self, test, ruleset, commandLine):
-        self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.getcwd())
+            return [ self.modeString ]
+    def performCompile(self, test, ruleset, commandArgs):
+        self.diag.info("Compiling with command '" + repr(commandArgs) + "' from directory " + os.getcwd())
         test.changeState(RunningRuleCompilation(test.state))
-        proc = subprocess.Popen(commandLine, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(commandArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         returncode = proc.wait()
         raveInfo = proc.stdout.read()
         fileToWrite = test.makeTmpFileName("crc_compile_output", forFramework=1)

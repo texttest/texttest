@@ -42,9 +42,8 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
                              the specified time. Default time is 1440 minutes.
 """
 
-import queuesystem, default, os, string, shutil, plugins, sys, signal, stat, guiplugins
+import queuesystem, default, os, string, shutil, plugins, sys, signal, stat, guiplugins, subprocess
 from socket import gethostname
-from tempfile import mktemp
 from respond import Responder
 from copy import copy
 from traffic_cmd import sendServerState
@@ -531,27 +530,23 @@ class CompileRules(plugins.Action):
         else:
             return self.modeString
     def performCompile(self, test, ruleset, commandLine):
-        # We don't have a write directory here if running remotely and creating one tends to cause the Eqw problem
-        # Instead we write a temporary file and send the contents over the wires.
-        compTmp = mktemp()
         self.diag.info("Compiling with command '" + commandLine + "' from directory " + os.getcwd())
-        fullCommand = commandLine + " > " + compTmp + " 2>&1"
         test.changeState(RunningRuleCompilation(test.state))
-        retStatus = os.system(fullCommand)
-        raveInfo = open(compTmp).read()
+        proc = subprocess.Popen(commandLine, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        returncode = proc.wait()
+        raveInfo = proc.stdout.read()
         fileToWrite = test.makeTmpFileName("crc_compile_output", forFramework=1)
-        if retStatus:
-            freeText = "Failed to build ruleset " + self.getRuleSetName(test) + "\n" + self.getPreview(test, open(compTmp))
+        if returncode:
+            freeText = "Failed to build ruleset " + ruleset + "\n" + self.getPreview(test, raveInfo)
             test.changeState(RuleBuildFailed(freeText, "Ruleset build failed", raveInfo, fileToWrite))
         else:
             test.changeState(RulesetCompiled(raveInfo, fileToWrite))
-        os.remove(compTmp)        
-    def getPreview(self, test, compTmp):
+    def getPreview(self, test, raveInfo):
         # For final reports, abbreviate the free text to avoid newsgroup bounces etc.
         maxLength = test.getConfigValue("lines_of_crc_compile")
         maxWidth = test.getConfigValue("max_width_text_difference")
         previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
-        return previewGenerator.getPreview(compTmp)
+        return previewGenerator.getPreviewFromText(raveInfo)
     def setUpSuite(self, suite):
         if suite.parent is None or isUserSuite(suite):
             self.describe(suite)

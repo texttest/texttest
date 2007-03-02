@@ -647,9 +647,7 @@ class PreviewGenerator:
         self.maxWidth = maxWidth
         self.cutFromStart = int(maxLength * startEndRatio)
         self.cutFromEnd = maxLength - self.cutFromStart
-    def getCutLines(self, file):
-        lines = file.readlines()
-        file.close()
+    def getCutLines(self, lines):
         if len(lines) < self.cutFromEnd + self.cutFromStart:
             return lines
         
@@ -659,9 +657,20 @@ class PreviewGenerator:
             cutLines += lines[-self.cutFromEnd:]    
         return cutLines
     def getPreview(self, file):
-        cutLines = retryOnInterrupt(self.getCutLines, file)
+        fileLines = retryOnInterrupt(self.getFileLines, file)
+        return self._getPreview(fileLines)
+    def getFileLines(self, file):
+        lines = file.readlines()
+        file.close()
+        return lines
+    def _getPreview(self, lines):
+        cutLines = self.getCutLines(lines)
         lines = map(self.getWrappedLine, cutLines)
         return string.join(lines, "")
+    def getPreviewFromText(self, text):
+        truncatedLines = text.split("\n")[:-1] # drop the final endline, don't get a new line after it
+        lines = [ line + "\n" for line in truncatedLines ]
+        return self._getPreview(lines)
     def getWrappedLine(self, line):
         if len(line) <= self.maxWidth:
             return line

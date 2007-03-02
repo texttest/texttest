@@ -25,7 +25,7 @@ class AboutTextTestDialog(guidialogs.ActionResultDialog):
     def addContents(self):
         logo = gtk.Image()
         logo.set_from_pixbuf(gtk.gdk.pixbuf_new_from_file(
-            os.path.join(plugins.installationDir("images"), "texttest-logo.jpg")))
+            os.path.join(plugins.installationDir("images"), "texttest-logo.gif")))
         logoFrame = gtk.Alignment(0.5, 0.5, 0.0, 0.0)
         logoFrame.set_padding(10, 10, 10, 10)
         logoFrame.add(logo)

@@ -529,10 +529,9 @@ class CompileRules(plugins.Action):
         self.diag.info("Compiling with command '" + repr(commandArgs) + "' from directory " + os.getcwd())
         test.changeState(RunningRuleCompilation(test.state))
         proc = subprocess.Popen(commandArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        returncode = proc.wait()
-        raveInfo = proc.stdout.read()
+        raveInfo = proc.communicate()[0] # wait to finish
         fileToWrite = test.makeTmpFileName("crc_compile_output", forFramework=1)
-        if returncode:
+        if proc.returncode:
             freeText = "Failed to build ruleset " + ruleset + "\n" + self.getPreview(test, raveInfo)
             test.changeState(RuleBuildFailed(freeText, "Ruleset build failed", raveInfo, fileToWrite))
         else:

@@ -15,8 +15,9 @@ abspath()
 }
 
 abspath $0 fullpath
-    
-if [ `arch` = "i386_linux" ]; then
+
+ARCH=`arch` 
+if [ $ARCH = "i386_linux" -o $ARCH = "x86_64_linux" ]; then
     export TEXTTEST_SLAVE_CMD=$fullpath
 
     # Sets gtk/pygtk environment variables and sets PYTHON_TO_RUN 

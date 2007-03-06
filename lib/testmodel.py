@@ -186,6 +186,11 @@ class Test(plugins.Observable):
             return description
         else:
             return "<No description provided>"
+    def refreshDescription(self):
+        oldDesc = self.state.freeText
+        self.state.freeText = self.getDescription()
+        if oldDesc != self.state.freeText:
+            self.notify("DescriptionChange")
     def readEnvironment(self):
         envReader = EnvironmentReader(self.app)
         envReader.read(self)
@@ -344,8 +349,9 @@ class Test(plugins.Observable):
             tests = plugins.readListWithComments(testSuiteFileName)            
             try:
                 thisIndex = tests.index(self.name)
-                newEntry = seqdict()                
-                newEntry[newName] = plugins.replaceComment(tests[self.name], newDescription)
+                newEntry = seqdict()
+                self.description = plugins.replaceComment(tests[self.name], newDescription)
+                newEntry[newName] = self.description
                 del tests[self.name]
                 tests.insert(thisIndex, newEntry)
                 self.parent.writeNewTestSuiteFile(testSuiteFileName, tests)
@@ -431,6 +437,7 @@ class Test(plugins.Observable):
             dircache.refresh()
     def filesChanged(self):
         self.refreshFiles()
+        self.refreshDescription()
         self.notify("FileChange")    
 
 class TestCase(Test):

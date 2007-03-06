@@ -295,6 +295,10 @@ class Quit(InteractiveAction):
         pass
     def performOnCurrent(self):
         # Generate a window closedown, so that the quit button behaves the same as closing the window
+        # This will not show the entire shutdown process, but it will tell
+        # us that we've pressed the Quit button, at least ...
+        self.notify("Status", "Quitting TextTest ...")
+        self.notify("ActionProgress", "")
         self.notify("Exit")
     def getConfirmationMessage(self):
         processesToReport = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
@@ -1776,8 +1780,11 @@ class RenameTest(InteractiveAction):
         return ("", False)
     def performOnCurrent(self):
         try:
-            if self.newName != self.oldName or self.newDescription != self.oldDescription:
+            if self.newName != self.oldName:
                 self.currTestSelection[0].rename(self.newName, self.newDescription)
+            if self.newDescription != self.oldDescription:
+                self.currTestSelection[0].rename(self.newName, self.newDescription)
+                self.currTestSelection[0].filesChanged() # To get the new description in the GUI ...
         except IOError, e:
             raise plugins.TextTestError, "Failed to rename test:\n" + str(e)
         except OSError, e:

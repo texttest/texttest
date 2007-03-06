@@ -477,6 +477,8 @@ class TextTestGUI(Responder, plugins.Observable):
         return tabInfo
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.notify("LifecycleChange", test, state, changeDesc)
+    def notifyDescriptionChange(self, test):
+        self.notify("DescriptionChange", test)
     def notifyFileChange(self, test):
         self.notify("FileChange", test)
     def notifyContentChange(self, suite):
@@ -1959,6 +1961,9 @@ class TextInfoGUI(SubGUI):
             self.currentTest = tests[0]
             self.resetText(self.currentTest.state)
             self.updateView()
+    def notifyDescriptionChange(self, test):
+        self.resetText(self.currentTest.state)
+        self.updateView()
     def updateView(self):
         if self.view:
             self.updateViewFromText()

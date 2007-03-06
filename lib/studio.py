@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.1 2007/02/22 17:02:51 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.2 2007/03/06 11:42:25 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -13,11 +13,6 @@ def getConfig(optionMap):
     return StudioConfig(optionMap)
 
 class StudioConfig(ravebased.Config):
-    def addToOptionGroups(self, app, groups):
-        ravebased.Config.addToOptionGroups(self, app, groups)
-        for group in groups:
-            if group.name.startswith("Invisible"):
-                group.addOption("rset", "Private: used for submitting ruleset compilation along with recording")
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues)
     def defaultBuildRules(self):
@@ -25,10 +20,8 @@ class StudioConfig(ravebased.Config):
         return 1
     def getPerformanceExtractor(self):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
-    def getRuleSetName(self, test):
-        if self.optionMap.has_key("rset"):
-            return self.optionMap["rset"]
-	rulesetName = ""
+    def _getRuleSetNames(self, test):
+        rulesetName = ""
         subplanDir = self._getSubPlanDirName(test)
         if subplanDir:
 	    headerFile = os.path.join(subplanDir, "subplanHeader")
@@ -58,8 +51,8 @@ class StudioConfig(ravebased.Config):
 		    pass
         if self.macroBuildsRuleset(test, rulesetName):
             # Don't want to manage the ruleset separately if the macro is going to build it...
-            return ""
-	return rulesetName
+            return []
+	return [ rulesetName ]
     def findOrigRulePath(self, headerFile):
         if not os.path.isfile(headerFile):
             return ""

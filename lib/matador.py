@@ -65,7 +65,16 @@ class MatadorConfig(optimization.OptimizationConfig):
             # print help information and exit:
             return ""
         return subPlan
-    def getRuleSetName(self, test):
+    def _getRuleSetNames(self, test):
+        rulesets = []
+        basicRuleSet = self.getBasicRuleSet(test)
+        if basicRuleSet:
+            rulesets.append(basicRuleSet)
+        for extra in self.getExtraRollingStockRulesets(test):
+            if not extra in rulesets:
+                rulesets.append(extra)
+        return rulesets
+    def getBasicRuleSet(self, test):
         fromOptions = getOption(test, "-r")
         if fromOptions:
             return fromOptions
@@ -81,9 +90,17 @@ class MatadorConfig(optimization.OptimizationConfig):
             for line in open(problemsFile).xreadlines():
                 if line.startswith("153"):
                     return line.split(";")[3]
-        return ""
+    def getExtraRollingStockRulesets(self, test):
+        extras = []
+        compRules = test.getEnvironment("COMPOSITION_OPTIMIZATION_RULESET")
+        if compRules:
+            extras.append(compRules)
+        rotRules = test.getEnvironment("ROTATION_OPTIMIZATION_RULESET")
+        if rotRules:
+            extras.append(rotRules)
+        return extras
     def getRuleBuildFilterer(self):
-        return FilterRuleBuilds(self.getRuleSetName, self.rebuildAllRulesets())
+        return FilterRuleBuilds(self.getRuleSetNames, self.raveMode(), self.rebuildAllRulesets())
     def filesFromRulesFile(self, test, rulesFile):
         scriptFile = self.getRuleSetting(test, "script_file_name")
         if scriptFile:

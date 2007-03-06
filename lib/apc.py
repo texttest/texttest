@@ -180,7 +180,7 @@ class ApcConfig(optimization.OptimizationConfig):
         # Process name starts with a dot and may be truncated or have
         # extra junk at the end added by APCbatch.sh
         processData = process[1:]
-        rulesetName = self.getRuleSetName(test)
+        rulesetName = self.getRuleSetNames(test)[0]
         return processData.startswith(rulesetName) or rulesetName.startswith(processData)
     def getFileExtractor(self):
         baseExtractor = optimization.OptimizationConfig.getFileExtractor(self)
@@ -204,11 +204,11 @@ class ApcConfig(optimization.OptimizationConfig):
         statusFile = self.getStatusFilePath(test)
         dirs = statusFile.split(os.sep)[:-2]
         return os.path.normpath(string.join(dirs, os.sep))
-    def getRuleSetName(self, test):
+    def _getRuleSetNames(self, test):
         for option in test.getWordsInFile("options"):
             if option.find("crc" + os.sep + "rule_set") != -1:
-                return option.split(os.sep)[-1]
-        return None
+                return [ os.path.basename(option) ]
+        return []
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)

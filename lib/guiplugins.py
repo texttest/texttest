@@ -721,15 +721,9 @@ class RecordTest(InteractiveTestAction):
     def updateForSelection(self):
         self.optionGroup.setOptionValue("v", self.currentTest.app.getFullVersion(forSave=1))
         self.optionGroup.setOptionValue("c", self.currentTest.app.checkout)
-        if self.getRecordMode() == "console" and not self.optionGroup.switches.has_key("hold"):
-            self.addSwitch("hold", "Hold record shell after recording")
-            return True, True
-        else:
-            return False, False
+        return False, False
     def updateRecordTime(self, test):
         if self.updateRecordTimeForFile(test, "usecase", "USECASE_RECORD_SCRIPT", "target_record"):
-            return True
-        if self.getRecordMode() == "console" and self.updateRecordTimeForFile(test, "input", "USECASE_RECORD_STDIN", "target"):
             return True
         return False
     def updateRecordTimeForFile(self, test, stem, envVar, prefix):
@@ -1257,10 +1251,15 @@ class CreateDefinitionFile(InteractiveTestAction):
         if self.currentTest.classId() == "test-case":
             defFiles.append("options")
             recordMode = self.currentTest.getConfigValue("use_case_record_mode")
-            if recordMode == "disabled" or recordMode == "console":
+            if recordMode == "disabled":
                 defFiles.append("input")
             else:
                 defFiles.append("usecase")
+        # these are created via the GUI, not manually via text editors (or are already handled above)
+        dontAppend = [ "testsuite", "knownbugs", "traffic", "input", "usecase", "logging", "environment", "options" ]
+        for defFile in self.currentTest.getConfigValue("definition_file_stems"):
+            if not defFile in dontAppend:
+                defFiles.append(defFile)
         return defFiles + self.currentTest.app.getDataFileNames()
     def updateForSelection(self):
         self.diagsEnabled = self.checkDiagsEnabled()

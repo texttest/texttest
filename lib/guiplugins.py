@@ -1230,6 +1230,7 @@ class CreateDefinitionFile(InteractiveTestAction):
         InteractiveTestAction.__init__(self)
         self.diagsEnabled = False
         self.addOption("type", "Type of definition file to create", allocateNofValues=2)
+        self.addOption("v", "Version identifier to use") 
     def inMenuOrToolBar(self):
         return False
     def correctTestClass(self):
@@ -1272,10 +1273,14 @@ class CreateDefinitionFile(InteractiveTestAction):
             return True, True
         else:
             return False, True
-    def getFileName(self):
+    def getFileName(self, stem, version):
         stem = self.optionGroup.getOptionValue("type")
         if stem in self.currentTest.getConfigValue("definition_file_stems"):
-            return stem + "." + self.currentTest.app.name
+            base = stem + "." + self.currentTest.app.name
+            if version:
+                return base + "." + version
+            else:
+                return base
         else:
             return stem
     def getTargetDirectory(self):
@@ -1284,21 +1289,22 @@ class CreateDefinitionFile(InteractiveTestAction):
         else:
             return self.currentTest.getDirectory()
 
-    def getSourceFile(self, fileName, targetFile):
-        # Use the file from the level above, if possible
-        if not self.currentTest.parent:
-            return None
+    def getSourceFile(self, stem, version, targetFile):
+        thisTestName = self.currentTest.getFileName(stem, version)
+        if thisTestName and not plugins.samefile(thisTestName, targetFile):
+            return thisTestName
 
-        if self.optionGroup.getSwitchValue("diag"):
-            thisTestName = self.currentTest.makePathName(fileName)
-            if not plugins.samefile(thisTestName, targetFile):
-                return thisTestName
-
-        return self.currentTest.parent.makePathName(fileName)            
+        test = self.currentTest.parent
+        while test:
+            currName = test.getFileName(stem, version)
+            if currName:
+                return currName
+            test = test.parent
     def performOnCurrent(self):
-        fileName = self.getFileName()
-        targetFile = os.path.join(self.getTargetDirectory(), fileName)
-        sourceFile = self.getSourceFile(fileName, targetFile)
+        stem = self.optionGroup.getOptionValue("type")
+        version = self.optionGroup.getOptionValue("v") 
+        targetFile = os.path.join(self.getTargetDirectory(), self.getFileName(stem, version))
+        sourceFile = self.getSourceFile(stem, version, targetFile)
         plugins.ensureDirExistsForFile(targetFile)
         if sourceFile and os.path.isfile(sourceFile):
             guilog.info("Creating new file, copying " + sourceFile)

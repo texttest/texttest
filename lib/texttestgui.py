@@ -655,25 +655,27 @@ class MenuBarGUI(SubGUI):
             
         # The all below also creates default actions, so we must do this before reading the file ...
         description = self.getInterfaceDescription()
-        try:
-            file = self.getGUIDescriptionFileName()
-            self.uiManager.add_ui_from_file(file)        
-        except Exception, e: 
-            raise plugins.TextTestError, "Failed to parse GUI description file '" + file + "': " + str(e)
+        for file in self.getGUIDescriptionFileNames():
+            try:
+                self.uiManager.add_ui_from_file(file)        
+            except Exception, e: 
+                raise plugins.TextTestError, "Failed to parse GUI description file '" + file + "': " + str(e)
         self.uiManager.add_ui_from_string(description)
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
-    def getGUIDescriptionFileName(self):
+    def getGUIDescriptionFileNames(self):
+        files = [ self.getStdGUIDescriptionFileName() ]
         userFileName = self.getUserGUIDescriptionFileName()
-        if not userFileName:
-            layoutDir = plugins.installationDir("layout")
-            if self.dynamic:
-                return os.path.join(layoutDir, "standard_gui_dynamic.xml")
-            else:
-                return os.path.join(layoutDir, "standard_gui_static.xml")
+        if userFileName:
+            files.append(userFileName)
+        return files
+    def getStdGUIDescriptionFileName(self):
+        layoutDir = plugins.installationDir("layout")
+        if self.dynamic:
+            return os.path.join(layoutDir, "standard_gui_dynamic.xml")
         else:
-            return userFileName
+            return os.path.join(layoutDir, "standard_gui_static.xml")
     def getUserGUIDescriptionFileName(self):
         file = guiConfig.getValue("gui_description_file", True)
         # Now we must find the file. It should either be an absolute

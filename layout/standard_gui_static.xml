@@ -44,11 +44,7 @@
     <separator/>
     <toolitem name="Select" action="Select"/>
     <toolitem name="Run" action="Run"/>
-    <toolitem name="Reset" action="Reset"/>
     <separator/>
-    <toolitem name="Move up" action="Move up"/>
-    <toolitem name="Move down" action="Move down"/>
-    <toolitem name="Rename..." action="Rename..."/>
     <toolitem name="Remove..." action="Remove..."/>
     <separator/>
   </toolbar>

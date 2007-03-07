@@ -30,8 +30,6 @@ class Config(plugins.Configuration):
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 diagDict = app.getConfigValue("diagnostics")
-                if diagDict.get("configuration_file_variable"):
-                    group.addSwitch("diag", "Write target application diagnostics")
                 if diagDict.get("trace_level_variable"):
                     group.addOption("trace", "Target application trace level")
                 if self.isolatesDataUsingCatalogues(app):
@@ -300,11 +298,7 @@ class Config(plugins.Configuration):
     def getTestEvaluator(self):
         return [ self.getFileExtractor(), self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
-        if self.optionMap.has_key("diag"):
-            print "Note: Running with Diagnostics on, so performance checking is disabled!"
-            return [ self.getPerformanceExtractor() ] 
-        else:
-            return [ self.getPerformanceFileMaker(), self.getPerformanceExtractor() ]
+        return [ self.getPerformanceFileMaker(), self.getPerformanceExtractor() ]
     def getCatalogueCreator(self):
         return CreateCatalogue()
     def getTestCollator(self):
@@ -637,12 +631,8 @@ class TestEnvironmentCreator:
             self.setTraceDiagnostics()
         if self.diagDict.has_key("configuration_file_variable"):
             self.setLog4xDiagnostics()
-    def setLog4xDiagnostics(self):
-        # Read the temporary diagnostics in the static GUI also
-        if self.optionMap.has_key("diag") or self.optionMap.has_key("gx"):
-            self.test.readSubDirectory("Diagnostics")
-        
-        diagConfigFile = self.getLoggingFile()
+    def setLog4xDiagnostics(self):        
+        diagConfigFile = self.test.getFileName("logging")
         if diagConfigFile:
             inVarName = self.diagDict.get("configuration_file_variable")
             self.addDiagVariable(inVarName, diagConfigFile)
@@ -654,12 +644,6 @@ class TestEnvironmentCreator:
             envVarName = self.diagDict.get("trace_level_variable")
             self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
             self.test.setEnvironment(envVarName, self.optionMap["trace"])
-    def getLoggingFile(self):
-        if self.optionMap.has_key("diag"):
-            if self.testCase():
-                return self.test.getFileName("logging", subDir="Diagnostics")
-        else:
-            return self.test.getFileName("logging")
     def addDiagVariable(self, entryName, entry):
         # Diagnostics are usually controlled from the environment, but in Java they have to work with properties...
         if self.diagDict.has_key("properties_file"):

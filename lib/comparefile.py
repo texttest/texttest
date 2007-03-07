@@ -164,14 +164,8 @@ class FileComparison:
             os.remove(self.stdFile)
 
         self.saveTmpFile(exact)
-    def getNewFileSubDir(self, diags):
-        if diags:
-            return "Diagnostics"
-        else:
-            return ""
     def saveNew(self, test, versionString, diags):
-        self.stdFile = os.path.join(test.getDirectory(), self.getNewFileSubDir(diags), \
-                                    self.versionise(self.stem + "." + test.app.name, versionString))
+        self.stdFile = os.path.join(test.getDirectory(), self.versionise(self.stem + "." + test.app.name, versionString))
         self.saveTmpFile()
     def saveTmpFile(self, exact=True):
         self.diag.info("Saving tmp file to " + self.stdFile)

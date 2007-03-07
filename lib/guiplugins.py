@@ -408,16 +408,11 @@ class SaveTests(SelectionAction):
         self.currApps = apps
         self.optionGroup.setOptionValue("v", self.getDefaultSaveOption(apps))
         self.optionGroup.setPossibleValues("v", self.getPossibleVersions(apps))
-        if self.diagnosticMode(apps):
-            self.addSwitch("newdiag", "Save all new files as diagnostics", 1)
-            return True, True
-        elif self.hasPerformance(apps) and not self.optionGroup.switches.has_key("ex"):
+        if self.hasPerformance(apps) and not self.optionGroup.switches.has_key("ex"):
             self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
             return True, True
         else:
             return False, True
-    def diagnosticMode(self, apps):
-        return apps[0].inputOptions.has_key("diag")
     def getDefaultSaveOption(self, apps):
         saveVersions = self.getSaveVersions(apps)
         if saveVersions.find(",") != -1:
@@ -1271,12 +1266,7 @@ class CreateDefinitionFile(InteractiveTestAction):
         defFiles = self.getDefinitionFiles()
         self.optionGroup.setValue("type", defFiles[0])
         self.optionGroup.setPossibleValues("type", defFiles)
-
-        if self.diagsEnabled and not self.optionGroup.switches.has_key("diag"):
-            self.addSwitch("diag", "Affect diagnostic mode only")
-            return True, True
-        else:
-            return False, True
+        return False, True
     def getFileName(self, stem, version):
         stem = self.optionGroup.getOptionValue("type")
         if stem in self.currentTest.getConfigValue("definition_file_stems"):
@@ -1287,12 +1277,6 @@ class CreateDefinitionFile(InteractiveTestAction):
                 return base
         else:
             return stem
-    def getTargetDirectory(self):
-        if self.optionGroup.getSwitchValue("diag"):
-            return self.currentTest.makeSubDirectory("Diagnostics")
-        else:
-            return self.currentTest.getDirectory()
-
     def getSourceFile(self, stem, version, targetFile):
         thisTestName = self.currentTest.getFileName(stem, version)
         if thisTestName and not plugins.samefile(thisTestName, targetFile):
@@ -1307,7 +1291,7 @@ class CreateDefinitionFile(InteractiveTestAction):
     def performOnCurrent(self):
         stem = self.optionGroup.getOptionValue("type")
         version = self.optionGroup.getOptionValue("v") 
-        targetFile = os.path.join(self.getTargetDirectory(), self.getFileName(stem, version))
+        targetFile = os.path.join(self.currentTest.getDirectory(), self.getFileName(stem, version))
         sourceFile = self.getSourceFile(stem, version, targetFile)
         plugins.ensureDirExistsForFile(targetFile)
         if sourceFile and os.path.isfile(sourceFile):

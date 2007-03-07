@@ -115,7 +115,7 @@ class EnvironmentReader:
             for pathVar in self.pathVars:
                 test.setEnvironment(pathVar, test.writeDirectory + os.pathsep + "$" + pathVar)
 
-        self.app.readValues(test.environment, "environment", test.dircaches[0])
+        self.app.readValues(test.environment, "environment", test.dircache)
         for key, value in test.environment.items():
             self.diag.info("Set " + key + " to " + value)
         # Should do this, but not quite yet...
@@ -171,7 +171,7 @@ class Test(plugins.Observable):
         self.uniqueName = name
         self.app = app
         self.parent = parent
-        self.dircaches = [ dircache ]
+        self.dircache = dircache
         self.paddedName = self.name
         self.previousEnv = {}
         self.environment = MultiEntryDictionary()
@@ -220,10 +220,9 @@ class Test(plugins.Observable):
     def resultFileStems(self):
         stems = []
         defStems = self.defFileStems()
-        for dircache in self.dircaches:
-            for stem in dircache.findAllStems():
-                if not stem in defStems:
-                    stems.append(stem)
+        for stem in self.dircache.findAllStems():
+            if not stem in defStems:
+                stems.append(stem)
         return stems
     def listStandardFiles(self, allVersions):
         resultFiles, defFiles = [],[]
@@ -241,10 +240,9 @@ class Test(plugins.Observable):
         if allVersions:
             files += self.findAllStdFiles(stem)
         else:
-            for dircache in self.dircaches:
-                allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.app.compareVersionLists)
-                if len(allFiles):
-                    files.append(allFiles[-1])
+            allFiles = self.dircache.findAndSortFiles(stem, allowedExtensions, self.app.compareVersionLists)
+            if len(allFiles):
+                files.append(allFiles[-1])
         return files
     def listDataFiles(self):
         existingDataFiles = []
@@ -279,57 +277,37 @@ class Test(plugins.Observable):
                 return True
         return False
     def findAllStdFiles(self, stem):
-        allFiles = []
-        for dircache in self.dircaches:
-            if stem == "environment":
-                otherApps = self.app.findOtherAppNames()
-                self.diagnose("Finding environment files, excluding " + repr(otherApps))
-                allFiles += dircache.findAllFiles(stem, forbidden=otherApps)
-            else:
-                allFiles += dircache.findAllFiles(stem, compulsory=[ self.app.name ])
-        return allFiles
+        if stem == "environment":
+            otherApps = self.app.findOtherAppNames()
+            self.diagnose("Finding environment files, excluding " + repr(otherApps))
+            return self.dircache.findAllFiles(stem, forbidden=otherApps)
+        else:
+            return self.dircache.findAllFiles(stem, compulsory=[ self.app.name ])
     def makeSubDirectory(self, name):
-        subdir = self.dircaches[0].pathName(name)
+        subdir = self.dircache.pathName(name)
         if os.path.isdir(subdir):
             return subdir
         try:
             os.mkdir(subdir)
-            self.readSubDirectory(subdir)
             return subdir
         except OSError:
             raise plugins.TextTestError, "Cannot create test sub-directory : " + subdir
-    def readSubDirectory(self, subdir):
-        # Don't do this for test suites...
-        pass
     def getFileNamesMatching(self, pattern):
         allowedExtensions = self.app.getFileExtensions()
-        allFiles = []
-        for dircache in self.dircaches:
-            allFiles += dircache.findFilesMatching(pattern, allowedExtensions)
-        return allFiles
-    def getFileName(self, stem, refVersion = None, subDir=""):
+        return self.dircache.findFilesMatching(pattern, allowedExtensions)
+    def getFileName(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
         appToUse = self.app
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
-        dirCache = self.getDirCache(subDir)
-        if dirCache:
-            return appToUse._getFileName([ dirCache ], stem)
-    def getDirCache(self, subDir):
-        if len(subDir) == 0:
-            return self.dircaches[0]
-        else:
-            for dircache in self.dircaches:
-                if os.path.basename(dircache.dir) == subDir:
-                    return dircache
+        return appToUse._getFileName([ self.dircache ], stem)
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
         return self.app.getCompositeConfigValue(key, subKey)
     def makePathName(self, fileName):
-        for dircache in self.dircaches:
-            if dircache.exists(fileName):
-                return dircache.pathName(fileName)
+        if self.dircache.exists(fileName):
+            return self.dircache.pathName(fileName)
         if self.parent:
             return self.parent.makePathName(fileName)
     def actionsCompleted(self):
@@ -342,7 +320,7 @@ class Test(plugins.Observable):
     def getRelPath(self):
         return plugins.relpath(self.getDirectory(), self.app.getDirectory())
     def getDirectory(self, temporary=False, forFramework=False):
-        return self.dircaches[0].dir
+        return self.dircache.dir
     def rename(self, newName, newDescription):
         # Correct all testsuite files ...
         for testSuiteFileName in self.parent.findTestSuiteFiles():
@@ -433,8 +411,7 @@ class Test(plugins.Observable):
     def size(self):
         return 1
     def refreshFiles(self):
-        for dircache in self.dircaches:
-            dircache.refresh()
+        self.dircache.refresh()
     def filesChanged(self):
         self.refreshFiles()
         self.refreshDescription()
@@ -458,7 +435,7 @@ class TestCase(Test):
             else:
                 return self.writeDirectory
         else:
-            return self.dircaches[0].dir
+            return self.dircache.dir
     def getDescription(self):
         performanceFileName = self.getFileName("performance")
         if performanceFileName:
@@ -501,12 +478,6 @@ class TestCase(Test):
         plugins.ensureDirectoryExists(self.writeDirectory)
         frameworkTmp = self.getDirectory(temporary=1, forFramework=True)
         plugins.ensureDirectoryExists(frameworkTmp)
-    def readSubDirectory(self, subdir):
-        # This registers some subdirectory to be regarded as part of the test (used by diagnostics mechanism)
-        fullPath = self.dircaches[0].pathName(subdir)
-        self.diagnose("Reading sub-directory at " + fullPath)
-        if os.path.isdir(fullPath):
-            self.dircaches.append(DirectoryCache(fullPath))
     def getTestRelPath(self, file):
         parts = file.split(self.getRelPath() + "/")
         if len(parts) >= 2:
@@ -609,10 +580,7 @@ class TestSuite(Test):
         plugins.printWarning("The test " + testName + " was included several times in a test suite file.\n" + \
                              "Please check the file at " + fileName)
     def fileExists(self, name):
-        for dircache in self.dircaches:
-            if dircache.exists(name):
-                return True
-        return False
+        return self.dircache.exists(name)
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
     def testCaseList(self):
@@ -636,12 +604,11 @@ class TestSuite(Test):
         compulsoryExts = [ self.app.name ] + self.app.versions
         self.diagnose("Finding test suite files, using all versions in " + repr(compulsoryExts))
         versionFiles = []
-        for dircache in self.dircaches:
-            allFiles = dircache.findAllFiles("testsuite", compulsoryExts, priorityFunction=self.app.compareVersionLists)
-            allFiles.reverse() # sort function works the wrong way round for us...
-            for newFile in allFiles:
-                if newFile != contentFile:
-                    versionFiles.append(newFile)
+        allFiles = self.dircache.findAllFiles("testsuite", compulsoryExts, priorityFunction=self.app.compareVersionLists)
+        allFiles.reverse() # sort function works the wrong way round for us...
+        for newFile in allFiles:
+            if newFile != contentFile:
+                versionFiles.append(newFile)
         return [ contentFile ] + versionFiles
     def getContentFileName(self):
         return self.getFileName("testsuite")
@@ -649,11 +616,11 @@ class TestSuite(Test):
         contentFile = self.getContentFileName()
         if contentFile:
             return
-        contentFile = self.dircaches[0].pathName("testsuite." + self.app.name)
+        contentFile = self.dircache.pathName("testsuite." + self.app.name)
         file = open(contentFile, "w")
         file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
         file.close()
-        self.dircaches[0].refresh()
+        self.dircache.refresh()
     def contentChanged(self):
         # Here we assume that only order can change...
         self.refreshFiles()

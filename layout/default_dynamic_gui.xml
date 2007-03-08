@@ -1,0 +1,22 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+
+    <menu name="filemenu" action="filemenu">
+      <placeholder name="FirstInFileMenu">
+        <menuitem name="Save" action="Save"/>
+        <separator/>
+      </placeholder>
+    </menu>
+  </menubar>
+
+  <toolbar name="MainToolBar">
+    <toolitem name="Quit" action="Quit"/>
+    <toolitem name="Save" action="Save"/>
+    <separator/>
+  </toolbar>
+
+  <popup name="TestPopupMenu">
+  </popup>
+
+</ui>

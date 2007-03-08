@@ -1611,14 +1611,12 @@ class SelectKPIGroup(guiplugins.InteractiveTestAction):
         return "Select KPI group"
     def _getTitle(self):
         return "_Select KPI group"
-    def getMainMenuPath(self):
-        return "_Optimization"
     def getStockId(self):
         return "index"
-    def inToolBar(self):
-        return True
     def inButtonBar(self):
         return False
+    def inMenuOrToolBar(self):
+        return True
     def getTabTitle(self):
         return "KPI group"
     def getGroupTabTitle(self):

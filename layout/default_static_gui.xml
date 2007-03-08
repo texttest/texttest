@@ -2,15 +2,14 @@
 
   <menubar name="MainMenuBar">
 
-    <menu name="filemenu" action="filemenu">
-      <menuitem name="Load Selection..." action="Load Selection..."/>
-      <separator/>
-      <menuitem name="Save Selection..." action="Save Selection..."/>
-      <separator/>
-      <menuitem name="Quit" action="Quit"/>
+    <menu action="filemenu">
+      <placeholder name="FirstInFileMenu">
+        <menuitem name="Load Selection..." action="Load Selection..."/>
+        <separator/>
+      </placeholder>
     </menu>
 
-    <menu name="editmenu" action="editmenu">
+    <menu action="editmenu">
       <menuitem name="Rename..." action="Rename..."/>
       <menuitem name="Remove..." action="Remove..."/>
       <separator/>
@@ -24,26 +23,24 @@
       <separator/>
     </menu>
 
-    <menu name="viewmenu" action="viewmenu">
-      <menuitem name="Toolbar" action="Toolbar"/>
-      <menuitem name="Shortcut bar" action="Shortcut bar"/>
-      <menuitem name="Status bar" action="Status bar"/>
-    </menu>
+    <placeholder name="ExtraMenus">
 
-    <menu name="actionsmenu" action="actionsmenu">
-      <menuitem name="Select" action="Select"/>
-      <menuitem name="Run" action="Run"/>
-      <menuitem name="Reconnect" action="Reconnect"/>
-      <menuitem name="Reset" action="Reset"/>
-    </menu>
-
+      <menu action="actionsmenu">
+        <menuitem name="Select" action="Select"/>
+        <menuitem name="Run" action="Run"/>
+        <menuitem name="Reconnect" action="Reconnect"/>
+        <menuitem name="Reset" action="Reset"/>
+      </menu>
+    </placeholder>
+  
   </menubar>
 
-  <toolbar name="MainToolBar">
+  <toolbar name="MainToolBar">    
     <toolitem name="Quit" action="Quit"/>
     <separator/>
     <toolitem name="Select" action="Select"/>
     <toolitem name="Run" action="Run"/>
+    <placeholder name="AfterRun" />
     <separator/>
     <toolitem name="Remove..." action="Remove..."/>
     <separator/>
@@ -53,7 +50,7 @@
     <menuitem name="Rename..." action="Rename..."/>
     <menuitem name="Remove..." action="Remove..."/>
     <separator/>
-    <menu name="reorderpopupmenu" action="reorderpopupmenu">
+    <menu action="reordermenu">
       <menuitem name="Move to first" action="Move to first"/>
       <menuitem name="Move up" action="Move up"/>
       <menuitem name="Move down" action="Move down"/>

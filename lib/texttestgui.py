@@ -32,6 +32,7 @@ from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
 from respond import Responder
 from copy import copy
+from glob import glob
 
 import guidialogs, helpdialogs
 from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog
@@ -173,16 +174,7 @@ class ContainerGUI(SubGUI):
         SubGUI.contentsChanged(self)
         for subgui in self.subguis:
             subgui.contentsChanged()
-            
-def getGtkRcFile():
-    configDir = plugins.getPersonalConfigDir()
-    if not configDir:
-        return
-    
-    file = os.path.join(configDir, ".texttest_gtk")
-    if os.path.isfile(file):
-        return file
-        
+                    
 #
 # A class responsible for putting messages in the status bar.
 # It is also responsible for keeping the throbber rotating
@@ -373,8 +365,12 @@ class TextTestGUI(Responder, plugins.Observable):
     def needsOwnThread(self):
         return True
     def readGtkRCFile(self):
-        file = getGtkRcFile()
-        if file:
+        configDir = plugins.getPersonalConfigDir()
+        if not configDir:
+            return
+
+        file = os.path.join(configDir, ".gtkrc-2.0")
+        if os.path.isfile(file):
             gtk.rc_add_default_file(file)
     def setUpScriptEngine(self):
         guiplugins.setUpGlobals(self.dynamic)
@@ -572,6 +568,7 @@ class MenuBarGUI(SubGUI):
         self.actionGroup = gtk.ActionGroup("AllActions")
         self.uiManager.insert_action_group(self.actionGroup, 0)
         self.toggleActions = []
+        self.diag = plugins.getDiagnostics("Menu Bar")
     def setActive(self, active):
         SubGUI.setActive(self, active)
         self.widget.get_toplevel().add_accel_group(self.uiManager.get_accel_group())
@@ -606,98 +603,59 @@ class MenuBarGUI(SubGUI):
             gtkAction.connect("toggled", self.toggleVisibility, observer)
             scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
             self.toggleActions.append(gtkAction)
-    def getInterfaceDescription(self):
-        description = "<ui>\n<menubar name=\"MainMenuBar\">\n"
-        for action in self.actionGUIs:
-            description += self.getMenuDescription(action)
-        description += "</menubar></ui>\n"        
-        return description
-    def getMenuDescription(self, action):
-        menuPath = action.action.getMainMenuPath()
-        if menuPath == "-":
-            return ""
-        pre = []
-        post = []
-        if menuPath != "":
-            for item in menuPath.split("/"):
-                itemName = item.replace("_", "").lower() + "menu"
-                if not self.actionGroup.get_action(itemName):
-                    self.actionGroup.add_action(gtk.Action(itemName, item, None, None))
-                thisAction = self.actionGroup.get_action(itemName)
-                pre.append("<menu action=\"" + thisAction.get_name() + "\">")
-                post.append("</menu>")
-        if action.action.hasBuiltInGUIDescription():
-            return "" # We create the actions, but don't add anything to the description ..
-        if action.action.separatorBeforeInMainMenu():
-            pre.append("<separator/>\n")
-        pre.append("<menuitem action=\"" + action.action.getTitle() + "\"/>")
-        if action.action.separatorAfterInMainMenu():
-            pre.append("<separator/>\n")
-        description = ""
-        for s in pre:
-            description += s + "\n"
-        for i in xrange(len(post) - 1, -1, -1):
-            description += post[i] + "\n"
-        return description
+    def getMenuNames(self):
+        return [ "file", "edit", "view", "actions", "site", "reorder", "help" ] + guiplugins.interactiveActionHandler.extraMenus
     def createView(self):
         # Initialize
-        self.actionGroup.add_action(gtk.Action("filemenu", "_File", None, None))
-        self.actionGroup.add_action(gtk.Action("editmenu", "_Edit", None, None))
-        self.actionGroup.add_action(gtk.Action("viewmenu", "_View", None, None))
-        self.actionGroup.add_action(gtk.Action("actionsmenu", "_Actions", None, None))
-        # To make sure the Help menu ends up last, we cannot have it in the xml files :-(
-        # The reason seems to be that the 'position' tag only specifies position w.r.t.
-        # the currently added items, and thus doesn't work properly when merging uis ...
-        self.actionGroup.add_action(gtk.Action("reorderpopupmenu", "_Reorder", None, None))
+        for menuName in self.getMenuNames():
+            self.actionGroup.add_action(gtk.Action(menuName + "menu", "_" + menuName.capitalize(), None, None))
         self.createToggleActions()
         for actionGUI in self.actionGUIs:
             actionGUI.addToGroups(self.actionGroup, self.uiManager.get_accel_group())
             
-        # The all below also creates default actions, so we must do this before reading the file ...
-        description = self.getInterfaceDescription()
         for file in self.getGUIDescriptionFileNames():
             try:
-                self.uiManager.add_ui_from_file(file)        
+                self.diag.info("Reading UI from file " + file)
+                self.uiManager.add_ui_from_file(file)
             except Exception, e: 
                 raise plugins.TextTestError, "Failed to parse GUI description file '" + file + "': " + str(e)
-        self.uiManager.add_ui_from_string(description)
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
     def getGUIDescriptionFileNames(self):
-        files = [ self.getStdGUIDescriptionFileName() ]
-        userFileName = self.getUserGUIDescriptionFileName()
-        if userFileName:
-            files.append(userFileName)
-        return files
-    def getStdGUIDescriptionFileName(self):
-        layoutDir = plugins.installationDir("layout")
-        if self.dynamic:
-            return os.path.join(layoutDir, "standard_gui_dynamic.xml")
+        return self.getDescriptionFilesInDir(plugins.installationDir("layout")) + \
+               self.getDescriptionFilesInDir(plugins.getPersonalConfigDir())
+    def getDescriptionFilesInDir(self, layoutDir):
+        allFiles = os.path.join(layoutDir, "*_gui.xml")
+        self.diag.info("All description files : " + repr(allFiles))
+        # Pick up all GUI descriptions corresponding to modules we've loaded
+        loadFiles = filter(self.shouldLoad, glob(allFiles))
+        loadFiles.sort(self.cmpDescFiles)
+        return loadFiles
+    def cmpDescFiles(self, file1, file2):
+        base1 = os.path.basename(file1)
+        base2 = os.path.basename(file2)
+        default1 = base1.startswith("default")
+        default2 = base2.startswith("default")
+        if default1 != default2:
+            return cmp(default2, default1)
+        partCount1 = base1.count("_")
+        partCount2 = base2.count("_")
+        if partCount1 != partCount2:
+            return cmp(partCount1, partCount2) # less _ implies read first (not mode-specific)
+        return cmp(base2, base1) # something deterministic, just to make sure it's the same for everyone
+    def shouldLoad(self, fileName):
+        parts = os.path.basename(fileName).split("_")
+        moduleName = parts[0]
+        mode = parts[1]
+        return sys.modules.has_key(moduleName) and self.correctMode(mode)
+    def correctMode(self, mode):
+        if mode == "static":
+            return not self.dynamic
+        elif mode == "dynamic":
+            return self.dynamic
         else:
-            return os.path.join(layoutDir, "standard_gui_static.xml")
-    def getUserGUIDescriptionFileName(self):
-        file = guiConfig.getValue("gui_description_file", True)
-        # Now we must find the file. It should either be an absolute
-        # path, or a path relative to TEXTTEST_HOME.
-        if not file:
-            return file
-        elif os.path.isabs(file):
-            if os.path.isfile(file):
-                return file
-            else:
-                plugins.printWarning("The GUI description file '" + file + "' does not exist. Using default GUI layout.")
-        else:
-            homeDirPath = os.path.abspath(os.path.join(plugins.getPersonalConfigDir(), file))
-            if os.path.isfile(homeDirPath):
-                return homeDirPath
-            else:
-                absPath = os.path.abspath(os.path.join(os.environ["TEXTTEST_HOME"], file))
-                if os.path.isfile(absPath):
-                    return absPath
-                
-        plugins.printWarning("The GUI description file '" + file + "' could not be found in $TEXTTEST_PERSONAL_CONFIG/$HOME or in $TEXTTEST_HOME. Using default GUI layout.")
-        return ""
+            return True
     def describe(self):
         for toggleAction in self.toggleActions:
             guilog.info("Viewing toggle action with title '" + toggleAction.get_property("label") + "'")
@@ -708,26 +666,13 @@ class ToolBarGUI(ContainerGUI):
     def __init__(self, uiManager, actionGUIs, subgui):
         ContainerGUI.__init__(self, [ subgui ])
         self.uiManager = uiManager
-        self.actionGUIs = filter(lambda a: a.action.inToolBar(), actionGUIs)
+        self.actionGUIs = filter(lambda a: a.action.inMenuOrToolBar(), actionGUIs)
     def getWidgetName(self):
         return "_Toolbar"
     def ensureVisible(self, toolbar):
         for item in toolbar.get_children(): 
             item.set_is_important(True) # Or newly added children without stock ids won't be visible in gtk.TOOLBAR_BOTH_HORIZ style
-    def getInterfaceDescription(self):
-        description = "<ui>\n<toolbar name=\"MainToolBar\">\n"
-        for actionGUI in self.actionGUIs:
-            if actionGUI.action.hasBuiltInGUIDescription():
-                continue
-            if actionGUI.action.separatorBeforeInToolBar():
-                description += "<separator/>\n"
-            description += "<toolitem action=\"" + actionGUI.action.getTitle() + "\"/>\n"
-            if actionGUI.action.separatorAfterInToolBar():
-                description += "<separator/>\n"
-        description += "</toolbar>\n</ui>\n"
-        return description
     def createView(self):
-        self.uiManager.add_ui_from_string(self.getInterfaceDescription())
         self.uiManager.ensure_update()
         toolbar = self.uiManager.get_widget("/MainToolBar")
         self.ensureVisible(toolbar)
@@ -761,42 +706,7 @@ class TestPopupMenuGUI(SubGUI):
         self.actionGroup = uiManager.get_action_groups()[0]
     def getWidgetName(self):
         return "_TestPopupMenu"
-    def getInterfaceDescription(self):
-        description = "<ui>\n<popup name=\"TestPopupMenu\">\n"
-        for action in self.actionGUIs:
-            description += self.getMenuDescription(action)
-        description += "</popup></ui>\n"        
-        return description
-    def getMenuDescription(self, action):
-        menuPath = action.action.getTestPopupMenuPath()
-        if menuPath == "-":
-            return ""
-        pre = []
-        post = []
-        if menuPath != "":
-            for item in menuPath.split("/"):
-                itemName = item.replace("_", "").lower() + "menu"
-                if not self.actionGroup.get_action(itemName):
-                    self.actionGroup.add_action(gtk.Action(itemName, item, None, None))
-                thisAction = self.actionGroup.get_action(itemName)
-                pre.append("<menu action=\"" + thisAction.get_name() + "\">")
-                post.append("</menu>")
-
-        if action.action.hasBuiltInGUIDescription():
-            return ""
-        if action.action.separatorBeforeInTestPopupMenu():
-            pre.append("<separator/>\n")
-        pre.append("<menuitem action=\"" + action.action.getTitle() + "\"/>")
-        if action.action.separatorAfterInTestPopupMenu():
-            pre.append("<separator/>\n")
-        description = ""
-        for s in pre:
-            description += s + "\n"
-        for i in xrange(len(post) - 1, -1, -1):
-            description += post[i] + "\n"
-        return description
     def createView(self):
-        self.uiManager.add_ui_from_string(self.getInterfaceDescription())
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/TestPopupMenu")
         self.widget.show_all()
@@ -2091,7 +2001,7 @@ class FileViewGUI(SubGUI):
             if len(details) > 0:
                 self.model.set_value(fciter, 4, details)
         return fciter
-    
+  
 class ApplicationFileGUI(FileViewGUI):
     def __init__(self, dynamic):
         FileViewGUI.__init__(self, dynamic, "Configuration Files")
@@ -2124,14 +2034,13 @@ class ApplicationFileGUI(FileViewGUI):
         configFiles.sort()
         return configFiles
     def getPersonalFiles(self):
-        personalFiles = []
-        personalFile = self.allApps[0].getPersonalConfigFile()
-        if personalFile:
-            personalFiles.append(personalFile)
-        gtkRcFile = getGtkRcFile()
-        if gtkRcFile:
-            personalFiles.append(gtkRcFile)
-        return personalFiles
+        personalDir = plugins.getPersonalConfigDir()
+        if not os.path.isdir(personalDir):
+            return []
+        allEntries = [ os.path.join(personalDir, file) for file in os.listdir(personalDir) ]
+        allFiles = filter(os.path.isfile, allEntries)
+        allFiles.sort()
+        return allFiles
 
 class TestFileGUI(FileViewGUI):
     def __init__(self, dynamic):
@@ -2304,7 +2213,7 @@ class TestFileGUI(FileViewGUI):
             newiter = self.addFileToModel(parentIter, file, None, colour)
             if os.path.isdir(file):
                 dirIters[file] = newiter
-  
+
 class ProgressBarGUI(SubGUI):
     def __init__(self, dynamic):
         SubGUI.__init__(self)

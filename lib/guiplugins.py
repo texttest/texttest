@@ -135,34 +135,9 @@ class InteractiveAction(plugins.Observable):
 
     # Should we create a gtk.Action? (or connect to button directly ...)
     def inMenuOrToolBar(self): 
-        return self.hasBuiltInGUIDescription() or self.getMainMenuPath() != "-" or self.inToolBar() or self.getTestPopupMenuPath() != "-" or self.inButtonBar()
-    # Is this a built-in action? If so, we'll assume the appropriate XML code
-    # is given by an outside definition file.
-    def hasBuiltInGUIDescription(self):
-        return False
-    # Put the action in a menu/submenu? Use / to separate submenus.
-    def getMainMenuPath(self):
-        return "_Actions" # '-' is special, and means 'don't put in menu'.
-    # Put the action in the test popup menu?  Use / to separate submenus.
-    def getTestPopupMenuPath(self):
-        return "-" # '-' is special, and means 'don't put in popup menu'.
-    # Put the action in the (main) toolbar?
-    def inToolBar(self): 
         return True
     # Put the action in a button bar?
     def inButtonBar(self):
-        return False
-    def separatorBeforeInToolBar(self):
-        return False
-    def separatorAfterInToolBar(self):
-        return False
-    def separatorBeforeInMainMenu(self):
-        return False
-    def separatorAfterInMainMenu(self):
-        return False
-    def separatorBeforeInTestPopupMenu(self):
-        return False
-    def separatorAfterInTestPopupMenu(self):
         return False
     def getStockId(self): # The stock ID for the action, in toolbar and menu.
         pass
@@ -283,9 +258,6 @@ class SelectionAction(InteractiveAction):
 class Quit(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
-    # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasBuiltInGUIDescription(self):
-        return True
     def getStockId(self):
         return "quit"
     def _getTitle(self):
@@ -324,8 +296,6 @@ class InteractiveTestAction(InteractiveAction):
         return self.currentTest.classId() == "test-case"
     def describeTests(self):
         return repr(self.currentTest)
-    def inToolBar(self):
-        return False
     def inButtonBar(self):
         return len(self.getOptionGroups()) == 0
     def getViewCommand(self, fileName):
@@ -378,9 +348,6 @@ class SaveTests(SelectionAction):
         self.currFileSelection = []
         self.currApps = []
         self.currTestDescription = ""
-    # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasBuiltInGUIDescription(self):
-        return True
     def getStockId(self):
         return "save"
     def getTabTitle(self):
@@ -887,8 +854,6 @@ class SelectTests(SelectionAction):
             return [ fullVersion ] + [ fullVersion + "." + extra for extra in extraVersions ]
     def isActiveOnCurrent(self):
         return True
-    def hasBuiltInGUIDescription(self):
-        return True
     def getStockId(self):
         return "refresh"
     def _getTitle(self):
@@ -1009,9 +974,6 @@ class SelectTests(SelectionAction):
         return newTestList
 
 class ResetGroups(InteractiveAction):
-    # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasBuiltInGUIDescription(self):
-        return True
     def getStockId(self):
         return "revert-to-saved"
     def _getTitle(self):
@@ -1029,8 +991,6 @@ class SaveSelection(SelectionAction):
         self.selectionGroup = commandOptionGroups[0]
         self.fileName = ""
         self.saveTestList = ""
-    def hasBuiltInGUIDescription(self):
-        return True
     def getStockId(self):
         return "save-as"
     def getDialogType(self):
@@ -1073,8 +1033,6 @@ class LoadSelection(SelectTests):
     def __init__(self, commandOptionGroups):
         SelectTests.__init__(self, commandOptionGroups)
         self.fileName = ""
-    def hasBuiltInGUIDescription(self):
-        return True
     def getStockId(self):
         return "open"
     def _getTitle(self):
@@ -1184,8 +1142,6 @@ class ReconnectToTests(RunningAction):
         self.addSwitch("reconnfull", "Results:", 0, ["Display as they were", "Recompute from files"])
     def getGroupTabTitle(self):
         return "Running"
-    def hasBuiltInGUIDescription(self):
-        return True
     def getStockId(self):
         return "connect"
     def _getTitle(self):
@@ -1208,9 +1164,6 @@ class RunTests(RunningAction):
                 self.optionGroups.append(group)
     def getOptionGroups(self):
         return self.optionGroups
-    # We'll assume the appropriate XML code is given by an outside definition file.
-    def hasBuiltInGUIDescription(self):
-        return True
     def _getTitle(self):
         return "_Run"
     def getStockId(self):
@@ -1315,8 +1268,6 @@ class RemoveTests(SelectionAction):
             if test.parent:
                 return True
         return False
-    def hasBuiltInGUIDescription(self):
-        return True
     def _getTitle(self):
         return "Remove..."
     def getStockId(self):
@@ -1568,8 +1519,6 @@ class SortTestSuiteFileAscending(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currTestSelection = []
-    def hasBuiltInGUIDescription(self):
-        return True
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def isActiveOnCurrent(self):
@@ -1624,8 +1573,6 @@ class RepositionTest(InteractiveAction):
         self.position = position
         self.currTestSelection = []
         self.testToMove = None
-    def hasBuiltInGUIDescription(self):
-        return True
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
         if len(tests) == 1:
@@ -1712,8 +1659,6 @@ class RenameTest(InteractiveAction):
         self.oldName = ""
         self.newDescription = ""
         self.oldDescription = ""
-    def hasBuiltInGUIDescription(self):
-        return True
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def isActiveOnCurrent(self):
@@ -1777,14 +1722,8 @@ class RenameTest(InteractiveAction):
 class VersionInformation(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
-    def inToolBar(self): 
-        return False
-    def getMainMenuPath(self):
-        return "_Help"
     def _getTitle(self):
         return "Component _Versions"
-    def separatorBeforeInMainMenu(self):
-        return True
     def messageAfterPerform(self):
         return ""
     def _getScriptTitle(self):
@@ -1797,12 +1736,6 @@ class VersionInformation(InteractiveAction):
 class AboutTextTest(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
-    def inToolBar(self): 
-        return False
-    def getMainMenuPath(self):
-        return "_Help"
-    def separatorBeforeInMainMenu(self):
-        return True
     def getStockId(self):
         return "about"
     def _getTitle(self):
@@ -1819,10 +1752,6 @@ class AboutTextTest(InteractiveAction):
 class MigrationNotes(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
-    def inToolBar(self): 
-        return False
-    def getMainMenuPath(self):
-        return "_Help"
     def _getTitle(self):
         return "_Migration Notes"
     def messageAfterPerform(self):
@@ -1848,9 +1777,12 @@ class InteractiveActionHandler:
                                      ReconnectToTests, LoadSelection, SaveSelection ]
         self.actionExternalClasses = []
         self.actionPostClasses = [ MigrationNotes, VersionInformation, AboutTextTest ]
+        self.extraMenus = []
         self.loadModules = [] # derived configurations add to this on being imported...
         self.optionGroupMap = {}
         self.diag = plugins.getDiagnostics("Interactive Actions")
+    def addMenu(self, name):
+        self.extraMenus.append(name)
     def setCommandOptionGroups(self, optionGroups):
         if len(self.optionGroupMap) > 0:
             return

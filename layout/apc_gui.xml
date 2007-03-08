@@ -1,0 +1,16 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+
+    <placeholder name="ExtraMenus">
+      <menu name="optimizationmenu" action="optimizationmenu">
+        <menuitem action="Select KPI group"/>
+      </menu>
+    </placeholder>
+
+  </menubar>
+
+  <toolbar name="MainToolBar">
+    <toolitem action="Select KPI group"/>
+  </toolbar>
+</ui>

@@ -1019,7 +1019,7 @@ class Application:
     def getPersonalConfigFile(self):
         personalDir = plugins.getPersonalConfigDir()
         if personalDir:
-            personalFile = os.path.join(personalDir, ".texttest")
+            personalFile = os.path.join(personalDir, "config")
             if os.path.isfile(personalFile):
                 return personalFile
     def findOtherAppNames(self):

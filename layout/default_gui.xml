@@ -3,25 +3,31 @@
   <menubar name="MainMenuBar">
 
     <menu name="filemenu" action="filemenu">
+      <placeholder name="FirstInFileMenu" />
       <menuitem name="Save Selection..." action="Save Selection..."/>
       <separator/>
-      <menuitem name="Save" action="Save"/>
-      <separator/>
       <menuitem name="Quit" action="Quit"/>
-    </menu>
-
+    </menu> 
+    <menu action="editmenu" />
+    
     <menu name="viewmenu" action="viewmenu">
       <menuitem name="Toolbar" action="Toolbar"/>
       <menuitem name="Shortcut bar" action="Shortcut bar"/>
       <menuitem name="Status bar" action="Status bar"/>
     </menu>
+    <placeholder name="ExtraMenus" />
+
+    <menu action="helpmenu">
+      <menuitem action="Migration Notes"/>
+      <separator/>
+      <menuitem action="Component Versions"/>
+      <separator/>
+      <menuitem action="About TextTest"/>
+    </menu>
 
   </menubar>
 
   <toolbar name="MainToolBar">
-    <toolitem name="Quit" action="Quit"/>
-    <toolitem name="Save" action="Save"/>
-    <separator/>
   </toolbar>
 
   <popup name="TestPopupMenu">

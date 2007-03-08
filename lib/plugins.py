@@ -439,7 +439,12 @@ def getDiagnostics(diagName):
     return log4py.Logger().get_instance(diagName)
 
 def getPersonalConfigDir():
-    return os.getenv("TEXTTEST_PERSONAL_CONFIG", os.getenv("HOME"))
+    fromEnv = os.getenv("TEXTTEST_PERSONAL_CONFIG")
+    if fromEnv:
+        return fromEnv
+    homeDir = os.getenv("HOME")
+    if homeDir:
+        return os.path.join(homeDir, ".texttest")
 
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):

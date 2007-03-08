@@ -1,0 +1,17 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+
+    <placeholder name="ExtraMenus">
+      <menu name="optimizationmenu" action="optimizationmenu">
+        <menuitem name="Plot Graph" action="Plot Graph"/>
+      </menu>
+    </placeholder>
+
+  </menubar>
+
+  <toolbar name="MainToolBar">
+    <toolitem name="Plot Graph" action="Plot Graph"/>
+  </toolbar>
+
+</ui>

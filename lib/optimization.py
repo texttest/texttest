@@ -966,8 +966,6 @@ class PlotTestInGUI(guiplugins.SelectionAction):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
-    def getMainMenuPath(self):
-        return "_Optimization"
     def getStockId(self):
         return "clear"    
     def getTabTitle(self):
@@ -1938,3 +1936,4 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
         return info
 
 guiplugins.interactiveActionHandler.actionExternalClasses += [ CVSLogInGUI ]
+guiplugins.interactiveActionHandler.addMenu("optimization")

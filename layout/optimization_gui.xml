@@ -10,8 +10,4 @@
 
   </menubar>
 
-  <toolbar name="MainToolBar">
-    <toolitem name="Plot Graph" action="Plot Graph"/>
-  </toolbar>
-
 </ui>

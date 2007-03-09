@@ -10,7 +10,8 @@
 
   </menubar>
 
-  <toolbar name="MainToolBar">
+  <toolbar name="MainToolBar">  
+    <toolitem name="Plot Graph" action="Plot Graph"/>
     <toolitem action="Select KPI group"/>
   </toolbar>
 </ui>

@@ -132,13 +132,3 @@ class VirtualDisplayFinder:
         self.diag.info("Testing with command '" + testCommandLine + "'")
         cin, cerr = os.popen4(testCommandLine)
         return cerr.read()
-   
-def isCompressed(path):
-    if os.path.getsize(path) == 0:
-        return False
-    magic = open(path).read(2)
-    if magic[0] == chr(0x1f) and magic[1] == chr(0x9d):
-        return True
-    else:
-        return False
-

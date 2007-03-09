@@ -1157,7 +1157,7 @@ class ImportTestCase(optimization.ImportTestCase):
     # copied from TestCaseInformation...
     def getRuleSetName(self, absSubPlanDir):
         problemPath = os.path.join(absSubPlanDir, "APC_FILES", "problems")
-        if not unixonly.isCompressed(problemPath):
+        if not self.isCompressed(problemPath):
             problemLines = open(problemPath).xreadlines()
         else:
             tmpName = os.tmpnam()
@@ -1169,6 +1169,14 @@ class ImportTestCase(optimization.ImportTestCase):
             if line[0:4] == "153;":
                 return line.split(";")[3]
         return ""
+    def isCompressed(self, path):
+        if os.path.getsize(path) == 0:
+            return False
+        magic = open(path).read(2)
+        if magic[0] == chr(0x1f) and magic[1] == chr(0x9d):
+            return True
+        else:
+            return False
     def writeResultsFiles(self, suite, testDir):
         carmdataVar, carmdata = ravebased.getCarmdata(suite)
         subPlanDir = self.getSubplanPath(carmdata)

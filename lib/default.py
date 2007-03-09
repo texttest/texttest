@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, shutil, plugins, respond, performance, comparetest, string, sys, batch, re, stat, paths
+import os, shutil, plugins, respond, performance, comparetest, string, sys, batch, re, stat, paths, subprocess
 import glob
 from threading import currentThread
 from knownbugs import CheckForBugs, CheckForCrashes
@@ -461,9 +461,9 @@ class Config(plugins.Configuration):
             return {}
     def getDefaultCollateScripts(self):
         if os.name == "posix":
-            return { "stacktrace" : "interpretcore.py" }
+            return { "default" : [], "stacktrace" : [ "interpretcore.py" ] }
         else:
-            return {}
+            return { "default" : [] }
     def setComparisonDefaults(self, app):
         app.setConfigDefault("log_file", "output", "Result file to search, by default")
         app.setConfigDefault("failure_severity", self.defaultSeverities(), \
@@ -945,7 +945,6 @@ class CollateFiles(plugins.Action):
             if key.find(".") != -1:
                 raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' characters are not allowed"
         self.discardFiles = app.getConfigValue("discard_file")
-        self.collateScripts = app.getConfigValue("collate_script")
     def expandCollations(self, test, coll):
         newColl = {}
         # copy items specified without "*" in targetStem
@@ -1001,7 +1000,7 @@ class CollateFiles(plugins.Action):
             for fullpath in self.findPaths(test, sourcePattern):
                 if self.testEdited(test, fullpath):
                     self.diag.info("Extracting " + fullpath + " to " + targetFile)
-                    self.extract(fullpath, targetFile, collationErrFile)
+                    self.extract(test, fullpath, targetFile, collationErrFile)
                     break
     def getFilesPresent(self, test):
         files = seqdict()
@@ -1020,21 +1019,30 @@ class CollateFiles(plugins.Action):
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
         paths = glob.glob(pattern)
         return filter(os.path.isfile, paths)
-    def findExtractionScript(self, sourceFile, targetFile):
+    def extract(self, test, sourceFile, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
-        script = self.collateScripts.get(stem)
-        if script:
-            return script
-        elif os.name == "posix":
-            from unixonly import isCompressed
-            if isCompressed(sourceFile):
-                return "zcat"
-    def extract(self, sourceFile, targetFile, collationErrFile):
-        extractionScript = self.findExtractionScript(sourceFile, targetFile)
-        if extractionScript:
-            os.system(extractionScript + " " + sourceFile + " > " + targetFile + " 2> " + collationErrFile)
-        else:
-            shutil.copyfile(sourceFile, targetFile)
+        scripts = test.getCompositeConfigValue("collate_script", stem)
+        if len(scripts) == 0:
+            return shutil.copyfile(sourceFile, targetFile)
+
+        currProc = None
+        stdin = None
+        for script in scripts:
+            args = script.split()
+            if currProc:
+                stdin = currProc.stdout
+            else:
+                args.append(sourceFile)
+            self.diag.info("Opening extract process with args " + repr(args))
+            if script is scripts[-1]:
+                stdout = open(targetFile, "w")
+                stderr = open(collationErrFile, "w")
+            else:
+                stdout = subprocess.PIPE
+                stderr = subprocess.STDOUT
+
+            currProc = subprocess.Popen(args, stdin=stdin, stdout=stdout, stderr=stderr)
+        currProc.wait()
     
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):

@@ -666,6 +666,7 @@ class RecordTest(InteractiveTestAction):
     def __init__(self):
         InteractiveTestAction.__init__(self)
         self.recordTime = None
+        self.currentApp = None
         self.addOption("v", "Version to record")
         self.addOption("c", "Checkout to use for recording") 
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
@@ -685,8 +686,10 @@ class RecordTest(InteractiveTestAction):
     def isActiveOnCurrent(self):
         return InteractiveTestAction.isActiveOnCurrent(self) and self.getRecordMode() != "disabled"
     def updateForSelection(self):
-        self.optionGroup.setOptionValue("v", self.currentTest.app.getFullVersion(forSave=1))
-        self.optionGroup.setOptionValue("c", self.currentTest.app.checkout)
+        if self.currentApp is not self.currentTest.app:
+            self.currentApp = self.currentTest.app
+            self.optionGroup.setOptionValue("v", self.currentTest.app.getFullVersion(forSave=1))
+            self.optionGroup.setOptionValue("c", self.currentTest.app.checkout)
         return False, False
     def updateRecordTime(self, test):
         if self.updateRecordTimeForFile(test, "usecase", "USECASE_RECORD_SCRIPT", "target_record"):

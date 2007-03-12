@@ -146,7 +146,7 @@ class InteractiveAction(plugins.Observable):
     def getDialogType(self): # The dialog type to launch on action execution.
         self.confirmationMessage = self.getConfirmationMessage()
         if self.confirmationMessage:
-            return "guidialogs.YesNoDialog"
+            return "guidialogs.ConfirmationDialog"
         else:
             return ""
     def getResultDialogType(self): # The dialog type to launch when the action has finished execution.
@@ -1278,17 +1278,20 @@ class RemoveTests(SelectionAction):
     def _getScriptTitle(self):
         return "Remove selected tests"
     def getConfirmationMessage(self):
+        extraLines = """
+NOTE: This will remove files from the file system and hence may not be reversible!
+Are you sure you wish to proceed?"""
         if len(self.currTestSelection) == 1:
             currTest = self.currTestSelection[0]
             if currTest.classId() == "test-case":
                 return "You are about to remove the test '" + currTest.name + \
-                       "' and all associated files.\nAre you sure you wish to proceed?"
+                       "' and all associated files." + extraLines
             else:
                 return "You are about to remove the entire test suite '" + currTest.name + \
-                       "' and all " + str(currTest.size()) + " tests that it contains!\nAre you VERY sure you wish to proceed??"
+                       "' and all " + str(currTest.size()) + " tests that it contains!" + extraLines
         else:
             return "You are about to remove " + repr(len(self.currTestSelection)) + \
-                   " tests with associated files!\nAre you VERY sure you wish to proceed??"
+                   " tests with associated files!" + extraLines
     def performOnCurrent(self):
         namesRemoved = []
         warnings = ""

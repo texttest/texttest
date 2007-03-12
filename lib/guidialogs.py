@@ -164,28 +164,41 @@ class ActionResultDialog(GenericActionDialog):
 #
        
 class YesNoDialog(ActionConfirmationDialog):
-    def __init__(self, parent, okMethod, cancelMethod, plugin, message = None):
+    def __init__(self, parent, okMethod, cancelMethod, plugin, message=None):
         ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
         if self.plugin:
             self.message = self.plugin.confirmationMessage
         else:
             self.message = message
-        guilog.info("QUERY: " + self.message)
+        guilog.info(self.alarmLevel().upper() + ": " + self.message)
         self.dialog.set_default_response(gtk.RESPONSE_NO)
 
     def getDialogTitle(self):
-        return "TextTest Query"
+        return "TextTest " + self.alarmLevel()
 
     def createButtons(self):
         noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        scriptEngine.connect("answer no to texttest query", "clicked", noButton, self.respond, gtk.RESPONSE_NO, False)
-        scriptEngine.connect("answer yes to texttest query", "clicked", yesButton, self.respond, gtk.RESPONSE_YES, True)
+        scriptEngine.connect("answer no to texttest " + self.alarmLevel(), "clicked",
+                             noButton, self.respond, gtk.RESPONSE_NO, False)
+        scriptEngine.connect("answer yes to texttest " + self.alarmLevel(), "clicked", yesButton,
+                             self.respond, gtk.RESPONSE_YES, True)
 
     def addContents(self):
-        self.dialog.vbox.pack_start(createDialogMessage(self.message,
-                                                        gtk.STOCK_DIALOG_QUESTION), expand=True, fill=True)
+        contents = createDialogMessage(self.message, self.stockIcon())
+        self.dialog.vbox.pack_start(contents, expand=True, fill=True)
 
+class QueryDialog(YesNoDialog):
+    def alarmLevel(self):
+        return "Query"
+    def stockIcon(self):
+        return gtk.STOCK_DIALOG_QUESTION
+
+class ConfirmationDialog(YesNoDialog):
+    def alarmLevel(self):
+        return "Confirmation"
+    def stockIcon(self):
+        return gtk.STOCK_DIALOG_WARNING
         
 class SaveSelectionDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
@@ -248,7 +261,7 @@ class SaveSelectionDialog(ActionConfirmationDialog):
                 self.fileChooser.set_current_name("filename_mandatory")
                 return                
             if os.path.exists(self.fileChooser.get_filename()):
-                confirmation = YesNoDialog(self.dialog, lambda : self.setOptionsAndExit(saidOK), None, None, "\nThe file \n" + self.fileChooser.get_filename() + "\nalready exists.\n\nDo you want to overwrite it?\n")
+                confirmation = QueryDialog(self.dialog, lambda : self.setOptionsAndExit(saidOK), None, None, "\nThe file \n" + self.fileChooser.get_filename() + "\nalready exists.\n\nDo you want to overwrite it?\n")
                 confirmation.run()
             else:
                 self.setOptionsAndExit(saidOK)
@@ -370,7 +383,7 @@ class RenameDialog(ActionConfirmationDialog):
                 showErrorDialog(message, self.dialog)
                 return
             elif message:
-                dialog = YesNoDialog(self.dialog, lambda: ActionConfirmationDialog.respond(self, button, saidOK, *args), None, None, message)
+                dialog = QueryDialog(self.dialog, lambda: ActionConfirmationDialog.respond(self, button, saidOK, *args), None, None, message)
                 dialog.run()
                 return
         ActionConfirmationDialog.respond(self, button, saidOK, *args)

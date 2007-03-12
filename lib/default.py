@@ -1041,8 +1041,18 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            currProc = subprocess.Popen(args, stdin=stdin, stdout=stdout, stderr=stderr)
-        currProc.wait()
+            try:
+                currProc = subprocess.Popen(args, stdin=stdin, stdout=stdout, stderr=stderr)
+            except OSError:
+                errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
+                stderr.write(errorMsg)
+                print "WARNING : " + errorMsg.strip()
+                stdout.close()
+                if os.path.isfile(targetFile):
+                    os.remove(targetFile) # don't create empty files
+
+        if currProc:
+            currProc.wait()
     
 class TextFilter(plugins.Filter):
     def __init__(self, filterText):

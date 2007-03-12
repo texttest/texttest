@@ -1179,6 +1179,18 @@ class RunTests(RunningAction):
         return "Started"
     def getUseCaseName(self):
         return "dynamic"
+    def actionReplayEnabled(self):
+        for group in self.optionGroups:
+            if group.getSwitchValue("actrep", False):
+                return True
+        return False
+    def getConfirmationMessage(self):
+        if len(self.currTestSelection) > 1 and self.actionReplayEnabled():
+            return "You are trying to run " + str(len(self.currTestSelection)) + " tests with slow motion replay enabled.\n" + \
+                   "This will mean lots of target application GUIs popping up and may be hard to follow.\n" + \
+                   "Are you sure you want to do this?"
+        else:
+            return ""
 
 class CreateDefinitionFile(InteractiveTestAction):
     def __init__(self):

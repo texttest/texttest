@@ -1276,35 +1276,58 @@ class CreateDefinitionFile(InteractiveTestAction):
 class RemoveTests(SelectionAction):
     def __init__(self):
         SelectionAction.__init__(self)
+        self.currFileSelection = []
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
+    def notifyNewFileSelection(self, files):
+        self.currFileSelection = files
     def isActiveOnCurrent(self):
         for test in self.currTestSelection:
             if test.parent:
                 return True
-        return False
+        # Only root selected. Any file?
+        if len(self.currFileSelection) > 0:
+            return True
+        else:
+            return False
     def _getTitle(self):
         return "Remove..."
     def getStockId(self):
         return "delete"
     def _getScriptTitle(self):
-        return "Remove selected tests"
+        return "Remove selected files"
+    def getFilesDescription(self, number = None):
+        numberOfFiles = len(self.currFileSelection)
+        if number is not None:
+            numberOfFiles = number
+        if numberOfFiles == 1:
+            return "1 file"
+        else:
+            return str(numberOfFiles) + " files"
     def getConfirmationMessage(self):
         extraLines = """
-NOTE: This will remove files from the file system and hence may not be reversible!
-Are you sure you wish to proceed?"""
+\nNote: This will remove files from the file system and hence may not be reversible.\n
+Are you sure you wish to proceed?\n"""
         if len(self.currTestSelection) == 1:
             currTest = self.currTestSelection[0]
+            if len(self.currFileSelection) > 0:
+                return "\nYou are about to remove " + self.getFilesDescription() + \
+                       " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines                
             if currTest.classId() == "test-case":
-                return "You are about to remove the test '" + currTest.name + \
+                return "\nYou are about to remove the test '" + currTest.name + \
                        "' and all associated files." + extraLines
             else:
-                return "You are about to remove the entire test suite '" + currTest.name + \
-                       "' and all " + str(currTest.size()) + " tests that it contains!" + extraLines
+                return "\nYou are about to remove the entire test suite '" + currTest.name + \
+                       "' and all " + str(currTest.size()) + " tests that it contains." + extraLines
         else:
-            return "You are about to remove " + repr(len(self.currTestSelection)) + \
-                   " tests with associated files!" + extraLines
+            return "\nYou are about to remove " + repr(len(self.currTestSelection)) + \
+                   " tests with associated files." + extraLines
     def performOnCurrent(self):
+        if len(self.currFileSelection) > 0:
+            self.removeFiles()
+        else:
+            self.removeTests()
+    def removeTests(self):
         namesRemoved = []
         warnings = ""
         for test in self.currTestSelection:
@@ -1318,7 +1341,25 @@ Are you sure you wish to proceed?"""
         self.notify("Status", "Removed test(s) " + string.join(namesRemoved, ","))
         if warnings:
             raise plugins.TextTestWarning, warnings
-        
+    def removeFiles(self):
+        test = self.currTestSelection[0]
+        testPath = test.getDirectory()
+        warnings = ""
+        removed = 0
+        for file in self.currFileSelection:
+            filePath = os.path.join(testPath, file)
+            try:
+                self.notify("Status", "Removing file " + file)
+                self.notify("ActionProgress", "")
+                os.remove(filePath)
+                removed += 1
+            except OSError, e:
+                warnings += "Failed to remove file '" + filePath + "':\n" + str(e)
+        test.filesChanged()
+        self.notify("Status", "Removed " + self.getFilesDescription(removed) + " from the " +
+                    test.classDescription() + " " + test.name + "")
+        if warnings:
+            raise plugins.TextTestWarning, warnings
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
 

@@ -191,6 +191,8 @@ class Test(plugins.Observable):
         self.state.freeText = self.getDescription()
         if oldDesc != self.state.freeText:
             self.notify("DescriptionChange")
+    def classDescription(self):
+        return self.classId().replace("-", " ")
     def readEnvironment(self):
         envReader = EnvironmentReader(self.app)
         envReader.read(self)

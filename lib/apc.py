@@ -1420,7 +1420,7 @@ class CVSBranchTests(plugins.Action):
     def __repr__(self):
         return "CVS Branch test for"
     def __call__(self, test):
-        interestingFiles = ["status","error","memory","performance","solution","warnings"]
+        interestingFiles = ["status","error","memory","performance","solution","warnings", "optinfo"]
         for file in interestingFiles:
             fullFileName = test.getFileName(file)
             if not fullFileName:

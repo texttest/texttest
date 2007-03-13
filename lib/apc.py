@@ -82,7 +82,7 @@ from socket import gethostname
 from time import sleep
 from ndict import seqdict
 from tempfile import mktemp
-from carmenqueuesystem import getArchitecture, RunWithParallelAction
+from carmenqueuesystem import getArchitecture, getMajorReleaseVersion, RunWithParallelAction
 from comparetest import ProgressTestComparison
 
 def readKPIGroupFileCommon(suite):
@@ -494,8 +494,12 @@ class CreateHTMLFiles(plugins.Action):
             os.system(scriptFile + " " + runStatusFiles + " " + xmlFile + " " + xmlAllFile)
             htmlFile = test.makeTmpFileName("optinfo")
             xslFile = os.path.join(carmsys, "data/apc/feedback/optinfo_html_xsl.xml")
+            majorRelease = getMajorReleaseVersion(test.app)
+            if majorRelease == "master":
+                xsltprocArchs = [ "i386_linux", "x86_64_linux", "sparc", "sparc_64" ]
+            else:
+                xsltprocArchs = [ "i386_linux", "x86_64_linux" ]
             arch = getArchitecture(test.app)
-            xsltprocArchs = ["i386_linux", "x86_64_linux" ]
             if arch in xsltprocArchs:
                 os.system("xsltproc " + xslFile + " " + xmlAllFile + " > " + htmlFile)
             else:

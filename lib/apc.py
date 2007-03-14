@@ -236,7 +236,11 @@ class ApcConfig(optimization.OptimizationConfig):
 
 class CheckFilesForApc(plugins.Action):
     def __call__(self, test):
-        verifyAirportFile(getArchitecture(test.app))
+        # A hack to get around that the etable reading doesn't work 100%.
+        try:
+            verifyAirportFile(getArchitecture(test.app))
+        except TypeError:
+            print "Failed to find AirportFile in etables. Not verifying airportFile."
         verifyLogFileDir(getArchitecture(test.app))
         os.environ["TEXTTEST_TEST_RELPATH"] = test.getRelPath()
 

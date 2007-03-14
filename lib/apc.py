@@ -191,7 +191,7 @@ class ApcConfig(optimization.OptimizationConfig):
             useExtractLogs = self.optionValue("extractlogs")
             if useExtractLogs == "":
                 useExtractLogs = "all"
-            subActions.append(ExtractApcLogs(useExtractLogs))
+            subActions.append(ExtractApcLogs(useExtractLogs, self.optionMap.has_key("keeptmp")))
         return subActions
     def getProgressComparisonClass(self):
         return ApcProgressTestComparison
@@ -587,9 +587,10 @@ class MarkApcLogDir(RunWithParallelAction):
             file.close()
 
 class ExtractApcLogs(plugins.Action):
-    def __init__(self, args):
+    def __init__(self, args, keepTmp):
         self.diag = plugins.getDiagnostics("ExtractApcLogs")
         self.args = args
+        self.keepTmp = keepTmp
         if not self.args:
             print "No argument given, using default value for extract_logs"
             self.args = "default"
@@ -640,6 +641,9 @@ class ExtractApcLogs(plugins.Action):
             errFile = test.makeTmpFileName("script_errors")
             if os.path.isfile(errFile):
                 os.remove(errFile)
+        if self.keepTmp:
+            apcTmpDirStored = test.makeTmpFileName("apc_tmp", forComparison=0)
+            shutil.copytree(apcTmpDir, apcTmpDirStored) 
         # Remove dir
         plugins.rmtree(apcTmpDir)
     def __repr__(self):

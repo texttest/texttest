@@ -98,7 +98,6 @@ class GenericActionDialog:
         imageBox.pack_start(gtk.image_new_from_stock(stockItem, gtk.ICON_SIZE_DIALOG), expand=False)
         return imageBox
 
-
 #
 # A skeleton for a dialog which can replace the 'tab options' of
 # today's actions. I think it should be possible to customize the

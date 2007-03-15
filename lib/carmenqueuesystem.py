@@ -36,6 +36,10 @@ helpOptions = """
 import queuesystem, default, performance, os, string, shutil, plugins, respond, time
 from ndict import seqdict
 
+# Use cvs plugin for all Carmen suites
+from guiplugins import interactiveActionHandler
+interactiveActionHandler.loadModules.append("cvs")
+
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
 

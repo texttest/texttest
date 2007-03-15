@@ -63,20 +63,20 @@ class PluginHandler:
     def __init__(self):
         self.modules = []
     def getInstance(self, className, *args):
-        for module in self.modules:
-            command = "from " + module + " import " + className + " as realClassName"
-            try:
-                exec command
-                guilog.info("Loaded class '" + className + "' from module '" + module + "'")
-            except ImportError:
-                continue
-            
-            actionObject = self.tryMakeObject(realClassName, *args)
-            if actionObject:
-                return actionObject
-
         dotPos = className.find(".")
-        if dotPos != -1:
+        if dotPos == -1:
+            for module in self.modules:
+                command = "from " + module + " import " + className + " as realClassName"
+                try:
+                    exec command
+                    guilog.info("Loaded class '" + className + "' from module '" + module + "'")
+                except ImportError:
+                    continue
+            
+                actionObject = self.tryMakeObject(realClassName, *args)
+                if actionObject:
+                    return actionObject
+        else:
             module = className[0:dotPos]
             theClassName = className[dotPos + 1:]
             exec "from " + module + " import " + theClassName + " as realClassName"
@@ -608,7 +608,10 @@ class MenuBarGUI(SubGUI):
     def createView(self):
         # Initialize
         for menuName in self.getMenuNames():
-            self.actionGroup.add_action(gtk.Action(menuName + "menu", "_" + menuName.capitalize(), None, None))
+            realMenuName = menuName
+            if not menuName.isupper():
+                realMenuName = menuName.capitalize()
+            self.actionGroup.add_action(gtk.Action(menuName + "menu", "_" + realMenuName, None, None))
         self.createToggleActions()
         for actionGUI in self.actionGUIs:
             actionGUI.addToGroups(self.actionGroup, self.uiManager.get_accel_group())

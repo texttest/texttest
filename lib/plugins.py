@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, time, re, stat, locale
+import sys, os, log4py, string, shutil, time, re, stat, locale, datetime
 from ndict import seqdict
 from process import Process
 from traceback import format_exception
@@ -66,6 +66,31 @@ def getNumberOfSeconds(timeString):
 # Same as above, but gives minutes instead of seconds ...
 def getNumberOfMinutes(timeString):
     return getNumberOfSeconds(timeString) / 60
+
+# Show a human readable time difference string. Diffs larger than farAwayLimit are
+# written as the actual 'to' time, while other diffs are written e.g. 'X days ago'.
+# If markup is True, diffs less than closeLimit are boldified and diffs the same
+# day are red as well.
+def getTimeDifference(now, then, markup = True, \
+                      closeLimit = datetime.timedelta(days=3), \
+                      farAwayLimit = datetime.timedelta(days=7)):
+    difference = now - then # Assume this is positive ...
+    if difference > farAwayLimit:
+        return then.ctime()
+
+    stringDiff = str(difference.days) + " days ago"
+    yesterday = now - datetime.timedelta(days=1)
+    if now.day == then.day:
+        stringDiff = "Today at " + then.strftime("%H:%M:%S")
+        if markup:
+            stringDiff = "<span weight='bold' foreground='red'>" + stringDiff + "</span>"
+    elif yesterday.day == then.day and yesterday.month == then.month and yesterday.year == then.year:
+        stringDiff = "Yesterday at " + then.strftime("%H:%M:%S")
+        if markup:
+            stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
+    elif difference <= closeLimit and markup:
+        stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
+    return stringDiff
 
 def printWarning(message):
     print "WARNING: " + message

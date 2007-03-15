@@ -1,0 +1,41 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+
+    <placeholder name="ExtraMenus">
+      <menu name="CVSmenu" action="CVSmenu">
+        <menuitem name="Log" action="Log"/>
+        <menuitem name="Log Recursive" action="Log Recursive"/>
+        <separator/>
+        <menuitem name="Difference" action="Difference"/>
+        <menuitem name="Difference Recursive" action="Difference Recursive"/>
+        <separator/>
+        <menuitem name="Status" action="Status"/>
+        <menuitem name="Status Recursive" action="Status Recursive"/>
+        <separator/>
+        <menuitem name="Annotate" action="Annotate"/>
+        <menuitem name="Annotate Recursive" action="Annotate Recursive"/>
+        <separator/>
+      </menu>
+    </placeholder>
+
+  </menubar>
+
+  <popup name="TestPopupMenu">
+    <menu name="CVSmenu" action="CVSmenu">
+      <menuitem name="Log" action="Log"/>
+      <menuitem name="Log Recursive" action="Log Recursive"/>
+      <separator/>
+      <menuitem name="Difference" action="Difference"/>
+      <menuitem name="Difference Recursive" action="Difference Recursive"/>
+      <separator/>
+      <menuitem name="Status" action="Status"/>
+      <menuitem name="Status Recursive" action="Status Recursive"/>
+      <separator/>
+      <menuitem name="Annotate" action="Annotate"/>
+      <menuitem name="Annotate Recursive" action="Annotate Recursive"/>
+      <separator/>
+    </menu>
+  </popup>
+
+</ui>

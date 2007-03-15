@@ -935,10 +935,11 @@ class Application:
         self.setDependentConfigDefaults()
         self.readConfigFiles(configModuleInitialised=True)
         from guiplugins import interactiveActionHandler # yuck, we should make this work properly!
-        interactiveActionHandler.loadModules.append(self.getConfigValue("interactive_action_module"))
         personalFile = self.getPersonalConfigFile()
         if personalFile:
             self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
+        for module in self.getConfigValue("interactive_action_module"):
+            interactiveActionHandler.loadModules.append(module)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
         self.writeDirectory = self.configObject.getWriteDirectoryName(self)
         self.diag.info("Write directory at " + self.writeDirectory)
@@ -1063,7 +1064,7 @@ class Application:
     def setDependentConfigDefaults(self):
         binary = self.getConfigValue("binary")
         # Set values which default to other values
-        self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module"),
+        self.setConfigDefault("interactive_action_module", [ self.getConfigValue("config_module") ],
                               "Module to search for InteractiveActions for the GUI")
         interDoc = "Program to use as interpreter for the SUT"
         if binary.endswith(".py"):

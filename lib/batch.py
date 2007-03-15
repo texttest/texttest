@@ -500,7 +500,7 @@ class GenerateHistoricalReport(plugins.Action):
     def generateWebPages(self, app, pageDir, extraVersions, relevantSubDirs):
         testoverview.colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
         module = app.getConfigValue("interactive_action_module")
-        command = "from " + module + " import GenerateWebPages"
+        command = "from " + module[0] + " import GenerateWebPages"
         try:
             exec command
         except:

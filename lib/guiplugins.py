@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, string, types, time, paths
+import plugins, os, sys, shutil, types, time, paths
 from copy import copy
 from threading import Thread
 from glob import glob
@@ -253,7 +253,7 @@ class SelectionAction(InteractiveAction):
             relPath = test.getRelPath()
             if not relPath in selTestPaths:
                 selTestPaths.append(relPath)
-        return "-tp " + string.join(selTestPaths, ",")
+        return "-tp " + "\n".join(selTestPaths)
     
 class Quit(InteractiveAction):
     def __init__(self, dynamic):
@@ -278,7 +278,8 @@ class Quit(InteractiveAction):
         if len(runningProcesses) == 0:
             return ""
         else:
-            return "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + string.join(runningProcesses, "\n   + ") + "\n\nQuit anyway?\n"
+            return "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + \
+                   "\n   + ".join(runningProcesses) + "\n\nQuit anyway?\n"
 
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveTestAction(InteractiveAction):
@@ -401,7 +402,7 @@ class SaveTests(SelectionAction):
             ver = self.getDefaultSaveVersion(app)
             if not ver in saveVersions:
                 saveVersions.append(ver)
-        return string.join(saveVersions, ",")
+        return ",".join(saveVersions)
     def getDefaultSaveVersion(self, app):
         return app.getFullVersion(forSave = 1)
     def hasPerformance(self, apps):
@@ -424,7 +425,7 @@ class SaveTests(SelectionAction):
     def performOnCurrent(self):
         saveDesc = ", exactness " + str(self.getExactness())
         if len(self.currFileSelection) > 0:
-            saveDesc += ", only " + string.join(self.currFileSelection, ",")
+            saveDesc += ", only " + ",".join(self.currFileSelection)
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
@@ -1019,7 +1020,7 @@ class SaveSelection(SelectionAction):
         if actualTests:
             return self.getCmdlineOption()
         else:
-            return string.join(self.selectionGroup.getCommandLines(useQuotes=False))
+            return " ".join(self.selectionGroup.getCommandLines(useQuotes=False))
     def performOnCurrent(self):
         toWrite = self.getTextToSave()
         try:
@@ -1111,7 +1112,7 @@ class RunningAction(SelectionAction):
             ttOptions += group.getCommandLines(useQuotes=True)
         ttOptions.append("-f " + filterFile)
         ttOptions.append("-fd " + self.getTmpFilterDir(app))
-        return string.join(ttOptions)
+        return " ".join(ttOptions)
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
@@ -1119,7 +1120,7 @@ class RunningAction(SelectionAction):
         for test in self.currTestSelection:
             if not test.app.name in apps:
                 apps.append(test.app.name)
-        return "-a " + string.join(apps, ",")
+        return "-a " + ",".join(apps)
     def checkTestRun(self, identifierString, errFile, testSel):
         try:
             self.notifyIfMainThread("ActionStart", "")
@@ -1338,7 +1339,7 @@ Are you sure you wish to proceed?\n"""
                 if os.path.isdir(dir): # might have already removed the enclosing suite
                     test.parent.removeTest(test)
                     namesRemoved.append(test.name)
-        self.notify("Status", "Removed test(s) " + string.join(namesRemoved, ","))
+        self.notify("Status", "Removed test(s) " + ",".join(namesRemoved))
         if warnings:
             raise plugins.TextTestWarning, warnings
     def removeFiles(self):

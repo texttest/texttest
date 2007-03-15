@@ -27,10 +27,11 @@ def getPerformance(fileName):
     return float(line[pos + 1:].lstrip().split()[0])
     
 def getTestPerformance(test, version = None):
-    return getPerformance(test.getFileName("performance", version))
-
-def getTestMemory(test, version = None):
-    return getPerformance(test.getFileName("memory", version))
+    try:
+        return getPerformance(test.getFileName("performance", version))
+    except IOError: # assume something disappeared externally
+        test.refreshFiles()
+        return getTestPerformance(test, version)
 
 def parseTimeExpression(timeExpression):
     # Starts with <, >, <=, >= ?

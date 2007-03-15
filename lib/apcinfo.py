@@ -664,7 +664,7 @@ class GenHTML(plugins.Action):
         
         # Table
         testPerformance = performance.getTestPerformance(test) / 60 # getTestPerformance is seconds now ...
-        testMemory = performance.getTestMemory(test)
+        testMemory = self.getTestMemory(test)
         if testMemory > 0:
             testMemory = str(testMemory)
         else:
@@ -674,7 +674,8 @@ class GenHTML(plugins.Action):
         self.currentSuitePage["group"][group]["table"].append(tableRow)
         self.currentSuitePage["group"][group]["numtests"] += 1
         self.totalCPUtime += testPerformance
-        
+    def getTestMemory(self, test):
+        return performance.getPerformance(test.getFileName("memory"))
     def extractProfiling(self, test, group):
         lprofFile = os.path.join(self.profilesDir, self.currentSuite.name + "__" + test.name + "_lprof.apc")
         if os.path.isfile(lprofFile):

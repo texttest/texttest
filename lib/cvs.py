@@ -10,6 +10,9 @@ cvsRootSet = True
 if "CVSROOT" not in os.environ:
     plugins.printWarning("CVSROOT must be set to use the CVS plugin. Please set this environment variable and re-start TextTest to enable the CVS commands.")
     cvsRootSet = False
+elif not os.path.exists(os.environ["CVSROOT"]):
+    plugins.printWarning("The CVSROOT '" + os.environ["CVSROOT"] + "' does not exist. Please correct the CVSROOT environment variable and re-start TextTest to enable the CVS commands.")
+    cvsRootSet = False
 
 #
 # Todo/improvements:

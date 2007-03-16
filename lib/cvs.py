@@ -5,6 +5,12 @@ import default, texttestgui, gtk, plugins
 from guidialogs import guilog, scriptEngine
 from gtkusecase import TreeModelIndexer
 
+# First make sure that CVSROOT is set ...
+cvsRootSet = True
+if "CVSROOT" not in os.environ:
+    plugins.printWarning("CVSROOT must be set to use the CVS plugin. Please set this environment variable and re-start TextTest to enable the CVS commands.")
+    cvsRootSet = False
+
 #
 # Todo/improvements:
 #
@@ -69,7 +75,7 @@ class CVSMultipleAction(guiplugins.InteractiveAction):
     def notifyNewFileSelection(self, files):
         self.currFileSelection = files
     def isActiveOnCurrent(self):
-        return len(self.currTestSelection) > 0
+        return cvsRootSet and len(self.currTestSelection) > 0 
     def separatorBeforeInMainMenu(self):
         return not self.recursive
     def separatorBeforeInTestPopupMenu(self):

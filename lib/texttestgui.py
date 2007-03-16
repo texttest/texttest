@@ -317,8 +317,9 @@ class TextTestGUI(Responder, plugins.Observable):
         return  selectionActions + [ self.testColumnGUI, self.testFileGUI ] + self.buttonBarGUIs + \
                [ self.textInfoGUI ] + self.actionTabGUIs + self.defaultActionGUIs + self.notebookGUIs
     def getLifecycleObservers(self):
-        return [ self.textInfoGUI, self.testColumnGUI, self.testTreeGUI, self.testFileGUI, \
-                 self.progressBarGUI, self.progressMonitor ] + self.actionTabGUIs + self.buttonBarGUIs
+        # only the things that want to know about lifecycle changes irrespective of what's selected,
+        # otherwise we go via the test tree. Include add/remove as lifecycle
+        return [ self.testColumnGUI, self.testTreeGUI, self.progressBarGUI, self.progressMonitor ] 
     def getActionObservers(self):
         # These actions might change the tree view selection or the status bar, need to observe them
         return [ self.testTreeGUI, statusMonitor, self.idleManager, self.topWindowGUI ] + self.actionTabGUIs
@@ -1070,6 +1071,14 @@ class TestTreeGUI(ContainerGUI):
 
         if state.hasSucceeded():
             self.updateSuiteSuccess(test.parent)
+        if test in self.selectedTests:
+            self.notify("LifecycleChange", test, state, changeDesc)
+    def notifyFileChange(self, test):
+        if test in self.selectedTests:
+            self.notify("FileChange", test)
+    def notifyDescriptionChange(self, test):
+        if test in self.selectedTests:
+            self.notify("DescriptionChange", test)
     def updateSuiteSuccess(self, suite):
         successCount = self.successPerSuite.get(suite, 0) + 1
         self.successPerSuite[suite] = successCount
@@ -1768,15 +1777,21 @@ class NotebookGUI(SubGUI):
                 self.notebook.set_current_page(allNames.index(name))
 
     def notifyNewTestSelection(self, tests, direct):
+        # only change pages around if a test is directly selected
+        self.recreatePages(tests, changeCurrent=direct)
+    def recreatePages(self, tests=[], changeCurrent=False):
         if not self.notebook:
             return 
         pagesShown = self.showNewPages()
         pagesHidden = self.hideOldPages()
-        if direct: # only change pages around if a test is directly selected
+        if changeCurrent: 
             self.updateCurrentPage(tests)
   
         if pagesShown or pagesHidden:
             SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        self.recreatePages()
+        
           
 class PaneGUI(ContainerGUI):
     def __init__(self, gui1, gui2 , horizontal):
@@ -2354,7 +2369,7 @@ class TestProgressMonitor(SubGUI):
             classifiers.addClassification([ catDesc ])
             return classifiers
 
-        if not state.isSaveable(): # If it's not saveable, don't classify it by the files
+        if not state.isSaveable() or state.warnOnSave(): # If it's not saveable, don't classify it by the files
             overall, details = state.getTypeBreakdown()
             self.diag.info("Adding unsaveable : " + catDesc + " " + details)
             classifiers.addClassification([ "Failed", catDesc, details ])

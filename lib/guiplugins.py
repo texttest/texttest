@@ -357,12 +357,17 @@ class SaveTests(SelectionAction):
         return "_Save"
     def _getScriptTitle(self):
         return "Save results for selected tests"
-    def messageBeforePerform(self):
-        self.currTestDescription = self.describeTests()
-        return "Saving " + self.currTestDescription + " ..."
     def messageAfterPerform(self):
-        # Test selection is reset after a save, use the description from before 
-        return "Saved " + self.currTestDescription + "."
+        pass # do it in the method
+    def getConfirmationMessage(self):
+        testsForWarn = filter(lambda test: test.state.warnOnSave(), self.currTestSelection)
+        if len(testsForWarn) == 0:
+            return ""
+        message = "You have selected tests whose results are partial or which are registered as bugs:\n"
+        for test in testsForWarn:
+            message += "  Test '" + test.uniqueName + "' " + test.state.categoryRepr() + "\n"
+        message += "Are you sure you want to do this?\n"
+        return message
     def getSelectedApps(self):
         apps = []
         for test in self.currTestSelection:
@@ -422,6 +427,10 @@ class SaveTests(SelectionAction):
         self.currFileSelection = files
     def newFilesAsDiags(self):
         return int(self.optionGroup.getSwitchValue("newdiag", 0))
+    def isActiveOnCurrent(self):
+        return len(self.getSaveableTests()) > 0
+    def getSaveableTests(self):
+        return filter(lambda test: test.state.isSaveable(), self.currTestSelection)
     def performOnCurrent(self):
         saveDesc = ", exactness " + str(self.getExactness())
         if len(self.currFileSelection) > 0:
@@ -430,19 +439,21 @@ class SaveTests(SelectionAction):
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
 
-        stemsToSave = [ fileName.split(".")[0] for fileName in self.currFileSelection ] 
-        for test in self.currTestSelection:
-            if not test.state.isSaveable():
-                continue
+        stemsToSave = [ fileName.split(".")[0] for fileName in self.currFileSelection ]
+        tests = self.getSaveableTests()
+        testDesc = str(len(tests)) + " tests"
+        self.notify("Status", "Saving " + testDesc + " ...")
+        for test in tests:
             version = self.getVersion(test)
             fullDesc = " - version " + version + saveDesc
             self.describe(test, fullDesc)
             testComparison = test.state
             testComparison.setObservers(self.observers)
-            if testComparison:
-                testComparison.save(test, self.getExactness(), version, overwriteSuccess, self.newFilesAsDiags(), stemsToSave)
-                newState = testComparison.makeNewState(test.app)
-                test.changeState(newState)
+            testComparison.save(test, self.getExactness(), version, overwriteSuccess, self.newFilesAsDiags(), stemsToSave)
+            newState = testComparison.makeNewState(test.app)
+            test.changeState(newState)
+
+        self.notify("Status", "Saved " + testDesc + ".")
           
 # Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
 # because it's special and plugged into the tree view. Don't use this as a generic example!

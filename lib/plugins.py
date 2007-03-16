@@ -444,6 +444,8 @@ class TestState(Observable):
         return self.lifecycleChange == "complete"
     def isSaveable(self):
         return self.hasFailed() and self.hasResults()
+    def warnOnSave(self):
+        return False
     def updateAbsPath(self, newAbsPath):
         pass
     def updateTmpPath(self, newTmpPath):

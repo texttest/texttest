@@ -120,11 +120,8 @@ class TestComparison(BaseTestComparison):
         self.category = prediction.category
     def hasSucceeded(self):
         return self.category == "success"
-    def isSaveable(self):
-        if self.failedPrediction:
-            return False
-        else:
-            return plugins.TestState.isSaveable(self)
+    def warnOnSave(self):
+        return bool(self.failedPrediction)
     def hasDifferences(self):
         return len(self.changedResults) > 0
     def needsRecalculation(self):

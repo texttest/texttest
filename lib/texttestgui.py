@@ -149,20 +149,22 @@ class SubGUI(plugins.Observable):
             window.add(widget)
 
     def showPopupMenu(self, treeview, event):
-        if event.button == 3:
-            if len(self.popupGUI.widget.get_children()) == 0:
-                return 0
-            x = int(event.x)
-            y = int(event.y)
+        if event.button == 3 and len(self.popupGUI.widget.get_children()) > 0:
             time = event.time
-            pathInfo = treeview.get_path_at_pos(x, y)
+            pathInfo = treeview.get_path_at_pos(int(event.x), int(event.y))
+            selection = treeview.get_selection()
+            selectedRows = selection.get_selected_rows()
+            # If they didnt right click on a currently selected
+            # row, change the selection
             if pathInfo is not None:
+                if pathInfo[0] not in selectedRows[1]:
+                    selection.unselect_all()
+                    selection.select_path(pathInfo[0])
                 path, col, cellx, celly = pathInfo
                 treeview.grab_focus()
-                treeview.set_cursor(path, col, 0)
+                #treeview.set_cursor(path, col, 0)
                 self.popupGUI.widget.popup(None, None, None, event.button, time)
-                return 1
-        return 0
+                return True
 
 # base class for managing containers
 class ContainerGUI(SubGUI):

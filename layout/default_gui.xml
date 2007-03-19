@@ -33,4 +33,7 @@
   <popup name="TestPopupMenu">
   </popup>
 
+  <popup name="TestFilePopupMenu">
+  </popup>
+
 </ui>

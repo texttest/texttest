@@ -147,7 +147,23 @@ class SubGUI(plugins.Observable):
             window.add_with_viewport(widget)
         else:
             window.add(widget)
-            
+
+    def showPopupMenu(self, treeview, event):
+        if event.button == 3:
+            if len(self.popupGUI.widget.get_children()) == 0:
+                return 0
+            x = int(event.x)
+            y = int(event.y)
+            time = event.time
+            pathInfo = treeview.get_path_at_pos(x, y)
+            if pathInfo is not None:
+                path, col, cellx, celly = pathInfo
+                treeview.grab_focus()
+                treeview.set_cursor(path, col, 0)
+                self.popupGUI.widget.popup(None, None, None, event.button, time)
+                return 1
+        return 0
+
 # base class for managing containers
 class ContainerGUI(SubGUI):
     def __init__(self, subguis):
@@ -300,10 +316,10 @@ class TextTestGUI(Responder, plugins.Observable):
         self.idleManager = IdleHandlerManager(self.dynamic)
         self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic)
         self.defaultActionGUIs, self.buttonBarGUIs = self.createActionGUIs()
-        self.menuBarGUI, self.toolBarGUI, testPopupGUI = self.createMenuAndToolBarGUIs()
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs()
         self.testColumnGUI = TestColumnGUI(self.dynamic)
         self.testTreeGUI = TestTreeGUI(self.dynamic, testPopupGUI, self.testColumnGUI)
-        self.testFileGUI = TestFileGUI(self.dynamic)
+        self.testFileGUI = TestFileGUI(self.dynamic, testFilePopupGUI)
         self.actionTabGUIs = self.createActionTabGUIs()
         self.notebookGUIs, rightWindowGUI = self.createRightWindowGUI()
         self.shortcutBarGUI = ShortcutBarGUI()
@@ -324,7 +340,8 @@ class TextTestGUI(Responder, plugins.Observable):
         # These actions might change the tree view selection or the status bar, need to observe them
         return [ self.testTreeGUI, statusMonitor, self.idleManager, self.topWindowGUI ] + self.actionTabGUIs
     def getFileViewObservers(self):
-        return filter(self.isFileObserver, self.intvActions)
+        # We should potentially let other GUIs be file observers too ...
+        return filter(self.isFileObserver, self.intvActions + self.defaultActionGUIs)
     def isFileObserver(self, action):
         return hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile")
     def getExitObservers(self):
@@ -402,8 +419,9 @@ class TextTestGUI(Responder, plugins.Observable):
         uiManager = gtk.UIManager()
         menu = MenuBarGUI(self.dynamic, uiManager, self.defaultActionGUIs)
         toolbar = ToolBarGUI(uiManager, self.defaultActionGUIs, self.progressBarGUI)
-        popup = TestPopupMenuGUI(uiManager, self.defaultActionGUIs)
-        return menu, toolbar, popup
+        testPopup = TestPopupMenuGUI(uiManager, self.defaultActionGUIs)
+        testFilePopup = TestFilePopupMenuGUI(uiManager, self.defaultActionGUIs)
+        return menu, toolbar, testPopup, testFilePopup
     def createActionGUIs(self):
         defaultGUIs, buttonGUIs = [], []
         for action in self.intvActions:
@@ -716,6 +734,20 @@ class TestPopupMenuGUI(SubGUI):
         self.widget.show_all()
         return self.widget
 
+class TestFilePopupMenuGUI(SubGUI):
+    def __init__(self, uiManager, actionGUIs):
+        SubGUI.__init__(self)
+        self.uiManager = uiManager
+        self.actionGUIs = actionGUIs
+        self.actionGroup = uiManager.get_action_groups()[0]
+    def getWidgetName(self):
+        return "_TestFilePopupMenu"
+    def createView(self):
+        self.uiManager.ensure_update()
+        self.widget = self.uiManager.get_widget("/TestFilePopupMenu")
+        self.widget.show_all()
+        return self.widget
+
 class ShortcutBarGUI(SubGUI):
     def getWidgetName(self):
         return "_Shortcut bar"
@@ -939,22 +971,6 @@ class TestTreeGUI(ContainerGUI):
         return self.addScrollBars(self.treeView)
     def describeTree(self, *args):
         SubGUI.contentsChanged(self) # don't describe the column too...
-
-    def showPopupMenu(self, treeview, event):
-        if event.button == 3:
-            if len(self.popupGUI.widget.get_children()) == 0:
-                return 0
-            x = int(event.x)
-            y = int(event.y)
-            time = event.time
-            pathInfo = treeview.get_path_at_pos(x, y)
-            if pathInfo is not None:
-                path, col, cellx, celly = pathInfo
-                treeview.grab_focus()
-                treeview.set_cursor(path, col, 0)
-                self.popupGUI.widget.popup(None, None, None, event.button, time)
-                return 1
-        return 0
 
     def canSelect(self, path):
         pathIter = self.filteredModel.get_iter(path)
@@ -1214,6 +1230,8 @@ class ActionGUI(SubGUI):
         message += self.sensitivityDescription()
         guilog.info(message)
     def notifyNewTestSelection(self, *args):
+        self.checkSensitivity()
+    def notifyNewFileSelection(self, *args):
         self.checkSensitivity()
     def notifyLifecycleChange(self, *args):
         self.checkSensitivity()
@@ -1925,10 +1943,11 @@ class TextInfoGUI(SubGUI):
 
         
 class FileViewGUI(SubGUI):
-    def __init__(self, dynamic, title = ""):
+    def __init__(self, dynamic, title = "", popupGUI = None):
         SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
+        self.popupGUI = popupGUI
         self.dynamic = dynamic
         self.title = title
         self.selection = None
@@ -1984,6 +2003,10 @@ class FileViewGUI(SubGUI):
         view.expand_all()
         indexer = TreeModelIndexer(self.model, self.nameColumn, 0)
         self.monitorEvents(indexer)
+        if self.popupGUI:
+            view.connect("button_press_event", self.showPopupMenu)
+            self.popupGUI.createView()
+
         view.show()
         return self.addScrollBars(view)
         # only used in test view
@@ -2061,8 +2084,8 @@ class ApplicationFileGUI(FileViewGUI):
         return allFiles
 
 class TestFileGUI(FileViewGUI):
-    def __init__(self, dynamic):
-        FileViewGUI.__init__(self, dynamic)
+    def __init__(self, dynamic, popupGUI):
+        FileViewGUI.__init__(self, dynamic, "", popupGUI)
         self.currentTest = None
     def notifyFileChange(self, test):
         if test is self.currentTest:

@@ -62,4 +62,9 @@
     </menu>
   </popup>
 
+  <popup name="TestFilePopupMenu">
+    <menuitem name="Remove..." action="Remove..."/>
+    <separator/>
+  </popup>
+
 </ui>

@@ -1734,7 +1734,7 @@ class RenameTest(InteractiveAction):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def isActiveOnCurrent(self):
         return len(self.currTestSelection) == 1 and \
-               self.currTestSelection[0].parent and \
+               self.currTestSelection[0].parent != None and \
                self.currTestSelection[0].classId() == "test-case"
     def getDialogType(self):
         if len(self.currTestSelection) == 1:

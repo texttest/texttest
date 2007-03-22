@@ -202,6 +202,7 @@ class ConfirmationDialog(YesNoDialog):
 class SaveSelectionDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
         self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_SAVE)
+        self.fileChooser.set_show_hidden(True)
         self.plugin = plugin
         self.folders, defaultFolder = self.plugin.getDirectories()
         self.startFolder = os.getcwd() # Just to make sure we always have some dir ...
@@ -285,6 +286,7 @@ class SaveSelectionDialog(ActionConfirmationDialog):
 class LoadSelectionDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
         self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_OPEN)
+        self.fileChooser.set_show_hidden(True)
         self.plugin = plugin
         self.folders, defaultFolder = self.plugin.getDirectories()
         self.startFolder = os.getcwd() # Just to make sure we always have some dir ...

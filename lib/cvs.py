@@ -1,6 +1,6 @@
 
 import sys, os, guiplugins, guidialogs, gobject, datetime, time
-import default, texttestgui, gtk, plugins
+import default, texttestgui, gtk, plugins, custom_widgets
 
 from guidialogs import guilog, scriptEngine
 from gtkusecase import TreeModelIndexer
@@ -112,7 +112,7 @@ class CVSAction(guiplugins.InteractiveAction):
         status.currTestSelection = [ self.fileToTest[file] ]
         status.currFileSelection = [ os.path.basename(file) ]
         status.performOnCurrent()
-        dialog = CVSTreeViewDialog(dialog.parent, None, status)
+        dialog = CVSStatusDialog(dialog.parent, None, status)
         dialog.run()
     def viewLog(self, file, dialog):
         logger = CVSLog()
@@ -409,7 +409,7 @@ class CVSStatus(CVSAction):
     def _getScriptTitle(self):
         return "cvs status for the selected files"
     def getResultDialogType(self):
-        return "CVSTreeViewDialog"
+        return "CVSStatusDialog"
     def getResultDialogTwoColumnsInTreeView(self):
         return True
     def getResultDialogIconType(self):
@@ -783,25 +783,25 @@ class CVSTreeViewDialog(guidialogs.ActionResultDialog):
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def viewStatus(self, button):
-        file = self.treeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
+        file = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
         self.plugin.viewStatus(file, self)
 
     def viewLog(self, button):
-        file = self.treeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
+        file = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
         self.plugin.viewLog(file,self)
 
     def viewAnnotations(self, button):
-        file = self.treeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
+        file = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
         self.plugin.viewAnnotations(file, self)
 
     def viewDiffs(self, button):
-        file = self.treeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
+        file = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
         self.plugin.viewDiffs(file,
                               self.revision1.get_text(),
                               self.revision2.get_text(), self)
 
     def viewGraphicalDiff(self, button):
-        file = self.treeModel.get_value(self.treeView.get_selection().get_selected()[1], 2)
+        file = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 2)
         self.plugin.viewGraphicalDiffs(file, self)
 
     def addHeader(self):
@@ -855,8 +855,13 @@ class CVSTreeViewDialog(guidialogs.ActionResultDialog):
         #                  is shown in the second column. If not, ignore.
         #              3 - Entire path of the node. Created here, used primarily
         #                  to distinguish leaf nodes with the same name in TreeModelIndexer.
+        #              4 - Should the row be visible?
         self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING,
-                                       gobject.TYPE_STRING, gobject.TYPE_STRING)
+                                       gobject.TYPE_STRING, gobject.TYPE_STRING,
+                                       gobject.TYPE_BOOLEAN)
+        self.filteredTreeModel = self.treeModel.filter_new()
+        self.filteredTreeModel.set_visible_column(4)
+        
         labelMap = {}
         for label, content, info in self.plugin.pages:
             utfContent = plugins.encodeToUTF(plugins.decodeText(content))
@@ -867,35 +872,45 @@ class CVSTreeViewDialog(guidialogs.ActionResultDialog):
                 previousPath = currentPath
                 currentPath = os.path.join(currentPath, element)
                 currentInfo = ""
+                currentElement = element.strip(" \n")
                 if currentPath == label:
                     currentInfo = info
+                else:
+                    currentElement = "<span weight='bold'>" + currentElement + "</span>"
                 if not labelMap.has_key(currentPath):
                     if labelMap.has_key(previousPath):
                         guilog.info("CVS tree view dialog: Adding " + currentPath + " as child of " + previousPath + ", info " + info)
-                        labelMap[currentPath] = self.treeModel.append(labelMap[previousPath], (element.strip("\n"), utfContent, currentInfo, currentPath.strip(" \n")))
+                        labelMap[currentPath] = self.treeModel.append(labelMap[previousPath],
+                                                                      (currentElement, utfContent,
+                                                                       currentInfo, currentPath.strip(" \n"), True))
                     else:
                         guilog.info("CVS tree view dialog: Adding " + currentPath + " as root, info " + info)
-                        labelMap[currentPath] = self.treeModel.append(None, (element.strip("\n"), utfContent, currentInfo, currentPath.strip(" \n")))
+                        labelMap[currentPath] = self.treeModel.append(None,
+                                                                      (currentElement, utfContent,
+                                                                       currentInfo, currentPath.strip(" \n"), True))
 
-        self.treeView = gtk.TreeView(self.treeModel)
+        self.treeView = gtk.TreeView(self.filteredTreeModel)
         self.treeView.set_enable_search(False)
         fileRenderer = gtk.CellRendererText()
-        fileColumn = gtk.TreeViewColumn("File", fileRenderer, text=0)
-        fileColumn.set_cell_data_func(fileRenderer, texttestgui.renderParentsBold)
+        fileColumn = gtk.TreeViewColumn("File", fileRenderer, markup=0)
         self.treeView.append_column(fileColumn)
         self.treeView.set_expander_column(fileColumn)
         if self.plugin.getResultDialogTwoColumnsInTreeView():
             infoRenderer = gtk.CellRendererText()
-            infoColumn = gtk.TreeViewColumn(self.plugin.getResultDialogSecondColumnTitle(), infoRenderer, markup=2)
-            self.treeView.append_column(infoColumn)
+            self.infoColumn = custom_widgets.ButtonedTreeViewColumn(self.plugin.getResultDialogSecondColumnTitle(), infoRenderer, markup=2)
+            self.treeView.append_column(self.infoColumn)
             guilog.info("CVS tree view dialog: Showing two columns")
         self.treeView.get_selection().connect("changed", self.showOutput)
         self.treeView.get_selection().set_select_function(self.canSelect)
         self.treeView.expand_all()
-        scriptEngine.monitor("select", self.treeView.get_selection(), TreeModelIndexer(self.treeModel, fileColumn, 3), noImplies = True)
+        scriptEngine.monitor("select", self.treeView.get_selection(),
+                             TreeModelIndexer(self.filteredTreeModel, fileColumn, 3),
+                             noImplies = True)
         if len(self.plugin.pages) > 0:
-            self.treeView.get_selection().select_iter(labelMap[self.plugin.pages[0][0]])
-            
+            self.treeView.get_selection().select_iter(
+                self.filteredTreeModel.convert_child_iter_to_iter(
+                labelMap[self.plugin.pages[0][0]]))
+
     def showOutput(self, selection):
         model, iter = selection.get_selected()
         if iter:
@@ -907,4 +922,70 @@ class CVSTreeViewDialog(guidialogs.ActionResultDialog):
             self.extraWidgetArea.set_sensitive(False)
 
     def canSelect(self, path):
-        return not self.treeModel.iter_has_child(self.treeModel.get_iter(path))
+        return not self.treeModel.iter_has_child(
+            self.treeModel.get_iter(self.filteredTreeModel.convert_path_to_child_path(path)))
+
+class CVSStatusDialog(CVSTreeViewDialog):
+    popupMenuUI = '''<ui>
+      <popup name='Info'>
+      </popup>
+    </ui>'''
+    def __init__(self, parent, okMethod, plugin, extraButtons = []):
+        CVSTreeViewDialog.__init__(self, parent, okMethod, plugin, extraButtons)
+        self.uiManager = gtk.UIManager()
+        parent.add_accel_group(self.uiManager.get_accel_group())
+        self.uiManager.insert_action_group(gtk.ActionGroup("infovisibilitygroup"), 0)
+        self.uiManager.get_action_groups()[0].add_actions([("Info", None, "Info", None, None, None)])
+        self.uiManager.add_ui_from_string(self.popupMenuUI)
+        self.popupMenu = self.uiManager.get_widget("/Info")
+        
+    def addToggleItems(self):
+        # Each unique info column (column 2) gets its own toggle action in the popup menu
+        uniqueInfos = []
+        self.treeModel.foreach(self.collectInfos, uniqueInfos)
+        for info in uniqueInfos:
+            action = gtk.ToggleAction(info, info, None, None)
+            action.set_active(True)
+            self.uiManager.get_action_groups()[0].add_action(action)
+            self.uiManager.add_ui_from_string("<popup name='Info'><menuitem name='" + info + "' action='" + info + "'/></popup>")
+            action.connect("toggled", self.toggleVisibility)
+            scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())
+        self.uiManager.ensure_update()
+
+    def toggleVisibility(self, action):
+        self.treeModel.foreach(self.setVisibility, (action.get_name(), action.get_active()))
+        self.treeView.expand_row(self.filteredTreeModel.get_path(self.filteredTreeModel.get_iter_root()), True)
+
+    def setVisibility(self, model, path, iter, (actionName, actionState)):
+        if model.iter_parent(iter) is not None and (
+            actionName == "" or
+            model.get_value(iter, 2).lstrip("<span weight='bold'>").lstrip("<span weight='bold' foreground='red'>").rstrip("</span>").strip(" ") == actionName):
+            model.set_value(iter, 4, actionState)
+            parentIter = model.iter_parent(iter)
+            if actionState or self.hasNoVisibleChildren(model, parentIter):
+                self.setVisibility(model, model.get_path(parentIter), parentIter, ("", actionState))
+
+    def hasNoVisibleChildren(self, model, iter):
+        i = model.iter_children(iter)
+        while i:
+            if model.get_value(i, 4):
+                return False
+            i = model.iter_next(i)
+        return True
+        
+    def collectInfos(self, model, path, iter, infos):
+        info = model.get_value(iter, 2)
+        if info != "" and info not in infos:
+            infos.append(info.lstrip("<span weight='bold'>").lstrip("<span weight='bold' foreground='red'>").rstrip("</span>").strip(" "))
+        
+    def addContents(self):
+        CVSTreeViewDialog.addContents(self)
+        self.addToggleItems()
+        self.infoColumn.set_clickable(True)
+        self.infoColumn.get_button().connect("button-press-event", self.showPopupMenu)
+        self.treeView.grab_focus() # Or the column button gets focus ...
+
+    def showPopupMenu(self, treeview, event):
+        if event.button == 3:
+            self.popupMenu.popup(None, None, None, event.button, event.time)
+            return True

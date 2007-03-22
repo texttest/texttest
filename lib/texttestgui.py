@@ -162,7 +162,6 @@ class SubGUI(plugins.Observable):
                     selection.select_path(pathInfo[0])
                 path, col, cellx, celly = pathInfo
                 treeview.grab_focus()
-                #treeview.set_cursor(path, col, 0)
                 self.popupGUI.widget.popup(None, None, None, event.button, time)
                 return True
 

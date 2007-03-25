@@ -12,6 +12,9 @@ class AboutTextTestDialog(guidialogs.ActionResultDialog):
     def getDialogTitle(self):
         return "About TextTest"
 
+    def isResizeable(self):
+        return False
+    
     def createButtons(self):        
         self.creditsButton = self.dialog.add_button('texttest-stock-credits', gtk.RESPONSE_NONE)
         self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
@@ -62,6 +65,9 @@ class VersionsDialog(guidialogs.ActionResultDialog):
     def getDialogTitle(self):
         return "Version Information"
 
+    def isResizeable(self):
+        return False
+    
     def addContents(self):
         textTestVersion = texttest_version.version
         pythonVersion = ".".join(map(lambda l: str(l), sys.version_info))
@@ -83,23 +89,40 @@ class VersionsDialog(guidialogs.ActionResultDialog):
         table.attach(self.justify(pygtkVersion, 1.0), 1, 2, 3, 4)
         header = gtk.Label()
         header.set_markup("<b>You are using these versions:\n</b>")
+        tableVbox = gtk.VBox()
+        tableVbox.pack_start(header, expand=False, fill=False)
+        tableVbox.pack_start(table, expand=True, fill=True)
+        centeredTable = gtk.Alignment(0.5)
+        centeredTable.add(tableVbox)
+        sourceDirLabel = gtk.Label()
+        sourceDirLabel.set_markup("")
+        sourceDir = gtk.Label(os.path.dirname(__file__))
         vbox = gtk.VBox()
-        vbox.pack_start(header, expand=True, fill=True)
-        vbox.pack_start(table, expand=True, fill=True)
-        frame = gtk.Alignment()
+        vbox.pack_start(centeredTable, expand=True, fill=True)
+        vbox.pack_start(self.justify("\n<b>TextTest source directory:</b>", 0.0, True), expand=True, fill=True)
+        vbox.pack_start(sourceDir, expand=True, fill=True)
+        frame = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         frame.set_padding(10, 10, 10, 10)
         frame.add(vbox)
         self.dialog.vbox.pack_start(frame, expand=True, fill=True)
 
-    def justify(self, label, leftFill):
+    def justify(self, label, leftFill, markup = False):
         alignment = gtk.Alignment(leftFill, 0.0, 0.0, 0.0)
-        alignment.add(gtk.Label(label))
+        if markup:
+            l = gtk.Label()
+            l.set_markup(label)
+            alignment.add(l)
+        else:
+            alignment.add(gtk.Label(label))
         return alignment
 
 class CreditsDialog(guidialogs.ActionResultDialog):
     def getDialogTitle(self):
         return "TextTest Credits"
 
+    def isResizeable(self):
+        return False
+    
     def addContents(self):
         try:
             authorFile = open(os.path.join(plugins.installationDir("doc"), "AUTHORS"))
@@ -126,6 +149,9 @@ class LicenseDialog(guidialogs.ActionResultDialog):
     def getDialogTitle(self):
         return "TextTest License"
 
+    def isResizeable(self):
+        return False
+    
     def addContents(self):
         try:
             licenseFile = open(os.path.join(plugins.installationDir("doc"), "LICENSE"))

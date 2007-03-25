@@ -85,6 +85,9 @@ class GenericActionDialog:
 
     def isModal(self):
         return True
+
+    def isResizeable(self):
+        return True
     
     def run(self):
         self.addContents()
@@ -115,7 +118,8 @@ class ActionConfirmationDialog(GenericActionDialog):
             self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL) 
             self.dialog.set_modal(True)
         else:
-            self.dialog = gtk.Dialog(self.plugin.getScriptTitle(None))             
+            self.dialog = gtk.Dialog(self.plugin.getScriptTitle(None))
+        self.dialog.set_resizable(self.isResizeable())
         self.createButtons()
 
     def createButtons(self):
@@ -143,6 +147,7 @@ class ActionResultDialog(GenericActionDialog):
             self.dialog.set_modal(True)
         else:
             self.dialog = gtk.Dialog(self.getDialogTitle())             
+        self.dialog.set_resizable(self.isResizeable())
         self.createButtons()
 
     def createButtons(self):

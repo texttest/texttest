@@ -61,7 +61,7 @@ class FileComparison:
         stdModTime = plugins.modifiedTime(self.stdFile)
         tmpModTime = plugins.modifiedTime(self.tmpFile)
         if stdModTime is not None and tmpModTime is not None and stdModTime >= tmpModTime:
-            self.diag.info("Standard result newer than generated result")
+            self.diag.info("Standard result newer than generated result at " + self.stdFile)
             return True
 
         if self.stdFile == self.stdCmpFile: # no filters

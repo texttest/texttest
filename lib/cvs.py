@@ -163,9 +163,9 @@ class CVSAction(guiplugins.InteractiveAction):
         except:
             return ""
     def getApplicationPath(self):
-        return os.path.realpath(self.currTestSelection[0].app.getDirectory())
+        return self.currTestSelection[0].app.getDirectory()
     def getRootPath(self):
-        return os.path.realpath(os.path.split(os.path.realpath(self.currTestSelection[0].app.getDirectory()).rstrip(os.sep))[0])
+        return os.path.split(self.getApplicationPath().rstrip(os.sep))[0]
     def getRelativePath(self, path, root):
         return path.replace(root, "").lstrip(os.sep).strip(" \n\t")
 
@@ -209,7 +209,7 @@ class CVSLog(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            testPath = os.path.realpath(test.getDirectory())
+            testPath = test.getDirectory()
             if len(self.currFileSelection) == 0:
                 files = testPath
             else:
@@ -333,7 +333,7 @@ class CVSDiff(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            testPath = os.path.realpath(test.getDirectory())
+            testPath = test.getDirectory()
             if len(self.currFileSelection) == 0:
                 files = testPath
             else:
@@ -436,7 +436,7 @@ class CVSStatus(CVSAction):
             rootDir = self.getRootPath()
             cvsRepository = self.getCVSRepository(self.getApplicationPath())
         for test in self.currTestSelection:
-            testPath = os.path.realpath(test.getDirectory())
+            testPath = test.getDirectory()
             if len(self.currFileSelection) == 0:
                 files = testPath
             else:
@@ -544,7 +544,7 @@ class CVSAnnotate(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            testPath = os.path.realpath(test.getDirectory())
+            testPath = test.getDirectory()
             if len(self.currFileSelection) == 0:
                 files = testPath
             else:
@@ -639,7 +639,7 @@ class CVSUpdate(CVSAction):
         for test in self.currTestSelection:
             self.performOnSingle(test, rootDir)
     def performOnSingle(self, test, rootDir):
-        dir = os.path.realpath(test.getDirectory())                
+        dir = test.getDirectory()                
         self.notify("Status", "Updating " + self.getRelativePath(dir, rootDir))
         self.notify("ActionProgress", "")
         cvsCommand = self.getCVSCommand() + " " + dir

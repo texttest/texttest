@@ -271,7 +271,7 @@ class TrafficServer(TCPServer):
     instance = None
     def __init__(self):
         self.recordFile = None
-        self.replayInfo = seqdict()
+        self.replayInfo = None
         self.diag = plugins.getDiagnostics("Traffic Server")
         TrafficServer.instance = self
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
@@ -289,10 +289,7 @@ class TrafficServer(TCPServer):
         CommandLineTraffic.realCommands[command] = realCommand
     def setState(self, recordFile, replayFile, envVarMethod, tmpFileName):
         self.recordFile = recordFile
-        if replayFile:
-            self.readReplayFile(replayFile)
-        else:
-            self.replayInfo = seqdict()
+        self.replayInfo = ReplayInfo(replayFile)
         if recordFile or replayFile:
             self.setAddressVariable()
         else:
@@ -301,36 +298,9 @@ class TrafficServer(TCPServer):
         CommandLineTraffic.origEnviron = deepcopy(os.environ)
         CommandLineTraffic.tmpFileName = tmpFileName
         ClientSocketTraffic.destination = None
-    def readReplayFile(self, replayFile):
-        self.replayInfo = seqdict()
-        trafficList = self.readIntoList(replayFile)
-        currResponseHandler = None
-        for trafficStr in trafficList:
-            if trafficStr.startswith("<-"):
-                if currResponseHandler:
-                    currResponseHandler.endResponse()
-                currTrafficIn = trafficStr.strip()
-                if not self.replayInfo.has_key(currTrafficIn):
-                    self.replayInfo[currTrafficIn] = ReplayedResponseHandler()
-                currResponseHandler = self.replayInfo[currTrafficIn]
-            else:
-                currResponseHandler.addResponse(trafficStr)
-        self.diag.info("Replay info " + repr(self.replayInfo))
-    def readIntoList(self, replayFile):
-        trafficList = []
-        currTraffic = ""
-        for line in open(replayFile).xreadlines():
-            if line.startswith("<-") or line.startswith("->"):
-                if currTraffic:
-                    trafficList.append(currTraffic)
-                currTraffic = ""
-            currTraffic += line
-        if currTraffic:
-            trafficList.append(currTraffic)
-        return trafficList
     def process(self, traffic):
         self.record(traffic)
-        for response in self.getResponses(traffic):
+        for response in self.replayInfo.getResponses(traffic):
             self.record(response)
             for chainResponse in response.forwardToDestination():
                 self.process(chainResponse)
@@ -344,8 +314,41 @@ class TrafficServer(TCPServer):
         writeFile = open(self.recordFile, "a")
         writeFile.write(desc)
         writeFile.close()
+
+class ReplayInfo:
+    def __init__(self, replayFile):
+        self.responseMap = seqdict()
+        self.diag = plugins.getDiagnostics("Traffic Replay")
+        if replayFile:
+            self.readReplayFile(replayFile)
+    def readReplayFile(self, replayFile):
+        trafficList = self.readIntoList(replayFile)
+        currResponseHandler = None
+        for trafficStr in trafficList:
+            if trafficStr.startswith("<-"):
+                if currResponseHandler:
+                    currResponseHandler.endResponse()
+                currTrafficIn = trafficStr.strip()
+                if not self.responseMap.has_key(currTrafficIn):
+                    self.responseMap[currTrafficIn] = ReplayedResponseHandler()
+                currResponseHandler = self.responseMap[currTrafficIn]
+            else:
+                currResponseHandler.addResponse(trafficStr)
+        self.diag.info("Replay info " + repr(self.responseMap))
+    def readIntoList(self, replayFile):
+        trafficList = []
+        currTraffic = ""
+        for line in open(replayFile).xreadlines():
+            if line.startswith("<-") or line.startswith("->"):
+                if currTraffic:
+                    trafficList.append(currTraffic)
+                currTraffic = ""
+            currTraffic += line
+        if currTraffic:
+            trafficList.append(currTraffic)
+        return trafficList
     def getResponses(self, traffic):
-        if len(self.replayInfo) > 0:
+        if len(self.responseMap) > 0:
             return self.readReplayResponses(traffic)
         else:
             return traffic.forwardToDestination()
@@ -356,34 +359,44 @@ class TrafficServer(TCPServer):
             return []
         desc = traffic.getDescription()
         bestMatchKey = self.findBestMatch(desc)
-        return self.replayInfo[bestMatchKey].makeResponses(traffic)
+        return self.responseMap[bestMatchKey].makeResponses(traffic)
     def findBestMatch(self, desc):
-        if self.replayInfo.has_key(desc):
+        self.diag.info("Trying to match '" + desc + "'")
+        if self.responseMap.has_key(desc):
+            self.diag.info("Found exact match")
             return desc
-        bestMatchPerc, bestMatch = 0.0, None
-        for key in self.replayInfo.keys():
-            matchPerc = self.findMatchPercentage(key, desc)
-            if matchPerc > bestMatchPerc:
-                bestMatchPerc, bestMatch = matchPerc, key
+        bestMatchPerc, bestMatch, fewestTimesChosen = 0.0, None, 100000
+        for currDesc, responseHandler in self.responseMap.items():
+            matchPerc = self.findMatchPercentage(currDesc, desc)
+            self.diag.info("Match percentage " + repr(matchPerc) + " with '" + currDesc + "'")
+            if matchPerc > bestMatchPerc or (matchPerc == bestMatchPerc and responseHandler.timesChosen < fewestTimesChosen):
+                bestMatchPerc, bestMatch, fewestTimesChosen = matchPerc, currDesc, responseHandler.timesChosen
         if bestMatch is not None:
+            self.diag.info("Best match chosen as '" + bestMatch + "'")
             return bestMatch
         else:
             sys.stderr.write("WARNING: Could not find any sensible match for the traffic:\n" + desc + "\n")
-            return self.replayInfo.keys()[0]
+            return self.responseMap.keys()[0]
+    def getWords(self, desc):
+        words = []
+        for part in desc.split("/"):
+            words += part.split()
+        return words
     def findMatchPercentage(self, traffic1, traffic2):
-        words1 = traffic1.split()
-        words2 = traffic2.split()
+        words1 = self.getWords(traffic1)
+        words2 = self.getWords(traffic2)
         matches = 0
         for word in words1:
             if word in words2:
                 matches += 1
         nomatches = len(words1) + len(words2) - (2 * matches)
         return 100.0 * float(matches) / float(nomatches + matches)
+    
 
 # Need to handle multiple replies to the same question
 class ReplayedResponseHandler:
     def __init__(self):
-        self.currIndex = 0
+        self.timesChosen = 0
         self.readIndex = 0
         self.responses = []
     def __repr__(self):
@@ -397,12 +410,10 @@ class ReplayedResponseHandler:
     def getCurrentStrings(self):
         if len(self.responses) == 0:
             return []
-        if self.currIndex < len(self.responses):
-            currStrings = self.responses[self.currIndex]
-            self.currIndex += 1
+        if self.timesChosen < len(self.responses):
+            currStrings = self.responses[self.timesChosen]
         else:
             currStrings = self.responses[0]
-            self.currIndex = 1
         return currStrings
     def makeResponses(self, traffic):
         trafficStrings = self.getCurrentStrings()
@@ -413,4 +424,5 @@ class ReplayedResponseHandler:
             for trafficClass in allClasses:
                 if trafficClass.typeId == trafficType:
                     responses.append(trafficClass(trafficStr[6:], traffic.responseFile))
+        self.timesChosen += 1
         return traffic.filterReplay(responses)

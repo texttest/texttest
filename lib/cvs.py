@@ -167,8 +167,21 @@ class CVSAction(guiplugins.InteractiveAction):
     def getRootPath(self):
         return os.path.split(self.getApplicationPath().rstrip(os.sep))[0]
     def getRelativePath(self, path, root):
-        return path.replace(root, "").lstrip(os.sep).strip(" \n\t")
-
+        usepath = path.strip()
+        relpath = plugins.relpath(usepath, root)
+        if relpath:
+            return relpath
+        else:
+            return self._findExisitingRelative(usepath.split("/")[1:], root)
+    def _findExisitingRelative(self, pathParts, root):
+        relPath = "/".join(pathParts)
+        fullPath = os.path.join(root, relPath)
+        if os.path.exists(fullPath):
+            return relPath
+        elif len(pathParts) > 1:
+            return self._findExisitingRelative(pathParts[1:], root)
+        else:
+            return ""
 #
 # 1 - First the methods which just check the repository and checked out files.
 #

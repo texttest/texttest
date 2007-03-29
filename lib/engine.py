@@ -402,25 +402,28 @@ class TextTest:
             if selectedAppDict.has_key(appName):
                 versionList = selectedAppDict[appName]
             try:
-                for version in versionList:
-                    appList += self.addApplications(appName, dircache, version)
+                appList += self.addApplications(appName, dircache, versionList)
             except (testmodel.BadConfigError, plugins.TextTestError):
                 sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + "\n")
                 raisedError = True
         return raisedError, appList
     def createApplication(self, appName, dircache, version):
         return testmodel.Application(appName, dircache, version, self.inputOptions)
-    def addApplications(self, appName, dircache, version):
+    def addApplications(self, appName, dircache, versions):
         appList = []
-        app = self.createApplication(appName, dircache, version)
-        appList.append(app)
-        for extraVersion in app.getExtraVersions():
-            aggVersion = extraVersion
-            if len(version) > 0:
-                aggVersion = version + "." + extraVersion
-            extraApp = self.createApplication(appName, dircache, aggVersion)
-            app.extras.append(extraApp)
-            appList.append(extraApp)
+        for version in versions:
+            app = self.createApplication(appName, dircache, version)
+            appList.append(app)
+            for extraVersion in app.getExtraVersions():
+                if extraVersion in versions:
+                    plugins.printWarning("Same version '" + extraVersion + "' implicitly requested more than once, ignoring.")
+                    continue
+                aggVersion = extraVersion
+                if len(version) > 0:
+                    aggVersion = version + "." + extraVersion
+                extraApp = self.createApplication(appName, dircache, aggVersion)
+                app.extras.append(extraApp)
+                appList.append(extraApp)
         return appList
     def needsTestRuns(self):
         for responder in self.allResponders:

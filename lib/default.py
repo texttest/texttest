@@ -245,7 +245,7 @@ class Config(plugins.Configuration):
                     realFilename = app.getFileName(dirsToSearchIn, filename)
             else:
                 realFilename = self.findFirstFilterFileMatching(app, filename)                
-            fileData = string.join(plugins.readList(realFilename), ",")
+            fileData = ",".join(plugins.readList(realFilename))
             optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
             return self.getFiltersFromMap(optionFinder, app)
         except Exception, e:
@@ -511,8 +511,7 @@ class Config(plugins.Configuration):
         dict["running"] = "yellow"
         dict["not_started"] = "white"
         dict["pending"] = "white"
-        dict["static"] = "pale green"
-        dict["app_static"] = "purple"
+        dict["static"] = "grey90"
         return dict
     def getDefaultAccelerators(self):
         dict = {}
@@ -1452,7 +1451,7 @@ class ReconnectTest(plugins.Action):
             self.reconnect(test, reconnLocation)
         else:
             test.changeState(plugins.Unrunnable(briefText="no results", \
-                                                freeText="No file found to load results from"))
+                                                freeText="No file found to load results from under " + reconnLocation))
             
         self.describe(test, self.getStateText(test))
     def getStateText(self, test):

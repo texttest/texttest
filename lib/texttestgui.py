@@ -2057,7 +2057,7 @@ class ApplicationFileGUI(FileViewGUI):
     def monitorEvents(self, indexer):
         scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated, indexer)
     def addFilesToModel(self, state):
-        colour = guiConfig.getCompositeValue("file_colours", "app_static")
+        colour = guiConfig.getCompositeValue("file_colours", "static")
         personalFiles = self.getPersonalFiles()
         if len(personalFiles) > 0:
             persiter = self.model.insert_before(None, None)

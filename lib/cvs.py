@@ -146,7 +146,7 @@ class CVSAction(guiplugins.InteractiveAction):
         scriptEngine.monitorProcess("shows CVS differences graphically", process)
     def getCVSRootFlag(self):
         if "CVSROOT" in os.environ and os.path.exists(os.environ["CVSROOT"]):
-            return "" # No -d flag necessary
+            return "-d " + os.environ["CVSROOT"] + " " # No -d flag necessary, but for testing purposes we'll keep it
         else:
             try:
                 rootFile = open(os.path.join(self.getApplicationPath(), os.path.join("CVS", "Root")))

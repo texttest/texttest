@@ -8,7 +8,7 @@ from gtkusecase import TreeModelIndexer
 # First make sure that CVSROOT is set ...
 if "CVSROOT" in os.environ and not os.path.exists(os.environ["CVSROOT"]):
     plugins.printWarning("The CVSROOT '" + os.environ["CVSROOT"] +
-                         "' does not exist. The CVS commands will extract CVSROOT from the application directory.")
+                         "' specified by the CVSROOT envronment variable does not exist.\nThe CVS commands will extract CVSROOT from the application directory instead.")
 
 #
 # Todo/improvements:
@@ -146,11 +146,11 @@ class CVSAction(guiplugins.InteractiveAction):
         scriptEngine.monitorProcess("shows CVS differences graphically", process)
     def getCVSRootFlag(self):
         if "CVSROOT" in os.environ and os.path.exists(os.environ["CVSROOT"]):
-            return "-d " + os.environ["CVSROOT"] + " " # No -d flag necessary, but for testing purposes we'll keep it
+            return "-d " + os.environ["CVSROOT"].rstrip(os.sep) + " " # No -d flag necessary, but for testing purposes we'll keep it
         else:
             try:
                 rootFile = open(os.path.join(self.getApplicationPath(), os.path.join("CVS", "Root")))
-                return "-d " + rootFile.read().strip(" \n\t") + " "
+                return "-d " + rootFile.read().strip(" \n\t").rstrip(os.sep) + " "
             except Exception, e:
                 raise plugins.TextTestError, "Failed to obtain CVSROOT from application directory:\n" + str(e)
     def getCVSRepository(self, appDir):

@@ -339,7 +339,7 @@ class TextTestGUI(Responder, plugins.Observable):
         return [ self.testColumnGUI, self.testTreeGUI, self.progressBarGUI, self.progressMonitor ] 
     def getActionObservers(self):
         # These actions might change the tree view selection or the status bar, need to observe them
-        return [ self.testTreeGUI, statusMonitor, self.idleManager, self.topWindowGUI ] + self.actionTabGUIs
+        return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ] + self.actionTabGUIs
     def getFileViewObservers(self):
         # We should potentially let other GUIs be file observers too ...
         return filter(self.isFileObserver, self.intvActions + self.defaultActionGUIs)
@@ -2025,11 +2025,16 @@ class FileViewGUI(SubGUI):
             return
         comparison = self.model.get_value(iter, 3)
         try:
-            self.notify("ViewFile", comparison, fileName)
+            self.notify("ViewFile", fileName, comparison)
         except plugins.TextTestError, e:
             showErrorDialog(str(e), globalTopWindow)
 
         self.selection.unselect_all()
+    def notifyNewFile(self, fileName, overwrittenExisting):
+        self.notify("ViewFile", fileName, None)
+        if not overwrittenExisting:
+            self.currentTest.refreshFiles()
+            self.recreateModel(self.getState())
     def addFileToModel(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
@@ -2147,7 +2152,7 @@ class TestFileGUI(FileViewGUI):
         selection.selected_foreach(self.fileSelected, filelist)
         self.notify("NewFileSelection", filelist)
     def fileSelected(self, treemodel, path, iter, filelist):
-        filelist.append(self.model.get_value(iter, 0))
+        filelist.append((self.model.get_value(iter, 2), self.model.get_value(iter, 3)))
     def getState(self):
         return self.currentTest.state
     def addComparisonsToModel(self, state):

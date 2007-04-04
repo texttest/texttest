@@ -110,28 +110,28 @@ class CVSAction(guiplugins.InteractiveAction):
     def viewStatus(self, file, dialog):
         status = CVSStatus()
         status.currTestSelection = [ self.fileToTest[file] ]
-        status.currFileSelection = [ os.path.basename(file) ]
+        status.currFileSelection = [ (file, None) ]
         status.performOnCurrent()
         dialog = CVSStatusDialog(dialog.parent, None, status)
         dialog.run()
     def viewLog(self, file, dialog):
         logger = CVSLog()
         logger.currTestSelection = [ self.fileToTest[file] ]
-        logger.currFileSelection = [ os.path.basename(file) ]
+        logger.currFileSelection = [ (file, None) ]
         logger.performOnCurrent(True)
         dialog = CVSTreeViewDialog(dialog.parent, None, logger)
         dialog.run()
     def viewAnnotations(self, file, dialog):
         annotater = CVSAnnotate()
         annotater.currTestSelection = [ self.fileToTest[file] ]
-        annotater.currFileSelection = [ os.path.basename(file) ]
+        annotater.currFileSelection = [ (file, None) ]
         annotater.performOnCurrent()
         dialog = CVSTreeViewDialog(dialog.parent, None, annotater)
         dialog.run()
     def viewDiffs(self, file, revision1, revision2, dialog):
         differ = CVSDiff(revision1, revision2)
         differ.currTestSelection = [ self.fileToTest[file] ]
-        differ.currFileSelection = [ os.path.basename(file) ]
+        differ.currFileSelection = [ (file, None) ]
         differ.performOnCurrent()
         dialog = CVSTreeViewDialog(dialog.parent, None, differ)
         dialog.run()
@@ -182,6 +182,24 @@ class CVSAction(guiplugins.InteractiveAction):
             return self._findExisitingRelative(pathParts[1:], root)
         else:
             return ""
+    def getFilesForCVS(self, test, ignorePresence=False):
+        testPath = test.getDirectory()
+        if len(self.currFileSelection) == 0:
+            return [ testPath ]
+        else:
+            allFiles = []
+            for filePath, comparison in self.currFileSelection:
+                allFiles.append(self.getAbsPath(filePath, testPath))
+            if ignorePresence:
+                return allFiles
+            else:
+                return filter(os.path.exists, allFiles)
+    def getAbsPath(self, filePath, testPath):
+        if os.path.isabs(filePath):
+            return filePath
+        else:
+            # internal structures store relative paths
+            return os.path.join(testPath, os.path.basename(filePath))
 #
 # 1 - First the methods which just check the repository and checked out files.
 #
@@ -222,18 +240,10 @@ class CVSLog(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            testPath = test.getDirectory()
-            if len(self.currFileSelection) == 0:
-                files = testPath
-            else:
-                files = ""
-                for file in self.currFileSelection:
-                    filePath = os.path.join(testPath, file)
-                    if ignorePresence or os.path.exists(filePath):
-                        files += filePath + " "
-            self.notify("Status", "Logging " + self.getRelativePath(testPath, rootDir))
+            fileArg = " ".join(self.getFilesForCVS(test, ignorePresence))
+            self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            command = self.getCVSCommand() + " " + files
+            command = self.getCVSCommand() + " " + fileArg
             stdin, stdouterr = os.popen4(command)
             self.parseOutput(stdouterr.readlines(), rootDir, test)
         
@@ -346,18 +356,10 @@ class CVSDiff(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            testPath = test.getDirectory()
-            if len(self.currFileSelection) == 0:
-                files = testPath
-            else:
-                files = ""
-                for file in self.currFileSelection:
-                    filePath = os.path.join(testPath, file)
-                    if os.path.exists(filePath):
-                        files += filePath + " "
-            self.notify("Status", "Diffing " + self.getRelativePath(testPath, rootDir))
+            fileArg = " ".join(self.getFilesForCVS(test))
+            self.notify("Status", "Diffing " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            command = self.getCVSCommand() + self.getRevisionOptions() + " " + files
+            command = self.getCVSCommand() + self.getRevisionOptions() + " " + fileArg
             stdin, stdouterr = os.popen4(command)            
             lines = stdouterr.readlines()
             self.parseOutput(lines, rootDir, test)
@@ -449,18 +451,10 @@ class CVSStatus(CVSAction):
             rootDir = self.getRootPath()
             cvsRepository = self.getCVSRepository(self.getApplicationPath())
         for test in self.currTestSelection:
-            testPath = test.getDirectory()
-            if len(self.currFileSelection) == 0:
-                files = testPath
-            else:
-                files = ""
-                for file in self.currFileSelection:
-                    filePath = os.path.join(testPath, file)
-                    if os.path.exists(filePath):
-                        files += filePath + " "
-            self.notify("Status", "Getting status for " + self.getRelativePath(testPath, rootDir))
+            fileArg = " ".join(self.getFilesForCVS(test))
+            self.notify("Status", "Getting status for " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            cvsCommand = self.getCVSCommand() + " " + files
+            cvsCommand = self.getCVSCommand() + " " + fileArg
             stdin, stdouterr = os.popen4(cvsCommand)
             outputLines = stdouterr.readlines()
             self.parseOutput(outputLines, rootDir, cvsRepository, test)
@@ -557,18 +551,10 @@ class CVSAnnotate(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            testPath = test.getDirectory()
-            if len(self.currFileSelection) == 0:
-                files = testPath
-            else:
-                files = ""
-                for file in self.currFileSelection:
-                    filePath = os.path.join(testPath, file)
-                    if os.path.exists(filePath):
-                        files += filePath + " "
-            self.notify("Status", "Getting annotations of " + self.getRelativePath(testPath, rootDir))
+            fileArg = " ".join(self.getFilesForCVS(test))
+            self.notify("Status", "Getting annotations of " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            command = self.getCVSCommand() + " " + files
+            command = self.getCVSCommand() + " " + fileArg
             stdin, stdouterr = os.popen4(command)
             self.parseOutput(stdouterr.readlines(), rootDir, test)            
     def parseOutput(self, outputLines, rootDir, test):

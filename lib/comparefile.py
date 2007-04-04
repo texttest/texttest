@@ -95,6 +95,21 @@ class FileComparison:
         return self.stdFile and self.tmpFile and not self.hasDifferences()
     def hasDifferences(self):
         return self.differenceCache
+    def getStdFile(self, filtered):
+        if filtered:
+            return self.stdCmpFile
+        else:
+            return self.stdFile
+    def getTmpFile(self, filtered):
+        if filtered:
+            return self.tmpCmpFile
+        else:
+            return self.tmpFile
+    def existingFile(self, filtered):
+        if self.missingResult():
+            return self.getStdFile(filtered)
+        else:
+            return self.getTmpFile(filtered)
     def cacheDifferences(self):
         if self.stdCmpFile and self.tmpCmpFile:
             self.differenceCache = not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)

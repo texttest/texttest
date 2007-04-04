@@ -131,7 +131,7 @@ class InteractiveAction(plugins.Observable):
     def isActiveOnCurrent(self):
         return True
     def canPerform(self):
-        return True # do we activate this via performOnCurrent() ?
+        return True # do we want a button on the tab for this?
 
     # Should we create a gtk.Action? (or connect to button directly ...)
     def inMenuOrToolBar(self): 
@@ -299,34 +299,11 @@ class InteractiveTestAction(InteractiveAction):
         return repr(self.currentTest)
     def inButtonBar(self):
         return len(self.getOptionGroups()) == 0
-    def getViewCommand(self, fileName):
-        stem = os.path.basename(fileName).split(".")[0]
-        viewProgram = self.getCompositeConfigValue("view_program", stem)
-        if not plugins.canExecute(viewProgram):
-            raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
-                  "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
-        cmd = viewProgram + " \"" + fileName + "\"" + plugins.nullRedirect()
-        if os.name == "posix":
-            cmd = "exec " + cmd # best to avoid shell messages etc.
-        return cmd, viewProgram
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 1:
             self.currentTest = tests[0]
         elif len(tests) > 1:
             self.currentTest = None
-    def viewFile(self, fileName, refreshContents=False, refreshFiles=False):
-        exitHandler = None
-        if refreshFiles:
-            exitHandler = self.currentTest.filesChanged
-        elif refreshContents:
-            exitHandler = self.currentTest.contentChanged
-
-        commandLine, descriptor = self.getViewCommand(fileName)
-        description = descriptor + " " + os.path.basename(fileName)
-        refresh = str(int(refreshContents or refreshFiles))
-        guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
-        process = self.startViewer(commandLine, description=description, exitHandler=exitHandler)
-        scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def startViewer(self, commandLine, description = "", exitHandler=None, exitHandlerArgs=(), \
                     shellTitle = None, holdShell = 0):
         testDesc = self.testDescription()
@@ -433,13 +410,13 @@ class SaveTests(SelectionAction):
         return filter(lambda test: test.state.isSaveable(), self.currTestSelection)
     def performOnCurrent(self):
         saveDesc = ", exactness " + str(self.getExactness())
-        if len(self.currFileSelection) > 0:
-            saveDesc += ", only " + ",".join(self.currFileSelection)
+        stemsToSave = [ os.path.basename(fileName).split(".")[0] for fileName, comparison in self.currFileSelection ]
+        if len(stemsToSave) > 0:
+            saveDesc += ", only " + ",".join(stemsToSave)
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
         if overwriteSuccess:
             saveDesc += ", overwriting both failed and succeeded files"
 
-        stemsToSave = [ fileName.split(".")[0] for fileName in self.currFileSelection ]
         tests = self.getSaveableTests()
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Saving " + testDesc + " ...")
@@ -454,83 +431,101 @@ class SaveTests(SelectionAction):
             test.changeState(newState)
 
         self.notify("Status", "Saved " + testDesc + ".")
-          
-# Plugin for viewing files (non-standard). In truth, the GUI knows a fair bit about this action,
-# because it's special and plugged into the tree view. Don't use this as a generic example!
-class ViewFile(InteractiveTestAction):
-    def __init__(self, dynamic):
+
+class FileViewAction(InteractiveTestAction):
+    def __init__(self):
         InteractiveTestAction.__init__(self)
-        self.dynamic = dynamic
-        if dynamic:
-            self.addDifferenceSwitches()
+        self.currFileSelection = []
+        self.viewTools = {}
     def inMenuOrToolBar(self):
+        return True
+    def inButtonBar(self):
         return False
     def isActiveOnCurrent(self):
-        return not self.dynamic or InteractiveTestAction.isActiveOnCurrent(self)
-    def _getTitle(self):
-        return "ViewFile"
-    def getTabTitle(self):
-        return "Viewing"
-    def canPerform(self):
-        return False # activate when a file is viewed, not via the performOnCurrent method
-    def hasButton(self):
+        if not InteractiveTestAction.isActiveOnCurrent(self):
+            return False
+        for fileName, comparison in self.currFileSelection:
+            if self.isActiveForFile(fileName, comparison):
+                return True
         return False
-    def addDifferenceSwitches(self):
-        self.addSwitch("rdt", "Include run-dependent text", 0)
-        self.addSwitch("nf", "Show differences where present", 1)
-    def updateForStateChange(self, test, state):
-        if test is self.currentTest:
-            return self.updateForState(state)
-        else:
-            return False, False
-    def updateForSelection(self):
-        return self.updateForState(self.currentTest.state)
-    def updateForState(self, state):
-        if not self.dynamic:
-            return False, False
+    def isActiveForFile(self, fileName, comparison):
+        if not self.viewTools.get(fileName):
+            return False
+        return self._isActiveForFile(fileName, comparison)
+    def _isActiveForFile(self, fileName, comparison):
+        return True
+    def notifyNewFileSelection(self, files):
+        self.currFileSelection = files
+        for fileName, comparison in self.currFileSelection:
+            self.viewTools[fileName] = self.getViewTool(fileName)
+    def useFiltered(self):
+        return False
+    def performOnCurrent(self):
+        for fileName, comparison in self.currFileSelection:
+            viewTool = self.viewTools.get(fileName)
+            self.performOnFile(fileName, comparison, viewTool)
+    def getViewTool(self, fileName):
+        viewProgram = self.getViewToolName(fileName)
+        if plugins.canExecute(viewProgram):
+            return viewProgram
+    def getViewToolName(self, fileName):
+        stem = os.path.basename(fileName).split(".")[0]
+        return guiConfig.getCompositeValue(self.getToolConfigEntry(), stem)
+    def differencesActive(self, comparison):
+        if not comparison or comparison.newResult() or comparison.missingResult():
+            return False
+        return comparison.hasDifferences()
+    def messageAfterPerform(self):
+        pass # provided by starting viewer, with message
+        
 
-        origCount = len(self.optionGroup.switches)
-        if self.isActiveOnCurrent():
-            followDefault = self.optionGroup.getSwitchValue("f", 1)
-            self.optionGroup.removeSwitch("f")
-            if not state.hasResults():
-                self.optionGroup.removeSwitch("rdt")
-                self.optionGroup.removeSwitch("nf")
-            if state.hasResults():
-                self.addDifferenceSwitches()
-            if not state.isComplete():
-                self.addSwitch("f", "Follow file rather than view it", followDefault)
-        changed = len(self.optionGroup.switches) != origCount
-        return changed, changed
-    def notifyNewTestSelection(self, tests, direct):
-        if len(tests) > 0 and self.currentTest not in tests:
-            self.currentTest = tests[0]
-    def tmpFile(self, comparison):
-        if self.optionGroup.getSwitchValue("rdt"):
-            return comparison.tmpFile
-        else:
-            return comparison.tmpCmpFile
-    def stdFile(self, comparison):
-        if self.optionGroup.getSwitchValue("rdt"):
-            return comparison.stdFile
-        else:
-            return comparison.stdCmpFile
-    def fileToFollow(self, comparison, fileName):
+class ViewInEditor(FileViewAction):
+    def __init__(self, dynamic):
+        FileViewAction.__init__(self)
+        self.dynamic = dynamic
+    def _getTitle(self):
+        return "View File"
+    def getToolConfigEntry(self):
+        return "view_program"
+    def viewFile(self, fileName, viewTool, exitHandler):
+        commandLine, descriptor = self.getViewCommand(fileName, viewTool)
+        description = descriptor + " " + os.path.basename(fileName)
+        refresh = bool(exitHandler)
+        guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
+        process = self.startViewer(commandLine, description=description, exitHandler=exitHandler)
+        scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
+    def getViewCommand(self, fileName, viewProgram):
+        cmd = viewProgram + " \"" + fileName + "\"" + plugins.nullRedirect()
+        if os.name == "posix":
+            cmd = "exec " + cmd # best to avoid shell messages etc.
+        return cmd, viewProgram
+    def getFileToView(self, fileName, comparison):
         if comparison:
-            return comparison.tmpFile
+            return comparison.existingFile(self.useFiltered())
         else:
             return fileName
-    def followFile(self, fileName):
-        followProgram = self.currentTest.getConfigValue("follow_program")
-        if not plugins.canExecute(followProgram):
-            raise plugins.TextTestError, "Cannot find file-following program '" + followProgram + \
-                  "'\nPlease install it somewhere on your PATH or point the follow_program setting at a different tool"
-        guilog.info("Following file " + fileName + " using '" + followProgram + "'")
-        description = followProgram + " " + os.path.basename(fileName)
-        baseName = os.path.basename(fileName)
-        title = self.currentTest.name + " (" + baseName + ")"
-        process = self.startViewer(followProgram + " " + fileName, description=description, shellTitle=title)
-        scriptEngine.monitorProcess("follows progress of test files", process)
+    def findExitHandler(self, fileName):
+        if self.dynamic:
+            return None
+
+        # options file can change appearance of test (environment refs etc.)
+        if self.isTestDefinition("options", fileName):
+            return self.currentTest.filesChanged
+        elif self.isTestDefinition("testsuite", fileName):
+            # refresh order of tests if this edited
+            return self.currentTest.contentChanged
+    def performOnFile(self, fileName, comparison, viewTool):
+        fileToView = self.getFileToView(fileName, comparison)
+        exitHandler = self.findExitHandler(fileToView)
+        return self.viewFile(fileToView, viewTool, exitHandler)
+    def notifyViewFile(self, fileName, comparison):
+        if not self.differencesActive(comparison):
+            viewProgram = self.getViewToolName(fileName)
+            if not plugins.canExecute(viewProgram):
+                raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
+                  "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
+
+            self.performOnFile(fileName, comparison, viewProgram)
     def isTestDefinition(self, stem, fileName):
         if not self.currentTest:
             return False
@@ -539,35 +534,29 @@ class ViewFile(InteractiveTestAction):
             return plugins.samefile(fileName, defFile)
         else:
             return False
-    def notifyViewFile(self, comparison, fileName):
-        if self.optionGroup.getSwitchValue("f"):
-            return self.followFile(self.fileToFollow(comparison, fileName))
-        if not comparison:
-            # refresh order of tests if this edited
-            refreshContents = self.isTestDefinition("testsuite", fileName)
-            # options file can change appearance of test (environment refs etc.)
-            refreshFiles = self.isTestDefinition("options", fileName)
-            return self.viewFile(fileName, refreshContents, refreshFiles)
-        if self.shouldTakeDiff(comparison):
-            self.takeDiff(comparison)
-        elif comparison.missingResult():
-            self.viewFile(self.stdFile(comparison))
-        else:
-            self.viewFile(self.tmpFile(comparison))
-    def shouldTakeDiff(self, comparison):
-        if comparison.newResult() or comparison.missingResult() or not self.optionGroup.getSwitchValue("nf"):
-            return 0
-        if comparison.hasDifferences():
-            return 1
-        # Take diff on succeeded tests if they want run-dependent text
-        return self.optionGroup.getSwitchValue("rdt")
-    def takeDiff(self, comparison):
-        diffProgram = self.currentTest.getConfigValue("diff_program")
-        if not plugins.canExecute(diffProgram):
-            raise plugins.TextTestError, "Cannot find graphical difference program '" + diffProgram + \
-                  "'\nPlease install it somewhere on your PATH or point the diff_program setting at a different tool"
-        stdFile = self.stdFile(comparison)
-        tmpFile = self.tmpFile(comparison)
+
+class ViewFilteredInEditor(ViewInEditor):
+    def __init__(self):
+        ViewInEditor.__init__(self, dynamic=True)
+    def useFiltered(self):
+        return True
+    def _getTitle(self):
+        return "View Filtered File"
+    def _isActiveForFile(self, fileName, comparison):
+        return bool(comparison)
+    def notifyViewFile(self, *args):
+        pass
+        
+class ViewFileDifferences(FileViewAction):
+    def _getTitle(self):
+        return "View Raw Differences"
+    def getToolConfigEntry(self):
+        return "diff_program"
+    def _isActiveForFile(self, fileName, comparison):
+        return bool(comparison)
+    def performOnFile(self, fileName, comparison, diffProgram):
+        stdFile = comparison.getStdFile(self.useFiltered())
+        tmpFile = comparison.getTmpFile(self.useFiltered())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
         guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
         guilog.info("-- original file : " + stdFile)
@@ -575,7 +564,44 @@ class ViewFile(InteractiveTestAction):
         commandLine = diffProgram + ' "' + stdFile + '" "' + tmpFile + '" ' + plugins.nullRedirect()
         process = self.startViewer(commandLine, description=description)
         scriptEngine.monitorProcess("shows graphical differences in test files", process)
+    
+class ViewFilteredFileDifferences(ViewFileDifferences):
+    def _getTitle(self):
+        return "View Differences"
+    def useFiltered(self):
+        return True
+    def _isActiveForFile(self, fileName, comparison):
+        return self.differencesActive(comparison)
+    def notifyViewFile(self, fileName, comparison):
+        if self.differencesActive(comparison):
+            diffProgram = self.getViewToolName(fileName)
+            if not plugins.canExecute(diffProgram):
+                raise plugins.TextTestError, "Cannot find graphical difference program '" + diffProgram + \
+                  "'\nPlease install it somewhere on your PATH or point the diff_program setting at a different tool"
+        
+            self.performOnFile(fileName, comparison, diffProgram)
 
+class FollowFile(FileViewAction):
+    def _getTitle(self):
+        return "Follow File Progress"
+    def getToolConfigEntry(self):
+        return "follow_program"
+    def _isActiveForFile(self, fileName, comparison):
+        return self.currentTest.state.hasStarted() and not self.currentTest.state.isComplete()
+    def fileToFollow(self, fileName, comparison):
+        if comparison:
+            return comparison.tmpFile
+        else:
+            return fileName
+    def performOnFile(self, fileName, comparison, followProgram):
+        useFile = self.fileToFollow(fileName, comparison)
+        guilog.info("Following file " + useFile + " using '" + followProgram + "'")
+        description = followProgram + " " + os.path.basename(useFile)
+        baseName = os.path.basename(useFile)
+        title = self.currentTest.name + " (" + baseName + ")"
+        process = self.startViewer(followProgram + " " + useFile, description=description, shellTitle=title)
+        scriptEngine.monitorProcess("follows progress of test files", process)    
+    
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveTestAction):
     def __init__(self):
@@ -1274,16 +1300,19 @@ class CreateDefinitionFile(InteractiveTestAction):
         targetFile = os.path.join(self.currentTest.getDirectory(), self.getFileName(stem, version))
         sourceFile = self.getSourceFile(stem, version, targetFile)
         plugins.ensureDirExistsForFile(targetFile)
+        fileExisted = os.path.exists(targetFile)
         if sourceFile and os.path.isfile(sourceFile):
             guilog.info("Creating new file, copying " + sourceFile)
             shutil.copyfile(sourceFile, targetFile)
-        elif not os.path.exists(targetFile):
+        elif not fileExisted:
             file = open(targetFile, "w")
             file.close()
             guilog.info("Creating new empty file...")
         else:
             raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile 
-        self.viewFile(targetFile, refreshFiles=True)
+        self.notify("NewFile", targetFile, fileExisted)
+    def messageAfterPerform(self):
+        pass
 
 class RemoveTests(SelectionAction):
     def __init__(self):
@@ -1355,13 +1384,11 @@ Are you sure you wish to proceed?\n"""
             raise plugins.TextTestWarning, warnings
     def removeFiles(self):
         test = self.currTestSelection[0]
-        testPath = test.getDirectory()
         warnings = ""
         removed = 0
-        for file in self.currFileSelection:
-            filePath = os.path.join(testPath, file)
+        for filePath, comparison in self.currFileSelection:
             try:
-                self.notify("Status", "Removing file " + file)
+                self.notify("Status", "Removing file " + os.path.basename(filePath))
                 self.notify("ActionProgress", "")
                 os.remove(filePath)
                 removed += 1
@@ -1837,8 +1864,9 @@ class MigrationNotes(InteractiveAction):
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.actionPreClasses = [ Quit, ViewFile ]
-        self.actionDynamicClasses = [ SaveTests, SaveSelection, RecomputeTest ]
+        self.actionPreClasses = [ Quit, ViewInEditor ]
+        self.actionDynamicClasses = [ ViewFilteredInEditor, ViewFileDifferences, ViewFilteredFileDifferences, FollowFile, \
+                                      SaveTests, SaveSelection, RecomputeTest ]
         self.actionStaticClasses = [ RecordTest, CopyTest, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups, RenameTest, RemoveTests, \

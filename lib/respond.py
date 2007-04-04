@@ -94,7 +94,7 @@ class InteractiveResponder(Responder):
             tool = test.getCompositeConfigValue("view_program", comparison.stem)
             cmdLine = tool + " " + comparison.tmpCmpFile + plugins.nullRedirect()
         else:
-            tool = test.getConfigValue("diff_program")
+            tool = test.getCompositeConfigValue("diff_program", comparison.stem)
             cmdLine = tool + " " + comparison.stdCmpFile + " " +\
                       comparison.tmpCmpFile + plugins.nullRedirect()
         return tool, cmdLine        

@@ -63,6 +63,8 @@
   </popup>
 
   <popup name="TestFilePopupMenu">
+    <menuitem action="View File"/>
+    <separator/>
     <menuitem name="Remove..." action="Remove..."/>
     <separator/>
   </popup>

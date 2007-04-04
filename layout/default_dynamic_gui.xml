@@ -19,4 +19,14 @@
   <popup name="TestPopupMenu">
   </popup>
 
+  <popup name="TestFilePopupMenu">
+    <menuitem action="View File"/>
+    <menuitem action="View Filtered File"/>
+    <separator/>
+    <menuitem action="View Differences"/>
+    <menuitem action="View Raw Differences"/>
+    <separator/>
+    <menuitem action="Follow File Progress"/>
+  </popup>
+
 </ui>

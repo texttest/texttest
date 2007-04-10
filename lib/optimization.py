@@ -376,7 +376,7 @@ class SolutionFileComparison(FileComparison):
                 return "solution better"
     def calculatePercentageIncrease(self, smallest, largest):
         if smallest == 0.0:
-            return 0.0
+            return "0.0"
 
         floatVal = ((largest - smallest) / abs(smallest)) * 100
         return str(round(floatVal, 1))

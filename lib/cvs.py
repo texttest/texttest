@@ -75,7 +75,7 @@ class CVSAction(guiplugins.InteractiveAction):
         self.currTestSelection = tests
     def notifyNewFileSelection(self, files):
         self.currFileSelection = files
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) > 0 
     def separatorBeforeInMainMenu(self):
         return not self.recursive

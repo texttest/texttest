@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, os, string, time, sys, locale, paths
+import guiplugins, plugins, os, string, time, sys, locale, paths, operator
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
@@ -123,7 +123,7 @@ class SubGUI(plugins.Observable):
     def createView(self):
         pass
 
-    def shouldShowCurrent(self):
+    def shouldShowCurrent(self, *args):
         return True # sometimes these things don't have anything to display
 
     def getTabTitle(self):
@@ -176,9 +176,9 @@ class ContainerGUI(SubGUI):
                 return True
         return False
     
-    def shouldShowCurrent(self):
+    def shouldShowCurrent(self, *args):
         for subgui in self.subguis:
-            if not subgui.shouldShowCurrent():
+            if not subgui.shouldShowCurrent(*args):
                 return False
         return True
     def shouldDescribe(self):
@@ -331,7 +331,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI.addObserver(actionThread) # window closing
     def getTestTreeObservers(self):
         selectionActions = filter(lambda action: hasattr(action, "notifyNewTestSelection"), self.intvActions)
-        return  selectionActions + [ self.testColumnGUI, self.testFileGUI ] + self.buttonBarGUIs + \
+        return selectionActions + [ self.testColumnGUI, self.testFileGUI ] + self.buttonBarGUIs + \
                [ self.textInfoGUI ] + self.actionTabGUIs + self.defaultActionGUIs + self.notebookGUIs
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
@@ -594,6 +594,8 @@ class MenuBarGUI(SubGUI):
         self.widget.get_toplevel().add_accel_group(self.uiManager.get_accel_group())
         if self.shouldHide("menubar"):
             self.hide(self.widget, "Menubar")
+        for actionGUI in self.actionGUIs:
+            actionGUI.setActive(active)
         for toggleAction in self.toggleActions:
             if self.shouldHide(toggleAction.get_name()):
                 toggleAction.set_active(False)
@@ -899,10 +901,14 @@ class TestTreeGUI(ContainerGUI):
     def addSuites(self, suites):
         if not self.dynamic:
             self.collapseStatic = guiConfig.getValue("static_collapse_suites")
+        totalSize = 0
         for suite in suites:
             size = suite.size()
+            totalSize += size
             if not self.dynamic or size > 0:
                 self.addSuiteWithParent(suite, None)
+        if self.dynamic and totalSize == 1:
+            self.selectedTests = reduce(operator.add, [ suite.testCaseList() for suite in suites ])
     def addSuiteWithParent(self, suite, parent, follower=None):    
         iter = self.model.insert_before(parent, follower)
         nodeName = suite.name
@@ -963,6 +969,10 @@ class TestTreeGUI(ContainerGUI):
         
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
         self.selection.connect("changed", self.userChangedSelection)
+        if len(self.selectedTests) > 0:
+            self.selectTestRows(self.selectedTests)
+            self.notify("NewTestSelection", self.selectedTests, False)
+
         self.treeView.show()
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)
@@ -1045,6 +1055,7 @@ class TestTreeGUI(ContainerGUI):
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
     def notifySetTestSelection(self, selTests, selectCollapsed=True):
         self.selectTestRows(selTests, selectCollapsed)
+        guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
         self.selectionChanged(direct=False) # Here it's been set via some indirect mechanism, might want to behave differently 
     def selectTestRows(self, selTests, selectCollapsed=True):
         self.selecting = True # don't respond to each individual programmatic change here
@@ -1062,12 +1073,11 @@ class TestTreeGUI(ContainerGUI):
                 treeView.expand_to_path(path)
             self.selection.select_iter(iter)
         treeView.grab_focus()
-        if firstPath is not None:
+        if firstPath is not None and treeView.get_property("visible"):
             cellArea = treeView.get_cell_area(firstPath, treeView.get_columns()[0])
             visibleArea = treeView.get_visible_rect()
             if cellArea.y < 0 or cellArea.y > visibleArea.height:
                 treeView.scroll_to_cell(firstPath, use_align=True, row_align=0.1)
-        guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
         self.selecting = False
     def expandLevel(self, view, iter, recursive=True):
         # Make sure expanding expands everything, better than just one level as default...
@@ -1234,18 +1244,18 @@ class ActionGUI(SubGUI):
         self.checkSensitivity()
     def notifyNewFileSelection(self, *args):
         self.checkSensitivity()
-    def notifyLifecycleChange(self, *args):
-        self.checkSensitivity()
-    def checkSensitivity(self):
-        if self.updateSensitivity():
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        self.checkSensitivity(test, state)
+    def checkSensitivity(self, test=None, state=None):
+        if self.updateSensitivity(test, state) and self.active:
             newActive = self.actionOrButton().get_property("sensitive")
             guilog.info("Setting sensitivity of action '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newActive))
-    def updateSensitivity(self):
+    def updateSensitivity(self, test=None, state=None):
         actionOrButton = self.actionOrButton()
         if not actionOrButton:
             return False
         oldActive = actionOrButton.get_property("sensitive")
-        newActive = self.action.isActiveOnCurrent()
+        newActive = self.action.isActiveOnCurrent(test, state)
         if oldActive != newActive:
             actionOrButton.set_property("sensitive", newActive)
             return True
@@ -1411,13 +1421,14 @@ class ActionTabGUI(SubGUI):
         self.action = action
         self.buttonGUI = buttonGUI
         self.vbox = None
+        self.diag = plugins.getDiagnostics("Action Tabs")
         self.tooltips = gtk.Tooltips()
     def getGroupTabTitle(self):
         return self.action.getGroupTabTitle()
     def getTabTitle(self):
         return self.optionGroup.name
-    def shouldShowCurrent(self):
-        return self.action.isActiveOnCurrent()
+    def shouldShowCurrent(self, *args):
+        return self.action.isActiveOnCurrent(*args)
     def createView(self):
         return self.addScrollBars(self.createVBox())
     def notifyReset(self):
@@ -1425,11 +1436,15 @@ class ActionTabGUI(SubGUI):
         self.contentsChanged()
     def notifyLifecycleChange(self, test, state, changeDesc):
         changedContents, changedValues = self.action.updateForStateChange(test, state)
+        self.diag.info("New state for " + self.getTabTitle() + ", " + state.category + \
+                       " contents changed " + repr(changedContents))
         self.handleChanges(changedContents, changedValues)     
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 0:
             return
         changedContents, changedValues = self.action.updateForSelectionChange()
+        self.diag.info("New selection for " + self.getTabTitle() + ", " + repr(tests) + \
+                       " contents changed " + repr(changedContents))
         self.handleChanges(changedContents, changedValues)
         
     def handleChanges(self, changedContents, changedValues):
@@ -1662,9 +1677,9 @@ class NotebookGUI(SubGUI):
         if self.currentPageName:
             self.tabInfo[self.currentPageName].contentsChanged()
 
-    def shouldShowCurrent(self):
+    def shouldShowCurrent(self, *args):
         for tabGUI in self.tabInfo.values():
-            if tabGUI.shouldShowCurrent():
+            if tabGUI.shouldShowCurrent(*args):
                 return True
         return False
 
@@ -1740,7 +1755,7 @@ class NotebookGUI(SubGUI):
             if tabName not in pageNamesRemoved:
                 return tabName
     
-    def showNewPages(self):
+    def showNewPages(self, *args):
         currChildren = self.notebook.get_children()
         currTabNames = map(self.notebook.get_tab_label_text, currChildren)
         insertIndex = 0
@@ -1749,11 +1764,11 @@ class NotebookGUI(SubGUI):
             page = self.findPage(name)
             if page:
                 insertIndex += 1
-                if tabGUI.shouldShowCurrent() and not page.get_property("visible"):
+                if tabGUI.shouldShowCurrent(*args) and not page.get_property("visible"):
                     self.diag.info("Showing page " + name)
                     page.show_all()
                     changed = True
-            elif tabGUI.shouldShowCurrent():
+            elif tabGUI.shouldShowCurrent(*args):
                 self.insertNewPage(name, insertIndex)
                 insertIndex += 1                
                 changed = True
@@ -1769,13 +1784,13 @@ class NotebookGUI(SubGUI):
         except ValueError:
             return False
 
-    def findPagesToHide(self):
-        return filter(lambda name: not self.tabInfo[name].shouldShowCurrent(), self.getTabNames())
+    def findPagesToHide(self, *args):
+        return filter(lambda name: not self.tabInfo[name].shouldShowCurrent(*args), self.getTabNames())
         
-    def hideOldPages(self):
+    def hideOldPages(self, *args):
         # Must reset the current page before removing it if we're viewing a removed page
         # otherwise we can output lots of pages we don't really look at
-        pagesToHide = self.findPagesToHide()
+        pagesToHide = self.findPagesToHide(*args)
         if len(pagesToHide) == 0:
             return False
 
@@ -1796,20 +1811,23 @@ class NotebookGUI(SubGUI):
                 self.notebook.set_current_page(allNames.index(name))
 
     def notifyNewTestSelection(self, tests, direct):
-        # only change pages around if a test is directly selected
-        self.recreatePages(tests, changeCurrent=direct)
-    def recreatePages(self, tests=[], changeCurrent=False):
         if not self.notebook:
             return 
         pagesShown = self.showNewPages()
         pagesHidden = self.hideOldPages()
-        if changeCurrent: 
+        # only change pages around if a test is directly selected
+        if direct: 
             self.updateCurrentPage(tests)
   
         if pagesShown or pagesHidden:
             SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
     def notifyLifecycleChange(self, test, state, changeDesc):
-        self.recreatePages()
+        if not self.notebook:
+            return 
+        pagesShown = self.showNewPages(test, state)
+        pagesHidden = self.hideOldPages(test, state)
+        if pagesShown or pagesHidden:
+            SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
         
           
 class PaneGUI(ContainerGUI):
@@ -1887,7 +1905,7 @@ class TextInfoGUI(SubGUI):
         self.currentTest = None
         self.text = ""
         self.view = None
-    def shouldShowCurrent(self):
+    def shouldShowCurrent(self, *args):
         return len(self.text) > 0
     def getTabTitle(self):
         return "Text Info"
@@ -2055,7 +2073,7 @@ class ApplicationFileGUI(FileViewGUI):
         self.allApps = []
     def addSuites(self, suites):
         self.allApps = [ suite.app for suite in suites ]
-    def shouldShowCurrent(self):
+    def shouldShowCurrent(self, *args):
         return not self.dynamic
     def getGroupTabTitle(self):
         return "Config"
@@ -2129,7 +2147,7 @@ class TestFileGUI(FileViewGUI):
     def getColour(self, name):
         return self.currentTest.getConfigValue("file_colours")[name]
 
-    def shouldShowCurrent(self):
+    def shouldShowCurrent(self, *args):
         return self.currentTest is not None
             
     def addFilesToModel(self, state):
@@ -2269,7 +2287,7 @@ class ProgressBarGUI(SubGUI):
         self.nofCompletedTests = 0
         self.nofFailedTests = 0
         self.widget = None
-    def shouldShowCurrent(self):
+    def shouldShowCurrent(self, *args):
         return self.dynamic
     def describe(self):
         guilog.info("Progress bar set to fraction " + str(self.widget.get_fraction()) + ", text '" + self.widget.get_text() + "'")
@@ -2343,7 +2361,7 @@ class TestProgressMonitor(SubGUI):
         self.diag = plugins.getDiagnostics("Progress Monitor")
     def getGroupTabTitle(self):
         return "Status"
-    def shouldShowCurrent(self):
+    def shouldShowCurrent(self, *args):
         return self.dynamic
     def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)

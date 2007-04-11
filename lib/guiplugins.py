@@ -120,7 +120,7 @@ class InteractiveAction(plugins.Observable):
     def createOptionGroupTab(self, optionGroup):
         return optionGroup.switches or optionGroup.options
     def updateForStateChange(self, test, state):
-        return False, False
+        return self.updateForState(test, state)
     def updateForSelectionChange(self):
         if self.isActiveOnCurrent():
             return self.updateForSelection()
@@ -128,7 +128,9 @@ class InteractiveAction(plugins.Observable):
             return False, False
     def updateForSelection(self):
         return False, False
-    def isActiveOnCurrent(self):
+    def updateForState(self, test, state):
+        return False, False
+    def isActiveOnCurrent(self, *args):
         return True
     def canPerform(self):
         return True # do we want a button on the tab for this?
@@ -236,7 +238,7 @@ class SelectionAction(InteractiveAction):
         self.currTestSelection = []
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) > 0
     def describeTests(self):
         return str(len(self.currTestSelection)) + " tests"
@@ -247,6 +249,11 @@ class SelectionAction(InteractiveAction):
         return test in self.currTestSelection
     def isNotSelected(self, test):
         return not self.isSelected(test)
+    def updateForStateChange(self, test, state):
+        if test in self.currTestSelection:
+            return self.updateForState(test, state)
+        else:
+            return False, False
     def getCmdlineOption(self):
         selTestPaths = []
         for test in self.currTestSelection:
@@ -291,7 +298,7 @@ class InteractiveTestAction(InteractiveAction):
             return self.currentTest.getCompositeConfigValue(section, name)
         else:
             return guiConfig.getCompositeValue(section, name)
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return self.currentTest is not None and self.correctTestClass()
     def correctTestClass(self):
         return self.currentTest.classId() == "test-case"
@@ -304,6 +311,11 @@ class InteractiveTestAction(InteractiveAction):
             self.currentTest = tests[0]
         elif len(tests) > 1:
             self.currentTest = None
+    def updateForStateChange(self, test, state):
+        if test is self.currentTest:
+            return self.updateForState(test, state)
+        else:
+            return False, False
     def startViewer(self, commandLine, description = "", exitHandler=None, exitHandlerArgs=(), \
                     shellTitle = None, holdShell = 0):
         testDesc = self.testDescription()
@@ -325,7 +337,6 @@ class SaveTests(SelectionAction):
         self.addSwitch("over", "Replace successfully compared files also", 0)
         self.currFileSelection = []
         self.currApps = []
-        self.currTestDescription = ""
     def getStockId(self):
         return "save"
     def getTabTitle(self):
@@ -351,7 +362,9 @@ class SaveTests(SelectionAction):
             if test.app not in apps:
                 apps.append(test.app)
         return apps
-    def updateForSelection(self):
+    def getSaveableTests(self):
+        return filter(lambda test: test.state.isSaveable(), self.currTestSelection)       
+    def updateForSelectionChange(self):
         apps = self.getSelectedApps()
         if apps == self.currApps:
             return False, False
@@ -404,10 +417,13 @@ class SaveTests(SelectionAction):
         self.currFileSelection = files
     def newFilesAsDiags(self):
         return int(self.optionGroup.getSwitchValue("newdiag", 0))
-    def isActiveOnCurrent(self):
-        return len(self.getSaveableTests()) > 0
-    def getSaveableTests(self):
-        return filter(lambda test: test.state.isSaveable(), self.currTestSelection)
+    def isActiveOnCurrent(self, test=None, state=None):
+        if state and state.isSaveable():
+            return True
+        for seltest in self.currTestSelection:
+            if seltest is not test and seltest.state.isSaveable():
+                return True
+        return False
     def performOnCurrent(self):
         saveDesc = ", exactness " + str(self.getExactness())
         stemsToSave = [ os.path.basename(fileName).split(".")[0] for fileName, comparison in self.currFileSelection ]
@@ -441,7 +457,7 @@ class FileViewAction(InteractiveTestAction):
         return True
     def inButtonBar(self):
         return False
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         if not InteractiveTestAction.isActiveOnCurrent(self):
             return False
         for fileName, comparison in self.currFileSelection:
@@ -721,8 +737,8 @@ class RecordTest(InteractiveTestAction):
         self.startTextTestProcess(self.currentTest, "record")
     def getRecordMode(self):
         return self.currentTest.getConfigValue("use_case_record_mode")
-    def isActiveOnCurrent(self):
-        return InteractiveTestAction.isActiveOnCurrent(self) and self.getRecordMode() != "disabled"
+    def isActiveOnCurrent(self, *args):
+        return InteractiveTestAction.isActiveOnCurrent(self, *args) and self.getRecordMode() != "disabled"
     def updateForSelection(self):
         if self.currentApp is not self.currentTest.app:
             self.currentApp = self.currentTest.app
@@ -893,7 +909,7 @@ class SelectTests(SelectionAction):
             return [ "<default>" ] + extraVersions
         else:
             return [ fullVersion ] + [ fullVersion + "." + extra for extra in extraVersions ]
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return True
     def getStockId(self):
         return "refresh"
@@ -1322,7 +1338,7 @@ class RemoveTests(SelectionAction):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def notifyNewFileSelection(self, files):
         self.currFileSelection = files
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.parent:
                 return True
@@ -1410,7 +1426,7 @@ class CopyTest(ImportTest):
         self.optionGroup.addOption("suite", "Copy to suite", "current", allocateNofValues = 2, description = "Which suite should the test be copied to?", changeMethod = self.updatePlacements)
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues = 2, description = "Where in the test suite should the test be placed?")
         self.optionGroup.addSwitch("keeporig", "Keep original", value = 1, description = "Should the original test be kept or removed?")
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return self.testToCopy
     def testType(self):
         return "Test"
@@ -1583,9 +1599,17 @@ class RecomputeTest(InteractiveTestAction):
         InteractiveTestAction.__init__(self)
         self.recomputing = False
         self.chainReaction = False
-    def isActiveOnCurrent(self):
-        return InteractiveTestAction.isActiveOnCurrent(self) and \
-               self.currentTest.state.hasStarted() and not self.currentTest.state.isComplete()
+    def getState(self, state):
+        if state:
+            return state
+        else:
+            return self.currentTest.state
+    def isActiveOnCurrent(self, test=None, state=None):
+        if not InteractiveTestAction.isActiveOnCurrent(self):
+            return False
+        
+        useState = self.getState(state)
+        return useState.hasStarted() and not useState.isComplete()
     def notifyNewTestSelection(self, tests, direct):
         InteractiveTestAction.notifyNewTestSelection(self, tests, direct)
         # Prevent recomputation triggering more...
@@ -1619,7 +1643,7 @@ class SortTestSuiteFileAscending(InteractiveAction):
         self.currTestSelection = []
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) == 1 and \
                self.currTestSelection[0].classId() == "test-suite" and \
                not self.currTestSelection[0].autoSortOrder
@@ -1696,7 +1720,7 @@ class RepositionTestDown(RepositionTest):
         return "Moved " + repr(self.testToMove) + " one step down in suite."
     def _getScriptTitle(self):
         return "Move selected test down in suite"
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
         return self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1] != self.currTestSelection[0]
@@ -1712,7 +1736,7 @@ class RepositionTestUp(RepositionTest):
         return "Moved " + repr(self.testToMove) + " one step up in suite."
     def _getScriptTitle(self):
         return "Move selected test up in suite"
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
         return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
@@ -1728,7 +1752,7 @@ class RepositionTestFirst(RepositionTest):
         return "Moved " + repr(self.testToMove) + " to first in suite."
     def _getScriptTitle(self):
         return "Move selected test to first in suite"
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
         return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
@@ -1744,7 +1768,7 @@ class RepositionTestLast(RepositionTest):
         return "Moved " + repr(self.testToMove) + " to last in suite."
     def _getScriptTitle(self):
         return "Move selected test to last in suite"
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
         return self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1] != self.currTestSelection[0]
@@ -1759,7 +1783,7 @@ class RenameTest(InteractiveAction):
         self.oldDescription = ""
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) == 1 and \
                self.currTestSelection[0].parent != None and \
                self.currTestSelection[0].classId() == "test-case"

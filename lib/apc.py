@@ -221,7 +221,7 @@ class ApcConfig(optimization.OptimizationConfig):
     def setApplicationDefaults(self, app):
         optimization.OptimizationConfig.setApplicationDefaults(self, app)
         self.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
-        self.itemNamesInFile[optimization.timeEntryName] = "cpu time|cpu-tid"
+        self.itemNamesInFile[optimization.timeEntryName] = "cpu time|cpu-tid|cpu-zeit"
         self.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
         if app.name == "cas_apc":
             self.itemNamesInFile[optimization.costEntryName] = "rule cost"
@@ -1437,7 +1437,7 @@ class CVSBranchTests(plugins.Action):
             fullFileName = test.getFileName(file)
             if not fullFileName:
                 continue
-            fullFileNameNewVersion = fullFileName + "." + self.version
+            fullFileNameNewVersion = test.getDirectory() + os.sep + file + "." + test.app.name + "." + self.version
             if os.path.isfile(fullFileNameNewVersion):
                 self.describe(test, ": version " + self.version + " already exists of " + file)
                 continue

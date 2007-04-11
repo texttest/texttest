@@ -8,7 +8,7 @@ from gtkusecase import TreeModelIndexer
 # First make sure that CVSROOT is set ...
 if "CVSROOT" in os.environ and not os.path.exists(os.environ["CVSROOT"]):
     plugins.printWarning("The CVSROOT '" + os.environ["CVSROOT"] +
-                         "' specified by the CVSROOT envronment variable does not exist.\nThe CVS commands will extract CVSROOT from the application directory instead.")
+                         "' specified by the CVSROOT environment variable does not exist.\nThe CVS commands will extract CVSROOT from the application directory instead.")
 
 #
 # Todo/improvements:
@@ -298,7 +298,6 @@ class CVSLogRecursive(CVSLog):
         return "Log Recursive"
     def _getScriptTitle(self):
         return "recursive " + CVSLog._getScriptTitle(self)
-    
 
 class CVSDiff(CVSAction):
     def __init__(self, rev1 = "", rev2 = ""):

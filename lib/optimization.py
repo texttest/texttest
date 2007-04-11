@@ -271,6 +271,7 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             return False
 
         overridesWithSections = self.pairWithSections(overrides)
+        self.diag.info("Overrides with sections " + repr(overridesWithSections))
         file = open(targetFile, 'w')
         activeOverrides = []
         for line in open(sourceFile).xreadlines():
@@ -288,7 +289,7 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         activeSection = "<PARAMETERS>"
         results[activeSection] = []
         for override in overrides:
-            if self.isSection(override):
+            if self.isSection(override.strip()):
                 activeSection = override.strip()
                 results[activeSection] = []
             else:

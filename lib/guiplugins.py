@@ -478,8 +478,9 @@ class FileViewAction(InteractiveTestAction):
         return False
     def performOnCurrent(self):
         for fileName, comparison in self.currFileSelection:
-            viewTool = self.viewTools.get(fileName)
-            self.performOnFile(fileName, comparison, viewTool)
+            if self.isActiveForFile(fileName, comparison):
+                viewTool = self.viewTools.get(fileName)
+                self.performOnFile(fileName, comparison, viewTool)
     def getViewTool(self, fileName):
         viewProgram = self.getViewToolName(fileName)
         if plugins.canExecute(viewProgram):

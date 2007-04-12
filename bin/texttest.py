@@ -16,9 +16,9 @@ if os.path.isdir(libDir):
 
 import texttest_version
 
-major, minor, micro, releaselevel, serial = sys.version_info
+major, minor, micro = sys.version_info[:3]
 reqMajor, reqMinor, reqMicro = texttest_version.required_python_version
-if major >= reqMajor and minor >= reqMinor and micro >= reqMicro:
+if (major, minor, micro) >= texttest_version.required_python_version:
     from engine import TextTest
     program = TextTest()
     program.run()

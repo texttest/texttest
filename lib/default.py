@@ -441,6 +441,8 @@ class Config(plugins.Configuration):
         if os.name == "posix":
             app.setConfigDefault("virtual_display_machine", [], \
                                  "(UNIX) List of machines to run virtual display server (Xvfb) on")
+            app.setConfigDefault("virtual_display_number", "42", \
+                                 "(UNIX) Number to use for running virtual display server (Xvfb)")
     def defaultSeverities(self):
         severities = {}
         severities["errors"] = 1
@@ -1239,7 +1241,7 @@ class RunTest(plugins.Action):
         if inputFileName:
             return inputFileName
         else:
-            return plugins.nullFileName()
+            return os.devnull
     def getInterruptActions(self, fetchResults):
         return [ KillTest() ]
     def setUpSuite(self, suite):

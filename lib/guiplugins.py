@@ -771,7 +771,7 @@ class RecordTest(InteractiveTestAction):
         plugins.ensureDirectoryExists(writeDir)
         logFile = self.getLogFile(writeDir, usecase, "output")
         errFile = self.getLogFile(writeDir, usecase)
-        commandLine +=  " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
+        commandLine +=  " < " + os.devnull + " > " + logFile + " 2> " + errFile
         process = self.startExtProgramNewUsecase(commandLine, usecase, \
                                                  exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase))
     def getLogFile(self, writeDir, usecase, type="errors"):
@@ -1148,7 +1148,7 @@ class RunningAction(SelectionAction):
         usecase = self.getUseCaseName()
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
-        commandLine = plugins.textTestName + " " + ttOptions + " < " + plugins.nullFileName() + " > " + logFile + " 2> " + errFile
+        commandLine = plugins.textTestName + " " + ttOptions + " < " + os.devnull + " > " + logFile + " 2> " + errFile
         identifierString = "started at " + plugins.localtime()
         self.startExtProgramNewUsecase(commandLine, usecase, exitHandler=self.checkTestRun, exitHandlerArgs=(identifierString,errFile,self.currTestSelection), description = description)
     def writeFilterFile(self, writeDir):

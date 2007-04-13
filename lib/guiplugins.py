@@ -309,7 +309,7 @@ class InteractiveTestAction(InteractiveAction):
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 1:
             self.currentTest = tests[0]
-        elif len(tests) > 1:
+        else:
             self.currentTest = None
     def updateForStateChange(self, test, state):
         if test is self.currentTest:
@@ -1634,9 +1634,11 @@ class RecomputeTest(InteractiveTestAction):
     def messageBeforePerform(self):
         return "Recomputing status of " + repr(self.currentTest) + " ..."
     def messageAfterPerform(self):
-        return "Done recomputing status of " + repr(self.currentTest) + "."
+        pass
     def performOnCurrent(self):
-        self.currentTest.app.configObject.recomputeProgress(self.currentTest, self.observers)
+        test = self.currentTest # recomputing can change selection, make sure we talk about the right one...
+        test.app.configObject.recomputeProgress(test, self.observers)
+        self.notify("Status", "Done recomputing status of " + repr(test) + ".")
 
 class SortTestSuiteFileAscending(InteractiveAction):
     def __init__(self):

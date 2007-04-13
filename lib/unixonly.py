@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import default, plugins, os
+import default, plugins, os, subprocess
                 
 class RunTest(default.RunTest):
     def __init__(self, hasAutomaticCputimeChecking):
@@ -37,6 +37,7 @@ class VirtualDisplayFinder:
     checkedDisplay = None
     def __init__(self, app):
         self.machines = app.getConfigValue("virtual_display_machine")
+        self.displayNumber = app.getConfigValue("virtual_display_number")
         self.diag = plugins.getDiagnostics("virtual display")
     def getDisplay(self):
         if self.checkedDisplay:
@@ -50,85 +51,72 @@ class VirtualDisplayFinder:
             VirtualDisplayFinder.checkedDisplay = usableDisplay
             return usableDisplay
         elif emptyMachine:
-            return self.startServer(emptyMachine)
+            self.startServer(emptyMachine)
+            return self.getDisplayName(emptyMachine)
         else:
-            plugins.printWarning("Virtual display test command failed on all machines - attempting to use first one anyway.")
-            return self.machines[0] + ":42.0"
+            plugins.printWarning("Virtual display test command failed on " + ",".join(self.machines) + " - using real display.")
     def classifyMachines(self):
         emptyMachine = None
         # Try to find an existing display we can connect to
         for machine in self.machines:
             self.diag.info("Looking for virtual display on " + machine)
-            display, displayErrs = self.findDisplay(machine)
-            if display:
-                connErrors = self.getConnectionErrors(display)
-                if len(connErrors) > 0:
-                    print "Failed to connect to virtual server on", machine + "\n" + connErrors
-                    if self.killServer(machine) and not emptyMachine:
-                        emptyMachine = machine
-                else:
-                    return display, emptyMachine
-            else:
-                if displayErrs:
-                    print "Could not get display info from", machine + ":\n" + displayErrs
-                elif not emptyMachine:
+            display = self.getDisplayName(machine)
+            connErrors = self.getConnectionErrors(display)
+            if len(connErrors) == 0:
+                return display, emptyMachine
+                
+            procOut, procErrs = self.getProcessInfo(machine)
+            if len(procErrs) == 0:
+                if self.clearMachine(machine, procOut, connErrors) and not emptyMachine:
                     emptyMachine = machine
+            else:
+                # assume stderr from rsh implies problems contacting the machine, and ignore it
+                print "Could not get display info from", machine + ":\n" + procErrs
+            
         return None, emptyMachine
-    def killServer(self, server):
-        # Xvfb servers get overloaded after a while. If they do, kill them
-        line, errors = self.getPsOutput(server)
-        if len(line) == 0:
-            # If it's been killed in the meantime, all is well...
+    def clearMachine(self, server, procOut, connErrors):
+        if len(procOut) == 0:
+            print "No virtual server is running on", server
             return True
 
-        words = line.split()
+        # Xvfb servers get overloaded after a while. If they do, kill them
+        words = procOut.split()
         # Assumes linux ps output (!)
         processOwner = words[2]
+        print "Unusable Xvfb process on machine " + server + " owned by user " + processOwner + ":\n" + \
+              "Errors from xdpyinfo : '" + connErrors.strip() + "'"
         if processOwner != os.getenv("USER"):
-            print "Unusable Xvfb process on machine " + server + " owned by user " + processOwner
             return False
     
         pidStr = words[3]
-        print "Killing unusable Xvfb process", pidStr, "on machine " + server
-        os.system(self.getSysCommand(server, "kill -9 " + pidStr, background=0))
+        print "Current user owns the process (" + pidStr + "), so killing it"
+        subprocess.call(self.getRemoteArgs(server, [ "kill", "-9", pidStr ]))
         return True
-    def getSysCommand(self, server, command, background=1):
-        if background:
-            command = "'" + command + " &' < /dev/null" + plugins.nullRedirect() + " &"
+    def getRemoteArgs(self, server, localArgs):
+        if server == "localhost":
+            return localArgs
         else:
-            command = "'" + command + "'"
-        return "rsh " + server + " " + command
+            return [ "rsh", server, " ".join(localArgs) ]
+    def getDisplayName(self, server):
+        return server + ":" + self.displayNumber + ".0"
     def startServer(self, server):
         print "Starting Xvfb on machine", server
-        startCommand = self.getSysCommand(server, "Xvfb :42")
-        self.diag.info("Starting Xvfb using command " + startCommand)
-        os.system(startCommand)
-        #
-        # The Xvfb server needs a running X-client and 'xhost +' if it is to receive X clients from
-        # remote hosts.
-        #
-        serverName = server + ":42.0"
-        os.system(self.getSysCommand(server, "xclock -display " + serverName))
-        os.system(self.getSysCommand(server, "xterm -display " + serverName + " -e xhost +"))
-        return serverName
-    def getPsOutput(self, server):
+        # -ac option disables all access control so anyone can run there
+        startArgs = self.getRemoteArgs(server, [ "Xvfb", "-ac", ":" + self.displayNumber ])
+        self.diag.info("Starting Xvfb using args " + repr(startArgs))
+        return subprocess.Popen(startArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+    def getProcessInfo(self, server):
         self.diag.info("Getting ps output from " + server)
-        psCommand = self.getSysCommand(server, "ps -efl | grep Xvfb | grep -v grep", background=0)
-        cin, cout,cerr = os.popen3(psCommand)
-        for line in cout.readlines():
-            if line.find("Xvfb") != -1 and line.find("42") != -1:
+        psArgs = self.getRemoteArgs(server, [ "ps", "-efl" ])
+        process = subprocess.Popen(psArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        outstr, errstr = process.communicate()
+        for line in outstr.splitlines():
+            if line.find("Xvfb") != -1 and line.find(self.displayNumber) != -1 and line.find("sh") == -1:
+                self.diag.info("Found Xvfb process running:\n" + line)
                 return line, ""
-        return "", cerr.read()
-    def findDisplay(self, server):
-        line, errors = self.getPsOutput(server)
-        if len(line):
-            self.diag.info("Found Xvfb process running:\n" + line)
-            serverName = server + line.split()[-1] + ".0"
-            return serverName, ""
-        else:
-            return "", errors
+        return "", errstr
     def getConnectionErrors(self, serverName):
-        testCommandLine = "xdpyinfo -display " + serverName + " > /dev/null"
-        self.diag.info("Testing with command '" + testCommandLine + "'")
-        cin, cerr = os.popen4(testCommandLine)
-        return cerr.read()
+        args = [ "xdpyinfo", "-display", serverName ]
+        self.diag.info("Testing with args '" + repr(args) + "'")
+        proc = subprocess.Popen(args, stdout=open(os.devnull, "w"), stderr=subprocess.PIPE)
+        return proc.stderr.read()

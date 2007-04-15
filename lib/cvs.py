@@ -63,12 +63,13 @@ if "CVSROOT" in os.environ and not os.path.exists(os.environ["CVSROOT"]):
 # Base class for all CVS actions.
 #
 class CVSAction(guiplugins.InteractiveAction):
-    def __init__(self, cvsCommand):
+    def __init__(self, cvsCommand, dynamic=False):
         guiplugins.InteractiveAction.__init__(self)
         self.currTestSelection = []
         self.currFileSelection = []
         self.cvsCommand = cvsCommand
         self.recursive = False
+        self.dynamic = dynamic
     def getCVSCommand(self):
         return "cvs " + self.getCVSRootFlag() + self.cvsCommand
     def notifyNewTestSelection(self, tests, direct):
@@ -172,20 +173,23 @@ class CVSAction(guiplugins.InteractiveAction):
         if relpath:
             return relpath
         else:
-            return self._findExisitingRelative(usepath.split("/")[1:], root)
-    def _findExisitingRelative(self, pathParts, root):
+            return self._findExistingRelative(usepath.split("/")[1:], root)
+    def _findExistingRelative(self, pathParts, root):
         relPath = "/".join(pathParts)
         fullPath = os.path.join(root, relPath)
         if os.path.exists(fullPath):
             return relPath
         elif len(pathParts) > 1:
-            return self._findExisitingRelative(pathParts[1:], root)
+            return self._findExistingRelative(pathParts[1:], root)
         else:
             return ""
     def getFilesForCVS(self, test, ignorePresence=False):
         testPath = test.getDirectory()
         if len(self.currFileSelection) == 0:
-            return [ testPath ]
+            if self.dynamic:
+                return self.getDynamicGUIFiles(test)
+            else:
+                return [ testPath ]
         else:
             allFiles = []
             for filePath, comparison in self.currFileSelection:
@@ -194,6 +198,23 @@ class CVSAction(guiplugins.InteractiveAction):
                 return allFiles
             else:
                 return filter(os.path.exists, allFiles)
+    def getDynamicGUIFiles(self, test):
+        tmpFiles = map(lambda l: os.path.basename(l) + test.app.versionSuffix(), test.listTmpFiles())
+        testPath = test.getDirectory()
+        correctedTmpFiles = []
+        # The tmp files don't have correct version suffixes, so we'll find the
+        # existing file with the best match, e.g. output.tas.apa when running
+        # version 'apa.bepa'
+        for tmpFile in tmpFiles:
+            adjustedFile = tmpFile        
+            while not os.path.exists(os.path.join(testPath, adjustedFile)):
+                lastPeriod = adjustedFile.rfind(".")
+                if lastPeriod == -1:
+                    break
+                adjustedFile = adjustedFile[:lastPeriod]
+            if os.path.exists(os.path.join(testPath, adjustedFile)):
+                correctedTmpFiles.append(os.path.realpath(os.path.join(testPath, adjustedFile)))
+        return correctedTmpFiles
     def getAbsPath(self, filePath, testPath):
         if os.path.isabs(filePath):
             return filePath
@@ -206,8 +227,8 @@ class CVSAction(guiplugins.InteractiveAction):
 
 
 class CVSLog(CVSAction):
-    def __init__(self):
-        CVSAction.__init__(self, "log -N -l")
+    def __init__(self, dynamic=False):
+        CVSAction.__init__(self, "log -N -l", dynamic)
     def _getTitle(self):
         return "_Log"
     def _getScriptTitle(self):
@@ -290,8 +311,8 @@ class CVSLog(CVSAction):
             self.pages.append((relativeFilePath, currentOutput, currentLastDate))
 
 class CVSLogRecursive(CVSLog):
-    def __init__(self):
-        CVSLog.__init__(self)
+    def __init__(self, dynamic=False):
+        CVSLog.__init__(self, dynamic)
         self.cvsCommand = "log -N"
         self.recursive = True
     def _getTitle(self):
@@ -300,8 +321,8 @@ class CVSLogRecursive(CVSLog):
         return "recursive " + CVSLog._getScriptTitle(self)
 
 class CVSDiff(CVSAction):
-    def __init__(self, rev1 = "", rev2 = ""):
-        CVSAction.__init__(self, "diff -N -l")
+    def __init__(self, rev1 = "", rev2 = "", dynamic=False):
+        CVSAction.__init__(self, "diff -N -l", dynamic)
         self.recursive = False
         self.revision1 = rev1
         self.revision2 = rev2
@@ -401,8 +422,8 @@ class CVSDiff(CVSAction):
             self.pages.append((relPath, currentOutput, currentFile))
 
 class CVSDiffRecursive(CVSDiff):
-    def __init__(self):
-        CVSDiff.__init__(self)
+    def __init__(self, dynamic=False):
+        CVSDiff.__init__(self, "", "", dynamic)
         self.cvsCommand = "diff -N"
         self.recursive = True
     def _getTitle(self):
@@ -416,8 +437,8 @@ class CVSStatus(CVSAction):
     cvsWarningStates = [ "Locally Modified", "Locally Removed", "Locally Added" ]
     cvsErrorStates = [ "File had conflicts on merge", "Needs Checkout", "Unresolved Conflicts", "Needs Patch",
                        "Needs Merge", "Entry Invalid", "Unknown", "PROHIBITED" ]
-    def __init__(self):
-        CVSAction.__init__(self, "status -l")
+    def __init__(self, dynamic=False):
+        CVSAction.__init__(self, "status -l", dynamic)
     def _getTitle(self):
         return "_Status"
     def _getScriptTitle(self):
@@ -510,8 +531,8 @@ class CVSStatus(CVSAction):
             self.pages.append((self.getRelativePath(currentFile, rootDir), currentOutput, info))    
 
 class CVSStatusRecursive(CVSStatus):
-    def __init__(self):
-        CVSStatus.__init__(self)
+    def __init__(self, dynamic=False):
+        CVSStatus.__init__(self, dynamic)
         self.cvsCommand = "status"
         self.recursive = True
     def _getTitle(self):
@@ -521,8 +542,8 @@ class CVSStatusRecursive(CVSStatus):
 
 
 class CVSAnnotate(CVSAction):
-    def __init__(self):
-        CVSAction.__init__(self, "annotate -l")
+    def __init__(self, dynamic=False):
+        CVSAction.__init__(self, "annotate -l", dynamic)
     def _getTitle(self):
         return "A_nnotate"
     def _getScriptTitle(self):
@@ -586,8 +607,8 @@ class CVSAnnotate(CVSAction):
             self.pages.append((relPath, currentOutput, currentFile))
 
 class CVSAnnotateRecursive(CVSAnnotate):
-    def __init__(self):
-        CVSAnnotate.__init__(self)
+    def __init__(self, dynamic=False):
+        CVSAnnotate.__init__(self, dynamic)
         self.cvsCommand = "annotate"
         self.recursive = True
     def _getTitle(self):
@@ -602,8 +623,8 @@ class CVSAnnotateRecursive(CVSAnnotate):
 
     
 class CVSUpdate(CVSAction):
-    def __init__(self):
-        CVSAction.__init__(self, "-qn up -l")
+    def __init__(self, dynamic=False):
+        CVSAction.__init__(self, "-qn up -l", dynamic)
     def _getTitle(self):
         return "_Update (non-modifying)"
     def _getScriptTitle(self):
@@ -658,14 +679,46 @@ class CVSUpdate(CVSAction):
             self.pages.append((self.getRelativePath(dir, rootDir), "".join(outputLines), info))
 
 class CVSUpdateRecursive(CVSUpdate):
-    def __init__(self):
-        CVSUpdate.__init__(self)
+    def __init__(self, dynamic=False):
+        CVSUpdate.__init__(self, dynamic)
         self.cvsCommand = "-qn up"
         self.recursive = True
     def _getTitle(self):
         return "Update Recursive (non-modifying)"
     def _getScriptTitle(self):
         return "recursive " + CVSUpdate._getScriptTitle(self)
+
+class DynamicCVSLog(CVSLog):
+    def __init__(self):
+        CVSLog.__init__(self, True)
+
+class DynamicCVSLogRecursive(CVSLogRecursive):
+    def __init__(self):
+        CVSLogRecursive.__init__(self, True)
+
+class DynamicCVSDiff(CVSDiff):
+    def __init__(self, rev1 = "", rev2 = ""):
+        CVSDiff.__init__(self, rev1, rev2, True)
+
+class DynamicCVSDiffRecursive(CVSDiffRecursive):
+    def __init__(self):
+        CVSDiffRecursive.__init__(self, True)
+
+class DynamicCVSStatus(CVSStatus):
+    def __init__(self):
+        CVSStatus.__init__(self, True)
+
+class DynamicCVSStatusRecursive(CVSStatusRecursive):
+    def __init__(self):
+        CVSStatusRecursive.__init__(self, True)
+
+class DynamicCVSAnnotate(CVSAnnotate):
+    def __init__(self):
+        CVSAnnotate.__init__(self, True)
+
+class DynamicCVSAnnotateRecursive(CVSAnnotateRecursive):
+    def __init__(self):
+        CVSAnnotateRecursive.__init__(self, True)
 
 
 #
@@ -691,14 +744,14 @@ guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSAnnotateRecurs
 #
 # Add appropriate actions also to dynamic action list.
 #
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(CVSLog)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(CVSLogRecursive)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(CVSDiff)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(CVSDiffRecursive)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(CVSStatus)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(CVSStatusRecursive)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(CVSAnnotate)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(CVSAnnotateRecursive)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSLog)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSLogRecursive)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSDiff)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSDiffRecursive)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSStatus)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSStatusRecursive)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSAnnotate)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSAnnotateRecursive)
 
 #
 #

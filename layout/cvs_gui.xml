@@ -6,6 +6,7 @@
       <menu name="CVSmenu" action="CVSmenu">
         <menuitem name="Log" action="Log"/>
         <menuitem name="Log Recursive" action="Log Recursive"/>
+        <menuitem name="Log Latest" action="Log Latest"/>
         <separator/>
         <menuitem name="Difference" action="Difference"/>
         <menuitem name="Difference Recursive" action="Difference Recursive"/>
@@ -25,6 +26,7 @@
     <menu name="CVSmenu" action="CVSmenu">
       <menuitem name="Log" action="Log"/>
       <menuitem name="Log Recursive" action="Log Recursive"/>
+      <menuitem name="Log Latest" action="Log Latest"/>
       <separator/>
       <menuitem name="Difference" action="Difference"/>
       <menuitem name="Difference Recursive" action="Difference Recursive"/>
@@ -42,6 +44,7 @@
     <menu name="CVSmenu" action="CVSmenu">
       <menuitem name="Log" action="Log"/>
       <menuitem name="Log Recursive" action="Log Recursive"/>
+      <menuitem name="Log Latest" action="Log Latest"/>
       <separator/>
       <menuitem name="Difference" action="Difference"/>
       <menuitem name="Difference Recursive" action="Difference Recursive"/>

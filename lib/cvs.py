@@ -213,7 +213,7 @@ class CVSAction(guiplugins.InteractiveAction):
                     break
                 adjustedFile = adjustedFile[:lastPeriod]
             if os.path.exists(os.path.join(testPath, adjustedFile)):
-                correctedTmpFiles.append(os.path.realpath(os.path.join(testPath, adjustedFile)))
+                correctedTmpFiles.append(self.getAbsPath(adjustedFile, testPath))
         return correctedTmpFiles
     def getAbsPath(self, filePath, testPath):
         if os.path.isabs(filePath):
@@ -319,6 +319,64 @@ class CVSLogRecursive(CVSLog):
         return "Log Recursive"
     def _getScriptTitle(self):
         return "recursive " + CVSLog._getScriptTitle(self)
+
+class CVSLogLatest(CVSLog):
+    def __init__(self, dynamic=False):
+        CVSLog.__init__(self, dynamic)
+        self.cvsCommand = "log -N -l -rHEAD"
+    def _getTitle(self):
+        return "Log Latest"
+    def _getScriptTitle(self):
+        return "cvs log latest for the selected test"
+    def getResultDialogType(self):
+        return "CVSNotebookDialog"
+    def getResultDialogMessage(self):
+        message = "Showing latest log entries for the CVS controlled files.\nCVS log command used: " + self.cvsCommand
+        if not self.recursive:
+            message += "\nSubdirectories were ignored."            
+        return message
+    def performOnCurrent(self):
+        self.pages = []
+        self.fileToTest = {}
+        self.notInRepository = False
+        if len(self.currTestSelection) > 0:
+            rootDir = self.getRootPath()
+        for test in self.currTestSelection:
+            fileArg = " ".join(self.getFilesForCVS(test))
+            self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
+            self.notify("ActionProgress", "")
+            command = self.getCVSCommand() + " " + fileArg
+            stdin, stdouterr = os.popen4(command)
+            self.parseOutput(stdouterr.readlines(), rootDir, test)
+    def parseOutput(self, outputLines, rootDir, test):
+        # Each file has something like:
+        #
+        # RCS file ...
+        # Working file:
+        # head ...
+        # ...
+        # description ...
+        # ------------
+        # revision ...
+        # date ...
+        # <comments>
+        # ============
+        #
+        # We only want to show the Working file and the stuff from ----- to ===== ...        
+        linesToShow = ""
+        enabled = False
+        for line in outputLines:
+            if line.startswith("Working file"):
+                linesToShow += "\nFile: " + self.getRelativePath(line[14:], rootDir) + "\n"
+                continue
+            if line.startswith("--------------------"):
+                enabled = True
+            elif line.startswith("===================="):
+                linesToShow += "====================\n"
+                enabled = False
+            if enabled:
+                linesToShow += line
+        self.pages.append((self.getRelativePath(test.getDirectory(), rootDir), linesToShow))
 
 class CVSDiff(CVSAction):
     def __init__(self, rev1 = "", rev2 = "", dynamic=False):
@@ -696,6 +754,10 @@ class DynamicCVSLogRecursive(CVSLogRecursive):
     def __init__(self):
         CVSLogRecursive.__init__(self, True)
 
+class DynamicCVSLogLatest(CVSLogLatest):
+    def __init__(self):
+        CVSLogLatest.__init__(self, True)
+
 class DynamicCVSDiff(CVSDiff):
     def __init__(self, rev1 = "", rev2 = ""):
         CVSDiff.__init__(self, rev1, rev2, True)
@@ -732,6 +794,7 @@ texttestgui.pluginHandler.modules.append("cvs")
 guiplugins.interactiveActionHandler.addMenu("CVS")
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSLog)
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSLogRecursive)
+guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSLogLatest)
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSDiff)
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSDiffRecursive)
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSStatus)
@@ -746,6 +809,7 @@ guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSAnnotateRecurs
 #
 guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSLog)
 guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSLogRecursive)
+guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSLogLatest)
 guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSDiff)
 guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSDiffRecursive)
 guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSStatus)
@@ -1040,3 +1104,63 @@ class CVSStatusDialog(CVSTreeViewDialog):
         if event.button == 3:
             self.popupMenu.popup(None, None, None, event.button, event.time)
             return True
+
+#
+# The CVSNotebookDialog uses the same type of data as the CVSTreeViewDialog,
+# but presents it in a gtk.Notebook instead of in a gtk.TreeView. The data
+# contained in each TreeView node is instead but in a notebook page.
+#
+class CVSNotebookDialog(guidialogs.ActionResultDialog):
+    def isModal(self):
+        return False
+    
+    def addContents(self):
+        self.vbox = gtk.VBox()
+        self.addHeader()
+        self.addNotebook()
+
+    def addHeader(self):
+        title = self.plugin.getResultDialogTitle()
+        self.dialog.set_title(title)
+        message = self.plugin.getResultDialogMessage()
+        guilog.info("Showing CVS notebook dialog '" + title + "' with header\n" + message)
+        if message:
+            hbox = gtk.HBox()
+            hbox.pack_start(self.getIcon(message), expand=False, fill=False)
+            hbox.pack_start(gtk.Label(message), expand=False, fill=False)        
+            alignment = gtk.Alignment()
+            alignment.set(0.0, 1.0, 1.0, 1.0)
+            alignment.set_padding(5, 5, 0, 5)
+            alignment.add(hbox)
+            self.vbox.pack_start(alignment, expand=False, fill=False)
+
+    def getIcon(self, message):
+        iconType = gtk.STOCK_DIALOG_INFO
+        guilog.info("Using CVS notebook dialog icon: " + repr(iconType))
+        return self.getStockIcon(iconType)
+
+    def addNotebook(self):
+        notebook = gtk.Notebook()
+        notebook.set_scrollable(True)
+        notebook.popup_enable()
+        for label, content in self.plugin.pages:
+            buffer = gtk.TextBuffer()
+            # Encode to UTF-8, necessary for gtk.TextView
+            # First decode using most appropriate encoding ...
+            unicodeInfo = plugins.decodeText(content)
+            text = plugins.encodeToUTF(unicodeInfo)
+            buffer.set_text(text)
+            textView = gtk.TextView(buffer)
+            textView.set_editable(False)
+            window = gtk.ScrolledWindow()
+            window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            window.add(textView)
+            guilog.info("Adding notebook tab '" + label + "' with contents\n" + text)
+            notebook.append_page(window, gtk.Label(label))
+        notebook.show_all()
+        scriptEngine.monitorNotebook(notebook, "view tab")
+        if len(notebook.get_children()) > 0: # Resize to a nice-looking dialog window ...
+            parentSize = self.parent.get_size()
+            self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))
+        self.vbox.pack_start(notebook, expand=True, fill=True)
+        self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)

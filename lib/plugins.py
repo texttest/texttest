@@ -490,12 +490,13 @@ def relpath(fullpath, parentdir):
         return relPath[1:]
     else:
         return relPath
-
+    
 def nullRedirect():
+    stdoutRedirect = " > " + os.devnull
     if os.name == "posix":  
-        return " >& " + os.devnull # works for both sh and csh
+        return stdoutRedirect + " 2>&1"
     else:
-        return " > " + os.devnull + " 2> nul"
+        return stdoutRedirect + " 2> nul"
 
 def canExecute(program):
     localName = program.split()[0]

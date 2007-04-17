@@ -367,7 +367,7 @@ class CVSLogLatest(CVSLog):
         enabled = False
         for line in outputLines:
             if line.startswith("Working file"):
-                linesToShow += "\nFile: " + self.getRelativePath(line[14:], rootDir) + "\n"
+                linesToShow += "\nFile: " + os.path.basename(line[14:])
                 continue
             if line.startswith("--------------------"):
                 enabled = True

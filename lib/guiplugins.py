@@ -457,6 +457,8 @@ class FileViewAction(InteractiveTestAction):
         return True
     def inButtonBar(self):
         return False
+    def correctTestClass(self):
+        return True # enable for both tests and suites
     def isActiveOnCurrent(self, *args):
         if not InteractiveTestAction.isActiveOnCurrent(self):
             return False

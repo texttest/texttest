@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, shutil, plugins, respond, performance, comparetest, string, sys, batch, re, stat, paths, subprocess
+import os, shutil, plugins, respond, rundependent, performance, comparetest, string, sys, batch, re, stat, paths, subprocess
 import glob
 from threading import currentThread
 from knownbugs import CheckForBugs, CheckForCrashes
@@ -146,7 +146,8 @@ class Config(plugins.Configuration):
         collator = self.getTestCollator()
         return [ self.getExecHostFinder(), self.getWriteDirectoryPreparer(ignoreCatalogues), \
                  SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
-                 catalogueCreator, collator, self.getTestRunner(), catalogueCreator, collator, self.getTestEvaluator() ]
+                 catalogueCreator, collator, rundependent.FilterOriginal(), self.getTestRunner(), \
+                 catalogueCreator, collator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
     def getPossibleResultFiles(self, app):
@@ -296,7 +297,7 @@ class Config(plugins.Configuration):
     def isReconnectingFast(self):
         return self.isReconnecting() and not self.optionMap.has_key("reconnfull")
     def getTestEvaluator(self):
-        return [ self.getFileExtractor(), self.getTestComparator(), self.getFailureExplainer() ]
+        return [ self.getFileExtractor(), rundependent.FilterTemporary(), self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
         return [ self.getPerformanceFileMaker(), self.getPerformanceExtractor() ]
     def getCatalogueCreator(self):
@@ -385,6 +386,8 @@ class Config(plugins.Configuration):
             return os.path.join(fullLocation, checkout)
     # For display in the GUI
     def recomputeProgress(self, test, observers):
+        fileFilter = rundependent.FilterRecompute()
+        fileFilter(test)
         comparator = self.getTestComparator()
         comparator.recomputeProgress(test, observers)
     def printHelpScripts(self):

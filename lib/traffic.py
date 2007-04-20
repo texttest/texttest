@@ -124,15 +124,9 @@ class ClientSocketTraffic(ResponseTraffic):
         sock.connect(self.destination)
         sock.sendall(self.text)
         sock.shutdown(1)
-        response = self.getResponse(sock)
+        response = sock.makefile().read()
         sock.close()
         return [ ServerTraffic(response, self.responseFile) ]
-    def getResponse(self, sock):
-        response = sock.recv(4096)
-        if len(response) < 4096:
-            return response
-        else:   
-            return response + self.getResponse(sock)
 
 class ServerTraffic(InTraffic):
     typeId = "SRV"

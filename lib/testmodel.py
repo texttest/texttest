@@ -651,7 +651,7 @@ class TestSuite(Test):
 # private:
     # Observe: orderedTestNames can be both list and seqdict ... (it will be seqdict if read from file)
     def getOrderedTestNames(self, orderedTestNames = None): # We assume that tests exists, we just want to re-order ...
-        if not orderedTestNames:
+        if orderedTestNames is None:
             orderedTestNames = self.readTestNames(False, False)
         if self.autoSortOrder:
             if self.getConfigValue("sort_test_suites_tests_first"):

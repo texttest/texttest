@@ -138,7 +138,8 @@ class Config(plugins.Configuration):
         return actions
     def getReconnectSequence(self):
         actions = [ ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull")) ]
-        actions += [ self.getTestComparator(), self.getFailureExplainer() ]
+        actions += [ rundependent.FilterOriginal(), rundependent.FilterTemporary(), \
+                     self.getTestComparator(), self.getFailureExplainer() ]
         return actions
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()

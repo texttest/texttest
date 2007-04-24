@@ -52,7 +52,7 @@ def replaceDollarForWindows(line):
 
 # Default viewing tools are different for windows
 def replaceToolsForWindows(line):
-    if line.find("'tail") != -1:
+    if line.find("'tail") != -1 or line.find("\"tail") != -1:
         return line.replace("tail -f", "baretail").replace("'tail'", "'baretail'")
     return line.replace("emacs", "notepad")
 

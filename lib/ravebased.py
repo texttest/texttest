@@ -444,9 +444,17 @@ class FilterRuleBuilds(plugins.Action):
         rulecomp = TestRuleCompilation(rulesets, test)
         self.diag.info("Rule compilation for " + repr(test) + " : " + repr(rulecomp)) 
         test.changeState(NeedRuleCompilation(rulecomp))
+        self.updateSynchroniser(test)
         # We WAIT here to avoid race conditions - make sure everyone knows the state of their
         # rule compilations before we start any of them.
         return self.WAIT
+    def updateSynchroniser(self, test):
+        for otherTest in test.state.rulecomp.getOtherCompilingTests():
+            self.diag.info("Registering update " + otherTest.uniqueName + " -> " + test.uniqueName)
+            updateMap = RuleBuildSynchroniser.updateMap
+            if not updateMap.has_key(otherTest):
+                updateMap[otherTest] = []
+            updateMap[otherTest].append(test)
     def makeRulesets(self, test):
         arch = getArchitecture(test.app)
         rulesets = []
@@ -591,24 +599,24 @@ class SynchroniseState(plugins.Action):
                 test.changeState(copy(otherTest.state))
 
 class RuleBuildSynchroniser(Responder):
+    updateMap = {}
     def __init__(self, optionMap):
-        self.updateMap = {}
         self.diag = plugins.getDiagnostics("Synchroniser")
+        self.completedTests = []
     def notifyLifecycleChange(self, test, state, changeDesc):
-        self.diag.info("Got change " + repr(test) + " -> " + state.category)
+        self.diag.info("Got change " + test.uniqueName + " -> " + state.category)
         self.writeRaveFile(test, state)
-        if state.category == "pend_rulecompile":
-            for otherTest in test.state.rulecomp.getOtherCompilingTests():
-                self.registerUpdate(otherTest, test)
-        elif self.updateMap.has_key(test) and hasattr(test.state, "rulecomp"):
+        if state.category != "pend_rulecompile" and self.updateMap.has_key(test) and hasattr(state, "rulecomp"):
+            self.diag.info("Checking for updates")
             for updateTest in self.updateMap[test]:
-                self.diag.info("Generated change for " + repr(updateTest))
-                updateTest.changeState(copy(state))
-                self.diag.info("Done.")
-    def registerUpdate(self, comptest, test):
-        if not self.updateMap.has_key(comptest):
-            self.updateMap[comptest] = []
-        self.updateMap[comptest].append(test)
+                if updateTest not in self.completedTests:
+                    self.diag.info("Generated change for " + updateTest.uniqueName)
+                    updateTest.changeState(copy(state))
+                    self.diag.info("Done.")
+                else:
+                    self.diag.info("Not generating change for completed test " + updateTest.uniqueName)
+        if state.isComplete():
+            self.completedTests.append(test)
     def writeRaveFile(self, test, state):
         try:
             raveFile = state.raveFile
@@ -624,9 +632,11 @@ class RuleBuildSynchroniser(Responder):
             writeFile = open(fileToWrite, "w")
             writeFile.write(raveInfo)
             writeFile.close()
-        else:
+        elif not os.path.exists(fileToWrite):
+            # We don't create several links currently, maybe we should...
+            self.diag.info("Creating symbolic link")
             os.symlink(raveFile, fileToWrite)
-
+                
 class WaitForRuleCompile(queuesystem.WaitForCompletion):
     raveMessageSent = False
     def __repr__(self):

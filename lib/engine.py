@@ -259,8 +259,7 @@ class ActionRunner(plugins.Observable):
     def run(self):
         try:
             self.runNormal()
-            self.diag.info("Finishing - notifying all completed")
-            self.notify("AllComplete")
+            self.diag.info("Finishing the action runner")
         except KeyboardInterrupt, e:
             excData = str(e)
             self.writeTermMessage(excData)
@@ -443,6 +442,8 @@ class TextTest:
         # Make sure we send application events when tests change state
         responderClasses.append(testmodel.ApplicationEventResponder)
         self.allResponders = map(lambda x : x(self.inputOptions), responderClasses)
+        allCompleteResponder = testmodel.AllCompleteResponder(self.allResponders)
+        self.allResponders.append(allCompleteResponder)
     def createTestSuites(self):
         uniqueNameFinder = UniqueNameFinder()
         appSuites = seqdict()

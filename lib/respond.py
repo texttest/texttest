@@ -5,7 +5,7 @@ from usecase import ScriptEngine
 
 # Interface all responders must fulfil
 class Responder:
-    def __init__(self, optionMap):
+    def __init__(self, optionMap=None):
         if ScriptEngine.instance:
             self.scriptEngine = ScriptEngine.instance
         else:

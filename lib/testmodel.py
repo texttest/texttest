@@ -1427,6 +1427,22 @@ class ApplicationEventResponder(Responder):
         self.scriptEngine.applicationEvent(eventName, category, timeDelay)
     def notifyAllComplete(self):
         self.scriptEngine.applicationEvent("completion of test actions")
+
+# Simple responder that collects completion notifications and sends one out when
+# it thinks everything is done.
+class AllCompleteResponder(Responder,plugins.Observable):
+    def __init__(self, observers):
+        Responder.__init__(self)
+        plugins.Observable.__init__(self)
+        self.unfinishedTests = 0
+        self.setObservers(observers)
+    def addSuites(self, suites):
+        self.unfinishedTests = sum([ suite.size() for suite in suites ])
+    def notifyComplete(self, test):
+        if self.unfinishedTests > 1:
+            self.unfinishedTests -= 1
+        else:
+            self.notify("AllComplete")
             
 class MultiEntryDictionary(seqdict):
     def __init__(self):

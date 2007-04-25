@@ -1,26 +1,45 @@
 #!/usr/bin/env python
 
+# texttest_release.py
+
+# Extracts the code and tests from Jeppesen's CVS into a zip file
+# and removes everything that is Jeppesen-specific
+# Not useful outside Jeppesen currently
+
+# Usage texttest_release.py [ -v <release_name> ] [ -x ] [ -d <working_dir> ] [ -D <export_date> ] 
+
+# <working_dir> indicates where temporary files are written and the final zip file will end up.
+# It defaults to the current working directory.
+
+# <export_date> indicates the date tag to use from CVS when exporting. It defaults to a date in 2030,
+# i.e. as up to date as possible.
+
+# <release_name> defaults to "current" and should be overridden when making external releases
+
+# The -x flag should be provided if the temporary files are to be left. Mostly useful for testing.
+
 import os, sys, shutil
 from glob import glob
+from getopt import getopt
 
-def exportDir(dirName, localOnly=False):
-    cmd = "cvs -d /carm/2_CVS/ export -D 2030-01-01"
+def exportDir(dirName, date, localOnly=False):
+    cmd = "cvs -d /carm/2_CVS/ export -D " + date
     if localOnly:
         cmd += " -l"
     cmdLine = cmd + " Testing/" + dirName
     print cmdLine
     os.system(cmdLine)
 
-def exportFromCvs():
+def exportFromCvs(date):
     for dirName in [ "TextTest", "PyUseCase", "Automatic/Diagnostics" ]:
-        exportDir(dirName)
-    exportDir("Automatic/texttest", localOnly=True)
+        exportDir(dirName, date)
+    exportDir("Automatic/texttest", date, localOnly=True)
     for subDirName in getTestSubDirs():
-        exportDir(os.path.join("Automatic/texttest", subDirName))
+        exportDir(os.path.join("Automatic/texttest", subDirName), date)
 
 def getTestSubDirs():
     checkDir = "/users/geoff/work/master/Testing/Automatic/texttest"
-    ignoreDirs = [ "CVS", "carmen" ]
+    ignoreDirs = [ "CVS", "carmen", "CurrentRelease", "ExternalWithOldFiles" ]
     subDirs = []
     for fileName in os.listdir(checkDir):
         fullPath = os.path.join(checkDir, fileName)
@@ -46,24 +65,24 @@ def getNames(fileName, key):
             fileStr = line.strip().split("=")[-1]
             return [ os.path.join(sourceDir, fileName) for fileName in fileStr.split() ]
 
+disallowedPrefixes = [ "optimization", "apc", "matador", "studio" ]
+disallowedFiles = [ "texttest", "texttest_release.py", ".cvsignore", "carmenqueuesystem.py", "ravebased.py", "barchart.py", "ddts.py" ]
+
+def isAllowed(file):
+    if file in disallowedFiles:
+        return False
+    for prefix in disallowedPrefixes:
+        if file.startswith(prefix):
+            return False
+    return True
+
 def getFrameworkFiles():
     sourceDir = "Testing/TextTest"
-    imakeFile = os.path.join(sourceDir, "Imakefile")
-    imgFile = os.path.join(sourceDir, "images", "Imakefile")
-    return getNames(imakeFile, "FRAMEWORK_MODULES") + getNames(imakeFile, "THIRD_PARTY_MODULES") + \
-           getNames(imakeFile, "FRAMEWORK_EXECUTABLES") + getNames(imgFile, "IMAGES")
-
-def createBasic(reldir):
-    if os.path.isdir(reldir):
-        shutil.rmtree(reldir)
-    os.mkdir(reldir)
-    for fileName in [ "install.py", "readme.txt" ]:
-        targetName = os.path.join(reldir, fileName)
-        shutil.copy(fileName, targetName)
-
-    shutil.copytree("doc", os.path.join(reldir, "doc"))
-    print "Basic directory", reldir, "created, looks like: "
-    os.system("ls -l " + reldir)
+    fullFiles = []
+    for dirpath, subdirs, files in os.walk(sourceDir):
+        allowedFiles = filter(isAllowed, files)
+        fullFiles += [ os.path.join(dirpath, file) for file in allowedFiles ]
+    return fullFiles
 
 def updateConfigFile(configFile):
     newFileName = configFile + ".new"
@@ -81,36 +100,36 @@ def createTests(reldir):
     testDir = os.path.join(reldir, "tests")
     os.rename("Testing/Automatic", testDir)
     updateConfigFile(os.path.join(testDir, "texttest", "config.texttest"))
-    extensions = [ "parisc_2_0", "powerpc", "sparc", "nonlinux", "carmen", "rhel3", "newgtk", "cover" ]
+    extensions = [ "parisc_2_0", "powerpc", "sparc", "nonlinux", "carmen", "rhel3", "newgtk", "cover", "ttrel" ]
     pruneFilesWithExtensions(testDir, extensions)
 
 def createSource(reldir):
+    if os.path.isdir(reldir):
+        shutil.rmtree(reldir)
     sourceDir = os.path.join(reldir, "source")
-    os.mkdir(sourceDir)
+    os.makedirs(sourceDir)
     for fileName in glob("Testing/PyUseCase/*.py") + getFrameworkFiles():
         print "Copying", fileName
-        targetPath = fileName.replace("Testing", reldir).replace("TextTest", "source").replace("PyUseCase", "source")
+        targetPath = fileName.replace("Testing", reldir).replace("TextTest", "source").replace("PyUseCase", "source/lib")
         dirName = os.path.dirname(targetPath)
         if not os.path.isdir(dirName):
-            os.mkdir(dirName)
+            os.makedirs(dirName)
+
         shutil.copy(fileName, targetPath)
 
-def getReleaseName():
-    if len(sys.argv) > 1:
-        return sys.argv[1]
-    else:
-        return "current"
-
+def getCommandLine():
+    options, leftovers = getopt(sys.argv[1:], "d:D:v:x")
+    optDict = dict(options)
+    return optDict.get("-d", os.getcwd()), optDict.get("-D", "2030-01-01"), optDict.get("-v", "current"), optDict.has_key("-x")
+    
 if __name__ == "__main__":
-    rootDir = os.path.dirname(sys.argv[0])
+    rootDir, cvsDate, releaseName, leaveDir = getCommandLine()
     os.chdir(rootDir)
     if os.path.isdir("Testing"):
         shutil.rmtree("Testing")
-    exportFromCvs()
+    exportFromCvs(cvsDate)
 
-    releaseName = getReleaseName()
     reldir = "texttest-" + releaseName
-    createBasic(reldir)
     createSource(reldir)
     createTests(reldir)
     
@@ -119,7 +138,5 @@ if __name__ == "__main__":
     if os.path.isfile(zipName):
         os.remove(zipName)
     os.system("zip -r " + zipName + " " + reldir)
-    if releaseName != "current":
+    if not leaveDir:
         shutil.rmtree(reldir)
-
-#./texttest_test_install.sh ${1}

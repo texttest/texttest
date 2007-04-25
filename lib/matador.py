@@ -102,7 +102,9 @@ class MatadorConfig(optimization.OptimizationConfig):
     def getRuleBuildFilterer(self):
         return FilterRuleBuilds(self.getRuleSetNames, self.raveMode(), self.rebuildAllRulesets())
     def filesFromRulesFile(self, test, rulesFile):
-        scriptFile = self.getRuleSetting(test, "script_file_name")
+        scriptFile = self.getScriptFileFromPyOption(test)
+        if not scriptFile:
+            scriptFile = self.getRuleSetting(test, "script_file_name")
         if scriptFile:
             return [ ("Script", self.getScriptPath(test, scriptFile)) ]
         else:
@@ -126,9 +128,24 @@ class MatadorConfig(optimization.OptimizationConfig):
                 continue
             if words[0].endswith(paramName):
                 return words[1]
+    def getScriptFileFromPyOption(self, test):
+        # Rollingstock has python script as '-py <file>' in options file ...
+        pyFile = getOption(test, "-py")
+        if not pyFile:
+            return ""
+        
+        envVars = [ "CARMSYS", "CARMUSR" ]
+        for envVar in envVars:
+            variable = test.getEnvironment(envVar)
+            pyFile = pyFile.replace("$" + envVar, variable)
+            pyFile = pyFile.replace("${" + envVar + "}", variable)
+            pyFile = pyFile.replace("{$" + envVar + "}", variable)
+        return pyFile
     def getTestComparator(self):
         return MakeComparisons(optimization.OptimizationTestComparison, self.getRuleSetting)
     def getScriptPath(self, test, file):
+        if os.path.isfile(file):
+            return file
         carmusr = test.getEnvironment("CARMUSR")
         fullPath = os.path.join(carmusr, "apc_scripts", file)
         if os.path.isfile(fullPath):

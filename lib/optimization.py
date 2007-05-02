@@ -271,6 +271,8 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             return False
 
         overridesWithSections = self.pairWithSections(overrides)
+        overrideSections = filter(lambda section: len(overridesWithSections.get(section, [])) > 0, \
+                                  overridesWithSections.keys())
         self.diag.info("Overrides with sections " + repr(overridesWithSections))
         file = open(targetFile, 'w')
         activeOverrides = []
@@ -278,8 +280,17 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             if self.isSection(line.strip()):
                 for override in activeOverrides:
                     file.write(override)
-                activeOverrides = overridesWithSections.get(line.strip(), [])
-                self.diag.info("Found section " + line.strip() + ", contains overrides " + repr(activeOverrides))
+                section = line.strip()
+                if section == "<END>":
+                    for overrideSection in overrideSections:
+                        file.write(overrideSection + "\n")
+                        for entry in overridesWithSections.get(overrideSection, []):
+                            file.write(entry)
+                else:
+                    if section in overrideSections:
+                        overrideSections.remove(section)
+                    activeOverrides = overridesWithSections.get(section, [])
+                    self.diag.info("Found section " + line.strip() + ", contains overrides " + repr(activeOverrides))
             file.write(line)
         return True
     def isSection(self, line):

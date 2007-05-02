@@ -231,8 +231,11 @@ class MailSender:
             self.storeMail(app, mailContents)
             sys.stdout.write("file written.")
         else:
-            self.sendMail(app, mailContents)
-            sys.stdout.write("done.")
+            errorMessage = self.sendMail(app, mailContents)
+            if errorMessage:
+                sys.stdout.write("FAILED. Details follow:\n" + errorMessage.strip())
+            else:
+                sys.stdout.write("done.")
         sys.stdout.write("\n")
     def exceptionOutput(self):
         exctype, value = sys.exc_info()[:2]
@@ -247,17 +250,11 @@ class MailSender:
         try:
             smtp.connect(smtpServer)
         except:
-            sys.stdout.write("FAILED.\nCould not connect to SMTP server at " + smtpServer + "\n" + \
-                             self.exceptionOutput() + \
-                             "Trying to store mail contents instead ...")
-            return self.storeMail(app, mailContents)
+            return "Could not connect to SMTP server at " + smtpServer + "\n" + self.exceptionOutput()
         try:
             smtp.sendmail(fromAddress, toAddresses, mailContents)
         except:
-            sys.stdout.write("FAILED.\nMail could not be sent\n" + \
-                             self.exceptionOutput() + \
-                             "Trying to store mail contents instead ...")
-            return self.storeMail(app, mailContents)
+            return "Mail could not be sent\n" + self.exceptionOutput()
         smtp.quit()
     def findAvailable(self, origFile):
         if not os.path.isfile(origFile):

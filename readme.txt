@@ -16,18 +16,26 @@ Installation and System Requirements:
 
     Read the installation guide at http:/www.texttest.org/TextTest/docs/install.html
     The lightning summary is that you need Python, PyGTK, tkdiff which are probably already
-    installed if you're on UNIX. On Windows you'll need to download them plus pstools -
+    installed if you're on UNIX. On Windows you'll need to download them plus "pstools" -
     but they all have installers now!
 
     You now don't need to do anything to install TextTest itself as such. You can copy the contents
     of the source directory to anywhere at all or leave it where it is. Running TextTest is a matter
     of running source/bin/texttest.py with the above stuff installed.
 
-    The Self Tests:
-        TextTest comes with a large number of tests for itself (using itself, naturally!). If you plan
-        to develop it you are strongly recommended to install these into your TEXTTEST_HOME so you can run
-        them and test your changes. They also function as working examples as described above, read source/doc/quickstart.txt 
-        for more details.
+TEXTTEST_HOME and the Self-Tests:
+    The tests subdirectory is a sketch of what a basic test repository looks like. You can move this
+    to anywhere at all or leave it where it is, but wherever it ends up you should point TEXTTEST_HOME
+    at it. It contains configuration for how to get debug information out of TextTest and also
+    a large number of tests for itself (using itself, naturally!) under the texttest subdirectory. 
+
+    If you plan to change the code you are strongly recommended to run them and test your changes. 
+    They also function as working examples as described above, read source/doc/quickstart.txt for more 
+    details.
+
+    The expected results provided are those from my own environment (RHEL4 Linux, currently). Unless your 
+    environment is identical you should transform the test suite to be suited to the environment and OS 
+    you are running in by running the script configure_tests.py which is included with these tests.
 
 Known bugs:
 

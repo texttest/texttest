@@ -39,7 +39,7 @@ def exportFromCvs(date):
 
 def getTestSubDirs():
     checkDir = "/users/geoff/work/master/Testing/Automatic/texttest"
-    ignoreDirs = [ "CVS", "carmen", "CurrentRelease", "ExternalWithOldFiles" ]
+    ignoreDirs = [ "CVS", "carmen", "ReleaseTests" ]
     subDirs = []
     for fileName in os.listdir(checkDir):
         fullPath = os.path.join(checkDir, fileName)
@@ -117,6 +117,14 @@ def createSource(reldir):
 
         shutil.copy(fileName, targetPath)
 
+def updateVersionFile(versionFile, releaseName):
+    newFileName = versionFile + ".new"
+    newFile = open(newFileName, "w")
+    for line in open(versionFile).xreadlines():
+        newFile.write(line.replace("master", releaseName))
+    newFile.close()
+    os.rename(newFileName, versionFile)
+
 def getCommandLine():
     options, leftovers = getopt(sys.argv[1:], "d:D:v:x")
     optDict = dict(options)
@@ -131,6 +139,9 @@ if __name__ == "__main__":
 
     reldir = "texttest-" + releaseName
     createSource(reldir)
+    versionFile = os.path.join(reldir, "source", "lib", "texttest_version.py")
+    updateVersionFile(versionFile, releaseName)
+    os.rename(os.path.join(reldir, "source", "readme.txt"), os.path.join(reldir, "readme.txt"))
     createTests(reldir)
     
     shutil.rmtree("Testing")

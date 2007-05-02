@@ -91,20 +91,24 @@ class BatchCategory(plugins.Filter):
                     data[freeText] = []
                 data[freeText].append(test)
         return data.items()
+    def testOutput(self, test):
+        return repr(test) + " (under " + test.getRelPath() + ")"
     def getFullDescription(self):
         fullText = ""
         for freeText, tests in self.getFreeTextData():
             fullText += "--------------------------------------------------------" + "\n"
             if len(tests) == 1:
                 test = tests[0]
-                fullText += "TEST " + repr(test.state) + " " + repr(test) + " (under " + test.getRelPath() + ")" + "\n"
+                fullText += "TEST " + repr(test.state) + " " + self.testOutput(test) + "\n"
             else:
                 fullText += str(len(tests)) + " TESTS " + repr(tests[0].state) + "\n"
             fullText += freeText
             if not freeText.endswith("\n"):
                 fullText += "\n"
             if len(tests) > 1:
-                fullText += "(tests were " + string.join([ test.name for test in tests ], ", ") + ")\n"
+                fullText += "\n"
+                for test in tests:
+                    fullText += "-- " + self.testOutput(test) + "\n"
         return fullText
 
 class BatchApplicationData:

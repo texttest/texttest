@@ -13,7 +13,7 @@ from Queue import Queue, Empty
 def joinpath(a, *p):
     path = a
     for b in p:
-        if os.path.isabs(b):
+        if os.path.isabs(b) and (path[1:2] != ":" or b[1:2] == ":"):
             path = b
         elif path == '' or path.endswith('/'):
             path +=  b
@@ -469,9 +469,8 @@ def getPersonalConfigDir():
     fromEnv = os.getenv("TEXTTEST_PERSONAL_CONFIG")
     if fromEnv:
         return fromEnv
-    homeDir = os.getenv("HOME")
-    if homeDir:
-        return os.path.join(homeDir, ".texttest")
+    else:
+        return os.path.normpath(os.path.expanduser("~/.texttest"))
 
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):

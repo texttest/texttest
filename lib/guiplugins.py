@@ -3,7 +3,6 @@ import plugins, os, sys, shutil, types, time, paths
 from copy import copy
 from threading import Thread
 from glob import glob
-from Queue import Queue, Empty
 global scriptEngine
 global processTerminationMonitor
 from log4py import LOGLEVEL_NORMAL
@@ -61,21 +60,13 @@ class GUIConfig:
 class ProcessTerminationMonitor:
     def __init__(self):
         self.processes = []
-        self.termQueue = Queue()
     def addMonitoring(self, process):
         self.processes.append(process)
         newThread = Thread(target=self.monitor, args=(process,))
         newThread.start()
     def monitor(self, process):
         process.waitForTermination()
-        self.termQueue.put(process)
-    def getTerminatedProcess(self):
-        try:
-            process = self.termQueue.get_nowait()
-            self.processes.remove(process)
-            return process
-        except Empty:
-            return None
+        process.runExitHandler()
     def listRunning(self, processesToCheck):
         running = []
         if len(processesToCheck) == 0:
@@ -96,7 +87,7 @@ class ProcessTerminationMonitor:
         # Don't leak processes
         for process in self.processes:
             if not process.hasTerminated():
-                guilog.info("Killing '" + process.description.split()[0] + "' interactive process")
+                guilog.info("Killing '" + process.description + "' interactive process")
                 process.killAll()
 
 processTerminationMonitor = ProcessTerminationMonitor()
@@ -146,11 +137,14 @@ class InteractiveAction(plugins.Observable):
     def getTooltip(self):
         return self.getScriptTitle(False)
     def getDialogType(self): # The dialog type to launch on action execution.
-        self.confirmationMessage = self.getConfirmationMessage()
-        if self.confirmationMessage:
-            return "guidialogs.ConfirmationDialog"
-        else:
-            return ""
+        try:
+            self.confirmationMessage = self.getConfirmationMessage()
+            if self.confirmationMessage:
+                return "guidialogs.ConfirmationDialog"
+            else:
+                return ""
+        except plugins.TextTestError, e:
+            self.notify("Error", str(e))
     def getResultDialogType(self): # The dialog type to launch when the action has finished execution.
         return ""
     def getTitle(self, includeMnemonics=False):
@@ -220,10 +214,13 @@ class InteractiveAction(plugins.Observable):
         if message != None:
             self.notify("Status", message)
         self.notify("ActionStart", message)
-        self.performOnCurrent()
-        message = self.messageAfterPerform()
-        if message != None:
-            self.notify("Status", message)
+        try:
+            self.performOnCurrent()
+            message = self.messageAfterPerform()
+            if message != None:
+                self.notify("Status", message)
+        except plugins.TextTestError, e:
+            self.notify("Error", str(e))
     def endPerform(self):
         self.notify("ActionStop", "")
     def perform(self):
@@ -540,11 +537,11 @@ class ViewInEditor(FileViewAction):
     def notifyViewFile(self, fileName, comparison):
         if not self.differencesActive(comparison):
             viewProgram = self.getViewToolName(fileName)
-            if not plugins.canExecute(viewProgram):
-                raise plugins.TextTestError, "Cannot find file editing program '" + viewProgram + \
-                  "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool"
-
-            self.performOnFile(fileName, comparison, viewProgram)
+            if plugins.canExecute(viewProgram):
+                self.performOnFile(fileName, comparison, viewProgram)
+            else:
+                self.notify("Error", "Cannot find file editing program '" + viewProgram + \
+                            "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool")
     def isTestDefinition(self, stem, fileName):
         if not self.currentTest:
             return False
@@ -594,11 +591,12 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
     def notifyViewFile(self, fileName, comparison):
         if self.differencesActive(comparison):
             diffProgram = self.getViewToolName(fileName)
-            if not plugins.canExecute(diffProgram):
-                raise plugins.TextTestError, "Cannot find graphical difference program '" + diffProgram + \
-                  "'\nPlease install it somewhere on your PATH or point the diff_program setting at a different tool"
+            if plugins.canExecute(diffProgram):
+                self.performOnFile(fileName, comparison, diffProgram)
+            else:
+                self.notify("Error", "Cannot find graphical difference program '" + diffProgram + \
+                            "'\nPlease install it somewhere on your PATH or point the diff_program setting at a different tool")
         
-            self.performOnFile(fileName, comparison, diffProgram)
 
 class FollowFile(FileViewAction):
     def _getTitle(self):
@@ -637,9 +635,9 @@ class ImportTest(InteractiveTestAction):
         if os.path.isdir(newDir):
             if self.testFilesExist(newDir, suite.app):
                 raise plugins.TextTestError, "Test already exists for application " + suite.app.fullName + \
-                      " : " + os.path.basename(newDir)
-            
-            return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
+                          " : " + os.path.basename(newDir)
+            else:
+                return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
         else:
             return ""
     def testFilesExist(self, dir, app):
@@ -717,8 +715,7 @@ class ImportTest(InteractiveTestAction):
             if test.name == testName:
                 raise plugins.TextTestError, "A " + self.testType() + " with the name '" + \
                       testName + "' already exists, please choose another name"
-
-
+        
 class RecordTest(InteractiveTestAction):
     def __init__(self):
         InteractiveTestAction.__init__(self)
@@ -779,7 +776,6 @@ class RecordTest(InteractiveTestAction):
     def getLogFile(self, writeDir, usecase, type="errors"):
         return os.path.join(writeDir, usecase + "_" + type + ".log")
     def textTestCompleted(self, test, usecase):
-        scriptEngine.applicationEvent(usecase + " texttest to complete")
         # Refresh the files before changed the data
         test.refreshFiles()
         if usecase == "record":
@@ -787,6 +783,7 @@ class RecordTest(InteractiveTestAction):
         else:
             self.setTestReady(test, usecase)
         test.filesChanged()
+        test.notify("CloseDynamic", usecase)
     def getWriteDir(self, test):
         return os.path.join(test.app.writeDirectory, "record")
     def setTestRecorded(self, test, usecase):
@@ -796,8 +793,8 @@ class RecordTest(InteractiveTestAction):
             errText = open(errFile).read()
             if len(errText):
                 self.notify("Status", "Recording failed for " + repr(test))
-                raise plugins.TextTestError, "Recording use-case failed, with the following errors:\n" + errText
- 
+                return self.notify("Error", "Recording use-case failed, with the following errors:\n" + errText)
+                            
         if self.updateRecordTime(test) and self.optionGroup.getSwitchValue("rep"):
             self.startTextTestProcess(test, usecase="replay")
             message = "Recording completed for " + repr(test) + \
@@ -1084,7 +1081,7 @@ class SaveSelection(SelectionAction):
             file.write(toWrite + "\n")
             file.close()
         except IOError, e:
-            raise plugins.TextTestError, "\nFailed to save selection:\n" + str(e) + "\n"
+            self.notify("Error", "\nFailed to save selection:\n" + str(e) + "\n")
     def messageAfterPerform(self):
         nameToPresent = paths.getRelativeOrAbsolutePath(self.folders[0], self.fileName)
         return "Saved " + self.describeTests() + " in file '" + nameToPresent + "'."
@@ -1178,21 +1175,14 @@ class RunningAction(SelectionAction):
                 apps.append(test.app.name)
         return "-a " + ",".join(apps)
     def checkTestRun(self, identifierString, errFile, testSel):
-        try:
-            self.notifyIfMainThread("ActionStart", "")
-            for test in testSel:
-                self.notifyIfMainThread("Status", "Updating files for " + repr(test) + " ...")
-                self.notifyIfMainThread("ActionProgress", "")
-                test.filesChanged()
-            scriptEngine.applicationEvent(self.getUseCaseName() + " GUI to be closed")
-            if os.path.isfile(errFile):
-                errText = open(errFile).read()
-                if len(errText):
-                    raise plugins.TextTestError, "Dynamic run failed, with the following errors:\n" + errText
-        finally:
-            self.notifyIfMainThread("Status", "Done updating after dynamic run " + identifierString + ".")
-            self.notifyIfMainThread("ActionStop", "")
-
+        if len(self.currTestSelection) == 1 and self.currTestSelection[0] in testSel:
+            self.currTestSelection[0].filesChanged()
+        testSel[0].notify("CloseDynamic", self.getUseCaseName())
+        if os.path.isfile(errFile):
+            errText = open(errFile).read()
+            if len(errText):
+                self.notify("Error", "Dynamic run failed, with the following errors:\n" + errText)
+            
 
 class ReconnectToTests(RunningAction):
     def __init__(self, commandOptionGroups):
@@ -1328,7 +1318,7 @@ class CreateDefinitionFile(InteractiveTestAction):
             file.close()
             guilog.info("Creating new empty file...")
         else:
-            raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile 
+            raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile
         self.notify("NewFile", targetFile, fileExisted)
     def messageAfterPerform(self):
         pass
@@ -1400,7 +1390,7 @@ Are you sure you wish to proceed?\n"""
                     namesRemoved.append(test.name)
         self.notify("Status", "Removed test(s) " + ",".join(namesRemoved))
         if warnings:
-            raise plugins.TextTestWarning, warnings
+            self.notify("Warning", warnings)
     def removeFiles(self):
         test = self.currTestSelection[0]
         warnings = ""
@@ -1417,7 +1407,7 @@ Are you sure you wish to proceed?\n"""
         self.notify("Status", "Removed " + self.getFilesDescription(removed) + " from the " +
                     test.classDescription() + " " + test.name + "")
         if warnings:
-            raise plugins.TextTestWarning, warnings
+            self.notify("Warning", warnings)
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
 
@@ -1564,7 +1554,7 @@ class ReportBugs(InteractiveTestAction):
             raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"
         if self.optionGroup.getOptionValue("bug_system") == "<none>":
             if len(self.optionGroup.getOptionValue("full_description")) == 0 or \
-               len(self.optionGroup.getOptionValue("brief_description")) == 0:
+                   len(self.optionGroup.getOptionValue("brief_description")) == 0:
                 raise plugins.TextTestError, "Must either provide a bug system or fill in both description and summary fields"
         else:
             if len(self.optionGroup.getOptionValue("bug_id")) == 0:
@@ -1675,12 +1665,10 @@ class SortTestSuiteFileAscending(InteractiveAction):
 
         self.notify("Status", "Sorting " + repr(suite))
         self.notify("ActionProgress", "")
-        try:
-            suite.sortTests(ascending)
-        except Exception, e:
-            errors += str(e) + "\n" 
-        if errors:
-            raise plugins.TextTestWarning, errors
+        if suite.hasNonDefaultTests():
+            self.notify("Warning", "\nThe test suite\n'" + suite.name + "'\ncontains tests which are not present in the default version.\nTests which are only present in some versions will not be\nmixed with tests in the default version, which might lead to\nthe suite not looking entirely sorted.")
+
+        suite.sortTests(ascending)
 
 class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
     def getStockId(self):
@@ -1711,8 +1699,11 @@ class RepositionTest(InteractiveAction):
                self.currTestSelection[0].parent and \
                not self.currTestSelection[0].parent.autoSortOrder
     def performOnCurrent(self):
-        self.testToMove.parent.repositionTest(self.testToMove, self.position)
-        self.notify("RefreshTestSelection")
+        if self.testToMove.parent.repositionTest(self.testToMove, self.position):
+            self.notify("RefreshTestSelection")
+        else:
+            raise plugins.TextTestError, "\nThe test\n'" + self.testToMove.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
+
     
 class RepositionTestDown(RepositionTest):
     def __init__(self):
@@ -1842,9 +1833,9 @@ class RenameTest(InteractiveAction):
                 self.currTestSelection[0].rename(self.newName, self.newDescription)
                 self.currTestSelection[0].filesChanged() # To get the new description in the GUI ...
         except IOError, e:
-            raise plugins.TextTestError, "Failed to rename test:\n" + str(e)
+            self.notify("Error", "Failed to rename test:\n" + str(e))
         except OSError, e:
-            raise plugins.TextTestError, "Failed to rename test:\n" + str(e)
+            self.notify("Error", "Failed to rename test:\n" + str(e))
 
 class VersionInformation(InteractiveAction):
     def __init__(self, dynamic):

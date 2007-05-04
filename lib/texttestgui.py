@@ -283,22 +283,7 @@ class IdleHandlerManager:
         self.sourceId = self._enableHandler()
 
     def _enableHandler(self):
-        if self.dynamic:
-            return plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
-        else:
-            return gobject.idle_add(self.pickUpProcess)
-        
-    def pickUpProcess(self):
-        process = guiplugins.processTerminationMonitor.getTerminatedProcess()
-        if process:
-            try:
-                process.runExitHandler()
-            except plugins.TextTestError, e:
-                showErrorDialog(str(e), globalTopWindow)
-        
-        # We must sleep for a bit, or we use the whole CPU (busy-wait)
-        time.sleep(0.1)
-        return True
+        return plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
     def notifyExit(self):
         guiplugins.processTerminationMonitor.killAll()
 
@@ -550,7 +535,12 @@ class TopWindowGUI(ContainerGUI):
     def notifyExit(self, *args):
         self.notify("Exit")
         self.topWindow.destroy()
-
+    def notifyError(self, message):
+        showErrorDialog(message, self.topWindow)
+    def notifyWarning(self, message):
+        showWarningDialog(message, self.topWindow)
+    def notifyInformation(self, message):
+        showInformationDialog(message, self.topWindow)
     def adjustSize(self):
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
@@ -1271,7 +1261,7 @@ class ActionGUI(SubGUI):
     def runInteractive(self, *args):
         if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
             return
-        dialogType = self.catchErrorsFor(self.action.getDialogType)
+        dialogType = self.action.getDialogType()
         if dialogType is not None:
             if dialogType:
                 dialog = pluginHandler.getInstance(dialogType, globalTopWindow,
@@ -1282,8 +1272,6 @@ class ActionGUI(SubGUI):
     def _dontRun(self):
         statusMonitor.notifyStatus("Action cancelled.")
     def _runInteractive(self):
-        return self.catchErrorsFor(self._tryRunInteractive)
-    def _tryRunInteractive(self):
         try:
             self.action.startPerform()
             resultDialogType = self.action.getResultDialogType()
@@ -1292,15 +1280,6 @@ class ActionGUI(SubGUI):
                 resultDialog.run()
         finally:
             self.action.endPerform()
-    def catchErrorsFor(self, method):
-        try:
-            return method()
-        except plugins.TextTestError, e:
-            showErrorDialog(str(e), globalTopWindow)
-        except plugins.TextTestWarning, e:
-            showWarningDialog(str(e), globalTopWindow)
-        except plugins.TextTestInformation, e:
-            showInformationDialog(str(e), globalTopWindow)    
            
 class DefaultActionGUI(ActionGUI):
     def __init__(self, action):

@@ -1919,7 +1919,7 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
             fileName = self.currentTest.getFileName(file)
             if fileName:
                 cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
-        raise  plugins.TextTestInformation, "CVS Logs" + os.linesep + os.linesep + cvsInfo
+        self.notify("Information", "CVS Logs" + os.linesep + os.linesep + cvsInfo)
     def _getTitle(self):
         return "CVS _Log"
     def getCVSInfo(self, path, file):

@@ -639,7 +639,6 @@ class TestSuite(Test):
                 if testcase.name == testName:
                     newList.append(testcase)
                     break
-
         if newList != self.testcases:
             self.testcases = newList
             self.notify("ContentChange")
@@ -710,7 +709,7 @@ class TestSuite(Test):
         try:
             currIndex = tests.index(test.name)
         except:
-            raise plugins.TextTestWarning, "\nThe test\n'" + test.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
+            return False
 
         # Depending on 'position', move test in list
         if position == "first":
@@ -745,16 +744,16 @@ class TestSuite(Test):
                     break
         self.testcases = newList
         self.notify("ContentChange")
+        return True
+    def hasNonDefaultTests(self):
+        tests = plugins.readListWithComments(self.getContentFileName())
+        return len(tests) < len(self.testcases)
     def sortTests(self, ascending = True):
         testsFirst = self.getConfigValue("sort_test_suites_tests_first")
         # Get testsuite list, sort in the desired order. Test
         # cases always end up before suites, regardless of name.
-        warning = ""
         for testSuiteFileName in self.findTestSuiteFiles():
             tests = plugins.readListWithComments(testSuiteFileName)
-            if testSuiteFileName == self.getContentFileName() and \
-               len(tests) < len(self.testcases):
-                warning = "\nThe test suite\n'" + self.name + "'\ncontains tests which are not present in the default version.\nTests which are only present in some versions will not be\nmixed with tests in the default version, which might lead to\nthe suite not looking entirely sorted."
             if testsFirst:
                 testNames = map(lambda t: t.name, filter(lambda t: t.classId() == "test-case", self.testcases))
             else:
@@ -773,8 +772,6 @@ class TestSuite(Test):
                     break
         self.testcases = newList
         self.notify("ContentChange")
-        if warning:
-            raise plugins.TextTestWarning, warning
     def compareTests(self, ascending, testNames, a, b):
         if a in testNames:
             if b in testNames:
@@ -1427,6 +1424,11 @@ class ApplicationEventResponder(Responder):
         self.scriptEngine.applicationEvent(eventName, category, timeDelay)
     def notifyAllComplete(self):
         self.scriptEngine.applicationEvent("completion of test actions")
+    def notifyCloseDynamic(self, test, name):
+        self.scriptEngine.applicationEvent(name + " GUI to be closed")
+    def notifyContentChange(self, suite):
+        eventName = "suite " + suite.uniqueName + " to change order"
+        self.scriptEngine.applicationEvent(eventName, suite.uniqueName)
 
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.

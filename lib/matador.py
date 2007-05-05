@@ -105,6 +105,9 @@ class MatadorConfig(optimization.OptimizationConfig):
         scriptFile = self.getScriptFileFromPyOption(test)
         if not scriptFile:
             scriptFile = self.getRuleSetting(test, "script_file_name")
+            useScriptFile = self.getRuleSetting(test, "use_script_file")
+            if useScriptFile and useScriptFile == "FALSE":
+                scriptFile = ""
         if scriptFile:
             return [ ("Script", self.getScriptPath(test, scriptFile)) ]
         else:

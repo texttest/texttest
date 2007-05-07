@@ -185,6 +185,11 @@ class InteractiveAction(plugins.Observable):
                                    selectFile, description)
     def addSwitch(self, key, name, defaultValue = 0, options = [], description = ""):
         self.optionGroup.addSwitch(key, name, defaultValue, options, description)
+    def getTextTestArgs(self):
+        if os.name == "nt" and plugins.textTestName.endswith(".py"):
+            return [ "python", plugins.textTestName ] # Windows isn't clever enough to figure out how to run Python programs...
+        else:
+            return [ plugins.textTestName ]
     def startExternalProgram(self, cmdArgs, description = "", outfile=os.devnull, errfile=os.devnull, \
                              exitHandler=None, exitHandlerArgs=()):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=open(outfile, "w"), stderr=open(errfile, "w"))
@@ -768,7 +773,7 @@ class RecordTest(InteractiveTestAction):
     def startTextTestProcess(self, test, usecase):
         ttOptions = self.getRunOptions(test, usecase)
         guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
-        cmdArgs = [ plugins.textTestName ] + ttOptions
+        cmdArgs = self.getTextTestArgs() + ttOptions
         writeDir = self.getWriteDir(test)
         plugins.ensureDirectoryExists(writeDir)
         logFile = self.getLogFile(writeDir, usecase, "output")
@@ -1147,7 +1152,7 @@ class RunningAction(SelectionAction):
         usecase = self.getUseCaseName()
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
-        cmdArgs = [ plugins.textTestName ] + ttOptions
+        cmdArgs = self.getTextTestArgs() + ttOptions
         identifierString = "started at " + plugins.localtime()
         self.startExtProgramNewUsecase(cmdArgs, usecase, logFile, errFile, exitHandler=self.checkTestRun, \
                                        exitHandlerArgs=(identifierString,errFile,self.currTestSelection), description = description)

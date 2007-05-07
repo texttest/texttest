@@ -1088,10 +1088,10 @@ class Application:
             checkout = self.checkout
         if not version:
             version = self.getFullVersion()
-        options = "-d " + self.inputOptions.directoryName + " -a " + self.name
+        options = [ "-d", self.inputOptions.directoryName, "-a", self.name ]
         if version:
-            options += " -v " + version
-        return options + " " + self.configObject.getRunOptions(checkout)
+            options += [ "-v", version ]
+        return options + self.configObject.getRunOptions(checkout)
     def hasPerformance(self):
         return self.configObject.hasPerformance(self)
     def addToOptionGroup(self, group):

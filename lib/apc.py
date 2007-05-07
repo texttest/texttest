@@ -77,7 +77,8 @@ apc.PlotKPIGroups          - A specialization of optimization.PlotTest for APC w
 
 """
 
-import default, ravebased, queuesystem, performance, os, copy, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview
+import default, ravebased, queuesystem, performance, os, copy, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview, subprocess
+from jobprocess import JobProcess
 from socket import gethostname
 from time import sleep
 from ndict import seqdict
@@ -311,9 +312,9 @@ class ViewApcLog(guiplugins.InteractiveTestAction):
         viewLogScript = self.currentTest.makeTmpFileName("view_apc_log", forFramework=1)
         if os.path.isfile(viewLogScript):
             file = open(viewLogScript)
-            command = file.readlines()[0].strip()
+            cmdArgs = eval(file.readlines()[0].strip())
             file.close()
-            process = self.startViewer(command, "APC log viewer")
+            process = self.startViewer(cmdArgs, "APC log viewer")
             guiplugins.scriptEngine.monitorProcess("views the APC log", process)
         else:
             raise plugins.TextTestError, "APC log file not yet available"
@@ -363,7 +364,7 @@ class RunApcTestInDebugger(default.RunTest):
     def __del__(self):
         # .nfs lock files are left if we don't kill the less process.
         if self.process:
-            self.process.killAll()
+            JobProcess(self.process.pid).killAll()
     def __call__(self, test):
         self.describe(test)
         # Get the options that are sent to APCbatch.sh
@@ -374,9 +375,9 @@ class RunApcTestInDebugger(default.RunTest):
         apcLogFile.write("")
         apcLogFile.close()
         if self.showLogFile:
-            command = "xterm -bg white -fg black -T " + "APCLOG-" + test.name + "" + " -e 'less +F " + apcLog + "'"
-            self.process = plugins.BackgroundProcess(command)
-            print "Created process : log file viewer :", self.process.processId
+            cmdArgs = [ "xterm", "-bg", "white", "-fg", "black", "-T", "APCLOG-" + test.name, "-e", "less +F " + apcLog ]
+            self.process = subprocess.Popen(cmdArgs)
+            print "Created process : log file viewer :", self.process.pid
         # Create a script for gdb to run.
         gdbArgs = test.makeTmpFileName("gdb_args")
         gdbArgsFile = open(gdbArgs, "w")
@@ -546,19 +547,19 @@ class MarkApcLogDir(RunWithParallelAction):
         if resLine.find("/") != -1:
             return resLine
         return "/tmp"
-    def getApcLogDir(self, test, processId = None):
+    def getApcLogDir(self, test, pid = None):
         # Logfile dir
         subplanPath = os.path.realpath(test.makeTmpFileName("APC_FILES", forComparison=0))
         subplanName, apcFiles = os.path.split(subplanPath)
         baseSubPlan = os.path.basename(subplanName)
         apcHostTmp = self.getApcHostTmp()
-        if processId:
-            logdir = os.path.join(apcHostTmp, baseSubPlan + "_" + gethostname() + "_" + processId)
+        if pid:
+            logdir = os.path.join(apcHostTmp, baseSubPlan + "_" + gethostname() + "_" + pid)
             if os.path.isdir(logdir):
                 return logdir
             # maintain backward compatibility with the old APCbatch.sh (v1.38)
             # collision prone naming scheme
-            return os.path.join(apcHostTmp, baseSubPlan + "_" + processId)
+            return os.path.join(apcHostTmp, baseSubPlan + "_" + pid)
         # Hmmm the code below might return something that doesn't "belong" to us
         for file in os.listdir(apcHostTmp):
             if file.startswith(baseSubPlan + "_"):
@@ -578,10 +579,11 @@ class MarkApcLogDir(RunWithParallelAction):
         viewLogScript = test.makeTmpFileName("view_apc_log", forFramework=1)
         file = open(viewLogScript, "w")
         logFileName = os.path.join(apcTmpDir, "apclog")
-        file.write("xon " + gethostname() + " 'xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "''" + plugins.nullRedirect())
+        cmdArgs = [ "xon", gethostname(), "xterm -bg white -T " + test.name + " -e 'less +F " + logFileName + "'" ]
+        file.write(repr(cmdArgs))
         file.close()
     def performParallelAction(self, test, execProcess, parentProcess):
-        apcTmpDir = self.getApcLogDir(test, str(parentProcess.processId))
+        apcTmpDir = self.getApcLogDir(test, str(parentProcess.pid))
         self.diag.info("APC log directory is " + apcTmpDir + " based on process " + parentProcess.getName())
         if not os.path.isdir(apcTmpDir):
             raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + execProcess.getName()

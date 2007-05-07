@@ -6,6 +6,7 @@ from threading import currentThread
 from knownbugs import CheckForBugs, CheckForCrashes
 from traffic import SetUpTrafficHandlers
 from cPickle import Unpickler
+from jobprocess import JobProcess
 from socket import gethostname
 from ndict import seqdict
 
@@ -115,9 +116,9 @@ class Config(plugins.Configuration):
                len(app.getConfigValue("partial_copy_test_path")) > 0
     def getRunOptions(self, checkout):
         if checkout:
-            return "-c " + checkout
+            return [ "-c", checkout ]
         else:
-            return ""
+            return []
     def getWriteDirectoryName(self, app):
         defaultName = plugins.Configuration.getWriteDirectoryName(self, app)
         if self.useStaticGUI(app):
@@ -1150,35 +1151,15 @@ class Running(plugins.TestState):
                                    executionHosts = execMachines, lifecycleChange="start")
         self.bkgProcess = bkgProcess
     def processCompleted(self):
-        return self.bkgProcess.hasTerminated()
+        return self.bkgProcess.poll() is not None
     def killProcess(self):
-        if self.bkgProcess and self.bkgProcess.processId:
-            print "Killing running test (process id", str(self.bkgProcess.processId) + ")"
-            self.bkgProcess.killAll()
+        if self.bkgProcess and self.bkgProcess.pid:
+            print "Killing running test (process id", str(self.bkgProcess.pid) + ")"
+            job = JobProcess(self.bkgProcess.pid)
+            job.killAll()
         return 1
 
-# Poll CPU time values as well
-class WindowsRunning(Running):
-    def __init__(self, execMachines, bkgProcess = None, freeText = "", briefText = ""):
-        Running.__init__(self, execMachines, bkgProcess, freeText, briefText)
-        self.latestCpu = 0.0
-        self.cpuDelta = 0.0
-    def processCompleted(self):
-        newCpu = self.bkgProcess.getCpuTime()
-        if newCpu is None:
-            return 1
-        self.cpuDelta = newCpu - self.latestCpu
-        self.latestCpu = newCpu
-        return 0
-    def getProcessCpuTime(self):
-        # Assume it finished linearly halfway between the last poll and now...
-        return self.latestCpu + (self.cpuDelta / 2.0)
-
 class RunTest(plugins.Action):
-    if os.name == "posix":
-        runningClass = Running
-    else:
-        runningClass = WindowsRunning
     def __init__(self):
         self.diag = plugins.getDiagnostics("run test")
     def __repr__(self):
@@ -1192,7 +1173,7 @@ class RunTest(plugins.Action):
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
         briefText = self.getBriefText(execMachines)
         freeText = "Running on " + string.join(execMachines, ",")
-        newState = self.runningClass(execMachines, process, briefText=briefText, freeText=freeText)
+        newState = Running(execMachines, process, briefText=briefText, freeText=freeText)
         test.changeState(newState)
     def getBriefText(self, execMachines):
         # Default to not bothering to print the machine name: all is local anyway
@@ -1211,13 +1192,8 @@ class RunTest(plugins.Action):
 
         testCommand = self.getExecuteCommand(test)
         self.describe(test)
-        if os.name == "nt" and plugins.BackgroundProcess.processHandler.processManagement == 0:
-            self.changeToRunningState(test, None)
-            os.system(testCommand)
-            return
-
         self.diag.info("Running test with command : " + testCommand)
-        process = plugins.BackgroundProcess(testCommand)
+        process = subprocess.Popen(testCommand, shell=True)
         if not inChild:
             self.changeToRunningState(test, process)
         return self.RETRY
@@ -1364,11 +1340,13 @@ class CreateCatalogue(plugins.Action):
         for line in open(logFile).xreadlines():
             if line.startswith(searchString):
                 parts = line.strip().split(" : ")
-                processId = int(parts[-1])
-                process = plugins.Process(processId)
+                try:
+                    processId = int(parts[-1])
+                except ValueError:
+                    continue
+                process = JobProcess(processId)
                 self.diag.info("Found process ID " + str(processId))
-                if not process.hasTerminated():
-                    process.killAll()
+                if process.killAll():
                     processes.append(parts[1])
         return processes
     def findAllPaths(self, test):

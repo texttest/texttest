@@ -1,5 +1,6 @@
 
-import plugins, os, sys, shutil, types, time, paths
+import plugins, os, sys, shutil, types, time, paths, subprocess
+from jobprocess import JobProcess
 from copy import copy
 from threading import Thread
 from glob import glob
@@ -60,35 +61,36 @@ class GUIConfig:
 class ProcessTerminationMonitor:
     def __init__(self):
         self.processes = []
-    def addMonitoring(self, process):
-        self.processes.append(process)
-        newThread = Thread(target=self.monitor, args=(process,))
+    def addMonitoring(self, process, description, exitHandler, exitHandlerArgs):
+        self.processes.append((process, description))
+        newThread = Thread(target=self.monitor, args=(process, exitHandler, exitHandlerArgs))
         newThread.start()
-    def monitor(self, process):
-        process.waitForTermination()
-        process.runExitHandler()
+    def monitor(self, process, exitHandler, exitHandlerArgs):
+        process.wait()
+        if exitHandler:
+            exitHandler(*exitHandlerArgs)
     def listRunning(self, processesToCheck):
         running = []
         if len(processesToCheck) == 0:
             return running
-        for process in self.processes:
-            if not process.hasTerminated():
+        for process, description in self.processes:
+            if process.poll() is None:
                 for processToCheck in processesToCheck:
                     if plugins.isRegularExpression(processToCheck):
-                        if plugins.findRegularExpression(processToCheck, process.description):
-                            running.append("PID " + str(process.processId) + " : " + process.description)
+                        if plugins.findRegularExpression(processToCheck, description):
+                            running.append("PID " + str(process.pid) + " : " + description)
                             break
-                    elif processToCheck.lower() == "all" or process.description.find(processToCheck) != -1:
-                            running.append("PID " + str(process.processId) + " : " + process.description)
+                    elif processToCheck.lower() == "all" or description.find(processToCheck) != -1:
+                            running.append("PID " + str(process.pid) + " : " + description)
                             break
 
         return running
     def killAll(self):
         # Don't leak processes
-        for process in self.processes:
-            if not process.hasTerminated():
-                guilog.info("Killing '" + process.description + "' interactive process")
-                process.killAll()
+        for process, description in self.processes:
+            if process.poll() is None:
+                guilog.info("Killing '" + description + "' interactive process")
+                JobProcess(process.pid).killAll()
 
 processTerminationMonitor = ProcessTerminationMonitor()
        
@@ -183,12 +185,13 @@ class InteractiveAction(plugins.Observable):
                                    selectFile, description)
     def addSwitch(self, key, name, defaultValue = 0, options = [], description = ""):
         self.optionGroup.addSwitch(key, name, defaultValue, options, description)
-    def startExternalProgram(self, *args):
-        process = plugins.BackgroundProcess(*args)
-        processTerminationMonitor.addMonitoring(process)
+    def startExternalProgram(self, cmdArgs, description = "", outfile=os.devnull, errfile=os.devnull, \
+                             exitHandler=None, exitHandlerArgs=()):
+        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=open(outfile, "w"), stderr=open(errfile, "w"))
+        processTerminationMonitor.addMonitoring(process, description, exitHandler, exitHandlerArgs)
         return process
-    def startExtProgramNewUsecase(self, commandLine, usecase, \
-                                  exitHandler, exitHandlerArgs, shellTitle=None, holdShell=0, description = ""): 
+    def startExtProgramNewUsecase(self, cmdArgs, usecase, outfile, errfile, \
+                                  exitHandler, exitHandlerArgs, description = ""): 
         recScript = os.getenv("USECASE_RECORD_SCRIPT")
         if recScript:
             os.environ["USECASE_RECORD_SCRIPT"] = plugins.addLocalPrefix(recScript, usecase)
@@ -201,7 +204,7 @@ class InteractiveAction(plugins.Observable):
                 os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
             else:
                 del os.environ["USECASE_REPLAY_SCRIPT"]
-        process = self.startExternalProgram(commandLine, description, exitHandler, exitHandlerArgs, shellTitle, holdShell)
+        process = self.startExternalProgram(cmdArgs, description, outfile, errfile, exitHandler, exitHandlerArgs)
         if recScript:
             os.environ["USECASE_RECORD_SCRIPT"] = recScript
         if repScript:
@@ -313,11 +316,10 @@ class InteractiveTestAction(InteractiveAction):
             return self.updateForState(test, state)
         else:
             return False, False
-    def startViewer(self, commandLine, description = "", exitHandler=None, exitHandlerArgs=(), \
-                    shellTitle = None, holdShell = 0):
+    def startViewer(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=()):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
-        process = self.startExternalProgram(commandLine, fullDesc, exitHandler, exitHandlerArgs, shellTitle, holdShell)
+        process = self.startExternalProgram(cmdArgs, fullDesc, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
         return process
     def testDescription(self):
@@ -504,17 +506,14 @@ class ViewInEditor(FileViewAction):
     def getToolConfigEntry(self):
         return "view_program"
     def viewFile(self, fileName, viewTool, exitHandler):
-        commandLine, descriptor = self.getViewCommand(fileName, viewTool)
+        cmdArgs, descriptor = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
         refresh = bool(exitHandler)
         guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
-        process = self.startViewer(commandLine, description=description, exitHandler=exitHandler)
+        process = self.startViewer(cmdArgs, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getViewCommand(self, fileName, viewProgram):
-        cmd = viewProgram + " \"" + fileName + "\"" + plugins.nullRedirect()
-        if os.name == "posix":
-            cmd = "exec " + cmd # best to avoid shell messages etc.
-        return cmd, viewProgram
+        return [ viewProgram, fileName ], viewProgram
     def getFileToView(self, fileName, comparison):
         if comparison:
             return comparison.existingFile(self.useFiltered())
@@ -577,8 +576,7 @@ class ViewFileDifferences(FileViewAction):
         guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
         guilog.info("-- original file : " + stdFile)
         guilog.info("--  current file : " + tmpFile)
-        commandLine = diffProgram + ' "' + stdFile + '" "' + tmpFile + '" ' + plugins.nullRedirect()
-        process = self.startViewer(commandLine, description=description)
+        process = self.startViewer([ diffProgram, stdFile, tmpFile ], description=description)
         scriptEngine.monitorProcess("shows graphical differences in test files", process)
     
 class ViewFilteredFileDifferences(ViewFileDifferences):
@@ -610,13 +608,18 @@ class FollowFile(FileViewAction):
             return comparison.tmpFile
         else:
             return fileName
+    def getFollowCommand(self, followProgram, fileName):
+        basic = [ followProgram, fileName ]
+        if followProgram.startswith("tail") and os.name == "posix":
+            title = self.currentTest.name + " (" + os.path.basename(fileName) + ")"
+            return [ "xterm", "-bg", "white", "-T", title, "-e" ] + basic
+        else:
+            return basic
     def performOnFile(self, fileName, comparison, followProgram):
         useFile = self.fileToFollow(fileName, comparison)
         guilog.info("Following file " + useFile + " using '" + followProgram + "'")
         description = followProgram + " " + os.path.basename(useFile)
-        baseName = os.path.basename(useFile)
-        title = self.currentTest.name + " (" + baseName + ")"
-        process = self.startViewer(followProgram + " " + useFile, description=description, shellTitle=title)
+        process = self.startViewer(self.getFollowCommand(followProgram, useFile), description=description)
         scriptEngine.monitorProcess("follows progress of test files", process)    
     
 # And a generic import test. Note acts on test suites
@@ -764,14 +767,13 @@ class RecordTest(InteractiveTestAction):
         return False
     def startTextTestProcess(self, test, usecase):
         ttOptions = self.getRunOptions(test, usecase)
-        guilog.info("Starting " + usecase + " run of TextTest with arguments " + ttOptions)
-        commandLine = plugins.textTestName + " " + ttOptions
+        guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
+        cmdArgs = [ plugins.textTestName ] + ttOptions
         writeDir = self.getWriteDir(test)
         plugins.ensureDirectoryExists(writeDir)
         logFile = self.getLogFile(writeDir, usecase, "output")
         errFile = self.getLogFile(writeDir, usecase)
-        commandLine +=  " < " + os.devnull + " > " + logFile + " 2> " + errFile
-        process = self.startExtProgramNewUsecase(commandLine, usecase, \
+        process = self.startExtProgramNewUsecase(cmdArgs, usecase, logFile, errFile, \
                                                  exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase))
     def getLogFile(self, writeDir, usecase, type="errors"):
         return os.path.join(writeDir, usecase + "_" + type + ".log")
@@ -807,12 +809,10 @@ class RecordTest(InteractiveTestAction):
     def getRunOptions(self, test, usecase):
         version = self.optionGroup.getOptionValue("v")
         checkout = self.optionGroup.getOptionValue("c")
-        basicOptions = self.getRunModeOption(usecase) + " -tp " + test.getRelPath() + \
-                       " " + test.app.getRunOptions(version, checkout)
+        basicOptions = [ self.getRunModeOption(usecase), "-tp", test.getRelPath() ] + \
+                       test.app.getRunOptions(version, checkout)
         if usecase == "record":
-            basicOptions += " -record"
-            if self.optionGroup.getSwitchValue("hold"):
-                basicOptions += " -holdshell"
+            basicOptions.append("-record")
         return basicOptions
     def getRunModeOption(self, usecase):
         if usecase == "record" or self.optionGroup.getSwitchValue("repgui"):
@@ -1073,7 +1073,7 @@ class SaveSelection(SelectionAction):
         if actualTests:
             return self.getCmdlineOption()
         else:
-            return " ".join(self.selectionGroup.getCommandLines(useQuotes=False))
+            return " ".join(self.selectionGroup.getCommandLines())
     def performOnCurrent(self):
         toWrite = self.getTextToSave()
         try:
@@ -1147,9 +1147,10 @@ class RunningAction(SelectionAction):
         usecase = self.getUseCaseName()
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
-        commandLine = plugins.textTestName + " " + ttOptions + " < " + os.devnull + " > " + logFile + " 2> " + errFile
+        cmdArgs = [ plugins.textTestName ] + ttOptions
         identifierString = "started at " + plugins.localtime()
-        self.startExtProgramNewUsecase(commandLine, usecase, exitHandler=self.checkTestRun, exitHandlerArgs=(identifierString,errFile,self.currTestSelection), description = description)
+        self.startExtProgramNewUsecase(cmdArgs, usecase, logFile, errFile, exitHandler=self.checkTestRun, \
+                                       exitHandlerArgs=(identifierString,errFile,self.currTestSelection), description = description)
     def writeFilterFile(self, writeDir):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
@@ -1159,13 +1160,13 @@ class RunningAction(SelectionAction):
         writeFile.close()
         return filterFileName
     def getTextTestOptions(self, filterFile, app):
-        ttOptions = [ self.getCmdlineOptionForApps() ]
-        ttOptions += self.invisibleGroup.getCommandLines(useQuotes=True)
+        ttOptions = self.getCmdlineOptionForApps()
+        ttOptions += self.invisibleGroup.getCommandLines()
         for group in self.getOptionGroups():
-            ttOptions += group.getCommandLines(useQuotes=True)
-        ttOptions.append("-f " + filterFile)
-        ttOptions.append("-fd " + self.getTmpFilterDir(app))
-        return " ".join(ttOptions)
+            ttOptions += group.getCommandLines()
+        ttOptions += [ "-f", filterFile ]
+        ttOptions += [ "-fd", self.getTmpFilterDir(app) ]
+        return ttOptions
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
@@ -1173,7 +1174,7 @@ class RunningAction(SelectionAction):
         for test in self.currTestSelection:
             if not test.app.name in apps:
                 apps.append(test.app.name)
-        return "-a " + ",".join(apps)
+        return [ "-a", ",".join(apps) ]
     def checkTestRun(self, identifierString, errFile, testSel):
         if len(self.currTestSelection) == 1 and self.currTestSelection[0] in testSel:
             self.currTestSelection[0].filesChanged()

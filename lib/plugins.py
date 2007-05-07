@@ -1,7 +1,6 @@
 
 import sys, os, log4py, string, shutil, time, re, stat, locale, datetime
 from ndict import seqdict
-from process import Process
 from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
@@ -757,44 +756,6 @@ class TextTrigger:
             return re.sub(self.text, newText, line)
         else:
             return line.replace(self.text, newText)
-
-# Generally useful class to encapsulate a background process, of which TextTest creates
-# a few...
-class BackgroundProcess(Process):
-    def __init__(self, commandLine, description = "", exitHandler=None, exitHandlerArgs=(), shellTitle=None, holdShell=0):
-        Process.__init__(self, None)
-        self.commandLine = commandLine
-        self.description = description
-        if self.description == "":
-            self.description = self.commandLine
-        self.shellTitle = shellTitle
-        self.holdShell = holdShell
-        self.exitHandler = exitHandler
-        self.exitHandlerArgs = exitHandlerArgs
-        self.processHandle = None
-        self.doFork()
-    def __repr__(self):
-        return self.commandLine.split()[0].lstrip()
-    def doFork(self):
-        self.processId, self.processHandle = self.processHandler.spawnProcess(self.commandLine, self.shellTitle, self.holdShell)
-    def waitForStart(self):
-        sys.stdout.flush()
-        while self.processHandle is None:
-            time.sleep(0.1)
-    def runExitHandler(self):
-        if self.exitHandler:
-            self.exitHandler(*self.exitHandlerArgs)
-    def waitForTermination(self):
-        if self.processHandle != None:
-            try:
-                os.waitpid(self.processHandle, 0)
-            except OSError:
-                # if it's not there to wait for, don't throw...
-                pass
-    def hasTerminated(self):
-        if self.processId == None:
-            return 1
-        return self.processHandler.hasTerminated(self.processId, childProcess=1)
     
 class Option:    
     def __init__(self, name, value, description, changeMethod):
@@ -956,21 +917,16 @@ class OptionGroup:
     def setOptionValue(self, key, value):
         if self.options.has_key(key):
             return self.options[key].setValue(value)
-    def getCommandLines(self, useQuotes):
+    def getCommandLines(self):
         commandLines = []
         for key, option in self.options.items():
             if len(option.getValue()):
-                quotedValue = self.getQuotedValue(option.getValue(), useQuotes)
-                commandLines.append("-" + key + " " + quotedValue)
+                commandLines.append("-" + key)
+                commandLines.append(option.getValue())
         for key, switch in self.switches.items():
             if switch.getValue():
                 commandLines.append("-" + key)
         return commandLines
-    def getQuotedValue(self, value, useQuotes):
-        if useQuotes:
-            return '"' + value + '"'
-        else:
-            return value
     def readCommandLineArguments(self, args):
         for arg in args:
             if arg.find("=") != -1:

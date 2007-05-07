@@ -134,6 +134,7 @@ from respond import Responder
 from comparetest import MakeComparisons, TestComparison
 from comparefile import FileComparison
 from performance import getTestPerformance
+from jobprocess import JobProcess
 
 itemNamesConfigKey = "_itemnames_map"
 
@@ -1507,7 +1508,7 @@ class PlotEngine(PlotEngineCommon):
             gnuplotProcess = self.findGnuplotProcess()
             self.gnuplotFile.close()
             if gnuplotProcess:
-                print "Created process : gnuplot window :", gnuplotProcess.processId
+                print "Created process : gnuplot window :", gnuplotProcess.pid
             else:
                 raise plugins.TextTestError, "Failed to create gnuplot process - errors from gnuplot:\n" + open(errsFile).read() 
             return gnuplotProcess
@@ -1529,7 +1530,7 @@ class PlotEngine(PlotEngineCommon):
         self.gnuplotFile.write(line + os.linesep)
         self.diag.info(line + os.linesep)
     def findGnuplotProcess(self):
-        thisProc = plugins.Process(os.getpid())
+        thisProc = JobProcess(os.getpid())
         for attempt in range(10):
             for childProc in thisProc.findChildProcesses():
                 name = childProc.getName()
@@ -1897,9 +1898,8 @@ class StartStudio(guiplugins.InteractiveTestAction):
             studio = os.path.join(os.environ["CARMSYS"], "bin", "studio")
             if not os.path.isfile(studio):
                 raise plugins.TextTestError, "Cannot start studio, no file at " + studio
-            commandLine = "exec " + studio + " -w -p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + \
-                            "\",0)'" + plugins.nullRedirect() 
-            process = self.startViewer(commandLine, description="Studio on " + subPlan)
+            cmdArgs = [ studio, "-w", "-p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'" ]
+            process = self.startViewer(cmdArgs, description="Studio on " + subPlan)
             guiplugins.scriptEngine.monitorProcess("runs studio", process)
         finally:
             self.currentTest.tearDownEnvironment(parents=1)

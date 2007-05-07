@@ -106,7 +106,7 @@ class QueueSystemConfig(default.Config):
         return 1
     def getRunOptions(self, checkout):
         # Options to add by default when recording, auto-replaying or running as slave
-        return "-l " + default.Config.getRunOptions(self, checkout)
+        return [ "-l" ] + default.Config.getRunOptions(self, checkout)
     def slaveRun(self):
         return self.optionMap.has_key("slave")
     def getWriteDirectoryName(self, app):
@@ -430,7 +430,7 @@ class SubmitTest(plugins.Action):
     def getSlaveCommand(self, test):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
-        commandLine = "exec " + plugins.textTestName + " " + test.app.getRunOptions() + " -tp " + test.getRelPath() \
+        commandLine = "exec " + plugins.textTestName + " " + " ".join(test.app.getRunOptions()) + " -tp " + test.getRelPath() \
                       + self.getSlaveArgs(test) + " " + self.runOptions
         return "exec " + self.loginShell + " -c \"" + commandLine + "\""
     def getSlaveArgs(self, test):

@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 
-import sys, string, os, plugins, types
+import sys, string, os, plugins, types, subprocess
+from jobprocess import JobProcess
 from usecase import ScriptEngine
 
 # Interface all responders must fulfil
@@ -92,12 +93,11 @@ class InteractiveResponder(Responder):
             return None, None
         if comparison.newResult():
             tool = test.getCompositeConfigValue("view_program", comparison.stem)
-            cmdLine = tool + " " + comparison.tmpCmpFile + plugins.nullRedirect()
+            cmdArgs = [ tool, comparison.tmpCmpFile ]
         else:
             tool = test.getCompositeConfigValue("diff_program", comparison.stem)
-            cmdLine = tool + " " + comparison.stdCmpFile + " " +\
-                      comparison.tmpCmpFile + plugins.nullRedirect()
-        return tool, cmdLine        
+            cmdArgs = [ tool, comparison.stdCmpFile, comparison.tmpCmpFile ]
+        return tool, cmdArgs        
     def viewTest(self, test):
         outputText = test.state.freeText
         sys.stdout.write(outputText)
@@ -106,11 +106,11 @@ class InteractiveResponder(Responder):
         logFile = test.getConfigValue("log_file")
         logFileComparison, list = test.state.findComparison(logFile)
         if logFileComparison:
-            tool, cmdLine = self.getViewCmdInfo(test, logFileComparison)
+            tool, cmdArgs = self.getViewCmdInfo(test, logFileComparison)
             if tool:
                 if plugins.canExecute(tool):
                     print "<See also " + tool + " window for details of " + logFile + ">"
-                    return plugins.BackgroundProcess(cmdLine)
+                    return subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
                 else:
                     print "<No window created - could not find graphical difference tool '" + tool + "'>"
     def askUser(self, test, allowView, process=None):      
@@ -134,6 +134,5 @@ class InteractiveResponder(Responder):
                 if response.startswith(versionOption):
                     self.save(test, versions[i], exactSave)
         if process:
-            process.killAll()
+            JobProcess(process.pid).killAll()
         return 0
-   

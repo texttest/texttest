@@ -35,6 +35,7 @@ helpOptions = """
 
 import queuesystem, default, performance, os, string, shutil, plugins, respond, time
 from ndict import seqdict
+from jobprocess import JobProcess
 
 # Use cvs plugin for all Carmen suites
 from guiplugins import interactiveActionHandler
@@ -274,14 +275,14 @@ class RunWithParallelAction(plugins.Action):
                 pass
     def findProcessInfo(self, firstpid, test):
         while 1:
-            execProcess, parentProcess = self._findProcessInfo(plugins.Process(firstpid), test)
+            execProcess, parentProcess = self._findProcessInfo(JobProcess(firstpid), test)
             if execProcess:
                 return execProcess, parentProcess
             else:
                 time.sleep(0.1)
     def _findProcessInfo(self, process, test):
         self.diag.info(" Looking for info from process " + repr(process))
-        if process.hasTerminated():
+        if process.poll() is not None:
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
         # Look for the binary process, or a child of it, that is a pure executable not a script
         childProcesses = process.findChildProcesses()
@@ -310,7 +311,7 @@ class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, execProcess, parentProcess):
         self.describe(test, ", profiling process '" + execProcess.getName() + "'")
         test.grabWorkingDirectory()
-        runLine = "/users/lennart/bin/gprofile " + str(execProcess.processId) + " >& gprof.output"
+        runLine = "/users/lennart/bin/gprofile " + str(execProcess.pid) + " >& gprof.output"
         os.system(runLine)
     def handleNoTimeAvailable(self, test):
         raise plugins.TextTestError, "Lprof information not collected, test did not run long enough to connect to it"

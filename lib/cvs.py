@@ -142,8 +142,8 @@ class CVSAction(guiplugins.InteractiveAction):
         if not plugins.canExecute(cvsDiffProgram):
             guidialogs.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
                   "'.\nPlease install it somewhere on your $PATH.\n", dialog.dialog)
-        command = cvsDiffProgram + " " + dialog.plugin.getRevisionOptions() + " " + path + " " + plugins.nullRedirect()
-        process = self.startExternalProgram(command, "Graphical CVS diff for file " + path)
+        cmdArgs = [ cvsDiffProgram, dialog.plugin.getRevisionOptions(), path ]
+        process = self.startExternalProgram(cmdArgs, "Graphical CVS diff for file " + path)
         scriptEngine.monitorProcess("shows CVS differences graphically", process)
     def getCVSRootFlag(self):
         if "CVSROOT" in os.environ and os.path.exists(os.environ["CVSROOT"]):

@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.3 2007/04/04 14:33:37 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.4 2007/05/07 10:12:32 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -195,7 +195,7 @@ class RecordTest(guiplugins.RecordTest):
         basicOptions = guiplugins.RecordTest.getRunOptions(self, test, usecase)
         ruleset = self.optionGroup.getOptionValue("rset")
         if usecase == "record" and ruleset:
-            return "-rulecomp -rset " + ruleset + " " + basicOptions
+            return [ "-rulecomp", "-rset", ruleset ] + basicOptions
         return basicOptions
     # We want to generate a second auto-replay...
     def setTestReady(self, test, usecase=""):
@@ -220,7 +220,7 @@ class ViewInEditor(guiplugins.ViewInEditor):
         viewProgram = os.path.join(carmSys, "bin", "startMacroRecorder")
         if not os.path.isfile(viewProgram):
             raise plugins.TextTestError, "Could not find macro editor at " + viewProgram
-        envStr = "env 'USER=nightjob' 'CARMSYS=" + carmSys + "' 'CARMUSR=" + carmUsr + "' "
-        commandLine = envStr + viewProgram + " " + fileName + plugins.nullRedirect()
-        return commandLine, "macro editor"
+        envArgs = [ "env", "USER=nightjob", "CARMSYS=" + carmSys, "CARMUSR=" + carmUsr ]
+        cmdArgs = envArgs + [ viewProgram + " " + fileName ]
+        return cmdArgs, "macro editor"
     

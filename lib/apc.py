@@ -230,6 +230,8 @@ class ApcConfig(optimization.OptimizationConfig):
         app.setConfigDefault("extract_logs", {})
         app.setConfigDefault("apcinfo", {})
         app.setConfigDefault("quit_ask_for_confirm", -1)
+        app.setConfigDefault("xml_script_file", "bin/APCcreatexml.sh", "")
+        app.setConfigDefault("optinfo_xml_file", "data/apc/feedback/optinfo_html_xsl.xml", "")
         app.addConfigEntry("select_kpi_group", "<control>k", "gui_accelerators")
     def getDefaultCollations(self):
         return { "stacktrace" : "apc_tmp_dir/core*" }
@@ -492,12 +494,12 @@ class CreateHTMLFiles(plugins.Action):
         xmlFile = os.path.join(subplanPath, "optinfo.xml")
         if os.path.isfile(xmlFile):
             carmsys = os.environ["CARMSYS"]
-            scriptFile = os.path.join(carmsys, "bin/APCcreatexml.sh")
+            scriptFile = os.path.join(carmsys, test.app.getConfigValue("xml_script_file"))
             runStatusFiles = os.path.join(subplanPath, "run_status")
             xmlAllFile = os.path.join(subplanPath, "optinfo_all.xml")
             os.system(scriptFile + " " + runStatusFiles + " " + xmlFile + " " + xmlAllFile)
             htmlFile = test.makeTmpFileName("optinfo")
-            xslFile = os.path.join(carmsys, "data/apc/feedback/optinfo_html_xsl.xml")
+            xslFile = os.path.join(carmsys, test.app.getConfigValue("optinfo_xml_file"))
             majorRelease = getMajorReleaseVersion(test.app)
             if majorRelease == "master":
                 xsltprocArchs = [ "i386_linux", "x86_64_linux", "sparc", "sparc_64" ]

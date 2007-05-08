@@ -161,6 +161,8 @@ class MatadorConfig(optimization.OptimizationConfig):
     def printHelpScripts(self):
         optimization.OptimizationConfig.printHelpScripts(self)
         print helpScripts
+    def getDefaultCollations(self):
+        return { "stacktrace" : "APC_FILES/core*" }
     def getDiagnosticSettings(self):
         diagDir = {}
         diagDir["configuration_file_variable"] = "DIAGNOSTICS_FILE"

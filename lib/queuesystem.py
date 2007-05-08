@@ -22,12 +22,11 @@ def queueSystemName(app):
 # Use a non-monitoring runTest, but the rest from unix
 class RunTestInSlave(unixonly.RunTest):
     def runTest(self, test, inChild=0):
-        command = self.getExecuteCommand(test)
+        process = self.getTestProcess(test)
         if not inChild:
             self.describe(test)
-            self.diag.info("Running test with command '" + command + "'")
-            self.changeToRunningState(test, None)
-        os.system(command)
+            self.changeToRunningState(test, process)
+        process.wait()
     def getBriefText(self, execMachines):
         return "RUN (" + string.join(execMachines, ",") + ")"
     def getInterruptActions(self, fetchResults):

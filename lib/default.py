@@ -1,7 +1,6 @@
 #!/usr/local/bin/python
 
-import os, shutil, plugins, respond, rundependent, performance, comparetest, string, sys, batch, re, stat, paths, subprocess
-import glob
+import os, shutil, plugins, respond, rundependent, performance, comparetest, sys, batch, re, stat, paths, subprocess, shlex, operator, glob
 from threading import currentThread
 from knownbugs import CheckForBugs, CheckForCrashes
 from traffic import SetUpTrafficHandlers
@@ -1172,7 +1171,7 @@ class RunTest(plugins.Action):
         execMachines = test.state.executionHosts
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
         briefText = self.getBriefText(execMachines)
-        freeText = "Running on " + string.join(execMachines, ",")
+        freeText = "Running on " + ",".join(execMachines)
         newState = Running(execMachines, process, briefText=briefText, freeText=freeText)
         test.changeState(newState)
     def getBriefText(self, execMachines):
@@ -1190,32 +1189,36 @@ class RunTest(plugins.Action):
                 self.diag.info("Process not complete yet, retrying...")
                 return self.RETRY
 
-        testCommand = self.getExecuteCommand(test)
         self.describe(test)
-        self.diag.info("Running test with command : " + testCommand)
-        process = subprocess.Popen(testCommand, shell=True)
+        process = self.getTestProcess(test)
         if not inChild:
             self.changeToRunningState(test, process)
         return self.RETRY
     def getOptions(self, test):
         optionsFile = test.getFileName("options")
         if optionsFile:
-            return " " + os.path.expandvars(open(optionsFile).read().strip())
+            return os.path.expandvars(open(optionsFile).read().strip())
         else:
             return ""
-    def getExecuteCommand(self, test):
-        testCommand = test.getConfigValue("binary")
+    def getTestProcess(self, test):
+        commandArgs = self.getExecuteCmdArgs(test)
+        self.diag.info("Running test with args : " + repr(commandArgs))
+        return subprocess.Popen(commandArgs, stdin=open(self.getInputFile(test)), \
+                                stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"))
+    def getCmdParts(self, test):
+        args = []
         interpreter = test.getConfigValue("interpreter")
         if interpreter:
-            testCommand = interpreter + " " + testCommand
-        testCommand += self.getOptions(test)
-        testCommand += " < " + self.getInputFile(test)
-        outfile = test.makeTmpFileName("output")
-        testCommand += " > " + outfile
-        errfile = test.makeTmpFileName("errors")
-        return self.getStdErrRedirect(testCommand, errfile)
-    def getStdErrRedirect(self, command, file):
-        return command + " 2> " + file
+            args.append(interpreter)
+        args.append(test.getConfigValue("binary"))
+        args.append(self.getOptions(test))
+        return args
+    def getExecuteCmdArgs(self, test):
+        parts = self.getCmdParts(test)
+        return reduce(operator.add, [ shlex.split(part) for part in parts ])
+    def makeFile(self, test, name):
+        fileName = test.makeTmpFileName(name)
+        return open(fileName, "w")
     def getInputFile(self, test):
         inputFileName = test.getFileName("input")
         if inputFileName:
@@ -1662,13 +1665,13 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
     def makeMemoryLine(self, values, fileStem):
         maxVal = max(values)
         roundedMaxVal = float(int(100*maxVal))/100
-        return "Max " + string.capitalize(fileStem) + "  :      " + str(roundedMaxVal) + " MB"
+        return "Max " + fileStem.capitalize() + "  :      " + str(roundedMaxVal) + " MB"
     def makeTimeLine(self, values, fileStem):
         sum = 0.0
         for value in values:
             sum += value
         roundedSum = float(int(10*sum))/10
-        return "Total " + string.capitalize(fileStem) + "  :      " + str(roundedSum) + " seconds"
+        return "Total " + fileStem.capitalize() + "  :      " + str(roundedSum) + " seconds"
     def findValues(self, logFile, entryFinder):
         values = []
         for line in open(logFile).xreadlines():

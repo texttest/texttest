@@ -14,24 +14,23 @@ class RunTest(default.RunTest):
         if self.realDisplay:
             os.environ["DISPLAY"] = self.realDisplay
         return retValue
-    def getExecuteCommand(self, test):
-        testCommand = default.RunTest.getExecuteCommand(self, test)
-            
+    def getTestProcess(self, test):
         if not self.hasAutomaticCputimeChecking(test.app):
-            return testCommand # Don't bother with this if we aren't measuring CPU time!
-        
-        # put the command in a file to avoid quoting problems,
-        cmdFile = test.makeTmpFileName("cmd", forFramework=1)
-        self.buildCommandFile(test, cmdFile, testCommand)
-        unixPerfFile = test.makeTmpFileName("unixperf", forFramework=1)
-        return '\\time -p sh ' + cmdFile + ' 2> ' + unixPerfFile
-    def buildCommandFile(self, test, cmdFile, testCommand):
-        f = plugins.openForWrite(cmdFile)
-        f.write(testCommand + "\n")
-        self.diag.info("Writing cmdFile at " + cmdFile)
-        self.diag.info("Contains : " + testCommand)
-        f.close()
-        return cmdFile
+            return default.RunTest.getTestProcess(self, test) # Don't bother with this if we aren't measuring CPU time!
+
+        cmdArgs = [ "time", "-p", "sh", "-c", self.getExecuteCommand(test) ]
+        self.diag.info("Running performance-test with args : " + repr(cmdArgs))
+        stderrFile = test.makeTmpFileName("unixperf", forFramework=1)
+        return subprocess.Popen(cmdArgs, stdin=open(os.devnull), \
+                                stdout=open(os.devnull, "w"), stderr=open(stderrFile, "w"))
+    def getExecuteCommand(self, test):
+        cmdParts = self.getCmdParts(test)
+        testCommand = " ".join(cmdParts)
+        testCommand += " < " + self.getInputFile(test)
+        outfile = test.makeTmpFileName("output")
+        testCommand += " > " + outfile
+        errfile = test.makeTmpFileName("errors")
+        return testCommand + " 2> " + errfile
 
 class VirtualDisplayFinder:
     checkedDisplay = None

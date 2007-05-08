@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, types, time, paths, subprocess
+import plugins, os, sys, shutil, types, time, paths, subprocess, shlex
 from jobprocess import JobProcess
 from copy import copy
 from threading import Thread
@@ -518,7 +518,8 @@ class ViewInEditor(FileViewAction):
         process = self.startViewer(cmdArgs, description=description, exitHandler=exitHandler)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getViewCommand(self, fileName, viewProgram):
-        return [ viewProgram, fileName ], viewProgram
+        # viewProgram might have arguments baked into it...
+        return shlex.split(viewProgram) + [ fileName ], viewProgram
     def getFileToView(self, fileName, comparison):
         if comparison:
             return comparison.existingFile(self.useFiltered())
@@ -581,7 +582,8 @@ class ViewFileDifferences(FileViewAction):
         guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
         guilog.info("-- original file : " + stdFile)
         guilog.info("--  current file : " + tmpFile)
-        process = self.startViewer([ diffProgram, stdFile, tmpFile ], description=description)
+        cmdArgs = shlex.split(diffProgram) + [ stdFile, tmpFile ]
+        process = self.startViewer(cmdArgs, description=description)
         scriptEngine.monitorProcess("shows graphical differences in test files", process)
     
 class ViewFilteredFileDifferences(ViewFileDifferences):

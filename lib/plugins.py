@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, time, re, stat, locale, datetime
+import sys, os, log4py, string, shutil, time, re, stat, locale, datetime, subprocess
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
@@ -505,6 +505,23 @@ def canExecute(program):
         if os.path.isfile(fullPath):
             return True
     return False
+
+selfHidden = os.getenv("TEXTTEST_VIRTUAL_DISPLAY") == "HIDE_WINDOWS"
+def getProcessStartUpInfo(testProcess=False):
+    # Used for hiding the windows if we're on Windows!
+    if shouldHideWindows(testProcess):
+        info = subprocess.STARTUPINFO()
+        info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        info.wShowWindow = subprocess.SW_HIDE
+        return info
+
+def shouldHideWindows(testProcess):
+    if os.name != "nt":
+        return False
+    if not testProcess:
+        return selfHidden
+    # Only test windows should be hidden if we aren't hidden ourselves
+    return os.getenv("TEXTTEST_VIRTUAL_DISPLAY") == "HIDE_WINDOWS"
 
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):

@@ -618,16 +618,20 @@ class TestEnvironmentCreator:
     def testCase(self):
         return self.test.classId() == "test-case"
     def setDisplayEnvironment(self):
-        from unixonly import VirtualDisplayFinder
-        finder = VirtualDisplayFinder(self.test.app)
-        display = finder.getDisplay()
-        if display:
-            self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", display)
-            print "Tests will run with DISPLAY variable set to", display
+        if os.name == "posix":
+            from unixonly import VirtualDisplayFinder
+            finder = VirtualDisplayFinder(self.test.app)
+            display = finder.getDisplay()
+            if display:
+                self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", display)
+                print "Tests will run with DISPLAY variable set to", display
+        else:
+            self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", "HIDE_WINDOWS")
     def setVirtualDisplay(self, runsTests):
-        # Set a virtual DISPLAY for the top level test on UNIX, if tests are going to be run
+        # Set a virtual display for the top level test, if tests are going to be run
         # Don't set it if we've requested a slow motion replay or we're trying to record a new usecase.
-        return runsTests and os.name == "posix" and self.topLevel() and \
+        # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
+        return runsTests and self.topLevel() and \
                not self.optionMap.has_key("actrep") and not self.isRecording()
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
@@ -1204,7 +1208,8 @@ class RunTest(plugins.Action):
         commandArgs = self.getExecuteCmdArgs(test)
         self.diag.info("Running test with args : " + repr(commandArgs))
         return subprocess.Popen(commandArgs, stdin=open(self.getInputFile(test)), \
-                                stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"))
+                                stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
+                                startupinfo=plugins.getProcessStartUpInfo(testProcess=True))
     def getCmdParts(self, test):
         args = []
         interpreter = test.getConfigValue("interpreter")

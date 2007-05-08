@@ -110,7 +110,7 @@ class InteractiveResponder(Responder):
             if tool:
                 if plugins.canExecute(tool):
                     print "<See also " + tool + " window for details of " + logFile + ">"
-                    return subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+                    return subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT, startupinfo=plugins.getProcessStartUpInfo())
                 else:
                     print "<No window created - could not find graphical difference tool '" + tool + "'>"
     def askUser(self, test, allowView, process=None):      

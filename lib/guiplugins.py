@@ -192,7 +192,8 @@ class InteractiveAction(plugins.Observable):
             return [ plugins.textTestName ]
     def startExternalProgram(self, cmdArgs, description = "", outfile=os.devnull, errfile=os.devnull, \
                              exitHandler=None, exitHandlerArgs=()):
-        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=open(outfile, "w"), stderr=open(errfile, "w"))
+        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=open(outfile, "w"), stderr=open(errfile, "w"), \
+                                   startupinfo=plugins.getProcessStartUpInfo())
         processTerminationMonitor.addMonitoring(process, description, exitHandler, exitHandlerArgs)
         return process
     def startExtProgramNewUsecase(self, cmdArgs, usecase, outfile, errfile, \

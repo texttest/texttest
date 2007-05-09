@@ -95,7 +95,7 @@ class GenericActionDialog:
         # empty and e.g. pop up an error dialog if that is more suitable ...
         if len(self.dialog.vbox.get_children()) > 2: # Separator and buttonbox are always there ...
             self.dialog.show_all()
-
+        
     def getStockIcon(self, stockItem):
         imageBox = gtk.VBox()
         imageBox.pack_start(gtk.image_new_from_stock(stockItem, gtk.ICON_SIZE_DIALOG), expand=False)
@@ -221,7 +221,6 @@ class SaveSelectionDialog(ActionConfirmationDialog):
     def createButtons(self):
         self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         self.okButton = self.dialog.add_button(gtk.STOCK_SAVE, gtk.RESPONSE_ACCEPT)
-        scriptEngine.registerFileChooser("choose to save in file ", self.fileChooser, self.okButton, self.folders)
         scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
         scriptEngine.connect("press save", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
 
@@ -255,7 +254,9 @@ class SaveSelectionDialog(ActionConfirmationDialog):
         if not self.enableOptions:
             frame.set_sensitive(False)
         self.fileChooser.set_extra_widget(frame)
-
+    def run(self):
+        ActionConfirmationDialog.run(self)
+        scriptEngine.registerFileChooser(self.fileChooser, "enter filter-file name =", "choose folder")
     def respond(self, button, saidOK, *args):
         if saidOK:
             if not self.fileChooser.get_filename():
@@ -304,7 +305,6 @@ class LoadSelectionDialog(ActionConfirmationDialog):
     def createButtons(self):
         self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         self.okButton = self.dialog.add_button("texttest-stock-load", gtk.RESPONSE_ACCEPT)
-        scriptEngine.registerFileChooser("choose to load from file ", self.fileChooser, self.okButton, self.folders)
         scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
         scriptEngine.connect("press load", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
         self.fileChooser.connect("file-activated", self.simulateOKClick)
@@ -336,6 +336,9 @@ class LoadSelectionDialog(ActionConfirmationDialog):
             self.setOptionsAndExit(saidOK)
         else:
             self.doExit(saidOK)
+    def run(self):
+        ActionConfirmationDialog.run(self)
+        scriptEngine.registerFileChooser(self.fileChooser, "select filter-file", "look in folder")
 
     def setOptionsAndExit(self, saidOK):
         self.plugin.fileName = self.fileChooser.get_filename()

@@ -955,7 +955,7 @@ class CollateFiles(plugins.Action):
                 raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' characters are not allowed"
         self.discardFiles = app.getConfigValue("discard_file")
     def expandCollations(self, test, coll):
-        newColl = {}
+        newColl = seqdict()
         # copy items specified without "*" in targetStem
         self.diag.info("coll initial:", str(coll))
         for targetStem, sourcePattern in coll.items():
@@ -970,7 +970,7 @@ class CollateFiles(plugins.Action):
             for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
                 fullStem = os.path.splitext(aFile)[0]
                 newTargetStem = os.path.basename(fullStem).replace(".", "_")
-                if not newTargetStem in newColl:
+                if not newColl.has_key(newTargetStem):
                     sourceExt = os.path.splitext(sourcePattern)[1]
                     self.diag.info("New collation to " + newTargetStem + " : from " + fullStem + " with extension " + sourceExt)
                     newColl[newTargetStem] = fullStem + sourceExt
@@ -1027,6 +1027,7 @@ class CollateFiles(plugins.Action):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
         paths = glob.glob(pattern)
+        paths.sort()
         return filter(os.path.isfile, paths)
     def extract(self, test, sourceFile, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
@@ -1037,7 +1038,19 @@ class CollateFiles(plugins.Action):
         currProc = None
         stdin = None
         for script in scripts:
+            if not plugins.canExecute(script):
+                errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
+                stderr = open(collationErrFile, "w")
+                stderr.write(errorMsg)
+                print "WARNING : " + errorMsg.strip()
+                stderr.close()
+                return
+
             args = script.split()
+            if os.name == "nt": # Windows isn't clever enough to know how to run Python/Java programs without some help...
+                interpreter = plugins.getInterpreter(args[0])
+                if interpreter:
+                    args = [ interpreter ] + args
             if currProc:
                 stdin = currProc.stdout
             else:
@@ -1050,16 +1063,8 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            try:
-                currProc = subprocess.Popen(args, stdin=stdin, stdout=stdout, stderr=stderr)
-            except OSError:
-                errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
-                stderr.write(errorMsg)
-                print "WARNING : " + errorMsg.strip()
-                stdout.close()
-                if os.path.isfile(targetFile):
-                    os.remove(targetFile) # don't create empty files
-
+            currProc = subprocess.Popen(args, stdin=stdin, stdout=stdout, stderr=stderr)
+            
         if currProc:
             currProc.wait()
     

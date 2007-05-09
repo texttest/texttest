@@ -1063,13 +1063,7 @@ class Application:
         # Set values which default to other values
         self.setConfigDefault("interactive_action_module", [ self.getConfigValue("config_module") ],
                               "Module to search for InteractiveActions for the GUI")
-        interDoc = "Program to use as interpreter for the SUT"
-        if binary.endswith(".py"):
-            self.setConfigDefault("interpreter", "python", interDoc)
-        elif binary.endswith(".jar"):
-            self.setConfigDefault("interpreter", "java -jar", interDoc)
-        else:
-            self.setConfigDefault("interpreter", "", interDoc)
+        self.setConfigDefault("interpreter", plugins.getInterpreter(binary), "Program to use as interpreter for the SUT")
     def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]
         optionGroups = []

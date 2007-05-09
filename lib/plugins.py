@@ -478,6 +478,14 @@ def abspath(relpath):
     else:
         return os.path.abspath(relpath)
 
+def getInterpreter(binary):
+    if binary.endswith(".py"):
+        return "python"
+    elif binary.endswith(".jar"):
+        return "java -jar"
+    else:   
+        return ""
+
 def relpath(fullpath, parentdir):
     normFull = os.path.normpath(fullpath)
     relPath = normFull.replace(os.path.normpath(parentdir), "")
@@ -498,7 +506,7 @@ def nullRedirect():
 
 def canExecute(program):
     localName = program.split()[0]
-    if os.name == "nt":
+    if os.name == "nt" and localName.find(".") == -1:
         localName += ".exe"
     for dir in os.environ["PATH"].split(os.pathsep):
         fullPath = os.path.join(dir, localName)

@@ -268,7 +268,7 @@ class SaveSelectionDialog(ActionConfirmationDialog):
                 self.fileChooser.set_current_name("filename_mandatory")
                 return                
             if os.path.exists(self.fileChooser.get_filename()):
-                confirmation = QueryDialog(self.dialog, lambda : self.setOptionsAndExit(saidOK), None, None, "\nThe file \n" + self.fileChooser.get_filename() + "\nalready exists.\n\nDo you want to overwrite it?\n")
+                confirmation = QueryDialog(self.dialog, lambda : self.setOptionsAndExit(saidOK), None, None, "\nThe file \n" + self.fileChooser.get_filename().replace("\\", "/") + "\nalready exists.\n\nDo you want to overwrite it?\n")
                 confirmation.run()
             else:
                 self.setOptionsAndExit(saidOK)

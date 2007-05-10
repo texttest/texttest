@@ -217,11 +217,13 @@ class SaveSelectionDialog(ActionConfirmationDialog):
         ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
         self.dialog.set_modal(True)
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-
+    def folderChanged(self, *args):
+        scriptEngine.applicationEvent("dialog to be displayed")
+        return False
     def createButtons(self):
         self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         self.okButton = self.dialog.add_button(gtk.STOCK_SAVE, gtk.RESPONSE_ACCEPT)
-
+        
     def addContents(self):
         alignment = gtk.Alignment()
         alignment.set(1.0, 1.0, 1.0, 1.0)
@@ -236,6 +238,7 @@ class SaveSelectionDialog(ActionConfirmationDialog):
         for i in xrange(len(self.folders) - 1, -1, -1):
             self.fileChooser.add_shortcut_folder(self.folders[i][1])
         self.fileChooser.set_local_only(True)
+        self.fileChooser.connect_after("current-folder-changed", self.folderChanged)
         vbox.pack_start(self.fileChooser, expand=True, fill=True)
 
         # In the static GUI case, we also want radiobuttons specifying 
@@ -252,11 +255,6 @@ class SaveSelectionDialog(ActionConfirmationDialog):
         if not self.enableOptions:
             frame.set_sensitive(False)
         self.fileChooser.set_extra_widget(frame)
-    def run(self):
-        ActionConfirmationDialog.run(self)
-        scriptEngine.registerSaveFileChooser(self.fileChooser, self.okButton, "enter filter-file name =", "choose folder")
-        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
-        scriptEngine.connect("press save", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
     def respond(self, button, saidOK, *args):
         if saidOK:
             if not self.fileChooser.get_filename():
@@ -273,6 +271,11 @@ class SaveSelectionDialog(ActionConfirmationDialog):
                 self.setOptionsAndExit(saidOK)
         else:
             self.doExit(saidOK)
+    def run(self):
+        ActionConfirmationDialog.run(self)
+        scriptEngine.registerSaveFileChooser(self.fileChooser, self.okButton, "enter filter-file name =", "choose folder")
+        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
+        scriptEngine.connect("press save", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
 
     def setOptionsAndExit(self, saidOK):
         # Transfer file name and options back to plugin
@@ -308,11 +311,14 @@ class LoadSelectionDialog(ActionConfirmationDialog):
         scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
         scriptEngine.connect("press load", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
         self.fileChooser.connect("file-activated", self.simulateOKClick)
-
+        self.fileChooser.connect_after("selection-changed", self.selectionChanged)
         # The OK button is what we monitor in the scriptEngine, so simulate that it is pressed ...
     def simulateOKClick(self, filechooser):
         self.okButton.clicked()
-
+    def selectionChanged(self, *args):
+        if self.fileChooser.get_filename():
+            scriptEngine.applicationEvent("dialog to be displayed")
+        
     def addContents(self):
         alignment = gtk.Alignment()
         alignment.set(1.0, 1.0, 1.0, 1.0)
@@ -336,6 +342,7 @@ class LoadSelectionDialog(ActionConfirmationDialog):
             self.setOptionsAndExit(saidOK)
         else:
             self.doExit(saidOK)
+
     def run(self):
         ActionConfirmationDialog.run(self)
         scriptEngine.registerOpenFileChooser(self.fileChooser, "select filter-file", "look in folder")

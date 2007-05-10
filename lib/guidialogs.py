@@ -221,8 +221,6 @@ class SaveSelectionDialog(ActionConfirmationDialog):
     def createButtons(self):
         self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         self.okButton = self.dialog.add_button(gtk.STOCK_SAVE, gtk.RESPONSE_ACCEPT)
-        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
-        scriptEngine.connect("press save", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
 
     def addContents(self):
         alignment = gtk.Alignment()
@@ -256,7 +254,9 @@ class SaveSelectionDialog(ActionConfirmationDialog):
         self.fileChooser.set_extra_widget(frame)
     def run(self):
         ActionConfirmationDialog.run(self)
-        scriptEngine.registerFileChooser(self.fileChooser, "enter filter-file name =", "choose folder")
+        scriptEngine.registerSaveFileChooser(self.fileChooser, self.okButton, "enter filter-file name =", "choose folder")
+        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
+        scriptEngine.connect("press save", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
     def respond(self, button, saidOK, *args):
         if saidOK:
             if not self.fileChooser.get_filename():
@@ -338,7 +338,7 @@ class LoadSelectionDialog(ActionConfirmationDialog):
             self.doExit(saidOK)
     def run(self):
         ActionConfirmationDialog.run(self)
-        scriptEngine.registerFileChooser(self.fileChooser, "select filter-file", "look in folder")
+        scriptEngine.registerOpenFileChooser(self.fileChooser, "select filter-file", "look in folder")
 
     def setOptionsAndExit(self, saidOK):
         self.plugin.fileName = self.fileChooser.get_filename()

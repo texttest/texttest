@@ -1532,16 +1532,13 @@ class PerformanceFileCreator(plugins.Action):
         performanceMachines = self.machineInfoFinder.findPerformanceMachines(test.app, fileStem)
         self.diag.info("Found performance machines as " + repr(performanceMachines))
         if "any" in performanceMachines:
-            return 1
+            return True
+        
         for host in test.state.executionHosts:
-            realHost = host
-            # Format support e.g. 2*apple for multi-processor machines
-            if host[1] == "*":
-                realHost = host[2:]
-            if not realHost in performanceMachines:
-                self.diag.info("Real host rejected for performance " + realHost)
-                return 0
-        return 1
+            if host not in performanceMachines:
+                self.diag.info("Real host rejected for performance " + host)
+                return False
+        return True
     def __call__(self, test):
         return self.makePerformanceFiles(test)
 

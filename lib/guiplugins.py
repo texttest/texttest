@@ -66,9 +66,12 @@ class ProcessTerminationMonitor:
         newThread = Thread(target=self.monitor, args=(process, exitHandler, exitHandlerArgs))
         newThread.start()
     def monitor(self, process, exitHandler, exitHandlerArgs):
-        process.wait()
-        if exitHandler:
-            exitHandler(*exitHandlerArgs)
+        try:
+            process.wait()
+            if exitHandler:
+                exitHandler(*exitHandlerArgs)
+        except OSError:
+            pass # Can be thrown by wait() sometimes when the process is killed
     def listRunning(self, processesToCheck):
         running = []
         if len(processesToCheck) == 0:

@@ -152,7 +152,7 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
     def findConcreteResources(self):
         resources = self.getBasicResources()
         # architecture resources
-        resources.append("carmarch=\"*" + self.archToUse + "*\"")
+        resources.append("carmarch=*" + self.archToUse + "*")
         majRelResource = self.getMajorReleaseResource()
         if majRelResource:
             resources.append(majRelResource)
@@ -310,8 +310,8 @@ class RunWithParallelAction(plugins.Action):
 class RunLprof(RunWithParallelAction):
     def performParallelAction(self, test, execProcess, parentProcess):
         self.describe(test, ", profiling process '" + execProcess.getName() + "'")
-        test.grabWorkingDirectory()
-        runLine = "/users/lennart/bin/gprofile " + str(execProcess.pid) + " >& gprof.output"
+        outFile = test.makeTmpFileName("gprof.output", forComparison=0)
+        runLine = "/users/lennart/bin/gprofile " + str(execProcess.pid) + " >& " + outFile
         os.system(runLine)
     def handleNoTimeAvailable(self, test):
         raise plugins.TextTestError, "Lprof information not collected, test did not run long enough to connect to it"

@@ -289,7 +289,7 @@ class Config(plugins.Configuration):
         return PrepareWriteDirectory(ignoreCatalogues)
     def getTestRunner(self):
         if os.name == "posix":
-            # Use Xvfb to suppress GUIs, cmd files to prevent shell-quote problems,
+            # Use Xvfb to suppress GUIs
             # UNIX time to collect system performance info.
             from unixonly import RunTest as UNIXRunTest
             return UNIXRunTest(self.hasAutomaticCputimeChecking)
@@ -323,11 +323,10 @@ class Config(plugins.Configuration):
         else:
             return respond.SaveState
     def setEnvironment(self, test):
-        testEnvironmentCreator = TestEnvironmentCreator(test, self.optionMap)
-        testEnvironmentCreator.setUp(self.runsTests())
-    def runsTests(self):
-        return not self.optionMap.has_key("gx") and not self.optionMap.has_key("s") and \
-               not self.isReconnecting()
+        testEnvironmentCreator = self.getEnvironmentCreator(test)
+        testEnvironmentCreator.setUp()
+    def getEnvironmentCreator(self, test):
+        return TestEnvironmentCreator(test, self.optionMap)
     def getTextResponder(self):
         return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes
@@ -607,17 +606,23 @@ class TestEnvironmentCreator:
         self.usecaseFile = self.test.getFileName("usecase")
         self.diagDict = self.test.getConfigValue("diagnostics")
         self.diag = plugins.getDiagnostics("Environment Creator")
-    def setUp(self, runsTests):
-        if self.setVirtualDisplay(runsTests):
-            self.setDisplayEnvironment()
+    def runsTests(self):
+        return not self.optionMap.has_key("gx") and not self.optionMap.has_key("s") and \
+               not self.optionMap.has_key("reconnect")
+    def setUp(self):
+        if self.runsTests():
+            self.doSetUp()
+    def doSetUp(self):
+        self.setDisplayEnvironment()
         self.setDiagEnvironment()
-        if self.testCase():
-            self.setUseCaseEnvironment()
+        self.setUseCaseEnvironment()
     def topLevel(self):
         return self.test.parent is None
     def testCase(self):
         return self.test.classId() == "test-case"
     def setDisplayEnvironment(self):
+        if not self.setVirtualDisplay():
+            return
         if os.name == "posix":
             from unixonly import VirtualDisplayFinder
             finder = VirtualDisplayFinder(self.test.app)
@@ -627,12 +632,11 @@ class TestEnvironmentCreator:
                 print "Tests will run with DISPLAY variable set to", display
         else:
             self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", "HIDE_WINDOWS")
-    def setVirtualDisplay(self, runsTests):
-        # Set a virtual display for the top level test, if tests are going to be run
+    def setVirtualDisplay(self):
+        # Set a virtual display for the top level test
         # Don't set it if we've requested a slow motion replay or we're trying to record a new usecase.
         # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
-        return runsTests and self.topLevel() and \
-               not self.optionMap.has_key("actrep") and not self.isRecording()
+        return self.topLevel() and not self.optionMap.has_key("actrep") and not self.isRecording()
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
             self.setTraceDiagnostics()
@@ -661,6 +665,8 @@ class TestEnvironmentCreator:
         elif entryName:
             self.test.setEnvironment(entryName, entry)
     def setUseCaseEnvironment(self):
+        if not self.testCase():
+            return
         # Here we assume the application uses either PyUseCase or JUseCase
         # PyUseCase reads environment variables, but you can't do that from java,
         # so we have a "properties file" set up as well. Do both always, to save forcing
@@ -713,7 +719,6 @@ class TestEnvironmentCreator:
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeWriteDirectories()
-        test.grabWorkingDirectory()
     def __repr__(self):
         return "Make write directory for"
     def setUpApplication(self, app):
@@ -983,9 +988,8 @@ class CollateFiles(plugins.Action):
         self.diag.info("Found files: " + repr(fileList))
 
         # generate a list of filenames for generated files
-        test.grabWorkingDirectory()
         self.diag.info("Adding files for source pattern " + sourcePattern)
-        sourceFiles = glob.glob(sourcePattern)
+        sourceFiles = glob.glob(test.makeTmpFileName(sourcePattern, forComparison=0))
         self.diag.info("Found files : " + repr(sourceFiles))
         fileList += sourceFiles
         fileList.sort()
@@ -1173,8 +1177,6 @@ class RunTest(plugins.Action):
     def __repr__(self):
         return "Running"
     def __call__(self, test, inChild=0):
-        # Change to the directory so any incidental files can be found easily
-        test.grabWorkingDirectory()
         return self.runTest(test, inChild)
     def changeToRunningState(self, test, process):
         execMachines = test.state.executionHosts
@@ -1212,7 +1214,7 @@ class RunTest(plugins.Action):
     def getTestProcess(self, test):
         commandArgs = self.getExecuteCmdArgs(test)
         self.diag.info("Running test with args : " + repr(commandArgs))
-        return subprocess.Popen(commandArgs, stdin=open(self.getInputFile(test)), \
+        return subprocess.Popen(commandArgs, stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
                                 stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
                                 startupinfo=plugins.getProcessStartUpInfo(testProcess=True))
     def getCmdParts(self, test):

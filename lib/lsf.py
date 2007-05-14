@@ -1,29 +1,28 @@
 
-import os, string
+import os
 
 # Used by the master to submit, monitor and delete jobs...
 class QueueSystem:
-    def getSubmitCommand(self, submissionRules):
-        bsubArgs = "-J " + submissionRules.getJobName()
+    def getSubmitCmdArgs(self, submissionRules):
+        bsubArgs = [ "bsub", "-J", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != "1":
-            bsubArgs += " -n " + submissionRules.processesNeeded
+            bsubArgs += [ "-n", submissionRules.processesNeeded ]
         queue = submissionRules.findQueue()
         if queue:
-            bsubArgs += " -q " + queue
+            bsubArgs += [ "-q", queue ]
         resource = self.getResourceArg(submissionRules)
         if len(resource):
-            bsubArgs += " -R \"" + resource + "\""
+            bsubArgs += [ "-R", resource ]
         machines = submissionRules.findMachineList()
         if len(machines):
-            bsubArgs += " -m '" + string.join(machines, " ") + "'"
+            bsubArgs += [ "-m", " ".join(machines) ]
         outputFile, errorsFile = submissionRules.getJobFiles()
-        bsubArgs += " -u nobody -o " + outputFile + " -e " + errorsFile
-        return "bsub " + bsubArgs
+        bsubArgs += [ "-u", "nobody", "-o", outputFile, "-e", errorsFile ]
+        return bsubArgs
     def findSubmitError(self, stderr):
-        for errorMessage in stderr.readlines():
+        for errorMessage in stderr.splitlines():
             if self.isRealError(errorMessage):
                 return errorMessage
-        return ""
     def isRealError(self, errorMessage):
         if not errorMessage:
             return 0
@@ -45,7 +44,7 @@ class QueueSystem:
         word = line.split()[1]
         return word[1:-1]
     def findJobId(self, stdout):
-        for line in stdout.readlines():
+        for line in stdout.splitlines():
             if line.find("is submitted") != -1:
                 return self.getJobId(line)
             else:
@@ -64,9 +63,9 @@ class QueueSystem:
             else:
                 selectResources.append(resource)
         if len(selectResources) == 0:
-            return string.join(others)
+            return " ".join(others)
         else:
-            return self.getSelectResourceArg(selectResources) + " " + string.join(others)
+            return self.getSelectResourceArg(selectResources) + " " + " ".join(others)
     def getSelectResourceArg(self, resourceList):
         if len(resourceList) == 1:
             return self.formatResource(resourceList[0])

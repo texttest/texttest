@@ -1,14 +1,9 @@
 
-import sys, os, guiplugins, guidialogs, gobject, datetime, time
+import sys, os, guiplugins, guidialogs, gobject, datetime, time, subprocess
 import default, texttestgui, gtk, plugins, custom_widgets
 
 from guidialogs import guilog, scriptEngine
 from gtkusecase import TreeModelIndexer
-
-# First make sure that CVSROOT is set ...
-if "CVSROOT" in os.environ and not os.path.exists(os.environ["CVSROOT"]):
-    plugins.printWarning("The CVSROOT '" + os.environ["CVSROOT"] +
-                         "' specified by the CVSROOT environment variable does not exist.\nThe CVS commands will extract CVSROOT from the application directory instead.")
 
 #
 # Todo/improvements:
@@ -63,15 +58,26 @@ if "CVSROOT" in os.environ and not os.path.exists(os.environ["CVSROOT"]):
 # Base class for all CVS actions.
 #
 class CVSAction(guiplugins.InteractiveAction):
-    def __init__(self, cvsCommand, dynamic=False):
+    def __init__(self, cvsArgs, dynamic=False):
         guiplugins.InteractiveAction.__init__(self)
         self.currTestSelection = []
         self.currFileSelection = []
-        self.cvsCommand = cvsCommand
+        self.cvsArgs = cvsArgs
         self.recursive = False
         self.dynamic = dynamic
-    def getCVSCommand(self):
-        return "cvs " + self.getCVSRootFlag() + self.cvsCommand
+        self.diag = plugins.getDiagnostics("CVS actions")
+    def getCVSCmdArgs(self):
+        return [ "cvs", "-d", self.getCVSRoot() ] + self.cvsArgs
+    def runCommand(self, args):
+        try:
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        except OSError:
+            try:
+                # purely for testing on Windows...
+                process = subprocess.Popen([ "python" ] + args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            except OSError:
+                raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
+        return process.stdout.readlines()
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests
     def notifyNewFileSelection(self, files):
@@ -142,27 +148,26 @@ class CVSAction(guiplugins.InteractiveAction):
         if not plugins.canExecute(cvsDiffProgram):
             guidialogs.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
                   "'.\nPlease install it somewhere on your $PATH.\n", dialog.dialog)
-        cmdArgs = [ cvsDiffProgram, dialog.plugin.getRevisionOptions(), path ]
+        cmdArgs = [ cvsDiffProgram ] + dialog.plugin.getRevisionOptions() + [ path ]
         process = self.startExternalProgram(cmdArgs, "Graphical CVS diff for file " + path)
         scriptEngine.monitorProcess("shows CVS differences graphically", process)
-    def getCVSRootFlag(self):
-        if "CVSROOT" in os.environ and os.path.exists(os.environ["CVSROOT"]):
-            return "-d " + os.environ["CVSROOT"].rstrip(os.sep) + " " # No -d flag necessary, but for testing purposes we'll keep it
+    def getCVSRoot(self):
+        cvsRoot = os.getenv("CVSROOT")
+        if cvsRoot:
+            return cvsRoot.rstrip(os.sep) # Don't strictly need this, but for testing purposes we'll keep it
         else:
-            try:
-                rootFile = open(os.path.join(self.getApplicationPath(), os.path.join("CVS", "Root")))
-                return "-d " + rootFile.read().strip(" \n\t").rstrip(os.sep) + " "
-            except Exception, e:
-                raise plugins.TextTestError, "Failed to obtain CVSROOT from application directory:\n" + str(e)
-    def getCVSRepository(self, appDir):
+            return self.getCVSFileContents("Root")
+    def getCVSFileContents(self, name):
+        fullPath = os.path.join(self.getApplicationPath(), "CVS", name)
+        if not os.path.isfile(fullPath):
+            raise plugins.TextTestError, "No CVS file found at " + fullPath    
+
+        info = open(fullPath).read()  
+        return info.strip().rstrip(os.sep)
+            
+    def getCVSRepository(self):
         # Join the dir/CVS/Root and dir/CVS/Repository files.
-        try:
-            rootFile = open(os.path.join(appDir, os.path.join("CVS", "Root")))
-            repFile = open(os.path.join(appDir, os.path.join("CVS", "Repository")))
-            return os.path.dirname(os.path.join(rootFile.read().strip(" \n\t"),
-                                                repFile.read().strip(" \n\t")).rstrip(os.sep))
-        except:
-            return ""
+        return os.path.join(self.getCVSRoot(), self.getCVSFileContents("Repository"))
     def getApplicationPath(self):
         return self.currTestSelection[0].app.getDirectory()
     def getRootPath(self):
@@ -228,7 +233,7 @@ class CVSAction(guiplugins.InteractiveAction):
 
 class CVSLog(CVSAction):
     def __init__(self, dynamic=False):
-        CVSAction.__init__(self, "log -N -l", dynamic)
+        CVSAction.__init__(self, [ "log", "-N", "-l" ], dynamic)
     def _getTitle(self):
         return "_Log"
     def _getScriptTitle(self):
@@ -242,9 +247,9 @@ class CVSLog(CVSAction):
             return gtk.STOCK_DIALOG_WARNING
     def getResultDialogMessage(self):
         if self.notInRepository:
-            message = "Showing logs for the CVS controlled files.\nSome directories were not under CVS control.\nCVS log command used: " + self.getCVSCommand()
+            message = "Showing logs for the CVS controlled files.\nSome directories were not under CVS control.\nCVS log command used: " + " ".join(self.getCVSCmdArgs())
         else:
-            message = "Showing logs for the CVS controlled files.\nCVS log command used: " + self.getCVSCommand()
+            message = "Showing logs for the CVS controlled files.\nCVS log command used: " + " ".join(self.getCVSCmdArgs())
         if not self.recursive:
             message += "\nSubdirectories were ignored, use CVS Log Recursive to see logs for all subdirectories."            
         return message
@@ -264,9 +269,9 @@ class CVSLog(CVSAction):
             fileArg = " ".join(self.getFilesForCVS(test, ignorePresence))
             self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            command = self.getCVSCommand() + " " + fileArg
-            stdin, stdouterr = os.popen4(command)
-            self.parseOutput(stdouterr.readlines(), rootDir, test)
+            args = self.getCVSCmdArgs()
+            args.append(fileArg)
+            self.parseOutput(self.runCommand(args), rootDir, test)
         
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with
@@ -313,7 +318,7 @@ class CVSLog(CVSAction):
 class CVSLogRecursive(CVSLog):
     def __init__(self, dynamic=False):
         CVSLog.__init__(self, dynamic)
-        self.cvsCommand = "log -N"
+        self.cvsArgs = [ "log", "-N" ]
         self.recursive = True
     def _getTitle(self):
         return "Log Recursive"
@@ -323,7 +328,7 @@ class CVSLogRecursive(CVSLog):
 class CVSLogLatest(CVSLog):
     def __init__(self, dynamic=False):
         CVSLog.__init__(self, dynamic)
-        self.cvsCommand = "log -N -l -rHEAD"
+        self.cvsArgs = [ "log", "-N", "-l", "-rHEAD" ]
     def _getTitle(self):
         return "Log Latest"
     def _getScriptTitle(self):
@@ -331,7 +336,7 @@ class CVSLogLatest(CVSLog):
     def getResultDialogType(self):
         return "CVSNotebookDialog"
     def getResultDialogMessage(self):
-        message = "Showing latest log entries for the CVS controlled files.\nCVS log command used: " + self.cvsCommand
+        message = "Showing latest log entries for the CVS controlled files.\nCVS log command used: " + " ".join(self.cvsArgs)
         if not self.recursive:
             message += "\nSubdirectories were ignored."            
         return message
@@ -345,9 +350,9 @@ class CVSLogLatest(CVSLog):
             fileArg = " ".join(self.getFilesForCVS(test))
             self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            command = self.getCVSCommand() + " " + fileArg
-            stdin, stdouterr = os.popen4(command)
-            self.parseOutput(stdouterr.readlines(), rootDir, test)
+            cmdArgs = self.getCVSCmdArgs()
+            cmdArgs.append(fileArg)
+            self.parseOutput(self.runCommand(cmdArgs), rootDir, test)
     def parseOutput(self, outputLines, rootDir, test):
         # Each file has something like:
         #
@@ -380,7 +385,7 @@ class CVSLogLatest(CVSLog):
 
 class CVSDiff(CVSAction):
     def __init__(self, rev1 = "", rev2 = "", dynamic=False):
-        CVSAction.__init__(self, "diff -N -l", dynamic)
+        CVSAction.__init__(self, [ "diff", "-N", "-l" ], dynamic)
         self.recursive = False
         self.revision1 = rev1
         self.revision2 = rev2
@@ -399,11 +404,11 @@ class CVSDiff(CVSAction):
         else:
             return gtk.STOCK_DIALOG_WARNING
     def getRevisionOptions(self):
-        options = ""
+        options = []
         if self.revision1:
-            options += " -r " + self.revision1
+            options += [ "-r", self.revision1 ]
         if self.revision2:
-            options += " -r " + self.revision2
+            options += [ "-r", self.revision2 ]
         return options
     def getRevisionMessage(self):
         if self.revision1 == "" and self.revision2 == "":
@@ -417,9 +422,9 @@ class CVSDiff(CVSAction):
     def getResultDialogMessage(self):
         if len(self.pages) > 0:
             if self.notInRepository:
-                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nSome directories were not under CVS control.\nCVS command used: " + self.getCVSCommand() + self.getRevisionOptions()
+                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nSome directories were not under CVS control.\nCVS command used: " + " ".join(self.getCVSCmdArgs() + self.getRevisionOptions())
             else:
-                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nCVS command used: " + self.getCVSCommand() + self.getRevisionOptions()
+                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nCVS command used: " + " ".join(self.getCVSCmdArgs() + self.getRevisionOptions())
         else:
             message = "All CVS controlled files are up-to-date and unmodified compared to the latest repository version."
         if not self.recursive:
@@ -437,10 +442,9 @@ class CVSDiff(CVSAction):
             fileArg = " ".join(self.getFilesForCVS(test))
             self.notify("Status", "Diffing " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            command = self.getCVSCommand() + self.getRevisionOptions() + " " + fileArg
-            stdin, stdouterr = os.popen4(command)            
-            lines = stdouterr.readlines()
-            self.parseOutput(lines, rootDir, test)
+            args = self.getCVSCmdArgs() + self.getRevisionOptions()
+            args.append(fileArg)
+            self.parseOutput(self.runCommand(args), rootDir, test)
 
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with
@@ -482,7 +486,7 @@ class CVSDiff(CVSAction):
 class CVSDiffRecursive(CVSDiff):
     def __init__(self, dynamic=False):
         CVSDiff.__init__(self, "", "", dynamic)
-        self.cvsCommand = "diff -N"
+        self.cvsArgs = [ "diff", "-N" ]
         self.recursive = True
     def _getTitle(self):
         return "Difference Recursive"
@@ -496,7 +500,7 @@ class CVSStatus(CVSAction):
     cvsErrorStates = [ "File had conflicts on merge", "Needs Checkout", "Unresolved Conflicts", "Needs Patch",
                        "Needs Merge", "Entry Invalid", "Unknown", "PROHIBITED" ]
     def __init__(self, dynamic=False):
-        CVSAction.__init__(self, "status -l", dynamic)
+        CVSAction.__init__(self, [ "status", "-l" ], dynamic)
     def _getTitle(self):
         return "_Status"
     def _getScriptTitle(self):
@@ -515,7 +519,7 @@ class CVSStatus(CVSAction):
             message = "CVS status found files which are not up-to-date or which have conflicts, or\ndirectories which are not under CVS control."
         else:
             message = "CVS status shown below."
-        message += "\nCVS command used: " + self.getCVSCommand()
+        message += "\nCVS command used: " + " ".join(self.getCVSCmdArgs())
         if not self.recursive:
             message += "\nSubdirectories were ignored, use CVS Status Recursive to get the status for all subdirectories."
         return message
@@ -527,15 +531,15 @@ class CVSStatus(CVSAction):
         self.needsAttention = False
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
-            cvsRepository = self.getCVSRepository(self.getApplicationPath())
+            cvsRepository = self.getCVSRepository()
+            self.diag.info("Found CVS repository as " + cvsRepository)
         for test in self.currTestSelection:
             fileArg = " ".join(self.getFilesForCVS(test))
             self.notify("Status", "Getting status for " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            cvsCommand = self.getCVSCommand() + " " + fileArg
-            stdin, stdouterr = os.popen4(cvsCommand)
-            outputLines = stdouterr.readlines()
-            self.parseOutput(outputLines, rootDir, cvsRepository, test)
+            cvsArgs = self.getCVSCmdArgs()
+            cvsArgs.append(fileArg)
+            self.parseOutput(self.runCommand(cvsArgs), rootDir, cvsRepository, test)
     def parseOutput(self, outputLines, rootDir, cvsRepository, test):
         # The section for each dir starts with
         # cvs status: Examining <dir>
@@ -562,9 +566,11 @@ class CVSStatus(CVSAction):
             # unfortunately cvs status doesn't output the proper filename ...
             if line.find("Repository revision:") != -1:
                 if line.find("No revision control file") == -1:
+                    
                     currentFile = line.strip(" \n\t").replace(",v", "").replace(cvsRepository, "###")
-                    currentFile = currentFile[currentFile.find("###"):].replace("###", "")                
-                    currentFile = os.path.join(rootDir, currentFile)
+                    currentFile = currentFile[currentFile.find("###"):].replace("###/", "")
+                    currentFile = os.path.join(self.getApplicationPath(), currentFile)
+                    self.diag.info("Found file as " + currentFile)
                 else:
                     currentFile = ""
             if line.find("there is no version here; do ") != -1:
@@ -591,7 +597,7 @@ class CVSStatus(CVSAction):
 class CVSStatusRecursive(CVSStatus):
     def __init__(self, dynamic=False):
         CVSStatus.__init__(self, dynamic)
-        self.cvsCommand = "status"
+        self.cvsArgs = [ "status" ]
         self.recursive = True
     def _getTitle(self):
         return "Status Recursive"
@@ -601,7 +607,7 @@ class CVSStatusRecursive(CVSStatus):
 
 class CVSAnnotate(CVSAction):
     def __init__(self, dynamic=False):
-        CVSAction.__init__(self, "annotate -l", dynamic)
+        CVSAction.__init__(self, [ "annotate", "-l" ], dynamic)
     def _getTitle(self):
         return "A_nnotate"
     def _getScriptTitle(self):
@@ -615,7 +621,7 @@ class CVSAnnotate(CVSAction):
         message = "CVS annotations shown below."
         if self.notInRepository:
             message += "\nSome directories were not under CVS control."
-        message += "\nCVS command used: " + self.getCVSCommand()
+        message += "\nCVS command used: " + " ".join(self.getCVSCmdArgs())
         if not self.recursive:
             message += "\nSubdirectories were ignored, use CVS Annotate Recursive to get the annotations for all subdirectories."
         return message
@@ -629,12 +635,11 @@ class CVSAnnotate(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            fileArg = " ".join(self.getFilesForCVS(test))
+            fileArgs = self.getFilesForCVS(test)
             self.notify("Status", "Getting annotations of " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            command = self.getCVSCommand() + " " + fileArg
-            stdin, stdouterr = os.popen4(command)
-            self.parseOutput(stdouterr.readlines(), rootDir, test)            
+            args = self.getCVSCmdArgs() + fileArgs
+            self.parseOutput(self.runCommand(args), rootDir, test)            
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with
         # Annotations for <file>
@@ -667,84 +672,12 @@ class CVSAnnotate(CVSAction):
 class CVSAnnotateRecursive(CVSAnnotate):
     def __init__(self, dynamic=False):
         CVSAnnotate.__init__(self, dynamic)
-        self.cvsCommand = "annotate"
+        self.cvsArgs = [ "annotate" ]
         self.recursive = True
     def _getTitle(self):
         return "Annotate Recursive"
     def _getScriptTitle(self):
         return "recursive " + CVSAnnotate._getScriptTitle(self)
-
-
-#
-# 2 - Then the methods which update from repository.
-#
-
-    
-class CVSUpdate(CVSAction):
-    def __init__(self, dynamic=False):
-        CVSAction.__init__(self, "-qn up -l", dynamic)
-    def _getTitle(self):
-        return "_Update (non-modifying)"
-    def _getScriptTitle(self):
-        return "cvs update  (non-modifying)  for the selected files"
-    def getResultDialogIconType(self):
-        if self.hasConflicts:            
-            return gtk.STOCK_DIALOG_WARNING
-        else:
-            return gtk.STOCK_DIALOG_INFO        
-    def getResultDialogMessage(self):
-        if len(self.pages) > 0:
-            if self.hasConflicts:
-                message = "CVS update encountered conflicts, details shown below."
-            else:
-                message = "Non-modifying CVS update output shown below."
-        else:
-            message = "All files are up-to-date."
-        message += "\nCVS command used: " + self.getCVSCommand()
-        if not self.recursive:
-            message += "\nSubdirectories were ignored, use CVS Update Recursive to update all subdirectories."
-        if len(self.pages) > 0:
-            message += "\n\nOBSERVE: No files have actually been updated!\n"
-        return message
-    def getResultDialogTwoColumnsInTreeView(self):
-        return self.hasConflicts
-    def performOnCurrent(self):
-        self.pages = []
-        self.hasConflicts = False
-        if len(self.currTestSelection) > 0:
-            rootDir = self.getRootPath()
-        for test in self.currTestSelection:
-            self.performOnSingle(test, rootDir)
-    def performOnSingle(self, test, rootDir):
-        dir = test.getDirectory()                
-        self.notify("Status", "Updating " + self.getRelativePath(dir, rootDir))
-        self.notify("ActionProgress", "")
-        cvsCommand = self.getCVSCommand() + " " + dir
-        stdin, stdouterr = os.popen4(cvsCommand)
-        outputLines = stdouterr.readlines()
-        # Making paths relative to rootDir makes output much more readable ...
-        # (And we have a lot less data to parse here than e.g. when logging)
-        outputLines = map(lambda l: l.replace(rootDir, "").replace(" " + os.sep, " "), outputLines)
-        info = ""
-        for line in outputLines:
-            # Dirs not under CVS control gives no output for cvs up, unfortunately
-            if line.startswith("C "):
-                self.hasConflicts = True
-                info = "Conflicts"
-                break
-            prevLine = line
-        if len(outputLines) > 0:
-            self.pages.append((self.getRelativePath(dir, rootDir), "".join(outputLines), info))
-
-class CVSUpdateRecursive(CVSUpdate):
-    def __init__(self, dynamic=False):
-        CVSUpdate.__init__(self, dynamic)
-        self.cvsCommand = "-qn up"
-        self.recursive = True
-    def _getTitle(self):
-        return "Update Recursive (non-modifying)"
-    def _getScriptTitle(self):
-        return "recursive " + CVSUpdate._getScriptTitle(self)
 
 class DynamicCVSLog(CVSLog):
     def __init__(self):
@@ -801,8 +734,6 @@ guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSStatus)
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSStatusRecursive)
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSAnnotate)
 guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSAnnotateRecursive)
-#guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSUpdate)
-#guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSUpdateRecursive)
 
 #
 # Add appropriate actions also to dynamic action list.

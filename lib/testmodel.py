@@ -502,8 +502,6 @@ class TestCase(Test):
             fullPath = os.path.join(self.writeDirectory, file)
             paths += self.listFiles(fullPath, file)
         return paths
-    def grabWorkingDirectory(self):
-        os.chdir(self.writeDirectory)
     def loadState(self, file):
         loaded, state = self.getNewState(file)
         self.changeState(state)

@@ -366,6 +366,7 @@ class RunApcTestInDebugger(default.RunTest):
         if self.process:
             JobProcess(self.process.pid).killAll()
     def __call__(self, test):
+        os.chdir(test.getDirectory()) # for backwards compatibility with when this was done by default...
         self.describe(test)
         # Get the options that are sent to APCbatch.sh
         opts = test.getWordsInFile("options")

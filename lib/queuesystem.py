@@ -1,11 +1,11 @@
 #!/usr/local/bin/python
 
-import os, string, sys, default, unixonly, performance, plugins, socket, time
+import os, string, sys, default, unixonly, performance, plugins, socket, time, subprocess, shlex
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
 from time import sleep
-from copy import copy, deepcopy
+from copy import copy
 from cPickle import dumps
 from respond import Responder, TextDisplayResponder
 from traffic_cmd import sendServerState
@@ -142,6 +142,11 @@ class QueueSystemConfig(default.Config):
             return self.getSlaveResponderClasses()
         else:
             return default.Config.getResponderClasses(self, allApps)
+    def getEnvironmentCreator(self, test):
+        if self.useQueueSystem():
+            return TestEnvironmentCreator(test, self.optionMap)
+        else:
+            return default.Config.getEnvironmentCreator(self, test)
     def getTextDisplayResponderClass(self):
         if self.useQueueSystem():
             return MasterTextResponder
@@ -152,8 +157,6 @@ class QueueSystemConfig(default.Config):
             return RunTestInSlave(self.hasAutomaticCputimeChecking)
         else:
             return default.Config.getTestRunner(self)
-    def runsTests(self):
-        return default.Config.runsTests(self) and not self.slaveRun()
     def showExecHostsInFailures(self):
         # Always show execution hosts, many different ones are used
         return 1
@@ -178,7 +181,7 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("min_time_for_performance_force", -1, "Minimum CPU time for test to always run on performance machines")
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
-        app.setConfigDefault("parallel_environment_name", "'*'", "(SGE) Which SGE parallel environment to use when SUT is parallel")
+        app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
         app.setConfigDefault("login_shell", self.defaultLoginShell(), \
                              "Which shell to use when starting remote processes")
 
@@ -189,7 +192,7 @@ class SubmissionRules:
         self.envResource = self.getEnvironmentResource()
         self.processesNeeded = self.getProcessesNeeded()
     def getEnvironmentResource(self):
-        return os.getenv("QUEUE_SYSTEM_RESOURCE", "")
+        return os.path.expandvars(os.getenv("QUEUE_SYSTEM_RESOURCE", ""))
     def getProcessesNeeded(self):
         return os.getenv("QUEUE_SYSTEM_PROCESSES", "1")
     def getJobName(self):
@@ -331,33 +334,29 @@ class QueueSystemServer:
         self.updateThread.start()
     def getServerAddress(self):
         return self.socketServer.getAddress()
-    def getEnvString(self, envDict):
-        envStr = "env "
-        for key, value in envDict.items():
-            envStr += "'" + key + "=" + value + "' "
-        return envStr
-    def submitJob(self, test, submissionRules, command, slaveEnv):
+    def submitJob(self, test, submissionRules, command):
         self.socketServer.testSubmitted(test)
         self.submitDiag.info("Creating job at " + plugins.localtime())
         queueSystem = self.getQueueSystem(test)
         extraArgs = os.getenv("QUEUE_SYSTEM_SUBMIT_ARGS")
-        submitCommand = queueSystem.getSubmitCommand(submissionRules)
+        cmdArgs = queueSystem.getSubmitCmdArgs(submissionRules)
         if extraArgs:
-            submitCommand += " " + extraArgs
-        fullCommand = self.getEnvString(slaveEnv) + submitCommand + " '" + command + "'"
+            cmdArgs += shlex.split(extraArgs)
+        cmdArgs.append(command)
         jobName = submissionRules.getJobName()
-        self.submitDiag.info("Creating job " + jobName + " with command : " + fullCommand)
-        # Change directory to the appropriate test dir
-        submissionRules.test.grabWorkingDirectory()
-        stdin, stdout, stderr = os.popen3(fullCommand)
-        errorMessage = plugins.retryOnInterrupt(queueSystem.findSubmitError, stderr)
-        if errorMessage:
-            self.submitDiag.info("Job not created : " + errorMessage)
-            qname = queueSystemName(test.app)
-            fullError = "Failed to submit to " + qname + " (" + errorMessage.strip() + ")\n" + \
-                        "Submission command was '" + submitCommand + " ... '\n"
-            raise plugins.TextTestError, fullError
-
+        self.submitDiag.info("Creating job " + jobName + " with command arguments : " + repr(cmdArgs))
+        process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   cwd=test.getDirectory(temporary=1))
+        stdout, stderr = process.communicate()
+        if len(stderr) > 0:
+            errorMessage = queueSystem.findSubmitError(stderr)
+            if errorMessage:
+                self.submitDiag.info("Job not created : " + errorMessage)
+                qname = queueSystemName(test.app)
+                fullError = "Failed to submit to " + qname + " (" + errorMessage.strip() + ")\n" + \
+                            "Submission command was '" + " ".join(cmdArgs[:-1]) + " ... '\n"
+                raise plugins.TextTestError, fullError
+        
         jobId = queueSystem.findJobId(stdout)
         self.submitDiag.info("Job created with id " + jobId)
         self.jobs[test] = jobId, jobName
@@ -399,13 +398,6 @@ class SubmitTest(plugins.Action):
         self.slaveSwitches = slaveSwitches
         self.runOptions = ""
         self.diag = plugins.getDiagnostics("Queue System Submit")
-        self.slaveEnv = {}
-        self.setUpScriptEngine()
-    def setUpScriptEngine(self):
-        # For self-testing: make sure the slave doesn't read the master use cases.
-        variables = [ "USECASE_RECORD_STDIN", "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]
-        for var in variables:
-            self.slaveEnv[var] = ""
     def slaveType(self):
         return "slave"
     def __repr__(self):
@@ -417,7 +409,7 @@ class SubmitTest(plugins.Action):
         self.describe(test, self.getPostText(test, submissionRules))
 
         self.diag.info("Submitting job : " + command)
-        QueueSystemServer.instance.submitJob(test, submissionRules, command, self.slaveEnv)
+        QueueSystemServer.instance.submitJob(test, submissionRules, command)
         if not test.state.hasStarted():
             self.setPending(test)
         return self.WAIT
@@ -584,7 +576,22 @@ class WaitForKill(plugins.Action):
             self.testsWaitingForKill[test] = 0
         self.testsWaitingForKill[test] += 1
         return self.testsWaitingForKill[test]    
-            
+
+# Only used when actually running master + slave
+class TestEnvironmentCreator(default.TestEnvironmentCreator):
+    def doSetUp(self):
+        if self.optionMap.has_key("slave"):
+            self.setDiagEnvironment()
+            self.setUseCaseEnvironment()
+        else:
+            self.setDisplayEnvironment()
+            self.clearUseCaseEnvironment() # don't have the slave using these
+    def clearUseCaseEnvironment(self):
+        if self.testCase() and os.environ.has_key("USECASE_REPLAY_SCRIPT"):
+            # If we're in the master, make sure we clear the scripts so the slave doesn't use them too...
+            self.test.setEnvironment("USECASE_REPLAY_SCRIPT", "")
+            self.test.setEnvironment("USECASE_RECORD_SCRIPT", "")
+        
 class MachineInfoFinder(default.MachineInfoFinder):
     def __init__(self):
         self.queueMachineInfo = None

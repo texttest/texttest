@@ -5,35 +5,31 @@ from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem:
-    def getSubmitCommand(self, submissionRules):
-        qsubArgs = "-N " + submissionRules.getJobName()
+    def getSubmitCmdArgs(self, submissionRules):
+        qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != "1":
-            qsubArgs += " -pe " + submissionRules.getParallelEnvironment() + " " + \
-                        submissionRules.processesNeeded
+            qsubArgs += [ "-pe", submissionRules.getParallelEnvironment(), \
+                          submissionRules.processesNeeded ]
         queue = submissionRules.findQueue()
         if queue:
-            qsubArgs += " -q " + queue
+            qsubArgs += [ "-q", queue ]
         priority = submissionRules.findPriority()
         if priority:
-            qsubArgs += " -p " + str(priority)
+            qsubArgs += [ "-p", str(priority) ]
         resource = self.getResourceArg(submissionRules)
         if len(resource):
-            qsubArgs += " -l " + resource
+            qsubArgs += [ "-l", resource ]
         outputFile, errorsFile = submissionRules.getJobFiles()
-        qsubArgs += " -w e -notify -m n -cwd -b y -V -o " + outputFile + " -e " + errorsFile
-        return "qsub " + qsubArgs
+        qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y", "-V", "-o", outputFile, "-e", errorsFile ]
+        return qsubArgs
     def getResourceArg(self, submissionRules):
         resourceList = submissionRules.findResourceList()
         machines = submissionRules.findMachineList()
         if len(machines):
-            resourceList.append("hostname='" + string.join(machines, "|") + "'")
-        return string.join(resourceList, ",")
+            resourceList.append("hostname=" + "|".join(machines))
+        return ",".join(resourceList)
     def findSubmitError(self, stderr):
-        errLines = stderr.readlines()
-        if len(errLines):
-            return errLines[0].strip()
-        else:
-            return ""
+        return stderr.splitlines()[0].strip()
     def killJob(self, jobId):
         self.qdelOutput = os.popen("qdel " + jobId + " 2>&1").read()
         return self.qdelOutput.find("has registered the job") != -1 or self.qdelOutput.find("has deleted job") != -1
@@ -41,7 +37,7 @@ class QueueSystem:
         return line.split()[2]
     def findJobId(self, stdout):
         jobId = ""
-        for line in stdout.readlines():
+        for line in stdout.splitlines():
             if line.find("has been submitted") != -1:
                 jobId = self.getJobId(line)
             else:

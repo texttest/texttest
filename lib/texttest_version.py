@@ -4,10 +4,13 @@
 
 version = "master"
 
-# Which python version do we require
+# Note: Decided it's not a good idea to require debug versions here. Even if we have Python 2.4.3 it's
+# pretty likely 2.4.2 works OK unless we know otherwise. The interface shouldn't be different at least.
 
-required_python_version = (2, 4, 3)
+# Which python version do we require?
+
+required_python_version = (2, 4, 0)
 
 # Which pygtk version do we require?
 
-required_pygtk_version = (2, 6, 3)
+required_pygtk_version = (2, 6, 0)

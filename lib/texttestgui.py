@@ -1679,12 +1679,12 @@ class NotebookGUI(SubGUI):
         return self.notebook
     
     def handlePageSwitch(self, notebook, ptr, pageNum, *args):
-        if not self.active:
-            return
         newPageName = self.getPageName(pageNum)
         if newPageName == self.currentPageName:
             return
         self.currentPageName = newPageName 
+        if not self.active:
+            return
         self.diag.info("Switching to page " + self.currentPageName)
         for tabName, tabGUI in self.tabInfo.items():
             if tabName == self.currentPageName:

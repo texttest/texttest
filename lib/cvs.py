@@ -158,7 +158,8 @@ class CVSAction(guiplugins.InteractiveAction):
         else:
             return self.getCVSFileContents("Root")
     def getCVSFileContents(self, name):
-        fullPath = os.path.join(self.getApplicationPath(), "CVS", name)
+        # Create a means of putting the CVS directories elsewhere so the tests still work even if not CVS controlled...
+        fullPath = os.path.join(self.getApplicationPath(), os.getenv("TEXTTEST_CVS_DIR", "CVS"), name)
         if not os.path.isfile(fullPath):
             raise plugins.TextTestError, "No CVS file found at " + fullPath    
 

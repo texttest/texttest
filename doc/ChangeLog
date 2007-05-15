@@ -703,3 +703,138 @@ Bug Fixes:
     - If parts of the test suite are externally removed, selecting tests will not stacktrace any more (guiplugins.py)
     - When running batch mode and GUI simultaneously with multiple apps, fixed default save version(!) (batch.py)
 
+Version 3.9
+===========
+System requirements:
+    - TextTest now requires at least Python 2.4 (all interfaces). 
+	This is because process management is vastly improved there.
+    - TextTest GUI now requires at least PyGTK 2.6 also.
+	This is mostly because PyGTK 2.4 had some stability problems around the tree view filtering.
+    - No longer requires special process management tools (pstools and handle) on Windows XP.
+	But pskill (only) still needed on Windows 2000.
+Major Enhancements:
+    - CVS integration (cvs.py)
+	For those source-controlling their tests with CVS, you can now get log, diff and status information from the GUI.
+	Use "interactive_action_module:cvs" somewhere in your configuration to enable.
+    - Filter-file handling greatly improved (guidialogs.py)
+	Now makes use of standard file-choosers to find and save them
+    - log4x configuration files now have the standard name logging.<app>
+	See migration notes for more details
+General GUI Enhancements:
+    - Status bar now says when an external viewer has been started (texttestgui.py)
+	Should help prevent viewers being started repeatedly when system is slow
+    - Now possible to personally configure all the menus and toolbars via XML (texttestgui.py)
+	Can also configure this for derived configurations.
+Static GUI Enhancements:
+    - Rename Test now present in popup menu (guiplugins.py)
+	Was previously possible only via a weird form of copying the test. Also allows editing the description.
+    - "Remove" button can now remove individual files if they are selected (guiplugins.py)
+	Also present in popup menus.
+    - Better functionality for sorting tests (texttestgui.py)
+	This can now be done persistently via the Edit menu, or temporarily by clicking the column header
+	(As well as automatically as in 3.8 via the "auto_sort_test_suites" config file control)
+    - Sorting the tests will now put all tests before all suites (guiplugins.py)
+	Previously interspersed them alphabetically which got messy when suites contained both tests and other suites.
+    - New File tab now supports version identifiers (guiplugins.py)
+	Easy to create version-specific files from the GUI now
+    - Text Info tab now shows expected performance and memory usage, if available (texttestgui.py)
+	In 3.8 we starting using this to show the test description
+    - Help menu and About tab added (guidialogs.py)
+	You can now see at a glance what versions you're using and read migration notes from the GUI
+    - Default colours changed (texttestgui.py)
+	The pale green and purple were not well liked. The static GUI is now grey throughout.
+	But you can of course configure it via "test_colours" and "file_colours" in the config file.
+    - Reconnect action is now present in menus/toolbars (guiplugins.py)
+	Don't need to go the Reconnect tab now if the defaults are correct
+    - Confirmation dialog when removing tests now makes it clear that you're about to remove files in the file system (guiplugins.py)
+    - Now get a warning if you try to run more than one GUI test with slow motion replay enabled (guiplugins.py)
+Dynamic GUI Enhancements:
+    - Viewing tab replaced by popup menu in file view (guiplugins.py)
+	See migration notes. Right clicking the file now gives you a menu of viewers to choose from.
+    - If only one test is run, it is now auto-selected (texttestgui.py)
+	Seemed to save a bit of time as one test is often run repeatedly when debugging.
+    - Can now save crashed or killed tests if you really want to (comparetest.py)
+	Get a warning instead of not being allowed to. Can be useful to save at least some files.
+    - Recomputation can now handle change of version to compare against (texttestgui.py)
+	Previously didn't react if a new versioned file appeared when previously comparing with the master version...
+Framework Enhancements:
+    - Personal configuration file names changed and Windows has a sensible default location (plugins.py)
+	See migration notes. Now a directory as it can house quite a few different things.
+    - Can now handle files that should be missing only in a version: auto-generate a marker file (comparefile.py)
+	See migration notes. Previously difficulties if the master version had a file that derived versions didn't
+    - A version of the virtual server functionality introduced on Windows (default.py)
+	Tested GUIs are now hidden by default. Note however that their dialogs aren't :)
+	Not great but better than nothing. Will hopefully figure out a better way in the future.
+    - Virtual server functionality doesn't rely on "rsh" any more (unixonly.py)
+	Means that "virtual_display_machine:localhost" should work fine even if no permission for rsh.
+    - Don't test virtual server more often than necessary now when running multiple apps (unixonly.py)
+	For GUI testing on UNIX: previously checked for every app and every version 
+    - Command-line/client-server traffic replay enhanced (traffic.py)
+	Can now handle repeated inexact matches with the recorded traffic.
+	Previously could only handle matches that were either repeated or inexact.
+    - Tightened up version requirements for Python and PyGTK (texttest.py/texttestgui.py)
+	Could previously just stacktrace if your versions were too old. Now get error messages.
+    - Filter files / saved selections now separated with linebreaks to make them easier to compare (default.py)
+    - default.ReplaceText script can now handle regular expressions in the text to replace (default.py)
+Batch Report Enhancements:
+    - -name option added that can identify batch runs other than by date (batch.py)
+	Useful for testing actual releases where the release number is more important than the date of the run.
+    - Plain text report now groups tests per line in the same way as the HTML report (batch.py)
+	Previously wrote them all on one line which was hard to read and could cause newsgroups to bounce the mail
+    - HTML tables in the pages are now generated with more standard HTML which is easier to parse (testoverview.py)
+	Useful for scripts that want to extract basic information from the test results
+Grid Engine (LSF/SGE) enhancements:
+    - If submission to LSF or SGE fails, now display the full command provided to aid in debugging (queuesystem.py)
+	Generally it's because wrong resources or queues have crept in somewhere
+Old functionality removed (see migration notes):
+    - Temporary diagnostic mode (comparetest.py/testmodel.py)
+	Just seemed to complicate things unnecessarily. 
+    - Automatic performance measurement on Windows (default.py)
+	Never worked very well and unclear if anyone's ever used it. 
+    - Record Standard Input functionality (default.py)
+	Unclear if anybody's ever used this. I certainly haven't.
+    - Shell syntax in QUEUE_SYSTEM_RESOURCE (queuesystem.py)
+	Previously this was passed to the shell and tolerated - though did not require - quoting. Shell no longer used.
+Installation and self-test changes:
+    - No longer need to install TextTest explicitly - see migration notes
+	It will run from anywhere. The install.py script is reduced and is now purely for locally configuring the self-tests.
+    - Self-tests reorganised and the legacy "diplomacy judge" program removed as default target application
+	This makes them faster and simpler.
+    - Virtual display tests use traffic mechanism and are now deterministic
+Bug Fixes:
+    - Viewing a file after saving a test displays the correct file again (comparefile.py)
+	This bug was reintroduced in TextTest 3.7 after being fixed in 3.3, due to incorrect test reorganisation...
+    - If a test configured for performance takes 0 seconds, now show "infinitely faster" (performance.py)
+	Previously didn't react to avoid dividing by zero
+    - Removing a test which is only in an extra_version now works correctly (guiplugins.py)
+	Previously gave a stacktrace
+    - Removing the root test suite isn't possible any more (guiplugins.py)
+	Remove now greyed out if the root suite is selected. Didn't work anyway before...
+    - Fixed stack-trace on startup on Windows if your user name begins with "g" (!) (log4py.py)
+	Now maintaining my own log4py version as it seems to have been abandoned.
+    - If all virtual displays seem to be unusable, use the real display (unixonly.py)
+	Previously just used the first virtual display anyway.
+    - Collection script to group plain text reports together doesn't write files if mail sending fails (batch.py)
+	There isn't really any point and it can be confusing to have them around
+    - If performance files are externally removed, selecting tests on performance will not stacktrace any more (guiplugins.py)
+	Variant of a bug fixed in TextTest 3.8
+    - Fixed environment variable "leakage" from root suite when multiple apps run (engine.py)
+	When one app was incorrectly set up could sometimes fail to clear its environment
+    - Save button now greyed out if only successful or UNRUNNABLE tests selected (guiplugins.py)
+    - Status bar now show the correct number of tests saved if a mixture of failed and succeeded tests were selected (guiplugins.py)
+    - Selecting tests via criteria doesn't auto-scroll to the first one now if it's already displayed (texttestgui.py)
+    - Known bugs defined on missing text now trigger if the entire file is missing (knownbugs.py)
+    - Adding a test with "auto_sort_test_suites" set now correctly sorts the new test (guiplugins.py)
+    - Checkout to use for recording is no longer reset upon changing test to record (guiplugins.py)
+    - Fixed stack trace when a specified "collate_script" didn't exist (default.py)
+    - Console interface no longer stacktraces if an invalid graphical difference tool provided (respond.py)
+    - Fixed race-condition/stack trace when viewing non-started tests in dynamic GUI using a grid engine (texttestgui.py)
+    - Recomputation of tests that don't have any run-dependent text now works (comparefile.py)
+    - Recomputation of crashed tests now doesn't lose the stack trace information (comparetest.py)
+    - If recomputation triggers an automatic collapse, fixed following inconsistency... (guiplugins.py)
+    - A warning is now produced if you try to add to an existing test for another app when creating a test (guiplugins.py)
+    - Fixed weird warnings from dynamic GUI when status messages contained '<' or '>' (texttestgui.py)
+    - Fixed stack trace if an "extra_version" is explicitly run along with a base version (engine.py)
+    - "Exact/Average" option for saving performance tests no longer disappears if test selected before completion (guiplugins.py)
+    - Fixed occasional failures of traffic mechanism due to failing to read from sockets properly (traffic.py)
+    - Fixed stack trace when machine names are one letter or shorter (thanks to Steve Cochran!) (default.py)

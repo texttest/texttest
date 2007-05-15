@@ -1,33 +1,39 @@
 Documentation Summary:
 
-    For those upgrading from previous versions of TextTest, migration notes are available for each version
-    in the doc subdirectory. These list not only necessary migrations (which are now kept to a minimum) but 
-    changes to the default behaviour of TextTest.
-
-    There is also a ChangeLog detailing all changes since the previous release.
-
-    Many people like to learn by example. There is a brief "quick start guide" based around reading the 
-    self-tests, under source/doc/quickstart.txt
-
-    The main documentation is however kept at www.texttest.org/TextTest/docs. At the bottom of this file is
+    There is some stuff in source/doc here in this download, but the main documentation is kept at 
+    www.texttest.org/TextTest/docs. At the bottom of this file there is also
     a brief summary of what TextTest is and what it can do for you.
+
+    In source/doc, you can find :
+       a) For those upgrading from previous versions of TextTest, migration notes are available for each 
+          version. These list not only necessary migrations (which are now kept to a minimum) but also
+          changes to the default behaviour of TextTest.
+
+       b) A ChangeLog detailing all changes since the previous release (and all releases).
+
+       c) Many people like to learn by example. There is a brief "quick start guide" based around reading the 
+          self-tests, under source/doc/quickstart.txt 
 
 Installation and System Requirements:
 
     Read the installation guide at http:/www.texttest.org/TextTest/docs/install.html
     The lightning summary is that you need Python, PyGTK, tkdiff which are probably already
-    installed if you're on UNIX. On Windows you'll need to download them plus "pstools" -
-    but they all have installers now!
+    installed if you're on UNIX. On Windows you'll probably need to download them. However
+    you don't need special process management tools any more and it's sufficient to run PyGTK's installer
+    and then tkdiff's installer!
 
     You now don't need to do anything to install TextTest itself as such. You can copy the contents
     of the source directory to anywhere at all or leave it where it is. Running TextTest is a matter
     of running source/bin/texttest.py with the above stuff installed.
 
 TEXTTEST_HOME and the Self-Tests:
+
     The tests subdirectory is a sketch of what a basic test repository looks like. You can move this
-    to anywhere at all or leave it where it is, but wherever it ends up you should point TEXTTEST_HOME
-    at it. It contains configuration for how to get debug information out of TextTest and also
-    a large number of tests for itself (using itself, naturally!) under the texttest subdirectory. 
+    to anywhere at all or leave it where it is, but wherever it ends up you should point the environment
+    variable TEXTTEST_HOME at it. It contains configuration for how to get debug information out of TextTest 
+    and also a large number of tests for itself (using itself, naturally!) under the texttest subdirectory. 
+    Your tests should be placed in product-specific subdirectories alongside the "texttest" and "Diagnostics"
+    directories.
 
     If you plan to change the code you are strongly recommended to run them and test your changes. 
     They also function as working examples as described above, read source/doc/quickstart.txt for more 
@@ -35,7 +41,8 @@ TEXTTEST_HOME and the Self-Tests:
 
     The expected results provided are those from my own environment (RHEL4 Linux, currently). Unless your 
     environment is identical you should transform the test suite to be suited to the environment and OS 
-    you are running in by running the script configure_tests.py which is included with these tests.
+    you are running in by running the script configure_tests.py which is included with these tests 
+    (under tests/texttest).
 
 Known bugs:
 
@@ -45,19 +52,18 @@ Known bugs:
     when adding entries to environment files, be aware that they will never be cleaned. If this will cause problems 
     you will need to set them to harmless values elsewhere.
 
-    (2) On Windows, TextTest relies on the pstools package for process management. These tools unfortunately require
-    administration rights on your system. If you don't have these rights, TextTest will still work, but will
-    tend to leak processes...
+    (2) On Windows, there is a PyGTK bug which causes the currently chosen tab to wander around of its own
+    accord a bit. Please bear with it until fixed... (see http://bugzilla.gnome.org/show_bug.cgi?id=438318)
 
 Bugs and Support:
     
     Contact the mailing list at texttest-users@lists.sourceforge.net
 
-    You can also contact me directly if you want to...
+    You can also contact me directly if you really want to...
 
     Geoff Bache
 
-    <Geoff.Bache@carmensystems.com>
+    <Geoff.Bache@jeppesen.com>
 
 
 Other (non-standard) Open Source python modules used by TextTest and packaged with it:
@@ -66,13 +72,14 @@ Other (non-standard) Open Source python modules used by TextTest and packaged wi
     log4py.py                   : logging/diagnostic tool, of the kind you'll probably need in your programs 
                                   if you use TextTest. (Martin  Preishuber, v1.3.1)
     usecase.py,gtkusecase.py    : "PyUseCase", record/replay tool for PyGTK GUIs, of the kind you may well 
-                                  need if you test GUIs (Geoff Bache, v1.2)
+                                  need if you test GUIs (Geoff Bache, v1.3)
     HTMLgen.py,HTMLcolors.py,   : "HTMLGen", tool for generating HTML in Python, used for the historical report
     ImageH.py,ImagePaletteH.py,   webpages generated for batch runs (Robin Friedrich, v2.2.2)
     imgsize.py
 
 Plugins included:
 
+    cvs.py      :   integration with CVS for version control
     sge.py      :   integration with Sun Grid Engine
     lsf.py      :   integration with LSF - note LSF is not free! (see www.platform.com)
     bugzilla.py :   integration with Bugzilla, using the Perl command-line interface program bugcli (Dennis Cox, v0.6)

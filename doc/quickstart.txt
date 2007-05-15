@@ -24,70 +24,88 @@ compared with the actual results from running the program with the input as defi
 
 What there is to find:
 
-./TestSelf/RunDependentText/TargetApp        : useful for understanding the run-dependent text filtering
+TargetApp                                  : used by default as it's very basic, this test suite has
+                                               one test (that fails) on a "Hello World" program.
 
-./TestSelf/EnvironmentFile/TargetApp         : useful for understanding how environment variables are 
+TestSelf/TestSelection/TargetApp           : Contains a few tests with related names, to explore the
+                                               functionality for selecting tests and saving those selections.
+
+TestSelf/ChangeTestResults/TargetApp       : Contains a few tests that fail in various ways, to explore
+                                               how these are reported and how the results can be saved.
+
+TestSelf/RunDependentText/TargetApp        : useful for understanding the run-dependent text filtering
+
+TestSelf/EnvironmentFile/TargetApp         : useful for understanding how environment variables are 
                                                set and unset
 
-./TestSelf/DiagnosticHandling/TargetApp      : useful for understanding integration with log4py, log4j 
-                                               and log4cpp to enable swift enabling and disabling of
-                                               debugging information.
+TestSelf/DiagnosticHandling/TargetApp      : useful for understanding integration with log4py, log4j 
+                                               and log4cpp to configuration of produced logs.
 
-./TestSelf/TestData/TargetApp                : useful for understanding how TextTest handles test data, and
+TestSelf/TestData/TargetApp                : useful for understanding how TextTest handles test data, and
                                                the differences between data that is only to be read and that
                                                which can also be written.
 
-./TestSelf/CollateFiles/TargetApp            : useful for understanding how TextTest collects files of any
+TestSelf/CollateFiles/TargetApp            : useful for understanding how TextTest collects files of any
                                                name written by an application
 
-./TestSelf/Checkouts/TargetApp               : useful for understanding how the checkout mechanism for 
+TestSelf/Checkouts/TargetApp               : useful for understanding how the checkout mechanism for 
                                                version control integration works.
 
-./TestSelf/MemoryTests/TargetApp             : useful for understanding how memory consumption is compared
+TestSelf/BatchTests/TargetApp              : useful for understanding how batch mode works (both plain-text 
+                                             and HTML reports)
 
-./TestSelf/PerformanceTests/TargetApp        : useful for understanding how test performance is compared 
-                                               (via \time on UNIX, 'pslist' on Windows and using extraction                                                                              from logfiles)
+TestSelf/MemoryTests/TargetApp             : useful for understanding how memory consumption is compared
 
-./TestSelf/KnownBugs/TargetApp               : useful for finding out how textual patterns are identified
+TestSelf/PerformanceTests/TargetApp        : useful for understanding how performance-related info is in general 
+                                             compared by extracting and comparing numbers from log files.
+
+TestSelf/KnownBugs/TargetApp               : useful for finding out how textual patterns are identified
                                                as known bugs, and also linked to bugs in Bugzilla
 
-./TestSelf/RunningTests/TargetApp            : shows how you can view your tests before
+TestSelf/RunningTests/TargetApp            : shows how you can view your tests before
                                                they compmlete in the dynamic GUI
 
-./TestSelf/BaseVersions/TargetApp            : shows how to get version settings to inherit from each other.
+TestSelf/BaseVersions/TargetApp            : shows how to get version settings to inherit from each other.
 
-./TestSelf/ExtraVersions/TargetApp           : shows how to automatically run other versions than the default
+TestSelf/ExtraVersions/TargetApp           : shows how to automatically run other versions than the default
                                                when running normally.
 
-./GUI/StaticGUI/StartFromScratch/TargetApp   : useful for getting a handle on what a totally empty test suite
+GUI/DynamicGUI/Filtering/TargetApp         : useful for exploring the status tab from the dynamic GUI and what
+                                             it can do.
+
+GUI/DynamicGUI/TextView/TargetApp          : mostly on unicode handling
+
+GUI/StaticGUI/TargetApp                    : fairly large suite that's a residue of the previous default one.
+
+GUI/StaticGUI/StartFromScratch/TargetApp   : useful for getting a handle on what a totally empty test suite
                                                should look like
 
-./GUI/StaticGUI/UseCaseRecording/TargetApp   : useful for understadning TextTest's integration with Use Case
+GUI/StaticGUI/UseCaseRecording/TargetApp   : useful for understadning TextTest's integration with Use Case
                                                Recorders such as PyUseCase and JUseCase for GUI testing.
 
-./TestSelf/TrafficInterception/TargetApp     : useful for understanding how TextTest can record and replay
+TestSelf/TrafficInterception/TargetApp     : useful for understanding how TextTest can record and replay
                                                results from "third-party" programs run on the command line
                                                and thus produce repeatable results.
 
-./TestSelf/TrafficInterception/ClientServer/TargetApp
+TestSelf/TrafficInterception/ClientServer/TargetApp
                                              : useful for undestanding how TextTest can record and replay 
                                                textual traffic on a network connection, allowing creation
                                                of component tests for client/server systems.
 
-./TargetApp                                  : used by default as it's a bit more advanced, this app is 
-                                               an adjudicator for the popular board game "diplomacy"
+TestSelf/BatchTests/CollectFiles/TargetApp : useful for understanding how batch reporting works.
 
-./TestSelf/BatchTests/CollectFiles/TargetApp : useful for understanding how batch reporting works.
-
-./TestSelf/EmptyTestSuites/TargetApp         : useful for understanding how TextTest handles various unusual
+TestSelf/EmptyTestSuites/TargetApp         : useful for understanding how TextTest handles various unusual
                                                things in the testsuite files.
 
-./TestSelf/CollateFiles/UnixOnly/TargetApp   : (UNIX only) useful for understanding core file processing
+TestSelf/PerformanceTests/UnixOnly/TargetApp :
+                                             (UNIX only) shows how performance can be extracted directly via the "time" program
 
-./TestSelf/Miscellaneous/UnixOnly/TargetApp  : (UNIX only) useful for understanding how the virtual display
+TestSelf/CollateFiles/UnixOnly/TargetApp   : (UNIX only) useful for understanding core file processing
+
+TestSelf/Miscellaneous/UnixOnly/TargetApp  : (UNIX only) useful for understanding how the virtual display
                                                integration with Xvfb works (to prevent application GUIs popping up)
 
-./QueueSystems/TargetApp                     : useful for understanding the queuesystem configuration and
+QueueSystems/TargetApp                     : useful for understanding the queuesystem configuration and
                                                the associated plugin for LSF and Sun Grid Engine
 
 

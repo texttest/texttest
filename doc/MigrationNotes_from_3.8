@@ -1,0 +1,213 @@
+
+For the first time in a long time 3.9 tries to remove a bunch of dubious old features...
+
+Anyway, this file is laid out in 3 sections: compulsory migration, removed features and
+functionality that has moved around or looks a bit different in the GUI. This last section 
+is mostly to resolve confusion and you can probably figure it out anyway without reading this.
+
+=============================================================================================
+COMPULSORY MIGRATION
+=============================================================================================
+
+(1) System requirements
+=======================
+You now need at least Python 2.4 and PyGTK 2.6 
+(3.8 supported Python 2.3 and PyGTK 2.4, and even Python 2.2 for the console interface)
+
+However on Windows XP you can throw away handle.exe, pslist.exe and pskill.exe. And
+it no longer makes any difference if you're an administrator...
+On Windows 2000 you need to keep just pskill.exe.
+
+(2) Installation
+================
+The "install.py" script is removed. You don't need to explicitly install TextTest any more.
+The "source" directory as a whole can be copied to anywhere in your file system and run in place,
+or left where it is.
+
+To run the self-tests now, set TEXTTEST_HOME to point to them (or copy/move them to your TEXTTEST_HOME)
+and run the "configure_tests.py" script that is in tests/texttest. This will convert all the expected 
+results to your local environment and comment out tests that cannot be run. This script is more or 
+less what was left of "install.py" when the moving-stuff-around was removed.
+
+(3) Personal configuration files
+================================
+These have changed name so they can live in a directory together. Previously, you could
+have a personal config file in your home directory called .texttest and a personal
+texttest GTK configuration file called .texttest-gtk.
+
+Instead, create a directory in your home directory called .texttest. The personal config
+file should be put there and named "config", and the GTK-file should be put there
+and named ".gtkrc-2.0". If you wish to change the menus and toolbars, the XML files to configure
+this also live in this directory (this possibility is a new feature).
+
+(4) Log4x configuration files
+=============================
+If you're using TextTest's integration with log4x, you need to rename all your log4x files and tweak
+your configuration, and possibly even your code.
+
+Up until now you've told TextTest the name of your log4x configuration file in your config file.
+Log4py files have traditionally been called "log4py.conf" and log4j files "log4j.properties".
+It has so far not been possible to use TextTest's normal application/version mechanisms to differentiate 
+these from each other, which has been a bit restrictive sometimes.
+
+Now, instead of expecting an "input directory_variable" and a "configuration_file" entry, the config file 
+now just expects a "configuration_file_variable" entry which is a variable (environment or Java property) 
+that will identify the file itself. All configuration files are called logging.<app>.<version> now and 
+all of the usual TextTest conventions apply to them. 
+
+So, your code needs to find the log4x configuration file via a single environment variable
+or property that identifies the full path to the file instead of via one that points out the
+directory and a hardcoded name. Your config file should be changed accordingly, and all
+configuration files in your test suite renamed to "logging.<app>".
+
+Note also that "temporary diagnostic mode" which was a part of the log4x integration does not exist any more. 
+See below for more details.
+
+=============================================================================================
+FEATURES THAT ARE REMOVED AND WHAT TO DO INSTEAD
+=============================================================================================
+
+(1) Temporary diagnostic mode for log4x ("Run with target application diagnostics")
+===================================================================================
+
+There used to be a check box with the above name under Running/Basic. This was deemed to be 
+causing complication for no good reason. The idea of temporarily enabling diagnostics to
+be placed in a separate subdirectory called "Diagnostics" is no longer possible.
+
+Naturally, you will still want to temporarily enable diagnostics/change your log4x configuration
+files. There are two basic suggestions for what you could do:
+
+a) Create a logging file using the "Create File" tab as before. Instead of checking "affect temporary
+diagnostics mode only", provide a version ID (e.g. "diag" or "tmp"). Then run the test with that version,
+saving the files if needed. Remove the files when done, if you remember. If using version control you can often
+dispense with even the need to run a separate version by just reverting when done.
+
+b) Copy the test (using the default options), change the logging "permanently" and remove the whole test 
+again when you're done. This tends to be easier to remember to do the removal and hence less prone
+to building up long-dead temporary files, but is a bit more work.
+
+(2) Standard Input Recording
+============================
+There used to be a possibility to interactively record standard input from shell sessions.
+This was a natty feature introduced in a fit of enthusiasm but seemed to be more trouble than
+it's worth in practice. In practice it's always been easier to just create an input file by hand, 
+and this feature has caused lots of trouble internally. So it's gone, and if you miss it you'll just
+have to keep TextTest 3.8 :)
+
+(3) Automatic performance measurement on Windows
+================================================
+This made use of pslist which isn't required any more. It never worked very well and I didn't think
+it was worth keeping. Performance measurement on Windows will need to use the more standard way via
+logging and extracting the information.
+
+(4) Shell parsing of QUEUE_SYSTEM_RESOURCE (if using LSF or SGE)
+================================================================
+Most subprocess management is now done via Python 2.4's wonderful subprocess module (a feature 
+Python has been sorely lacking in the past). One consequence of this is that TextTest isn't using 
+the shell now unless absolutely necessary, and this is why I've been able to dump handle.exe and friends
+on Windows.
+
+A knockon consequence is that the QUEUE_SYSTEM_RESOURCE variable in your environment files won't be 
+quite as flexible as before. Previously it would accept and largely ignore any shell quoting you put 
+there, but now it won't work to put shell quoting there as the shell isn't run.
+
+So
+QUEUE_SYSTEM_RESOURCE:model=Opteron*
+will work, but
+QUEUE_SYSTEM_RESOURCE:model="Opteron*"
+or
+QUEUE_SYSTEM_RESOURCE:model=Opteron\*
+won't.
+
+=============================================================================================
+CHANGES IN THE GUI LAYOUT AND WHERE TO FIND THINGS NOW
+=============================================================================================
+
+(1) Saving and Loading Selections
+=================================
+
+TextTest 3.9 introduces some improvements to the way test selections 
+(OBSERVE: NOT test results!) are saved and accessed. Previously, all 
+selections that were saved from the dynamic GUI were saved in a 
+temporary location, which was read by the static GUI when the dynamic 
+GUI terminated, and added to the drop-down list in the selection tab. 
+Sometimes it took a long while before the drop-down list was updated, 
+making it painful to exchange selections between GUIs. 
+
+Now, all selection files are saved and accessed via standard 
+FileChooser widgets. This makes it possible to save and load files 
+to/from any location in the file system. Also, since the chooser reads
+the file system directly, it is possible to access files immediately 
+after saving them, even without terminating the dynamic GUI. The 
+default is still to save to and load from a temporary location 
+(temporary_filter_files), but a default persistent directory 
+(filter_files) is also added as a standard location for selections you 
+want to save permanently. Using the config option 
+'test_list_files_directory' you can also add more directories under 
+the application directory which will appear as shortcuts in the file 
+chooser. (but of course you can also save anywhere else, the shortcut 
+is just for convenience)
+
+Observe that to save a selection you'll now have to choose 
+'Save Selection...' in the File menu, the tab page has disappeared. 
+There is also a "Load Selection" action in this menu where you can
+select any file to load from the file system.
+
+About the FileChooser: This is a standard GTK widget, so we're 
+not responsible for its behavior in all aspects :) It is possible to use 
+the + and - buttons in the botton left corner to add (and remove)
+directories to the bottom shortcut list. These 'bookmarks' are saved 
+in ~/.gtk-bookmarks and are added any time you use a FileChooser, 
+also from other applications (Not sure about the exact details). However, 
+if you have some preferred global location which you always want to have 
+easy access to, adding it there can make your life easier.
+
+(2) Popup menus
+===============
+
+These are more popular now :) Both the test view on the left and the file view on the right
+will produce you a popup menu on being right-clicked and various functionality has moved to these.
+
+For example there is now a dedicated Rename / Change Description action there, as well as sorting
+and removing functionality.
+
+The "Viewing" tab in the dynamic GUI has now been replaced by a popup menu in the file view. It had been
+observed that it was a bit error prone and not very intuitive as things tended to appear and disappear at 
+different times.
+
+To start different viewers in the dynamic GUI now, right-click the file and select the view operation 
+you want from the popup menu.
+
+Double-clicking the files will now always view the filtered differences on the file, if there are any to view,
+and bring up an editor on the (unfiltered) file if there aren't. There is no way to configure this any more.
+
+When tests are still running and you double-click files, you won't get the "follow file" (using "tail -f" or
+"baretail" any more). You need to explicitly select it from the popup menu. Instead, you'll get the file 
+in your editor, until you press "Update Info" when you'll get the differences so far.
+(We discovered the follow-file functionality wasn't very popular and didn't merit being the default)
+
+(3) Saving missing files
+========================
+Up until now saving missing files has simply removed them. This had led to problems
+when the default version produces a file but some version does not, there was no good way
+to represent this.
+
+Now, if you save a missing file with a version identifier and the root (non-versioned) file
+is present, instead of removing the file it will auto-generate a marker file to show that
+this version should be missing. If you then run the test again it should be green, in both the
+named version and the default version.
+
+For example, suppose I have a test that produces
+
+output.myapp
+improve.myapp
+
+
+However, version 2 only produces an output file, output.myapp.2. So when I run it I get
+"improve missing".
+
+Saving this with version 2 will now create a dummy file improve.myapp.2, which will tell
+TextTest that there is no standard file for version 2, rather than have it compare
+with improve.myapp.
+
+This has been a bit of a pain for a while so hopefully it will be more convenient now.

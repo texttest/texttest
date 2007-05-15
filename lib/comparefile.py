@@ -134,7 +134,7 @@ class FileComparison:
         else:
             titleText = "Differences in"
         titleText += " " + repr(self)
-        return "------------------ " + titleText + " --------------------"
+        return "-" * 10 + " " + titleText + " " + "-" * 10
     def getFreeTextBody(self):
         if self.newResult():
             return self.previewGenerator.getPreview(open(self.tmpCmpFile))

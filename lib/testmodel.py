@@ -910,9 +910,7 @@ class Application:
         self.dircache = dircache
         # Place to store reference to extra_version applications
         self.extras = []
-        self.versions = version.split(".")
-        if self.versions[0] == "":
-            self.versions = []
+        self.versions = filter(len, version.split(".")) # remove empty versions    
         self.diag = plugins.getDiagnostics("application")
         self.inputOptions = inputOptions
         self.configDir = MultiEntryDictionary()

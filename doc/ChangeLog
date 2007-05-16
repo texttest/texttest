@@ -840,3 +840,4 @@ Bug Fixes:
     - "Exact/Average" option for saving performance tests no longer disappears if test selected before completion (guiplugins.py)
     - Fixed occasional failures of traffic mechanism due to failing to read from sockets properly (traffic.py)
     - Fixed stack trace when machine names are one letter or shorter (default.py)
+    - Fixed stack trace when empty composite versions given (-v .v1..v2 or similar)  (testmodel.py)

@@ -47,13 +47,10 @@ TEXTTEST_HOME and the Self-Tests:
 Known bugs:
 
     (1) TextTest drives the system under test partly by setting and unsetting environment variables. 
-    However, some platforms and versions of Python do not support unsetting environment variables: you can 
+    However, some UNIX platforms (e.g. Sparc solaris) do not support unsetting environment variables: you can 
     only set them to new values. The install script will warn you if this is the case with your system. If so, 
     when adding entries to environment files, be aware that they will never be cleaned. If this will cause problems 
     you will need to set them to harmless values elsewhere.
-
-    (2) On Windows, there is a PyGTK bug which causes the currently chosen tab to wander around of its own
-    accord a bit. Please bear with it until fixed... (see http://bugzilla.gnome.org/show_bug.cgi?id=438318)
 
 Bugs and Support:
     
@@ -69,8 +66,10 @@ Bugs and Support:
 Other (non-standard) Open Source python modules used by TextTest and packaged with it:
 
     ndict.py                    : sequential dictionaries. (Wolfgang Grafen, v0.2)
-    log4py.py                   : logging/diagnostic tool, of the kind you'll probably need in your programs 
-                                  if you use TextTest. (Martin  Preishuber, v1.3.1)
+    log4py.py                   : logging/diagnostic tool (Martin  Preishuber, v1.3.1)
+                                  Python now has a builtin "logging" module which is probably why this
+                                  has been abandoned. I haven't yet migrated away from it though and
+a                                 am currently maintaining my own version of it.
     usecase.py,gtkusecase.py    : "PyUseCase", record/replay tool for PyGTK GUIs, of the kind you may well 
                                   need if you test GUIs (Geoff Bache, v1.3)
     HTMLgen.py,HTMLcolors.py,   : "HTMLGen", tool for generating HTML in Python, used for the historical report
@@ -84,6 +83,7 @@ Plugins included:
     lsf.py      :   integration with LSF - note LSF is not free! (see www.platform.com)
     bugzilla.py :   integration with Bugzilla, using the Perl command-line interface program bugcli (Dennis Cox, v0.6)
                     See http:://www.bugzilla.org and http://quigley.durrow.com/bugzilla.html 
+                    Bugcli also appears to have been abandoned but I haven't had any trouble with it...
     unixonly.py :   integration with Xvfb, UNIX virtual display tool, useful for stopping tested GUIs 
                     popping up all the time.
 

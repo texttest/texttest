@@ -1715,7 +1715,7 @@ class NotebookGUI(SubGUI):
         oldPage = self.findPage(name)
         if oldPage:
             self.diag.info("Hiding page " + name)
-            oldPage.hide_all()
+            oldPage.hide()
 
     def insertNewPage(self, name, insertPosition=0):
         if self.notebook.get_n_pages() == 0:
@@ -1745,7 +1745,7 @@ class NotebookGUI(SubGUI):
                 insertIndex += 1
                 if tabGUI.shouldShowCurrent(*args) and not page.get_property("visible"):
                     self.diag.info("Showing page " + name)
-                    page.show_all()
+                    page.show()
                     changed = True
             elif tabGUI.shouldShowCurrent(*args):
                 self.insertNewPage(name, insertIndex)

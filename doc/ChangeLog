@@ -725,6 +725,8 @@ General GUI Enhancements:
 	Should help prevent viewers being started repeatedly when system is slow
     - Now possible to personally configure all the menus and toolbars via XML (texttestgui.py)
 	Can also configure this for derived configurations.
+    - Now use a fixed-width font (Courier) in the Text Info window (texttestgui.py)
+	Textual differences often look better when vertically aligned
 Static GUI Enhancements:
     - Rename Test now present in popup menu (guiplugins.py)
 	Was previously possible only via a weird form of copying the test. Also allows editing the description.
@@ -837,4 +839,4 @@ Bug Fixes:
     - Fixed stack trace if an "extra_version" is explicitly run along with a base version (engine.py)
     - "Exact/Average" option for saving performance tests no longer disappears if test selected before completion (guiplugins.py)
     - Fixed occasional failures of traffic mechanism due to failing to read from sockets properly (traffic.py)
-    - Fixed stack trace when machine names are one letter or shorter (thanks to Steve Cochran!) (default.py)
+    - Fixed stack trace when machine names are one letter or shorter (default.py)

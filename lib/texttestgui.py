@@ -1924,7 +1924,7 @@ class TextInfoGUI(SubGUI):
             return
         self.view = gtk.TextView()
         from pango import FontDescription
-        self.view.modify_font(FontDescription("courier 8"))
+        self.view.modify_font(FontDescription("courier 10"))
         self.view.set_editable(False)
         self.view.set_cursor_visible(False)
         self.view.set_wrap_mode(gtk.WRAP_WORD)

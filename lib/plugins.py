@@ -481,6 +481,8 @@ def abspath(relpath):
 def getInterpreter(binary):
     if binary.endswith(".py"):
         return "python"
+    elif binary.endswith(".rb"):
+        return "ruby"
     elif binary.endswith(".jar"):
         return "java -jar"
     else:   

@@ -52,6 +52,10 @@ Known bugs:
     when adding entries to environment files, be aware that they will never be cleaned. If this will cause problems 
     you will need to set them to harmless values elsewhere.
 
+    (2) When testing GUIs on Windows, TextTest hides the window as it does via the virtual DISPLAY on UNIX. However,
+    this isn't recursive so any dialogs, other windows, other apps etc. started by the test will still pop up. This
+    is very obvious if you run the self-tests on Windows...
+
 Bugs and Support:
     
     Contact the mailing list at texttest-users@lists.sourceforge.net

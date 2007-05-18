@@ -778,6 +778,7 @@ Framework Enhancements:
 	Could previously just stacktrace if your versions were too old. Now get error messages.
     - Filter files / saved selections now separated with linebreaks to make them easier to compare (default.py)
     - default.ReplaceText script can now handle regular expressions in the text to replace (default.py)
+    - .rb files now automatically recognised as Ruby (plugins.py)
 Batch Report Enhancements:
     - -name option added that can identify batch runs other than by date (batch.py)
 	Useful for testing actual releases where the release number is more important than the date of the run.

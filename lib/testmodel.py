@@ -1102,12 +1102,12 @@ class Application:
             if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):
                 return optionGroup
     def _getRootTmpDir(self):
-        if not os.environ.has_key("TEXTTEST_TMP"):
-            if os.name == "posix":
-                os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
+        if not os.getenv("TEXTTEST_TMP"):
+            if os.name == "nt" and os.getenv("TEMP"):
+                os.environ["TEXTTEST_TMP"] = os.getenv("TEMP").replace("\\", "/")
             else:
-                os.environ["TEXTTEST_TMP"] = os.environ["TEMP"].replace("\\", "/")
-        return os.path.expanduser(os.environ["TEXTTEST_TMP"])
+                os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
+        return os.path.expanduser(os.getenv("TEXTTEST_TMP"))
     def getStandardWriteDirectoryName(self):
         timeStr = plugins.startTimeString().replace(":", "")
         localName = self.name + self.versionSuffix() + "." + timeStr

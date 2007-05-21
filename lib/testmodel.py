@@ -651,10 +651,7 @@ class TestSuite(Test):
         if orderedTestNames is None:
             orderedTestNames = self.readTestNames(False, False)
         if self.autoSortOrder:
-            if self.getConfigValue("sort_test_suites_tests_first"):
-                testCaseNames = map(lambda l: l.name, filter(lambda l: l.classId() == "test-case", self.testcases))
-            else:
-                testCaseNames = []
+            testCaseNames = map(lambda l: l.name, filter(lambda l: l.classId() == "test-case", self.testcases))
             if self.autoSortOrder == 1:
                 orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
             else:
@@ -667,10 +664,7 @@ class TestSuite(Test):
         for testName in orderedTestNames:
             testCaches[testName] = self.createTestCache(testName)
         if self.autoSortOrder:
-            if self.getConfigValue("sort_test_suites_tests_first"):
-                testCaseNames = filter(lambda l: len(testCaches[l].findAllFiles("testsuite", compulsory = [ self.app.name ])) == 0, orderedTestNames)
-            else:
-                testCaseNames = []
+            testCaseNames = filter(lambda l: len(testCaches[l].findAllFiles("testsuite", compulsory = [ self.app.name ])) == 0, orderedTestNames)
             if self.autoSortOrder == 1:
                 orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
             else:
@@ -747,15 +741,11 @@ class TestSuite(Test):
         tests = plugins.readListWithComments(self.getContentFileName())
         return len(tests) < len(self.testcases)
     def sortTests(self, ascending = True):
-        testsFirst = self.getConfigValue("sort_test_suites_tests_first")
         # Get testsuite list, sort in the desired order. Test
         # cases always end up before suites, regardless of name.
         for testSuiteFileName in self.findTestSuiteFiles():
             tests = plugins.readListWithComments(testSuiteFileName)
-            if testsFirst:
-                testNames = map(lambda t: t.name, filter(lambda t: t.classId() == "test-case", self.testcases))
-            else:
-                testNames = []
+            testNames = map(lambda t: t.name, filter(lambda t: t.classId() == "test-case", self.testcases))
             tests.sort(lambda a, b: self.compareTests(ascending, testNames, a, b))
 
             # Save back, notify change

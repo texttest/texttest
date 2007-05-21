@@ -771,6 +771,8 @@ Framework Enhancements:
 	Means that "virtual_display_machine:localhost" should work fine even if no permission for rsh.
     - Don't test virtual server more often than necessary now when running multiple apps (unixonly.py)
 	For GUI testing on UNIX: previously checked for every app and every version 
+    - Virtual server's display number is now configurable (unixonly.py)
+	Now use the config entry "virtual_display_number". Previously hardcoded to 42.
     - Command-line/client-server traffic replay enhanced (traffic.py)
 	Can now handle repeated inexact matches with the recorded traffic.
 	Previously could only handle matches that were either repeated or inexact.
@@ -824,7 +826,7 @@ Bug Fixes:
     - Fixed environment variable "leakage" from root suite when multiple apps run (engine.py)
 	When one app was incorrectly set up could sometimes fail to clear its environment
     - Save button now greyed out if only successful or UNRUNNABLE tests selected (guiplugins.py)
-    - Status bar now show the correct number of tests saved if a mixture of failed and succeeded tests were selected (guiplugins.py)
+    - Status bar now shows the correct number of tests saved if a mixture of failed and succeeded tests were selected (guiplugins.py)
     - Selecting tests via criteria doesn't auto-scroll to the first one now if it's already displayed (texttestgui.py)
     - Known bugs defined on missing text now trigger if the entire file is missing (knownbugs.py)
     - Adding a test with "auto_sort_test_suites" set now correctly sorts the new test (guiplugins.py)

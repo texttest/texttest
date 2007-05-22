@@ -620,7 +620,7 @@ class FollowFile(FileViewAction):
         else:
             return fileName
     def getFollowCommand(self, followProgram, fileName):
-        basic = [ followProgram, fileName ]
+        basic = shlex.split(followProgram) + [ fileName ]
         if followProgram.startswith("tail") and os.name == "posix":
             title = self.currentTest.name + " (" + os.path.basename(fileName) + ")"
             return [ "xterm", "-bg", "white", "-T", title, "-e" ] + basic

@@ -355,39 +355,39 @@ class RemoveObsoleteVersions(plugins.Action):
     def __call__(self, test):
         self.describe(test)
         compFiles = {}
-        for file in test.ownFiles():
+        resultFiles, defFiles = test.listStandardFiles(allVersions=True)
+        for file in resultFiles:
             stem = file.split(".")[0]
             compFile = self.filterFile(test, file)
-            if compFiles.has_key(stem):
-                compFiles[stem].append(compFile)
-            else:
-                compFiles[stem] = [ compFile ]
+            if not compFiles.has_key(stem):
+                compFiles[stem] = []
+            compFiles[stem].append((file, compFile))
         for compFilesMatchingStem in compFiles.values():
             for index1 in range(len(compFilesMatchingStem)):
                 for index2 in range(index1 + 1, len(compFilesMatchingStem)):
                     self.compareFiles(test, compFilesMatchingStem[index1], compFilesMatchingStem[index2])
-                os.remove(compFilesMatchingStem[index1])
+                os.remove(compFilesMatchingStem[index1][1])
         for file in self.filesToRemove:
-            os.system("cvs rm -f " + file)
+            print file #os.system("cvs rm -f " + file)
         self.filesToRemove = []
     def cmpFile(self, test, file):
         basename = os.path.basename(file)
         return mktemp(basename + "cmp")
-    def origFile(self, test, file):
-        if file.endswith("cmp"):
-            return test.getFileName(os.path.basename(file)[:-3])
-        else:
-            return file
     def filterFile(self, test, file):
         newFile = self.cmpFile(test, file)
-        filter = RunDependentTextFilter(test, os.path.basename(file).split(".")[0])
-        return filter.filterFile(file, newFile)
-    def compareFiles(self, test, file1, file2):
-        origFile1 = self.origFile(test, file1)
-        origFile2 = self.origFile(test, file2)
+        stem = os.path.basename(file).split(".")[0]
+        runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
+        unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)    
+        from rundependent import RunDependentTextFilter
+        filter = RunDependentTextFilter(test.getRelPath(), test.app.name, runDepTexts, unorderedTexts)
+        filter.filterFile(file, newFile)
+        return newFile
+    def compareFiles(self, test, filePair1, filePair2):
+        origFile1, cmpFile1 = filePair1
+        origFile2, cmpFile2 = filePair2
         if origFile1 in self.filesToRemove or origFile2 in self.filesToRemove:
             return
-        if filecmp.cmp(file1, file2, 0):
+        if filecmp.cmp(cmpFile1, cmpFile2, 0):
             local1 = os.path.basename(origFile1)
             local2 = os.path.basename(origFile2)
             if local1.find(local2) != -1:

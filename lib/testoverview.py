@@ -2,7 +2,7 @@
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
 import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors, re
-from cPickle import Pickler, Unpickler, UnpicklingError
+from cPickle import Pickler, loads, UnpicklingError
 from ndict import seqdict
 HTMLgen.PRINTECHO = 0
 
@@ -137,10 +137,11 @@ class GenerateWebPages:
                 return version
         return "None"
     def readState(self, stateFile):
-        file = open(stateFile)
+        file = open(stateFile, "rU")
         try:
-            unpickler = Unpickler(file)
-            state = unpickler.load()
+            # Would like to do load(file) here... but it doesn't work, see Python bug 1724366
+            # http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470
+            state = loads(file.read())
             state.ensureCompatible()
             return state
         except (UnpicklingError, ImportError, EOFError, AttributeError), e:

@@ -181,7 +181,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return baseRunner
     def isExecutable(self, process, parentProcess, test):
         binaryName = os.path.basename(test.getConfigValue("binary"))
-        return binaryName.startswith(parentProcess) and not process.startswith(".") and process.find("arch") == -1 and process.find("crsutil") == -1 and process.find("CMD") == -1
+        return process != parentProcess and binaryName.startswith(parentProcess) and not process.startswith(".") and process.find("arch") == -1 and process.find("crsutil") == -1
     def getFileExtractor(self):
         baseExtractor = queuesystem.QueueSystemConfig.getFileExtractor(self)
         if self.optionMap.has_key("lprof"):
@@ -291,6 +291,8 @@ class RunWithParallelAction(plugins.Action):
         
         executableProcessName = childProcesses[-1].getName()
         parentProcessName = childProcesses[-2].getName()
+        if len(executableProcessName) == 0 or len(parentProcessName) == 0:
+            return None, None # processes already complete
         if self.isExecutable(executableProcessName, parentProcessName, test):
             self.diag.info("Chose process as executable : " + executableProcessName + " parent process " + parentProcessName)
             return childProcesses[-1], childProcesses[-2]

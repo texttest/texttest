@@ -876,6 +876,7 @@ class TestTreeGUI(ContainerGUI):
         self.collapsedRows = {}
         self.filteredModel = None
         self.treeView = None
+        self.diag = plugins.getDiagnostics("Test Tree")
     def setActive(self, value):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         ContainerGUI.setActive(self, value)
@@ -1026,6 +1027,7 @@ class TestTreeGUI(ContainerGUI):
     def selectionChanged(self, direct):
         newSelection = self.getSelected()
         if newSelection != self.selectedTests:
+            self.diag.info("Selection now changed to " + repr(newSelection))
             self.selectedTests = newSelection
             self.notify("NewTestSelection", newSelection, direct)
     def notifyRefreshTestSelection(self):
@@ -1903,7 +1905,9 @@ class TextInfoGUI(SubGUI):
         guilog.info(plugins.encodeToLocale(buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter()), guilog).strip())
         guilog.info("--------------------------------------")
     def notifyNewTestSelection(self, tests, direct):
-        if len(tests) > 0 and self.currentTest not in tests:
+        if len(tests) == 0:
+            self.currentTest = None
+        elif self.currentTest not in tests:
             self.currentTest = tests[0]
             self.resetText(self.currentTest.state)
             self.updateView()

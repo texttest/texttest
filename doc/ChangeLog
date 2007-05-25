@@ -844,3 +844,16 @@ Bug Fixes:
     - Fixed occasional failures of traffic mechanism due to failing to read from sockets properly (traffic.py)
     - Fixed stack trace when machine names are one letter or shorter (default.py)
     - Fixed stack trace when empty composite versions given (-v .v1..v2 or similar)  (testmodel.py)
+
+Version 3.9.1
+=============
+Fixes for bugs introduced in 3.9:
+    - Fixed "Follow file progress" on UNIX (The "tail -f" window, which just produced an error in 3.9) (guiplugins.py)
+    - Fixed handling of Windows path names in "binary" config file setting and options.<app> files (default.py)
+Fixes for older bugs: 
+    - Fixed dynamic GUI bug where deselecting all tests (e.g. by hiding or collapsing) blocked all Text Info updates (texttestgui.py)
+	Could lead to a Text Info window which showed "Running" even when the test was complete.
+    - Fixed HTML report bug where generating a report on UNIX from a run done on Windows produced "read error" (testoverview.py)
+	Windows line-ending trouble again
+    - Fixed bug where terminated processes on UNIX got named "CMD" (jobprocess.py)
+	Could lead to occasional confusing printouts. 

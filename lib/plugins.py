@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, time, re, stat, locale, datetime, subprocess
+import sys, os, log4py, string, shutil, time, re, stat, locale, datetime, subprocess, shlex
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
@@ -558,6 +558,15 @@ def movefile(sourcePath, targetFile):
             os.remove(sourcePath)
         except OSError:
             pass
+
+# portable version of shlex.split
+# See http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470
+# As usual, UNIX paths work better on Windows than Windows paths...
+def splitcmd(s):
+    if os.name == "posix":
+        return shlex.split(s)
+    else:
+        return shlex.split(s.replace("\\", "\\\\"))
 
 # portable version of os.path.samefile
 def samefile(writeDir, currDir):

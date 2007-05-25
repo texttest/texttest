@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, string, sys, default, unixonly, performance, plugins, socket, time, subprocess, shlex
+import os, string, sys, default, unixonly, performance, plugins, socket, time, subprocess
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
@@ -341,7 +341,7 @@ class QueueSystemServer:
         extraArgs = os.getenv("QUEUE_SYSTEM_SUBMIT_ARGS")
         cmdArgs = queueSystem.getSubmitCmdArgs(submissionRules)
         if extraArgs:
-            cmdArgs += shlex.split(extraArgs)
+            cmdArgs += plugins.splitcmd(extraArgs)
         cmdArgs.append(command)
         jobName = submissionRules.getJobName()
         self.submitDiag.info("Creating job " + jobName + " with command arguments : " + repr(cmdArgs))

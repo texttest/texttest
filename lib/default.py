@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, shutil, plugins, respond, rundependent, performance, comparetest, sys, batch, re, stat, paths, subprocess, shlex, operator, glob
+import os, shutil, plugins, respond, rundependent, performance, comparetest, sys, batch, re, stat, paths, subprocess, operator, glob
 from threading import currentThread
 from knownbugs import CheckForBugs, CheckForCrashes
 from traffic import SetUpTrafficHandlers
@@ -1226,7 +1226,7 @@ class RunTest(plugins.Action):
         return args
     def getExecuteCmdArgs(self, test):
         parts = self.getCmdParts(test)
-        return reduce(operator.add, [ shlex.split(part) for part in parts ])
+        return reduce(operator.add, map(plugins.splitcmd, parts))
     def makeFile(self, test, name):
         fileName = test.makeTmpFileName(name)
         return open(fileName, "w")

@@ -329,8 +329,9 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         if os.path.basename(dirname) != "APC_FILES":
             return False
 
-        names = [ "input", "status", "colgen_analysis.example_rotations", "hostname", "best_solution" ]
-        prefixes = [ "Solution_", "core", "run_status", "optinfo" ]
+        names = [ "input", "status", "colgen_analysis.example_rotations", "hostname", "best_solution"]                  
+        prefixes = [ "Solution_", "core", "run_status", "optinfo",
+                     "composition_solution", "rotation_solution", "depotplanning_solution" ]
         postfixes = [ ".log" ]
         if file in names:
             return False

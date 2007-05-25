@@ -548,7 +548,7 @@ class CompileRules(plugins.Action):
 
             commandArgs = [ "crc_compile" ] + ruleset.getCompilationArgs()
             if ruleset.modeString == "-debug":
-                test.app.configObject.target.ensureDebugLibrariesExist(test.app)
+                test.app.ensureDebugLibrariesExist()
             success, currRaveInfo = self.performCompile(test, commandArgs)
             if success:
                 raveInfo += "\n" + currRaveInfo
@@ -936,7 +936,7 @@ class BuildCode(plugins.Action):
         arch = getArchitecture(app)
         buildFile = "build.default." + arch
         extra = ""
-        if app.configObject.target.raveMode() == "-debug":
+        if app.raveMode() == "-debug":
             extra = "VERSION=debug "
         makeCommand = "gmake " + extra + makeTargets
         commandLine = self.getRemoteCommandLine(arch, absPath, makeCommand)

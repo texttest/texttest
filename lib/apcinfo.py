@@ -537,7 +537,7 @@ class GenHTML(plugins.Action):
         return cost_spread, meanvar
         
     def createGroupInfo(self, group, test):
-        subplanDir = test.app.configObject.target._getSubPlanDirName(test)
+        subplanDir = test.app._getSubPlanDirName(test)
         info = HTMLgen.Paragraph()
 
         # Info from status file

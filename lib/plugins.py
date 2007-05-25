@@ -234,6 +234,8 @@ class Configuration:
         return ""
     def getFilterFilePath(self, app, localName, forWrite):
         return localName
+    def getInteractiveReplayOptions(self):
+        return []
     def useExtraVersions(self, app):
         return True
     def printHelpText(self):
@@ -695,10 +697,13 @@ def retryOnInterrupt(function, *args):
         else:
             raise
 
+def getExceptionString():
+    type, value, traceback = sys.exc_info()
+    return "".join(format_exception(type, value, traceback))
+
 def printException():
     sys.stderr.write("Description of exception thrown :\n")
-    type, value, traceback = sys.exc_info()
-    exceptionString = string.join(format_exception(type, value, traceback), "")
+    exceptionString = getExceptionString()
     sys.stderr.write(exceptionString)
     return exceptionString
 

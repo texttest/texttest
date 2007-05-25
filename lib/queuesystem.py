@@ -144,7 +144,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getResponderClasses(self, allApps)
     def getEnvironmentCreator(self, test):
         if self.useQueueSystem():
-            return TestEnvironmentCreator(test, self.optionMap)
+            return TestEnvironmentCreator(test, self.optionMap, self.getInteractiveReplayOptions())
         else:
             return default.Config.getEnvironmentCreator(self, test)
     def getTextDisplayResponderClass(self):

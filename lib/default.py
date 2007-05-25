@@ -326,7 +326,9 @@ class Config(plugins.Configuration):
         testEnvironmentCreator = self.getEnvironmentCreator(test)
         testEnvironmentCreator.setUp()
     def getEnvironmentCreator(self, test):
-        return TestEnvironmentCreator(test, self.optionMap)
+        return TestEnvironmentCreator(test, self.optionMap, self.getInteractiveReplayOptions())
+    def getInteractiveReplayOptions(self):
+        return [ ("actrep", "slow motion") ]
     def getTextResponder(self):
         return respond.InteractiveResponder
     # Utilities, which prove useful in many derived classes
@@ -599,9 +601,10 @@ class Config(plugins.Configuration):
 
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:
-    def __init__(self, test, optionMap):
+    def __init__(self, test, optionMap, intvReplayOptions):
         self.test = test
         self.optionMap = optionMap
+        self.intvReplayOptions = intvReplayOptions
         self.usecaseFile = self.test.getFileName("usecase")
         self.diagDict = self.test.getConfigValue("diagnostics")
         self.diag = plugins.getDiagnostics("Environment Creator")
@@ -635,7 +638,12 @@ class TestEnvironmentCreator:
         # Set a virtual display for the top level test
         # Don't set it if we've requested a slow motion replay or we're trying to record a new usecase.
         # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
-        return self.topLevel() and not self.optionMap.has_key("actrep") and not self.isRecording()
+        if not self.topLevel() or self.isRecording():
+            return False
+        for option, desc in self.intvReplayOptions:
+            if self.optionMap.has_key(option):
+                return False
+        return True
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
             self.setTraceDiagnostics()

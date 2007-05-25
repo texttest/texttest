@@ -934,7 +934,7 @@ class SelectTests(SelectionAction):
         if name == "Tests listed in file":
             apps = guiConfig.apps
             if len(apps) > 0:
-                dirs = apps[0].configObject.getFilterFileDirectories(apps)
+                dirs = apps[0].getFilterFileDirectories(apps)
                 # Set first non-empty dir as default ...)
                 for dir in dirs:
                     if os.path.isdir(os.path.abspath(dir[1])) and \
@@ -951,8 +951,8 @@ class SelectTests(SelectionAction):
         return "Selected " + self.describeTests() + "."    
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def getFilterList(self, app):
-        app.configObject.updateOptions(self.appSelectGroup)
-        return app.configObject.getFilterList(app, False)
+        app.updateConfigOptions(self.appSelectGroup)
+        return app.getFilterList(extendFileNames=False)
     def performOnCurrent(self): 
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")
@@ -1071,7 +1071,7 @@ class SaveSelection(SelectionAction):
         return not guiConfig.dynamic
     def getDirectories(self, name=""):
         apps = guiConfig.apps
-        dirs = apps[0].configObject.getFilterFileDirectories(apps)
+        dirs = apps[0].getFilterFileDirectories(apps)
         if len(dirs) > 0:
             self.folders = (dirs, dirs[0][1])
         else:
@@ -1238,16 +1238,19 @@ class RunTests(RunningAction):
         return "Started"
     def getUseCaseName(self):
         return "dynamic"
-    def actionReplayEnabled(self):
+    def getInteractiveReplayDescription(self):
+        app = self.currTestSelection[0].app
         for group in self.optionGroups:
-            if group.getSwitchValue("actrep", False):
-                return True
-        return False
+            for switchName, desc in app.getInteractiveReplayOptions():
+                if group.getSwitchValue(switchName, False):
+                    return desc
     def getConfirmationMessage(self):
-        if len(self.currTestSelection) > 1 and self.actionReplayEnabled():
-            return "You are trying to run " + str(len(self.currTestSelection)) + " tests with slow motion replay enabled.\n" + \
-                   "This will mean lots of target application GUIs popping up and may be hard to follow.\n" + \
-                   "Are you sure you want to do this?"
+        if len(self.currTestSelection) > 1:
+            interactiveDesc = self.getInteractiveReplayDescription()
+            if interactiveDesc:
+                return "You are trying to run " + str(len(self.currTestSelection)) + " tests with " + \
+                       interactiveDesc + " replay enabled.\nThis will mean lots of target application GUIs " + \
+                       "popping up and may be hard to follow.\nAre you sure you want to do this?"
         else:
             return ""
 
@@ -1641,7 +1644,7 @@ class RecomputeTest(InteractiveTestAction):
         pass
     def performOnCurrent(self):
         test = self.currentTest # recomputing can change selection, make sure we talk about the right one...
-        test.app.configObject.recomputeProgress(test, self.observers)
+        test.app.recomputeProgress(test, self.observers)
         self.notify("Status", "Done recomputing status of " + repr(test) + ".")
 
 class SortTestSuiteFileAscending(InteractiveAction):

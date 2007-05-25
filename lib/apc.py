@@ -411,7 +411,7 @@ class RunApcTestInDebugger(default.RunTest):
         outFile.close()
         # Create execute command.
         binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
-        if test.app.configObject.target.raveMode() == "-debug":
+        if test.app.raveMode() == "-debug":
             binName += "_g"
         if self.inXEmacs:
             gdbStart, gdbWithArgs = self.runInXEmacs(test, binName, gdbArgs)

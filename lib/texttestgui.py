@@ -2234,9 +2234,9 @@ class TestFileGUI(FileViewGUI):
         self.addStaticDataFilesToModel()
     def getDisplayDataFiles(self):
         try:
-            return self.currentTest.app.configObject.extraReadFiles(self.currentTest).items()
+            return self.currentTest.app.extraReadFiles(self.currentTest).items()
         except:
-            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentTest.app.configObject.moduleName + \
+            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentTest.getConfigValue("config_module") + \
                              "' configuration while requesting extra data files, not displaying any such files")
             plugins.printException()
             return seqdict()

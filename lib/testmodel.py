@@ -106,7 +106,7 @@ class EnvironmentReader:
         self.diag = plugins.getDiagnostics("read environment")
     def read(self, test, referenceVars = []):
         self.diag.info("Reading environment for " + repr(test))
-        self.app.configObject.setEnvironment(test)
+        self.app.setEnvironment(test)
         if test.parent == None:
             test.setEnvironment("TEXTTEST_CHECKOUT", self.app.checkout)
         elif isinstance(test, TestCase):
@@ -849,50 +849,34 @@ class BadConfigError(RuntimeError):
     pass
 
 class ConfigurationCall:
-    def __init__(self, name, moduleName, target):
+    def __init__(self, name, app):
         self.name = name
-        self.moduleName = moduleName
-        exec "self.targetCall = target." + name
-    def __call__(self, *args):
+        self.app = app
+        self.firstAttemptException = ""
+        self.targetCall = eval("app.configObject." + name)
+    def __call__(self, *args, **kwargs):
         try:
-            return self.targetCall(*args)
+            return self.targetCall(*args, **kwargs)
+        except TypeError:
+            if self.firstAttemptException:
+                self.raiseException()
+            else:
+                self.firstAttemptException = plugins.getExceptionString()
+                return self(self.app, *args, **kwargs)
         except plugins.TextTestError:
             # Just pass it through here, these are deliberate
             raise
         except:
             self.raiseException()
     def raiseException(self):
-        message = "Exception thrown by '" + self.moduleName + "' configuration, while requesting '" + self.name + "'"
-        plugins.printException()
-        raise BadConfigError, message
-        
-class ConfigurationWrapper:
-    def __init__(self, moduleName, inputOptions):
-        self.moduleName = moduleName
-        importCommand = "from " + moduleName + " import getConfig"
-        try:
-            exec importCommand
-        except:
-            if sys.exc_type == exceptions.ImportError:
-                errorString = "No module named " + moduleName
-                if str(sys.exc_value) == errorString:
-                    raise BadConfigError, "could not find config_module " + moduleName
-                elif str(sys.exc_value) == "cannot import name getConfig":
-                    raise BadConfigError, "module " + moduleName + " is not intended for use as a config_module"
-            plugins.printException()
-            raise BadConfigError, "config_module " + moduleName + " contained errors and could not be imported"
-        self.target = getConfig(inputOptions)
-    def updateOptions(self, optionGroup):
-        for key, option in optionGroup.options.items():
-            if len(option.getValue()):
-                self.target.optionMap[key] = option.getValue()
-            elif self.target.optionMap.has_key(key):
-                del self.target.optionMap[key]
-    def __getattr__(self, name):
-        if hasattr(self.target, name):
-            return ConfigurationCall(name, self.moduleName, self.target)
+        message = "Exception thrown by '" + self.app.getConfigValue("config_module") + \
+                  "' configuration, while requesting '" + self.name + "'"
+        if self.firstAttemptException:
+            sys.stderr.write("Both attempts to call configuration failed, both exceptions follow :\n")
+            sys.stderr.write(self.firstAttemptException + "\n" + self.getExceptionString())
         else:
-            raise AttributeError, "No such configuration method : " + name        
+            plugins.printException()
+        raise BadConfigError, message
     
 class Application:
     def __init__(self, name, dircache, version, inputOptions):
@@ -910,7 +894,7 @@ class Application:
         self.readValues(self.configDir, "config", self.dircache, insert=0)
         self.fullName = self.getConfigValue("full_name")
         self.diag.info("Found application " + repr(self))
-        self.configObject = ConfigurationWrapper(self.getConfigValue("config_module"), inputOptions)
+        self.configObject = self.makeConfigObject()
         self.cleanMode = self.configObject.getCleanMode()
         self.rootTmpDir = self._getRootTmpDir()
         # Fill in the values we expect from the configurations, and read the file a second time
@@ -926,7 +910,7 @@ class Application:
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
         self.writeDirectory = self.configObject.getWriteDirectoryName(self)
         self.diag.info("Write directory at " + self.writeDirectory)
-        self.checkout = self.makeCheckout()
+        self.checkout = self.configObject.getCheckoutPath(self)
         self.diag.info("Checkout set to " + self.checkout)
         self.setCheckoutVariable()
         self.optionGroups = self.createOptionGroups(inputOptions)
@@ -935,6 +919,32 @@ class Application:
         return self.fullName
     def __hash__(self):
         return id(self)
+    def makeConfigObject(self):
+        moduleName = self.getConfigValue("config_module")
+        importCommand = "from " + moduleName + " import getConfig"
+        try:
+            exec importCommand
+        except:
+            if sys.exc_type == exceptions.ImportError:
+                errorString = "No module named " + moduleName
+                if str(sys.exc_value) == errorString:
+                    raise BadConfigError, "could not find config_module " + moduleName
+                elif str(sys.exc_value) == "cannot import name getConfig":
+                    raise BadConfigError, "module " + moduleName + " is not intended for use as a config_module"
+            plugins.printException()
+            raise BadConfigError, "config_module " + moduleName + " contained errors and could not be imported"
+        return getConfig(self.inputOptions)
+    def updateConfigOptions(self, optionGroup):
+        for key, option in optionGroup.options.items():
+            if len(option.getValue()):
+                self.configObject.optionMap[key] = option.getValue()
+            elif self.configObject.optionMap.has_key(key):
+                del self.configObject.optionMap[key]
+    def __getattr__(self, name): # If we can't find a method, assume the configuration has got one
+        if hasattr(self.configObject, name):
+            return ConfigurationCall(name, self)
+        else:
+            raise AttributeError, "No such Application method : " + name 
     def getIndent(self):
         # Useful for printing with tests
         return ""
@@ -1015,8 +1025,6 @@ class Application:
             if appName != self.name and not appName in names:
                 names.append(appName)
         return names
-    def useExtraVersions(self):
-        return self.configObject.useExtraVersions(self)
     def getExtraVersions(self, forUse=True):
         if forUse and not self.useExtraVersions():
             return []
@@ -1072,8 +1080,6 @@ class Application:
         if version:
             options += [ "-v", version ]
         return options + self.configObject.getRunOptions(checkout)
-    def hasPerformance(self):
-        return self.configObject.hasPerformance(self)
     def addToOptionGroup(self, group):
         if group.name.startswith("Basic"):
             group.addOption("v", "Run this version", self.getFullVersion())
@@ -1289,8 +1295,6 @@ class Application:
         self.configDir[key] = value
         if len(docString) > 0:
             self.configDocs[key] = docString
-    def makeCheckout(self):
-        return self.configObject.getCheckoutPath(self)
     def checkBinaryExists(self):
         binary = self.getConfigValue("binary")
         if not binary:

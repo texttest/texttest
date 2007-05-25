@@ -295,6 +295,8 @@ class Config(CarmenConfig):
                             "carmusr_default", "crc", "modules", getBasicRaveName(test))
     def filesFromSubplan(self, test, subplanDir):
         return []
+    def ensureDebugLibrariesExist(self, app):
+        pass
     def setEnvironment(self, test):
         CarmenConfig.setEnvironment(self, test)
         if test.parent and test.parent.parent is None:
@@ -545,6 +547,8 @@ class CompileRules(plugins.Action):
             self.describe(test, " - ruleset " + ruleset.name)
 
             commandArgs = [ "crc_compile" ] + ruleset.getCompilationArgs()
+            if ruleset.modeString == "-debug":
+                test.app.configObject.target.ensureDebugLibrariesExist(test.app)
             success, currRaveInfo = self.performCompile(test, commandArgs)
             if success:
                 raveInfo += "\n" + currRaveInfo

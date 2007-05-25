@@ -210,6 +210,17 @@ class ApcConfig(optimization.OptimizationConfig):
             if option.find("crc" + os.sep + "rule_set") != -1:
                 return [ os.path.basename(option) ]
         return []
+    def ensureDebugLibrariesExist(self, app):
+        libraries = [ ("data/crc", "librave_rts.a", "librave_rts_g.a"),
+                      ("data/crc", "librave_private.a", "librave_private_g.a"),
+                      ("lib", "libDMFramework.so", "libDMFramework_g.so"),
+                      ("lib", "libBasics_Foundation.so", "libBasics_Foundation_g.so"),
+                      ("lib", "libBasics_errlog.so", "libBasics_errlog_g.so")]
+        for libpath, orig, debug in libraries:
+            debugLib = os.path.join(os.environ["CARMSYS"], libpath, getArchitecture(app), debug)
+            if not os.path.exists(debugLib):
+                origLib = os.path.join(os.environ["CARMSYS"], libpath, getArchitecture(app), orig)
+                os.symlink(origLib, debugLib)
     def printHelpDescription(self):
         print helpDescription
         optimization.OptimizationConfig.printHelpDescription(self)

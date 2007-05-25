@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.5 2007/05/22 10:09:05 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.6 2007/05/25 10:47:56 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -13,6 +13,11 @@ def getConfig(optionMap):
     return StudioConfig(optionMap)
 
 class StudioConfig(ravebased.Config):
+    def addToOptionGroups(self, app, groups):
+        for group in groups:
+            if group.name.startswith("Basic"):
+                group.addSwitch("stepmacro", "Step through macro using the Macro Recorder")
+        ravebased.Config.addToOptionGroups(self, app, groups)
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues)
     def defaultBuildRules(self):
@@ -101,7 +106,13 @@ class StudioConfig(ravebased.Config):
             if line.find("Build ruleset " + rulesetName) != -1:
                 return True
         return False
-
+    def setEnvironment(self, test):
+        ravebased.Config.setEnvironment(self, test)
+        if not test.parent and self.optionMap.has_key("stepmacro"):
+            test.setEnvironment("USECASE_REPLAY_SINGLESTEP", "1")
+    def getInteractiveReplayOptions(self):
+        return ravebased.Config.getInteractiveReplayOptions(self) + [ ("stepmacro", "single-step") ]
+        
 class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
     def findValues(self, logFile, entryFinder):
         values = []

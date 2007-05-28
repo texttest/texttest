@@ -14,6 +14,10 @@ Documentation Summary:
        c) Many people like to learn by example. There is a brief "quick start guide" based around reading the 
           self-tests, under source/doc/quickstart.txt 
 
+       d) A directory RHEL_upgrade, especially for people working on Red Hat Enterprise Linux
+          who are stuck with an old version of Python or PyGTK and a sysadmin group unwilling to
+          upgrade the central version.
+
 Installation and System Requirements:
 
     Read the installation guide at http:/www.texttest.org/TextTest/docs/install.html

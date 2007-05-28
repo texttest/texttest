@@ -1,0 +1,27 @@
+#!/bin/sh
+
+abspath()
+{
+    case "$1" in
+        
+    /*)
+        eval "$2=$1"
+        ;;
+
+    *)
+        eval $2=`pwd`/`basename $1`
+        ;;
+    esac
+}
+
+abspath $0 fullpath
+
+# Make sure that TextTest runs this script when it starts itself internally
+export TEXTTEST_SLAVE_CMD=$fullpath
+
+# Sets gtk/pygtk environment variables and sets PYTHON_TO_RUN 
+# to point to the full name of the python binary to run.
+bindir=`dirname ${fullpath}`
+. $bindir/setup_python_gtk.sh
+
+exec $PYTHON_TO_RUN -u ${fullpath}.py "$@"

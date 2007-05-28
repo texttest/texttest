@@ -1,0 +1,149 @@
+
+Before building anything, make sure the correct Python is your default (i.e. first in the PATH!)
+
+tiff-v3.6.1
+-----------
+
+Run 
+
+> tar zxvf tiff-v3.6.1.tar.gz
+> cd tiff-v3.6.1
+> ./configure --prefix=$INSTALLATION_DIR - change man page dir to $INSTALLATION_DIR/man/
+> make
+> make install
+> cd $SOURCE_DIR
+
+jpegsrc.v6b
+-----------
+
+Run 
+
+> tar zxvf jpegsrc.v6b.tar.gz
+> cd jpeg-6b
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+libart_lgpl-2.3.17
+------------------
+
+Run
+
+> tar jxvf libart_lgpl-2.3.17.tar.bz2
+> cd libart_lgpl-2.3.17
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+glib-2.6.6
+----------
+
+Run 
+
+> tar jxvf glib-2.6.6.tar.bz2
+> cd glib-2.6.6
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+Now, to make sure the build system finds our newly installed glib (and other packages, as we continue), set
+
+setenv PKG_CONFIG_PATH ${INSTALLATION_DIR}/lib/pkgconfig/
+setenv LD_LIBRARY_PATH $INSTALLATION_DIR/lib/:${LD_LIBRARY_PATH}
+
+libgsf-1.14.3
+-------------
+
+Run
+
+> tar jxvf libgsf-1.14.3.tar.bz2
+> cd libgsf-1.14.3
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+librsvg-2.12.7
+--------------
+
+Run
+
+> tar jxvf librsvg-2.12.7.tar.bz2
+> cd librsvg-2.12.7
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+libpng-1.2.8
+------------
+
+Run 
+
+> tar jxvf libpng-1.2.8.tar.bz2
+> cd libpng-1.2.8
+> cp scripts/makefile.linux makefile
+
+Edit makefile so that prefix points at INSTALLATION_DIR:
+
+# where "make install" puts libpng12.a, libpng12.so*,
+# libpng12/png.h and libpng12/pngconf.h
+# Prefix must be a full pathname.
+prefix=$INSTALLATION_DIR (you might need to expand $INSTALLATION_DIR here)
+
+Run 
+
+> make
+> make install
+> cd $SOURCE_DIR
+
+atk-1.9.0
+---------
+
+Run
+
+> tar jxvf atk-1.9.0.tar.bz2
+> cd atk-1.9.0
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+pango-1.8.2
+-----------
+
+Run
+
+> tar jxvf pango-1.8.2.tar.bz2
+> cd pango-1.8.2
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+gtk+-2.6.9
+----------
+
+Run
+
+> tar jxvf gtk+-2.6.9.tar.bz2
+> cd gtk+-2.6.9
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+pygtk-2.6.3
+-----------
+
+Run
+
+> tar jxvf pygtk-2.6.3.tar.bz2
+> cd pygtk-2.6.3
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR

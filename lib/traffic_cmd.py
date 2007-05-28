@@ -19,7 +19,7 @@ def sendServerState(stateDesc):
 
 if __name__ == "__main__":
     sock = createSocket()
-    text = "SUT_COMMAND_LINE:" + repr(sys.argv) + ":SUT_ENVIRONMENT:" + repr(os.environ)
+    text = "SUT_COMMAND_LINE:" + repr(sys.argv) + ":SUT_SEP:" + repr(os.environ) + ":SUT_SEP:" + os.getcwd()
     sock.sendall(text)
     sock.shutdown(1)
     response = sock.makefile().read()
@@ -30,10 +30,7 @@ if __name__ == "__main__":
         sys.stdout.flush()
         sys.stderr.write(stderr)
         sys.stderr.flush()
-        exitCode = int(exitStr)
-        if os.name == "posix":
-            exitCode = os.WEXITSTATUS(exitCode)
-        sys.exit(exitCode)
+        sys.exit(int(exitStr))
     except ValueError:
         sys.stderr.write("Received unexpected communication from MIM server:\n " + response + "\n\n")
 

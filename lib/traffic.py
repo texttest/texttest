@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, string, sys, plugins, shutil, sys, socket, tempfile
+import os, sys, plugins, shutil, socket, subprocess
 from copy import deepcopy
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
@@ -30,7 +30,7 @@ class SetUpTrafficHandlers(plugins.Action):
         recordFile = test.makeTmpFileName("traffic")
         envVarMethod = MethodWrap(test.getCompositeConfigValue, "collect_traffic_environment")
         if self.record:
-            self.setServerState(recordFile, None, envVarMethod, test.makeTmpFileName("traffic_tmp", forFramework=1))
+            self.setServerState(recordFile, None, envVarMethod)
             return True
         else:
             trafficReplay = test.getFileName("traffic")
@@ -40,11 +40,11 @@ class SetUpTrafficHandlers(plugins.Action):
             else:
                 self.setServerState(None, None, envVarMethod)
                 return False
-    def setServerState(self, recordFile, replayFile, envVarMethod, tmpFileName=None):
+    def setServerState(self, recordFile, replayFile, envVarMethod):
         if recordFile or replayFile and not TrafficServer.instance:
             TrafficServer.instance = TrafficServer()
         if TrafficServer.instance:
-            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod, tmpFileName)
+            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod)
     def makeIntercepts(self, test):
         for cmd in test.getConfigValue("collect_traffic"):
             linkName = test.makeTmpFileName(cmd, forComparison=0)
@@ -69,9 +69,7 @@ class Traffic:
     def hasInfo(self):
         return len(self.text) > 0
     def getDescription(self):
-        return self.direction + self.typeId + ":" + self.getText()
-    def getText(self):
-        return self.text
+        return self.direction + self.typeId + ":" + self.text
     def forwardToDestination(self):
         if self.responseFile:
             self.responseFile.write(self.text)
@@ -105,17 +103,9 @@ class SysExitTraffic(ResponseTraffic):
     def __init__(self, status, responseFile):
         ResponseTraffic.__init__(self, str(status), responseFile)
         self.exitStatus = int(status)
-        if os.name == "posix" and type(status) == StringType: # from reading replay
-            self.exitStatus *= 256 # encode for os.system calls
-            self.text = str(self.exitStatus)
     def hasInfo(self):
         return self.exitStatus != 0
-    def getText(self):
-        if os.name == "posix":
-            return str(os.WEXITSTATUS(self.exitStatus)) # for recording
-        else:
-            return self.text
-
+    
 class ClientSocketTraffic(ResponseTraffic):
     destination = None
     typeId = "CLI"
@@ -146,17 +136,18 @@ class CommandLineTraffic(InTraffic):
     envVarMethod = None
     origEnviron = {}
     realCommands = {}
-    tmpFileName = None
     def __init__(self, inText, responseFile):
-        cmdText, environText = inText.split(":SUT_ENVIRONMENT:")
+        cmdText, environText, cmdCwd = inText.split(":SUT_SEP:")
         argv = eval(cmdText)
-        cmdEnviron = eval(environText)
+        self.cmdEnviron = eval(environText)
+        self.cmdCwd = cmdCwd
         self.fullCommand = argv[0].replace("\\", "/")
         self.commandName = os.path.basename(self.fullCommand)
-        self.argStr = string.join(map(self.quote, argv[1:]))
-        self.environ = self.filterEnvironment(cmdEnviron)
+        self.cmdArgs = argv[1:]
+        self.argStr = " ".join(map(self.quote, argv[1:]))
+        self.environ = self.filterEnvironment(self.cmdEnviron)
         self.diag = plugins.getDiagnostics("Traffic Server")
-        self.path = cmdEnviron.get("PATH")
+        self.path = self.cmdEnviron.get("PATH")
         text = self.getEnvString() + self.commandName + " " + self.argStr
         InTraffic.__init__(self, text, responseFile)
     def filterEnvironment(self, cmdEnviron):
@@ -189,34 +180,14 @@ class CommandLineTraffic(InTraffic):
                 quoteChar = self.getQuoteChar(char)
                 return quoteChar + arg + quoteChar
         return arg
-    def setUpEnvironment(self):
-        for var, value in self.environ:
-            os.putenv(var, value) # don't assign to os.environ, that might screw up other threads
-    def restoreEnvironment(self):
-        for var, value in self.environ:
-            oldVal = self.origEnviron.get(var)
-            if oldVal:
-                os.putenv(var, oldVal)
-            elif hasattr(os, "unsetenv"):
-                os.unsetenv(var)
-            else:
-                os.putenv(var, "")
     def forwardToDestination(self):
         realCmd = self.findRealCommand()
         if realCmd:
-            realCmdLine = realCmd + " " + self.argStr
-            TrafficServer.instance.diag.info("Executing real command : " + realCmdLine)
-            coutFile = self.tmpFileName + ".out"
-            cerrFile = self.tmpFileName + ".err"
-            self.setUpEnvironment()
-            exitCode = os.system(realCmdLine + " > " + coutFile + " 2> " + cerrFile)
-            TrafficServer.instance.diag.info("Completed with status : " + repr(exitCode))
-            self.restoreEnvironment()
-            output = open(coutFile).read()
-            errors = open(cerrFile).read()
-            os.remove(coutFile)
-            os.remove(cerrFile)
-            return self.makeResponse(output, errors, exitCode)
+            fullArgs = [ realCmd ] + self.cmdArgs
+            proc = subprocess.Popen(fullArgs, env=self.cmdEnviron, cwd=self.cmdCwd,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, errors = proc.communicate()
+            return self.makeResponse(output, errors, proc.returncode)
         else:
             return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH", 1)
     def makeResponse(self, output, errors, exitCode):
@@ -281,7 +252,7 @@ class TrafficServer(TCPServer):
     def setRealVersion(self, command, realCommand):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
-    def setState(self, recordFile, replayFile, envVarMethod, tmpFileName):
+    def setState(self, recordFile, replayFile, envVarMethod):
         self.recordFile = recordFile
         self.replayInfo = ReplayInfo(replayFile)
         if recordFile or replayFile:
@@ -290,7 +261,6 @@ class TrafficServer(TCPServer):
             os.environ["TEXTTEST_MIM_SERVER"] = ""
         CommandLineTraffic.envVarMethod = envVarMethod
         CommandLineTraffic.origEnviron = deepcopy(os.environ)
-        CommandLineTraffic.tmpFileName = tmpFileName
         ClientSocketTraffic.destination = None
     def process(self, traffic):
         self.record(traffic)

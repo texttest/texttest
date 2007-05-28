@@ -491,10 +491,10 @@ class KillTestSubmission(plugins.Action):
         return QueueSystemServer.instance.killJob(test)
     def setKilledPending(self, test):
         timeStr =  plugins.localtime("%H:%M")
-        briefText = "killed pending job at " + timeStr
-        freeText = "Test job was killed (while still pending in " + queueSystemName(test.app) +\
+        briefText = "cancelled pending job at " + timeStr
+        freeText = "Test job was cancelled (while still pending in " + queueSystemName(test.app) +\
                    ") at " + timeStr
-        test.changeState(plugins.TestState("killed", briefText=briefText, freeText=freeText, completed=1))
+        test.changeState(default.Cancelled(briefText, freeText))
     def setSlaveLost(self, test):
         failReason = "no report, possibly killed with SIGKILL"
         fullText = failReason + "\n" + self.getJobFailureInfo(test)

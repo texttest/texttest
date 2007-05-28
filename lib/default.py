@@ -10,6 +10,7 @@ from socket import gethostname
 from ndict import seqdict
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
+plugins.addCategory("cancelled", "cancelled", "were cancelled before starting")
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -1265,16 +1266,26 @@ class Killed(plugins.TestState):
     def processCompleted(self):
         return self.prevState.processCompleted()
 
+class Cancelled(plugins.TestState):
+    def __init__(self, briefText, freeText):
+        plugins.TestState.__init__(self, "cancelled", briefText=briefText, freeText=freeText, \
+                                   started=1, completed=1, lifecycleChange="complete")
+
 class KillTest(plugins.Action):
+    def __init__(self):
+        self.diag = plugins.getDiagnostics("Kill Test")
     def __call__(self, test):
-        if not test.state.hasStarted():
-            raise plugins.TextTestError, "Termination already in progress before test started."
-        
+        self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
+        if test.state.hasStarted():
+            self.killTest(test)
+        else:
+            test.changeState(Cancelled("cancelled", "Test run was cancelled before it had started"))
+    def killTest(self, test):
         briefText, fullText = self.getKillInfo(test)
         freeText = "Test " + fullText + "\n"
         newState = Killed(briefText, freeText, test.state)
         test.changeState(newState)
-        test.state.prevState.killProcess()
+        test.state.prevState.killProcess()        
     def getKillDescriptor(self, test):
         if hasattr(sys, "exc_value"):
             return self.interpret(test, str(sys.exc_value))

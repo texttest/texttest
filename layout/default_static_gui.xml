@@ -23,26 +23,23 @@
       <separator/>
     </menu>
 
-    <placeholder name="ExtraMenus">
-
-      <menu action="actionsmenu">
-        <menuitem name="Select" action="Select"/>
-        <menuitem name="Run" action="Run"/>
-        <menuitem name="Reconnect" action="Reconnect"/>
-        <menuitem name="Reset" action="Reset"/>
-      </menu>
-    </placeholder>
-  
+    <menu action="actionsmenu">
+      <menuitem action="Select"/>
+      <menuitem action="Run"/>
+      <menuitem action="Reconnect"/>
+      <menuitem action="Reset"/>
+    </menu>
+    
   </menubar>
 
   <toolbar name="MainToolBar">    
-    <toolitem name="Quit" action="Quit"/>
+    <toolitem action="Quit"/>
     <separator/>
-    <toolitem name="Select" action="Select"/>
-    <toolitem name="Run" action="Run"/>
+    <toolitem action="Select"/>
+    <toolitem action="Run"/>
     <placeholder name="AfterRun" />
     <separator/>
-    <toolitem name="Remove..." action="Remove..."/>
+    <toolitem action="Remove..."/>
     <separator/>
   </toolbar>
 

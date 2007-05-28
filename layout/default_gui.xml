@@ -10,11 +10,14 @@
     </menu> 
     <menu action="editmenu" />
     
-    <menu name="viewmenu" action="viewmenu">
+    <menu action="viewmenu">
       <menuitem name="Toolbar" action="Toolbar"/>
       <menuitem name="Shortcut bar" action="Shortcut bar"/>
       <menuitem name="Status bar" action="Status bar"/>
     </menu>
+    
+    <menu action="actionsmenu" />
+
     <placeholder name="ExtraMenus" />
 
     <menu action="helpmenu">

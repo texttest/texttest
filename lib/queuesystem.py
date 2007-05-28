@@ -40,21 +40,11 @@ class FindExecutionHosts(default.FindExecutionHosts):
         return _getExecutionMachines()
 
 class KillTestInSlave(default.KillTest):
-    def getBriefText(self, test, origBriefText):
+    def interpret(self, test, origBriefText):
         moduleName = queueSystemName(test.app).lower()
         command = "from " + moduleName + " import getLimitInterpretation as _getLimitInterpretation"
         exec command
-        interpretation = _getLimitInterpretation(origBriefText)
-        if interpretation == "KILLED":
-            timeStr = plugins.localtime("%H:%M")
-            return "killed at " + timeStr
-        else:
-            return interpretation
-    def getFullText(self, briefText):
-        if briefText.startswith("killed at"):
-            return briefText.replace("killed", "killed explicitly")
-        else:
-            return default.KillTest.getFullText(self, briefText)
+        return _getLimitInterpretation(origBriefText)
     
 class SocketResponder(Responder):
     def __init__(self, optionMap):
@@ -121,6 +111,13 @@ class QueueSystemConfig(default.Config):
             return self.CLEAN_NONE
         else:
             return default.Config.getCleanMode(self)
+    def getTestKiller(self):
+        if not self.useQueueSystem():
+            return default.Config.getTestKiller(self)
+        elif self.slaveRun():
+            return KillTestInSlave()
+        else:
+            return KillTestSubmission()
     def getTestProcessor(self):
         baseProcessor = default.Config.getTestProcessor(self)
         if not self.useQueueSystem() or self.slaveRun():

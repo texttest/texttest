@@ -873,7 +873,7 @@ class ConfigurationCall:
                   "' configuration, while requesting '" + self.name + "'"
         if self.firstAttemptException:
             sys.stderr.write("Both attempts to call configuration failed, both exceptions follow :\n")
-            sys.stderr.write(self.firstAttemptException + "\n" + self.getExceptionString())
+            sys.stderr.write(self.firstAttemptException + "\n" + plugins.getExceptionString())
         else:
             plugins.printException()
         raise BadConfigError, message

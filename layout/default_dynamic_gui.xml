@@ -8,16 +8,17 @@
         <separator/>
       </placeholder>
     </menu>
+    <menu action="actionsmenu">
+      <menuitem action="Kill"/>
+    </menu>
   </menubar>
 
   <toolbar name="MainToolBar">
-    <toolitem name="Quit" action="Quit"/>
-    <toolitem name="Save" action="Save"/>
+    <toolitem action="Quit"/>
+    <toolitem action="Kill"/>
+    <toolitem action="Save"/>
     <separator/>
   </toolbar>
-
-  <popup name="TestPopupMenu">
-  </popup>
 
   <popup name="TestFilePopupMenu">
     <menuitem action="View File"/>

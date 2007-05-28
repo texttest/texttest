@@ -149,6 +149,11 @@ class Config(plugins.Configuration):
                  SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
                  catalogueCreator, collator, rundependent.FilterOriginal(), self.getTestRunner(), \
                  catalogueCreator, collator, self.getTestEvaluator() ]
+    def killTest(self, test):
+        killer = self.getTestKiller()
+        killer(test)
+    def getTestKiller(self):
+        return KillTest()
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
     def getPossibleResultFiles(self, app):
@@ -1257,28 +1262,39 @@ class Killed(plugins.TestState):
                                    started=1, completed=1, executionHosts=prevState.executionHosts)
         # Cache running information, it can be useful to have this available...
         self.prevState = prevState
-    def getProcessCpuTime(self):
-        # for Windows
-        return self.prevState.getProcessCpuTime()
+    def processCompleted(self):
+        return self.prevState.processCompleted()
 
 class KillTest(plugins.Action):
     def __call__(self, test):
         if not test.state.hasStarted():
             raise plugins.TextTestError, "Termination already in progress before test started."
         
-        test.state.killProcess()
         briefText, fullText = self.getKillInfo(test)
         freeText = "Test " + fullText + "\n"
         newState = Killed(briefText, freeText, test.state)
         test.changeState(newState)
+        test.state.prevState.killProcess()
+    def getKillDescriptor(self, test):
+        if hasattr(sys, "exc_value"):
+            return self.interpret(test, str(sys.exc_value))
+        else:
+            return "KILLED"
+    def interpret(self, test, descriptor):
+        return descriptor
     def getKillInfo(self, test):
-        briefText = self.getBriefText(test, str(sys.exc_value))
+        descriptor = self.getKillDescriptor(test)
+        briefText = self.getBriefText(descriptor)
         if briefText:
             return briefText, self.getFullText(briefText)
         else:
             return "quit", "terminated by quitting"
-    def getBriefText(self, test, origBriefText):
-        return origBriefText
+    def getBriefText(self, descriptor):
+        if descriptor == "KILLED":
+            timeStr = plugins.localtime("%H:%M")
+            return "killed at " + timeStr
+        else:
+            return descriptor
     def getFullText(self, briefText):
         if briefText.startswith("RUNLIMIT"):
             return "exceeded maximum wallclock time allowed"
@@ -1286,6 +1302,8 @@ class KillTest(plugins.Action):
             return "exceeded maximum cpu time allowed"
         elif briefText.startswith("signal"):
             return "terminated by " + briefText
+        elif briefText.startswith("killed at"):
+            return briefText.replace("killed", "killed explicitly")
         else:
             return briefText
 

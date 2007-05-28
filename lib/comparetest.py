@@ -114,6 +114,7 @@ class TestComparison(BaseTestComparison):
             comparison.updatePaths(self.appWriteDir, newPath)
         self.appAbsPath = newPath
     def setFailedPrediction(self, prediction):
+        self.diag.info("Setting failed prediction to " + str(prediction))
         self.failedPrediction = prediction
         self.freeText = str(prediction)
         self.briefText = prediction.briefText

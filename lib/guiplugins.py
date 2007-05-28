@@ -632,6 +632,34 @@ class FollowFile(FileViewAction):
         description = followProgram + " " + os.path.basename(useFile)
         process = self.startViewer(self.getFollowCommand(followProgram, useFile), description=description)
         scriptEngine.monitorProcess("follows progress of test files", process)    
+
+class KillTests(SelectionAction):
+    def getStockId(self):
+        return "stop"
+    def _getTitle(self):
+        return "_Kill"
+    def __repr__(self):
+        return "Killing"
+    def _getScriptTitle(self):
+        return "Kill selected tests"
+    def isActiveOnCurrent(self, test=None, state=None):
+        for seltest in self.currTestSelection:
+            if seltest is test:
+                if not state.isComplete():
+                    return True
+            else:
+                if not seltest.state.isComplete():
+                    return True
+        return False
+    def performOnCurrent(self):
+        tests = filter(lambda test: not test.state.isComplete(), self.currTestSelection)
+        testDesc = str(len(tests)) + " tests"
+        self.notify("Status", "Killing " + testDesc + " ...")
+        for test in tests:
+            self.describe(test)
+            test.app.killTest(test)
+
+        self.notify("Status", "Killed " + testDesc + ".")
     
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveTestAction):
@@ -1901,7 +1929,7 @@ class InteractiveActionHandler:
     def __init__(self):
         self.actionPreClasses = [ Quit, ViewInEditor ]
         self.actionDynamicClasses = [ ViewFilteredInEditor, ViewFileDifferences, ViewFilteredFileDifferences, FollowFile, \
-                                      SaveTests, SaveSelection, RecomputeTest ]
+                                      SaveTests, SaveSelection, RecomputeTest, KillTests ]
         self.actionStaticClasses = [ RecordTest, CopyTest, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups, RenameTest, RemoveTests, \

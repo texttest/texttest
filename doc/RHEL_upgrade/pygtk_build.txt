@@ -147,3 +147,22 @@ Run
 > make
 > make install
 > cd $SOURCE_DIR
+
+
+
+Troubleshooting
+===============
+
+If you get problems with freetype-config not being found, try
+
+> tar jxvf freetype-2.2.1.tar.bz2
+> cd freetype-2.2.1
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+Adjust $PATH so that future configurations finds freetype-config in $INSTALLATION_DIR/bin:
+
+> setenv PATH $INSTALLATION_DIR/bin:${PATH}
+

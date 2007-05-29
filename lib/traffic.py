@@ -182,10 +182,13 @@ class CommandLineTraffic(InTraffic):
         return arg
     def forwardToDestination(self):
         realCmd = self.findRealCommand()
-        if realCmd:
+        if realCmd:                
             fullArgs = [ realCmd ] + self.cmdArgs
-            proc = subprocess.Popen(fullArgs, env=self.cmdEnviron, cwd=self.cmdCwd,
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            interpreter = plugins.getInterpreter(realCmd)
+            if interpreter:
+                fullArgs = [ interpreter ] + fullArgs
+            proc = subprocess.Popen(fullArgs, env=self.cmdEnviron, cwd=self.cmdCwd, 
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             output, errors = proc.communicate()
             return self.makeResponse(output, errors, proc.returncode)
         else:

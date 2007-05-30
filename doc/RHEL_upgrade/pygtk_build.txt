@@ -66,18 +66,6 @@ Run
 > make install
 > cd $SOURCE_DIR
 
-librsvg-2.12.7
---------------
-
-Run
-
-> tar jxvf librsvg-2.12.7.tar.bz2
-> cd librsvg-2.12.7
-> ./configure --prefix=$INSTALLATION_DIR
-> make
-> make install
-> cd $SOURCE_DIR
-
 libpng-1.2.8
 ------------
 
@@ -131,6 +119,18 @@ Run
 
 > tar jxvf gtk+-2.6.9.tar.bz2
 > cd gtk+-2.6.9
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+> cd $SOURCE_DIR
+
+librsvg-2.12.7
+--------------
+
+Run
+
+> tar jxvf librsvg-2.12.7.tar.bz2
+> cd librsvg-2.12.7
 > ./configure --prefix=$INSTALLATION_DIR
 > make
 > make install

@@ -122,9 +122,6 @@ class RaveSubmissionRules(CarmenSgeSubmissionRules):
             return [ self.envResource ]
         else:
             return []
-    def getSubmitSuffix(self, name):
-        return " (" + ",".join(self.getRuleSetNames(self.test)) + " ruleset)" + \
-               CarmenSgeSubmissionRules.getSubmitSuffix(self, name)
 
 class Config(CarmenConfig):
     def addToOptionGroups(self, app, groups):
@@ -139,46 +136,20 @@ class Config(CarmenConfig):
                 group.addSwitch("debug", "Use debug rulesets")
                 group.addSwitch("raveexp", "Run with RAVE Explorer")
             elif group.name.startswith("Invisible"):
-                group.addOption("raveslave", "Private: used for submitting slaves to compile rulesets")
                 group.addOption("rset", "Private: used for submitting ruleset names to compile")
     def getFilterClasses(self):
         return CarmenConfig.getFilterClasses(self) + [ UserFilter ]
-    def useExtraVersions(self, app):
-        return CarmenConfig.useExtraVersions(self, app) and not self.raveSlave()
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true"
-    def getResponderClasses(self, allApps):
-        if self.raveSlave():
-            return self.getSlaveResponderClasses()
-        baseResponders = CarmenConfig.getResponderClasses(self, allApps)
-        if self.useQueueSystem():
-            baseResponders.append(RuleBuildSynchroniser)
-        return baseResponders
     def getActionSequence(self):
         if self.slaveRun() or self.optionMap.has_key("coll") or self.isReconnecting():
             return CarmenConfig.getActionSequence(self)
-
-        if self.raveSlave():
-            return self.getRuleActions()
         
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
         return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleActions() ] + \
                  CarmenConfig._getActionSequence(self, makeDirs = 0)
-    def raveSlave(self):
-        return self.optionMap.has_key("raveslave")
     def getSlaveSwitches(self):
         return CarmenConfig.getSlaveSwitches(self) + [ "debug", "lprof", "raveexp" ]
-    def getWriteDirectoryName(self, app):
-        slaveDir = self.optionMap.get("raveslave")
-        if slaveDir:
-            return slaveDir
-        else:
-            return CarmenConfig.getWriteDirectoryName(self, app)
-    def getCleanMode(self):
-        if self.raveSlave():
-            return self.CLEAN_NONE
-        else:
-            return CarmenConfig.getCleanMode(self)
     def getCarmVarChecker(self):
         if not self.isReconnecting():
             return CheckCarmVariables()
@@ -190,7 +161,7 @@ class Config(CarmenConfig):
         return self.optionValue("a").find("rave") != -1 or self.optionValue("v").find("rave") != -1
     def rebuildAllRulesets(self):
         return self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp"))\
-               or self.isRaveRun() or self.raveSlave()
+               or self.isRaveRun()
     def getRuleActions(self):
         if self.buildRules():
             realBuilder = self.getRealRuleActions()
@@ -212,11 +183,11 @@ class Config(CarmenConfig):
         return FilterRuleBuilds(self.getRuleSetNames, self.raveMode(), self.rebuildAllRulesets())
     def getRealRuleActions(self):
         filterer = self.getRuleBuildFilterer()
-        if self.useQueueSystem() and not self.raveSlave():
+        if self.useQueueSystem():
             submitter = SubmitRuleCompilations(self.getRaveSubmissionRules, self.optionMap, self.getSlaveSwitches())
             return [ filterer, submitter, WaitForRuleCompile() ]
         else:
-            return [ filterer, self.getRuleBuildObject(), SynchroniseState() ]
+            return [ filterer, self.getRuleBuildObject(), EvaluateRuleBuild() ]
     def getRaveSubmissionRules(self, test):
         if queuesystem.queueSystemName(test.app) == "LSF":
             return self.getSubmissionRules(test)
@@ -304,7 +275,7 @@ class Config(CarmenConfig):
             if carmsys and (not test.parent.environment.has_key("PATH") or \
                             test.parent.environment["PATH"].find("$CARMSYS/bin") == -1):
                 test.setEnvironment("PATH", "$PATH:$CARMSYS/bin")
-        if not test.parent and self.raveSlave():
+        if not test.parent and self.useQueueSystem():
             test.setEnvironment("_AUTOTEST__LOCAL_COMPILE_", "1")
     def printHelpOptions(self):
         CarmenConfig.printHelpOptions(self)
@@ -429,7 +400,77 @@ class CleanupRules(plugins.Action):
         if self.raveNames == []:
             self.raveNames = getRaveNames(suite)
     
+class RuleBuildRequestHandler(queuesystem.SlaveRequestHandler):        
+    def handleRequestFromHost(self, hostname, requestId):
+        if requestId.startswith("remotecmd.py"):
+            self.handleRuleCompRequest(hostname, requestId)
+        else:
+            queuesystem.SlaveRequestHandler.handleRequestFromHost(self, hostname, requestId)
+    def handleRuleCompRequest(self, hostname, requestId):
+        diag = plugins.getDiagnostics("Synchroniser")
+        header, name, status = requestId.split(":")
+        diag.info("Got ruleset response for " + name)
+        raveOutput = self.getRaveOutput(status)
+        evaluator = EvaluateRuleBuild()
+        ruleset = self.server.findRuleset(name)
+        for test in self.server.findTestsForRuleset(name):
+            diag.info("Found test " + test.uniqueName)
+            if test.state.isComplete():
+                continue
+            if status == "start":
+                test.changeState(RunningRuleCompilation(test.state, hostname))
+            else:
+                if status == "exitcode=0":
+                    ruleset.succeeded(raveOutput)
+                else:
+                    ruleset.failed(raveOutput)
+                evaluator(test)
+    def getRaveOutput(self, status):
+        if status == "start":
+            return ""
+        else:
+            stdout, stderr = self.rfile.read().split("|STD_ERR|")
+            return stdout + stderr
+            
+class EvaluateRuleBuild(plugins.Action):
+    def __init__(self):
+        self.diag = plugins.getDiagnostics("Synchroniser")
+    def __call__(self, test):
+        self.diag.info("Evaluating rule build for " + test.uniqueName)
+        if not hasattr(test.state, "rulecomp"):
+            return
+        rulecomp = test.state.rulecomp
+        fileToWrite = test.makeTmpFileName("crc_compile_output", forFramework=1)
+        writeFile = open(fileToWrite, "w")
+        writeFile.write(rulecomp.getRuleBuildOutput())
+        writeFile.close()
+        ruleset = rulecomp.findFailedRuleset()
+        if ruleset:
+            freeText = "Failed to build ruleset " + ruleset.name + "\n" + self.getPreview(test, ruleset.output)            
+            test.changeState(RuleBuildFailed(test.state, freeText, "Ruleset build failed"))
+        elif rulecomp.allSucceeded():
+            print test.getIndent() + "All rulesets compiled for", test.uniqueName, \
+                  "(ruleset" + rulecomp.description() + ")"
+            test.changeState(RulesetCompiled(test.state))
+    def getPreview(self, test, raveInfo):
+        # For final reports, abbreviate the free text to avoid newsgroup bounces etc.
+        maxLength = test.getConfigValue("lines_of_crc_compile")
+        maxWidth = test.getConfigValue("max_width_text_difference")
+        previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
+        return previewGenerator.getPreviewFromText(raveInfo)
+
+
+class RuleBuildSlaveServer(queuesystem.SlaveServer):
+    def findRuleset(self, name):
+        return FilterRuleBuilds.rulesetNamesToRulesets.get(name)
+    def findTestsForRuleset(self, name):
+        return FilterRuleBuilds.rulesetNamesToTests.get(name, [])
+    def getHandlerClass(self):
+        return RuleBuildRequestHandler
+            
 class FilterRuleBuilds(plugins.Action):
+    rulesetNamesToTests = {}
+    rulesetNamesToRulesets = {}
     def __init__(self, getRuleSetNames, raveMode, forceRebuild):
         self.raveNames = []
         self.getRuleSetNames = getRuleSetNames
@@ -439,33 +480,25 @@ class FilterRuleBuilds(plugins.Action):
     def __repr__(self):
         return "Filtering rule builds for"
     def __call__(self, test):
-        rulesets = self.makeRulesets(test)
-        if len(rulesets) == 0:
+        buildSelf, othersBuild = self.makeRulesets(test)
+        if len(buildSelf + othersBuild) == 0:
             return
 
-        rulecomp = TestRuleCompilation(rulesets, test)
+        rulecomp = TestRuleCompilation(test, buildSelf, othersBuild)
         self.diag.info("Rule compilation for " + repr(test) + " : " + repr(rulecomp)) 
         test.changeState(NeedRuleCompilation(rulecomp))
-        self.updateSynchroniser(test)
         # We WAIT here to avoid race conditions - make sure everyone knows the state of their
         # rule compilations before we start any of them.
         return self.WAIT
-    def updateSynchroniser(self, test):
-        for otherTest in test.state.rulecomp.getOtherCompilingTests():
-            self.diag.info("Registering update " + otherTest.uniqueName + " -> " + test.uniqueName)
-            updateMap = RuleBuildSynchroniser.updateMap
-            if not updateMap.has_key(otherTest):
-                updateMap[otherTest] = []
-            updateMap[otherTest].append(test)
     def makeRulesets(self, test):
         arch = getArchitecture(test.app)
-        rulesets = []
+        unknown, known = [], []
         try:
             rulesetNames = self.getRuleSetNames(test)
         except plugins.TextTestError, e:
             # assume problems here are due to compilation itself not being setup, ignore
             print e
-            return []
+            return [], []
 
         for rulesetName in rulesetNames:
             ruleset = RuleSet(rulesetName, self.raveNames, arch, self.raveMode)
@@ -481,11 +514,19 @@ class FilterRuleBuilds(plugins.Action):
                     raise plugins.TextTestError, "Could not compile ruleset '" + ruleset.name + "' : rule source file does not exist"
 
             if self.shouldCompileFor(test, ruleset):
-                rulesets.append(ruleset)
+                targetName = ruleset.targetFiles[0]
+                origRuleset = self.rulesetNamesToRulesets.get(targetName)
+                if origRuleset:
+                    known.append(origRuleset)
+                else:
+                    FilterRuleBuilds.rulesetNamesToTests[targetName] = []
+                    unknown.append(ruleset)
+                    self.rulesetNamesToRulesets[targetName] = ruleset
+                self.rulesetNamesToTests[targetName].append(test)
             else:
                 self.diag.info("Filter rejected rule build for " + test.name)
                 
-        return rulesets
+        return unknown, known
     def setUpSuite(self, suite):
         if isUserSuite(suite):
             self.raveNames = getRaveNames(suite)
@@ -506,23 +547,30 @@ class FilterRuleBuilds(plugins.Action):
         return not libFile or not os.path.isfile(libFile)        
 
 class SubmitRuleCompilations(queuesystem.SubmitTest):
-    def slaveType(self):
-        return "raveslave"
     def __repr__(self):
         return "Submitting Rule Builds for"
-    def getRuleSets(self, test):
-        return test.state.rulecomp.getRuleSetNamesForSelf()
+    def tryStartServer(self):
+        if not queuesystem.QueueSystemServer.instance:
+            queuesystem.QueueSystemServer.instance = queuesystem.QueueSystemServer(RuleBuildSlaveServer)
     def __call__(self, test):
+        self.tryStartServer()
         if test.state.category != "need_rulecompile":
             return
-
-        if len(self.getRuleSets(test)) == 0:
+    
+        submissionRules = self.submitRuleFunction(test)
+        remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
+        for ruleset in test.state.rulecomp.rulesetsForSelf:
+            postText = self.getPostText(test, submissionRules)
+            self.describe(test, " (" + ruleset.name + " ruleset)" + postText)
+            compileArgs = " ".join(ruleset.getCompilationArgs())
+            command = self.shellWrap(remoteCmd + " " + ruleset.targetFiles[0] + " " + self.getServerAddress() + \
+                                     " " + compileArgs)
+        
+            self.diag.info("Submitting job : " + command)
+            queuesystem.QueueSystemServer.instance.submitJob(test, submissionRules, command)
+        if not test.state.hasStarted():
             self.setPending(test)
-            return self.WAIT
-        return queuesystem.SubmitTest.__call__(self, test)
-    def getSlaveArgs(self, test):
-        baseArgs = queuesystem.SubmitTest.getSlaveArgs(self, test)
-        return baseArgs + " -rset " + ",".join(self.getRuleSets(test))
+        return self.WAIT
     def getPendingState(self, test):
         return PendingRuleCompilation(test.state)
 
@@ -542,23 +590,17 @@ class CompileRules(plugins.Action):
             return
         
         raveInfo = ""
-        fileToWrite = test.makeTmpFileName("crc_compile_output", forFramework=1)
         for ruleset in rulecomp.rulesetsForSelf:
             self.describe(test, " - ruleset " + ruleset.name)
 
-            commandArgs = [ "crc_compile" ] + ruleset.getCompilationArgs()
+            commandArgs = ruleset.getCompilationArgs()
             if ruleset.modeString == "-debug":
                 test.app.ensureDebugLibrariesExist()
             success, currRaveInfo = self.performCompile(test, commandArgs)
             if success:
-                raveInfo += "\n" + currRaveInfo
+                ruleset.succeeded(currRaveInfo)
             else:
-                freeText = "Failed to build ruleset " + ruleset.name + "\n" + self.getPreview(test, currRaveInfo)            
-                test.changeState(RuleBuildFailed(test.state, freeText, "Ruleset build failed", currRaveInfo, fileToWrite))
-                return
-
-        if len(rulecomp.rulesetsFromOthers) == 0:
-            test.changeState(RulesetCompiled(test.state, raveInfo, fileToWrite))
+                ruleset.failed(currRaveInfo)
     def performCompile(self, test, commandArgs):
         self.diag.info("Compiling with command '" + repr(commandArgs) + "' from directory " + os.getcwd())
         test.changeState(RunningRuleCompilation(test.state))
@@ -569,12 +611,6 @@ class CompileRules(plugins.Action):
         else:
             return True, raveInfo
 
-    def getPreview(self, test, raveInfo):
-        # For final reports, abbreviate the free text to avoid newsgroup bounces etc.
-        maxLength = test.getConfigValue("lines_of_crc_compile")
-        maxWidth = test.getConfigValue("max_width_text_difference")
-        previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
-        return previewGenerator.getPreviewFromText(raveInfo)
     def setUpSuite(self, suite):
         if suite.parent is None or isUserSuite(suite):
             self.describe(suite)
@@ -589,58 +625,7 @@ class RuleBuildKilled(queuesystem.KillTestInSlave):
         briefText = "Ruleset build " + short
         freeText = "Ruleset compilation " + long
         test.changeState(RuleBuildFailed(test.state, freeText, briefText))    
-    
-class SynchroniseState(plugins.Action):
-    def getRuleCompilation(self, test):
-        try:
-            return test.state.rulecomp
-        except AttributeError:
-            return None
-    def __call__(self, test):
-        rulecomp = self.getRuleCompilation(test)
-        if rulecomp:
-            for otherTest in rulecomp.getOtherCompilingTests():
-                test.changeState(copy(otherTest.state))
-
-class RuleBuildSynchroniser(Responder):
-    updateMap = {}
-    def __init__(self, optionMap):
-        self.diag = plugins.getDiagnostics("Synchroniser")
-        self.completedTests = []
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        self.diag.info("Got change " + test.uniqueName + " -> " + state.category)
-        self.writeRaveFile(test, state)
-        if state.category != "pend_rulecompile" and self.updateMap.has_key(test) and hasattr(state, "rulecomp"):
-            self.diag.info("Checking for updates")
-            for updateTest in self.updateMap[test]:
-                if updateTest not in self.completedTests:
-                    self.diag.info("Generated change for " + updateTest.uniqueName)
-                    updateTest.changeState(copy(state))
-                    self.diag.info("Done.")
-                else:
-                    self.diag.info("Not generating change for completed test " + updateTest.uniqueName)
-        if state.isComplete():
-            self.completedTests.append(test)
-    def writeRaveFile(self, test, state):
-        try:
-            raveFile = state.raveFile
-            raveInfo = state.raveInfo
-        except AttributeError:
-            return
-        if not raveFile:
-            return
-        fileToWrite = test.makeTmpFileName("crc_compile_output", forFramework=1)
-        self.diag.info("Rave file at " + raveFile + ", write at " + fileToWrite)
-        plugins.ensureDirExistsForFile(fileToWrite)
-        if fileToWrite == raveFile:
-            writeFile = open(fileToWrite, "w")
-            writeFile.write(raveInfo)
-            writeFile.close()
-        elif not os.path.exists(fileToWrite):
-            # We don't create several links currently, maybe we should...
-            self.diag.info("Creating symbolic link")
-            os.symlink(raveFile, fileToWrite)
-                
+                    
 class WaitForRuleCompile(queuesystem.WaitForCompletion):
     raveMessageSent = False
     def __repr__(self):
@@ -652,35 +637,29 @@ class WaitForRuleCompile(queuesystem.WaitForCompletion):
         self.tryNotifyState()
         if not test.state.isComplete() and test.state.category != "ruleset_compiled":
             return self.WAIT | self.RETRY
-        self.describe(test, self.getResultText(test))
     def tryNotifyState(self):
         if not self.raveMessageSent:
             WaitForRuleCompile.raveMessageSent = True
             sendServerState("Completed submission of all rule compilations")
-    def getResultText(self, test):
-        text = " (ruleset" + test.state.rulecomp.description() + " "
-        if test.state.isComplete():
-            text += "FAILED!"
-        else:
-            text += "ok"
-        return text + ")"
     def getInterruptActions(self, fetchResults):
-        actions = [ KillRuleBuildSubmission() ]
-        if fetchResults:
-            actions.append(queuesystem.WaitForKill())
-        return actions
-
+        return [ KillRuleBuildSubmission() ]
+ 
 class KillRuleBuildSubmission(queuesystem.KillTestSubmission):
     def __repr__(self):
         return "Cancelling Rule Build"
     def jobStarted(self, test):
         return test.state.category != "need_rulecompile" and test.state.category != "pend_rulecompile"
+    def setKilled(self, test):
+        timeStr =  plugins.localtime("%H:%M")
+        briefText = "Ruleset build killed at " + timeStr
+        freeText = "Ruleset compilation killed explicitly at " + timeStr
+        test.changeState(default.Cancelled(briefText, freeText))
     def setKilledPending(self, test):
         timeStr =  plugins.localtime("%H:%M")
         briefText = "killed pending rule compilation at " + timeStr
         freeText = "Rule compilation job was killed (while still pending in " + queuesystem.queueSystemName(test.app) +\
                    ") at " + timeStr
-        test.changeState(RuleBuildFailed(test.state, freeText, briefText))
+        test.changeState(default.Cancelled(freeText, briefText))
     def setSlaveLost(self, test):
         failReason = "no report from rule compilation (possibly killed with SIGKILL)"
         fullText = failReason + "\n" + self.getJobFailureInfo(test)
@@ -691,31 +670,30 @@ class KillRuleBuildSubmission(queuesystem.KillTestSubmission):
 
 class TestRuleCompilation:
     rulesCompiled = {}
-    def __init__(self, rulesets, test):
-        self.rulesetsForSelf = []
-        self.rulesetsFromOthers = seqdict()
-        for ruleset in rulesets:
-            targetName = ruleset.targetFiles[0]
-            otherTestCompiling = TestRuleCompilation.rulesCompiled.get(targetName)
-            if otherTestCompiling:
-                self.rulesetsFromOthers[ruleset.name] = otherTestCompiling
-            else:
-                TestRuleCompilation.rulesCompiled[targetName] = test
-                self.rulesetsForSelf.append(ruleset)
+    def __init__(self, test, rulesetsToBuild, rulesetsFromOthers):
+        self.rulesetsForSelf = rulesetsToBuild
+        self.rulesetsFromOthers = rulesetsFromOthers
+    def allSucceeded(self):
+        for ruleset in self.allRulesets():
+            if not ruleset.hasSucceeded():
+                return False
+        return True
+    def allRulesets(self):
+        return self.rulesetsForSelf + self.rulesetsFromOthers
     def __repr__(self):
-        return ",".join(self.getRuleSetNamesForSelf()) + " / " + self.reprOthers()
+        return ",".join(self.getRuleSetNames(self.rulesetsForSelf)) + " / " + self.reprOthers()
     def reprOthers(self):
-        return ",".join([ rulesetName + " -> " + test.uniqueName for rulesetName, test in self.rulesetsFromOthers.items() ])
-    def getOtherCompilingTests(self):
-        others = []
-        for otherTest in self.rulesetsFromOthers.values():
-            if not otherTest in others:
-                others.append(otherTest)
-        return others
-    def getRuleSetNamesForSelf(self):
-        return [ ruleset.name for ruleset in self.rulesetsForSelf ]
+        return ",".join(self.getRuleSetNames(self.rulesetsFromOthers))
+    def getRuleSetNames(self, rulesets):
+        return [ ruleset.name for ruleset in rulesets ]
+    def getRuleBuildOutput(self):
+        return "\n".join([ ruleset.output for ruleset in self.allRulesets() ])
+    def findFailedRuleset(self):
+        for ruleset in self.allRulesets():
+            if ruleset.hasFailed():
+                return ruleset
     def description(self):
-        allRulesets = self.getRuleSetNamesForSelf() + self.rulesetsFromOthers.keys()
+        allRulesets = self.getRuleSetNames(self.allRulesets())
         if len(allRulesets) > 1:
             return "s " + " and ".join(allRulesets)
         else:
@@ -736,33 +714,30 @@ class PendingRuleCompilation(plugins.TestState):
                                    freeText=freeText, lifecycleChange=lifecycleChange)
 
 class RunningRuleCompilation(plugins.TestState):
-    def __init__(self, prevState, compilingState = None):
+    def __init__(self, prevState, hostname = None):
         self.rulecomp = prevState.rulecomp
-        if compilingState:
-            briefText = compilingState.briefText
-            freeText = compilingState.freeText
-        else:
-            briefText = "RULES (" + gethostname() + ")"
-            freeText = "Compiling ruleset" + self.rulecomp.description() + " on " + gethostname()
+        if not hostname:
+            hostname = gethostname()
+        briefText = "RULES (" + hostname + ")"
+        freeText = "Compiling ruleset" + self.rulecomp.description() + " on " + hostname
         lifecycleChange = "start ruleset compilation"
         plugins.TestState.__init__(self, "running_rulecompile", briefText=briefText, \
                                    freeText=freeText, lifecycleChange=lifecycleChange)
 
 class RuleBuildFailed(plugins.Unrunnable):
-    def __init__(self, prevState, freeText, briefText, raveInfo="", raveFile=""):
+    def __init__(self, prevState, freeText, briefText):
         plugins.Unrunnable.__init__(self, freeText, briefText)
         self.rulecomp = prevState.rulecomp
-        self.raveInfo = raveInfo
-        self.raveFile = raveFile
 
 class RulesetCompiled(plugins.TestState):
-    def __init__(self, prevState, raveInfo, raveFile):
+    def __init__(self, prevState):
         plugins.TestState.__init__(self, "ruleset_compiled", lifecycleChange="complete rule compilation")
         self.rulecomp = prevState.rulecomp
-        self.raveInfo = raveInfo
-        self.raveFile = raveFile
 
 class RuleSet:
+    NOT_COMPILED = 0
+    COMPILED = 1
+    COMPILE_FAILED = 2
     def __init__(self, ruleSetName, raveNames, arch, modeString = "-optimize"):
         self.name = ruleSetName
         self.raveNames = raveNames
@@ -770,12 +745,24 @@ class RuleSet:
         self.modeString = modeString
         self.sourceFile = self.sourcePath(self.name)
         self.targetFiles = []
+        self.status = self.NOT_COMPILED
+        self.output = ""
         for raveName in raveNames:
             self.targetFiles.append(self.targetPath("rule_set", raveName, arch, self.name))
             if modeString == "-debug":
                 self.targetFiles[-1] += "_g"
+    def hasSucceeded(self):
+        return self.status == self.COMPILED
+    def hasFailed(self):
+        return self.status == self.COMPILE_FAILED
+    def succeeded(self, output):
+        self.status = self.COMPILED
+        self.output = output
+    def failed(self, output):
+        self.status = self.COMPILE_FAILED
+        self.output = output
     def getCompilationArgs(self):
-        return self.raveNames + self.getModeArgs() + [ "-archs", self.arch, self.sourceFile ]
+        return [ "crc_compile" ] + self.raveNames + self.getModeArgs() + [ "-archs", self.arch, self.sourceFile ]
     def getModeArgs(self):
         raveMode = os.getenv("TEXTTEST_RAVE_MODE")
         if raveMode:

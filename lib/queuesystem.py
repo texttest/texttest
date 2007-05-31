@@ -167,8 +167,6 @@ class QueueSystemConfig(default.Config):
             return MachineInfoFinder()
         else:
             return default.Config.getMachineInfoFinder(self)
-    def defaultLoginShell(self):
-        return "sh"
     def printHelpDescription(self):
         print """The queuesystem configuration is a published configuration, 
                documented online at http://www.texttest.org/TextTest/docs/queuesystem"""
@@ -179,8 +177,6 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
-        app.setConfigDefault("login_shell", self.defaultLoginShell(), \
-                             "Which shell to use when starting remote processes")
 
 class SubmissionRules:
     def __init__(self, optionMap, test):
@@ -260,35 +256,37 @@ class SubmissionRules:
 
 class SlaveRequestHandler(StreamRequestHandler):
     def handle(self):
-        clientPid = self.rfile.readline().strip()
-        testString = self.rfile.readline().strip()
-        test = self.server.getTest(testString)
+        identifier = self.rfile.readline().strip()
         self.wfile.close()
         clientHost, clientPort = self.client_address
         # Don't use port, it changes all the time
-        clientInfo = (clientHost, clientPid)
-        if self.server.clientCorrect(test, clientInfo):
+        self.handleRequestFromHost(self.getHostName(clientHost), identifier)
+    def handleRequestFromHost(self, hostname, identifier):
+        testString = self.rfile.readline().strip()
+        test = self.server.getTest(testString)
+        if self.server.clientCorrect(test, (hostname, identifier)):
             test.loadState(self.rfile)
             if test.state.hasStarted():
-                self.server.storeClient(test, clientInfo)
+                self.server.storeClient(test, (hostname, identifier))
         else:
             expectedHost, expectedPid = self.server.testClientInfo[test]
             sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
-                             self.getHostName(clientHost) + " (process " + clientPid + ")\n")
-            sys.stderr.write("Slave already registered from " + self.getHostName(expectedHost) + " (process " + expectedPid + ")\n")
+                             clientHost + " (process " + clientPid + ")\n")
+            sys.stderr.write("Slave already registered from " + expectedHost + " (process " + expectedPid + ")\n")
             sys.stderr.write("Ignored all communication from this unexpected TextTest slave")
             sys.stderr.flush()
     def getHostName(self, ipAddress):
-        name, aliasList, ipList = socket.gethostbyaddr(ipAddress)
-        return name
+        return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
 
 class SlaveServer(TCPServer):
     def __init__(self):
-        TCPServer.__init__(self, (socket.gethostname(), 0), SlaveRequestHandler)
+        TCPServer.__init__(self, (socket.gethostname(), 0), self.getHandlerClass())
         self.testMap = {}
         self.testClientInfo = {}
         self.diag = plugins.getDiagnostics("Slave Server")
         sendServerState("TextTest slave server started on " + self.getAddress())
+    def getHandlerClass(self):
+        return SlaveRequestHandler
     def getAddress(self):
         host, port = self.socket.getsockname()
         return host + ":" + str(port)
@@ -310,8 +308,8 @@ class SlaveServer(TCPServer):
             return True
     def storeClient(self, test, clientInfo):
         self.testClientInfo[test] = clientInfo
-    def handle_error(self, request, client_address):
-        print "Slave server caught an exception, ignoring..."
+#    def handle_error(self, request, client_address):
+#        print "Slave server caught an exception, ignoring..."
 
 class MasterTextResponder(TextDisplayResponder):
     def notifyComplete(self, test):
@@ -319,13 +317,13 @@ class MasterTextResponder(TextDisplayResponder):
 
 class QueueSystemServer:
     instance = None
-    def __init__(self):
+    def __init__(self, slaveServerClass):
         self.jobs = {}
         self.killedTests = []
         self.queueSystems = {}
         self.submitDiag = plugins.getDiagnostics("Queue System Submit")
         QueueSystemServer.instance = self
-        self.socketServer = SlaveServer()
+        self.socketServer = slaveServerClass()
         self.updateThread = Thread(target=self.socketServer.serve_forever)
         self.updateThread.setDaemon(1)
         self.updateThread.start()
@@ -389,7 +387,6 @@ class QueueSystemServer:
                                  
 class SubmitTest(plugins.Action):
     def __init__(self, submitRuleFunction, optionMap, slaveSwitches):
-        self.loginShell = None
         self.submitRuleFunction = submitRuleFunction
         self.optionMap = optionMap
         self.slaveSwitches = slaveSwitches
@@ -401,7 +398,7 @@ class SubmitTest(plugins.Action):
         return "Submitting"
     def __call__(self, test):    
         self.tryStartServer()
-        command = self.getSlaveCommand(test)
+        command = self.shellWrap(self.getSlaveCommand(test))
         submissionRules = self.submitRuleFunction(test)
         self.describe(test, self.getPostText(test, submissionRules))
 
@@ -415,21 +412,21 @@ class SubmitTest(plugins.Action):
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
     def setPending(self, test):
         test.changeState(self.getPendingState(test))
-    def getSlaveCommand(self, test):
+    def shellWrap(self, command):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
-        commandLine = "exec " + plugins.textTestName + " " + " ".join(test.app.getRunOptions()) + " -tp " + test.getRelPath() \
-                      + self.getSlaveArgs(test) + " " + self.runOptions
-        return "exec " + self.loginShell + " -c \"" + commandLine + "\""
+        return "exec " + os.getenv("SHELL") + " -c \"exec " + command + "\""
+    def getSlaveCommand(self, test):
+        return plugins.textTestName + " " + " ".join(test.app.getRunOptions()) + " -tp " + test.getRelPath() \
+               + self.getSlaveArgs(test) + " " + self.runOptions
+    def getServerAddress(self):
+        return os.getenv("TEXTTEST_MIM_SERVER", QueueSystemServer.instance.getServerAddress())        
     def getSlaveArgs(self, test):
-        servAddr = os.getenv("TEXTTEST_MIM_SERVER")
-        if not servAddr:
-            servAddr = QueueSystemServer.instance.getServerAddress()
         return " -" + self.slaveType() + " " + test.app.writeDirectory + \
-               " -servaddr " + servAddr
+               " -servaddr " + self.getServerAddress()
     def tryStartServer(self):
         if not QueueSystemServer.instance:
-            QueueSystemServer.instance = QueueSystemServer()
+            QueueSystemServer.instance = QueueSystemServer(SlaveServer)
     def setRunOptions(self, app):
         runOptions = []
         for slaveSwitch in self.slaveSwitches:
@@ -455,7 +452,6 @@ class SubmitTest(plugins.Action):
     def setUpApplication(self, app):
         app.checkBinaryExists()
         self.runOptions = self.setRunOptions(app)
-        self.loginShell = app.getConfigValue("login_shell")
     def getInterruptActions(self, fetchResults):
         return [ SubmissionMissed() ]
 
@@ -476,13 +472,17 @@ class KillTestSubmission(plugins.Action):
         self.describeJob(test, jobId, jobName)
         startNotified = self.jobStarted(test)
         if jobExisted:
-            if not startNotified:
+            if startNotified:
+                self.setKilled(test)
+            else:
                 self.setKilledPending(test)
         else:
             if startNotified:
                 self.setSlaveLost(test)
             else:
                 self.setSlaveFailed(test)
+    def setKilled(self, test):
+        pass # just wait for it to report
     def jobStarted(self, test):
         return test.state.hasStarted()
     def performKill(self, test):

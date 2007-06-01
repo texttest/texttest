@@ -659,6 +659,7 @@ class KillTests(SelectionAction):
         return False
     def performOnCurrent(self):
         tests = filter(lambda test: not test.state.isComplete(), self.currTestSelection)
+        tests.reverse() # best to cut across the action thread rather than follow it and disturb it excessively
         self.killTests(tests)
     def killTests(self, tests):
         testDesc = str(len(tests)) + " tests"

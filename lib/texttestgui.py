@@ -266,13 +266,13 @@ class IdleHandlerManager:
     def __init__(self, dynamic):
         self.dynamic = dynamic
         self.sourceId = -1
-    def notifyActionStart(self, message):
+    def notifyActionStart(self, *args):
         # To make it possible to have an while-events-process loop
         # to update the GUI during actions, we need to make sure the idle
         # process isn't run. We hence remove that for a while here ...
         if self.sourceId > 0:
             gobject.source_remove(self.sourceId)
-    def notifyActionStop(self, message):
+    def notifyActionStop(self, *args):
         # Activate idle function again, see comment in notifyActionStart
         if self.sourceId > 0:
             self.enableHandler()
@@ -501,7 +501,9 @@ class TextTestGUI(Responder, plugins.Observable):
         else:
             self.notify("Status", "Waiting for all tests to terminate ...")
     def terminate(self):
+        self.idleManager.notifyActionStart() # disable idle handlers
         self.notify("Status", "Removing all temporary files ...")
+        self.notify("ActionProgress")
         self.topWindowGUI.removeWriteDirsAndWindow()
         gtk.main_quit()
 
@@ -834,7 +836,7 @@ class TestColumnGUI(SubGUI):
                 self.setSortingOrder(order, suite)
         else:
             self.notify("Status", "Sorting suite " + suite.name + " ...")
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             suite.autoSortOrder = order
             suite.updateOrder(order == 0) # Re-read testsuite files if order is 0 ...
             for test in suite.testcases:

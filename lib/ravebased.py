@@ -422,8 +422,8 @@ class RuleBuildRequestHandler(queuesystem.SlaveRequestHandler):
         diag.info("Got ruleset response for " + name)
         raveOutput = self.getRaveOutput(status)
         evaluator = EvaluateRuleBuild()
-        ruleset = self.server.findRuleset(name)
-        for test in self.server.findTestsForRuleset(name):
+        ruleset = self.findRuleset(name)
+        for test in self.findTestsForRuleset(name):
             diag.info("Found test " + test.uniqueName)
             if test.state.isComplete():
                 continue
@@ -435,6 +435,10 @@ class RuleBuildRequestHandler(queuesystem.SlaveRequestHandler):
                 else:
                     ruleset.failed(raveOutput)
                 evaluator(test)
+    def findRuleset(self, name):
+        return FilterRuleBuilds.rulesetNamesToRulesets.get(name)
+    def findTestsForRuleset(self, name):
+        return FilterRuleBuilds.rulesetNamesToTests.get(name, [])
     def getRaveOutput(self, status):
         if status == "start":
             return ""
@@ -468,15 +472,6 @@ class EvaluateRuleBuild(plugins.Action):
         maxWidth = test.getConfigValue("max_width_text_difference")
         previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength, startEndRatio=0.5)
         return previewGenerator.getPreviewFromText(raveInfo)
-
-
-class RuleBuildSlaveServer(queuesystem.SlaveServer):
-    def findRuleset(self, name):
-        return FilterRuleBuilds.rulesetNamesToRulesets.get(name)
-    def findTestsForRuleset(self, name):
-        return FilterRuleBuilds.rulesetNamesToTests.get(name, [])
-    def getHandlerClass(self):
-        return RuleBuildRequestHandler
             
 class FilterRuleBuilds(plugins.Action):
     rulesetNamesToTests = {}
@@ -560,8 +555,9 @@ class SubmitRuleCompilations(queuesystem.SubmitTest):
     def __repr__(self):
         return "Submitting Rule Builds for"
     def tryStartServer(self):
-        if not queuesystem.QueueSystemServer.instance:
-            queuesystem.QueueSystemServer.instance = queuesystem.QueueSystemServer(RuleBuildSlaveServer)
+        queuesystem.SubmitTest.tryStartServer(self)
+        # bit of a hack, but there we go...
+        queuesystem.QueueSystemServer.instance.socketServer.RequestHandlerClass = RuleBuildRequestHandler
     def __call__(self, test):
         self.tryStartServer()
         if test.state.category != "need_rulecompile":

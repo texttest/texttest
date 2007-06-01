@@ -316,13 +316,13 @@ class MasterTextResponder(TextDisplayResponder):
 
 class QueueSystemServer:
     instance = None
-    def __init__(self, slaveServerClass):
+    def __init__(self):
         self.jobs = {}
         self.killedTests = []
         self.queueSystems = {}
         self.submitDiag = plugins.getDiagnostics("Queue System Submit")
         QueueSystemServer.instance = self
-        self.socketServer = slaveServerClass()
+        self.socketServer = SlaveServer()
         self.updateThread = Thread(target=self.socketServer.serve_forever)
         self.updateThread.setDaemon(1)
         self.updateThread.start()
@@ -425,7 +425,7 @@ class SubmitTest(plugins.Action):
                " -servaddr " + self.getServerAddress()
     def tryStartServer(self):
         if not QueueSystemServer.instance:
-            QueueSystemServer.instance = QueueSystemServer(SlaveServer)
+            QueueSystemServer.instance = QueueSystemServer()
     def setRunOptions(self, app):
         runOptions = []
         for slaveSwitch in self.slaveSwitches:

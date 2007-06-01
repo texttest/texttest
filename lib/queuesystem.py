@@ -1,6 +1,4 @@
-#!/usr/local/bin/python
-
-import os, string, sys, default, unixonly, performance, plugins, socket, time, subprocess
+import os, string, sys, default, unixonly, performance, plugins, socket, time, subprocess, operator
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
@@ -136,8 +134,10 @@ class QueueSystemConfig(default.Config):
     def getResponderClasses(self, allApps):
         if self.slaveRun():
             return self.getSlaveResponderClasses()
-        else:
-            return default.Config.getResponderClasses(self, allApps)
+        responderClasses = default.Config.getResponderClasses(self, allApps)
+        if self.useQueueSystem():
+            responderClasses += [ AllSubmittedResponder ]
+        return responderClasses
     def getEnvironmentCreator(self, test):
         if self.useQueueSystem():
             return TestEnvironmentCreator(test, self.optionMap, self.getInteractiveReplayOptions())
@@ -533,15 +533,27 @@ class KillTestSubmission(plugins.Action):
         test.changeState(Abandoned(freeText))
 
 class WaitForCompletion(plugins.Action):
-    messageSent = False
     def __call__(self, test):
-        self.tryNotifyState()
         if not test.state.isComplete():
             return self.WAIT | self.RETRY
-    def tryNotifyState(self):
-        if not self.messageSent:
-            WaitForCompletion.messageSent = True
-            sendServerState("Completed submission of all tests")
+
+# Synchronise self-tests by sending out a notification when we're done submitting
+class AllSubmittedResponder(Responder):
+    def __init__(self, *args):
+        Responder.__init__(self)
+        self.notStartedTests = []
+        self.sentMessage = False
+    def addSuites(self, suites):
+        self.notStartedTests = reduce(operator.add, [ suite.testCaseList() for suite in suites ])
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        if self.sentMessage:
+            return
+        if changeDesc == "become pending" or state.isComplete():
+            if test in self.notStartedTests:
+                self.notStartedTests.remove(test)
+            if len(self.notStartedTests) == 0:
+                self.sentMessage = True
+                sendServerState("Completed submission of all tests")            
 
 class Abandoned(plugins.TestState):
     def __init__(self, freeText):

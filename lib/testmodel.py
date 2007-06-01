@@ -314,11 +314,9 @@ class Test(plugins.Observable):
             return self.parent.makePathName(fileName)
     def actionsCompleted(self):
         self.diagnose("Completion notified")
-        if not self.state.lifecycleChange:
+        if self.state.isComplete() and not self.state.lifecycleChange:
             self.state.lifecycleChange = "complete"
-            self.notify("LifecycleChange", self.state, self.state.lifecycleChange)
-
-        self.notify("Complete")
+            self.changeState(self.state)
     def getRelPath(self):
         return plugins.relpath(self.getDirectory(), self.app.getDirectory())
     def getDirectory(self, temporary=False, forFramework=False):
@@ -470,7 +468,9 @@ class TestCase(Test):
         self.state = state
         self.diagnose("Change notified to state " + state.category)
         if state and state.lifecycleChange:
-            self.notify("LifecycleChange", state, state.lifecycleChange)            
+            self.notify("LifecycleChange", state, state.lifecycleChange)
+            if state.lifecycleChange == "complete":
+                self.notify("Complete")
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
     def setWriteDirectory(self, newDir):

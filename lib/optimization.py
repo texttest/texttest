@@ -647,12 +647,12 @@ class OptimizationValueCalculator:
     def convertTime(self, timeLine):
         # Get line _after_ timeEntryName
         position = self.regexps[timeEntryName].search(timeLine.strip())
-	cutLine = timeLine[position.start():]
+        cutLine = timeLine[position.start():]
         # Find first pattern after timeEntryName
         timeEntry = re.findall(r'[0-9]{1,3}:[0-9]{2}:[0-9]{2}', cutLine)
-	if len(timeEntry) == 0:
+        if len(timeEntry) == 0:
             # No match, return 0
-	    return 0
+            return 0
         entries = timeEntry[0].split(":")
         timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip()) 
         return float(timeInSeconds) / 60.0
@@ -947,6 +947,8 @@ class DescribePlotTest(plugins.Action):
         return "Plotting"
     def __call__(self, test):
         self.describe(test)
+        # Trigger a completion notification (rabid abuse of Action/Responder paradigm)
+        test.changeState(plugins.TestState("plotted", completed=1))
     def setUpSuite(self, suite):
         self.describe(suite)
 
@@ -1335,7 +1337,7 @@ class TestGraph:
         if len(version) != 6:
             return None
         dateEntry = re.findall(r'[0-9]{6}', version)
-	if len(dateEntry) == 0:
+        if len(dateEntry) == 0:
             return None
         return dateEntry[0]
     def createPlotObjects(self, lineName, version, logFile, test, scaling):

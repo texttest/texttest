@@ -212,9 +212,8 @@ class ApplicationRunner:
             raise testmodel.BadConfigError, "Could not instantiate script action " + repr(actionCom) +\
                   " with arguments " + repr(actionArgs) 
 
-class ActionRunner(plugins.Observable):
+class ActionRunner:
     def __init__(self):
-        plugins.Observable.__init__(self)
         self.previousTestRunner = None
         self.currentTestRunner = None
         self.allTests = []
@@ -422,7 +421,6 @@ class TextTest:
             responder.addSuites(testSuites)
     def createActionRunner(self, appSuites):
         actionRunner = ActionRunner()
-        actionRunner.setObservers(self.allResponders)
         script = self.inputOptions.runScript()
         if not script:
             self.checkForNoTests(appSuites)

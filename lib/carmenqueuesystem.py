@@ -36,6 +36,7 @@ helpOptions = """
 import queuesystem, default, performance, os, string, shutil, plugins, respond, time
 from ndict import seqdict
 from jobprocess import JobProcess
+from threading import Thread
 
 # Use cvs plugin for all Carmen suites
 from guiplugins import interactiveActionHandler
@@ -176,12 +177,11 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def getTestRunner(self):
         baseRunner = queuesystem.QueueSystemConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):
-            return RunLprof(baseRunner, self.isExecutable)
+            return [ RunLprof(self.isExecutable), baseRunner ]
         else:
             return baseRunner
-    def isExecutable(self, process, parentProcess, test):
-        binaryName = os.path.basename(test.getConfigValue("binary"))
-        return process != parentProcess and binaryName.startswith(parentProcess) and not process.startswith(".") and process.find("arch") == -1 and process.find("crsutil") == -1
+    def isExecutable(self, process, test):
+        return not process.startswith(".") and process.find("arch") == -1 and process.find("crsutil") == -1
     def getFileExtractor(self):
         baseExtractor = queuesystem.QueueSystemConfig.getFileExtractor(self)
         if self.optionMap.has_key("lprof"):
@@ -234,48 +234,32 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         return envVars
     
 class RunWithParallelAction(plugins.Action):
-    def __init__(self, baseRunner, isExecutable):
-        self.parallelActions = [ self ]
-        if isinstance(baseRunner, RunWithParallelAction):
-            self.parallelActions.append(baseRunner)
-            self.baseRunner = baseRunner.baseRunner
-        else:
-            self.baseRunner = baseRunner
+    def __init__(self, isExecutable):
         self.isExecutable = isExecutable
         self.diag = plugins.getDiagnostics("Parallel Action")
-    def __repr__(self):
-        return repr(self.baseRunner)
     def __call__(self, test):
-        processId = os.fork()
-        if processId == 0:
-            # Note, this is a child process, so any state changes made by baseRunner will not be reflected, and anything written will not get printed...
-            try:
-                self.baseRunner(test, inChild=1)
-            except KeyboardInterrupt:
-                # Don't allow interruptions to propagate, we want to kill this off
-                pass
-            os._exit(0)
+        parallelActionThread = Thread(target=self.runParallelAction, args=(test,))
+        parallelActionThread.setDaemon(True)
+        parallelActionThread.start()
+    def runParallelAction(self, test):
+        try:
+            execProcess, parentProcess = self.findProcessInfo(test)
+            self.performParallelAction(test, execProcess, parentProcess)
+        except plugins.TextTestError:
+            self.handleNoTimeAvailable(test)
+    def getTestProcess(self, test):
+        state = test.state # cache to avoid race conditions
+        if state.isComplete():
+            raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
+        elif not state.hasStarted():
+            time.sleep(0.1)
+            return self.getTestProcess(test)
         else:
-            try:
-                # Make the state change that would presumably be made by the baseRunner...
-                self.baseRunner.changeToRunningState(test, None)
-                execProcess, parentProcess = self.findProcessInfo(processId, test)
-                for parallelAction in self.parallelActions:
-                    parallelAction.performParallelAction(test, execProcess, parentProcess)
-            except plugins.TextTestError:
-                for parallelAction in self.parallelActions:
-                    parallelAction.handleNoTimeAvailable(test)
-            except IOError:
-                # interrupted system call in I/O is no problem
-                pass
-            try:
-                os.waitpid(processId, 0)
-            except OSError:
-                # Assume interrupted system call, which isn't a problem, basically.
-                pass
-    def findProcessInfo(self, firstpid, test):
+            return JobProcess(test.state.bkgProcess.pid)
+    def findProcessInfo(self, test):
+        parentProcess = self.getTestProcess(test)
         while 1:
-            execProcess, parentProcess = self._findProcessInfo(JobProcess(firstpid), test)
+            execProcess = self._findProcessInfo(parentProcess, test)
             if execProcess:
                 return execProcess, parentProcess
             else:
@@ -284,25 +268,18 @@ class RunWithParallelAction(plugins.Action):
         self.diag.info(" Looking for info from process " + repr(process))
         if process.poll() is not None:
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
-        # Look for the binary process, or a child of it, that is a pure executable not a script
         childProcesses = process.findChildProcesses()
-        if len(childProcesses) < 2:
-            return None, None
+        if len(childProcesses) != 1:
+            return
         
-        executableProcessName = childProcesses[-1].getName()
-        parentProcessName = childProcesses[-2].getName()
-        if len(executableProcessName) == 0 or len(parentProcessName) == 0:
-            return None, None # processes already complete
-        if self.isExecutable(executableProcessName, parentProcessName, test):
-            self.diag.info("Chose process as executable : " + executableProcessName + " parent process " + parentProcessName)
-            return childProcesses[-1], childProcesses[-2]
+        executableProcessName = childProcesses[0].getName()
+        if len(executableProcessName) == 0:
+            return# process already complete
+        if self.isExecutable(executableProcessName, test):
+            self.diag.info("Chose process as executable : " + executableProcessName)
+            return childProcesses[0]
         else:
             self.diag.info("Rejected process as executable : " + executableProcessName)
-            return None, None
-    def setUpSuite(self, suite):
-        self.baseRunner.setUpSuite(suite)
-    def setUpApplication(self, app):
-        self.baseRunner.setUpApplication(app)
     def handleNoTimeAvailable(self, test):
         # Do nothing by default
         pass
@@ -310,8 +287,10 @@ class RunWithParallelAction(plugins.Action):
         return self.baseRunner.getInterruptActions(fetchResults)
                 
 class RunLprof(RunWithParallelAction):
+    def __repr__(self):
+        return "Running Lprof profiler on"
     def performParallelAction(self, test, execProcess, parentProcess):
-        self.describe(test, ", profiling process '" + execProcess.getName() + "'")
+        self.describe(test, ", process '" + execProcess.getName() + "'")
         outFile = test.makeTmpFileName("gprof.output", forComparison=0)
         runLine = "/users/lennart/bin/gprofile " + str(execProcess.pid) + " >& " + outFile
         os.system(runLine)

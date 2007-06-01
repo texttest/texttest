@@ -7,10 +7,10 @@ class RunTest(default.RunTest):
         default.RunTest.__init__(self)
         self.realDisplay = os.getenv("DISPLAY")
         self.hasAutomaticCputimeChecking = hasAutomaticCputimeChecking
-    def __call__(self, test, inChild=0):
+    def __call__(self, test):
         if os.environ.has_key("TEXTTEST_VIRTUAL_DISPLAY"):
             os.environ["DISPLAY"] = os.environ["TEXTTEST_VIRTUAL_DISPLAY"]
-        retValue = default.RunTest.__call__(self, test, inChild)
+        retValue = default.RunTest.__call__(self, test)
         if self.realDisplay:
             os.environ["DISPLAY"] = self.realDisplay
         return retValue

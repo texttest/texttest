@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, types, time, paths, subprocess
+import plugins, os, sys, shutil, types, time, paths, subprocess, operator
 from jobprocess import JobProcess
 from copy import copy
 from threading import Thread
@@ -58,8 +58,9 @@ class GUIConfig:
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
 # they can be terminated when TextTest is terminated.
-class ProcessTerminationMonitor:
+class ProcessTerminationMonitor(plugins.Observable):
     def __init__(self):
+        plugins.Observable.__init__(self)
         self.processes = []
     def addMonitoring(self, process, description, exitHandler, exitHandlerArgs):
         self.processes.append((process, description))
@@ -76,24 +77,29 @@ class ProcessTerminationMonitor:
         running = []
         if len(processesToCheck) == 0:
             return running
-        for process, description in self.processes:
-            if process.poll() is None:
-                for processToCheck in processesToCheck:
-                    if plugins.isRegularExpression(processToCheck):
-                        if plugins.findRegularExpression(processToCheck, description):
-                            running.append("PID " + str(process.pid) + " : " + description)
-                            break
-                    elif processToCheck.lower() == "all" or description.find(processToCheck) != -1:
-                            running.append("PID " + str(process.pid) + " : " + description)
-                            break
+        for process, description in self.getRunningProcesses():
+            for processToCheck in processesToCheck:
+                if plugins.isRegularExpression(processToCheck):
+                    if plugins.findRegularExpression(processToCheck, description):
+                        running.append("PID " + str(process.pid) + " : " + description)
+                        break
+                elif processToCheck.lower() == "all" or description.find(processToCheck) != -1:
+                    running.append("PID " + str(process.pid) + " : " + description)
+                    break
 
         return running
-    def killAll(self):
+    def getRunningProcesses(self):
+        return filter(lambda (process, desc): process.poll() is None, self.processes)
+    def notifyExit(self):
         # Don't leak processes
-        for process, description in self.processes:
-            if process.poll() is None:
-                guilog.info("Killing '" + description + "' interactive process")
-                JobProcess(process.pid).killAll()
+        runningProcesses = self.getRunningProcesses()
+        if len(runningProcesses) == 0:
+            return
+        self.notify("Status", "Terminating all external viewers ...")
+        for process, description in runningProcesses:
+            self.notify("ActionProgress", "")
+            guilog.info("Killing '" + description + "' interactive process")
+            JobProcess(process.pid).killAll()
 
 processTerminationMonitor = ProcessTerminationMonitor()
        
@@ -159,7 +165,7 @@ class InteractiveAction(plugins.Observable):
         else:
             return title.replace("_", "")
     def getDirectories(self, inputDirs=[], name=""):
-	return ([], None)
+        return ([], None)
     def messageBeforePerform(self):
         # Don't change this by default, most of these things don't take very long
         pass
@@ -282,11 +288,6 @@ class Quit(InteractiveAction):
         # Don't provide one, the GUI isn't there to show it :)
         pass
     def performOnCurrent(self):
-        # Generate a window closedown, so that the quit button behaves the same as closing the window
-        # This will not show the entire shutdown process, but it will tell
-        # us that we've pressed the Quit button, at least ...
-        self.notify("Status", "Quitting TextTest ...")
-        self.notify("ActionProgress", "")
         self.notify("Exit")
     def getConfirmationMessage(self):
         processesToReport = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
@@ -634,6 +635,11 @@ class FollowFile(FileViewAction):
         scriptEngine.monitorProcess("follows progress of test files", process)    
 
 class KillTests(SelectionAction):
+    def __init__(self):
+        SelectionAction.__init__(self)
+        self.rootTestSuites = []
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
     def getStockId(self):
         return "stop"
     def _getTitle(self):
@@ -653,13 +659,21 @@ class KillTests(SelectionAction):
         return False
     def performOnCurrent(self):
         tests = filter(lambda test: not test.state.isComplete(), self.currTestSelection)
+        self.killTests(tests)
+    def killTests(self, tests):
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Killing " + testDesc + " ...")
         for test in tests:
+            self.notify("ActionProgress", "")
             self.describe(test)
             test.app.killTest(test)
 
         self.notify("Status", "Killed " + testDesc + ".")
+    def notifyExit(self):
+        tests = reduce(operator.add, [ suite.getRunningTests() for suite in self.rootTestSuites ])
+        if len(tests) > 0:
+            self.killTests(tests)
+                
     
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveTestAction):

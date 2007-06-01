@@ -588,6 +588,10 @@ class TestSuite(Test):
         for case in self.testcases:
             list += case.testCaseList()
         return list
+    def getRunningTests(self):
+        runningTests = filter(lambda test: not test.state.isComplete(), self.testCaseList())
+        runningTests.reverse() # Best to start at the end to avoid race conditions
+        return runningTests
     def classId(self):
         return "test-suite"
     def isEmpty(self):

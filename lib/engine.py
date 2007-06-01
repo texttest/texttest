@@ -9,30 +9,19 @@ class TestRunner:
     def __init__(self, test, appRunner, diag):
         self.test = test
         self.diag = diag
-        self.interrupted = 0
         self.actionSequence = []
         self.appRunner = appRunner
         self.setActionSequence(appRunner.actionSequence)
-    def switchToCleanup(self):
-        self.interrupted = 0
-        newActionSequence = []
-        for action in self.actionSequence:
-            newActionSequence += self.appRunner.cleanUpActions[action]
-        self.actionSequence = newActionSequence
     def setActionSequence(self, actionSequence):
         self.actionSequence = []
         # Copy the action sequence, so we can edit it and mark progress
         for action in actionSequence:
             self.actionSequence.append(action)
-    def interrupt(self):
-        self.interrupted = 1
     def handleExceptions(self, method, *args):
         try:
             return method(*args)
         except plugins.TextTestError, e:
             self.failTest(str(sys.exc_value))
-        except KeyboardInterrupt:
-            raise
         except:
             plugins.printWarning("Caught exception while running " + repr(self.test) + " changing state to UNRUNNABLE :")
             exceptionText = plugins.printException()
@@ -48,7 +37,7 @@ class TestRunner:
         for suite in setUpSuites:
             suite.setUpEnvironment()
             self.appRunner.markForSetUp(suite)
-        abandon = False
+        abandon = self.test.state.shouldAbandon()
         while len(self.actionSequence):
             action = self.actionSequence[0]
             if abandon and not action.callDuringAbandon(self.test):
@@ -80,8 +69,6 @@ class TestRunner:
         return retString
     def performAction(self, action, runToCompletion):
         while 1:
-            if self.interrupted:
-                raise KeyboardInterrupt, "Interrupted externally"
             retValue = self.callAction(action)
             if not retValue:
                 # No return value: we've finished and should proceed
@@ -144,16 +131,8 @@ class ApplicationRunner:
         self.suitesSetUp = {}
         self.suitesToSetUp = {}
         self.diag = diag
-        self.cleanUpActions = {}
         self.actionSequence = self.getActionSequence(script)
         self.setUpApplications(self.actionSequence)
-    def switchToCleanup(self, fetchResults):
-        newActionSequence = []
-        for action in self.actionSequence:
-            cleanUpActions = action.getInterruptActions(fetchResults)
-            self.cleanUpActions[action] = cleanUpActions
-            newActionSequence += cleanUpActions
-        self.actionSequence = newActionSequence
     def setUpApplications(self, sequence):
         self.testSuite.setUpEnvironment()
         try:
@@ -165,8 +144,6 @@ class ApplicationRunner:
         self.diag.info("Performing " + str(action) + " set up on " + repr(self.testSuite.app))
         try:
             action.setUpApplication(self.testSuite.app)
-        except KeyboardInterrupt:
-            raise
         except:
             self.handleFailedSetup()
     def handleFailedSetup(self):
@@ -195,7 +172,12 @@ class ApplicationRunner:
         else:
             self.suitesSetUp[suite] = [ action ]
     def tearDownSuite(self, suite):
-        for action in self.suitesSetUp[suite]:
+        self.diag.info("Try tear down " + repr(suite))
+        suitesToTearDown = self.suitesSetUp.get(suite, [])
+        if len(suitesToTearDown) == 0:
+            self.diag.info("No tear down " + repr(suite))
+            return
+        for action in suitesToTearDown:
             self.diag.info(str(action) + " tear down " + repr(suite))
             action.tearDownSuite(suite)
         suite.tearDownEnvironment()
@@ -233,7 +215,6 @@ class ApplicationRunner:
 class ActionRunner(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
-        self.interrupted = 0
         self.previousTestRunner = None
         self.currentTestRunner = None
         self.allTests = []
@@ -249,36 +230,11 @@ class ActionRunner(plugins.Observable):
             testRunner = TestRunner(test, appRunner, self.diag)
             self.testQueue.append(testRunner)
             self.allTests.append(testRunner)
-    def switchToCleanup(self, fetchResults):
-        for appRunner in self.appRunners:
-            appRunner.switchToCleanup(fetchResults)
-        for testRunner in self.testQueue:
-            self.diag.info("Running cleanup actions for test " + testRunner.test.getRelPath())
-            testRunner.switchToCleanup()
-        self.interrupted = 0
+    def runInThread(self):
+        thread = Thread(target=self.run)
+        thread.start()
     def run(self):
-        try:
-            self.runNormal()
-            self.diag.info("Finishing the action runner")
-        except KeyboardInterrupt, e:
-            excData = str(e)
-            self.writeTermMessage(excData)
-            fetchResults = excData.find("LIMIT") != -1
-            # block all event notifications...
-            if not fetchResults:
-                plugins.Observable.blocked = True
-            self.switchToCleanup(fetchResults)
-            self.run()
-    def writeTermMessage(self, excData):
-        message = "Terminating testing due to external interruption"
-        if excData:
-            message += " (" + excData + ")"
-        print message
-        sys.stdout.flush() # Try not to lose log file information...
-    def runNormal(self):
         while len(self.testQueue):
-            if self.interrupted:
-                raise KeyboardInterrupt, "Interrupted externally"
             self.currentTestRunner = self.testQueue[0]
             self.diag.info("Running actions for test " + self.currentTestRunner.test.getRelPath())
             runToCompletion = len(self.testQueue) == 1
@@ -288,11 +244,8 @@ class ActionRunner(plugins.Observable):
                 self.diag.info("Incomplete - putting to back of queue")
                 self.testQueue.append(self.currentTestRunner)
             self.previousTestRunner = self.currentTestRunner
-    def interrupt(self):
-        self.interrupted = 1
-        if self.currentTestRunner:
-            self.currentTestRunner.interrupt()
-
+        self.diag.info("Finishing the action runner.")
+    
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder:
     def __init__(self):
@@ -355,7 +308,7 @@ class TextTest:
         self.allResponders = []
         self.inputOptions = testmodel.OptionFinder()
         self.diag = plugins.getDiagnostics("Find Applications")
-        self.allApps = self.findApps()
+        self.appSuites = seqdict()
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
         if not os.environ.has_key("USECASE_HOME"):
             os.environ["USECASE_HOME"] = os.path.join(self.inputOptions.directoryName, "usecases")
@@ -400,42 +353,42 @@ class TextTest:
             versionList = self.inputOptions.findVersionList()
             if selectedAppDict.has_key(appName):
                 versionList = selectedAppDict[appName]
-            try:
-                appList += self.addApplications(appName, dircache, versionList)
-            except (testmodel.BadConfigError, plugins.TextTestError):
-                sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + "\n")
-                raisedError = True
+            for version in versionList:
+                try:
+                    appList += self.addApplications(appName, dircache, version, versionList)
+                except (testmodel.BadConfigError, plugins.TextTestError):
+                    sys.stderr.write("Could not use application " + appName +  " - " + str(sys.exc_value) + "\n")
+                    raisedError = True
         return raisedError, appList
     def createApplication(self, appName, dircache, version):
         return testmodel.Application(appName, dircache, version, self.inputOptions)
-    def addApplications(self, appName, dircache, versions):
+    def addApplications(self, appName, dircache, version, allVersions):
         appList = []
-        for version in versions:
-            app = self.createApplication(appName, dircache, version)
-            appList.append(app)
-            for extraVersion in app.getExtraVersions():
-                if extraVersion in versions:
-                    plugins.printWarning("Same version '" + extraVersion + "' implicitly requested more than once, ignoring.")
-                    continue
-                aggVersion = extraVersion
-                if len(version) > 0:
-                    aggVersion = version + "." + extraVersion
-                extraApp = self.createApplication(appName, dircache, aggVersion)
-                app.extras.append(extraApp)
-                appList.append(extraApp)
+        app = self.createApplication(appName, dircache, version)
+        appList.append(app)
+        for extraVersion in app.getExtraVersions():
+            if extraVersion in allVersions:
+                plugins.printWarning("Same version '" + extraVersion + "' implicitly requested more than once, ignoring.")
+                continue
+            aggVersion = extraVersion
+            if len(version) > 0:
+                aggVersion = version + "." + extraVersion
+            extraApp = self.createApplication(appName, dircache, aggVersion)
+            app.extras.append(extraApp)
+            appList.append(extraApp)
         return appList
     def needsTestRuns(self):
         for responder in self.allResponders:
             if not responder.needsTestRuns():
                 return False
         return True
-    def createResponders(self):
+    def createResponders(self, allApps):
         # With scripts, we ignore all responder options, we're just transforming data
         if self.inputOptions.runScript():
             return
         responderClasses = []
-        for app in self.allApps:
-            for respClass in app.getResponderClasses(self.allApps):
+        for app in allApps:
+            for respClass in app.getResponderClasses(allApps):
                 if not respClass in responderClasses:
                     self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.append(respClass)
@@ -444,11 +397,11 @@ class TextTest:
         self.allResponders = map(lambda x : x(self.inputOptions), responderClasses)
         allCompleteResponder = testmodel.AllCompleteResponder(self.allResponders)
         self.allResponders.append(allCompleteResponder)
-    def createTestSuites(self):
+    def createTestSuites(self, allApps):
         uniqueNameFinder = UniqueNameFinder()
         appSuites = seqdict()
         forTestRuns = self.needsTestRuns()
-        for app in self.allApps:
+        for app in allApps:
             valid = False
             try:
                 valid, testSuite = app.createTestSuite(responders=self.allResponders, forTestRuns=forTestRuns)
@@ -462,10 +415,9 @@ class TextTest:
         return appSuites
     def deleteTempFiles(self, appSuites):
         for app, testSuite in appSuites.items():
-            if app.cleanMode & plugins.Configuration.CLEAN_SELF:
-                app.removeWriteDirectory()
-    def setUpResponders(self, appSuites):
-        testSuites = [ testSuite for app, testSuite in appSuites.items() ]
+            app.removeWriteDirectory()
+    def setUpResponders(self):
+        testSuites = [ testSuite for app, testSuite in self.appSuites.items() ]
         for responder in self.allResponders:
             responder.addSuites(testSuites)
     def createActionRunner(self, appSuites):
@@ -486,33 +438,34 @@ class TextTest:
                 sys.stderr.write("Error in set-up of application " + repr(app) + " - " + str(sys.exc_value) + "\n")
         return actionRunner, acceptedAppSuites
     def run(self):
+        allApps = self.findApps()
         if self.inputOptions.helpMode():
-            if len(self.allApps) > 0:
-                self.allApps[0].printHelpText()
+            if len(allApps) > 0:
+                allApps[0].printHelpText()
             else:
                 print testmodel.helpIntro
                 print "TextTest didn't find any valid test applications - you probably need to tell it where to find them."
                 print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
                 print "If this makes no sense, read the online documentation..."
             return
-        self._run()
+        self._run(allApps)
     def findOwnThreadResponder(self):
         for responder in self.allResponders:
             if responder.needsOwnThread():
                 return responder
-    def _run(self):
+    def _run(self, allApps):
         try:
-            self.createResponders()
+            self.createResponders(allApps)
         except plugins.TextTestError, e:
             # Responder class-level errors are basically fatal : there is no point running without them (cannot
             # do anything about them) and no way to get partial errors.
             sys.stderr.write(str(e) + "\n")
             return
-        appSuites = self.createTestSuites()
+        appSuites = self.createTestSuites(allApps)
         try:
             self.runAppSuites(appSuites)
         finally:
-            self.deleteTempFiles(appSuites)
+            self.deleteTempFiles(appSuites) # include the dud ones, possibly
     def runAppSuites(self, appSuites):
         # pick out any responder that is designed to hang around executing
         # some sort of loop in its own thread... generally GUIs of some sort
@@ -520,20 +473,20 @@ class TextTest:
         if not ownThreadResponder or ownThreadResponder.needsTestRuns():
             self.runWithTests(ownThreadResponder, appSuites)
         else:
-            self.runAlone(ownThreadResponder, appSuites)
-    def runAlone(self, ownThreadResponder, appSuites):
-        self.setUpResponders(appSuites)
+            self.appSuites = appSuites
+            self.runAlone(ownThreadResponder)
+    def runAlone(self, ownThreadResponder):
+        self.setUpResponders()
         ownThreadResponder.run()
     def runWithTests(self, ownThreadResponder, appSuites):                
-        actionRunner, acceptedAppSuites = self.createActionRunner(appSuites)
-        if len(acceptedAppSuites) == 0:
+        actionRunner, self.appSuites = self.createActionRunner(appSuites)
+        if len(self.appSuites) == 0:
             return # error already printed
 
         # Wait until now to do this, in case problems encountered so far...
-        self.setUpResponders(acceptedAppSuites)
+        self.setUpResponders()
         if ownThreadResponder:
-            actionThread = ActionThread(actionRunner)
-            ownThreadResponder.addActionThread(actionThread)
+            actionRunner.runInThread()
             ownThreadResponder.run()
         else:
             actionRunner.run()
@@ -554,13 +507,32 @@ class TextTest:
     def setSignalHandlers(self):
         # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
         if os.name == "posix":
+            signal.signal(signal.SIGINT, self.handleSignal)
             signal.signal(signal.SIGUSR1, self.handleSignal)
             signal.signal(signal.SIGUSR2, self.handleSignal)
             signal.signal(signal.SIGXCPU, self.handleSignal)
     def handleSignal(self, sig, stackFrame):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
-        raise KeyboardInterrupt, self.getSignalText(sig)
+        signalText = self.getSignalText(sig)
+        self.writeTermMessage(signalText)
+        fetchResults = signalText.find("LIMIT") != -1
+        # block all event notifications...
+        if not fetchResults:
+            plugins.Observable.blocked = True
+            
+        self.killAllTests(signalText)
+    def killAllTests(self, signalText):
+        # Kill all the tests and wait for the action runner to finish
+        for app, suite in self.appSuites.items():
+            for test in suite.getRunningTests():
+                app.killTest(test, signalText)
+    def writeTermMessage(self, signalText):
+        message = "Terminating testing due to external interruption"
+        if signalText:
+            message += " (" + signalText + ")"
+        print message
+        sys.stdout.flush() # Try not to lose log file information...
     def getSignalText(self, sig):
         if sig == signal.SIGUSR1:
             return "RUNLIMIT1"
@@ -568,19 +540,8 @@ class TextTest:
             return "CPULIMIT"
         elif sig == signal.SIGUSR2:
             return "RUNLIMIT2"
+        elif sig == signal.SIGINT:
+            return "" # mostly for historical reasons to be compatible with the default handler
         else:
             return "signal " + str(sig)
-
-class ActionThread(Thread):
-    def __init__(self, actionRunner):
-        Thread.__init__(self)
-        self.actionRunner = actionRunner
-        self.start()
-    def run(self):
-        try:
-            self.actionRunner.run()
-        except KeyboardInterrupt:
-            print "Terminated before tests complete: cleaning up..."
-    def notifyExit(self):
-        self.actionRunner.interrupt()
-        self.join()
+    

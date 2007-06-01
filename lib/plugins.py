@@ -273,12 +273,6 @@ class Action:
     def callDuringAbandon(self, test):
         # set to True if tests should have this action called even after all is reckoned complete (e.g. UNRUNNABLE)
         return False
-    # Return the actions to replace the current one if run is interrupted
-    def getInterruptActions(self, fetchResults):
-        if fetchResults:
-            return [ self ]
-        else:
-            return []
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText
@@ -691,7 +685,7 @@ def ensureDirectoryExists(path):
 def retryOnInterrupt(function, *args):
     try:
         return function(*args)
-    except IOError, detail:
+    except (IOError, OSError), detail:
         if str(detail).find("Interrupted system call") != -1:
             return retryOnInterrupt(function, *args)
         else:
@@ -921,7 +915,7 @@ class OptionGroup:
         if self.options.has_key(key):
             return self.options[key].getValue()
         else:
-	    return defValue
+            return defValue
     def getOption(self, key):
         return self.options[key]
     def getSwitch(self, key):

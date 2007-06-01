@@ -174,10 +174,10 @@ class ApcConfig(optimization.OptimizationConfig):
         else:
             baseRunner = optimization.OptimizationConfig.getTestRunner(self)
             if self.slaveRun():
-                return MarkApcLogDir(baseRunner, self.isExecutable, self.optionMap.has_key("extractlogs"))
+                return [ MarkApcLogDir(self.isExecutable, self.optionMap.has_key("extractlogs")), baseRunner ]
             else:
                 return baseRunner
-    def isExecutable(self, process, parentProcess, test):
+    def isExecutable(self, process, test):
         # Process name starts with a dot and may be truncated or have
         # extra junk at the end added by APCbatch.sh
         processData = process[1:]
@@ -550,8 +550,8 @@ class GoogleProfileExtract(plugins.Action):
         os.system("rsh abbeville \"" + command + "\"")
         
 class MarkApcLogDir(RunWithParallelAction):
-    def __init__(self, baseRunner, isExecutable, keepLogs):
-        RunWithParallelAction.__init__(self, baseRunner, isExecutable)
+    def __init__(self, isExecutable, keepLogs):
+        RunWithParallelAction.__init__(self, isExecutable)
         self.keepLogs = keepLogs
     def getApcHostTmp(self):
         configFile = os.path.join(os.environ["CARMSYS"],"CONFIG")
@@ -600,7 +600,6 @@ class MarkApcLogDir(RunWithParallelAction):
         if not os.path.isdir(apcTmpDir):
             raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + execProcess.getName()
         self.makeLinks(test, apcTmpDir)
-        self.describe(test)
         if self.keepLogs:
             fileName = os.path.join(apcTmpDir, "apc_debug")
             file = open(fileName, "w")

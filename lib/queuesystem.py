@@ -21,16 +21,13 @@ def queueSystemName(app):
 
 # Use a non-monitoring runTest, but the rest from unix
 class RunTestInSlave(unixonly.RunTest):
-    def runTest(self, test, inChild=0):
+    def runTest(self, test):
         process = self.getTestProcess(test)
-        if not inChild:
-            self.describe(test)
-            self.changeToRunningState(test, process)
-        process.wait()
+        self.describe(test)
+        self.changeToRunningState(test, process)
+        plugins.retryOnInterrupt(process.wait)
     def getBriefText(self, execMachines):
         return "RUN (" + string.join(execMachines, ",") + ")"
-    def getInterruptActions(self, fetchResults):
-        return [ KillTestInSlave() ]
 
 class FindExecutionHosts(default.FindExecutionHosts):
     def getExecutionMachines(self, test):
@@ -112,12 +109,14 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getCleanMode(self)
     def getTestKiller(self):
-        if not self.useQueueSystem():
-            return default.Config.getTestKiller(self)
-        elif self.slaveRun():
+        if self.slaveRun():
             return KillTestInSlave()
+        elif not self.useQueueSystem():
+            return default.Config.getTestKiller(self)
         else:
-            return KillTestSubmission()
+            return self.getSubmissionKiller()
+    def getSubmissionKiller(self):
+        return KillTestSubmission()
     def getTestProcessor(self):
         baseProcessor = default.Config.getTestProcessor(self)
         if not self.useQueueSystem() or self.slaveRun():
@@ -452,28 +451,24 @@ class SubmitTest(plugins.Action):
     def setUpApplication(self, app):
         app.checkBinaryExists()
         self.runOptions = self.setRunOptions(app)
-    def getInterruptActions(self, fetchResults):
-        return [ SubmissionMissed() ]
-
-class SubmissionMissed(plugins.Action):
-    def __call__(self, test):
-        if not test.state.hasStarted() and test.state.category != "pending":
-            raise plugins.TextTestError, "Termination already in progress when trying to submit to " + \
-                  queueSystemName(test.app)
 
 class KillTestSubmission(plugins.Action):
+    def __init__(self):
+        self.diag = plugins.getDiagnostics("Kill Test")
     def __repr__(self):
         return "Cancelling"
-    def __call__(self, test):
+    def __call__(self, test, killReason):
+        self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
         jobExisted, jobId, jobName = self.performKill(test)
         if not jobId:
+            test.changeState(default.Cancelled())
             return
 
         self.describeJob(test, jobId, jobName)
         startNotified = self.jobStarted(test)
         if jobExisted:
             if startNotified:
-                self.setKilled(test)
+                self.setKilled(test, killReason, jobId)
             else:
                 self.setKilledPending(test)
         else:
@@ -481,8 +476,9 @@ class KillTestSubmission(plugins.Action):
                 self.setSlaveLost(test)
             else:
                 self.setSlaveFailed(test)
-    def setKilled(self, test):
-        pass # just wait for it to report
+    def setKilled(self, test, killReason, jobId):
+        if killReason.find("LIMIT") != -1:
+            self.waitForKill(test, jobId)
     def jobStarted(self, test):
         return test.state.hasStarted()
     def performKill(self, test):
@@ -523,7 +519,19 @@ class KillTestSubmission(plugins.Action):
     def describeJob(self, test, jobId, jobName):
         postText = self.getPostText(test, jobId)
         self.describe(test, postText)
-    
+    def waitForKill(self, test, jobId):
+        # Wait for a minute for the kill to take effect, otherwise give up
+        for attempt in range(1, 61):
+            if test.state.isComplete():
+                return
+            time.sleep(1)
+            print test.getIndent() + "Cancellation in progress for " + repr(test) + \
+                  ", waited " + str(attempt) + " seconds so far."
+        name = queueSystemName(test.app)
+        freeText = "Could not delete " + repr(test) + " in " + name + " (job " + jobId + "): have abandoned it"
+        print test.getIndent() + freeText
+        test.changeState(Abandoned(freeText))
+
 class WaitForCompletion(plugins.Action):
     messageSent = False
     def __call__(self, test):
@@ -534,11 +542,6 @@ class WaitForCompletion(plugins.Action):
         if not self.messageSent:
             WaitForCompletion.messageSent = True
             sendServerState("Completed submission of all tests")
-    def getInterruptActions(self, fetchResults):
-        actions = [ KillTestSubmission() ]
-        if fetchResults:
-            actions.append(WaitForKill())
-        return actions
 
 class Abandoned(plugins.TestState):
     def __init__(self, freeText):
@@ -546,33 +549,6 @@ class Abandoned(plugins.TestState):
                                                       freeText=freeText, completed=1)
     def shouldAbandon(self):
         return 1
-    
-class WaitForKill(plugins.Action):
-    def __init__(self):
-        self.testsWaitingForKill = {}
-    def __call__(self, test):
-        if test.state.isComplete():
-            return
-
-        attempt = self.getAttempt(test)
-        if attempt > 600:
-            name = queueSystemName(test.app)
-            jobId = QueueSystemServer.instance.getJobId(test)
-            freeText = "Could not delete " + repr(test) + " in " + name + " (job " + jobId + "): have abandoned it"
-            print test.getIndent() + freeText
-            return test.changeState(Abandoned(freeText))
-
-        self.testsWaitingForKill[test] += 1
-        attempt = self.testsWaitingForKill[test]
-        if attempt % 10 == 0:
-            print test.getIndent() + "Cancellation in progress for " + repr(test) + \
-                  ", queue system wait time " + str(attempt)
-        return self.WAIT | self.RETRY
-    def getAttempt(self, test):
-        if not self.testsWaitingForKill.has_key(test):
-            self.testsWaitingForKill[test] = 0
-        self.testsWaitingForKill[test] += 1
-        return self.testsWaitingForKill[test]    
 
 # Only used when actually running master + slave
 class TestEnvironmentCreator(default.TestEnvironmentCreator):

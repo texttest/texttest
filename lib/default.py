@@ -1,5 +1,3 @@
-#!/usr/local/bin/python
-
 import os, shutil, plugins, respond, rundependent, performance, comparetest, sys, batch, re, stat, paths, subprocess, operator, glob
 from threading import currentThread
 from knownbugs import CheckForBugs, CheckForCrashes
@@ -150,9 +148,9 @@ class Config(plugins.Configuration):
                  SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
                  catalogueCreator, collator, rundependent.FilterOriginal(), self.getTestRunner(), \
                  catalogueCreator, collator, self.getTestEvaluator() ]
-    def killTest(self, test):
+    def killTest(self, test, killReason="KILLED"):
         killer = self.getTestKiller()
-        killer(test)
+        killer(test, killReason)
     def getTestKiller(self):
         return KillTest()
     def shouldIgnoreCatalogues(self):
@@ -185,7 +183,7 @@ class Config(plugins.Configuration):
         #   - temporary filter dir
         #   - all dirs in test_list_files_directory
         #
-	# Add these to a list. Never add the same dir twice. The first item will
+        # Add these to a list. Never add the same dir twice. The first item will
         # be the default save/open dir, and the others will be added as shortcuts.
         #
         dirs = []
@@ -1019,7 +1017,7 @@ class CollateFiles(plugins.Action):
             if os.path.isfile(filePath):
                 os.remove(filePath)
     def collate(self, test):
-	testCollations = self.expandCollations(test, self.collations)
+        testCollations = self.expandCollations(test, self.collations)
         for targetStem, sourcePattern in testCollations.items():
             targetFile = test.makeTmpFileName(targetStem)
             collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
@@ -1189,8 +1187,8 @@ class RunTest(plugins.Action):
         self.diag = plugins.getDiagnostics("run test")
     def __repr__(self):
         return "Running"
-    def __call__(self, test, inChild=0):
-        return self.runTest(test, inChild)
+    def __call__(self, test):
+        return self.runTest(test)
     def changeToRunningState(self, test, process):
         execMachines = test.state.executionHosts
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
@@ -1204,7 +1202,7 @@ class RunTest(plugins.Action):
     def updateStateAfterRun(self, test):
         # space to add extra states after running
         pass
-    def runTest(self, test, inChild=0):
+    def runTest(self, test):
         if test.state.hasStarted():
             if test.state.processCompleted():
                 self.diag.info("Process completed.")
@@ -1215,8 +1213,7 @@ class RunTest(plugins.Action):
 
         self.describe(test)
         process = self.getTestProcess(test)
-        if not inChild:
-            self.changeToRunningState(test, process)
+        self.changeToRunningState(test, process)
         return self.RETRY
     def getOptions(self, test):
         optionsFile = test.getFileName("options")
@@ -1250,8 +1247,6 @@ class RunTest(plugins.Action):
             return inputFileName
         else:
             return os.devnull
-    def getInterruptActions(self, fetchResults):
-        return [ KillTest() ]
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
@@ -1267,35 +1262,30 @@ class Killed(plugins.TestState):
         return self.prevState.processCompleted()
 
 class Cancelled(plugins.TestState):
-    def __init__(self, briefText, freeText):
+    def __init__(self, briefText="cancelled", freeText="Test run was cancelled before it had started"):
         plugins.TestState.__init__(self, "cancelled", briefText=briefText, freeText=freeText, \
                                    started=1, completed=1, lifecycleChange="complete")
 
 class KillTest(plugins.Action):
     def __init__(self):
         self.diag = plugins.getDiagnostics("Kill Test")
-    def __call__(self, test):
+    def __call__(self, test, killReason="KILLED"):
         self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
         if test.state.hasStarted():
-            self.killTest(test)
+            self.killTest(test, killReason)
         else:
-            test.changeState(Cancelled("cancelled", "Test run was cancelled before it had started"))
-    def killTest(self, test):
-        briefText, fullText = self.getKillInfo(test)
+            test.changeState(Cancelled())
+    def killTest(self, test, killReason):
+        briefText, fullText = self.getKillInfo(test, killReason)
         freeText = "Test " + fullText + "\n"
         newState = Killed(briefText, freeText, test.state)
         test.changeState(newState)
         test.state.prevState.killProcess()        
-    def getKillDescriptor(self, test):
-        if hasattr(sys, "exc_value"):
-            return self.interpret(test, str(sys.exc_value))
-        else:
-            return "KILLED"
     def interpret(self, test, descriptor):
         return descriptor
-    def getKillInfo(self, test):
-        descriptor = self.getKillDescriptor(test)
-        briefText = self.getBriefText(descriptor)
+    def getKillInfo(self, test, killReason):
+        actualReason = self.interpret(test, killReason)
+        briefText = self.getBriefText(actualReason)
         if briefText:
             return briefText, self.getFullText(briefText)
         else:

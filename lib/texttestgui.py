@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, os, string, time, sys, locale, paths, operator
+import guiplugins, plugins, os, time, sys, locale, paths, operator
 from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
@@ -284,10 +284,10 @@ class IdleHandlerManager:
 
     def _enableHandler(self):
         return plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
-    def notifyExit(self):
-        guiplugins.processTerminationMonitor.killAll()
-
+    
 class TextTestGUI(Responder, plugins.Observable):
+    EXIT_NOTIFIED = 1
+    COMPLETION_NOTIFIED = 2
     def __init__(self, optionMap):
         self.readGtkRCFile()
         self.dynamic = not optionMap.has_key("gx")
@@ -310,10 +310,11 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notebookGUIs, rightWindowGUI = self.createRightWindowGUI()
         self.shortcutBarGUI = ShortcutBarGUI()
         self.topWindowGUI = self.createTopWindowGUI(rightWindowGUI)
+        self.exitStatus = 0
+        if not self.dynamic:
+            self.exitStatus |= self.COMPLETION_NOTIFIED # no tests to wait for...
 
         self.setUpObservers() # uses the above 5
-    def addActionThread(self, actionThread):
-        self.topWindowGUI.addObserver(actionThread) # window closing
     def getTestTreeObservers(self):
         selectionActions = filter(lambda action: hasattr(action, "notifyNewTestSelection"), self.intvActions)
         return selectionActions + [ self.testColumnGUI, self.testFileGUI ] + self.buttonBarGUIs + \
@@ -321,7 +322,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle
-        return [ self.testColumnGUI, self.testTreeGUI, self.progressBarGUI, self.progressMonitor ] 
+        return [ self.testColumnGUI, self.testTreeGUI, self.progressBarGUI, self.progressMonitor, statusMonitor ] 
     def getActionObservers(self):
         # These actions might change the tree view selection or the status bar, need to observe them
         return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ] + self.actionTabGUIs
@@ -331,7 +332,8 @@ class TextTestGUI(Responder, plugins.Observable):
     def isFileObserver(self, action):
         return hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile")
     def getExitObservers(self):
-        return [ self, self.idleManager ]
+        exitActions = filter(lambda action: hasattr(action, "notifyExit"), self.intvActions)
+        return exitActions + [ guiplugins.processTerminationMonitor, self ]
     def getTestColumnObservers(self):
         return [ self.testTreeGUI, statusMonitor, self.idleManager ]
     def getHideableGUIs(self):
@@ -353,6 +355,7 @@ class TextTestGUI(Responder, plugins.Observable):
             
         # watch for category selections
         self.progressMonitor.addObserver(self.testTreeGUI)
+        guiplugins.processTerminationMonitor.addObserver(statusMonitor)
         for observer in self.getLifecycleObservers():        
             self.addObserver(observer) # forwarding of test observer mechanism
 
@@ -394,8 +397,6 @@ class TextTestGUI(Responder, plugins.Observable):
         self.idleManager.enableHandler()
     def run(self):        
         gtk.main()
-    def notifyExit(self, *args):
-        gtk.main_quit()
     def createTopWindowGUI(self, rightWindowGUI):
         mainWindowGUI = PaneGUI(self.testTreeGUI, rightWindowGUI, horizontal=True)
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, statusMonitor ]
@@ -490,21 +491,37 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notify("Remove", test)
     def notifyAllComplete(self):
         plugins.Observable.threadedNotificationHandler.disablePoll()
-    def contentsChanged(self):
-        pass # doesn't use this yet    
-   
+        self.exitStatus |= self.COMPLETION_NOTIFIED
+        if self.exitStatus & self.EXIT_NOTIFIED:
+            self.terminate()
+    def notifyExit(self, *args):
+        self.exitStatus |= self.EXIT_NOTIFIED        
+        if self.exitStatus & self.COMPLETION_NOTIFIED:
+            self.terminate()
+        else:
+            self.notify("Status", "Waiting for all tests to terminate ...")
+    def terminate(self):
+        self.notify("Status", "Removing all temporary files ...")
+        self.topWindowGUI.removeWriteDirsAndWindow()
+        gtk.main_quit()
 
 class TopWindowGUI(ContainerGUI):
     def __init__(self, contentGUI, dynamic):
         ContainerGUI.__init__(self, [ contentGUI ])
         self.dynamic = dynamic
         self.topWindow = None
-        self.appNames = []
+        self.allApps = []
         self.windowSizeDescriptor = ""
     def addSuites(self, suites):
         for suite in suites:
-            if not suite.app.fullName in self.appNames:
-                self.appNames.append(suite.app.fullName)
+            if not suite.app in self.allApps:
+                self.allApps.append(suite.app)
+    def allAppNames(self):
+        allNames = []
+        for app in self.allApps:
+            if not app.fullName in allNames:
+                allNames.append(app.fullName)
+        return allNames
     def createView(self):
         # Create toplevel window to show it all.
         self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)        
@@ -519,7 +536,8 @@ class TopWindowGUI(ContainerGUI):
         if self.dynamic:
             self.topWindow.set_title("TextTest dynamic GUI (tests started at " + plugins.startTimeString() + ")")
         else:
-            self.topWindow.set_title("TextTest static GUI : management of tests for " + string.join(self.appNames, ","))
+            self.topWindow.set_title("TextTest static GUI : management of tests for " + \
+                                     ",".join(self.allAppNames()))
             
         self.topWindow.add(self.subguis[0].createView())
         self.topWindow.show()
@@ -534,6 +552,9 @@ class TopWindowGUI(ContainerGUI):
         guilog.info(self.windowSizeDescriptor)
     def notifyExit(self, *args):
         self.notify("Exit")
+    def removeWriteDirsAndWindow(self):
+        for app in self.allApps:
+            app.removeWriteDirectory()
         self.topWindow.destroy()
     def notifyError(self, message):
         showErrorDialog(message, self.topWindow)
@@ -1631,7 +1652,7 @@ class ActionTabGUI(SubGUI):
         value = switch.getValue()
         if len(switch.options) >= 1:
             text = "Viewing radio button for switch '" + switch.name + "', options "
-            text += string.join(switch.options, "/")
+            text += "/".join(switch.options)
             text += "'. Default value " + str(value) + "."
         else:
             text = "Viewing check button for switch '" + switch.name + "'"
@@ -1673,7 +1694,7 @@ class NotebookGUI(SubGUI):
                 self.notebook.append_page(tabGUI.createView(), label)
 
         scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
-	self.notebook.set_scrollable(True)
+        self.notebook.set_scrollable(True)
         if not self.setCurrentPage(self.currentPageName):
             self.currentPageName = self.getPageName(0)
         self.notebook.connect("switch-page", self.handlePageSwitch)
@@ -1729,7 +1750,7 @@ class NotebookGUI(SubGUI):
         self.notebook.insert_page(page, label, insertPosition)
 
     def describe(self):
-        guilog.info("Tabs showing : " + string.join(self.getTabNames(), ", "))
+        guilog.info("Tabs showing : " + ", ".join(self.getTabNames()))
 
     def findFirstRemaining(self, pageNamesRemoved):
         for tabName in self.getTabNames():

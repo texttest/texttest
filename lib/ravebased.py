@@ -171,12 +171,20 @@ class Config(CarmenConfig):
                 return [ self.getRuleCleanup(), realBuilder ]
         else:
             return None
-    def getRuleSetNames(self, test):
-        cmdLineOption =  self.optionMap.get("rset")
+    def getRuleSetNames(self, test, forCompile=True):
+        cmdLineOption = self.optionMap.get("rset")
         if cmdLineOption:
-            return cmdLineOption.split(",")
+            cmdLineRules = cmdLineOption.split(",")
+            if forCompile:
+                return cmdLineRules
+            else:
+                allNames = self._getRuleSetNames(test)
+                return filter(lambda name: name not in cmdLineRules, allNames)
         else:
-            return self._getRuleSetNames(test)
+            if forCompile:
+                return self._getRuleSetNames(test)
+            else:
+                return []
     def _getRuleSetNames(self, test):
         raise plugins.TextTestError, "Cannot determine ruleset name(s), need to provide derived configuration to use rule compilation"
     def getRuleBuildFilterer(self):
@@ -195,6 +203,8 @@ class Config(CarmenConfig):
             return RaveSubmissionRules(self.optionMap, test, self.getRuleSetNames)
     def getRuleBuildObject(self):
         return CompileRules()
+    def getSubmissionKiller(self):
+        return KillRuleBuildOrTestSubmission()
     def buildRules(self):
         if self.optionMap.has_key("skip") or self.isReconnecting():
             return 0
@@ -614,24 +624,11 @@ class CompileRules(plugins.Action):
     def setUpSuite(self, suite):
         if suite.parent is None or isUserSuite(suite):
             self.describe(suite)
-    def getInterruptActions(self, fetchResults):
-        return [ RuleBuildKilled() ]
 
-class RuleBuildKilled(queuesystem.KillTestInSlave):
-    def __call__(self, test):
-        if test.state.category != "running_rulecompile":
-            return
-        short, long = self.getKillInfo(test)
-        briefText = "Ruleset build " + short
-        freeText = "Ruleset compilation " + long
-        test.changeState(RuleBuildFailed(test.state, freeText, briefText))    
-                    
 class WaitForRuleCompile(queuesystem.WaitForCompletion):
     raveMessageSent = False
-    def __repr__(self):
-        return "Evaluating Rule Build for"
     def __call__(self, test):
-        # Don't do this if tests not compiled
+        # Don't do this if tests not compiled or killed
         if test.state.category == "not_started":
             return
         self.tryNotifyState()
@@ -641,32 +638,42 @@ class WaitForRuleCompile(queuesystem.WaitForCompletion):
         if not self.raveMessageSent:
             WaitForRuleCompile.raveMessageSent = True
             sendServerState("Completed submission of all rule compilations")
-    def getInterruptActions(self, fetchResults):
-        return [ KillRuleBuildSubmission() ]
  
-class KillRuleBuildSubmission(queuesystem.KillTestSubmission):
-    def __repr__(self):
-        return "Cancelling Rule Build"
+class KillRuleBuildOrTestSubmission(queuesystem.KillTestSubmission):
+    def isRuleBuild(self, test):
+        return test.state.category == "running_rulecompile"
     def jobStarted(self, test):
-        return test.state.category != "need_rulecompile" and test.state.category != "pend_rulecompile"
-    def setKilled(self, test):
-        timeStr =  plugins.localtime("%H:%M")
-        briefText = "Ruleset build killed at " + timeStr
-        freeText = "Ruleset compilation killed explicitly at " + timeStr
-        test.changeState(default.Cancelled(briefText, freeText))
+        return self.isRuleBuild(test) or test.state.hasStarted()
+    def setKilled(self, test, killReason, jobId):
+        if self.isRuleBuild(test):
+            timeStr =  plugins.localtime("%H:%M")
+            briefText = "Ruleset build killed at " + timeStr
+            freeText = "Ruleset compilation killed explicitly at " + timeStr
+            test.changeState(default.Cancelled(briefText, freeText))
+        else:
+            queuesystem.KillTestSubmission.setKilled(self, test, killReason, jobId)
     def setKilledPending(self, test):
-        timeStr =  plugins.localtime("%H:%M")
-        briefText = "killed pending rule compilation at " + timeStr
-        freeText = "Rule compilation job was killed (while still pending in " + queuesystem.queueSystemName(test.app) +\
-                   ") at " + timeStr
-        test.changeState(default.Cancelled(freeText, briefText))
+        if self.isRuleBuild(test):
+            timeStr =  plugins.localtime("%H:%M")
+            briefText = "killed pending rule compilation at " + timeStr
+            freeText = "Rule compilation job was killed (while still pending in " + queuesystem.queueSystemName(test.app) +\
+                     ") at " + timeStr
+            test.changeState(default.Cancelled(freeText, briefText))
+        else:
+            queuesystem.KillTestSubmission.setKilledPending(self, test)
     def setSlaveLost(self, test):
-        failReason = "no report from rule compilation (possibly killed with SIGKILL)"
-        fullText = failReason + "\n" + self.getJobFailureInfo(test)
-        test.changeState(RuleBuildFailed(test.state, fullText, failReason))
+        if self.isRuleBuild(test):
+            failReason = "no report from rule compilation (possibly killed with SIGKILL)"
+            fullText = failReason + "\n" + self.getJobFailureInfo(test)
+            test.changeState(RuleBuildFailed(test.state, fullText, failReason))
+        else:
+            queuesystem.KillTestSubmission.setSlaveLost(self, test)
     def describeJob(self, test, jobId, jobName):
-        postText = self.getPostText(test, jobId)
-        print test.getIndent() + repr(self), jobName + postText
+        if self.isRuleBuild(test):
+            postText = self.getPostText(test, jobId)
+            print test.getIndent() + repr(self), jobName + postText
+        else:
+            queuesystem.KillTestSubmission.describeJob(self, test, jobId, jobName)
 
 class TestRuleCompilation:
     rulesCompiled = {}

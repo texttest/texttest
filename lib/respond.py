@@ -134,5 +134,6 @@ class InteractiveResponder(Responder):
                 if response.startswith(versionOption):
                     self.save(test, versions[i], exactSave)
         if process:
+            print "Terminating graphical viewer..."
             JobProcess(process.pid).killAll()
         return 0

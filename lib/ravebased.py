@@ -280,7 +280,8 @@ class Config(CarmenConfig):
         pass
     def setEnvironment(self, test):
         CarmenConfig.setEnvironment(self, test)
-        if test.parent and test.parent.parent is None:
+        # Change PATH so we can intercept crc_compile calls
+        if test.parent and test.parent.parent is None and not self.slaveRun() and not self.useQueueSystem():
             carmsys = test.getEnvironment("CARMSYS")
             if carmsys and (not test.parent.environment.has_key("PATH") or \
                             test.parent.environment["PATH"].find("$CARMSYS/bin") == -1):
@@ -568,7 +569,7 @@ class SubmitRuleCompilations(queuesystem.SubmitTest):
         for ruleset in test.state.rulecomp.rulesetsForSelf:
             postText = self.getPostText(test, submissionRules)
             self.describe(test, " (" + ruleset.name + " ruleset)" + postText)
-            compileArgs = " ".join(ruleset.getCompilationArgs())
+            compileArgs = " ".join(ruleset.getCompilationArgs(remote=True))
             command = self.shellWrap(remoteCmd + " " + ruleset.targetFiles[0] + " " + self.getServerAddress() + \
                                      " " + compileArgs)
         
@@ -599,7 +600,7 @@ class CompileRules(plugins.Action):
         for ruleset in rulecomp.rulesetsForSelf:
             self.describe(test, " - ruleset " + ruleset.name)
 
-            commandArgs = ruleset.getCompilationArgs()
+            commandArgs = ruleset.getCompilationArgs(remote=False)
             if ruleset.modeString == "-debug":
                 test.app.ensureDebugLibrariesExist()
             success, currRaveInfo = self.performCompile(test, commandArgs)
@@ -764,8 +765,15 @@ class RuleSet:
     def failed(self, output):
         self.status = self.COMPILE_FAILED
         self.output = output
-    def getCompilationArgs(self):
-        return [ "crc_compile" ] + self.raveNames + self.getModeArgs() + [ "-archs", self.arch, self.sourceFile ]
+    def getCompilationArgs(self, remote):
+        return [ self.getExecutable(remote) ] + self.raveNames + self.getModeArgs() + [ "-archs", self.arch, self.sourceFile ]
+    def getExecutable(self, remote):
+        if remote:
+            # Don't allow interception or path corruption
+            return os.path.join(os.getenv("CARMSYS"), "bin", "crc_compile")
+        else:
+            # Let the traffic mechanism intercept local runs though
+            return "crc_compile"
     def getModeArgs(self):
         raveMode = os.getenv("TEXTTEST_RAVE_MODE")
         if raveMode:

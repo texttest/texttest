@@ -1,0 +1,9 @@
+#! /bin/sh
+
+if [ -f /usr/bin/python2.4.i386 ]; then
+    exec /usr/bin/python2.4.i386 "$@"
+elif [ -f /usr/local/tt-env/python2.4.rhel3/bin/python ]; then
+    exec /usr/local/tt-env/python2.4.rhel3/bin/python "$@"
+else
+    exec python "$@"
+fi

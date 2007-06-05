@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env /usr/local/share/texttest/bin/ttpython
 
 # Basic program to run a command line, and notify a remote server when it starts and ends, along
 # with its result

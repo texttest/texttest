@@ -173,11 +173,8 @@ class ApplicationRunner:
             self.suitesSetUp[suite] = [ action ]
     def tearDownSuite(self, suite):
         self.diag.info("Try tear down " + repr(suite))
-        suitesToTearDown = self.suitesSetUp.get(suite, [])
-        if len(suitesToTearDown) == 0:
-            self.diag.info("No tear down " + repr(suite))
-            return
-        for action in suitesToTearDown:
+        actionsToTearDown = self.suitesSetUp.get(suite, [])
+        for action in actionsToTearDown:
             self.diag.info(str(action) + " tear down " + repr(suite))
             action.tearDownSuite(suite)
         suite.tearDownEnvironment()

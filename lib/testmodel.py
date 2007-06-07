@@ -914,9 +914,8 @@ class Application:
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
         self.writeDirectory = self.configObject.getWriteDirectoryName(self)
         self.diag.info("Write directory at " + self.writeDirectory)
-        self.checkout = self.configObject.getCheckoutPath(self)
+        self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
-        self.setCheckoutVariable()
         self.optionGroups = self.createOptionGroups(inputOptions)
         interactiveActionHandler.setCommandOptionGroups(self.optionGroups)
     def __repr__(self):
@@ -997,9 +996,6 @@ class Application:
                 return allFiles[-1]
     def getRefVersionApplication(self, refVersion):
         return Application(self.name, self.dircache, refVersion, self.inputOptions)
-    def setCheckoutVariable(self):
-        if self.checkout:
-            os.environ["TEXTTEST_CHECKOUT"] = self.checkout
     def getPreviousWriteDirInfo(self, previousTmpInfo):
         # previousTmpInfo can be either a directory, which should be returned if it exists,
         # a user name, which should be expanded and checked
@@ -1008,14 +1004,11 @@ class Application:
         if os.path.isdir(previousTmpInfo):
             return previousTmpInfo
         else:
-            # try as user name, throw if we fail
-            path = os.path.expanduser("~" + previousTmpInfo + "/texttesttmp")
-            if os.path.isdir(path):
-                return path
-            if previousTmpInfo.find(os.sep) != -1:
-                raise plugins.TextTestError, "Could not find TextTest temporary directory at " + previousTmpInfo
+            # try as user name
+            if previousTmpInfo.find("/") == -1 and previousTmpInfo.find("\\") == -1:
+                return os.path.expanduser("~" + previousTmpInfo + "/texttesttmp")
             else:
-                raise plugins.TextTestError, "Could not find TextTest temporary directory for " + previousTmpInfo + " at " + path
+                return previousTmpInfo
     def getPersonalConfigFile(self):
         personalDir = plugins.getPersonalConfigDir()
         if personalDir:
@@ -1123,23 +1116,23 @@ class Application:
             return ""
         return "." + fullVersion
     def createTestSuite(self, responders=[], filters=[], forTestRuns = True):
-        # Reasonable that test-suite creation can depend on checkout...
-        self.setCheckoutVariable()
         if len(filters) == 0:
             filters = self.configObject.getFilterList(self)
 
         self.diag.info("Creating test suite with filters " + repr(filters))
-        success = 1
-        for filter in filters:
-            if not filter.acceptsApplication(self):
-                success = 0
         suite = TestSuite(os.path.basename(self.dircache.dir), "Root test suite", self.dircache, self)
         suite.setObservers(responders)
         suite.readContents(filters, forTestRuns)
-        if success:
-            self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
-            suite.readEnvironment()
-        return success, suite
+        self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
+        suite.readEnvironment()
+        self.verifyWithEnvironment(suite) # make sure everything's OK, given the basic environment
+        return suite
+    def verifyWithEnvironment(self, suite):
+        suite.setUpEnvironment()
+        try:
+            self.configObject.verifyWithEnvironment(suite)
+        finally:
+            suite.tearDownEnvironment()
     def description(self, includeCheckout = False):
         description = "Application " + self.fullName
         if len(self.versions):
@@ -1215,12 +1208,10 @@ class Application:
         plugins.ensureDirectoryExists(self.writeDirectory)
         self.diag.info("Made root directory at " + self.writeDirectory)
     def removeWriteDirectory(self):
-        doRemove = self.cleanMode & plugins.Configuration.CLEAN_SELF
-        if doRemove and os.path.isdir(self.writeDirectory):
+        if self.cleanMode.cleanSelf and os.path.isdir(self.writeDirectory):
             plugins.rmtree(self.writeDirectory)
     def tryCleanPreviousWriteDirs(self, rootDir):
-        doRemove = self.cleanMode & plugins.Configuration.CLEAN_PREVIOUS
-        if not doRemove or not os.path.isdir(rootDir):
+        if not self.cleanMode.cleanPrevious or not os.path.isdir(rootDir):
             return
         searchParts = [ self.name ] + self.versions
         for file in os.listdir(rootDir):
@@ -1299,16 +1290,6 @@ class Application:
         self.configDir[key] = value
         if len(docString) > 0:
             self.configDocs[key] = docString
-    def checkBinaryExists(self):
-        binary = self.getConfigValue("binary")
-        if not binary:
-            raise plugins.TextTestError, "config file entry 'binary' not defined"
-        if self.binaryShouldBeFile(binary) and not os.path.isfile(binary):
-            raise plugins.TextTestError, binary + " has not been built."
-    def binaryShouldBeFile(self, binary):
-        # For finding java classes, don't warn if they don't exist as files...
-        interpreter = self.getConfigValue("interpreter")
-        return not interpreter.startswith("java") or binary.endswith(".jar") 
             
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):

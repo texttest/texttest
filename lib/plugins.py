@@ -204,49 +204,12 @@ def parseBytes(text):
 # pango markup doesn't like <,>,& ...
 def convertForMarkup(message):
     return message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            
-# Generic configuration class
-class Configuration:
-    CLEAN_NONE = 0
-    CLEAN_SELF = 1
-    CLEAN_PREVIOUS = 2
-    def __init__(self, optionMap):
-        self.optionMap = optionMap
-    def addToOptionGroups(self, app, groups):
-        pass
-    def getActionSequence(self):
-        return []
-    def getResponderClasses(self, allApps):
-        return []
-    def getFilterList(self, app):
-        return []
-    def setEnvironment(self, test):
-        pass
-    def hasPerformance(self, app):
-        return False
-    def getCleanMode(self):
-        return self.CLEAN_SELF
-    def getWriteDirectoryName(self, app):
-        return app.getStandardWriteDirectoryName()
-    def getCheckoutPath(self, app):
-        return ""
-    def getRunOptions(self, checkout):
-        return ""
-    def getFilterFilePath(self, app, localName, forWrite):
-        return localName
-    def getInteractiveReplayOptions(self):
-        return []
-    def useExtraVersions(self, app):
-        return True
-    def printHelpText(self):
-        pass
-    def extraReadFiles(self, test):
-        return {}
-    def recomputeProgress(self, test, observers):
-        return ""
-    def setApplicationDefaults(self, app):
-        pass
-    
+
+class CleanMode:
+    def __init__(self, cleanSelf=False, cleanPrevious=False):
+        self.cleanSelf = cleanSelf
+        self.cleanPrevious = cleanPrevious
+
 # Filter interface: all must provide these three methods
 class Filter:
     def acceptsTestCase(self, test):
@@ -254,8 +217,6 @@ class Filter:
     def acceptsTestSuite(self, suite):
         return 1
     def acceptsTestSuiteContents(self, suite):
-        return 1
-    def acceptsApplication(self, app):
         return 1
 
 # Generic action to be performed: all actions need to provide these methods

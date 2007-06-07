@@ -1002,10 +1002,6 @@ class SelectTests(SelectionAction):
         selectedTests = []                
         for suite in self.getSuitesToTry():
             filters = self.getFilterList(suite.app)            
-            for filter in filters:
-                if not filter.acceptsApplication(suite.app):
-                    continue
-                
             reqTests = self.getRequestedTests(suite, filters)
             newTests = self.combineWithPrevious(reqTests, strategy)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))

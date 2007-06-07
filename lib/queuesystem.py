@@ -103,7 +103,7 @@ class QueueSystemConfig(default.Config):
         return default.Config.useExtraVersions(self, app) and not self.slaveRun()
     def getCleanMode(self):
         if self.slaveRun():
-            return self.CLEAN_NONE
+            return plugins.CleanMode()
         else:
             return default.Config.getCleanMode(self)
     def getTestKiller(self):
@@ -449,7 +449,6 @@ class SubmitTest(plugins.Action):
         name = queueSystemName(suite.app)
         self.describe(suite, " to " + name + " queues")
     def setUpApplication(self, app):
-        app.checkBinaryExists()
         self.runOptions = self.setRunOptions(app)
 
 class KillTestSubmission(plugins.Action):

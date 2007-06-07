@@ -172,8 +172,8 @@ class OptimizationConfig(ravebased.Config):
         if self.optionMap.has_key("plot") or self.optionMap.has_key("prrep"):
             return False
         return ravebased.Config.useQueueSystem(self)
-    def ignoreCheckouts(self):
-        return self.optionMap.has_key("plot") or ravebased.Config.ignoreCheckouts(self)
+    def ignoreBinary(self):
+        return self.optionMap.has_key("plot") or ravebased.Config.ignoreBinary(self)
     def getResponderClasses(self, allApps):
         if self.optionMap.has_key("plot"):
             return [ GraphPlotResponder ]
@@ -466,10 +466,8 @@ class LogFileFinder:
         if version:
             versionMod = version + "."
         searchString = app.name + "." + versionMod 
-        try:
-            root = app.getPreviousWriteDirInfo(self.searchInUser)
-        except plugins.TextTestError:
-            # If there isn't any temp info, this will throw
+        root = app.getPreviousWriteDirInfo(self.searchInUser)
+        if not os.path.isdir(root):
             return None, None
         if thisRun:
             fromThisRun = self.test.makeTmpFileName(stem)

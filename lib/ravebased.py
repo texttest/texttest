@@ -146,7 +146,7 @@ class Config(CarmenConfig):
             return CarmenConfig.getActionSequence(self)
         
         # Drop the write directory maker, in order to insert the rulebuilder in between it and the test runner
-        return [ self.getAppBuilder(), self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleActions() ] + \
+        return [ self.getWriteDirectoryMaker(), self.getCarmVarChecker(), self.getRuleActions() ] + \
                  CarmenConfig._getActionSequence(self, makeDirs = 0)
     def getSlaveSwitches(self):
         return CarmenConfig.getSlaveSwitches(self) + [ "debug", "lprof", "raveexp" ]
@@ -220,11 +220,11 @@ class Config(CarmenConfig):
             return "-debug"
         else:
             return "-optimize"
-    def getAppBuilder(self):
+    def verifyWithEnvironment(self, suite):
+        CarmenConfig.verifyWithEnvironment(self, suite)
         if self.optionMap.has_key("build"):
-            return BuildCode(self.optionValue("build"))
-        else:
-            return None
+            builder = BuildCode(self.optionValue("build"))
+            builder.build(suite.app)
     def _getLocalPlanPath(self, test):
         # Key assumption : to avoid reading Carmen Resource system LocalPlanPath
         # If this does not hold changing the CARMUSR is needed
@@ -868,12 +868,12 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
         pass
     # getCarmtmpPath implemented by subclasses
 
-class BuildCode(plugins.Action):
+class BuildCode:
     builtDirs = {}
     buildFailedDirs = {}
     def __init__(self, target):
         self.target = target
-    def setUpApplication(self, app):
+    def build(self, app):
         targetDir = app.getConfigValue("build_targets")
         if not targetDir.has_key(self.target):
             return

@@ -4,28 +4,13 @@ import os, performance, plugins, respond, sys, string, time, types, shutil, test
 from ndict import seqdict
 from cPickle import Pickler
 
-class BatchFilter(plugins.Filter):
-    option = "b"
+class BatchVersionFilter:
     def __init__(self, batchSession):
         self.batchSession = batchSession
-        self.performanceFilter = None
-    def acceptsTestCase(self, test):
-        if self.performanceFilter == None:
-            return 1
-        else:
-            return self.performanceFilter.acceptsTestCase(test)
-    def acceptsApplication(self, app):
+    def verifyVersions(self, app):
         badVersion = self.findUnacceptableVersion(app)
-        if badVersion != None:
-            print "Rejected application", app, "for", self.batchSession, "session, unregistered version '" + badVersion + "'"
-            return 0
-        
-        self.setTimeLimit(app)
-        return 1
-    def setTimeLimit(self, app):
-        timeLimit = app.getCompositeConfigValue("batch_timelimit", self.batchSession)
-        if timeLimit:
-            self.performanceFilter = performance.TimeFilter(timeLimit)
+        if badVersion is not None:
+            raise plugins.TextTestError, "unregistered version '" + badVersion + "' for " + self.batchSession + " session."
     def findUnacceptableVersion(self, app):
         if app.getCompositeConfigValue("batch_use_version_filtering", self.batchSession) != "true":
             return
@@ -57,7 +42,7 @@ class BatchCategory(plugins.Filter):
         return self.tests.has_key(test.getRelPath())
     def describeBrief(self, app):
         if self.size() > 0:
-            valid, suite = app.createTestSuite(filters = [ self ])
+            suite = app.createTestSuite(filters = [ self ])
             self.testSuites.append(suite)
             return "The following tests " + self.longDescription + " : \n" + \
                    self.getTestLines(suite) + "\n"
@@ -547,6 +532,9 @@ class CollectFiles(plugins.ScriptWithArgs):
         fileBodies = []
         totalValues = seqdict()
         rootDir = app.getPreviousWriteDirInfo(self.userName)
+        if not os.path.isdir(rootDir):
+            sys.stderr.write("No temporary directory found at " + rootDir + " - not collecting batch reports.\n")
+            return
         dirlist = os.listdir(rootDir)
         dirlist.sort()
         for dir in dirlist:

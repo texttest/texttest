@@ -13,7 +13,9 @@ plugins.addCategory("cancelled", "cancelled", "were cancelled before starting")
 def getConfig(optionMap):
     return Config(optionMap)
 
-class Config(plugins.Configuration):
+class Config:
+    def __init__(self, optionMap):
+        self.optionMap = optionMap
     def addToOptionGroups(self, app, groups):
         recordsUseCases = app.getConfigValue("use_case_record_mode") != "disabled"
         for group in groups:
@@ -118,7 +120,7 @@ class Config(plugins.Configuration):
         else:
             return []
     def getWriteDirectoryName(self, app):
-        defaultName = plugins.Configuration.getWriteDirectoryName(self, app)
+        defaultName = app.getStandardWriteDirectoryName()
         if self.useStaticGUI(app):
             dirname, local = os.path.split(defaultName)
             versionSuffix = app.versionSuffix()
@@ -136,7 +138,7 @@ class Config(plugins.Configuration):
             actions = [ self.getWriteDirectoryMaker() ] + actions
         return actions
     def getReconnectSequence(self):
-        actions = [ ReconnectTest(self.optionValue("reconnect"), self.optionMap.has_key("reconnfull")) ]
+        actions = [ ReconnectTest(self.reconnDir, self.optionMap.has_key("reconnfull")) ]
         actions += [ rundependent.FilterOriginal(), rundependent.FilterTemporary(), \
                      self.getTestComparator(), self.getFailureExplainer() ]
         return actions
@@ -218,8 +220,7 @@ class Config(plugins.Configuration):
         else:
             return ("temporary_filter_files", os.path.join(app.writeDirectory, "temporary_filter_files"))
     def getFilterClasses(self):
-        return [ TestNameFilter, TestPathFilter, TestSuiteFilter, \
-                 batch.BatchFilter, performance.TimeFilter ]
+        return [ TestNameFilter, TestPathFilter, TestSuiteFilter, performance.TimeFilter ]
     def getFilterList(self, app, extendFileNames = True):
         filters = self.getFiltersFromMap(self.optionMap, app)
 
@@ -234,8 +235,7 @@ class Config(plugins.Configuration):
                 try:
                     filters += self.getFiltersFromFile(app, filterFileName, extendFileNames)
                 except:
-                    sys.stderr.write("Rejected application " + repr(app) + " : filter file '" + filterFileName + "' could not be found\n")
-                    return [ RejectFilter() ]
+                    raise plugins.TextTestError, "filter file '" + filterFileName + "' could not be found."
             else:
                 # When running from the GUI, it's more appropriate to propagate the TextTestError ...
                 filters += self.getFiltersFromFile(app, filterFileName, extendFileNames)
@@ -266,6 +266,11 @@ class Config(plugins.Configuration):
         for filterClass in self.getFilterClasses():
             if optionMap.has_key(filterClass.option):
                 filters.append(filterClass(optionMap[filterClass.option]))
+        batchSession = self.optionMap.get("b")
+        if batchSession:
+            timeLimit = app.getCompositeConfigValue("batch_timelimit", batchSession)
+            if timeLimit:
+                filters.append(performance.TimeFilter(timeLimit))
         if optionMap.has_key("grep"):
             filters.append(GrepFilter(optionMap["grep"], self.getGrepFile(optionMap, app)))
         return filters
@@ -280,9 +285,9 @@ class Config(plugins.Configuration):
         return self.optionMap.has_key("keeptmp") or (self.batchMode() and not self.isReconnecting())
     def getCleanMode(self):
         if self.keepTemporaryDirectories():
-            return self.CLEAN_PREVIOUS
+            return plugins.CleanMode(cleanPrevious=True)
         
-        return self.CLEAN_SELF
+        return plugins.CleanMode(cleanSelf=True)
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
@@ -338,22 +343,58 @@ class Config(plugins.Configuration):
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         return self.optionMap.get(option, "")
-    def ignoreCheckouts(self):
-        return self.isReconnecting()
-    def getCheckoutPath(self, app):
-        if self.ignoreCheckouts():
-            return "" 
-        
+    def allowEmpty(self):
+        return self.optionMap.has_key("gx") or self.optionMap.runScript()
+    def ignoreBinary(self):
+        return self.optionMap.runScript() or self.isReconnecting()
+    def setUpCheckout(self, app):
+        if self.ignoreBinary():
+            return ""
         checkoutPath = self.getGivenCheckoutPath(app)
         # Allow empty checkout, means no checkout is set, basically
         if len(checkoutPath) > 0:
-            self.verifyCheckoutValid(checkoutPath)
+            # don't fail to start the static GUI because of checkouts, can be fixed from there
+            if not self.optionMap.has_key("gx"): 
+                self.verifyCheckoutValid(checkoutPath)
+            if checkoutPath:
+                os.environ["TEXTTEST_CHECKOUT"] = checkoutPath
+    
         return checkoutPath
     def verifyCheckoutValid(self, checkoutPath):
         if not os.path.isabs(checkoutPath):
             raise plugins.TextTestError, "could not create absolute checkout from relative path '" + checkoutPath + "'"
         elif not os.path.isdir(checkoutPath):
             raise plugins.TextTestError, "checkout '" + checkoutPath + "' does not exist"
+    def verifyWithEnvironment(self, suite):
+        if suite.size() == 0 and not self.allowEmpty():
+            raise plugins.TextTestError, "no tests matching the selection criteria found."
+
+        if not self.ignoreBinary() and not self.optionMap.has_key("gx"):
+            self.checkBinaryExists(suite.app)
+        
+        self.checkConfigSanity(suite.app)
+        batchSession = self.optionMap.get("b")
+        if batchSession:
+            batchFilter = batch.BatchVersionFilter(batchSession)
+            batchFilter.verifyVersions(suite.app)
+        if self.isReconnecting():
+            reconnector = ReconnectApp()
+            self.reconnDir = reconnector.findReconnectDir(suite.app, self.optionValue("reconnect"))
+            
+    def checkBinaryExists(self, app):
+        binary = app.getConfigValue("binary")
+        if not binary:
+            raise plugins.TextTestError, "config file entry 'binary' not defined"
+        if self.binaryShouldBeFile(app, binary) and not os.path.isfile(binary):
+            raise plugins.TextTestError, binary + " has not been built."
+    def binaryShouldBeFile(self, app, binary):
+        # For finding java classes, don't warn if they don't exist as files...
+        interpreter = app.getConfigValue("interpreter")
+        return not interpreter.startswith("java") or binary.endswith(".jar") 
+    def checkConfigSanity(self, app):
+        for key in app.getConfigValue("collate_file"):
+            if key.find(".") != -1:
+                raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' characters are not allowed"
     def getGivenCheckoutPath(self, app):
         checkout = self.getCheckout(app)
         if os.path.isabs(checkout):
@@ -396,6 +437,8 @@ class Config(plugins.Configuration):
         fileFilter(test)
         comparator = self.getTestComparator()
         comparator.recomputeProgress(test, observers)
+    def extraReadFiles(self, test):
+        return {}
     def printHelpScripts(self):
         pass
     def printHelpDescription(self):
@@ -966,9 +1009,6 @@ class CollateFiles(plugins.Action):
         self.diag = plugins.getDiagnostics("Collate Files")
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
-        for key in self.collations.keys():
-            if key.find(".") != -1:
-                raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' characters are not allowed"
         self.discardFiles = app.getConfigValue("discard_file")
     def expandCollations(self, test, coll):
         newColl = seqdict()
@@ -1156,18 +1196,7 @@ class GrepFilter(TextFilter):
             if self.stringContainsText(line):
                 return True
         return False
-
-# Dummy class to signify failure...
-class RejectFilter(plugins.Filter):
-    def acceptsTestCase(self, test):
-        return False
-    def acceptsTestSuite(self, suite):
-        return False
-    def acceptsTestSuiteContents(self, suite):
-        return False
-    def acceptsApplication(self, app):
-        return False
-
+ 
 class Running(plugins.TestState):
     def __init__(self, execMachines, bkgProcess = None, freeText = "", briefText = ""):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
@@ -1249,8 +1278,6 @@ class RunTest(plugins.Action):
             return os.devnull
     def setUpSuite(self, suite):
         self.describe(suite)
-    def setUpApplication(self, app):
-        app.checkBinaryExists()
 
 class Killed(plugins.TestState):
     def __init__(self, briefText, freeText, prevState):
@@ -1462,10 +1489,35 @@ class CountTest(plugins.Action):
     def setUpApplication(self, app):
         self.appCount[app.description()] = 0
 
+# Trawl around for a suitable dir to reconnect to if we haven't been told one
+class ReconnectApp:
+    def findReconnectDir(self, app, reconnectTmpInfo):
+        fetchDir = app.getPreviousWriteDirInfo(reconnectTmpInfo)
+        if not os.path.isdir(fetchDir):
+            if fetchDir == reconnectTmpInfo or len(reconnectTmpInfo) == 0:
+                raise plugins.TextTestError, "Could not find TextTest temporary directory at " + fetchDir
+            else:
+                raise plugins.TextTestError, "Could not find TextTest temporary directory for " + reconnectTmpInfo + " at " + fetchDir
+
+        rootDirToCopy = self.findReconnDirectory(fetchDir, app)
+        if rootDirToCopy:
+            return rootDirToCopy
+        else:
+            raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + " under " + fetchDir
+    def findReconnDirectory(self, fetchDir, app):
+        return app.getFileName([ fetchDir ], app.name, self.getVersionList)
+    def getVersionList(self, fileName, stem):
+        # Show the framework how to find the version list given a file name
+        # If it doesn't match, return None
+        parts = fileName.split(".")
+        if len(parts) < 2 or stem != parts[0]:
+            return
+        # drop the application at the start and the date/time at the end
+        return parts[1:-1]
+
 class ReconnectTest(plugins.Action):
-    def __init__(self, reconnectTmpInfo, fullRecalculate):
-        self.reconnectTmpInfo = reconnectTmpInfo
-        self.rootDirToCopy = None
+    def __init__(self, rootDirToCopy, fullRecalculate):
+        self.rootDirToCopy = rootDirToCopy
         self.fullRecalculate = fullRecalculate
         self.diag = plugins.getDiagnostics("Reconnection")
     def __repr__(self):
@@ -1525,23 +1577,8 @@ class ReconnectTest(plugins.Action):
             newState.updateTmpPath(self.rootDirToCopy)
             return True
     def setUpApplication(self, app):
-        fetchDir = app.getPreviousWriteDirInfo(self.reconnectTmpInfo)
-        self.rootDirToCopy = self.findReconnDirectory(fetchDir, app)
-        if not self.rootDirToCopy:
-            raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + " under " + fetchDir
-
         print "Reconnecting to test results in directory", self.rootDirToCopy
-    def findReconnDirectory(self, fetchDir, app):
-        self.diag.info("Looking for reconnection in " + fetchDir)
-        return app.getFileName([ fetchDir ], app.name, self.getVersionList)
-    def getVersionList(self, fileName, stem):
-        # Show the framework how to find the version list given a file name
-        # If it doesn't match, return None
-        parts = fileName.split(".")
-        if len(parts) < 2 or stem != parts[0]:
-            return
-        # drop the application at the start and the date/time at the end
-        return parts[1:-1]
+
     def setUpSuite(self, suite):
         self.describe(suite)
 

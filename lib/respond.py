@@ -32,8 +32,6 @@ class Responder:
     # Called when everything is finished
     def notifyAllComplete(self):
         pass
-    def needsOwnThread(self):
-        return 0
     def needsTestRuns(self):
         return 1
 

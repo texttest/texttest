@@ -6,6 +6,7 @@ from cPickle import Unpickler
 from jobprocess import JobProcess
 from socket import gethostname
 from ndict import seqdict
+from actionrunner import ActionRunner
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 plugins.addCategory("cancelled", "cancelled", "were cancelled before starting")
@@ -108,6 +109,13 @@ class Config:
             classes.append(self.getStateSaver())
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
+        return classes
+    def getThreadRunnerClasses(self):
+        classes = []
+        if self.useGUI():
+            self.addGuiResponder(classes)
+        if not self.optionMap.has_key("gx"):
+            classes.append(ActionRunner)
         return classes
     def getTextDisplayResponderClass(self):
         return respond.TextDisplayResponder

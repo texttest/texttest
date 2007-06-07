@@ -27,7 +27,6 @@ except:
     raiseException("Unable to import module 'gobject'")
 
 import guiplugins, plugins, os, time, sys, locale, paths, operator
-from threading import Thread, currentThread
 from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
 from respond import Responder
@@ -369,8 +368,6 @@ class TextTestGUI(Responder, plugins.Observable):
         for observer in self.getExitObservers():
             self.topWindowGUI.addObserver(observer)
                 
-    def needsOwnThread(self):
-        return True
     def readGtkRCFile(self):
         configDir = plugins.getPersonalConfigDir()
         if not configDir:

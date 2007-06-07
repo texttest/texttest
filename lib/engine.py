@@ -4,7 +4,6 @@ import plugins, os, sys, testmodel, signal
 from threading import Thread
 from usecase import ScriptEngine
 from ndict import seqdict
-from actionrunner import ActionRunner
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder:
@@ -161,6 +160,19 @@ class TextTest:
         self.allResponders = map(lambda x : x(self.inputOptions), responderClasses)
         allCompleteResponder = testmodel.AllCompleteResponder(self.allResponders)
         self.allResponders.append(allCompleteResponder)
+    def createThreadRunners(self, allApps):
+        threadRunnerClasses = []
+        for app in allApps:
+            for threadClass in app.getThreadRunnerClasses():
+                if not threadClass in threadRunnerClasses:
+                    self.diag.info("Adding thread runner " + repr(threadClass))
+                    threadRunnerClasses.append(threadClass)
+        return map(self.makeThreadRunner, threadRunnerClasses)
+    def makeThreadRunner(self, threadRunnerClass):
+        for responder in self.allResponders:
+            if isinstance(responder, threadRunnerClass):
+                return responder
+        return threadRunnerClass(self.inputOptions)
     def createTestSuites(self, allApps):
         uniqueNameFinder = UniqueNameFinder()
         appSuites = seqdict()
@@ -188,10 +200,6 @@ class TextTest:
     def deleteTempFiles(self):
         for app, testSuite in self.appSuites.items():
             app.removeWriteDirectory()
-    def setUpResponders(self):
-        testSuites = [ testSuite for app, testSuite in self.appSuites.items() ]
-        for responder in self.allResponders:
-            responder.addSuites(testSuites)
     def run(self):
         allApps = self.findApps()
         if self.inputOptions.helpMode():
@@ -203,11 +211,10 @@ class TextTest:
                 print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
                 print "If this makes no sense, read the online documentation..."
             return
-        self._run(allApps)
-    def findOwnThreadResponder(self):
-        for responder in self.allResponders:
-            if responder.needsOwnThread():
-                return responder
+        try:
+            self._run(allApps)
+        finally:
+            self.deleteTempFiles() # include the dud ones, possibly
     def _run(self, allApps):
         try:
             self.createResponders(allApps)
@@ -217,34 +224,31 @@ class TextTest:
             sys.stderr.write(str(e) + "\n")
             return
         self.appSuites = self.createTestSuites(allApps)
-        if len(self.appSuites) > 0:
-            try:
-                self.runAppSuites()
-            finally:
-                self.deleteTempFiles() # include the dud ones, possibly
-    def runAppSuites(self):
-        # pick out any responder that is designed to hang around executing
-        # some sort of loop in its own thread... generally GUIs of some sort
-        ownThreadResponder = self.findOwnThreadResponder()
-        if not ownThreadResponder or ownThreadResponder.needsTestRuns():
-            self.runWithTests(ownThreadResponder)
-        else:
-            self.runAlone(ownThreadResponder)
-    def runAlone(self, ownThreadResponder):
-        self.setUpResponders()
-        ownThreadResponder.run()
-    def runWithTests(self, ownThreadResponder):              
-        actionRunner = ActionRunner(self.inputOptions)
-        actionRunner.addSuites([ testSuite for app, testSuite in self.appSuites.items() ])
-    
-        # Wait until now to do this, in case problems encountered so far...
-        self.setUpResponders()
-        if ownThreadResponder:
-            thread = Thread(target=actionRunner.run)
+        if len(self.appSuites) == 0:
+            return
+        threadRunners = self.createThreadRunners(allApps)
+        self.addSuites(threadRunners)
+        self.runThreads(threadRunners)
+    def addSuites(self, threadRunners):
+        suites = [ testSuite for app, testSuite in self.appSuites.items() ]
+        for responder in self.allResponders:
+            self.diag.info("Adding suites for " + str(responder.__class__))
+            responder.addSuites(suites)
+        for threadRunner in threadRunners:
+            if not threadRunner in self.allResponders:
+                self.diag.info("Adding suites for " + str(threadRunner.__class__))
+                threadRunner.addSuites(suites)
+    def runThreads(self, threadRunners):
+        # Run the first one as the main thread and the rest in subthreads
+        # They will hopefully be arranged in order of how long they should run
+        for subThreadRunner in threadRunners[1:]:
+            thread = Thread(target=subThreadRunner.run)
+            self.diag.info("Running " + str(subThreadRunner.__class__) + " in a subthread")
             thread.start()
-            ownThreadResponder.run()
-        else:
-            actionRunner.run()
+        if len(threadRunners) > 0:
+            self.diag.info("Running " + str(threadRunners[0].__class__) + " in main thread")
+            threadRunners[0].run()
+
     def setSignalHandlers(self):
         # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
         if os.name == "posix":

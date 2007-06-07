@@ -1209,6 +1209,7 @@ class Application:
         self.diag.info("Made root directory at " + self.writeDirectory)
     def removeWriteDirectory(self):
         if self.cleanMode.cleanSelf and os.path.isdir(self.writeDirectory):
+            self.diag.info("Removing write directory at " + self.writeDirectory)
             plugins.rmtree(self.writeDirectory)
     def tryCleanPreviousWriteDirs(self, rootDir):
         if not self.cleanMode.cleanPrevious or not os.path.isdir(rootDir):

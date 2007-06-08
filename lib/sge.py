@@ -1,5 +1,5 @@
 
-import os, string, signal
+import os, string, subprocess
 from plugins import getDiagnostics, localtime
 from time import sleep
 
@@ -31,7 +31,8 @@ class QueueSystem:
     def findSubmitError(self, stderr):
         return stderr.splitlines()[0].strip()
     def killJob(self, jobId):
-        self.qdelOutput = os.popen("qdel " + jobId + " 2>&1").read()
+        proc = subprocess.Popen([ "qdel", jobId ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        self.qdelOutput = proc.communicate()[0]
         return self.qdelOutput.find("has registered the job") != -1 or self.qdelOutput.find("has deleted job") != -1
     def getJobId(self, line):
         return line.split()[2]

@@ -139,6 +139,10 @@ class Config(CarmenConfig):
                 group.addOption("rset", "Private: used for submitting ruleset names to compile")
     def getFilterClasses(self):
         return CarmenConfig.getFilterClasses(self) + [ UserFilter ]
+    def getResponderClasses(self, allApps):
+        # Change the handler class (hack!)
+        queuesystem.SlaveServerResponder.handlerClass = RuleBuildRequestHandler
+        return CarmenConfig.getResponderClasses(self, allApps)
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true"
     def getActionSequence(self):
@@ -446,7 +450,7 @@ class RuleBuildRequestHandler(queuesystem.SlaveRequestHandler):
         else:
             stdout, stderr = self.rfile.read().split("|STD_ERR|")
             return stdout + stderr
-            
+                        
 class EvaluateRuleBuild(plugins.Action):
     def __init__(self):
         self.diag = plugins.getDiagnostics("Synchroniser")
@@ -555,10 +559,6 @@ class FilterRuleBuilds(plugins.Action):
 class SubmitRuleCompilations(queuesystem.SubmitTest):
     def __repr__(self):
         return "Submitting Rule Builds for"
-    def tryStartServer(self):
-        queuesystem.SubmitTest.tryStartServer(self)
-        # bit of a hack, but there we go...
-        queuesystem.QueueSystemServer.instance.socketServer.RequestHandlerClass = RuleBuildRequestHandler
     def __call__(self, test):
         self.tryStartServer()
         if test.state.category != "need_rulecompile":
@@ -570,7 +570,7 @@ class SubmitRuleCompilations(queuesystem.SubmitTest):
             postText = self.getPostText(test, submissionRules)
             self.describe(test, " (" + ruleset.name + " ruleset)" + postText)
             compileArgs = " ".join(ruleset.getCompilationArgs(remote=True))
-            command = self.shellWrap(remoteCmd + " " + ruleset.targetFiles[0] + " " + self.getServerAddress() + \
+            command = self.shellWrap(remoteCmd + " " + ruleset.targetFiles[0] + " " + self.serverAddress + \
                                      " " + compileArgs)
         
             self.diag.info("Submitting job : " + command)

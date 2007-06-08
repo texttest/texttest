@@ -1,13 +1,13 @@
-import os, string, sys, default, unixonly, performance, plugins, socket, time, subprocess, operator
+import os, sys, default, unixonly, performance, plugins, socket, time, subprocess, operator
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
-from threading import Thread
 from time import sleep
 from copy import copy
 from cPickle import dumps
 from respond import Responder, TextDisplayResponder
 from traffic_cmd import sendServerState
 from knownbugs import CheckForBugs
+from actionrunner import ActionRunner
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
@@ -25,7 +25,7 @@ class RunTestInSlave(unixonly.RunTest):
         self.changeToRunningState(test, process)
         plugins.retryOnInterrupt(process.wait)
     def getBriefText(self, execMachines):
-        return "RUN (" + string.join(execMachines, ",") + ")"
+        return "RUN (" + ",".join(execMachines) + ")"
 
 class FindExecutionHosts(default.FindExecutionHosts):
     def getExecutionMachines(self, test):
@@ -41,14 +41,9 @@ class KillTestInSlave(default.KillTest):
         exec command
         return _getLimitInterpretation(origBriefText)
     
-class SocketResponder(Responder):
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
-        self.serverAddress = None
-        servAddr = optionMap.get("servaddr")
-        if servAddr:
-            host, port = servAddr.split(":")
-            self.serverAddress = (host, int(port))
+class TestStateSender:
+    def __init__(self, serverAddress):
+        self.serverAddress = serverAddress
     def connect(self, sendSocket):
         for attempt in range(5):
             try:
@@ -57,14 +52,25 @@ class SocketResponder(Responder):
             except socket.error:
                 sleep(1)
         sendSocket.connect(self.serverAddress)
+    def send(self, test, state):
+        testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
+        pickleData = dumps(state)
+        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect(sendSocket)
+        sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
+        sendSocket.close()
+    
+class SocketResponder(Responder):
+    def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
+        self.sender = None
+        servAddr = optionMap.get("servaddr")
+        if servAddr:
+            host, port = servAddr.split(":")
+            self.sender = TestStateSender((host, int(port)))
     def notifyLifecycleChange(self, test, state, changeDesc):
-        if self.serverAddress:
-            testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
-            pickleData = dumps(state)
-            sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.connect(sendSocket)
-            sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
-            sendSocket.close()
+        if self.sender:
+            self.sender.send(test, state)
     
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
@@ -85,9 +91,8 @@ class QueueSystemConfig(default.Config):
     def getPossibleResources(self, queueSystem):
         return []
     def useQueueSystem(self):
-        if self.optionMap.has_key("reconnect") or self.optionMap.has_key("l"):
-            return 0
-        return 1
+        return not self.isReconnecting() and not self.optionMap.has_key("l") and \
+               not self.optionMap.has_key("gx") and not self.optionMap.runScript() and not self.optionMap.has_key("coll")
     def getRunOptions(self, checkout):
         # Options to add by default when recording, auto-replaying or running as slave
         return [ "-l" ] + default.Config.getRunOptions(self, checkout)
@@ -121,7 +126,7 @@ class QueueSystemConfig(default.Config):
             return baseProcessor
 
         submitter = SubmitTest(self.getSubmissionRules, self.optionMap, self.getSlaveSwitches())
-        return [ submitter, WaitForCompletion(), CheckForUnrunnableBugs() ]
+        return [ submitter, CheckForUnrunnableBugs() ]
     def getSlaveSwitches(self):
         return [ "trace", "ignorecat", "actrep", "rectraffic", "keeptmp" ]
     def getExecHostFinder(self):
@@ -136,10 +141,15 @@ class QueueSystemConfig(default.Config):
             return self.getSlaveResponderClasses()
         responderClasses = default.Config.getResponderClasses(self, allApps)
         if self.useQueueSystem():
-            responderClasses += [ AllSubmittedResponder ]
+            responderClasses += [ AllSubmittedResponder, SlaveServerResponder ]
         return responderClasses
+    def getThreadRunnerClasses(self):
+        baseClasses = default.Config.getThreadRunnerClasses(self)
+        if not self.slaveRun() and self.useQueueSystem():
+            baseClasses.append(SlaveServerResponder)
+        return baseClasses
     def getEnvironmentCreator(self, test):
-        if self.useQueueSystem():
+        if self.slaveRun() or self.useQueueSystem():
             return TestEnvironmentCreator(test, self.optionMap, self.getInteractiveReplayOptions())
         else:
             return default.Config.getEnvironmentCreator(self, test)
@@ -191,7 +201,7 @@ class SubmissionRules:
         path = self.test.getRelPath()
         parts = path.split("/")
         parts.reverse()
-        return "Test-" + string.join(parts, ".") + "-" + repr(self.test.app).replace(" ", "_") + self.test.app.versionSuffix()
+        return "Test-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_") + self.test.app.versionSuffix()
     def getSubmitSuffix(self, name):
         queue = self.findQueue()
         if queue:
@@ -256,6 +266,8 @@ class SubmissionRules:
 class SlaveRequestHandler(StreamRequestHandler):
     def handle(self):
         identifier = self.rfile.readline().strip()
+        if identifier == "TERMINATE_SERVER":
+            return
         self.wfile.close()
         clientHost, clientPort = self.client_address
         # Don't use port, it changes all the time
@@ -277,19 +289,40 @@ class SlaveRequestHandler(StreamRequestHandler):
     def getHostName(self, ipAddress):
         return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
 
-class SlaveServer(TCPServer):
-    def __init__(self):
-        TCPServer.__init__(self, (socket.gethostname(), 0), self.getHandlerClass())
+class SlaveServerResponder(Responder,TCPServer):
+    handlerClass = SlaveRequestHandler
+    def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
+        TCPServer.__init__(self, (socket.gethostname(), 0), self.handlerClass)
         self.testMap = {}
         self.testClientInfo = {}
         self.diag = plugins.getDiagnostics("Slave Server")
+        self.terminate = False
+        # Need to tell the submission code where we are, if it's not using the MIM already
+        if not SubmitTest.serverAddress:
+            SubmitTest.serverAddress = self.getAddress()
+    def run(self):
+        # Tell the man-in-the-middle (MIM), if any, where we are
         sendServerState("TextTest slave server started on " + self.getAddress())
-    def getHandlerClass(self):
-        return SlaveRequestHandler
+        while not self.terminate:
+            self.handle_request()
+        
+        self.diag.info("Terminating slave server")
+    def notifyAllComplete(self):
+        self.diag.info("Notified all complete, shutting down soon...")
+        self.terminate = True
+        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sendSocket.connect(self.socket.getsockname())
+        sendSocket.sendall("TERMINATE_SERVER\n")
+        sendSocket.close()
     def getAddress(self):
         host, port = self.socket.getsockname()
         return host + ":" + str(port)
-    def testSubmitted(self, test):
+    def addSuites(self, suites):
+        for suite in suites:
+            for test in suite.testCaseList():
+                self.storeTest(test)
+    def storeTest(self, test):
         testPath = test.getRelPath()
         testApp = test.app.name + test.app.versionSuffix()
         if not self.testMap.has_key(testApp):
@@ -322,14 +355,7 @@ class QueueSystemServer:
         self.queueSystems = {}
         self.submitDiag = plugins.getDiagnostics("Queue System Submit")
         QueueSystemServer.instance = self
-        self.socketServer = SlaveServer()
-        self.updateThread = Thread(target=self.socketServer.serve_forever)
-        self.updateThread.setDaemon(1)
-        self.updateThread.start()
-    def getServerAddress(self):
-        return self.socketServer.getAddress()
     def submitJob(self, test, submissionRules, command):
-        self.socketServer.testSubmitted(test)
         self.submitDiag.info("Creating job at " + plugins.localtime())
         queueSystem = self.getQueueSystem(test)
         extraArgs = os.getenv("QUEUE_SYSTEM_SUBMIT_ARGS")
@@ -360,19 +386,16 @@ class QueueSystemServer:
         queueSystem = self.getQueueSystem(test)
         jobId, jobName = self.jobs[test]
         return queueSystem.getJobFailureInfo(jobId)
-    def getJobId(self, test):
-        if not self.jobs.has_key(test):
-            return "NONE"
-        jobId, jobName = self.jobs[test]
-        return jobId             
+    def getJobInfo(self, test):
+        return self.jobs.get(test, (None, None))
     def killJob(self, test):
         if not self.jobs.has_key(test) or test in self.killedTests:
-            return False, None, None
+            return False
         queueSystem = self.getQueueSystem(test)
         jobId, jobName = self.jobs[test]
         jobExisted = queueSystem.killJob(jobId)
         self.killedTests.append(test)
-        return jobExisted, jobId, jobName
+        return jobExisted
     def getQueueSystem(self, test):
         queueModule = test.app.getConfigValue("queue_system_module").lower()
         if self.queueSystems.has_key(queueModule):
@@ -385,6 +408,7 @@ class QueueSystemServer:
         return system
                                  
 class SubmitTest(plugins.Action):
+    serverAddress = os.getenv("TEXTTEST_MIM_SERVER") # Where we tell the slaves to report back to
     def __init__(self, submitRuleFunction, optionMap, slaveSwitches):
         self.submitRuleFunction = submitRuleFunction
         self.optionMap = optionMap
@@ -405,7 +429,6 @@ class SubmitTest(plugins.Action):
         QueueSystemServer.instance.submitJob(test, submissionRules, command)
         if not test.state.hasStarted():
             self.setPending(test)
-        return self.WAIT
     def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
@@ -418,11 +441,9 @@ class SubmitTest(plugins.Action):
     def getSlaveCommand(self, test):
         return plugins.textTestName + " " + " ".join(test.app.getRunOptions()) + " -tp " + test.getRelPath() \
                + self.getSlaveArgs(test) + " " + self.runOptions
-    def getServerAddress(self):
-        return os.getenv("TEXTTEST_MIM_SERVER", QueueSystemServer.instance.getServerAddress())        
     def getSlaveArgs(self, test):
         return " -" + self.slaveType() + " " + test.app.writeDirectory + \
-               " -servaddr " + self.getServerAddress()
+               " -servaddr " + self.serverAddress
     def tryStartServer(self):
         if not QueueSystemServer.instance:
             QueueSystemServer.instance = QueueSystemServer()
@@ -441,7 +462,7 @@ class SubmitTest(plugins.Action):
             runOptions.append("-xr " + self.optionMap.diagConfigFile)
             slaveWriteDir = os.path.join(self.optionMap.diagWriteDir, self.slaveType())
             runOptions.append("-xw " + slaveWriteDir)
-        return string.join(runOptions)
+        return " ".join(runOptions)
     def getPostText(self, test, submissionRules):
         name = queueSystemName(test.app)
         return submissionRules.getSubmitSuffix(name)
@@ -458,12 +479,13 @@ class KillTestSubmission(plugins.Action):
         return "Cancelling"
     def __call__(self, test, killReason):
         self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
-        jobExisted, jobId, jobName = self.performKill(test)
+        jobId, jobName = self.getJobInfo(test)
         if not jobId:
             test.changeState(default.Cancelled())
             return
 
         self.describeJob(test, jobId, jobName)
+        jobExisted = QueueSystemServer.instance.killJob(test)
         startNotified = self.jobStarted(test)
         if jobExisted:
             if startNotified:
@@ -480,10 +502,10 @@ class KillTestSubmission(plugins.Action):
             self.waitForKill(test, jobId)
     def jobStarted(self, test):
         return test.state.hasStarted()
-    def performKill(self, test):
+    def getJobInfo(self, test):
         if not QueueSystemServer.instance:
-            return False, None, None
-        return QueueSystemServer.instance.killJob(test)
+            return None, None
+        return QueueSystemServer.instance.getJobInfo(test)
     def setKilledPending(self, test):
         timeStr =  plugins.localtime("%H:%M")
         briefText = "cancelled pending job at " + timeStr
@@ -494,7 +516,7 @@ class KillTestSubmission(plugins.Action):
         failReason = "no report, possibly killed with SIGKILL"
         fullText = failReason + "\n" + self.getJobFailureInfo(test)
         test.changeState(plugins.TestState("killed", briefText=failReason, \
-                                           freeText=fullText, completed=1))
+                                           freeText=fullText, completed=1, lifecycleChange="complete"))
     def getJobFailureInfo(self, test):
         name = queueSystemName(test.app)
         return "Full accounting info from " + name + " follows:\n" + \
@@ -502,7 +524,7 @@ class KillTestSubmission(plugins.Action):
     def setSlaveFailed(self, test):
         failReason, fullText = self.getSlaveFailure(test)
         fullText = failReason + "\n" + fullText
-        test.changeState(plugins.Unrunnable(briefText=failReason, freeText=fullText))
+        test.changeState(plugins.Unrunnable(briefText=failReason, freeText=fullText, lifecycleChange="complete"))
     def getSlaveFailure(self, test):
         slaveErrFile = test.makeTmpFileName("slaveerrs", forFramework=1)
         if os.path.isfile(slaveErrFile):
@@ -557,7 +579,7 @@ class AllSubmittedResponder(Responder):
 class Abandoned(plugins.TestState):
     def __init__(self, freeText):
         plugins.TestState.__init__(self, "abandoned", briefText="job deletion failed", \
-                                                      freeText=freeText, completed=1)
+                                                      freeText=freeText, completed=1, lifecycleChange="complete")
     def shouldAbandon(self):
         return 1
 
@@ -620,10 +642,14 @@ class MachineInfoFinder(default.MachineInfoFinder):
         jobs = []
         for user, jobName in jobsFromQueue:
             jobs.append("Also on " + machine + " : " + user + "'s job '" + jobName + "'")
-        return jobs
-        
+        return jobs    
+    
 class CheckForUnrunnableBugs(CheckForBugs):
-    def __call__(self, test):
+    def localUnrunnable(self, test):        
         # Try to pick up only on unrunnable tests that have not come from a slave process
-        if not test.state.hasResults() and test.state.lifecycleChange != "complete":
+        return test.state.isComplete() and not test.state.hasResults() and test.state.lifecycleChange != "complete"
+    def callDuringAbandon(self, test):
+        return self.localUnrunnable(test)
+    def __call__(self, test):
+        if self.localUnrunnable(test):
             CheckForBugs.__call__(self, test)

@@ -276,17 +276,14 @@ class ThreadedNotificationHandler:
             observable, args = self.workQueue.get_nowait()
             observable.notify(*args)
         except Empty:
-            pass
-        # Idle handler. We must sleep for a bit, or we use the whole CPU (busy-wait)
-        time.sleep(0.1)
+            # Idle handler. We must sleep for a bit if we don't do anything, or we use the whole CPU (busy-wait)
+            time.sleep(0.1)
         return self.active
     def transfer(self, observable, *args):
         self.workQueue.put((observable, args))
 
 class Observable:
     threadedNotificationHandler = ThreadedNotificationHandler()
-    # allow calling code to block all notifications everywhere, during a shutdown
-    blocked = False
     def __init__(self, passSelf=False):
         self.observers = []
         self.passSelf = passSelf
@@ -297,14 +294,12 @@ class Observable:
     def inMainThread(self):
         return currentThread().getName() == "MainThread"
     def notify(self, *args):
-        if self.blocked:
-            return
         if self.threadedNotificationHandler.active and not self.inMainThread():
             self.threadedNotificationHandler.transfer(self, *args)
         else:
             self.performNotify(*args)
     def notifyIfMainThread(self, *args):
-        if self.blocked or not self.inMainThread():
+        if not self.inMainThread():
             return
         else:
             self.performNotify(*args)
@@ -410,9 +405,9 @@ class TestState(Observable):
 addCategory("unrunnable", "unrunnable", "could not be run")
 
 class Unrunnable(TestState):
-    def __init__(self, freeText, briefText = "UNRUNNABLE", executionHosts=[]):
+    def __init__(self, freeText, briefText = "UNRUNNABLE", executionHosts=[], lifecycleChange=""):
         TestState.__init__(self, "unrunnable", freeText, briefText, completed=1, \
-                           executionHosts=executionHosts)
+                           executionHosts=executionHosts, lifecycleChange=lifecycleChange)
     def shouldAbandon(self):
         return True
 

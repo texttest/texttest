@@ -238,16 +238,37 @@ class TextTest:
             if not threadRunner in self.allResponders:
                 self.diag.info("Adding suites for " + str(threadRunner.__class__))
                 threadRunner.addSuites(suites)
+    def runThread(self, subThreadRunner):
+        subThreadRunner.run()
+        if os.name == "posix":
+            os.kill(os.getpid(), signal.SIGCHLD) # Alert the main thread that we're exiting (yuk)
     def runThreads(self, threadRunners):
         # Run the first one as the main thread and the rest in subthreads
-        # They will hopefully be arranged in order of how long they should run
+        # Make sure all of them are finished before we stop
+        allThreads = []
         for subThreadRunner in threadRunners[1:]:
-            thread = Thread(target=subThreadRunner.run)
+            thread = Thread(target=self.runThread, args=(subThreadRunner,))
+            allThreads.append(thread)
             self.diag.info("Running " + str(subThreadRunner.__class__) + " in a subthread")
             thread.start()
+            
         if len(threadRunners) > 0:
             self.diag.info("Running " + str(threadRunners[0].__class__) + " in main thread")
             threadRunners[0].run()
+            
+        self.waitForThreads(allThreads)
+    def waitForThreads(self, allThreads):
+        if os.name == "posix":
+            for thread in allThreads:
+                if thread.isAlive():
+                    # signals are only handled in the main thread, if we finish before others then 
+                    # we need to be ready to handle them here. 
+                    signal.signal(signal.SIGCHLD, self.doNothing) # so we can use this to wake up again
+                    signal.pause()
+                    thread.join()
+        else:
+            for thread in allThreads:
+                thread.join() # wait for thread to terminate
 
     def setSignalHandlers(self):
         # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
@@ -256,17 +277,16 @@ class TextTest:
             signal.signal(signal.SIGUSR1, self.handleSignal)
             signal.signal(signal.SIGUSR2, self.handleSignal)
             signal.signal(signal.SIGXCPU, self.handleSignal)
+    def doNothing(self, *args):
+        pass
     def handleSignal(self, sig, stackFrame):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
+        origChldHandler = signal.signal(signal.SIGCHLD, signal.SIG_DFL)
         signalText = self.getSignalText(sig)
-        self.writeTermMessage(signalText)
-        fetchResults = signalText.find("LIMIT") != -1
-        # block all event notifications...
-        if not fetchResults:
-            plugins.Observable.blocked = True
-            
+        self.writeTermMessage(signalText)    
         self.killAllTests(signalText)
+        signal.signal(signal.SIGCHLD, origChldHandler)
     def killAllTests(self, signalText):
         # Kill all the tests and wait for the action runner to finish
         for app, suite in self.appSuites.items():

@@ -313,8 +313,9 @@ class Test(plugins.Observable):
         if self.parent:
             return self.parent.makePathName(fileName)
     def actionsCompleted(self):
-        self.diagnose("Completion notified")
+        self.diagnose("All actions completed")
         if self.state.isComplete() and not self.state.lifecycleChange:
+            self.diagnose("Completion notified")
             self.state.lifecycleChange = "complete"
             self.changeState(self.state)
     def getRelPath(self):

@@ -4,6 +4,7 @@ import plugins, os, sys, testmodel, signal
 from threading import Thread
 from usecase import ScriptEngine
 from ndict import seqdict
+from time import sleep
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder:
@@ -238,16 +239,12 @@ class TextTest:
             if not threadRunner in self.allResponders:
                 self.diag.info("Adding suites for " + str(threadRunner.__class__))
                 threadRunner.addSuites(suites)
-    def runThread(self, subThreadRunner):
-        subThreadRunner.run()
-        if os.name == "posix":
-            os.kill(os.getpid(), signal.SIGCHLD) # Alert the main thread that we're exiting (yuk)
     def runThreads(self, threadRunners):
         # Run the first one as the main thread and the rest in subthreads
         # Make sure all of them are finished before we stop
         allThreads = []
         for subThreadRunner in threadRunners[1:]:
-            thread = Thread(target=self.runThread, args=(subThreadRunner,))
+            thread = Thread(target=subThreadRunner.run)
             allThreads.append(thread)
             self.diag.info("Running " + str(subThreadRunner.__class__) + " in a subthread")
             thread.start()
@@ -258,18 +255,22 @@ class TextTest:
             
         self.waitForThreads(allThreads)
     def waitForThreads(self, allThreads):
-        if os.name == "posix":
-            for thread in allThreads:
-                if thread.isAlive():
-                    # signals are only handled in the main thread, if we finish before others then 
-                    # we need to be ready to handle them here. 
-                    signal.signal(signal.SIGCHLD, self.doNothing) # so we can use this to wake up again
-                    signal.pause()
-                    thread.join()
-        else:
-            for thread in allThreads:
-                thread.join() # wait for thread to terminate
-
+        # Need to wait for the threads to terminate in a way that allows signals to be
+        # caught. thread.join doesn't do this. signal.pause seems like a good idea but
+        # doesn't return unless a signal is caught, leading to sending "fake" ones from the
+        # threads when they finish. And playing with signals and threads together is playing with fire...
+        
+        # So we poll, which we don't really want to do, but it seems better than using Twisted or asyncore
+        # just for this :) With a long enough sleep it shouldn't generate too much load... 
+        
+        # See http://groups.google.com/group/comp.lang.python/browse_thread/thread/a244905b86f06e48/7e969a0c7932fa91#
+        currThreads = self.aliveThreads(allThreads)
+        while len(currThreads) > 0:
+            sleep(0.5)
+            currThreads = self.aliveThreads(currThreads)
+    def aliveThreads(self, threads):
+        return filter(lambda thread: thread.isAlive(), threads)
+            
     def setSignalHandlers(self):
         # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
         if os.name == "posix":
@@ -277,16 +278,12 @@ class TextTest:
             signal.signal(signal.SIGUSR1, self.handleSignal)
             signal.signal(signal.SIGUSR2, self.handleSignal)
             signal.signal(signal.SIGXCPU, self.handleSignal)
-    def doNothing(self, *args):
-        pass
     def handleSignal(self, sig, stackFrame):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
-        origChldHandler = signal.signal(signal.SIGCHLD, signal.SIG_DFL)
         signalText = self.getSignalText(sig)
         self.writeTermMessage(signalText)    
         self.killAllTests(signalText)
-        signal.signal(signal.SIGCHLD, origChldHandler)
     def killAllTests(self, signalText):
         # Kill all the tests and wait for the action runner to finish
         for app, suite in self.appSuites.items():

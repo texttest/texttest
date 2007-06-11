@@ -174,7 +174,7 @@ class ApcConfig(optimization.OptimizationConfig):
         else:
             baseRunner = optimization.OptimizationConfig.getTestRunner(self)
             if self.slaveRun():
-                return [ MarkApcLogDir(self.isExecutable, self.optionMap.has_key("extractlogs")), baseRunner ]
+                return [ MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, self.optionMap.has_key("extractlogs")), baseRunner ]
             else:
                 return baseRunner
     def isExecutable(self, process, test):
@@ -550,8 +550,8 @@ class GoogleProfileExtract(plugins.Action):
         os.system("rsh abbeville \"" + command + "\"")
         
 class MarkApcLogDir(RunWithParallelAction):
-    def __init__(self, isExecutable, keepLogs):
-        RunWithParallelAction.__init__(self, isExecutable)
+    def __init__(self, isExecutable, hasAutomaticCpuTimeChecking, keepLogs):
+        RunWithParallelAction.__init__(self, isExecutable, hasAutomaticCpuTimeChecking)
         self.keepLogs = keepLogs
     def getApcHostTmp(self):
         configFile = os.path.join(os.environ["CARMSYS"],"CONFIG")

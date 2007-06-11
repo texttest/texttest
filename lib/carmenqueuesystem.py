@@ -177,7 +177,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def getTestRunner(self):
         baseRunner = queuesystem.QueueSystemConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):
-            return [ RunLprof(self.isExecutable), baseRunner ]
+            return [ RunLprof(self.isExecutable, self.hasAutomaticCputimeChecking), baseRunner ]
         else:
             return baseRunner
     def isExecutable(self, process, test):
@@ -234,8 +234,9 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         return envVars
     
 class RunWithParallelAction(plugins.Action):
-    def __init__(self, isExecutable):
+    def __init__(self, isExecutable, hasAutomaticCpuTimeChecking):
         self.isExecutable = isExecutable
+        self.hasAutomaticCpuTimeChecking = hasAutomaticCpuTimeChecking
         self.diag = plugins.getDiagnostics("Parallel Action")
     def __call__(self, test):
         parallelActionThread = Thread(target=self.runParallelAction, args=(test,))
@@ -255,7 +256,15 @@ class RunWithParallelAction(plugins.Action):
             time.sleep(0.1)
             return self.getTestProcess(test)
         else:
-            return JobProcess(test.state.bkgProcess.pid)
+            jobProc = JobProcess(test.state.bkgProcess.pid)
+            if self.hasAutomaticCpuTimeChecking(test.app):
+                # Here we expect the given process to be "time", with a shell subprocess
+                for attempt in range(5):
+                    childProcs = jobProc.findChildProcesses()
+                    if len(childProcs) > 1:
+                        return childProcs[1]
+                raise plugins.TextTestError, "Child processes didn't look as expected when running with automatic CPU time checking"
+            return jobProc
     def findProcessInfo(self, test):
         parentProcess = self.getTestProcess(test)
         while 1:

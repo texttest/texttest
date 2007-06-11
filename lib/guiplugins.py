@@ -671,7 +671,7 @@ class KillTests(SelectionAction):
 
         self.notify("Status", "Killed " + testDesc + ".")
     def notifyExit(self):
-        tests = reduce(operator.add, [ suite.getRunningTests() for suite in self.rootTestSuites ])
+        tests = reduce(operator.add, [ suite.getRunningTests() for suite in reversed(self.rootTestSuites) ])
         if len(tests) > 0:
             self.killTests(tests)
                 

@@ -286,7 +286,7 @@ class TextTest:
         self.killAllTests(signalText)
     def killAllTests(self, signalText):
         # Kill all the tests and wait for the action runner to finish
-        for app, suite in self.appSuites.items():
+        for app, suite in reversed(self.appSuites.items()):
             for test in suite.getRunningTests():
                 app.killTest(test, signalText)
     def writeTermMessage(self, signalText):

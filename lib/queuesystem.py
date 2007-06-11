@@ -276,9 +276,12 @@ class SlaveRequestHandler(StreamRequestHandler):
         testString = self.rfile.readline().strip()
         test = self.server.getTest(testString)
         if self.server.clientCorrect(test, (hostname, identifier)):
-            test.loadState(self.rfile)
-            if test.state.hasStarted():
-                self.server.storeClient(test, (hostname, identifier))
+            if not test.state.isComplete(): # we might have killed it already...
+                oldBt = test.state.briefText
+                test.loadState(self.rfile)
+                self.server.diag.info("Changed from '" + oldBt + "' to '" + test.state.briefText + "'")
+                if test.state.hasStarted():
+                    self.server.storeClient(test, (hostname, identifier))
         else:
             expectedHost, expectedPid = self.server.testClientInfo[test]
             sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
@@ -340,8 +343,6 @@ class SlaveServerResponder(Responder,TCPServer):
             return True
     def storeClient(self, test, clientInfo):
         self.testClientInfo[test] = clientInfo
-    def handle_error(self, request, client_address):
-        print "Slave server caught an exception, ignoring..."
 
 class MasterTextResponder(TextDisplayResponder):
     def notifyComplete(self, test):
@@ -493,10 +494,12 @@ class KillTestSubmission(plugins.Action):
             else:
                 self.setKilledPending(test)
         else:
-            if startNotified:
-                self.setSlaveLost(test)
-            else:
-                self.setSlaveFailed(test)
+            # might get here when the test completed since we checked...
+            if not test.state.isComplete():
+                if startNotified:
+                    self.setSlaveLost(test)
+                else:
+                    self.setSlaveFailed(test)
     def setKilled(self, test, killReason, jobId):
         if killReason.find("LIMIT") != -1:
             self.waitForKill(test, jobId)

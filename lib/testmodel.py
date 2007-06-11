@@ -466,12 +466,20 @@ class TestCase(Test):
     def callAction(self, action):
         return action(self)
     def changeState(self, state):
+        isCompletion = not self.state.isComplete() and state.isComplete()
         self.state = state
         self.diagnose("Change notified to state " + state.category)
         if state and state.lifecycleChange:
-            self.notify("LifecycleChange", state, state.lifecycleChange)
+            notifyMethod = self.getNotifyMethod(isCompletion)
+            notifyMethod("LifecycleChange", state, state.lifecycleChange)
             if state.lifecycleChange == "complete":
-                self.notify("Complete")
+                notifyMethod("Complete")
+    def getNotifyMethod(self, isCompletion):
+        if isCompletion: 
+            return self.notifyThreaded # use the idle handlers to avoid things in the wrong order
+        else:
+            # might as well do it instantly if the test isn't still "active"
+            return self.notify
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
     def setWriteDirectory(self, newDir):

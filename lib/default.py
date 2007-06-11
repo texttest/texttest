@@ -1314,8 +1314,9 @@ class KillTest(plugins.Action):
         briefText, fullText = self.getKillInfo(test, killReason)
         freeText = "Test " + fullText + "\n"
         newState = Killed(briefText, freeText, test.state)
-        test.changeState(newState)
-        test.state.prevState.killProcess()        
+        if not test.state.isComplete(): # minimise racing
+            test.changeState(newState)
+            test.state.prevState.killProcess()        
     def interpret(self, test, descriptor):
         return descriptor
     def getKillInfo(self, test, killReason):

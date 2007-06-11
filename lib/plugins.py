@@ -298,6 +298,12 @@ class Observable:
             self.threadedNotificationHandler.transfer(self, *args)
         else:
             self.performNotify(*args)
+    def notifyThreaded(self, *args):
+        # join the idle handler queue even if we're the main thread
+        if self.threadedNotificationHandler.active:
+            self.threadedNotificationHandler.transfer(self, *args)
+        else:
+            self.performNotify(*args)        
     def notifyIfMainThread(self, *args):
         if not self.inMainThread():
             return
@@ -547,12 +553,13 @@ def rmtree(dir, attempts=100):
             shutil.rmtree(realDir)
             return
         except OSError:
-            if i == attempts - 1:
-                print "Unable to remove directory", dir, ":"
-                printException()
-            else:
-                print "Problems removing directory", dir, "- waiting 1 second to retry..."
-                time.sleep(1)                
+            if os.path.isdir(realDir):
+                if i == attempts - 1:
+                    print "Unable to remove directory", dir, ":"
+                    printException()
+                else:
+                    print "Problems removing directory", dir, "- waiting 1 second to retry..."
+                    time.sleep(1)                
 
 def readList(filename):
     items = []

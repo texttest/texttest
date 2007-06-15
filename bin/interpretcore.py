@@ -65,10 +65,11 @@ def writeCmdFile():
 def findCoreInfo(stdout):
     summaryLine = ""
     stackLines = []
+    prevLine = ""
     for line in stdout.readlines():
         if line.find("Program terminated") != -1:
             summaryLine = line.strip()
-        if line[0] == "#" and line != prevLine:
+        if line.startswith("#") and line != prevLine:
             startPos = line.find("in ") + 3
             endPos = line.rfind("(")
             methodName = line[startPos:endPos]
@@ -106,11 +107,8 @@ def writeStackTrace(corefile, binary):
     if len(stackLines) > 100:
         details += "\nStack trace print-out aborted after 100 function calls"
     return summary, details
-    
-if len(sys.argv) != 2:
-    print "Usage: interpretcore.py <corefile>"
-else:
-    corefile = sys.argv[1]
+
+def printCoreInfo(corefile):
     compression = corefile.endswith(".Z")
     if compression:
         os.system("uncompress " + corefile)
@@ -121,3 +119,12 @@ else:
     print details
     if compression:
         os.system("compress " + corefile)
+
+if len(sys.argv) != 2:
+    print "Usage: interpretcore.py <corefile>"
+else:
+    corefile = sys.argv[1]
+    if os.path.isfile(corefile):
+        printCoreInfo(corefile)
+    else:    
+        sys.stderr.write("File not found : " + corefile + "\n")

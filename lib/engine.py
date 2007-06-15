@@ -62,7 +62,7 @@ class UniqueNameFinder:
 
 class TextTest:
     def __init__(self):
-        self.setSignalHandlers()
+        self.setSignalHandlers(self.handleSignalWhileStarting)
         if os.environ.has_key("FAKE_OS"):
             os.name = os.environ["FAKE_OS"]
         self.allResponders = []
@@ -188,6 +188,8 @@ class TextTest:
                     uniqueNameFinder.addSuite(testSuite)
                 except plugins.TextTestError, e:
                     errorMessages.append("Rejected " + partApp.description() + " - " + str(e) + "\n")
+                except KeyboardInterrupt:
+                    raise
                 except:  
                     sys.stderr.write("Error creating test suite for " + partApp.description() + " :\n")
                     plugins.printException()
@@ -202,6 +204,11 @@ class TextTest:
         for app, testSuite in self.appSuites.items():
             app.removeWriteDirectory()
     def run(self):
+        try:
+            self._run()
+        except KeyboardInterrupt:
+            pass # already written about this
+    def _run(self):
         allApps = self.findApps()
         if self.inputOptions.helpMode():
             if len(allApps) > 0:
@@ -213,10 +220,10 @@ class TextTest:
                 print "If this makes no sense, read the online documentation..."
             return
         try:
-            self._run(allApps)
+            self.createAndRunSuites(allApps)
         finally:
             self.deleteTempFiles() # include the dud ones, possibly
-    def _run(self, allApps):
+    def createAndRunSuites(self, allApps):
         try:
             self.createResponders(allApps)
         except plugins.TextTestError, e:
@@ -240,6 +247,8 @@ class TextTest:
                 self.diag.info("Adding suites for " + str(threadRunner.__class__))
                 threadRunner.addSuites(suites)
     def runThreads(self, threadRunners):
+        # Set the signal handlers to use when running
+        self.setSignalHandlers(self.handleSignalWhileRunning)
         # Run the first one as the main thread and the rest in subthreads
         # Make sure all of them are finished before we stop
         allThreads = []
@@ -270,15 +279,22 @@ class TextTest:
             currThreads = self.aliveThreads(currThreads)
     def aliveThreads(self, threads):
         return filter(lambda thread: thread.isAlive(), threads)
-            
-    def setSignalHandlers(self):
-        # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
+    def getSignals(self):
         if os.name == "posix":
-            signal.signal(signal.SIGINT, self.handleSignal)
-            signal.signal(signal.SIGUSR1, self.handleSignal)
-            signal.signal(signal.SIGUSR2, self.handleSignal)
-            signal.signal(signal.SIGXCPU, self.handleSignal)
-    def handleSignal(self, sig, stackFrame):
+            # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
+            return [ signal.SIGINT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]
+        else:
+            return []
+    def setSignalHandlers(self, handler):
+        for sig in self.getSignals():
+            signal.signal(sig, handler)
+    def handleSignalWhileStarting(self, sig, stackFrame):
+        # Don't respond to the same signal more than once!
+        signal.signal(sig, signal.SIG_IGN)
+        signalText = self.getSignalText(sig)
+        self.writeTermMessage(signalText)
+        raise KeyboardInterrupt, signalText
+    def handleSignalWhileRunning(self, sig, stackFrame):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
         signalText = self.getSignalText(sig)

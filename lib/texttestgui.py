@@ -980,9 +980,7 @@ class TestTreeGUI(ContainerGUI):
         
         scriptEngine.monitor("set test selection to", self.selection, modelIndexer)
         self.selection.connect("changed", self.userChangedSelection)
-        if len(self.selectedTests) > 0:
-            self.selectTestRows(self.selectedTests)
-            self.notify("NewTestSelection", self.selectedTests, False)
+        self.performStoredSelection()
 
         self.treeView.show()
         if self.dynamic:
@@ -991,6 +989,10 @@ class TestTreeGUI(ContainerGUI):
 
         self.popupGUI.createView()
         return self.addScrollBars(self.treeView)
+    def performStoredSelection(self):
+        if len(self.selectedTests) > 0:
+            actualSelection = self.selectTestRows(self.selectedTests)
+            self.notify("NewTestSelection", actualSelection, True)        
     def describeTree(self, *args):
         SubGUI.contentsChanged(self) # don't describe the column too...
 
@@ -1074,10 +1076,12 @@ class TestTreeGUI(ContainerGUI):
         self.selection.unselect_all()
         treeView = self.selection.get_tree_view()
         firstPath = None
+        actuallySelected = []
         for test in selTests:
             iter = self.findIter(test)
             if not iter:
                 continue
+            actuallySelected.append(test)
             path = self.filteredModel.get_path(iter) 
             if not firstPath:
                 firstPath = path
@@ -1091,6 +1095,7 @@ class TestTreeGUI(ContainerGUI):
             if cellArea.y < 0 or cellArea.y > visibleArea.height:
                 treeView.scroll_to_cell(firstPath, use_align=True, row_align=0.1)
         self.selecting = False
+        return actuallySelected
     def expandLevel(self, view, iter, recursive=True):
         # Make sure expanding expands everything, better than just one level as default...
         # Avoid using view.expand_row(path, open_all=True), as the open_all flag
@@ -1197,6 +1202,7 @@ class TestTreeGUI(ContainerGUI):
             while rootIter != None:
                 self.expandRow(rootIter, True)
                 rootIter = self.filteredModel.iter_next(rootIter)
+            self.performStoredSelection() # if we've stored a selection from previously, remake it.
         else:
             self.selectionChanged(direct=False)
 

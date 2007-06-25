@@ -113,7 +113,7 @@ class ClientSocketTraffic(ResponseTraffic):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(self.destination)
         sock.sendall(self.text)
-        sock.shutdown(1)
+        sock.shutdown(socket.SHUT_WR)
         response = sock.makefile().read()
         sock.close()
         return [ ServerTraffic(response, self.responseFile) ]
@@ -266,11 +266,14 @@ class TrafficServer(TCPServer):
         CommandLineTraffic.origEnviron = deepcopy(os.environ)
         ClientSocketTraffic.destination = None
     def process(self, traffic):
+        self.diag.info("Processing traffic " + repr(traffic.__class__))
         self.record(traffic)
         for response in self.replayInfo.getResponses(traffic):
+            self.diag.info("Providing response " + repr(response.__class__))
             self.record(response)
             for chainResponse in response.forwardToDestination():
                 self.process(chainResponse)
+            self.diag.info("Completed response " + repr(response.__class__))
     def record(self, traffic):
         if not traffic.hasInfo():
             return

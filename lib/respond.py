@@ -74,10 +74,14 @@ class InteractiveResponder(Responder):
             saveDesc += "(exact) "
         if self.overwriteSuccess:
             saveDesc += "(overwriting succeeded files also)"
-        print test.getIndent() + "Saving " + repr(test) + saveDesc
+        self.describeSave(test, saveDesc)
         test.state.save(test, exact, version, self.overwriteSuccess)
         newState = test.state.makeNewState(test.app)
         test.changeState(newState)
+    def describeSave(self, test, saveDesc):
+        print test.getIndent() + "Saving " + repr(test) + saveDesc
+    def describeViewOptions(self, test, options):
+        print test.getIndent() + options
     def useInteractiveResponse(self, test):
         return test.state.hasFailed() and test.state.hasResults() and not self.overwriteFailure
     def presentInteractiveDialog(self, test):            
@@ -119,7 +123,7 @@ class InteractiveResponder(Responder):
         options += "Save(s) or continue(any other key)?"
         if allowView:
             options = "View details(v), " + options
-        print test.getIndent() + options
+        self.describeViewOptions(test, options)
         response = self.scriptEngine.readStdin()
         exactSave = response.find('+') != -1
         if response.startswith('s'):

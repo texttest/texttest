@@ -207,11 +207,13 @@ class Test(plugins.Observable):
             return []
     def setEnvironment(self, var, value):
         self.environment[var] = value
-    def getEnvironment(self, var):
+    def getEnvironment(self, var, defaultValue=None):
         if self.environment.has_key(var):
             return self.environment[var]
         elif self.parent:
             return self.parent.getEnvironment(var)
+        else:
+            return os.getenv(var, defaultValue)
     def getTestRelPath(self, file):
         # test suites don't use this mechanism currently
         return ""
@@ -368,16 +370,16 @@ class Test(plugins.Observable):
             test.notify("Add")
             self.parent.removeTest(self, False)
         self.parent.contentChanged()
-    def setUpEnvVariable(self, var, value):
-        if os.environ.has_key(var):
+    def setUpEnvVariable(self, var, value, toModify=os.environ):
+        if toModify is os.environ and toModify.has_key(var):
             self.previousEnv[var] = os.environ[var]
-        os.environ[var] = value
-        self.diagnose("Setting " + var + " to " + os.environ[var])
-    def setUpEnvironment(self, parents=0):
+        toModify[var] = value
+        self.diagnose("Setting " + var + " to " + toModify[var])
+    def setUpEnvironment(self, parents=False, toModify=os.environ):
         if parents and self.parent:
-            self.parent.setUpEnvironment(1)
+            self.parent.setUpEnvironment(parents, toModify)
         for var, value in self.environment.items():
-            self.setUpEnvVariable(var, value)
+            self.setUpEnvVariable(var, value, toModify)
     def tearDownEnvironment(self, parents=0):
         # Note this has no effect on the real environment, but can be useful for internal environment
         # variables. It would be really nice if Python had a proper "unsetenv" function...
@@ -484,7 +486,7 @@ class TestCase(Test):
         return self.makeTmpFileName("teststate", forFramework=True)
     def setWriteDirectory(self, newDir):
         self.writeDirectory = newDir        
-    def makeWriteDirectories(self):
+    def makeWriteDirectory(self):
         self.diagnose("Created writedir at " + self.writeDirectory)
         plugins.ensureDirectoryExists(self.writeDirectory)
         frameworkTmp = self.getDirectory(temporary=1, forFramework=True)
@@ -1335,7 +1337,8 @@ class OptionFinder(plugins.OptionFinder):
         self.configureLog4py()
     def configureLog4py(self):
         # Don't use the default locations, particularly current directory causes trouble
-        del log4py.CONFIGURATION_FILES[1]
+        if len(log4py.CONFIGURATION_FILES) > 1:
+            del log4py.CONFIGURATION_FILES[1]
         if self.diagConfigFile:
             # Assume log4py's configuration file refers to files relative to TEXTTEST_DIAGDIR
             os.environ["TEXTTEST_DIAGDIR"] = self.diagWriteDir

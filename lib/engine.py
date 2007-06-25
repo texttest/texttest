@@ -158,17 +158,33 @@ class TextTest:
                     responderClasses.append(respClass)
         # Make sure we send application events when tests change state
         responderClasses.append(testmodel.ApplicationEventResponder)
-        self.allResponders = map(lambda x : x(self.inputOptions), responderClasses)
-        allCompleteResponder = testmodel.AllCompleteResponder(self.allResponders)
-        self.allResponders.append(allCompleteResponder)
+        allResponders = map(lambda x : x(self.inputOptions), responderClasses)
+        allCompleteResponder = testmodel.AllCompleteResponder(allResponders)
+        allResponders.append(allCompleteResponder)
+        self.allResponders = self.removeBaseClasses(allResponders)
     def createThreadRunners(self, allApps):
         threadRunnerClasses = []
+        threadRunners = []
         for app in allApps:
             for threadClass in app.getThreadRunnerClasses():
                 if not threadClass in threadRunnerClasses:
                     self.diag.info("Adding thread runner " + repr(threadClass))
                     threadRunnerClasses.append(threadClass)
-        return map(self.makeThreadRunner, threadRunnerClasses)
+                    threadRunners.append(self.makeThreadRunner(threadClass))
+        return self.removeBaseClasses(threadRunners)
+    def removeBaseClasses(self, objects):
+        # Different apps can produce different versions of the same responder/thread runner
+        # We should make sure we only include the most specific ones
+        toRemove = []
+        for i in range(len(objects)):
+            for j in range(i + 1, len(objects)):
+                obj1 = objects[i]
+                obj2 = objects[j]
+                if isinstance(obj1, obj2.__class__):
+                    toRemove.append(obj2)
+                elif isinstance(obj2, obj1.__class__):
+                    toRemove.append(obj1)
+        return filter(lambda obj: obj not in toRemove, objects)
     def makeThreadRunner(self, threadRunnerClass):
         for responder in self.allResponders:
             if isinstance(responder, threadRunnerClass):

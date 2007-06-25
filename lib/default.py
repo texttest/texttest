@@ -115,8 +115,10 @@ class Config:
         if self.useGUI():
             self.addGuiResponder(classes)
         if not self.optionMap.has_key("gx"):
-            classes.append(ActionRunner)
+            classes += self.getThreadActionClasses()
         return classes
+    def getThreadActionClasses(self):
+        return [ ActionRunner ]
     def getTextDisplayResponderClass(self):
         return respond.TextDisplayResponder
     def isolatesDataUsingCatalogues(self, app):
@@ -780,7 +782,7 @@ class TestEnvironmentCreator:
     
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
-        test.makeWriteDirectories()
+        test.makeWriteDirectory()
     def __repr__(self):
         return "Make write directory for"
     def setUpApplication(self, app):
@@ -1561,7 +1563,7 @@ class ReconnectTest(plugins.Action):
 
         return stateToUse    
     def copyFiles(self, test, reconnLocation):
-        test.makeWriteDirectories()
+        test.makeWriteDirectory()
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
             if os.path.isfile(fullPath):

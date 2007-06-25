@@ -100,7 +100,7 @@ class MatadorConfig(optimization.OptimizationConfig):
             extras.append(rotRules)
         return extras
     def getRuleBuildFilterer(self):
-        return FilterRuleBuilds(self.getRuleSetNames, self.raveMode(), self.rebuildAllRulesets())
+        return FilterRuleBuilds()
     def filesFromRulesFile(self, test, rulesFile):
         scriptFile = self.getScriptFileFromPyOption(test)
         if not scriptFile:

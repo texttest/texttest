@@ -33,7 +33,7 @@ helpOptions = """
              the graphical information also
 """
 
-import queuesystem, default, performance, os, string, shutil, plugins, respond, time
+import queuesystem, default, performance, os, shutil, plugins, respond, time
 from ndict import seqdict
 from jobprocess import JobProcess
 from threading import Thread
@@ -160,8 +160,9 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
         return resources
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]
-    def getSubmitSuffix(self, name):
-        return " to " + name + " queue " + self.findQueueResource() + ", requesting " + string.join(self.findConcreteResources(), ",")
+    def getSubmitSuffix(self):
+        name = queuesystem.queueSystemName(self.test)
+        return " to " + name + " queue " + self.findQueueResource() + ", requesting " + ",".join(self.findConcreteResources())
 
 class CarmenConfig(queuesystem.QueueSystemConfig):
     def addToOptionGroups(self, app, groups):

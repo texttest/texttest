@@ -1246,7 +1246,7 @@ class ImportTestCase(optimization.ImportTestCase):
         if application == "cs":
             return "FANDANGO"
         else:
-            return "APC"
+            return "${APPDIRNAME}"
     def buildOptions(self, carmdataVar, subplan, ruleSet, application):
         path = os.path.join("$" + carmdataVar, "LOCAL_PLAN", subplan, "APC_FILES")
         statusFile = os.path.join(path, "run_status")

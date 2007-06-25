@@ -296,10 +296,11 @@ class TextTest:
     def aliveThreads(self, threads):
         return filter(lambda thread: thread.isAlive(), threads)
     def getSignals(self):
-        if os.name == "posix":
+        if hasattr(signal, "SIGINT"):
             # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
             return [ signal.SIGINT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]
         else:
+            # Windows, which doesn't do signals
             return []
     def setSignalHandlers(self, handler):
         for sig in self.getSignals():

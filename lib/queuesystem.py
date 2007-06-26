@@ -2,7 +2,7 @@ import os, sys, default, unixonly, performance, plugins, socket, time, subproces
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from time import sleep
-from copy import copy
+from copy import copy, deepcopy
 from cPickle import dumps
 from respond import Responder, TextDisplayResponder, InteractiveResponder
 from traffic_cmd import sendServerState
@@ -446,7 +446,7 @@ class QueueSystemServer:
             runOptions.append("-xw " + slaveWriteDir)
         return " ".join(runOptions)
     def getTestEnvironment(self, test):
-        envCopy = copy(os.environ)
+        envCopy = deepcopy(os.environ)
         test.setUpEnvironment(parents=True, toModify=envCopy)
         return envCopy
     def submitJob(self, test, submissionRules, command):

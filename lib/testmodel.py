@@ -211,7 +211,7 @@ class Test(plugins.Observable):
         if self.environment.has_key(var):
             return self.environment[var]
         elif self.parent:
-            return self.parent.getEnvironment(var)
+            return self.parent.getEnvironment(var, defaultValue)
         else:
             return os.getenv(var, defaultValue)
     def getTestRelPath(self, file):

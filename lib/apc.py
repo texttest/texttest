@@ -1239,18 +1239,12 @@ class ImportTestCase(optimization.ImportTestCase):
         carmdataVar, carmdata = ravebased.getCarmdata(suite)
         subplan = self.getSubplanName()
         ruleset = self.findRuleset(carmdata)
-        application = self.getApplication(suite)
+        application = ravebased.getRaveNames(suite)[0]
         return self.buildOptions(carmdataVar, subplan, ruleset, application)
-    def getApplication(self, suite):
-        application = suite.app.name
-        if application == "cs":
-            return "FANDANGO"
-        else:
-            return "${APPDIRNAME}"
     def buildOptions(self, carmdataVar, subplan, ruleSet, application):
         path = os.path.join("$" + carmdataVar, "LOCAL_PLAN", subplan, "APC_FILES")
         statusFile = os.path.join(path, "run_status")
-        ruleSetPath = os.path.join("${CARMTMP}", "crc", "rule_set", application, "PUTS_ARCH_HERE")
+        ruleSetPath = os.path.join("${CARMTMP}", "crc", "rule_set", application.upper(), "PUTS_ARCH_HERE")
         ruleSetFile = os.path.join(ruleSetPath, ruleSet)
         return path + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
 

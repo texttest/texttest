@@ -716,7 +716,7 @@ class RuleSet:
                 return False
         return True
     def targetPath(self, type, raveName, arch, name):
-        return os.path.join(self.envMethod("CARMTMP"), "crc", type, string.upper(raveName), arch, name)
+        return os.path.join(self.envMethod("CARMTMP"), "crc", type, raveName.upper(), arch, name)
     def sourcePath(self, name):
         return os.path.join(self.envMethod("CARMUSR"), "crc", "source", name)
     def backup(self):

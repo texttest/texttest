@@ -248,6 +248,10 @@ class TestComparison(BaseTestComparison):
                 if comparison.stem == stem:
                     return comparison, list
         return None, None
+    def removeComparison(self,stem):
+        comparison, newList = self.findComparison(stem)
+        newList.remove(comparison)
+        self.allResults.remove(comparison)
     def save(self, test, exact=True, versionString="", overwriteSuccessFiles=False, newFilesAsDiags=False, onlyStems=[]):
         self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):

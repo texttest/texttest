@@ -211,9 +211,10 @@ class CheckForCrashes(plugins.Action):
             stackTraceFile = comparison.tmpFile
             self.diag.info("Parsing " + stackTraceFile)
             summary, errorInfo = self.parseStackTrace(test, stackTraceFile)
+            
             newState = copy(test.state)
-            comparison, newList = newState.findComparison("stacktrace")
-            newList.remove(comparison)
+            newState.removeComparison("stacktrace")
+        
             crashState = FailedPrediction("crash", errorInfo, summary)
             newState.setFailedPrediction(crashState)
             test.changeState(newState)

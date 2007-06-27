@@ -253,15 +253,23 @@ class TextTest:
         threadRunners = self.createThreadRunners(allApps)
         self.addSuites(threadRunners)
         self.runThreads(threadRunners)
+    def getObjectsToAddSuites(self, threadRunners):
+        return self.allResponders + filter(lambda runner: runner not in self.allResponders, threadRunners)
     def addSuites(self, threadRunners):
-        suites = [ testSuite for app, testSuite in self.appSuites.items() ]
-        for responder in self.allResponders:
-            self.diag.info("Adding suites for " + str(responder.__class__))
-            responder.addSuites(suites)
-        for threadRunner in threadRunners:
-            if not threadRunner in self.allResponders:
-                self.diag.info("Adding suites for " + str(threadRunner.__class__))
-                threadRunner.addSuites(suites)
+        for object in self.getObjectsToAddSuites(threadRunners):
+            suites = self.getSuitesToAdd(object, threadRunners)
+            self.diag.info("Adding suites " + repr(suites) + " for " + str(object.__class__))
+            object.addSuites(suites)
+    def getSuitesToAdd(self, responderOrThreadRunner, threadRunners):
+        if not responderOrThreadRunner in threadRunners:
+            return [ suite for app, suite in self.appSuites.items() ]
+        suites = []
+        for app, testSuite in self.appSuites.items():
+            for threadRunnerClass in app.getThreadRunnerClasses():
+                if isinstance(responderOrThreadRunner, threadRunnerClass):
+                    suites.append(testSuite)
+                    break
+        return suites        
     def runThreads(self, threadRunners):
         # Set the signal handlers to use when running
         self.setSignalHandlers(self.handleSignalWhileRunning)
@@ -296,7 +304,7 @@ class TextTest:
     def aliveThreads(self, threads):
         return filter(lambda thread: thread.isAlive(), threads)
     def getSignals(self):
-        if hasattr(signal, "SIGINT"):
+        if hasattr(signal, "SIGUSR1"):
             # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
             return [ signal.SIGINT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]
         else:

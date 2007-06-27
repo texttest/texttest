@@ -33,12 +33,20 @@ class FileComparison:
         self.textDiffToolMaxSize = plugins.parseBytes(test.getConfigValue("text_diff_program_max_file_size"))
         # subclasses may override if they don't want to store in this way
         self.cacheDifferences()
-    def __repr__(self):
-        return self.stem
-    def ensureCompatible(self):
+    def __getstate__(self):
+        # don't pickle the diagnostics
+        state = {}
+        for var, value in self.__dict__.items():
+            if var != "diag":
+                state[var] = value
+        return state
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self.diag = plugins.getDiagnostics("TestComparison")
         if not hasattr(self, "differenceCache"):
             self.differenceCache = self.differenceId
-        self.diag = plugins.getDiagnostics("FileComparison")
+    def __repr__(self):
+        return self.stem
     def modifiedDates(self):
         files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
         return " : ".join(map(self.modifiedDate, files))

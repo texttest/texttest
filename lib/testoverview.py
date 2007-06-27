@@ -142,11 +142,15 @@ class GenerateWebPages:
             # Would like to do load(file) here... but it doesn't work, see Python bug 1724366
             # http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470
             state = loads(file.read())
-            state.ensureCompatible()
-            return state
-        except (UnpicklingError, ImportError, EOFError, AttributeError), e:
-            freeText = "Failed to read results file, possibly deprecated format. Stack info follows:\n " + str(e)
-            return plugins.Unrunnable(freeText, "read error")
+            if isinstance(state, plugins.TestState):
+                return state
+            else:
+                return self.readErrorState("Incorrect type for state object.")
+        except (UnpicklingError, ImportError, EOFError), e:
+            return self.readErrorState("Stack info follows:\n" + str(e))
+    def readErrorState(self, errMsg):
+        freeText = "Failed to read results file, possibly deprecated format. " + errMsg
+        return plugins.Unrunnable(freeText, "read error")
     def addOverviewPages(self, item, version, table):
         if not self.pagesOverview.has_key(item):
             pageOverviewTitle = "Test results for " + self.pageAppName + " - version " + self.pageVersion

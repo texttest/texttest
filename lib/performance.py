@@ -61,8 +61,8 @@ class PerformanceFileComparison(FileComparison):
                 self.diag.info("Performance is " + str(oldPerf) + " and " + str(newPerf))
                 self.perfComparison = PerformanceComparison(oldPerf, newPerf, stem)
                 self.cachePerformanceChange(test, stem)
-    def ensureCompatible(self):
-        FileComparison.ensureCompatible(self)
+    def __setstate__(self, state):
+        FileComparison.__setstate__(self, state)
         if hasattr(self, "newPerformance"):
             self.perfComparison = PerformanceComparison(self.oldPerformance, self.newPerformance, self.stem)
     def cacheDifferences(self):

@@ -65,7 +65,7 @@ class SocketResponder(Responder):
     def __init__(self, optionMap):
         Responder.__init__(self, optionMap)
         self.sender = None
-        servAddr = optionMap.get("servaddr")
+        servAddr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
         if servAddr:
             host, port = servAddr.split(":")
             self.sender = TestStateSender((host, int(port)))

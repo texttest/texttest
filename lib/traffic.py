@@ -75,9 +75,6 @@ class Traffic:
             self.responseFile.write(self.text)
             self.responseFile.close()
         return []
-
-class InTraffic(Traffic):
-    direction = "<-"
     def filterReplay(self, trafficList):
         return trafficList
     
@@ -106,33 +103,42 @@ class SysExitTraffic(ResponseTraffic):
     def hasInfo(self):
         return self.exitStatus != 0
     
-class ClientSocketTraffic(ResponseTraffic):
+class ClientSocketTraffic(Traffic):
     destination = None
+    direction = "<-"
     typeId = "CLI"
     def forwardToDestination(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(self.destination)
-        sock.sendall(self.text)
-        sock.shutdown(socket.SHUT_WR)
-        response = sock.makefile().read()
-        sock.close()
-        return [ ServerTraffic(response, self.responseFile) ]
+        if self.destination:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect(self.destination)
+            sock.sendall(self.text)
+            sock.shutdown(socket.SHUT_WR)
+            response = sock.makefile().read()
+            sock.close()
+            return [ ServerTraffic(response, self.responseFile) ]
+        else:
+            return [] # client is alone, nowhere to forward
 
-class ServerTraffic(InTraffic):
+class ServerTraffic(Traffic):
     typeId = "SRV"
+    direction = "->"
 
 class ServerStateTraffic(ServerTraffic):
     def __init__(self, inText, responseFile):
-        InTraffic.__init__(self, inText, responseFile)
+        ServerTraffic.__init__(self, inText, responseFile)
         if not ClientSocketTraffic.destination:
             lastWord = inText.strip().split()[-1]
             host, port = lastWord.split(":")
             ClientSocketTraffic.destination = host, int(port)
+            # If we get a server state message, switch the order around
+            ClientSocketTraffic.direction = "->"
+            ServerTraffic.direction = "<-"
     def forwardToDestination(self):
         return []
             
-class CommandLineTraffic(InTraffic):
+class CommandLineTraffic(Traffic):
     typeId = "CMD"
+    direction = "<-"
     envVarMethod = None
     origEnviron = {}
     realCommands = {}
@@ -149,7 +155,7 @@ class CommandLineTraffic(InTraffic):
         self.diag = plugins.getDiagnostics("Traffic Server")
         self.path = self.cmdEnviron.get("PATH")
         text = self.getEnvString() + self.commandName + " " + self.argStr
-        InTraffic.__init__(self, text, responseFile)
+        Traffic.__init__(self, text, responseFile)
     def filterEnvironment(self, cmdEnviron):
         interestingEnviron = []
         for var in self.envVarMethod(self.commandName):
@@ -329,7 +335,10 @@ class ReplayInfo:
             return []
         desc = traffic.getDescription()
         bestMatchKey = self.findBestMatch(desc)
-        return self.responseMap[bestMatchKey].makeResponses(traffic)
+        if bestMatchKey:
+            return self.responseMap[bestMatchKey].makeResponses(traffic)
+        else:
+            return []
     def findBestMatch(self, desc):
         self.diag.info("Trying to match '" + desc + "'")
         if self.responseMap.has_key(desc):
@@ -337,6 +346,8 @@ class ReplayInfo:
             return desc
         bestMatchPerc, bestMatch, fewestTimesChosen = 0.0, None, 100000
         for currDesc, responseHandler in self.responseMap.items():
+            if not self.sameType(desc, currDesc):
+                continue
             matchPerc = self.findMatchPercentage(currDesc, desc)
             self.diag.info("Match percentage " + repr(matchPerc) + " with '" + currDesc + "'")
             if matchPerc > bestMatchPerc or (matchPerc == bestMatchPerc and responseHandler.timesChosen < fewestTimesChosen):
@@ -344,9 +355,8 @@ class ReplayInfo:
         if bestMatch is not None:
             self.diag.info("Best match chosen as '" + bestMatch + "'")
             return bestMatch
-        else:
-            sys.stderr.write("WARNING: Could not find any sensible match for the traffic:\n" + desc + "\n")
-            return self.responseMap.keys()[0]
+    def sameType(self, desc1, desc2):
+        return desc1[2:5] == desc2[2:5]
     def getWords(self, desc):
         words = []
         for part in desc.split("/"):
@@ -390,7 +400,7 @@ class ReplayedResponseHandler:
         responses = []
         for trafficStr in trafficStrings:
             trafficType = trafficStr[2:5]
-            allClasses = [ ClientSocketTraffic, StdoutTraffic, StderrTraffic, SysExitTraffic ]
+            allClasses = [ ClientSocketTraffic, ServerTraffic, StdoutTraffic, StderrTraffic, SysExitTraffic ]
             for trafficClass in allClasses:
                 if trafficClass.typeId == trafficType:
                     responses.append(trafficClass(trafficStr[6:], traffic.responseFile))

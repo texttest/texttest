@@ -95,14 +95,19 @@ class TestComparison(BaseTestComparison):
             return longDescription + " (" + self.failedPrediction.briefText + ")"
         else:
             return plugins.TestState.categoryRepr(self)
-    def ensureCompatible(self):
+    def __getstate__(self):
+        # don't pickle the diagnostics
+        state = {}
+        for var, value in self.__dict__.items():
+            if var != "diag":
+                state[var] = value
+        return state
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self.diag = plugins.getDiagnostics("TestComparison")
         # If loaded from old pickle files, can get out of date objects...
         if not hasattr(self, "missingResults"):
             self.missingResults = []
-
-        self.diag = plugins.getDiagnostics("TestComparison")
-        for fileComparison in self.allResults:
-            fileComparison.ensureCompatible()
     def updateAbsPath(self, newPath):
         self.diag.info("Updating abspath " + self.appAbsPath + " to " + newPath)
         for comparison in self.allResults:

@@ -526,7 +526,6 @@ class TestCase(Test):
         try:
             unpickler = Unpickler(file)
             newState = unpickler.load()
-            newState.ensureCompatible()
             return True, newState
         except UnpicklingError:
             return False, plugins.Unrunnable(briefText="read error", \

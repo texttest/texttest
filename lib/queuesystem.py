@@ -41,10 +41,17 @@ class KillTestInSlave(default.KillTest):
         command = "from " + moduleName + " import getLimitInterpretation as _getLimitInterpretation"
         exec command
         return _getLimitInterpretation(origBriefText)
-    
-class TestStateSender:
-    def __init__(self, serverAddress):
-        self.serverAddress = serverAddress
+        
+class SocketResponder(Responder):
+    def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
+        self.serverAddress = self.getServerAddress(optionMap)
+    def getServerAddress(self, optionMap):
+        servAddrStr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
+        if not servAddrStr:
+            raise plugins.TextTestError, "Cannot run slave, no server address has been provided to send results to!"
+        host, port = servAddrStr.split(":")
+        return host, int(port)
     def connect(self, sendSocket):
         for attempt in range(5):
             try:
@@ -53,25 +60,13 @@ class TestStateSender:
             except socket.error:
                 sleep(1)
         sendSocket.connect(self.serverAddress)
-    def send(self, test, state):
+    def notifyLifecycleChange(self, test, state, changeDesc):
         testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
         pickleData = dumps(state)
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect(sendSocket)
         sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
         sendSocket.close()
-    
-class SocketResponder(Responder):
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
-        self.sender = None
-        servAddr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
-        if servAddr:
-            host, port = servAddr.split(":")
-            self.sender = TestStateSender((host, int(port)))
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        if self.sender:
-            self.sender.send(test, state)
     
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
@@ -134,7 +129,7 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getExecHostFinder(self)
     def getSlaveResponderClasses(self):
-        return [ TextDisplayResponder, SocketResponder ]
+        return [ SocketResponder ]
     def getResponderClasses(self, allApps):
         if self.slaveRun():
             return self.getSlaveResponderClasses()

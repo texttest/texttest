@@ -193,9 +193,13 @@ class QueueSystemConfig(default.Config):
 class Activator:
     def __init__(self, optionMap):
         self.allTests = []
+        self.allApps = []
     def addSuites(self, suites):
         self.allTests = reduce(operator.add, [ suite.testCaseList() for suite in suites ]) 
+        self.allApps = [ suite.app for suite in suites ]
     def run(self):
+        for app in self.allApps:
+            app.makeWriteDirectory()
         for test in self.allTests:
             test.makeWriteDirectory()
             QueueSystemServer.instance.submit(test)

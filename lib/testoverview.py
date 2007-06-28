@@ -146,7 +146,7 @@ class GenerateWebPages:
                 return state
             else:
                 return self.readErrorState("Incorrect type for state object.")
-        except (UnpicklingError, ImportError, EOFError), e:
+        except (UnpicklingError, ImportError, EOFError, AttributeError), e:
             return self.readErrorState("Stack info follows:\n" + str(e))
     def readErrorState(self, errMsg):
         freeText = "Failed to read results file, possibly deprecated format. " + errMsg

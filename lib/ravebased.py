@@ -167,6 +167,14 @@ class Config(CarmenConfig):
     def rebuildAllRulesets(self):
         return self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp"))\
                or self.isRaveRun()
+    def buildRules(self):
+        if self.optionMap.has_key("skip") or self.isReconnecting():
+            return 0
+        if self.optionMap.has_key("rulecomp"):
+            return 1
+        return self.defaultBuildRules()
+    def defaultBuildRules(self):
+        return 0
     def getRuleSetNames(self, test, forCompile=True):
         cmdLineOption = self.optionMap.get("rset")
         if cmdLineOption:
@@ -196,14 +204,6 @@ class Config(CarmenConfig):
         return CompileRules()
     def getSubmissionKiller(self):
         return KillRuleBuildOrTestSubmission()
-    def buildRules(self):
-        if self.optionMap.has_key("skip") or self.isReconnecting():
-            return 0
-        if self.optionMap.has_key("rulecomp"):
-            return 1
-        return self.defaultBuildRules()
-    def defaultBuildRules(self):
-        return 0
     def raveMode(self):
         if self.optionMap.has_key("raveexp"):
             return "-explorer"
@@ -339,7 +339,6 @@ class RuleBuildActivator(Activator):
         testsNoRuleBuild = []
         ruleCompilations = []
         for test in self.allTests:
-            test.makeWriteDirectory()
             rulecomp = self.getRuleCompilation(test)
             if rulecomp:
                 ruleCompilations.append((test, rulecomp))
@@ -347,9 +346,11 @@ class RuleBuildActivator(Activator):
                 testsNoRuleBuild.append(test)
         
         for test, rulecomp in ruleCompilations:
+            test.makeWriteDirectory()
             self.submitRuleCompilation(test, rulecomp)
             
         for test in testsNoRuleBuild:
+            test.makeWriteDirectory()
             QueueSystemServer.instance.submit(test)
             
         if len(ruleCompilations) > 0:

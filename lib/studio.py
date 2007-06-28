@@ -1,10 +1,10 @@
 #
-#	Studio plug-in for Texttest framework
+#       Studio plug-in for Texttest framework
 #
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.6 2007/05/25 10:47:56 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.7 2007/06/28 13:56:58 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -21,43 +21,44 @@ class StudioConfig(ravebased.Config):
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues)
     def defaultBuildRules(self):
-        # Overriding this assures rule builds in the nightjob and with -v rave.
-        return 1
+        # Overriding this assures rule builds in the nightjob and with -v rave, without
+        # requiring constant checking if rulesets exist before running tests
+        return self.rebuildAllRulesets()
     def getPerformanceExtractor(self):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def _getRuleSetNames(self, test):
         rulesetName = ""
         subplanDir = self._getSubPlanDirName(test)
         if subplanDir:
-	    headerFile = os.path.join(subplanDir, "subplanHeader")
-	    origPath = self.findOrigRulePath(headerFile)
-	    rulesetName = os.path.basename(origPath)
-	if not rulesetName:
-	    # get default ruleset from resources
-	    carmSys = test.getEnvironment("CARMSYS")
-	    carmUsr = test.getEnvironment("CARMUSR")
-	    carmTmp = test.getEnvironment("CARMTMP")
-	    userId = "nightjob"
-	    if carmSys and carmUsr and carmTmp:
-		script = os.path.join(carmSys, "bin", "crsutil")
-		cmd = "/usr/bin/env USER=" + userId + \
-			    " CARMUSR=" + carmUsr + \
-			    " CARMTMP=" + carmTmp + \
-			    " " + script + " -f 'CrcDefaultRuleSet: %s\n'  -g CrcDefaultRuleSet"
-		try:
-		    for l in os.popen(cmd):
-		    	if not l.startswith("CrcDefaultRuleSet:"):
-			    continue
-			name = l[:-1]
-			if name:
-			    rulesetName = os.path.basename(name)
-			    break
-		except Exception, x:
-		    pass
+            headerFile = os.path.join(subplanDir, "subplanHeader")
+            origPath = self.findOrigRulePath(headerFile)
+            rulesetName = os.path.basename(origPath)
+        if not rulesetName:
+            # get default ruleset from resources
+            carmSys = test.getEnvironment("CARMSYS")
+            carmUsr = test.getEnvironment("CARMUSR")
+            carmTmp = test.getEnvironment("CARMTMP")
+            userId = "nightjob"
+            if carmSys and carmUsr and carmTmp:
+                script = os.path.join(carmSys, "bin", "crsutil")
+                cmd = "/usr/bin/env USER=" + userId + \
+                            " CARMUSR=" + carmUsr + \
+                            " CARMTMP=" + carmTmp + \
+                            " " + script + " -f 'CrcDefaultRuleSet: %s\n'  -g CrcDefaultRuleSet"
+                try:
+                    for l in os.popen(cmd):
+                        if not l.startswith("CrcDefaultRuleSet:"):
+                            continue
+                        name = l[:-1]
+                        if name:
+                            rulesetName = os.path.basename(name)
+                            break
+                except Exception, x:
+                    pass
         if self.macroBuildsRuleset(test, rulesetName):
             # Don't want to manage the ruleset separately if the macro is going to build it...
             return []
-	return [ rulesetName ]
+        return [ rulesetName ]
     def findOrigRulePath(self, headerFile):
         if not os.path.isfile(headerFile):
             return ""
@@ -121,7 +122,7 @@ class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
             if not line.startswith("cslDispatcher"):
                 continue
             if line.find("returnvalue") != -1:
-	    	print "line=",line
+                print "line=",line
                 cpuTime = int(line.split()[-2])
                 realTime = int(line.split()[-6])
                 if currOperations[-1]:
@@ -140,7 +141,7 @@ class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
             sumCpu += valueCpu
             sumReal += valueReal
         return "Total CPU time in " + fileStem + "  :      " + str(sumCpu) + " milliseconds" \
-	+"\n"+ "Total REAL time in " + fileStem + "  :      " + str(sumReal) + " milliseconds"
+        +"\n"+ "Total REAL time in " + fileStem + "  :      " + str(sumReal) + " milliseconds"
     
 # Graphical import suite. Basically the same as those used for optimizers
 class ImportTestSuite(ravebased.ImportTestSuite):
@@ -220,14 +221,14 @@ class RecordTest(guiplugins.RecordTest):
 
 class ViewInEditor(guiplugins.ViewInEditor):
     def getViewCommand(self, fileName, stdViewProgram):
-    	fname=os.path.basename(fileName)
+        fname=os.path.basename(fileName)
         if not (fname.startswith("usecase.") \
-	        or (fname.startswith("slave_") and fname.find("usecase.") > 0)):
-	    return guiplugins.ViewInEditor.getViewCommand(self, fileName, stdViewProgram)
+                or (fname.startswith("slave_") and fname.find("usecase.") > 0)):
+            return guiplugins.ViewInEditor.getViewCommand(self, fileName, stdViewProgram)
         carmSys = self.currentTest.getEnvironment("CARMSYS")
         carmUsr = self.currentTest.getEnvironment("CARMUSR")
-	if not carmSys or not carmUsr:
-	    return guiplugins.ViewInEditor.getViewCommand(self, fileName, stdViewProgram)
+        if not carmSys or not carmUsr:
+            return guiplugins.ViewInEditor.getViewCommand(self, fileName, stdViewProgram)
         viewProgram = os.path.join(carmSys, "bin", "startMacroRecorder")
         if not os.path.isfile(viewProgram):
             raise plugins.TextTestError, "Could not find macro editor at " + viewProgram

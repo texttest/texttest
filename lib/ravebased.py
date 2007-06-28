@@ -333,6 +333,7 @@ class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
     
 class RuleBuildActivator(Activator):
     def run(self):
+        self.makeAppWriteDirectories()
         # push the non-rules tests last, to avoid indeterminism and decrease total time as these need two
         # SGE submissions
         testsNoRuleBuild = []

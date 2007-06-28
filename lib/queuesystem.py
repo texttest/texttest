@@ -192,9 +192,11 @@ class Activator:
     def addSuites(self, suites):
         self.allTests = reduce(operator.add, [ suite.testCaseList() for suite in suites ]) 
         self.allApps = [ suite.app for suite in suites ]
-    def run(self):
+    def makeAppWriteDirectories(self):
         for app in self.allApps:
-            app.makeWriteDirectory()
+            app.makeWriteDirectory()            
+    def run(self):
+        self.makeAppWriteDirectories()
         for test in self.allTests:
             test.makeWriteDirectory()
             QueueSystemServer.instance.submit(test)

@@ -151,12 +151,13 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
     def getBasicResources(self):
         return queuesystem.SubmissionRules.findResourceList(self)
     def findConcreteResources(self):
-        resources = self.getBasicResources()
         # architecture resources
-        resources.append("carmarch=*" + self.archToUse + "*")
+        resources = [ "carmarch=*" + self.archToUse + "*" ]
         majRelResource = self.getMajorReleaseResource()
         if majRelResource:
             resources.append(majRelResource)
+            
+        resources += self.getBasicResources()
         return resources
     def findResourceList(self):
         return self.findConcreteResources() + [ self.findQueueResource() ]

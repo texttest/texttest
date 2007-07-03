@@ -1301,18 +1301,11 @@ class KillTest(plugins.Action):
     def interpret(self, test, descriptor):
         return descriptor
     def getKillInfo(self, test, killReason):
-        actualReason = self.interpret(test, killReason)
-        briefText = self.getBriefText(actualReason)
+        briefText = self.interpret(test, killReason)
         if briefText:
             return briefText, self.getFullText(briefText)
         else:
             return "quit", "terminated by quitting"
-    def getBriefText(self, descriptor):
-        if descriptor == "KILLED":
-            timeStr = plugins.localtime("%H:%M")
-            return "killed at " + timeStr
-        else:
-            return descriptor
     def getFullText(self, briefText):
         if briefText.startswith("RUNLIMIT"):
             return "exceeded maximum wallclock time allowed"
@@ -1320,8 +1313,9 @@ class KillTest(plugins.Action):
             return "exceeded maximum cpu time allowed"
         elif briefText.startswith("signal"):
             return "terminated by " + briefText
-        elif briefText.startswith("killed at"):
-            return briefText.replace("killed", "killed explicitly")
+        elif briefText.startswith("KILLED"):
+            timeStr = plugins.localtime("%H:%M")
+            return "killed explicitly at " + timeStr
         else:
             return briefText
 

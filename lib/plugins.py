@@ -805,22 +805,32 @@ class Option:
 class TextOption(Option):
     def __init__(self, name, value, possibleValues, allocateNofValues, selectDir, selectFile, description, changeMethod):
         Option.__init__(self, name, value, description, changeMethod)
-        self.possValMethod = None
+        self.possValAppendMethod = None
+        self.possValListMethod = None
         self.nofValues = allocateNofValues
         self.selectDir = selectDir
         self.selectFile = selectFile
         self.clearMethod = None
         self.setPossibleValues(possibleValues)
-    def setPossibleValuesAppendMethod(self, method):
-        if method:
-            self.possValMethod = method
+    def setPossibleValuesMethods(self, appendMethod, getMethod):
+        self.possValListMethod = getMethod
+        if appendMethod:
+            self.possValAppendMethod = appendMethod
+            self.updatePossibleValues()
+    def updatePossibleValues(self):
+        if self.possValAppendMethod:
             for value in self.possibleValues:
-                method(value)
+                self.possValAppendMethod(value)
+    def listPossibleValues(self):
+        if self.possValListMethod:
+            return self.possValListMethod()
+        else:
+            return self.possibleValues
     def addPossibleValue(self, value):
         if value not in self.possibleValues:
             self.possibleValues.append(value)
-            if self.possValMethod:
-                self.possValMethod(value)
+            if self.possValAppendMethod:
+                self.possValAppendMethod(value)
             return True
         else:
             return False
@@ -829,6 +839,8 @@ class TextOption(Option):
             self.possibleValues = values
         else:
             self.possibleValues = [ self.defaultValue ] + values
+        self.clear()
+        self.updatePossibleValues()
     def inqNofValues(self): 
         if self.nofValues > 0:
             return self.nofValues
@@ -917,12 +929,6 @@ class OptionGroup:
             return option.addPossibleValue(possibleValue)
         else:
             return False
-    def setPossibleValuesUpdate(self, key, possibleValues):
-        option = self.options.get(key)
-        if option:
-            option.setPossibleValues(possibleValues)
-            option.clear()
-            option.setPossibleValuesAppendMethod(option.possValMethod)
     def getOption(self, key):
         return self.options.get(key)
     def getSwitch(self, key):

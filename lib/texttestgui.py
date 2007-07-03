@@ -1420,6 +1420,18 @@ class BoxGUI(ContainerGUI):
             
         box.show()
         return box
+
+class ComboBoxListFinder:
+    def __init__(self, combobox):
+        self.model = combobox.get_model()
+        self.textColumn = combobox.get_text_column()
+    def __call__(self):
+        entries = []
+        self.model.foreach(self.getText, entries)
+        return entries
+    def getText(self, model, path, iter, entries):
+        text = self.model.get_value(iter, self.textColumn)
+        entries.append(text)
         
 class ActionTabGUI(SubGUI):
     def __init__(self, optionGroup, action, buttonGUI):
@@ -1508,7 +1520,7 @@ class ActionTabGUI(SubGUI):
     def createComboBox(self, option):
         combobox = gtk.combo_box_entry_new_text()
         entry = combobox.child
-        option.setPossibleValuesAppendMethod(combobox.append_text)
+        option.setPossibleValuesMethods(combobox.append_text, ComboBoxListFinder(combobox))
         
         option.setClearMethod(combobox.get_model().clear)
         return combobox, entry
@@ -1650,7 +1662,7 @@ class ActionTabGUI(SubGUI):
         if len(value) > 0:
             text += " (set to '" + value + "')"
         if option.inqNofValues() > 1:
-            text += " (drop-down list containing " + repr(option.possibleValues) + ")"
+            text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
         return text
     
     def getSwitchDescription(self, switch):

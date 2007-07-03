@@ -727,7 +727,7 @@ class ImportTest(InteractiveTestAction):
             placements += [ "after " + test.name ]
         placements.append("last in suite")
 
-        self.optionGroup.setPossibleValuesUpdate("testpos", placements)
+        self.optionGroup.setPossibleValues("testpos", placements)
         self.optionGroup.getOption("testpos").reset()                    
     def getDefaultName(self):
         return ""

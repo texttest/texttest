@@ -532,6 +532,8 @@ class TopWindowGUI(ContainerGUI):
             plugins.printException()
         global globalTopWindow
         globalTopWindow = self.topWindow
+        imageDir = plugins.installationDir("images")
+        self.topWindow.set_icon_from_file(os.path.join(imageDir, "texttest-icon.jpg"))
         if self.dynamic:
             self.topWindow.set_title("TextTest dynamic GUI (tests started at " + plugins.startTimeString() + ")")
         else:

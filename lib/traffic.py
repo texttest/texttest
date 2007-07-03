@@ -271,6 +271,9 @@ class TrafficServer(TCPServer):
         CommandLineTraffic.envVarMethod = envVarMethod
         CommandLineTraffic.origEnviron = deepcopy(os.environ)
         ClientSocketTraffic.destination = None
+        # Assume testing client until a server contacts us
+        ClientSocketTraffic.direction = "<-"
+        ServerTraffic.direction = "->"
     def process(self, traffic):
         self.diag.info("Processing traffic " + repr(traffic.__class__))
         self.record(traffic)
@@ -289,6 +292,7 @@ class TrafficServer(TCPServer):
         self.diag.info("Recording " + repr(traffic.__class__) + " " + desc)
         writeFile = open(self.recordFile, "a")
         writeFile.write(desc)
+        writeFile.flush()
         writeFile.close()
 
 class ReplayInfo:

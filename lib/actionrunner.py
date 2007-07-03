@@ -1,8 +1,13 @@
 
-import plugins, sys, time
+import plugins, os, sys, time
+from respond import Responder
+from testmodel import Application, DirectoryCache
+from glob import glob
 
-class ActionRunner:
+class ActionRunner(Responder):
     def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
+        self.inputOptions = optionMap
         self.previousTestRunner = None
         self.currentTestRunner = None
         self.script = optionMap.runScript()
@@ -12,17 +17,46 @@ class ActionRunner:
         self.diag = plugins.getDiagnostics("Action Runner")
     def addSuites(self, suites):
         for suite in suites:
-            print "Using", suite.app.description(includeCheckout=True)
             self.addTestActions(suite)
-    def addTestActions(self, testSuite):
-        self.diag.info("Processing test suite of size " + str(testSuite.size()) + " for app " + testSuite.app.name)
-        appRunner = ApplicationRunner(testSuite, self.script, self.diag)
+    def addTestActions(self, suite):
+        print "Using", suite.app.description(includeCheckout=True)
+        self.diag.info("Processing test suite of size " + str(suite.size()) + " for app " + suite.app.name)
+        appRunner = ApplicationRunner(suite, self.script, self.diag)
         self.appRunners.append(appRunner)
-        for test in testSuite.testCaseList():
-            self.diag.info("Adding test runner for test " + test.getRelPath())
-            testRunner = TestRunner(test, appRunner, self.diag)
-            self.testQueue.append(testRunner)
-            self.allTests.append(testRunner)
+        for test in suite.testCaseList():
+            self.addTestRunner(test, appRunner)
+    def addTestRunner(self, test, appRunner):
+        self.diag.info("Adding test runner for test " + test.getRelPath())
+        testRunner = TestRunner(test, appRunner, self.diag)
+        self.testQueue.append(testRunner)
+        self.allTests.append(testRunner)
+    def notifyExtraTest(self, testPath, appName, versions):
+        appRunner = self.findApplicationRunner(appName, versions)
+        if appRunner:
+            extraTest = appRunner.addExtraTest(testPath)
+            if extraTest:
+                self.addTestRunner(extraTest, appRunner)
+        else:
+            newApp = Application(appName, self.makeDirectoryCache(appName), versions, self.inputOptions)
+            newTestSuite = self.createTestSuite(newApp, testPath)
+            self.addTestActions(newTestSuite)
+    def makeDirectoryCache(self, appName):
+        configFile = "config." + appName
+        rootDir = self.inputOptions.directoryName
+        rootConfig = os.path.join(rootDir, configFile)
+        if os.path.isfile(rootConfig):
+            return DirectoryCache(rootDir)
+        else:
+            allFiles = glob(os.path.join(rootDir, "*", configFile))
+            return DirectoryCache(os.path.dirname(allFiles[0]))
+    def createTestSuite(self, app, testPath):
+        filter = plugins.TestPathFilter(testPath)
+        responders = self.appRunners[0].testSuite.observers
+        return app.createTestSuite(responders, [ filter ])
+    def findApplicationRunner(self, appName, versions):
+        for appRunner in self.appRunners:
+            if appRunner.matches(appName, versions):
+                return appRunner
     def run(self):
         while len(self.testQueue):
             self.currentTestRunner = self.testQueue[0]
@@ -44,6 +78,11 @@ class ApplicationRunner:
         self.diag = diag
         self.actionSequence = self.getActionSequence(script)
         self.setUpApplications(self.actionSequence)
+    def matches(self, appName, versions):
+        app = self.testSuite.app
+        return app.name == appName and app.versions == versions
+    def addExtraTest(self, testPath):
+        return self.testSuite.addTestCaseWithPath(testPath)
     def setUpApplications(self, sequence):
         self.testSuite.setUpEnvironment()
         for action in sequence:

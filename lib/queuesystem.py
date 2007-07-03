@@ -41,10 +41,14 @@ class KillTestInSlave(default.KillTest):
         command = "from " + moduleName + " import getLimitInterpretation as _getLimitInterpretation"
         exec command
         return _getLimitInterpretation(origBriefText)
-        
-class SocketResponder(Responder):
+
+def socketSerialise(test):
+    return test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
+
+class SocketResponder(Responder,plugins.Observable):
     def __init__(self, optionMap):
         Responder.__init__(self, optionMap)
+        plugins.Observable.__init__(self)
         self.serverAddress = self.getServerAddress(optionMap)
     def getServerAddress(self, optionMap):
         servAddrStr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
@@ -61,12 +65,18 @@ class SocketResponder(Responder):
                 sleep(1)
         sendSocket.connect(self.serverAddress)
     def notifyLifecycleChange(self, test, state, changeDesc):
-        testData = test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
+        testData = socketSerialise(test)
         pickleData = dumps(state)
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect(sendSocket)
         sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
+        sendSocket.shutdown(socket.SHUT_WR)
+        response = sendSocket.makefile().read()
         sendSocket.close()
+        if len(response) > 0:
+            appDesc, testPath = response.strip().split(":")
+            appParts = appDesc.split(".")
+            self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
     
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
@@ -97,7 +107,11 @@ class QueueSystemConfig(default.Config):
     def getWriteDirectoryName(self, app):
         slaveDir = self.optionMap.get("slave")
         if slaveDir:
-            return slaveDir
+            parts = os.path.basename(slaveDir).split(".")
+            if parts[0] == app.name and parts[1:-1] == app.versions:
+                return slaveDir
+            else:
+                return os.path.join(os.path.dirname(slaveDir), app.name + app.versionSuffix() + "." + parts[-1])
         else:
             return default.Config.getWriteDirectoryName(self, app)
     def useExtraVersions(self, app):
@@ -129,7 +143,7 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getExecHostFinder(self)
     def getSlaveResponderClasses(self):
-        return [ SocketResponder ]
+        return [ SocketResponder, default.ActionRunner ]
     def getResponderClasses(self, allApps):
         if self.slaveRun():
             return self.getSlaveResponderClasses()
@@ -174,6 +188,8 @@ class QueueSystemConfig(default.Config):
             return MachineInfoFinder()
         else:
             return default.Config.getMachineInfoFinder(self)
+    def getDefaultMaxCapacity(self):
+        return 100000
     def printHelpDescription(self):
         print """The queuesystem configuration is a published configuration, 
                documented online at http://www.texttest.org/TextTest/docs/queuesystem"""
@@ -184,6 +200,7 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
+        app.setConfigDefault("queue_system_max_capacity", self.getDefaultMaxCapacity(), "Maximum possible number of parallel similar jobs in the available grid")
 
 class Activator:
     def __init__(self, optionMap):
@@ -277,14 +294,14 @@ class SubmissionRules:
         # If we haven't got a log_file yet, we should do this so we collect performance reliably
         logFile = self.test.getFileName(self.test.getConfigValue("log_file"))
         return logFile is None
+    def allowsReuse(self, newRules):
+        return self.findResourceList() == newRules.findResourceList()
 
 class SlaveRequestHandler(StreamRequestHandler):
     def handle(self):
         identifier = self.rfile.readline().strip()
         if identifier == "TERMINATE_SERVER":
             return
-        self.connection.shutdown(socket.SHUT_WR)
-        self.wfile.close()
         clientHost, clientPort = self.client_address
         # Don't use port, it changes all the time
         self.handleRequestFromHost(self.getHostName(clientHost), identifier)
@@ -295,13 +312,18 @@ class SlaveRequestHandler(StreamRequestHandler):
             if not test.state.isComplete(): # we might have killed it already...
                 oldBt = test.state.briefText
                 test.loadState(self.rfile)
+                self.connection.shutdown(socket.SHUT_RD)
                 self.server.diag.info("Changed from '" + oldBt + "' to '" + test.state.briefText + "'")
-                if test.state.hasStarted():
+                if test.state.isComplete():
+                    newTest = QueueSystemServer.instance.getTestForReuse(test)
+                    if newTest:
+                        self.wfile.write(socketSerialise(newTest))
+                else:
                     self.server.storeClient(test, (hostname, identifier))
         else:
             expectedHost, expectedPid = self.server.testClientInfo[test]
             sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
-                             clientHost + " (process " + clientPid + ")\n")
+                             hostname + " (process " + clientPid + ")\n")
             sys.stderr.write("Slave already registered from " + expectedHost + " (process " + expectedPid + ")\n")
             sys.stderr.write("Ignored all communication from this unexpected TextTest slave")
             sys.stderr.flush()
@@ -380,44 +402,116 @@ class QueueSystemServer:
     def __init__(self, optionMap):
         self.optionMap = optionMap
         self.queue = Queue()
+        # queue for putting tests when we couldn't reuse the originals
+        self.reuseFailureQueue = Queue()
         self.testCount = 0
+        self.testsSubmitted = 0
+        self.maxCapacity = 100000 # infinity, sort of
         self.jobs = {}
+        self.submissionRules = {}
         self.killedTests = []
         self.queueSystems = {}
         self.diag = plugins.getDiagnostics("Queue System Submit")
         QueueSystemServer.instance = self
     def addSuites(self, suites):
         for suite in suites:
+            currCap = suite.getConfigValue("queue_system_max_capacity")
+            if currCap < self.maxCapacity:
+                self.maxCapacity = currCap
             print "Using", queueSystemName(suite.app), "queues for", suite.app.description(includeCheckout=True)
-        self.testCount = reduce(operator.add, [ suite.size() for suite in suites ])        
+            self.testCount += suite.size()
     def submit(self, test):
         self.queue.put(test)
     def handleLocalError(self, test):
         self.handleErrorState(test)
         if self.testCount == 0:
-            self.submit(None) # snap out of our loop if this was the last one
+            self.submitTerminators()
+    def submitTerminators(self):
+        # snap out of our loop if this was the last one
+        self.queue.put(None)
+        self.reuseFailureQueue.put(None)
+    def getItemFromQueue(self, queue, block):
+        try:
+            return queue.get(block=block)
+        except Empty:
+            return
+    def getTestForReuse(self, test):
+        # Pick up any test that matches the current one's resource requirements
+        newTest = self.getTest(block=False)
+        if newTest:
+            if self.allowReuse(test, newTest):
+                self.jobs[newTest] = self.getJobInfo(test)
+                if self.testCount > 1:
+                    self.testCount -= 1
+                    self.diag.info("Reusing slave for " + newTest.uniqueName + self.remainStr())
+                else:
+                    # Don't allow test count to drop to 0 here, can cause race conditions
+                    self.submitTerminators() 
+                return newTest
+            else:
+                self.reuseFailureQueue.put(newTest)
+    def allowReuse(self, oldTest, newTest):
+        oldRules = self.getSubmissionRules(oldTest)
+        newRules = self.getSubmissionRules(newTest)
+        return oldRules.allowsReuse(newRules)
+    def getSubmissionRules(self, test):
+        if self.submissionRules.has_key(test):
+            return self.submissionRules[test]
+        else:
+            submissionRules = test.app.getSubmissionRules(test)
+            self.submissionRules[test] = submissionRules
+            return submissionRules
+    def getTest(self, block):
+        testOrStatus = self.getItemFromQueue(self.queue, block)
+        if not testOrStatus:
+            return
+        if type(testOrStatus) == StringType:
+            self.sendServerState(testOrStatus)
+            return self.getTest(block)
+        else:
+            return testOrStatus
+    def sendServerState(self, state):
+        self.diag.info("Sending server state '" + state + "'")
+        sendServerState(state)
+    def getTestForSubmit(self):
+        if self.testsSubmitted < self.maxCapacity:
+            reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=False)
+            if reuseFailure:
+                self.diag.info("Found a reuse failure...")
+                return reuseFailure
+            else:
+                self.diag.info("Waiting for new tests...")
+                return self.getTest(block=True)
+        else:
+            self.diag.info("Waiting for reuse failures...")
+            return self.getItemFromQueue(self.reuseFailureQueue, block=True)
     def run(self):        
         while self.testCount > 0:
-            testOrStatus = self.queue.get()
-            if not testOrStatus:
+            test = self.getTestForSubmit()
+            if not test:
+                self.diag.info("Found no-test marker, exiting")
                 break
-            elif type(testOrStatus) == StringType:
-                sendServerState(testOrStatus)
-            else:
-                test = testOrStatus # just for clarity
-                self.diag.info("Handling test " + test.uniqueName + " : " + str(self.testCount) + " tests remain.")
-                if not test.state.isComplete():
-                    self.performSubmission(test)
+            self.diag.info("Handling test " + test.uniqueName)
+            if not test.state.isComplete():
+                self.performSubmission(test)
             
-        sendServerState("Completed submission of all tests")
-    def performSubmission(self, test):    
+        self.sendServerState("Completed submission of all tests")
+    def remainStr(self):
+        return " : " + str(self.testCount) + " tests remain."
+    def performSubmission(self, test):
         command = self.getSlaveCommand(test)
         submissionRules = test.app.getSubmissionRules(test)
         print "Q: Submitting test", test.uniqueName, submissionRules.getSubmitSuffix()
-        if self.submitJob(test, submissionRules, command):
-            self.testCount -= 1 # successfully submitted a test
+        if not self.submitJob(test, submissionRules, command):
+            return
+        
+        self.testCount -= 1
+        self.diag.info("Submission successful" + self.remainStr())
+        self.testsSubmitted += 1
         if not test.state.hasStarted():
             test.changeState(self.getPendingState(test))
+        if self.testsSubmitted == self.maxCapacity:
+            self.sendServerState("Completed submission of tests up to capacity")
     def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
@@ -483,6 +577,7 @@ class QueueSystemServer:
             return queueSystem.findSubmitError(stderr)
     def handleErrorState(self, test):
         self.testCount -= 1
+        self.diag.info("Test " + test.uniqueName + " in error state" + self.remainStr())
         bugchecker = CheckForBugs()
         self.setUpSuites(bugchecker, test)
         bugchecker(test)
@@ -528,6 +623,7 @@ class KillTestSubmission(plugins.Action):
         self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
         jobId, jobName = self.getJobInfo(test)
         if not jobId:
+            self.diag.info("No job info found from queue system server, changing state to cancelled")
             return self.changeState(test, default.Cancelled())
         
         self.describeJob(test, jobId, jobName)

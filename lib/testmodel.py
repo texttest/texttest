@@ -708,6 +708,10 @@ class TestSuite(Test):
         newSuite.setObservers(self.observers)
         if newSuite.readContents(filters, forTestRuns):
             return newSuite
+    def findSubtest(self, testName):
+        for test in self.testcases:
+            if test.name == testName:
+                return test
     def repositionTest(self, test, position):
         # Find test in list
         testSuiteFileName = self.getContentFileName()
@@ -744,10 +748,10 @@ class TestSuite(Test):
         testNamesInOrder = self.readTestNames(False, False)
         newList = []
         for testName in testNamesInOrder.keys():
-            for test in self.testcases:
-                if test.name == testName:
-                    newList.append(test)
-                    break
+            test = self.findSubtest(testName)
+            if test:
+                newList.append(test)
+                    
         self.testcases = newList
         self.notify("ContentChange")
         return True
@@ -799,9 +803,20 @@ class TestSuite(Test):
         currContent.insert(placement, newEntry)
         self.writeNewTestSuiteFile(contentFileName, currContent)
         return self.makeSubDirectory(testName)
-    def addTestCase(self, testName, description, placement):
+    def addTestCaseWithPath(self, testPath):
+        pathElements = testPath.split("/", 1)
+        subSuite = self.findSubtest(pathElements[0])
+        if len(pathElements) == 1:
+            if not subSuite:
+                return self.addTestCase(testPath)
+            # if it already exists, don't return anything
+        else:
+            if not subSuite:
+                subSuite = self.addTestSuite(pathElements[0])
+            return subSuite.addTestCaseWithPath(pathElements[1])
+    def addTestCase(self, testName, description="", placement=-1):
         return self.addTest(testName, description, placement, TestCase)
-    def addTestSuite(self, testName, description, placement):
+    def addTestSuite(self, testName, description="", placement=-1):
         return self.addTest(testName, description, placement, TestSuite)
     def addTest(self, testName, description, placement, className):
         cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
@@ -893,12 +908,12 @@ class ConfigurationCall:
         raise BadConfigError, message
     
 class Application:
-    def __init__(self, name, dircache, version, inputOptions):
+    def __init__(self, name, dircache, versions, inputOptions):
         self.name = name
         self.dircache = dircache
         # Place to store reference to extra_version applications
         self.extras = []
-        self.versions = filter(len, version.split(".")) # remove empty versions    
+        self.versions = versions    
         self.diag = plugins.getDiagnostics("application")
         self.inputOptions = inputOptions
         self.configDir = MultiEntryDictionary()
@@ -1005,7 +1020,7 @@ class Application:
             if len(allFiles):
                 return allFiles[-1]
     def getRefVersionApplication(self, refVersion):
-        return Application(self.name, self.dircache, refVersion, self.inputOptions)
+        return Application(self.name, self.dircache, refVersion.split("."), self.inputOptions)
     def getPreviousWriteDirInfo(self, previousTmpInfo):
         # previousTmpInfo can be either a directory, which should be returned if it exists,
         # a user name, which should be expanded and checked
@@ -1414,11 +1429,10 @@ class ApplicationEventResponder(Responder):
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.
 class AllCompleteResponder(Responder,plugins.Observable):
-    def __init__(self, observers):
+    def __init__(self, inputOptions):
         Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.unfinishedTests = 0
-        self.setObservers(observers)
     def addSuites(self, suites):
         self.unfinishedTests = sum([ suite.size() for suite in suites ])
     def notifyComplete(self, test):

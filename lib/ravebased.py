@@ -43,7 +43,7 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
 """
 
 import default, os, string, shutil, plugins, sys, signal, stat, guiplugins, subprocess
-from socket import gethostname
+from socket import gethostname, SHUT_WR
 from respond import Responder
 from copy import copy
 from traffic_cmd import sendServerState
@@ -58,7 +58,7 @@ def getConfig(optionMap):
 def isUserSuite(suite):
     return suite.environment.has_key("CARMUSR")
 
-class UserFilter(default.TextFilter):
+class UserFilter(plugins.TextFilter):
     option = "u"
     def isUserSuite(self, suite):
         for file in suite.findAllStdFiles("environment"):
@@ -382,6 +382,7 @@ class RuleBuildRequestHandler(SlaveRequestHandler):
         else:
             SlaveRequestHandler.handleRequestFromHost(self, hostname, requestId)
     def handleRuleCompRequest(self, hostname, requestId):
+        self.connection.shutdown(SHUT_WR) # avoid deadlock, we don't plan to write anything
         diag = plugins.getDiagnostics("Synchroniser")
         header, name, status = requestId.split(":")
         diag.info("Got ruleset response for " + name)

@@ -230,7 +230,7 @@ class Config:
         else:
             return ("temporary_filter_files", os.path.join(app.writeDirectory, "temporary_filter_files"))
     def getFilterClasses(self):
-        return [ TestNameFilter, TestPathFilter, TestSuiteFilter, performance.TimeFilter ]
+        return [ TestNameFilter, plugins.TestPathFilter, TestSuiteFilter, performance.TimeFilter ]
     def getFilterList(self, app, extendFileNames = True):
         filters = self.getFiltersFromMap(self.optionMap, app)
 
@@ -914,7 +914,10 @@ class PrepareWriteDirectory(plugins.Action):
         if os.name != "posix":
             return self.copyTestPath(test, fullPath, target)
         if os.path.exists(fullPath):
-            os.symlink(fullPath, target)
+            if not os.path.exists(target):
+                os.symlink(fullPath, target)
+            else:
+                raise plugins.TextTestError, "File already existed at " + target + "\nTrying to link to " + fullPath
     def partialCopyTestPath(self, test, sourcePath, targetPath):
         # Linking doesn't exist on windows!
         if os.name != "posix":
@@ -1133,45 +1136,21 @@ class CollateFiles(plugins.Action):
         if currProc:
             currProc.wait()
     
-class TextFilter(plugins.Filter):
-    def __init__(self, filterText):
-        self.texts = plugins.commasplit(filterText)
-        self.textTriggers = [ plugins.TextTrigger(text) for text in self.texts ]
-    def containsText(self, test):
-        return self.stringContainsText(test.name)
-    def stringContainsText(self, searchString):
-        for trigger in self.textTriggers:
-            if trigger.matches(searchString):
-                return True
-        return False
-    def equalsText(self, test):
-        return test.name in self.texts
-
-class TestPathFilter(TextFilter):
-    option = "tp"
-    def acceptsTestCase(self, test):
-        return test.getRelPath() in self.texts
-    def acceptsTestSuite(self, suite):
-        for relPath in self.texts:
-            if relPath.startswith(suite.getRelPath()):
-                return True
-        return False
-    
-class TestNameFilter(TextFilter):
+class TestNameFilter(plugins.TextFilter):
     option = "t"
     def acceptsTestCase(self, test):
         return self.containsText(test)
 
-class TestSuiteFilter(TextFilter):
+class TestSuiteFilter(plugins.TextFilter):
     option = "ts"
     def acceptsTestCase(self, test):
         return self.stringContainsText(test.parent.getRelPath())
     def acceptsTestSuiteContents(self, suite):
         return not suite.isEmpty()
 
-class GrepFilter(TextFilter):
+class GrepFilter(plugins.TextFilter):
     def __init__(self, filterText, fileStem):
-        TextFilter.__init__(self, filterText)
+        plugins.TextFilter.__init__(self, filterText)
         self.fileStem = fileStem
     def acceptsTestCase(self, test):
         for logFile in self.findAllLogFiles(test):

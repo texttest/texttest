@@ -219,6 +219,30 @@ class Filter:
     def acceptsTestSuiteContents(self, suite):
         return 1
 
+class TextFilter(Filter):
+    def __init__(self, filterText):
+        self.texts = commasplit(filterText)
+        self.textTriggers = [ TextTrigger(text) for text in self.texts ]
+    def containsText(self, test):
+        return self.stringContainsText(test.name)
+    def stringContainsText(self, searchString):
+        for trigger in self.textTriggers:
+            if trigger.matches(searchString):
+                return True
+        return False
+    def equalsText(self, test):
+        return test.name in self.texts
+
+class TestPathFilter(TextFilter):
+    option = "tp"
+    def acceptsTestCase(self, test):
+        return test.getRelPath() in self.texts
+    def acceptsTestSuite(self, suite):
+        for relPath in self.texts:
+            if relPath.startswith(suite.getRelPath()):
+                return True
+        return False
+
 # Generic action to be performed: all actions need to provide these methods
 class Action:
     RETRY = 1

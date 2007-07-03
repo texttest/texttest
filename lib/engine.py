@@ -120,9 +120,10 @@ class TextTest:
                 else:
                     raisedError = True
         return raisedError, appList
-    def createApplication(self, appName, dircache, version):
+    def createApplication(self, appName, dircache, versionStr):
         try:
-            return testmodel.Application(appName, dircache, version, self.inputOptions)
+            versions = filter(len, versionStr.split(".")) # remove empty versions
+            return testmodel.Application(appName, dircache, versions, self.inputOptions)
         except (testmodel.BadConfigError, plugins.TextTestError), e:
             sys.stderr.write("Could not use application '" + appName +  "' - " + str(e) + "\n")
     def addApplication(self, appName, dircache, version, allVersions):
@@ -157,11 +158,15 @@ class TextTest:
                     self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.append(respClass)
         # Make sure we send application events when tests change state
-        responderClasses.append(testmodel.ApplicationEventResponder)
+        responderClasses += [ testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
         allResponders = map(lambda x : x(self.inputOptions), responderClasses)
-        allCompleteResponder = testmodel.AllCompleteResponder(allResponders)
-        allResponders.append(allCompleteResponder)
         self.allResponders = self.removeBaseClasses(allResponders)
+        for responder in self.allResponders:
+            # For all observable responders, set them to be observed by the others if they
+            # haven't fixed their own observers
+            if isinstance(responder, plugins.Observable) and len(responder.observers) == 0:
+                self.diag.info("All responders now observing " + str(responder.__class__))
+                responder.setObservers(allResponders)
     def createThreadRunners(self, allApps):
         threadRunnerClasses = []
         threadRunners = []

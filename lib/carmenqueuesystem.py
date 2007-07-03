@@ -88,6 +88,8 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
         self.presetPerfCategory = self.getEnvironmentPerfCategory()
         self.archToUse = getArchitecture(self.test.app)
         self.nightjob = nightjob
+        self.cpuTime = performance.getTestPerformance(self.test)
+        self.diag = plugins.getDiagnostics("Submission Rules")
     def getMajorReleaseResourceType(self):
         return "run"
     def getEnvironmentPerfCategory(self):
@@ -99,7 +101,9 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
         # Hard-coded, useful at boundaries and for rave compilations
         if self.presetPerfCategory:
             return self.presetPerfCategory
-        cpuTime = performance.getTestPerformance(self.test)
+        else:
+            return self.getPerfCategoryFromTime(self.cpuTime)
+    def getPerfCategoryFromTime(self, cpuTime):
         if cpuTime == -1:
             # This means we don't know, probably because it's not enabled
             return "short"
@@ -128,15 +132,14 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
         else:
             return "idle"
     def findPriority(self):
-        cpuTime = performance.getTestPerformance(self.test)
-        if cpuTime == -1:
+        if self.cpuTime == -1:
             # We don't know yet...
             return 0
         shortQueueSeconds = self.getShortQueueSeconds()
-        if cpuTime < shortQueueSeconds:
-            return -cpuTime
+        if self.cpuTime < shortQueueSeconds:
+            return -self.cpuTime
         else:
-            priority = -600 -cpuTime / 100
+            priority = -600 -self.cpuTime / 100
             # don't return less than minimum priority
             if priority > -1023:
                 return priority
@@ -164,6 +167,24 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
     def getSubmitSuffix(self):
         name = queuesystem.queueSystemName(self.test)
         return " to " + name + " queue " + self.findQueueResource() + ", requesting " + ",".join(self.findConcreteResources())
+    def allowsReuse(self, otherRules):
+        if not queuesystem.SubmissionRules.allowsReuse(self, otherRules):
+            return False
+        # Try to make sure we don't change "performance category" by reuse
+        self.diag.info("Check for reuse : old time " + repr(self.cpuTime) + ", additional time " + repr(otherRules.cpuTime))
+        thisCategory = self.getPerformanceCategory()
+        otherCategory = otherRules.getPerformanceCategory()
+        if thisCategory != otherCategory:
+            return False
+
+        totalTime = self.cpuTime + otherRules.cpuTime
+        combinedCategory = self.getPerfCategoryFromTime(totalTime)
+        if combinedCategory == thisCategory:
+            self.cpuTime = totalTime
+            otherRules.cpuTime = totalTime
+            return True
+        else:
+            return False
 
 class CarmenConfig(queuesystem.QueueSystemConfig):
     def addToOptionGroups(self, app, groups):
@@ -207,12 +228,13 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def getFilteredBatchSessions(self):
         return [ "nightjob", "wkendjob", "release", "nightly_publish", "nightly_publish.lsf", \
                  "weekly_publish", "weekly_publish.lsf", "small_publish" ]
+    def getDefaultMaxCapacity(self):
+        return 70 # roughly number of R&D i386_linux machines, with a bit extra for luck
     def setApplicationDefaults(self, app):
         queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux", "Which Carmen architecture to run tests on by default")
         app.setConfigDefault("default_major_release", "master", "Which Carmen major release to run by default")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10, "Maximum time a test can take and be sent to the short queue")
-        app.setConfigDefault("maximum_cputime_for_chunking", 0.0, "(LSF) Maximum time a test can take and be chunked")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")
         for batchSession in self.getFilteredBatchSessions():

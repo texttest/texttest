@@ -882,7 +882,8 @@ class PrepareWriteDirectory(plugins.Action):
         # Code is a copy of shutil.copytree, with copying modification times
         # so that we can tell when things change...
         names = os.listdir(src)
-        os.mkdir(dst)
+        if not os.path.exists(dst):
+            os.mkdir(dst)
         for name in names:
             srcname = os.path.join(src, name)
             dstname = os.path.join(dst, name)

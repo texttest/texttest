@@ -1418,8 +1418,14 @@ class ApplicationEventResponder(Responder):
             return
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName
-        timeDelay = int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
+        timeDelay = self.getTimeDelay()
         self.scriptEngine.applicationEvent(eventName, category, timeDelay)
+
+    def getTimeDelay(self):
+        try:
+            return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
+        except ValueError:
+            return 1
     def notifyAllComplete(self):
         self.scriptEngine.applicationEvent("completion of test actions")
     def notifyCloseDynamic(self, test, name):

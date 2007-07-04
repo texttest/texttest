@@ -160,7 +160,7 @@ class CommandLineTraffic(Traffic):
         interestingEnviron = []
         for var in self.envVarMethod(self.commandName):
             value = cmdEnviron.get(var)
-            if value is not None:
+            if value is not None and value != self.origEnviron.get(var):
                 interestingEnviron.append((var, value))
         return interestingEnviron
     def getEnvString(self):

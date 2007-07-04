@@ -365,12 +365,13 @@ class RuleBuildActivator(Activator):
         submissionRules = test.app.getRaveSubmissionRules(test)
         remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
         test.changeState(NeedRuleCompilation(rulecomp))
+        rulecompEnvVars = [ "CARMSYS", "CARMUSR", "CARMTMP", "_AUTOTEST__LOCAL_COMPILE_" ] 
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
             print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for test " + test.uniqueName + ")", postText
             compileArgs = [ remoteCmd, ruleset.targetFiles[0], SlaveServerResponder.submitAddress ] + ruleset.getCompilationArgs(remote=True)
             command = " ".join(compileArgs)
-            QueueSystemServer.instance.submitJob(test, submissionRules, command)
+            QueueSystemServer.instance.submitJob(test, submissionRules, command, rulecompEnvVars)
         
         if test.state.category == "need_rulecompile":
             test.changeState(PendingRuleCompilation(rulecomp))

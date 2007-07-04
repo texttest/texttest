@@ -370,16 +370,16 @@ class Test(plugins.Observable):
             test.notify("Add")
             self.parent.removeTest(self, False)
         self.parent.contentChanged()
-    def setUpEnvVariable(self, var, value, toModify=os.environ):
-        if toModify is os.environ and toModify.has_key(var):
+    def setUpEnvVariable(self, var, value):
+        if os.environ.has_key(var):
             self.previousEnv[var] = os.environ[var]
-        toModify[var] = value
-        self.diagnose("Setting " + var + " to " + toModify[var])
-    def setUpEnvironment(self, parents=False, toModify=os.environ):
+        os.environ[var] = value
+        self.diagnose("Setting " + var + " to " + os.environ[var])
+    def setUpEnvironment(self, parents=False):
         if parents and self.parent:
-            self.parent.setUpEnvironment(parents, toModify)
+            self.parent.setUpEnvironment(parents)
         for var, value in self.environment.items():
-            self.setUpEnvVariable(var, value, toModify)
+            self.setUpEnvVariable(var, value)
     def tearDownEnvironment(self, parents=0):
         # Note this has no effect on the real environment, but can be useful for internal environment
         # variables. It would be really nice if Python had a proper "unsetenv" function...
@@ -1095,7 +1095,9 @@ class Application:
         return optionGroups
     def getRunOptions(self, version=None, checkout=None):
         if not checkout:
-            checkout = self.checkout
+            inputCheckout = self.inputOptions.get("c")
+            if inputCheckout:
+                checkout = inputCheckout
         if not version:
             version = self.getFullVersion()
         options = [ "-d", self.inputOptions.directoryName, "-a", self.name ]

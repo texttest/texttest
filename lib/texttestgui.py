@@ -532,8 +532,7 @@ class TopWindowGUI(ContainerGUI):
             plugins.printException()
         global globalTopWindow
         globalTopWindow = self.topWindow
-        imageDir = plugins.installationDir("images")
-        self.topWindow.set_icon_from_file(os.path.join(imageDir, "texttest-icon.jpg"))
+        self.topWindow.set_icon_from_file(self.getIcon())
         if self.dynamic:
             self.topWindow.set_title("TextTest dynamic GUI (tests started at " + plugins.startTimeString() + ")")
         else:
@@ -545,6 +544,13 @@ class TopWindowGUI(ContainerGUI):
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyExit)
         self.windowSizeDescriptor = self.adjustSize()
         return self.topWindow
+
+    def getIcon(self):
+        imageDir = plugins.installationDir("images")
+        if self.dynamic:
+            return os.path.join(imageDir, "texttest-icon-dynamic.jpg")
+        else:
+            return os.path.join(imageDir, "texttest-icon-static.jpg")
     def writeSeparator(self):
         pass # Don't bother, we're at the top
     def describe(self):

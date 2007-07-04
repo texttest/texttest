@@ -542,7 +542,10 @@ class QueueSystemServer:
         return " ".join(runOptions)
     def getTestEnvironment(self, test):
         envCopy = deepcopy(os.environ)
-        test.setUpEnvironment(parents=True, toModify=envCopy)
+        for var in [ "TEXTTEST_VIRTUAL_DISPLAY", "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT" ]:
+            value = test.getEnvironment(var)
+            if value is not None:
+                envCopy[var] = value        
         return envCopy
     def submitJob(self, test, submissionRules, command):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)

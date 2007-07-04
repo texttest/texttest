@@ -370,16 +370,16 @@ class Test(plugins.Observable):
             test.notify("Add")
             self.parent.removeTest(self, False)
         self.parent.contentChanged()
-    def setUpEnvVariable(self, var, value):
-        if os.environ.has_key(var):
+    def setUpEnvVariable(self, var, value, toModify=os.environ):
+        if toModify is os.environ and toModify.has_key(var):
             self.previousEnv[var] = os.environ[var]
-        os.environ[var] = value
-        self.diagnose("Setting " + var + " to " + os.environ[var])
-    def setUpEnvironment(self, parents=False):
+        toModify[var] = value
+        self.diagnose("Setting " + var + " to " + toModify[var])
+    def setUpEnvironment(self, parents=False, toModify=os.environ):
         if parents and self.parent:
-            self.parent.setUpEnvironment(parents)
+            self.parent.setUpEnvironment(parents, toModify)
         for var, value in self.environment.items():
-            self.setUpEnvVariable(var, value)
+            self.setUpEnvVariable(var, value, toModify)
     def tearDownEnvironment(self, parents=0):
         # Note this has no effect on the real environment, but can be useful for internal environment
         # variables. It would be really nice if Python had a proper "unsetenv" function...

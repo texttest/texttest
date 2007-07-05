@@ -227,7 +227,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         return "xemacs"
     def getFilteredBatchSessions(self):
         return [ "nightjob", "wkendjob", "release", "nightly_publish", "nightly_publish.lsf", \
-                 "weekly_publish", "weekly_publish.lsf", "small_publish" ]
+                 "weekly_publish", "weekly_publish.lsf", "small_publish", "test_nightjob" ]
     def getDefaultMaxCapacity(self):
         return 70 # roughly number of R&D i386_linux machines, with a bit extra for luck
     def setApplicationDefaults(self, app):

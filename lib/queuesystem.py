@@ -136,7 +136,7 @@ class QueueSystemConfig(default.Config):
     def getSubmissionKiller(self):
         return KillTestSubmission()
     def getSlaveSwitches(self):
-        return [ "trace", "ignorecat", "actrep", "rectraffic", "keeptmp" ]
+        return [ "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp" ]
     def getExecHostFinder(self):
         if self.slaveRun():
             return FindExecutionHosts()

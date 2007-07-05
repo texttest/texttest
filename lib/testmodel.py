@@ -804,6 +804,11 @@ class TestSuite(Test):
         self.writeNewTestSuiteFile(contentFileName, currContent)
         return self.makeSubDirectory(testName)
     def addTestCaseWithPath(self, testPath):
+        self.setUpEnvironment()
+        newTest = self.addTestCaseWithPathAndEnv(testPath)
+        self.tearDownEnvironment()
+        return newTest
+    def addTestCaseWithPathAndEnv(self, testPath):
         pathElements = testPath.split("/", 1)
         subSuite = self.findSubtest(pathElements[0])
         if len(pathElements) == 1:

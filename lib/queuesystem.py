@@ -295,7 +295,8 @@ class SubmissionRules:
         logFile = self.test.getFileName(self.test.getConfigValue("log_file"))
         return logFile is None
     def allowsReuse(self, newRules):
-        return self.findResourceList() == newRules.findResourceList()
+        return self.findResourceList() == newRules.findResourceList() and \
+               self.getProcessesNeeded() == newRules.getProcessesNeeded()
 
 class SlaveRequestHandler(StreamRequestHandler):
     def handle(self):

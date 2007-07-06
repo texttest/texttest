@@ -21,7 +21,7 @@ class RunTest(default.RunTest):
         cmdArgs = [ "time", "-p", "sh", "-c", self.getExecuteCommand(test) ]
         self.diag.info("Running performance-test with args : " + repr(cmdArgs))
         stderrFile = test.makeTmpFileName("unixperf", forFramework=1)
-        return subprocess.Popen(cmdArgs, stdin=open(os.devnull), \
+        return subprocess.Popen(cmdArgs, stdin=open(os.devnull), cwd=test.getDirectory(temporary=1),\
                                 stdout=open(os.devnull, "w"), stderr=open(stderrFile, "w"))
     def getExecuteCommand(self, test):
         cmdParts = self.getCmdParts(test)

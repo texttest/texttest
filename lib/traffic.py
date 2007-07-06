@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os, sys, plugins, shutil, socket, subprocess
-from copy import deepcopy
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
@@ -30,22 +29,23 @@ class SetUpTrafficHandlers(plugins.Action):
         recordFile = test.makeTmpFileName("traffic")
         envVarMethod = MethodWrap(test.getCompositeConfigValue, "collect_traffic_environment")
         writeDir = test.getDirectory(temporary=1)
+        runEnv = test.getRunEnvironment()
         if self.record:
-            self.setServerState(recordFile, None, envVarMethod, writeDir)
+            self.setServerState(recordFile, None, envVarMethod, runEnv, writeDir)
             return True
         else:
             trafficReplay = test.getFileName("traffic")
             if trafficReplay:
-                self.setServerState(recordFile, trafficReplay, envVarMethod, writeDir)
+                self.setServerState(recordFile, trafficReplay, envVarMethod, runEnv, writeDir)
                 return True
             else:
-                self.setServerState(None, None, envVarMethod, writeDir)
+                self.setServerState(None, None, envVarMethod, runEnv, writeDir)
                 return False
-    def setServerState(self, recordFile, replayFile, envVarMethod, writeDir):
+    def setServerState(self, recordFile, replayFile, envVarMethod, environ, writeDir):
         if recordFile or replayFile and not TrafficServer.instance:
             TrafficServer.instance = TrafficServer()
         if TrafficServer.instance:
-            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod, writeDir)
+            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod, environ, writeDir)
     def makeIntercepts(self, test):
         for cmd in test.getConfigValue("collect_traffic"):
             linkName = test.makeTmpFileName(cmd, forComparison=0)
@@ -267,7 +267,7 @@ class TrafficServer(TCPServer):
     def setRealVersion(self, command, realCommand):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
-    def setState(self, recordFile, replayFile, envVarMethod, writeDir):
+    def setState(self, recordFile, replayFile, envVarMethod, environ, writeDir):
         self.recordFile = recordFile
         self.replayInfo = ReplayInfo(replayFile)
         if recordFile or replayFile:
@@ -275,7 +275,7 @@ class TrafficServer(TCPServer):
         else:
             os.environ["TEXTTEST_MIM_SERVER"] = ""
         CommandLineTraffic.envVarMethod = envVarMethod
-        CommandLineTraffic.origEnviron = deepcopy(os.environ)
+        CommandLineTraffic.origEnviron = environ
         CommandLineTraffic.origCwd = writeDir
         ClientSocketTraffic.destination = None
         # Assume testing client until a server contacts us

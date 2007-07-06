@@ -125,7 +125,6 @@ class EnvironmentReader:
         if isinstance(test, TestSuite):
             for subTest in test.testcases:
                 self.read(subTest, childReferenceVars)
-        test.tearDownEnvironment()
         self.diag.info("End Expanding " + test.name)
     def getPathVars(self):
         pathVars = [ "PATH" ]
@@ -138,27 +137,39 @@ class EnvironmentReader:
     def expandReferences(self, test, referenceVars = []):
         childReferenceVars = copy(referenceVars)
         for var, value in test.environment.items():
-            expValue = os.path.expandvars(value)
+            # Our own hacked version of expandvars, so as not to change the environment for real
+            # See top of plugins.py
+            expValue, selfRef = self.expandVariable(value, test)
             if expValue != value:
                 self.diag.info("Expanded variable " + var + " to " + expValue)
                 # Check for self-referential variables: don't multiple-expand
-                if value.find(var) == -1:
+                if not selfRef:
                     childReferenceVars.append((var, value))
                 test.setEnvironment(var, expValue)
-            test.setUpEnvVariable(var, expValue)
+            else:
+                self.diag.info("Variable " + var + " left as " + value)
         for var, value in referenceVars:
             self.diag.info("Trying reference variable " + var)
             if test.environment.has_key(var):
                 childReferenceVars.remove((var, value))
                 continue
-            expValue = os.path.expandvars(value)
-            if expValue != os.getenv(var):
+            expValue, selfRef = self.expandVariable(value, test)
+            if expValue != value:
                 test.setEnvironment(var, expValue)
                 self.diag.info("Adding reference variable " + var + " as " + expValue)
-                test.setUpEnvVariable(var, expValue)
             else:
                 self.diag.info("Not adding reference " + var + " as same as local value " + expValue)
         return childReferenceVars
+
+    def expandVariable(self, value, test):
+        testVar = os.path.expandvars(value, test.getEnvironment)
+        if testVar.find("$") == -1:
+            return testVar, False
+        # self-referential variables
+        if test.parent:
+            return os.path.expandvars(value, test.parent.getEnvironment), True
+        else:
+            return os.path.expandvars(value), True
     
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
@@ -173,7 +184,6 @@ class Test(plugins.Observable):
         self.parent = parent
         self.dircache = dircache
         self.paddedName = self.name
-        self.previousEnv = {}
         self.environment = MultiEntryDictionary()
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
@@ -305,8 +315,8 @@ class Test(plugins.Observable):
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse._getFileName([ self.dircache ], stem)
-    def getConfigValue(self, key, expandVars=True):
-        return self.app.getConfigValue(key, expandVars)
+    def getConfigValue(self, key, expandVars=True, getenvFunc=os.getenv):
+        return self.app.getConfigValue(key, expandVars, getenvFunc)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
         return self.app.getCompositeConfigValue(key, subKey)
     def makePathName(self, fileName):
@@ -370,32 +380,19 @@ class Test(plugins.Observable):
             test.notify("Add")
             self.parent.removeTest(self, False)
         self.parent.contentChanged()
-    def setUpEnvVariable(self, var, value):
-        if os.environ.has_key(var):
-            self.previousEnv[var] = os.environ[var]
-        os.environ[var] = value
-        self.diagnose("Setting " + var + " to " + os.environ[var])
-    def setUpEnvironment(self, parents=False):
-        if parents and self.parent:
-            self.parent.setUpEnvironment(parents)
+    def getRunEnvironment(self, onlyVars = []):
+        if self.parent:
+            environ = self.parent.getRunEnvironment(onlyVars)
+        else:
+            # deepcopy(os.environ) still seems to affect the environment in weird ways
+            environ = {}
+            for var, value in os.environ.items():
+                environ[var] = value
         for var, value in self.environment.items():
-            self.setUpEnvVariable(var, value)
-    def tearDownEnvironment(self, parents=0):
-        # Note this has no effect on the real environment, but can be useful for internal environment
-        # variables. It would be really nice if Python had a proper "unsetenv" function...
-        for var in self.previousEnv.keys():
-            self.diagnose("Restoring " + var + " to " + self.previousEnv[var])
-            os.environ[var] = self.previousEnv[var]
-        for var in self.environment.keys():
-            if not self.previousEnv.has_key(var):
-                # Set to empty string as a fake-remove. Some versions of
-                # python do not have os.unsetenv and hence del only has an internal
-                # effect. It's better to leave an empty value than to leak the set value
-                self.diagnose("Removing " + var)
-                os.environ[var] = ""
-                del os.environ[var]
-        if parents and self.parent:
-            self.parent.tearDownEnvironment(1)
+            if len(onlyVars) == 0 or (var in onlyVars):
+                environ[var] = value
+                self.diagnose("Setting " + var + " to " + value)
+        return environ
     def getIndent(self):
         relPath = self.getRelPath()
         if not len(relPath):
@@ -804,11 +801,6 @@ class TestSuite(Test):
         self.writeNewTestSuiteFile(contentFileName, currContent)
         return self.makeSubDirectory(testName)
     def addTestCaseWithPath(self, testPath):
-        self.setUpEnvironment()
-        newTest = self.addTestCaseWithPathAndEnv(testPath)
-        self.tearDownEnvironment()
-        return newTest
-    def addTestCaseWithPathAndEnv(self, testPath):
         pathElements = testPath.split("/", 1)
         subSuite = self.findSubtest(pathElements[0])
         if len(pathElements) == 1:
@@ -1157,14 +1149,8 @@ class Application:
         suite.readContents(filters, forTestRuns)
         self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
         suite.readEnvironment()
-        self.verifyWithEnvironment(suite) # make sure everything's OK, given the basic environment
+        self.configObject.checkSanity(suite) # allow the configurations to decide whether to accept the suite
         return suite
-    def verifyWithEnvironment(self, suite):
-        suite.setUpEnvironment()
-        try:
-            self.configObject.verifyWithEnvironment(suite)
-        finally:
-            suite.tearDownEnvironment()
     def description(self, includeCheckout = False):
         description = "Application " + self.fullName
         if len(self.versions):
@@ -1276,21 +1262,22 @@ class Application:
             header += "-"
         print header
         self.configObject.printHelpText()
-    def getConfigValue(self, key, expandVars=True):
+    def getConfigValue(self, key, expandVars=True, getenvFunc=os.getenv):
         value = self.configDir.get(key)
         if not expandVars:
             return value
         if type(value) == types.StringType:
-            return os.path.expandvars(value)
+            # See top of plugins.py, we redefined this one so we can use a different environment
+            return os.path.expandvars(value, getenvFunc)
         elif type(value) == types.ListType:
-            return map(os.path.expandvars, value)
+            return [ os.path.expandvars(element, getenvFunc) for element in value ]
         elif type(value) == types.DictType:
             newDict = {}
             for key, val in value.items():
                 if type(val) == types.StringType:
-                    newDict[key] = os.path.expandvars(val)
+                    newDict[key] = os.path.expandvars(val, getenvFunc)
                 elif type(val) == types.ListType:
-                    newDict[key] = map(os.path.expandvars, val)
+                    newDict[key] = [ os.path.expandvars(element, getenvFunc) for element in val ]
                 else:
                     newDict[key] = val
             return newDict

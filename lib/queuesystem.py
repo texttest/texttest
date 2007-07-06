@@ -541,15 +541,8 @@ class QueueSystemServer:
             slaveWriteDir = os.path.join(self.optionMap.diagWriteDir, "slave")
             runOptions.append("-xw " + slaveWriteDir)
         return " ".join(runOptions)
-    def getTestEnvironment(self, test, envVars):
-        envCopy = deepcopy(os.environ)
-        for var in envVars:
-            value = test.getEnvironment(var)
-            if value is not None:
-                envCopy[var] = value        
-        return envCopy
     def submitJob(self, test, submissionRules, command, \
-                  envVars = [ "TEXTTEST_VIRTUAL_DISPLAY", "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT" ]):
+                  envVars = [ "DISPLAY", "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT" ]):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
         self.diag.info("Creating job at " + plugins.localtime())
         queueSystem = self.getQueueSystem(test)
@@ -561,7 +554,7 @@ class QueueSystemServer:
         jobName = submissionRules.getJobName()
         self.diag.info("Creating job " + jobName + " with command arguments : " + repr(cmdArgs))
         process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   cwd=test.getDirectory(temporary=1), env=self.getTestEnvironment(test, envVars))
+                                   cwd=test.getDirectory(temporary=1), env=test.getRunEnvironment(envVars))
         stdout, stderr = process.communicate()
         errorMessage = self.findErrorMessage(stderr, queueSystem)
         if not errorMessage:

@@ -5,15 +5,7 @@ import default, plugins, os, subprocess
 class RunTest(default.RunTest):
     def __init__(self, hasAutomaticCputimeChecking):
         default.RunTest.__init__(self)
-        self.realDisplay = os.getenv("DISPLAY")
         self.hasAutomaticCputimeChecking = hasAutomaticCputimeChecking
-    def __call__(self, test):
-        if os.environ.has_key("TEXTTEST_VIRTUAL_DISPLAY"):
-            os.environ["DISPLAY"] = os.environ["TEXTTEST_VIRTUAL_DISPLAY"]
-        retValue = default.RunTest.__call__(self, test)
-        if self.realDisplay:
-            os.environ["DISPLAY"] = self.realDisplay
-        return retValue
     def getTestProcess(self, test):
         if not self.hasAutomaticCputimeChecking(test.app):
             return default.RunTest.getTestProcess(self, test) # Don't bother with this if we aren't measuring CPU time!
@@ -22,7 +14,7 @@ class RunTest(default.RunTest):
         self.diag.info("Running performance-test with args : " + repr(cmdArgs))
         stderrFile = test.makeTmpFileName("unixperf", forFramework=1)
         return subprocess.Popen(cmdArgs, stdin=open(os.devnull), cwd=test.getDirectory(temporary=1),\
-                                stdout=open(os.devnull, "w"), stderr=open(stderrFile, "w"))
+                                env=test.getRunEnvironment(), stdout=open(os.devnull, "w"), stderr=open(stderrFile, "w"))
     def getExecuteCommand(self, test):
         cmdParts = self.getCmdParts(test)
         testCommand = " ".join(cmdParts)

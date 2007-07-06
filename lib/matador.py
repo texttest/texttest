@@ -244,7 +244,7 @@ class PrintRuleValue(plugins.Action):
     def __repr__(self):
         return "Printing rule values for"
     def __call__(self, test):
-        rulesFile = os.path.join(os.environ["CARMUSR"], "LOCAL_PLAN", getOption(test, "-s"), "APC_FILES", "rules")
+        rulesFile = os.path.join(test.getEnvironment("CARMUSR"), "LOCAL_PLAN", getOption(test, "-s"), "APC_FILES", "rules")
         for line in open(rulesFile).xreadlines():
             if line.find(self.variable + " TRUE") != -1:
                 print test.getIndent() + self.variable + " in " + repr(test)   

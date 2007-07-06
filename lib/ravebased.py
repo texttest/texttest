@@ -211,11 +211,11 @@ class Config(CarmenConfig):
             return "-debug"
         else:
             return "-optimize"
-    def verifyWithEnvironment(self, suite):
-        CarmenConfig.verifyWithEnvironment(self, suite)
+    def checkSanity(self, suite):
+        CarmenConfig.checkSanity(self, suite)
         if self.optionMap.has_key("build"):
             builder = BuildCode(self.optionValue("build"))
-            builder.build(suite.app)
+            builder.build(suite.app, suite.getEnvironment("CARMSYS"))
     def _getLocalPlanPath(self, test):
         # Key assumption : to avoid reading Carmen Resource system LocalPlanPath
         # If this does not hold changing the CARMUSR is needed
@@ -267,7 +267,7 @@ class Config(CarmenConfig):
                             "carmusr_default", "crc", "modules", getBasicRaveName(test))
     def filesFromSubplan(self, test, subplanDir):
         return []
-    def ensureDebugLibrariesExist(self, app):
+    def ensureDebugLibrariesExist(self, test):
         pass
     def setEnvironment(self, test):
         CarmenConfig.setEnvironment(self, test)
@@ -300,15 +300,18 @@ class Config(CarmenConfig):
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
         app.addConfigEntry("ruleset_compiled", "white", "test_colours")
 
-def getProductName(test):
-    return os.popen(". $CARMSYS/CONFIG > /dev/null 2>&1; echo $PRODUCT").read().strip()
+def getEnvVarFromCONFIG(var, test):
+    cmdLine = ". " + test.getEnvironment("CARMSYS") + "/CONFIG > /dev/null 2>&1; echo $" + var
+    runEnv = test.getRunEnvironment(getCrcCompileVars())
+    proc = subprocess.Popen(cmdLine, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=runEnv)
+    return proc.communicate()[0].strip()
 
 def getRaveNames(test):
     raveNameDir = test.getConfigValue("rave_name")
     if len(raveNameDir) == 1:
         return raveNameDir["default"]
     else:
-        return test.getCompositeConfigValue("rave_name", getProductName(test))
+        return test.getCompositeConfigValue("rave_name", getEnvVarFromCONFIG("PRODUCT", test))
 
 def getBasicRaveName(test):
     return test.getConfigValue("rave_name")["default"][0]
@@ -330,6 +333,9 @@ class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
             self.collatePath(test, "$CARMDATA", self.partialCopyTestPath)
         else:
             self.collatePath(test, "$CARMUSR", self.partialCopyTestPath)
+
+def getCrcCompileVars():
+    return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMGROUP", "_AUTOTEST__LOCAL_COMPILE_" ] 
     
 class RuleBuildActivator(Activator):
     def run(self):
@@ -365,7 +371,7 @@ class RuleBuildActivator(Activator):
         submissionRules = test.app.getRaveSubmissionRules(test)
         remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
         test.changeState(NeedRuleCompilation(rulecomp))
-        rulecompEnvVars = [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMGROUP", "_AUTOTEST__LOCAL_COMPILE_" ] 
+        rulecompEnvVars = getCrcCompileVars()
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
             print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for test " + test.uniqueName + ")", postText
@@ -557,7 +563,7 @@ class CompileRules(plugins.Action):
 
             commandArgs = ruleset.getCompilationArgs(remote=False)
             if ruleset.modeString == "-debug":
-                test.app.ensureDebugLibrariesExist()
+                test.app.ensureDebugLibrariesExist(test)
             success, currRaveInfo = self.performCompile(test, commandArgs)
             if success:
                 ruleset.succeeded(currRaveInfo)
@@ -565,9 +571,10 @@ class CompileRules(plugins.Action):
                 ruleset.failed(currRaveInfo)
     def performCompile(self, test, commandArgs):
         self.diag.info("Compiling with command '" + repr(commandArgs) + "' from directory " + os.getcwd())
-        self.diag.info("PATH is " + os.getenv("PATH"))
+        runEnv = test.getRunEnvironment(getCrcCompileVars())
+        self.diag.info("PATH is " + runEnv.get("PATH"))
         test.changeState(RunningRuleCompilation(test.state))
-        proc = subprocess.Popen(commandArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(commandArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=runEnv)
         raveInfo = proc.communicate()[0] # wait to finish
         if proc.returncode:
             return False, raveInfo
@@ -807,7 +814,7 @@ class BuildCode:
     buildFailedDirs = {}
     def __init__(self, target):
         self.target = target
-    def build(self, app):
+    def build(self, app, carmsys):
         targetDir = app.getConfigValue("build_targets")
         if not targetDir.has_key(self.target):
             return
@@ -825,7 +832,7 @@ class BuildCode:
                       + "(Build in " + absPath + " on " + arch + ")"
             
             if os.path.isdir(absPath):
-                self.buildLocal(absPath, app, makeTargets)
+                self.buildLocal(absPath, app, makeTargets, carmsys)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
     def getPathAndTargets(self, optValue):
@@ -863,7 +870,7 @@ class BuildCode:
         if arch == "sparc_64" or arch == "x86_64_linux":
             commandLine = "setenv BITMODE 64; " + commandLine
         return commandLine
-    def buildLocal(self, absPath, app, makeTargets):
+    def buildLocal(self, absPath, app, makeTargets, carmsys):
         arch = getArchitecture(app)
         buildFile = os.path.join(absPath, "build.default." + arch)
         extra = ""
@@ -881,11 +888,11 @@ class BuildCode:
         print "Product", app, "built correctly in", absPath
         self.builtDirs[arch].append(absPath)
         os.remove(buildFile)
-        if os.environ.has_key("CARMSYS"):
-            makeCommand = "gmake install " + extra + "CARMSYS=" + os.environ["CARMSYS"]
+        if carmsys:
+            makeCommand = "gmake install " + extra + "CARMSYS=" + carmsys
             commandLine = self.getRemoteCommandLine(arch, absPath, makeCommand)
             os.system("rsh " + machine + " '" + commandLine + "' < /dev/null > /dev/null 2>&1")
-            print "Making install from", absPath ,"to", os.environ["CARMSYS"]
+            print "Making install from", absPath ,"to", carmsys
     def checkBuildFile(self, buildFile):
         for line in open(buildFile).xreadlines():
             if line.find("***") != -1 and line.find("Error") != -1:
@@ -912,7 +919,7 @@ class TraverseCarmUsers(plugins.Action):
     def __repr__(self):
         return "Traversing CARMUSR "
     def __call__(self, test):
-        user = os.environ["CARMUSR"]
+        user = test.getEnvironment("CARMUSR")
         if self.traversedUsers.has_key(user):
             return
         self.traversedUsers[user] = 1

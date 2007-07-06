@@ -84,10 +84,8 @@ class ApplicationRunner:
     def addExtraTest(self, testPath):
         return self.testSuite.addTestCaseWithPath(testPath)
     def setUpApplications(self, sequence):
-        self.testSuite.setUpEnvironment()
         for action in sequence:
             self.setUpApplicationFor(action)
-        self.testSuite.tearDownEnvironment()
     def setUpApplicationFor(self, action):
         self.diag.info("Performing " + str(action) + " set up on " + repr(self.testSuite.app))
         try:
@@ -120,7 +118,6 @@ class ApplicationRunner:
         for action in actionsToTearDown:
             self.diag.info(str(action) + " tear down " + repr(suite))
             action.tearDownSuite(suite)
-        suite.tearDownEnvironment()
         self.suitesSetUp[suite] = []
     
     def getActionSequence(self, script):
@@ -187,7 +184,6 @@ class TestRunner:
         for suite in tearDownSuites:
             self.handleExceptions(previousTestRunner.appRunner.tearDownSuite, suite)
         for suite in setUpSuites:
-            suite.setUpEnvironment()
             self.appRunner.markForSetUp(suite)
         abandon = self.test.state.shouldAbandon()
         while len(self.actionSequence):
@@ -235,10 +231,7 @@ class TestRunner:
                 # Don't attempt to retry the action, mark complete
                 return completed, tryOthers 
     def callAction(self, action):
-        self.test.setUpEnvironment()
-        retValue = self.handleExceptions(self.test.callAction, action)
-        self.test.tearDownEnvironment()
-        return retValue
+        return self.handleExceptions(self.test.callAction, action)
     def findSuitesToChange(self, previousTestRunner):
         tearDownSuites = []
         commonAncestor = None

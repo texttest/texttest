@@ -1,7 +1,7 @@
 
 import plugins, os, sys, shutil, types, time, paths, subprocess, operator
 from jobprocess import JobProcess
-from copy import copy
+from copy import copy, deepcopy
 from threading import Thread
 from glob import glob
 global scriptEngine
@@ -199,32 +199,28 @@ class InteractiveAction(plugins.Observable):
             return [ "python", plugins.textTestName ] # Windows isn't clever enough to figure out how to run Python programs...
         else:
             return [ plugins.textTestName ]
-    def startExternalProgram(self, cmdArgs, description = "", outfile=os.devnull, errfile=os.devnull, \
+    def startExternalProgram(self, cmdArgs, description = "", env=None, outfile=os.devnull, errfile=os.devnull, \
                              exitHandler=None, exitHandlerArgs=()):
-        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=open(outfile, "w"), stderr=open(errfile, "w"), \
+        process = subprocess.Popen(cmdArgs, env=env, stdin=open(os.devnull), stdout=open(outfile, "w"), stderr=open(errfile, "w"), \
                                    startupinfo=plugins.getProcessStartUpInfo())
         processTerminationMonitor.addMonitoring(process, description, exitHandler, exitHandlerArgs)
         return process
     def startExtProgramNewUsecase(self, cmdArgs, usecase, outfile, errfile, \
-                                  exitHandler, exitHandlerArgs, description = ""): 
+                                  exitHandler, exitHandlerArgs, description = ""):
+        environ = deepcopy(os.environ)
         recScript = os.getenv("USECASE_RECORD_SCRIPT")
         if recScript:
-            os.environ["USECASE_RECORD_SCRIPT"] = plugins.addLocalPrefix(recScript, usecase)
+            environ["USECASE_RECORD_SCRIPT"] = plugins.addLocalPrefix(recScript, usecase)
         repScript = os.getenv("USECASE_REPLAY_SCRIPT")
         if repScript:
             # Dynamic GUI might not record anything (it might fail) - don't try to replay files that
             # aren't there...
             dynRepScript = plugins.addLocalPrefix(repScript, usecase)
             if os.path.isfile(dynRepScript):
-                os.environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
+                environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
             else:
-                del os.environ["USECASE_REPLAY_SCRIPT"]
-        process = self.startExternalProgram(cmdArgs, description, outfile, errfile, exitHandler, exitHandlerArgs)
-        if recScript:
-            os.environ["USECASE_RECORD_SCRIPT"] = recScript
-        if repScript:
-            os.environ["USECASE_REPLAY_SCRIPT"] = repScript
-        return process
+                del environ["USECASE_REPLAY_SCRIPT"]
+        return self.startExternalProgram(cmdArgs, description, environ, outfile, errfile, exitHandler, exitHandlerArgs)
     def describe(self, testObj, postText = ""):
         guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     def startPerform(self):
@@ -326,10 +322,10 @@ class InteractiveTestAction(InteractiveAction):
             return self.updateForState(test, state)
         else:
             return False, False
-    def startViewer(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=()):
+    def startViewer(self, cmdArgs, description = "", env=None, exitHandler=None, exitHandlerArgs=()):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
-        process = self.startExternalProgram(cmdArgs, fullDesc, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        process = self.startExternalProgram(cmdArgs, fullDesc, env=env, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
         return process
     def testDescription(self):

@@ -375,12 +375,12 @@ class Config:
             raise plugins.TextTestError, "could not create absolute checkout from relative path '" + checkoutPath + "'"
         elif not os.path.isdir(checkoutPath):
             raise plugins.TextTestError, "checkout '" + checkoutPath + "' does not exist"
-    def verifyWithEnvironment(self, suite):
+    def checkSanity(self, suite):
         if suite.size() == 0 and not self.allowEmpty():
             raise plugins.TextTestError, "no tests matching the selection criteria found."
 
         if not self.ignoreBinary() and not self.optionMap.has_key("gx"):
-            self.checkBinaryExists(suite.app)
+            self.checkBinaryExists(suite)
         
         self.checkConfigSanity(suite.app)
         batchSession = self.optionMap.get("b")
@@ -391,11 +391,11 @@ class Config:
             reconnector = ReconnectApp()
             self.reconnDir = reconnector.findReconnectDir(suite.app, self.optionValue("reconnect"))
             
-    def checkBinaryExists(self, app):
-        binary = app.getConfigValue("binary")
+    def checkBinaryExists(self, suite):
+        binary = suite.app.getConfigValue("binary", getenvFunc=suite.getEnvironment)
         if not binary:
             raise plugins.TextTestError, "config file entry 'binary' not defined"
-        if self.binaryShouldBeFile(app, binary) and not os.path.isfile(binary):
+        if self.binaryShouldBeFile(suite.app, binary) and not os.path.isfile(binary):
             raise plugins.TextTestError, binary + " has not been built."
     def binaryShouldBeFile(self, app, binary):
         # For finding java classes, don't warn if they don't exist as files...
@@ -687,10 +687,10 @@ class TestEnvironmentCreator:
             finder = VirtualDisplayFinder(self.test.app)
             display = finder.getDisplay()
             if display:
-                self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", display)
+                self.test.setEnvironment("DISPLAY", display)
                 print "Tests will run with DISPLAY variable set to", display
         else:
-            self.test.setEnvironment("TEXTTEST_VIRTUAL_DISPLAY", "HIDE_WINDOWS")
+            self.test.setEnvironment("DISPLAY", "HIDE_WINDOWS")
     def setVirtualDisplay(self):
         # Set a virtual display for the top level test
         # Don't set it if we've requested a slow motion replay or we're trying to record a new usecase.
@@ -813,28 +813,25 @@ class PrepareWriteDirectory(plugins.Action):
             
         envVarToSet = self.findEnvironmentVariable(test, configName)
         if envVarToSet:
-            prevEnv = test.getEnvironment(envVarToSet)
             self.diag.info("Setting env. variable " + envVarToSet + " to " + target)
             test.setEnvironment(envVarToSet, target)
-            if prevEnv:
-                test.previousEnv[envVarToSet] = prevEnv
     def collateExistingPath(self, test, sourcePath, target, collateMethod):
         self.diag.info("Path for linking/copying at " + sourcePath)
         plugins.ensureDirExistsForFile(target)
         collateMethod(test, sourcePath, target)
-    def getEnvironmentSourcePath(self, configName):
-        pathName = self.getPathFromEnvironment(configName)
+    def getEnvironmentSourcePath(self, configName, test):
+        pathName = self.getPathFromEnvironment(configName, test)
         if pathName != configName:
             return pathName
-    def getPathFromEnvironment(self, configName):
-        return os.path.normpath(os.path.expandvars(configName))
+    def getPathFromEnvironment(self, configName, test):
+        return os.path.normpath(os.path.expandvars(configName, test.getEnvironment))
     def getTargetPath(self, test, configName):
         # handle environment variables
-        localName = os.path.basename(self.getPathFromEnvironment(configName))
+        localName = os.path.basename(self.getPathFromEnvironment(configName, test))
         return test.makeTmpFileName(localName, forComparison=0)
     def getSourcePath(self, test, configName):
         # These can refer to environment variables or to paths within the test structure
-        fileName = self.getSourceFileName(configName)
+        fileName = self.getSourceFileName(configName, test)
         if not fileName or os.path.isabs(fileName):
             return fileName
         
@@ -843,9 +840,9 @@ class PrepareWriteDirectory(plugins.Action):
             return pathName
         else:
             return self.getSourceFromSearchPath(test, fileName, configName)
-    def getSourceFileName(self, configName):
+    def getSourceFileName(self, configName, test):
         if configName.startswith("$"):
-            return self.getEnvironmentSourcePath(configName)
+            return self.getEnvironmentSourcePath(configName, test)
         else:
             return configName
     def getSourceFromSearchPath(self, test, fileName, configName):
@@ -1237,7 +1234,8 @@ class RunTest(plugins.Action):
     def getOptions(self, test):
         optionsFile = test.getFileName("options")
         if optionsFile:
-            return os.path.expandvars(open(optionsFile).read().strip())
+            # Our own version, see plugins.py
+            return os.path.expandvars(open(optionsFile).read().strip(), test.getEnvironment)
         else:
             return ""
     def getTestProcess(self, test):
@@ -1245,13 +1243,13 @@ class RunTest(plugins.Action):
         self.diag.info("Running test with args : " + repr(commandArgs))
         return subprocess.Popen(commandArgs, stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
                                 stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
-                                startupinfo=plugins.getProcessStartUpInfo(testProcess=True))
+                                env=test.getRunEnvironment(), startupinfo=plugins.getProcessStartUpInfo(testProcess=True))
     def getCmdParts(self, test):
         args = []
         interpreter = test.getConfigValue("interpreter")
         if interpreter:
             args.append(interpreter)
-        args.append(test.getConfigValue("binary"))
+        args.append(test.getConfigValue("binary", getenvFunc=test.getEnvironment))
         args.append(self.getOptions(test))
         return args
     def getExecuteCmdArgs(self, test):

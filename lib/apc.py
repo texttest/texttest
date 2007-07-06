@@ -210,16 +210,16 @@ class ApcConfig(optimization.OptimizationConfig):
             if option.find("crc" + os.sep + "rule_set") != -1:
                 return [ os.path.basename(option) ]
         return []
-    def ensureDebugLibrariesExist(self, app):
+    def ensureDebugLibrariesExist(self, test):
         libraries = [ ("data/crc", "librave_rts.a", "librave_rts_g.a"),
                       ("data/crc", "librave_private.a", "librave_private_g.a"),
                       ("lib", "libDMFramework.so", "libDMFramework_g.so"),
                       ("lib", "libBasics_Foundation.so", "libBasics_Foundation_g.so"),
                       ("lib", "libBasics_errlog.so", "libBasics_errlog_g.so")]
         for libpath, orig, debug in libraries:
-            debugLib = os.path.join(os.environ["CARMSYS"], libpath, getArchitecture(app), debug)
+            debugLib = os.path.join(test.getEnvironment("CARMSYS"), libpath, getArchitecture(test.app), debug)
             if not os.path.exists(debugLib):
-                origLib = os.path.join(os.environ["CARMSYS"], libpath, getArchitecture(app), orig)
+                origLib = os.path.join(test.getEnvironment("CARMSYS"), libpath, getArchitecture(test.app), orig)
                 os.symlink(origLib, debugLib)
     def printHelpDescription(self):
         print helpDescription
@@ -252,19 +252,20 @@ class CheckFilesForApc(plugins.Action):
     def __call__(self, test):
         # A hack to get around that the etable reading doesn't work 100%.
         try:
-            verifyAirportFile(getArchitecture(test.app))
+            verifyAirportFile(test)
         except TypeError:
             print "Failed to find AirportFile in etables. Not verifying airportFile."
-        verifyLogFileDir(getArchitecture(test.app))
+        verifyLogFileDir(test)
         os.environ["TEXTTEST_TEST_RELPATH"] = test.getRelPath()
 
-def verifyAirportFile(arch):
+def verifyAirportFile(test):
     diag = plugins.getDiagnostics("APC airport")
-    etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
+    carmusr = test.getEnvironment("CARMUSR")
+    etabPath = os.path.join(carmusr, "Resources", "CarmResources")
     customerEtab = os.path.join(etabPath, "Customer.etab")
     if os.path.isfile(customerEtab):
         diag.info("Reading etable at " + customerEtab)
-        etab = ConfigEtable(customerEtab)
+        etab = ConfigEtable(customerEtab, test.getEnvironment)
         airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
         if airportFile != None and os.path.isfile(airportFile):
             return
@@ -273,23 +274,25 @@ def verifyAirportFile(arch):
         if srcDir == None:
             srcDir = etab.getValue("default", "AirpMaint", "AirportSourceDir")
         if srcDir == None:
-            srcDir = os.path.join(os.environ["CARMUSR"], "data", "Airport", "source")
+            srcDir = os.path.join(carmusr, "data", "Airport", "source")
         srcFile = os.path.join(srcDir, "AirportFile")
         if os.path.isfile(srcFile) and airportFile != None:
-            apCompile = os.path.join(os.environ["CARMSYS"], "bin", arch, "apcomp")
+            arch = getArchitecture(test.app)
+            carmsys = test.getEnvironment("CARMSYS")
+            apCompile = os.path.join(carmsys, "bin", arch, "apcomp")
             if os.path.isfile(apCompile):
                 print "Missing AirportFile detected, building:", airportFile
                 plugins.ensureDirExistsForFile(airportFile)
                 # We need to source the CONFIG file in order to get some
                 # important environment variables set, i.e. PRODUCT and BRANCH.
-                configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
+                configFile = os.path.join(carmsys, "CONFIG")
                 os.system(". " + configFile + "; " + apCompile + " " + srcFile + " > " + airportFile)
             if os.path.isfile(airportFile):
                 return
     raise plugins.TextTestError, "Failed to find AirportFile"
 
-def verifyLogFileDir(arch):
-    carmTmp = os.environ["CARMTMP"]
+def verifyLogFileDir(test):
+    carmTmp = test.getEnvironment("CARMTMP")
     if os.path.isdir(carmTmp):
         logFileDir = carmTmp + "/logfiles"
         if not os.path.isdir(logFileDir):
@@ -394,7 +397,8 @@ class RunApcTestInDebugger(default.RunTest):
         gdbArgs = test.makeTmpFileName("gdb_args")
         gdbArgsFile = open(gdbArgs, "w")
         gdbArgsFile.write("set pagination off" + os.linesep)
-        gdbArgsFile.write(os.path.expandvars("set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep))
+        cmdLine = "set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep
+        gdbArgsFile.write(os.path.expandvars(cmdLine, test.getEnvironment))
         if not self.noRun:
             gdbArgsFile.write("run" + os.linesep)
             gdbArgsFile.write("if $_exitcode" + os.linesep)
@@ -410,7 +414,7 @@ class RunApcTestInDebugger(default.RunTest):
         outFile.write("SUBPLAN " + opts[0] + os.linesep)
         outFile.close()
         # Create execute command.
-        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
+        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
         if test.app.raveMode() == "-debug":
             binName += "_g"
         if self.inXEmacs:
@@ -438,8 +442,8 @@ class RunApcTestInDebugger(default.RunTest):
         # Change to running state, without an associated process
         self.changeToRunningState(test, None)
         # Source the CONFIG file to get the environment correct and run gdb with the script.
-        configFile = os.path.join(os.environ["CARMSYS"], "CONFIG")
-        os.system(". " + configFile + "; " + executeCommand)
+        configFile = os.path.join(test.getEnvironment("CARMSYS"), "CONFIG")
+        subprocess.call(". " + configFile + "; " + executeCommand, env=test.getRunEnvironment(), shell=True)
         # Remove the temp files, texttest will compare them if we dont remove them.
         os.remove(gdbArgs)
         if not self.keepTmps:
@@ -506,7 +510,7 @@ class CreateHTMLFiles(plugins.Action):
         subplanPath = os.path.realpath(test.makeTmpFileName("APC_FILES", forComparison=0))
         xmlFile = os.path.join(subplanPath, "optinfo.xml")
         if os.path.isfile(xmlFile):
-            carmsys = os.environ["CARMSYS"]
+            carmsys = test.getEnvironment("CARMSYS")
             scriptFile = os.path.join(carmsys, test.app.getConfigValue("xml_script_file"))
             runStatusFiles = os.path.join(subplanPath, "run_status")
             xmlAllFile = os.path.join(subplanPath, "optinfo_all.xml")
@@ -544,7 +548,7 @@ class GoogleProfileExtract(plugins.Action):
         datafile = test.makeTmpFileName("profiledata", forFramework=0)
         profilefile = test.makeTmpFileName("profile", forFramework=0)
         opts = test.getWordsInFile("options")
-        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)))
+        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
         command = "/users/johani/bin/pprof --text " + binName + " " + datafile + " > " + profilefile
         # Have to make sure it runs on a 32-bit machine.
         os.system("rsh abbeville \"" + command + "\"")
@@ -553,9 +557,8 @@ class MarkApcLogDir(RunWithParallelAction):
     def __init__(self, isExecutable, hasAutomaticCpuTimeChecking, keepLogs):
         RunWithParallelAction.__init__(self, isExecutable, hasAutomaticCpuTimeChecking)
         self.keepLogs = keepLogs
-    def getApcHostTmp(self):
-        configFile = os.path.join(os.environ["CARMSYS"],"CONFIG")
-        resLine = os.popen(". " + configFile + "; echo ${APC_TEMP_DIR}").readlines()[-1].strip()
+    def getApcHostTmp(self, test):
+        resLine = ravebased.getEnvVarFromCONFIG("APC_TEMP_DIR", test)
         if resLine.find("/") != -1:
             return resLine
         return "/tmp"
@@ -564,7 +567,7 @@ class MarkApcLogDir(RunWithParallelAction):
         subplanPath = os.path.realpath(test.makeTmpFileName("APC_FILES", forComparison=0))
         subplanName, apcFiles = os.path.split(subplanPath)
         baseSubPlan = os.path.basename(subplanName)
-        apcHostTmp = self.getApcHostTmp()
+        apcHostTmp = self.getApcHostTmp(test)
         if pid:
             logdir = os.path.join(apcHostTmp, baseSubPlan + "_" + gethostname() + "_" + pid)
             if os.path.isdir(logdir):
@@ -614,7 +617,7 @@ class ExtractApcLogs(plugins.Action):
             print "No argument given, using default value for extract_logs"
             self.args = "default"
     def __call__(self, test):
-        if os.getenv("DONTEXTRACTAPCLOG"):
+        if test.getEnvironment("DONTEXTRACTAPCLOG"):
             self.diag.info("Environment DONTEXTRACTAPCLOG is set, not extracting.")
             return
         apcTmpDir = test.makeTmpFileName("apc_tmp_dir", forComparison=0)
@@ -823,7 +826,7 @@ class MakeProgressReport(optimization.MakeProgressReport):
                 if groupParameter == "pf":
                     self.groupPenaltyQualityFactor[groupName] = float(groupValue)
     def compare(self, test, referenceRun, currentRun):
-        userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
+        userName = os.path.normpath(test.getEnvironment("CARMUSR")).split(os.sep)[-1]
         if not self.kpiGroupForTest.has_key(test.name):
             return
         groupName = self.kpiGroupForTest[test.name]
@@ -1328,10 +1331,10 @@ class PrintAirport(plugins.Action):
     def setUpSuite(self, suite):
         if suite.name == "picador":
             return
-        etabPath = os.path.join(os.environ["CARMUSR"], "Resources", "CarmResources")
+        etabPath = os.path.join(suite.getEnvironment("CARMUSR"), "Resources", "CarmResources")
         customerEtab = os.path.join(etabPath, "Customer.etab")
         if os.path.isfile(customerEtab):
-            etab = ConfigEtable(customerEtab)
+            etab = ConfigEtable(customerEtab, suite.getEnvironment)
             airportFile = etab.getValue("default", "AirpMaint", "AirportFile")
             if airportFile != None:
                 self.describe(suite, ": " + airportFile)
@@ -1904,12 +1907,13 @@ class ApcTestTable(optimization.TestTable):
 # This class reads a CarmResources etab file and gives access to it
 #
 class ConfigEtable:
-    def __init__(self, fileName):
+    def __init__(self, fileName, getenvFunc):
         self.inFile = open(fileName)
         self.applications = {}
         self.columns = self._readColumns()
         self.parser = ConfigEtableParser(self.inFile)
         self.diag = plugins.getDiagnostics("ConfigEtable")
+        self.getenvFunc = getenvFunc
         lineTuple = self._readTuple()
         while lineTuple != None:
             self._storeValue(lineTuple[0], lineTuple[1], lineTuple[2], lineTuple[4])
@@ -1988,7 +1992,7 @@ class ConfigEtable:
             return self._etabExpand(whole)
         else:
             whole = "${" + value[2:lPos] + "}" + self._etabExpand(value[lPos + 1:])
-            return os.path.expandvars(whole)
+            return os.path.expandvars(whole, self.getenvFunc)
 
 class ConfigEtableParser:
     def __init__(self, infile):

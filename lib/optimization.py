@@ -240,7 +240,7 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         else:
             return modPathsBasic
     def getModPathsFromSubplan(self, test, carmdataSource):
-        if os.environ.has_key("DISABLE_TMP_DIR_CREATION"):
+        if test.getEnvironment("DISABLE_TMP_DIR_CREATION"):
             return {}
 
         subplan = self.subplanFunction(test)
@@ -826,7 +826,7 @@ class MakeProgressReport(plugins.Action):
         else:
             return "NaN%"
     def compare(self, test, referenceRun, currentRun):
-        userName = os.path.normpath(os.environ["CARMUSR"]).split(os.sep)[-1]
+        userName = os.path.basename(os.path.normpath(test.getEnvironment("CARMUSR")))
         self.doCompare(referenceRun, currentRun, test.app, test.name, userName)
     def doCompare(self, referenceRun, currentRun, app, groupName, userName, groupNameDefinition = "test",appSpecificData=None):
         if currentRun.isVeryShort() or referenceRun.isVeryShort():
@@ -1886,25 +1886,22 @@ class StartStudio(guiplugins.InteractiveTestAction):
         self.optionGroup.setOptionValue("sys", self.currentTest.getEnvironment("CARMSYS"))
         return False, False
     def performOnCurrent(self):
-        self.currentTest.setUpEnvironment(parents=1)
-        try:
-            os.environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
-            print "CARMSYS:", os.environ["CARMSYS"]
-            print "CARMUSR:", os.environ["CARMUSR"]
-            print "CARMTMP:", os.environ["CARMTMP"]
-            fullSubPlanPath = self.currentTest.app._getSubPlanDirName(self.currentTest)
-            lPos = fullSubPlanPath.find("LOCAL_PLAN/")
-            subPlan = fullSubPlanPath[lPos + 11:]
-            localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
-            studio = os.path.join(os.environ["CARMSYS"], "bin", "studio")
-            if not os.path.isfile(studio):
-                raise plugins.TextTestError, "Cannot start studio, no file at " + studio
-            cmdArgs = [ studio, "-w", "-p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'" ]
-            process = self.startViewer(cmdArgs, description="Studio on " + subPlan)
-            guiplugins.scriptEngine.monitorProcess("runs studio", process)
-        finally:
-            self.currentTest.tearDownEnvironment(parents=1)
-
+        environ = self.currentTest.getRunEnvironment([ "CARMUSR", "CARMTMP" ])
+        environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
+        print "CARMSYS:", environ["CARMSYS"]
+        print "CARMUSR:", environ["CARMUSR"]
+        print "CARMTMP:", environ["CARMTMP"]
+        fullSubPlanPath = self.currentTest.app._getSubPlanDirName(self.currentTest)
+        lPos = fullSubPlanPath.find("LOCAL_PLAN/")
+        subPlan = fullSubPlanPath[lPos + 11:]
+        localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
+        studio = os.path.join(environ["CARMSYS"], "bin", "studio")
+        if not os.path.isfile(studio):
+            raise plugins.TextTestError, "Cannot start studio, no file at " + studio
+        cmdArgs = [ studio, "-w", "-p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'" ]
+        process = self.startViewer(cmdArgs, description="Studio on " + subPlan, env=environ)
+        guiplugins.scriptEngine.monitorProcess("runs studio", process)
+        
 guiplugins.interactiveActionHandler.actionStaticClasses += [ StartStudio ]
 
 class CVSLogInGUI(guiplugins.InteractiveTestAction):

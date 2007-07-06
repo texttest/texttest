@@ -365,7 +365,7 @@ class RuleBuildActivator(Activator):
         submissionRules = test.app.getRaveSubmissionRules(test)
         remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
         test.changeState(NeedRuleCompilation(rulecomp))
-        rulecompEnvVars = [ "CARMSYS", "CARMUSR", "CARMTMP", "_AUTOTEST__LOCAL_COMPILE_" ] 
+        rulecompEnvVars = [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMGROUP", "_AUTOTEST__LOCAL_COMPILE_" ] 
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
             print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for test " + test.uniqueName + ")", postText

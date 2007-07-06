@@ -29,22 +29,23 @@ class SetUpTrafficHandlers(plugins.Action):
     def configureServer(self, test):
         recordFile = test.makeTmpFileName("traffic")
         envVarMethod = MethodWrap(test.getCompositeConfigValue, "collect_traffic_environment")
+        writeDir = test.getDirectory(temporary=1)
         if self.record:
-            self.setServerState(recordFile, None, envVarMethod)
+            self.setServerState(recordFile, None, envVarMethod, writeDir)
             return True
         else:
             trafficReplay = test.getFileName("traffic")
             if trafficReplay:
-                self.setServerState(recordFile, trafficReplay, envVarMethod)
+                self.setServerState(recordFile, trafficReplay, envVarMethod, writeDir)
                 return True
             else:
-                self.setServerState(None, None, envVarMethod)
+                self.setServerState(None, None, envVarMethod, writeDir)
                 return False
-    def setServerState(self, recordFile, replayFile, envVarMethod):
+    def setServerState(self, recordFile, replayFile, envVarMethod, writeDir):
         if recordFile or replayFile and not TrafficServer.instance:
             TrafficServer.instance = TrafficServer()
         if TrafficServer.instance:
-            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod)
+            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod, writeDir)
     def makeIntercepts(self, test):
         for cmd in test.getConfigValue("collect_traffic"):
             linkName = test.makeTmpFileName(cmd, forComparison=0)
@@ -141,18 +142,20 @@ class CommandLineTraffic(Traffic):
     direction = "<-"
     envVarMethod = None
     origEnviron = {}
+    origCwd = None
     realCommands = {}
     def __init__(self, inText, responseFile):
+        self.diag = plugins.getDiagnostics("Traffic Server")
         cmdText, environText, cmdCwd = inText.split(":SUT_SEP:")
         argv = eval(cmdText)
         self.cmdEnviron = eval(environText)
         self.cmdCwd = cmdCwd
+        self.diag.info("Received command with cwd = " + cmdCwd)
         self.fullCommand = argv[0].replace("\\", "/")
         self.commandName = os.path.basename(self.fullCommand)
         self.cmdArgs = argv[1:]
         self.argStr = " ".join(map(self.quote, argv[1:]))
         self.environ = self.filterEnvironment(self.cmdEnviron)
-        self.diag = plugins.getDiagnostics("Traffic Server")
         self.path = self.cmdEnviron.get("PATH")
         text = self.getEnvString() + self.commandName + " " + self.argStr
         Traffic.__init__(self, text, responseFile)
@@ -164,9 +167,12 @@ class CommandLineTraffic(Traffic):
                 interestingEnviron.append((var, value))
         return interestingEnviron
     def getEnvString(self):
+        recStr = ""
+        if self.cmdCwd != self.origCwd:
+            recStr += "cd " + self.cmdCwd + "; "
         if len(self.environ) == 0:
-            return ""
-        recStr = "env "
+            return recStr
+        recStr += "env "
         for var, value in self.environ:
             recLine = "'" + var + "=" + value + "' "
             oldVal = self.origEnviron.get(var)
@@ -261,7 +267,7 @@ class TrafficServer(TCPServer):
     def setRealVersion(self, command, realCommand):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
-    def setState(self, recordFile, replayFile, envVarMethod):
+    def setState(self, recordFile, replayFile, envVarMethod, writeDir):
         self.recordFile = recordFile
         self.replayInfo = ReplayInfo(replayFile)
         if recordFile or replayFile:
@@ -270,6 +276,7 @@ class TrafficServer(TCPServer):
             os.environ["TEXTTEST_MIM_SERVER"] = ""
         CommandLineTraffic.envVarMethod = envVarMethod
         CommandLineTraffic.origEnviron = deepcopy(os.environ)
+        CommandLineTraffic.origCwd = writeDir
         ClientSocketTraffic.destination = None
         # Assume testing client until a server contacts us
         ClientSocketTraffic.direction = "<-"

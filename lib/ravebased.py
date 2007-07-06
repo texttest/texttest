@@ -864,9 +864,8 @@ class BuildCode:
             commandLine = "setenv BITMODE 64; " + commandLine
         return commandLine
     def buildLocal(self, absPath, app, makeTargets):
-        os.chdir(absPath)
         arch = getArchitecture(app)
-        buildFile = "build.default." + arch
+        buildFile = os.path.join(absPath, "build.default." + arch)
         extra = ""
         if app.raveMode() == "-debug":
             extra = "VERSION=debug "

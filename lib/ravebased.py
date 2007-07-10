@@ -347,6 +347,7 @@ class RuleBuildActivator(Activator):
         for test in self.allTests:
             rulecomp = self.getRuleCompilation(test)
             if rulecomp:
+                test.changeState(NeedRuleCompilation(rulecomp))
                 ruleCompilations.append((test, rulecomp))
             else:
                 testsNoRuleBuild.append(test)
@@ -370,7 +371,6 @@ class RuleBuildActivator(Activator):
     def submitRuleCompilation(self, test, rulecomp):
         submissionRules = test.app.getRaveSubmissionRules(test)
         remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
-        test.changeState(NeedRuleCompilation(rulecomp))
         rulecompEnvVars = getCrcCompileVars()
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
@@ -442,6 +442,7 @@ class EvaluateRuleBuild(plugins.Action):
             return False
         rulecomp = test.state.rulecomp
         fileToWrite = test.makeTmpFileName("crc_compile_output", forFramework=1)
+        plugins.ensureDirExistsForFile(fileToWrite)
         writeFile = open(fileToWrite, "w")
         writeFile.write(rulecomp.getRuleBuildOutput())
         writeFile.close()

@@ -166,10 +166,18 @@ class EnvironmentReader:
         if testVar.find("$") == -1:
             return testVar, False
         # self-referential variables
-        if test.parent:
-            return os.path.expandvars(value, test.parent.getEnvironment), True
+        parentExpanded = self.expandParentEnvironment(test, value)
+        if parentExpanded.find("$") == -1:
+            return parentExpanded, True
         else:
-            return os.path.expandvars(value), True
+            # Might also refer to a variable in the same dir as well as self...
+            return os.path.expandvars(parentExpanded, test.getEnvironment), True
+
+    def expandParentEnvironment(self, test, value):
+        if test.parent:
+            return os.path.expandvars(value, test.parent.getEnvironment)
+        else:
+            return os.path.expandvars(value)
     
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):

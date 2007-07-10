@@ -168,7 +168,7 @@ class CommandLineTraffic(Traffic):
         return interestingEnviron
     def getEnvString(self):
         recStr = ""
-        if self.cmdCwd != self.origCwd:
+        if not plugins.samefile(self.cmdCwd, self.origCwd):
             recStr += "cd " + self.cmdCwd + "; "
         if len(self.environ) == 0:
             return recStr

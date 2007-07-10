@@ -198,8 +198,7 @@ class ApcConfig(optimization.OptimizationConfig):
         return ApcProgressTestComparison
     def getStatusFilePath(self, test):
         rawStatusFile = test.getWordsInFile("options")[1]
-        carmdataVar, carmdata = ravebased.getCarmdata(test)
-        statusFile = rawStatusFile.replace("$" + carmdataVar, carmdata).replace("${" + carmdataVar + "}", carmdata)
+        statusFile = os.path.expandvars(rawStatusFile, test.getEnvironment)
         return os.path.normpath(statusFile)
     def _getSubPlanDirName(self, test):
         statusFile = self.getStatusFilePath(test)

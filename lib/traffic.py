@@ -313,12 +313,13 @@ class ReplayInfo:
         currResponseHandler = None
         for trafficStr in trafficList:
             if trafficStr.startswith("<-"):
-                if currResponseHandler:
-                    currResponseHandler.endResponse()
                 currTrafficIn = trafficStr.strip()
-                if not self.responseMap.has_key(currTrafficIn):
-                    self.responseMap[currTrafficIn] = ReplayedResponseHandler()
-                currResponseHandler = self.responseMap[currTrafficIn]
+                currResponseHandler = self.responseMap.get(currTrafficIn)
+                if currResponseHandler:
+                    currResponseHandler.newResponse()
+                else:
+                    currResponseHandler = ReplayedResponseHandler()
+                    self.responseMap[currTrafficIn] = currResponseHandler
             else:
                 currResponseHandler.addResponse(trafficStr)
         self.diag.info("Replay info " + repr(self.responseMap))
@@ -388,16 +389,13 @@ class ReplayInfo:
 class ReplayedResponseHandler:
     def __init__(self):
         self.timesChosen = 0
-        self.readIndex = 0
-        self.responses = []
+        self.responses = [[]]
     def __repr__(self):
         return repr(self.responses)
-    def endResponse(self):
-        self.readIndex += 1
+    def newResponse(self):
+        self.responses.append([])        
     def addResponse(self, trafficStr):
-        if len(self.responses) <= self.readIndex:
-            self.responses.append([])
-        self.responses[self.readIndex].append(trafficStr)
+        self.responses[-1].append(trafficStr)
     def getCurrentStrings(self):
         if len(self.responses) == 0:
             return []

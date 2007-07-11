@@ -102,7 +102,12 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
         if self.presetPerfCategory:
             return self.presetPerfCategory
         else:
-            return self.getPerfCategoryFromTime(self.cpuTime)
+            # Disabled the short queue in sparc for now, it has too many problems with overloading. See bug 17494
+            timeCat = self.getPerfCategoryFromTime(self.cpuTime)
+            if timeCat == "short" and self.archToUse.find("sparc") != -1:
+                return "medium"
+            else:
+                return timeCat
     def getPerfCategoryFromTime(self, cpuTime):
         if cpuTime == -1:
             # This means we don't know, probably because it's not enabled

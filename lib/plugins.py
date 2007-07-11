@@ -86,8 +86,10 @@ def ntexpandvars(path, getenvFunc=os.getenv):
                     value = getenvFunc(var)
                     if value is not None:
                         res = res + value
+                    else:
+                        res = res + '${' + var + '}'
                 except ValueError:
-                    res = res + path
+                    res = res + '${' + path
                     index = pathlen - 1
             else:
                 var = ''
@@ -100,8 +102,10 @@ def ntexpandvars(path, getenvFunc=os.getenv):
                 envValue = getenvFunc(var)
                 if envValue is not None:
                     res = res + envValue
+                else:
+                    res = res + '$' + var
                 if c != '':
-                    res = res + c
+                    index = index - 1
         else:
             res = res + c
         index = index + 1
@@ -586,22 +590,13 @@ def canExecute(program):
             return True
     return False
 
-selfHidden = os.getenv("DISPLAY") == "HIDE_WINDOWS"
-def getProcessStartUpInfo(testProcess=False):
+def getProcessStartUpInfo(getenvFunc=os.getenv):
     # Used for hiding the windows if we're on Windows!
-    if shouldHideWindows(testProcess):
+    if os.name == "nt" and getenvFunc("DISPLAY") == "HIDE_WINDOWS":
         info = subprocess.STARTUPINFO()
         info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         info.wShowWindow = subprocess.SW_HIDE
         return info
-
-def shouldHideWindows(testProcess):
-    if os.name != "nt":
-        return False
-    if not testProcess:
-        return selfHidden
-    # Only test windows should be hidden if we aren't hidden ourselves
-    return os.getenv("DISPLAY") == "HIDE_WINDOWS"
 
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
@@ -645,7 +640,7 @@ def samefile(writeDir, currDir):
     except:
         # samefile doesn't exist on Windows, but nor do soft links so we can
         # do a simpler version
-        return os.path.normpath(writeDir) == os.path.normpath(currDir)
+        return os.path.normpath(writeDir.replace("\\", "/")) == os.path.normpath(currDir.replace("\\", "/"))
 
 # Version of rmtree not prone to crashing if directory in use or externally removed
 def rmtree(dir, attempts=100):

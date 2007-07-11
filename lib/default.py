@@ -1243,7 +1243,7 @@ class RunTest(plugins.Action):
         self.diag.info("Running test with args : " + repr(commandArgs))
         return subprocess.Popen(commandArgs, stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
                                 stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
-                                env=test.getRunEnvironment(), startupinfo=plugins.getProcessStartUpInfo(testProcess=True))
+                                env=test.getRunEnvironment(), startupinfo=plugins.getProcessStartUpInfo(test.getEnvironment))
     def getCmdParts(self, test):
         args = []
         interpreter = test.getConfigValue("interpreter")

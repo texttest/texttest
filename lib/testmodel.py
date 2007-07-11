@@ -167,6 +167,7 @@ class EnvironmentReader:
             return testVar, False
         # self-referential variables
         parentExpanded = self.expandParentEnvironment(test, value)
+        self.diag.info("Self-reference: expanded parent environment from " + value + " to " + parentExpanded)
         if parentExpanded.find("$") == -1:
             return parentExpanded, True
         else:

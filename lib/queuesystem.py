@@ -412,6 +412,7 @@ class QueueSystemServer:
         self.submissionRules = {}
         self.killedTests = []
         self.queueSystems = {}
+        self.reuseOnly = False
         self.diag = plugins.getDiagnostics("Queue System Submit")
         QueueSystemServer.instance = self
     def addSuites(self, suites):
@@ -421,8 +422,12 @@ class QueueSystemServer:
                 self.maxCapacity = currCap
             print "Using", queueSystemName(suite.app), "queues for", suite.app.description(includeCheckout=True)
             self.testCount += suite.size()
-    def submit(self, test):
-        self.queue.put(test)
+    def submit(self, test, initial=True):
+        # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
+        if self.reuseOnly and self.testsSubmitted == 0:
+            self.reuseFailureQueue.put(test)
+        else:
+            self.queue.put(test)
     def handleLocalError(self, test):
         self.handleErrorState(test)
         if self.testCount == 0:
@@ -451,6 +456,8 @@ class QueueSystemServer:
                 return newTest
             else:
                 self.reuseFailureQueue.put(newTest)
+        # Allowed a submitted job to terminate
+        self.testsSubmitted -= 1
     def allowReuse(self, oldTest, newTest):
         oldRules = self.getSubmissionRules(oldTest)
         newRules = self.getSubmissionRules(newTest)
@@ -476,6 +483,7 @@ class QueueSystemServer:
         sendServerState(state)
     def getTestForSubmit(self):
         if self.testsSubmitted < self.maxCapacity:
+            self.reuseOnly = False
             reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=False)
             if reuseFailure:
                 self.diag.info("Found a reuse failure...")
@@ -484,6 +492,7 @@ class QueueSystemServer:
                 self.diag.info("Waiting for new tests...")
                 return self.getTest(block=True)
         else:
+            self.reuseOnly = True
             self.diag.info("Waiting for reuse failures...")
             return self.getItemFromQueue(self.reuseFailureQueue, block=True)
     def run(self):        

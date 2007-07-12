@@ -409,13 +409,11 @@ class TextTestGUI(Responder, plugins.Observable):
     def createActionGUIs(self):
         defaultGUIs, buttonGUIs = [], []
         for action in self.intvActions:
-            if not action.inMenuOrToolBar():
-                continue
-
-            if action.inButtonBar():
-                buttonGUIs.append(ButtonActionGUI(action))
-            else:
+            if action.inMenuOrToolBar():
                 defaultGUIs.append(DefaultActionGUI(action))
+            elif action.inButtonBar():
+                buttonGUIs.append(ButtonActionGUI(action))
+
         return defaultGUIs, buttonGUIs
 
     def createActionGUIForTab(self, action):

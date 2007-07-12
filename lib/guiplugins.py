@@ -311,7 +311,7 @@ class InteractiveTestAction(InteractiveAction):
     def describeTests(self):
         return repr(self.currentTest)
     def inButtonBar(self):
-        return len(self.getOptionGroups()) == 0
+        return not self.inMenuOrToolBar() and len(self.getOptionGroups()) == 0
     def notifyNewTestSelection(self, tests, direct):
         if len(tests) == 1:
             self.currentTest = tests[0]
@@ -458,10 +458,6 @@ class FileViewAction(InteractiveTestAction):
         InteractiveTestAction.__init__(self)
         self.currFileSelection = []
         self.viewTools = {}
-    def inMenuOrToolBar(self):
-        return True
-    def inButtonBar(self):
-        return False
     def correctTestClass(self):
         return True # enable for both tests and suites
     def isActiveOnCurrent(self, *args):
@@ -1667,8 +1663,8 @@ class RecomputeTest(InteractiveTestAction):
             if self.chainReaction:
                 self.chainReaction = False
                 return "Recomputation chain reaction!"
-    def inButtonBar(self):
-        return True
+    def inMenuOrToolBar(self):
+        return False
     def _getTitle(self):
         return "_Update Info"
     def _getScriptTitle(self):

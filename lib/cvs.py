@@ -90,8 +90,6 @@ class CVSAction(guiplugins.InteractiveAction):
         return self.separatorBeforeInMainMenu()
     def inToolBar(self):
         return False
-    def inButtonBar(self):
-        return False
     def getMainMenuPath(self):
         return "_CVS"
     def getTestPopupMenuPath(self):

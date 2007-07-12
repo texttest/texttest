@@ -321,6 +321,8 @@ class ApcProgressTestComparison(ProgressTestComparison):
 class ViewApcLog(guiplugins.InteractiveTestAction):
     def __repr__(self):
         return "Viewing log of"
+    def inMenuOrToolBar(self):
+        return False
     def performOnCurrent(self):
         viewLogScript = self.currentTest.makeTmpFileName("view_apc_log", forFramework=1)
         if os.path.isfile(viewLogScript):
@@ -1576,6 +1578,8 @@ class CreateSCSolverTestSuite(plugins.Action):
                 testsuiteFile.close()
 
 class SaveBestSolution(guiplugins.InteractiveTestAction):
+    def inMenuOrToolBar(self):
+        return False
     def performOnCurrent(self):
         import shutil
         # If we have the possibility to save, we know that the current solution is best
@@ -1644,10 +1648,6 @@ class SelectKPIGroup(guiplugins.InteractiveTestAction):
         return "_Select KPI group"
     def getStockId(self):
         return "index"
-    def inButtonBar(self):
-        return False
-    def inMenuOrToolBar(self):
-        return True
     def getTabTitle(self):
         return "KPI group"
     def getGroupTabTitle(self):

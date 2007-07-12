@@ -1907,6 +1907,8 @@ guiplugins.interactiveActionHandler.actionStaticClasses += [ StartStudio ]
 class CVSLogInGUI(guiplugins.InteractiveTestAction):
     def __init__(self, dynamic):
         guiplugins.InteractiveTestAction.__init__(self)
+    def inMenuOrToolBar(self):
+        return False
     def performOnCurrent(self):
         logFileStem = self.currentTest.app.getConfigValue("log_file")
         files = [ logFileStem ]

@@ -265,11 +265,10 @@ class CVSLog(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            fileArg = " ".join(self.getFilesForCVS(test, ignorePresence))
+            fileArgs = self.getFilesForCVS(test, ignorePresence)
             self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            args = self.getCVSCmdArgs()
-            args.append(fileArg)
+            args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
             self.parseOutput(self.runCommand(args), rootDir, test)
         
     def parseOutput(self, outputLines, rootDir, test):
@@ -346,11 +345,10 @@ class CVSLogLatest(CVSLog):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            fileArg = " ".join(self.getFilesForCVS(test))
+            fileArgs = self.getFilesForCVS(test)
             self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            cmdArgs = self.getCVSCmdArgs()
-            cmdArgs.append(fileArg)
+            cmdArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
             self.parseOutput(self.runCommand(cmdArgs), rootDir, test)
     def parseOutput(self, outputLines, rootDir, test):
         # Each file has something like:
@@ -438,11 +436,10 @@ class CVSDiff(CVSAction):
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
-            fileArg = " ".join(self.getFilesForCVS(test))
+            fileArgs = self.getFilesForCVS(test)
             self.notify("Status", "Diffing " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            args = self.getCVSCmdArgs() + self.getRevisionOptions()
-            args.append(fileArg)
+            args = self.getCVSCmdArgs() + self.getRevisionOptions() + fileArgs # Popen doesn't like spaces in args ...
             self.parseOutput(self.runCommand(args), rootDir, test)
 
     def parseOutput(self, outputLines, rootDir, test):
@@ -533,11 +530,10 @@ class CVSStatus(CVSAction):
             cvsRepository = self.getCVSRepository()
             self.diag.info("Found CVS repository as " + cvsRepository)
         for test in self.currTestSelection:
-            fileArg = " ".join(self.getFilesForCVS(test))
+            fileArgs = self.getFilesForCVS(test)
             self.notify("Status", "Getting status for " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            cvsArgs = self.getCVSCmdArgs()
-            cvsArgs.append(fileArg)
+            cvsArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
             self.parseOutput(self.runCommand(cvsArgs), rootDir, cvsRepository, test)
     def parseOutput(self, outputLines, rootDir, cvsRepository, test):
         # The section for each dir starts with
@@ -637,7 +633,7 @@ class CVSAnnotate(CVSAction):
             fileArgs = self.getFilesForCVS(test)
             self.notify("Status", "Getting annotations of " + self.getRelativePath(test.getDirectory(), rootDir))
             self.notify("ActionProgress", "")
-            args = self.getCVSCmdArgs() + fileArgs
+            args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
             self.parseOutput(self.runCommand(args), rootDir, test)            
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with

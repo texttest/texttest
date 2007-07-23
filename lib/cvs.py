@@ -80,6 +80,8 @@ class CVSAction(guiplugins.InteractiveAction):
         return process.stdout.readlines()
     def notifyNewTestSelection(self, tests, direct):
         self.currTestSelection = tests
+        if not self.dynamic: # See bugzilla 17653
+            self.currFileSelection = []
     def notifyNewFileSelection(self, files):
         self.currFileSelection = files
     def isActiveOnCurrent(self, *args):

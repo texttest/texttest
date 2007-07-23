@@ -13,11 +13,6 @@ from gtkusecase import TreeModelIndexer
 #   could be unified and collected in a more centralized place?
 # + Update on non-cvs controlled tests give no hint that tests are not in cvs.
 # + Test:
-#   - Each action.
-#   - Dynamic GUI!
-#   - For diff, there should be some differing files, but we should also test
-#     the case without diffs.
-#   - For status, we want to test 'U ' and 'C ' files
 #   - For update, we want a 'C ' file ...
 #   - For add we need some new files and dirs ... and something that can cause
 #     'add aborted' ...
@@ -25,9 +20,6 @@ from gtkusecase import TreeModelIndexer
 #     which is re-born before pressing OK.
 #   - Commit needs modified, added and removed files. We also want some error
 #     which can cause the commit to fail, e.g. a simultaneous commit from someone else.
-# + Add 'Observe' message when diff invoked from the dynamic GUI
-#   that the diffs are not related to the current test results, but to the
-#   latest saved versions.
 # + Commit
 #   -r rev      Commit to this branch or trunk revision?
 # + Fix update
@@ -39,19 +31,6 @@ from gtkusecase import TreeModelIndexer
 #   - Other date/revision options. Should we care?
 # + What happens when we add a test which already has a CVS dir? (e.g.
 #   when a test case/suite has been copied with plain 'cp -r' ...
-# + 
-# V Add diff button in log dialog (diff w.r.t. different revisions?)
-# V Add log button in status dialog
-# V Support single-file action (if files are selected, as for save)
-#   What if multiple tests are selected, in the dynamic GUI?
-# V Adding cspsolver gives strange result ...
-# V Should recursive actions report on files individually?
-# V guilog
-# V ScriptEngine! (e.g. monitor tkdiff)
-# V Add tkdiff button to diff result window
-# V Add success or failure icons to result dialogs ...
-# V When diffing a dir, we get a message 'cvs diff: Diffing <dirname>'
-#   even when no diffs occur in the dir. Annoying.
 #
 
 #

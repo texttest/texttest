@@ -139,8 +139,10 @@ class PerformanceComparison:
             else:
                 return self.getDescriptor("performance") + postfix
     def getSummary(self, includeNumbers=True):
-        perc = int(self.percentageChange)
-        if perc == 0:
+        perc = int(self.percentageChange)        
+        if self.newPerformance < 0:
+            return "Performance comparison failed"
+        elif perc == 0:
             return ""
         elif perc == -1:
             return "infinitely " + self.descriptor

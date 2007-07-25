@@ -2111,18 +2111,33 @@ class ApplicationFileGUI(FileViewGUI):
     def addFilesToModel(self, state):
         colour = guiConfig.getCompositeValue("file_colours", "static")
         personalFiles = self.getPersonalFiles()
+        importedFiles = {}
         if len(personalFiles) > 0:
             persiter = self.model.insert_before(None, None)
             self.model.set_value(persiter, 0, "Personal Files")
             for file in personalFiles:
                 self.addFileToModel(persiter, file, None, colour)
+                for importedFile in self.getImportedFiles(file):
+                    importedFiles[importedFile] = importedFile
 
         for app in self.allApps:
             confiter = self.model.insert_before(None, None)
             self.model.set_value(confiter, 0, "Files for " + app.fullName)
             for file in self.getConfigFiles(app):
                 self.addFileToModel(confiter, file, None, colour)
-
+                for importedFile in self.getImportedFiles(file, app):
+                    importedFiles[importedFile] = importedFile
+                    
+        # Handle recursive imports here ...
+        
+        if len(importedFiles) > 0:
+            importediter = self.model.insert_before(None, None)
+            self.model.set_value(importediter, 0, "Imported Files")
+            sortedFiles = importedFiles.values()
+            sortedFiles.sort()
+            for importedFile in sortedFiles:
+                self.addFileToModel(importediter, importedFile, None, colour)
+                
     def getConfigFiles(self, app):
         configFiles = app.dircache.findAllFiles("config", [ app.name ])
         configFiles.sort()
@@ -2135,6 +2150,19 @@ class ApplicationFileGUI(FileViewGUI):
         allFiles = filter(os.path.isfile, allEntries)
         allFiles.sort()
         return allFiles
+    def getImportedFiles(self, file, app = None):
+        if os.path.isfile(file):
+            imports = []
+            importLines = filter(lambda l: l.startswith("import_config_file"), open(file, "r").readlines())
+            for line in importLines:
+                try:
+                    file = line.split(":")[1].strip()
+                    if app:
+                        file = app.configPath(file)
+                    imports.append(file)
+                except Exception, e: # App. file not found ...
+                    continue
+            return imports
 
 class TestFileGUI(FileViewGUI):
     def __init__(self, dynamic, popupGUI):

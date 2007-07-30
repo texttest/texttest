@@ -1539,7 +1539,7 @@ class ActionTabGUI(SubGUI):
         else:
             entry = gtk.Entry()
             box.pack_start(entry, expand=True, fill=True)
-            
+        
         if option.selectDir:
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
@@ -1566,6 +1566,8 @@ class ActionTabGUI(SubGUI):
         if option.description:
             self.tooltips.set_tip(label, option.description)
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
+        if self.buttonGUI:
+            scriptEngine.connect("activate from " + option.name, "activate", entry, self.buttonGUI.runInteractive)
         entry.set_text(option.getValue())
         option.setMethods(entry.get_text, entry.set_text)
         if option.changeMethod:

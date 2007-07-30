@@ -300,9 +300,13 @@ class Config(CarmenConfig):
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
         app.addConfigEntry("ruleset_compiled", "white", "test_colours")
 
-def getEnvVarFromCONFIG(var, test):
-    cmdLine = ". " + test.getEnvironment("CARMSYS") + "/CONFIG > /dev/null 2>&1; echo $" + var
+def getCarmCmdAndEnv(cmdLine, test):
     runEnv = test.getRunEnvironment(getCrcCompileVars())
+    fullCmd = ". " + test.getEnvironment("CARMSYS") + "/CONFIG > /dev/null 2>&1; " + cmdLine
+    return fullCmd, runEnv
+
+def getEnvVarFromCONFIG(var, test):
+    cmdLine, runEnv = getCarmCmdAndEnv("echo $" + var, test)
     proc = subprocess.Popen(cmdLine, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=runEnv)
     return proc.communicate()[0].strip()
 

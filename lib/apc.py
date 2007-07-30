@@ -275,6 +275,7 @@ def verifyAirportFile(test):
         if srcDir == None:
             srcDir = os.path.join(carmusr, "data", "Airport", "source")
         srcFile = os.path.join(srcDir, "AirportFile")
+        diag.info("Airport source file is at " + srcFile)
         if os.path.isfile(srcFile) and airportFile != None:
             arch = getArchitecture(test.app)
             carmsys = test.getEnvironment("CARMSYS")
@@ -284,8 +285,9 @@ def verifyAirportFile(test):
                 plugins.ensureDirExistsForFile(airportFile)
                 # We need to source the CONFIG file in order to get some
                 # important environment variables set, i.e. PRODUCT and BRANCH.
-                configFile = os.path.join(carmsys, "CONFIG")
-                os.system(". " + configFile + "; " + apCompile + " " + srcFile + " > " + airportFile)
+                compileCmd = apCompile + " " + srcFile + " > " + airportFile
+                cmdLine, runEnv = ravebased.getCarmCmdAndEnv(compileCmd, test)
+                subprocess.call(cmdLine, shell=True, env=runEnv)
             if os.path.isfile(airportFile):
                 return
     raise plugins.TextTestError, "Failed to find AirportFile"

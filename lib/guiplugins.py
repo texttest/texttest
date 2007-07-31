@@ -1085,7 +1085,7 @@ class SaveSelection(SelectionAction):
         return "Save selected tests in file"
     def dialogEnableOptions(self):
         return not guiConfig.dynamic
-    def getDirectories(self, name=""):
+    def getDirectories(self):
         apps = guiConfig.apps
         dirs = apps[0].getFilterFileDirectories(apps)
         if len(dirs) > 0:

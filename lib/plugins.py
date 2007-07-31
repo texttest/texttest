@@ -985,10 +985,10 @@ class OptionGroup:
             switch.reset()
     def setValue(self, key, value):
         if self.options.has_key(key):
-            self.options[key].defaultValue = value
+            self.options[key].setValue(value)
             return 1
         elif self.switches.has_key(key):
-            self.switches[key].defaultValue = value
+            self.switches[key].setValue(value)
             return 1
         return 0
     def addSwitch(self, key, name, value = 0, options = [], description = "", changeMethod = None):

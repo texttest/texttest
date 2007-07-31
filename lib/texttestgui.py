@@ -99,7 +99,8 @@ class SubGUI(plugins.Observable):
         self.active = False
         self.widget = None
     def setActive(self, newValue):
-        self.active = newValue
+        if self.shouldShow():
+            self.active = newValue
 
     def activate(self):
         self.setActive(True)
@@ -122,8 +123,11 @@ class SubGUI(plugins.Observable):
     def createView(self):
         pass
 
+    def shouldShow(self, *args):
+        return True # should this be shown/created at all this run
+
     def shouldShowCurrent(self, *args):
-        return True # sometimes these things don't have anything to display
+        return True # should this be shown or hidden in the current context?
 
     def getTabTitle(self):
         return "Need Title For Tab!"
@@ -433,6 +437,7 @@ class TextTestGUI(Responder, plugins.Observable):
         buttonBarGUI = BoxGUI(self.buttonBarGUIs, horizontal=True, reversed=True)
         topTestViewGUI = BoxGUI([ self.testFileGUI, buttonBarGUI ], horizontal=False)
 
+        tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
         tabInfo = seqdict()
         for name, notebookGUI in subNotebookGUIs.items():
@@ -722,7 +727,7 @@ class ToolBarGUI(ContainerGUI):
         self.widget.add(toolbar)
         toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
         progressBarGUI = self.subguis[0]
-        if progressBarGUI.shouldShowCurrent():
+        if progressBarGUI.shouldShow():
             progressBar = progressBarGUI.createView()
             width = 7 # Looks good, same as gtk.Paned border width
             alignment = gtk.Alignment()
@@ -1371,11 +1376,12 @@ class ButtonActionGUI(ActionGUI):
         self.tooltips = gtk.Tooltips()
     def actionOrButton(self):
         return self.button
-    def createView(self):
+    def createView(self, alwaysSensitive=False):
         self.button = gtk.Button(self.action.getTitle(includeMnemonics=True))
         self.tooltips.set_tip(self.button, self.scriptTitle)
         scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
-        self.updateSensitivity()
+        if not alwaysSensitive:
+            self.updateSensitivity()
         self.button.show()
         return self.button
     
@@ -1515,7 +1521,7 @@ class ActionTabGUI(SubGUI):
             hbox = self.createSwitchBox(switch)
             self.vbox.pack_start(hbox, expand=False, fill=False)
         if self.buttonGUI:
-            button = self.buttonGUI.createView()
+            button = self.buttonGUI.createView(alwaysSensitive=True)
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()
@@ -1718,19 +1724,29 @@ class NotebookGUI(SubGUI):
     def createView(self):
         self.notebook = gtk.Notebook()
         for tabName, tabGUI in self.tabInfo.items():
-            if tabGUI.shouldShowCurrent():
-                label = gtk.Label(tabName)
-                self.diag.info("Adding page " + tabName)
-                self.notebook.append_page(tabGUI.createView(), label)
+            label = gtk.Label(tabName)
+            self.diag.info("Adding page " + tabName)
+            page = tabGUI.createView()
+            if not tabGUI.shouldShowCurrent():
+                page.hide()
+            self.notebook.append_page(page, label)
 
         scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
         self.notebook.set_scrollable(True)
         if not self.setCurrentPage(self.currentPageName):
-            self.currentPageName = self.getPageName(0)
+            self.currentPageName = self.findInitialCurrentPage()
+            self.diag.info("Current page set to '" + self.currentPageName + "'")
         self.notebook.connect("switch-page", self.handlePageSwitch)
         self.notebook.show()
         return self.notebook
-    
+
+    def findInitialCurrentPage(self):
+        for tabName, tabGUI in self.tabInfo.items():
+            if tabGUI.shouldShowCurrent():
+                return tabName
+
+        return self.tabInfo.keys()[0]
+            
     def handlePageSwitch(self, notebook, ptr, pageNum, *args):
         if not self.active:
             return
@@ -1770,15 +1786,6 @@ class NotebookGUI(SubGUI):
             self.diag.info("Hiding page " + name)
             oldPage.hide()
 
-    def insertNewPage(self, name, insertPosition=0):
-        if self.notebook.get_n_pages() == 0:
-            self.currentPageName = name
-        tabGUI = self.tabInfo[name]
-        self.diag.info("Inserting new page " + name)
-        page = tabGUI.createView()
-        label = gtk.Label(name)
-        self.notebook.insert_page(page, label, insertPosition)
-
     def describe(self):
         guilog.info("Tabs showing : " + ", ".join(self.getTabNames()))
 
@@ -1788,21 +1795,12 @@ class NotebookGUI(SubGUI):
                 return tabName
     
     def showNewPages(self, *args):
-        currChildren = self.notebook.get_children()
-        currTabNames = map(self.notebook.get_tab_label_text, currChildren)
-        insertIndex = 0
         changed = False
         for name, tabGUI in self.tabInfo.items():
             page = self.findPage(name)
-            if page:
-                insertIndex += 1
-                if tabGUI.shouldShowCurrent(*args) and not page.get_property("visible"):
-                    self.diag.info("Showing page " + name)
-                    page.show()
-                    changed = True
-            elif tabGUI.shouldShowCurrent(*args):
-                self.insertNewPage(name, insertIndex)
-                insertIndex += 1                
+            if tabGUI.shouldShowCurrent(*args) and not page.get_property("visible"):
+                self.diag.info("Showing page " + name)
+                page.show()
                 changed = True
         return changed
     def setCurrentPage(self, newName):
@@ -1844,7 +1842,8 @@ class NotebookGUI(SubGUI):
 
     def notifyNewTestSelection(self, tests, direct):
         if not self.notebook:
-            return 
+            return
+        self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.scriptTitle + "'")
         pagesShown = self.showNewPages()
         pagesHidden = self.hideOldPages()
         # only change pages around if a test is directly selected
@@ -1975,8 +1974,6 @@ class TextInfoGUI(SubGUI):
         self.resetText(state)
         self.updateView()
     def createView(self):
-        if not self.shouldShowCurrent():
-            return
         self.view = gtk.TextView()
         from pango import FontDescription
         self.view.modify_font(FontDescription("courier 10"))
@@ -2043,7 +2040,8 @@ class FileViewGUI(SubGUI):
         
     def createView(self):
         self.model.clear()
-        self.addFilesToModel(self.getState())
+        state = self.getState()
+        self.addFilesToModel(state)
         view = gtk.TreeView(self.model)
         self.selection = view.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
@@ -2109,7 +2107,7 @@ class ApplicationFileGUI(FileViewGUI):
         self.allApps = []
     def addSuites(self, suites):
         self.allApps = [ suite.app for suite in suites ]
-    def shouldShowCurrent(self, *args):
+    def shouldShow(self):
         return not self.dynamic
     def getGroupTabTitle(self):
         return "Config"
@@ -2215,6 +2213,8 @@ class TestFileGUI(FileViewGUI):
         return self.currentTest is not None
             
     def addFilesToModel(self, state):
+        if not state:
+            return
         if state.hasStarted():
             if hasattr(state, "correctResults"):
                 # failed on comparison
@@ -2236,7 +2236,8 @@ class TestFileGUI(FileViewGUI):
     def fileSelected(self, treemodel, path, iter, filelist):
         filelist.append((self.model.get_value(iter, 2), self.model.get_value(iter, 3)))
     def getState(self):
-        return self.currentTest.state
+        if self.currentTest:
+            return self.currentTest.state
     def addComparisonsToModel(self, state):
         self.addComparisons(state, state.correctResults + state.changedResults, "Comparison Files")
         self.addComparisons(state, state.newResults, "New Files")
@@ -2351,7 +2352,7 @@ class ProgressBarGUI(SubGUI):
         self.nofCompletedTests = 0
         self.nofFailedTests = 0
         self.widget = None
-    def shouldShowCurrent(self, *args):
+    def shouldShow(self):
         return self.dynamic
     def describe(self):
         guilog.info("Progress bar set to fraction " + str(self.widget.get_fraction()) + ", text '" + self.widget.get_text() + "'")
@@ -2425,7 +2426,7 @@ class TestProgressMonitor(SubGUI):
         self.diag = plugins.getDiagnostics("Progress Monitor")
     def getGroupTabTitle(self):
         return "Status"
-    def shouldShowCurrent(self, *args):
+    def shouldShow(self):
         return self.dynamic
     def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)

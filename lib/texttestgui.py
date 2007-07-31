@@ -1543,11 +1543,13 @@ class ActionTabGUI(SubGUI):
         if option.selectDir:
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
-            button.connect("clicked", self.showDirectoryChooser, entry, option.name)
+            scriptEngine.connect("search for directories for '" + option.name + "'",
+                                 "clicked", button, self.showDirectoryChooser, None, entry, option.name)
         elif option.selectFile:
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
-            button.connect("clicked", self.showFileChooser, entry, option.name)
+            scriptEngine.connect("search for files for '" + option.name + "'",
+                                 "clicked", button, self.showFileChooser, None, entry, option.name)
         return (box, entry)
   
     def getConfigOptions(self, option):
@@ -1647,11 +1649,14 @@ class ActionTabGUI(SubGUI):
         for i in xrange(len(folders) - 1, -1, -1):
             dialog.add_shortcut_folder(folders[i][1])
         dialog.set_default_response(gtk.RESPONSE_OK)
-        response = dialog.run()
+        scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder")
+        scriptEngine.connect("open selected file", "response", dialog, self.respond, gtk.RESPONSE_OK, entry, folders)
+        scriptEngine.connect("cancel file selection", "response", dialog, self.respond, gtk.RESPONSE_CANCEL, entry, folders)
+        dialog.show()
+    def respond(self, dialog, response, entry, folders):
         if response == gtk.RESPONSE_OK:
             entry.set_text(paths.getRelativeOrAbsolutePath(folders, dialog.get_filename()))
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
-            entry.activate() # Necessary (?) for pyusecase to catch the set text ...
         dialog.destroy()
         
     def describe(self):

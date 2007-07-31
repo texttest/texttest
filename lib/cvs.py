@@ -203,8 +203,9 @@ class CVSAction(guiplugins.InteractiveAction):
     def getTmpFiles(self, test):
         files = test.listTmpFiles()
         if len(files) == 0:
-            for comparison in test.state.allResults:
-                files.append(os.path.basename(comparison.stdFile))
+            if test.state.hasResults():
+                for comparison in test.state.allResults:
+                    files.append(os.path.basename(comparison.stdFile))
         return files
     def getAbsPath(self, filePath, testPath):
         if os.path.isabs(filePath):
@@ -253,10 +254,11 @@ class CVSLog(CVSAction):
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test, ignorePresence)
-            self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
-            self.notify("ActionProgress", "")
-            args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-            self.parseOutput(self.runCommand(args), rootDir, test)
+            if len(fileArgs) > 0:
+                self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("ActionProgress", "")
+                args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
+                self.parseOutput(self.runCommand(args), rootDir, test)
         
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with
@@ -333,10 +335,11 @@ class CVSLogLatest(CVSLog):
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
-            self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
-            self.notify("ActionProgress", "")
-            cmdArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-            self.parseOutput(self.runCommand(cmdArgs), rootDir, test)
+            if len(fileArgs) > 0:
+                self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("ActionProgress", "")
+                cmdArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
+                self.parseOutput(self.runCommand(cmdArgs), rootDir, test)
     def parseOutput(self, outputLines, rootDir, test):
         # Each file has something like:
         #
@@ -424,10 +427,11 @@ class CVSDiff(CVSAction):
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
-            self.notify("Status", "Diffing " + self.getRelativePath(test.getDirectory(), rootDir))
-            self.notify("ActionProgress", "")
-            args = self.getCVSCmdArgs() + self.getRevisionOptions() + fileArgs # Popen doesn't like spaces in args ...
-            self.parseOutput(self.runCommand(args), rootDir, test)
+            if len(fileArgs) > 0:
+                self.notify("Status", "Diffing " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("ActionProgress", "")
+                args = self.getCVSCmdArgs() + self.getRevisionOptions() + fileArgs # Popen doesn't like spaces in args ...
+                self.parseOutput(self.runCommand(args), rootDir, test)
 
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with
@@ -518,10 +522,11 @@ class CVSStatus(CVSAction):
             self.diag.info("Found CVS repository as " + cvsRepository)
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
-            self.notify("Status", "Getting status for " + self.getRelativePath(test.getDirectory(), rootDir))
-            self.notify("ActionProgress", "")
-            cvsArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-            self.parseOutput(self.runCommand(cvsArgs), rootDir, cvsRepository, test)
+            if len(fileArgs) > 0:
+                self.notify("Status", "Getting status for " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("ActionProgress", "")
+                cvsArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...            
+                self.parseOutput(self.runCommand(cvsArgs), rootDir, cvsRepository, test)
     def parseOutput(self, outputLines, rootDir, cvsRepository, test):
         # The section for each dir starts with
         # cvs status: Examining <dir>
@@ -618,10 +623,11 @@ class CVSAnnotate(CVSAction):
             rootDir = self.getRootPath()
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
-            self.notify("Status", "Getting annotations of " + self.getRelativePath(test.getDirectory(), rootDir))
-            self.notify("ActionProgress", "")
-            args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-            self.parseOutput(self.runCommand(args), rootDir, test)            
+            if len(fileArgs) > 0:
+                self.notify("Status", "Getting annotations of " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("ActionProgress", "")
+                args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
+                self.parseOutput(self.runCommand(args), rootDir, test)            
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with
         # Annotations for <file>

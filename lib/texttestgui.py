@@ -1544,12 +1544,12 @@ class ActionTabGUI(SubGUI):
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
             scriptEngine.connect("search for directories for '" + option.name + "'",
-                                 "clicked", button, self.showDirectoryChooser, None, entry, option.name)
+                                 "clicked", button, self.showDirectoryChooser, None, entry, option)
         elif option.selectFile:
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
             scriptEngine.connect("search for files for '" + option.name + "'",
-                                 "clicked", button, self.showFileChooser, None, entry, option.name)
+                                 "clicked", button, self.showFileChooser, None, entry, option)
         return (box, entry)
   
     def getConfigOptions(self, option):
@@ -1618,27 +1618,27 @@ class ActionTabGUI(SubGUI):
             checkButton.show()
             return checkButton
 
-    def showDirectoryChooser(self, widget, entry, name):
+    def showDirectoryChooser(self, widget, entry, option):
         dialog = gtk.FileChooserDialog("Select a directory",
                                        globalTopWindow,
                                        gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
                                        (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
                                         gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-        self.startChooser(dialog, entry, name)
+        self.startChooser(dialog, entry, option)
 
-    def showFileChooser(self, widget, entry, name):
+    def showFileChooser(self, widget, entry, option):
         dialog = gtk.FileChooserDialog("Select a file",
                                        globalTopWindow,
                                        gtk.FILE_CHOOSER_ACTION_OPEN,
                                        (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
                                         gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-        self.startChooser(dialog, entry, name)
+        self.startChooser(dialog, entry, option)
 
-    def startChooser(self, dialog, entry, name):
+    def startChooser(self, dialog, entry, option):
         # Folders is a list of pairs (short name, absolute path),
         # where 'short name' means the name given in the config file, e.g.
         # 'temporary_filter_files' or 'filter_files' ...
-        folders, defaultFolder = self.action.getDirectories(name)
+        folders, defaultFolder = option.getDirectories()
         # If current entry forms a valid path, set that as default
         currPath = paths.getAbsolutePath(folders, entry.get_text())
         currDir, currFile = os.path.split(currPath)

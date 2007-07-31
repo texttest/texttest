@@ -22,7 +22,8 @@ class Config:
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing")
-                group.addOption("f", "Tests listed in file", selectFile=True)
+                possibleDirs = self.getFilterFileDirectories([ app ], createDirs=False)
+                group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("ts", "Suite names containing")
                 group.addOption("grep", "Result files containing")
                 group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))

@@ -164,7 +164,7 @@ class InteractiveAction(plugins.Observable):
             return title
         else:
             return title.replace("_", "")
-    def getDirectories(self, inputDirs=[], name=""):
+    def getDirectories(self):
         return ([], None)
     def messageBeforePerform(self):
         # Don't change this by default, most of these things don't take very long
@@ -965,21 +965,6 @@ class SelectTests(SelectionAction):
         return "Select indicated tests"
     def getGroupTabTitle(self):
         return "Selection"
-    def getDirectories(self, name=""):
-        if name == "Tests listed in file":
-            apps = guiConfig.apps
-            if len(apps) > 0:
-                dirs = apps[0].getFilterFileDirectories(apps)
-                # Set first non-empty dir as default ...)
-                for dir in dirs:
-                    if os.path.isdir(os.path.abspath(dir[1])) and \
-                       len(os.listdir(os.path.abspath(dir[1]))) > 0:
-                        return (dirs, dir[1])
-                return (dirs, dirs[0][1])
-            else:
-                return ([], None)
-        else:
-            return ([], None)
     def messageBeforePerform(self):
         return "Selecting tests ..."
     def messageAfterPerform(self):
@@ -1145,7 +1130,7 @@ class LoadSelection(SelectTests):
     def getDialogType(self):
         return "guidialogs.LoadSelectionDialog"
     def getDirectories(self):
-        self.folders = SelectTests.getDirectories(self, "Tests listed in file")
+        self.folders = self.optionGroup.getOption("f").getDirectories()
         return self.folders
     def performOnCurrent(self):
         if self.fileName:

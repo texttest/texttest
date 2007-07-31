@@ -889,13 +889,14 @@ class Option:
             self.valueMethod = None
 
 class TextOption(Option):
-    def __init__(self, name, value, possibleValues, allocateNofValues, selectDir, selectFile, description, changeMethod):
+    def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1, selectDir=False, selectFile=False, possibleDirs=[], description="", changeMethod=None):
         Option.__init__(self, name, value, description, changeMethod)
         self.possValAppendMethod = None
         self.possValListMethod = None
         self.nofValues = allocateNofValues
         self.selectDir = selectDir
         self.selectFile = selectFile
+        self.possibleDirs = possibleDirs
         self.clearMethod = None
         self.setPossibleValues(possibleValues)
     def setPossibleValuesMethods(self, appendMethod, getMethod):
@@ -937,7 +938,19 @@ class TextOption(Option):
     def clear(self):
         if self.clearMethod:
             self.clearMethod()
-
+    def getDirectories(self):
+        for dir in self.possibleDirs:
+            try:
+                os.makedirs(dir[1])
+            except:
+                pass # makedir throws if dir exists ...
+        # Set first non-empty dir as default ...)
+        for dir in self.possibleDirs:
+            if os.path.isdir(os.path.abspath(dir[1])) and \
+                   len(os.listdir(os.path.abspath(dir[1]))) > 0:
+                return (self.possibleDirs, dir[1])
+        return (self.possibleDirs, dirs[0][1])
+        
 class Switch(Option):
     def __init__(self, name, defaultValue, options, description, changeMethod):
         Option.__init__(self, name, int(defaultValue), description, changeMethod)
@@ -983,10 +996,10 @@ class OptionGroup:
             return False
         self.switches[key] = Switch(name, value, options, description, changeMethod)
         return True
-    def addOption(self, key, name, value = "", possibleValues = [], allocateNofValues = -1, selectDir = False, selectFile = False, description = "", changeMethod = None):
+    def addOption(self, key, *args, **kwargs): 
         if self.options.has_key(key):
             return False
-        self.options[key] = TextOption(name, value, possibleValues, allocateNofValues, selectDir, selectFile, description, changeMethod)
+        self.options[key] = TextOption(*args, **kwargs)
         return True
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):

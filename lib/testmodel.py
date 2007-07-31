@@ -503,6 +503,8 @@ class TestCase(Test):
             return parts[-1]
     def listTmpFiles(self):
         tmpFiles = []
+        if not os.path.isdir(self.writeDirectory):
+            return tmpFiles
         filelist = os.listdir(self.writeDirectory)
         filelist.sort()
         for file in filelist:

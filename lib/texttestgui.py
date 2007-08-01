@@ -317,21 +317,23 @@ class TextTestGUI(Responder, plugins.Observable):
         if not self.dynamic:
             self.exitStatus |= self.COMPLETION_NOTIFIED # no tests to wait for...
 
-        self.setUpObservers() # uses the above 5
+        self.setUpObservers()
     def getTestTreeObservers(self):
-        selectionActions = filter(lambda action: hasattr(action, "notifyNewTestSelection"), self.intvActions)
-        return selectionActions + [ self.testColumnGUI, self.testFileGUI ] + self.buttonBarGUIs + \
-               [ self.textInfoGUI ] + self.actionTabGUIs + self.defaultActionGUIs + self.notebookGUIs
+        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI ] + self.intvActions + self.notebookGUIs
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle
         return [ self.testColumnGUI, self.testTreeGUI, self.progressBarGUI, self.progressMonitor, statusMonitor ] 
-    def getActionObservers(self):
-        # These actions might change the tree view selection or the status bar, need to observe them
-        return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ] + self.actionTabGUIs
+    def getActionObservers(self, action):
+        if str(action.__class__).find("Reset") != -1:
+            # It's such a hack, but so is this action...
+            return [ statusMonitor ] + self.actionTabGUIs
+        else:
+            # These actions might change the tree view selection or the status bar, need to observe them
+            return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ]
     def getFileViewObservers(self):
         # We should potentially let other GUIs be file observers too ...
-        return filter(self.isFileObserver, self.intvActions + self.defaultActionGUIs)
+        return filter(self.isFileObserver, self.intvActions)
     def isFileObserver(self, action):
         return hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile")
     def getExitObservers(self):
@@ -363,15 +365,19 @@ class TextTestGUI(Responder, plugins.Observable):
             self.addObserver(observer) # forwarding of test observer mechanism
 
         for action in self.intvActions:
-            for observer in self.getActionObservers():
+            for observer in self.getActionObservers(action):
                 action.addObserver(observer)
+
+        # Action-based GUIs should observe their actions
+        for actionBasedGUI in self.defaultActionGUIs + self.buttonBarGUIs + self.actionTabGUIs:
+            actionBasedGUI.action.addObserver(actionBasedGUI)
 
         for observer in self.getHideableGUIs():
             self.menuBarGUI.addObserver(observer)
 
         for observer in self.getExitObservers():
             self.topWindowGUI.addObserver(observer)
-                
+    
     def readGtkRCFile(self):
         configDir = plugins.getPersonalConfigDir()
         if not configDir:
@@ -1269,27 +1275,14 @@ class ActionGUI(SubGUI):
         message += self.detailDescription()
         message += self.sensitivityDescription()
         guilog.info(message)
-    def notifyNewTestSelection(self, *args):
-        self.checkSensitivity()
-    def notifyNewFileSelection(self, *args):
-        self.checkSensitivity()
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        self.checkSensitivity(test, state)
-    def checkSensitivity(self, test=None, state=None):
-        if self.updateSensitivity(test, state) and self.active:
-            newActive = self.actionOrButton().get_property("sensitive")
-            guilog.info("Setting sensitivity of action '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newActive))
-    def updateSensitivity(self, test=None, state=None):
+    def notifySensitivity(self, newValue):
         actionOrButton = self.actionOrButton()
         if not actionOrButton:
-            return False
-        oldActive = actionOrButton.get_property("sensitive")
-        newActive = self.action.isActiveOnCurrent(test, state)
-        if oldActive != newActive:
-            actionOrButton.set_property("sensitive", newActive)
-            return True
-        else:
-            return False
+            return
+        oldValue = actionOrButton.get_property("sensitive")
+        actionOrButton.set_property("sensitive", newValue)
+        if self.active and oldValue != newValue:
+            guilog.info("Setting sensitivity of action '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
     def detailDescription(self):
         return ""
     def sensitivityDescription(self):
@@ -1329,7 +1322,9 @@ class DefaultActionGUI(ActionGUI):
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.action.getTooltip(), self.getStockId())
         scriptEngine.connect(self.action.getScriptTitle(False), "activate", self.gtkAction, self.runInteractive)
-        self.updateSensitivity()
+        if not action.isActiveOnCurrent():
+            self.gtkAction.set_property("sensitive", False)
+            
     def addToGroups(self, actionGroup, accelGroup):
         self.accelerator = self.getAccelerator()
         actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
@@ -1380,8 +1375,8 @@ class ButtonActionGUI(ActionGUI):
         self.button = gtk.Button(self.action.getTitle(includeMnemonics=True))
         self.tooltips.set_tip(self.button, self.scriptTitle)
         scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
-        if not alwaysSensitive:
-            self.updateSensitivity()
+        if not alwaysSensitive and not self.action.isActiveOnCurrent():
+            self.button.set_property("sensitive", False)
         self.button.show()
         return self.button
     
@@ -1449,41 +1444,30 @@ class ActionTabGUI(SubGUI):
     def __init__(self, optionGroup, action, buttonGUI):
         SubGUI.__init__(self)
         self.optionGroup = optionGroup
-        self.action = action
         self.buttonGUI = buttonGUI
+        self.action = action
         self.vbox = None
         self.diag = plugins.getDiagnostics("Action Tabs")
+        self.sensitive = action.isActiveOnCurrent()
+        self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.sensitive))
         self.tooltips = gtk.Tooltips()
     def getGroupTabTitle(self):
         return self.action.getGroupTabTitle()
     def getTabTitle(self):
         return self.optionGroup.name
     def shouldShowCurrent(self, *args):
-        return self.action.isActiveOnCurrent(*args)
+        return self.sensitive
     def createView(self):
         return self.addScrollBars(self.createVBox())
+    def notifySensitivity(self, newValue):
+        self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
+        self.sensitive = newValue
     def notifyReset(self):
         self.optionGroup.reset()
         self.contentsChanged()
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        changedContents, changedValues = self.action.updateForStateChange(test, state)
-        self.diag.info("New state for " + self.getTabTitle() + ", " + state.category + \
-                       " contents changed " + repr(changedContents))
-        self.handleChanges(changedContents, changedValues)     
-    def notifyNewTestSelection(self, tests, direct):
-        if len(tests) == 0:
-            return
-        changedContents, changedValues = self.action.updateForSelectionChange()
-        self.diag.info("New selection for " + self.getTabTitle() + ", " + repr(tests) + \
-                       " contents changed " + repr(changedContents))
-        self.handleChanges(changedContents, changedValues)
-        
-    def handleChanges(self, changedContents, changedValues):
-        if changedContents:
-            self.recreateContents()
-        if changedContents or changedValues:
-            self.contentsChanged()
-    def recreateContents(self):
+    def notifyUpdateOptions(self):
+        self.contentsChanged()
+    def notifyAddOptions(self):
         if not self.vbox:
             return
         container = self.vbox.get_parent()

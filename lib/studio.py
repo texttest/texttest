@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.7 2007/06/28 13:56:58 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.8 2007/08/01 08:32:52 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -156,11 +156,11 @@ class ImportTestCase(guiplugins.ImportTestCase):
     def addDefinitionFileOption(self):
         guiplugins.ImportTestCase.addDefinitionFileOption(self)
         self.optionGroup.addOption("mac", "Macro to use", self.newMacroString)
-    def updateForSelection(self):
-        guiplugins.ImportTestCase.updateForSelection(self)
+    def updateOptions(self):
+        guiplugins.ImportTestCase.updateOptions(self)
         self.optionGroup.setOptionValue("mac", self.newMacroString)
         self.optionGroup.setPossibleValues("mac", self.getExistingMacros())
-        return False, True
+        return True
     def getExistingMacros(self):
         carmUsr = self.currentTest.getEnvironment("CARMUSR")
         if not carmUsr:
@@ -187,8 +187,8 @@ class RecordTest(guiplugins.RecordTest):
     def __init__(self):
         guiplugins.RecordTest.__init__(self)
         self.optionGroup.addOption("rset", "Compile this ruleset first")
-    def updateForSelection(self):
-        retValue = guiplugins.RecordTest.updateForSelection(self)
+    def updateOptions(self):
+        retValue = guiplugins.RecordTest.updateOptions(self)
         self.optionGroup.setOptionValue("rset", "")
         self.optionGroup.setPossibleValues("rset", self.findRuleSets())
         return retValue

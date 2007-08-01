@@ -1882,9 +1882,9 @@ class StartStudio(guiplugins.InteractiveTestAction):
         return "Studio"
     def getScriptTitle(self, tab):
         return "Start Studio"
-    def updateForSelection(self):
+    def updateOptions(self):
         self.optionGroup.setOptionValue("sys", self.currentTest.getEnvironment("CARMSYS"))
-        return False, False
+        return False
     def performOnCurrent(self):
         environ = self.currentTest.getRunEnvironment([ "CARMUSR", "CARMTMP" ])
         environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")

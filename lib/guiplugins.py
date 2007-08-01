@@ -106,6 +106,8 @@ processTerminationMonitor = ProcessTerminationMonitor()
 class InteractiveAction(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
+        self.currFileSelection = []
+        self.diag = plugins.getDiagnostics("Interactive Actions")
         self.optionGroup = plugins.OptionGroup(self.getTabTitle())
     def __repr__(self):
         if self.optionGroup.name:
@@ -121,17 +123,33 @@ class InteractiveAction(plugins.Observable):
             return [ self.optionGroup ]
     def createOptionGroupTab(self, optionGroup):
         return optionGroup.switches or optionGroup.options
-    def updateForStateChange(self, test, state):
-        return self.updateForState(test, state)
-    def updateForSelectionChange(self):
-        if self.isActiveOnCurrent():
-            return self.updateForSelection()
-        else:
-            return False, False
-    def updateForSelection(self):
-        return False, False
-    def updateForState(self, test, state):
-        return False, False
+    def notifyNewTestSelection(self, tests, direct):
+        self.updateSelection(tests)
+        newActive = self.isActiveOnCurrent()
+        self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
+        self.changeSensitivity(newActive)
+
+    def notifyLifecycleChange(self, test, state, desc):
+        newActive = self.isActiveOnCurrent(test, state)
+        self.diag.info("State change for " + self.getTitle() + "=" + state.category + " : new active = " + repr(newActive))
+        self.changeSensitivity(newActive)
+
+    def updateFileSelection(self, files):
+        self.currFileSelection = files
+        newActive = self.isActiveOnCurrent()
+        self.diag.info("New file selection for " + self.getTitle() + "=" + repr(files) + " : new active = " + repr(newActive))
+        self.changeSensitivity(newActive)
+
+    def changeSensitivity(self, newActive):
+        self.notify("Sensitivity", newActive)
+        if newActive:
+            if self.updateOptions():
+                self.notify("UpdateOptions")
+
+    def updateSelection(self, tests):
+        pass
+    def updateOptions(self):
+        return False     
     def isActiveOnCurrent(self, *args):
         return True
     def canPerform(self):
@@ -247,7 +265,7 @@ class SelectionAction(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currTestSelection = []
-    def notifyNewTestSelection(self, tests, direct):
+    def updateSelection(self, tests):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) > 0
@@ -260,11 +278,6 @@ class SelectionAction(InteractiveAction):
         return test in self.currTestSelection
     def isNotSelected(self, test):
         return not self.isSelected(test)
-    def updateForStateChange(self, test, state):
-        if test in self.currTestSelection:
-            return self.updateForState(test, state)
-        else:
-            return False, False
     def getCmdlineOption(self):
         selTestPaths = []
         for test in self.currTestSelection:
@@ -283,6 +296,8 @@ class Quit(InteractiveAction):
     def messageAfterPerform(self):
         # Don't provide one, the GUI isn't there to show it :)
         pass
+    def notifyNewTestSelection(self, tests, direct):
+        pass # we don't care and don't want to screw things up...
     def performOnCurrent(self):
         self.notify("Exit")
     def getConfirmationMessage(self):
@@ -312,16 +327,11 @@ class InteractiveTestAction(InteractiveAction):
         return repr(self.currentTest)
     def inButtonBar(self):
         return not self.inMenuOrToolBar() and len(self.getOptionGroups()) == 0
-    def notifyNewTestSelection(self, tests, direct):
+    def updateSelection(self, tests):
         if len(tests) == 1:
             self.currentTest = tests[0]
         else:
             self.currentTest = None
-    def updateForStateChange(self, test, state):
-        if test is self.currentTest:
-            return self.updateForState(test, state)
-        else:
-            return False, False
     def startViewer(self, cmdArgs, description = "", env=None, exitHandler=None, exitHandlerArgs=()):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
@@ -340,7 +350,6 @@ class SaveTests(SelectionAction):
         SelectionAction.__init__(self)
         self.addOption("v", "Version to save")
         self.addSwitch("over", "Replace successfully compared files also", 0)
-        self.currFileSelection = []
         self.currApps = []
     def getStockId(self):
         return "save"
@@ -369,18 +378,19 @@ class SaveTests(SelectionAction):
         return apps
     def getSaveableTests(self):
         return filter(lambda test: test.state.isSaveable(), self.currTestSelection)       
-    def updateForSelectionChange(self):
+    def updateOptions(self):
         apps = self.getSelectedApps()
         if apps == self.currApps:
-            return False, False
+            return False
         self.currApps = apps
-        self.optionGroup.setOptionValue("v", self.getDefaultSaveOption(apps))
+        defaultSaveOption = self.getDefaultSaveOption(apps)
+        self.optionGroup.setOptionValue("v", defaultSaveOption)
+        self.diag.info("Setting default save version to " + defaultSaveOption)
         self.optionGroup.setPossibleValues("v", self.getPossibleVersions(apps))
         if self.hasPerformance(apps) and not self.optionGroup.switches.has_key("ex"):
             self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
-            return True, True
-        else:
-            return False, True
+            self.notify("AddOptions")
+        return True
     def getDefaultSaveOption(self, apps):
         saveVersions = self.getSaveVersions(apps)
         if saveVersions.find(",") != -1:
@@ -419,7 +429,7 @@ class SaveTests(SelectionAction):
         else:
             return versionString
     def notifyNewFileSelection(self, files):
-        self.currFileSelection = files
+        self.updateFileSelection(files)
     def newFilesAsDiags(self):
         return int(self.optionGroup.getSwitchValue("newdiag", 0))
     def isActiveOnCurrent(self, test=None, state=None):
@@ -456,7 +466,6 @@ class SaveTests(SelectionAction):
 class FileViewAction(InteractiveTestAction):
     def __init__(self):
         InteractiveTestAction.__init__(self)
-        self.currFileSelection = []
         self.viewTools = {}
     def correctTestClass(self):
         return True # enable for both tests and suites
@@ -474,9 +483,9 @@ class FileViewAction(InteractiveTestAction):
     def _isActiveForFile(self, fileName, comparison):
         return True
     def notifyNewFileSelection(self, files):
-        self.currFileSelection = files
-        for fileName, comparison in self.currFileSelection:
+        for fileName, comparison in files:
             self.viewTools[fileName] = self.getViewTool(fileName)
+        self.updateFileSelection(files)
     def useFiltered(self):
         return False
     def performOnCurrent(self):
@@ -705,11 +714,11 @@ class ImportTest(InteractiveTestAction):
         return self.testType() + " Description"
     def getPlaceTitle(self):
         return "Place " + self.testType()
-    def updateForSelection(self):
+    def updateOptions(self):
         self.optionGroup.setOptionValue("name", self.getDefaultName())
         self.optionGroup.setOptionValue("desc", self.getDefaultDesc())
         self.setPlacements(self.currentTest)
-        return False, True
+        return True
     def setPlacements(self, suite):
         if suite.classId() == "test-case":
             suite = suite.parent
@@ -788,12 +797,14 @@ class RecordTest(InteractiveTestAction):
         return self.currentTest.getConfigValue("use_case_record_mode")
     def isActiveOnCurrent(self, *args):
         return InteractiveTestAction.isActiveOnCurrent(self, *args) and self.getRecordMode() != "disabled"
-    def updateForSelection(self):
+    def updateOptions(self):
         if self.currentApp is not self.currentTest.app:
             self.currentApp = self.currentTest.app
             self.optionGroup.setOptionValue("v", self.currentTest.app.getFullVersion(forSave=1))
             self.optionGroup.setOptionValue("c", self.currentTest.app.checkout)
-        return False, False
+            return True
+        else:
+            return False
     def updateRecordTime(self, test):
         if self.updateRecordTimeForFile(test, "usecase", "USECASE_RECORD_SCRIPT", "target_record"):
             return True
@@ -1068,7 +1079,9 @@ class ResetGroups(InteractiveAction):
         return "Reset running options"
     def performOnCurrent(self):
         self.notify("Reset")
-
+    def notifyNewTestSelection(self, tests, direct):
+        pass # we don't care and don't want to screw things up...
+    
 class SaveSelection(SelectionAction):
     def __init__(self, commandOptionGroups):
         SelectionAction.__init__(self)
@@ -1307,12 +1320,12 @@ class CreateDefinitionFile(InteractiveTestAction):
             if not defFile in dontAppend:
                 defFiles.append(defFile)
         return defFiles + self.currentTest.app.getDataFileNames()
-    def updateForSelection(self):
+    def updateOptions(self):
         self.diagsEnabled = self.checkDiagsEnabled()
         defFiles = self.getDefinitionFiles()
         self.optionGroup.setValue("type", defFiles[0])
         self.optionGroup.setPossibleValues("type", defFiles)
-        return False, True
+        return True
     def getFileName(self, stem, version):
         stem = self.optionGroup.getOptionValue("type")
         if stem in self.currentTest.getConfigValue("definition_file_stems"):
@@ -1355,13 +1368,10 @@ class CreateDefinitionFile(InteractiveTestAction):
         pass
 
 class RemoveTests(SelectionAction):
-    def __init__(self):
-        SelectionAction.__init__(self)
-        self.currFileSelection = []
-    def notifyNewTestSelection(self, tests, direct):
+    def updateSelection(self, tests):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def notifyNewFileSelection(self, files):
-        self.currFileSelection = files
+        self.updateFileSelection(files)
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.parent:
@@ -1479,9 +1489,9 @@ class CopyTest(ImportTest):
         return "_Copy"
     def getScriptTitle(self, tab):
         return "Copy Test"
-    def updateForSelection(self):
+    def updateOptions(self):
         self.fillSuiteList()
-        return ImportTest.updateForSelection(self)
+        return ImportTest.updateOptions(self)
     def updatePlacements(self, w):
         # Get the suite from the 'suite' option, adjust placement possibilities
         chosenSuite = self.optionGroup.getOptionValue("suite")
@@ -1511,9 +1521,9 @@ class CopyTest(ImportTest):
         self.optionGroup.getOption("suite").reset()
     def getDestinationSuite(self):
         return self.suiteMap[self.optionGroup.getOptionValue("suite")]
-    def notifyNewTestSelection(self, tests, direct):
+    def updateSelection(self, tests):
         # apply to parent
-        ImportTest.notifyNewTestSelection(self, tests, direct)
+        ImportTest.updateSelection(self, tests)
         if self.currentTest and self.currentTest.classId() == "test-case":
             self.testToCopy = self.currentTest
             self.currentTest = self.currentTest.parent
@@ -1564,11 +1574,11 @@ class ReportBugs(InteractiveTestAction):
         return "Report Described Bugs"
     def getTabTitle(self):
         return "Bugs"
-    def updateForSelection(self):
+    def updateOptions(self):
         self.optionGroup.setOptionValue("search_file", self.currentTest.app.getConfigValue("log_file"))
         self.optionGroup.setPossibleValues("search_file", self.getPossibleFileStems())
         self.optionGroup.setOptionValue("version", self.currentTest.app.getFullVersion())
-        return False, False
+        return False
     def getPossibleFileStems(self):
         stems = []
         for test in self.currentTest.testCaseList():
@@ -1634,8 +1644,8 @@ class RecomputeTest(InteractiveTestAction):
         
         useState = self.getState(state)
         return useState.hasStarted() and not useState.isComplete()
-    def notifyNewTestSelection(self, tests, direct):
-        InteractiveTestAction.notifyNewTestSelection(self, tests, direct)
+    def updateSelection(self, tests):
+        InteractiveTestAction.updateSelection(self, tests)
         # Prevent recomputation triggering more...
         if self.recomputing:
             self.chainReaction = True
@@ -1667,7 +1677,7 @@ class SortTestSuiteFileAscending(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currTestSelection = []
-    def notifyNewTestSelection(self, tests, direct):
+    def updateSelection(self, tests):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) == 1 and \
@@ -1719,7 +1729,7 @@ class RepositionTest(InteractiveAction):
         self.position = position
         self.currTestSelection = []
         self.testToMove = None
-    def notifyNewTestSelection(self, tests, direct):
+    def updateSelection(self, tests):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
         if len(tests) == 1:
             self.testToMove = tests[0]
@@ -1808,7 +1818,7 @@ class RenameTest(InteractiveAction):
         self.oldName = ""
         self.newDescription = ""
         self.oldDescription = ""
-    def notifyNewTestSelection(self, tests, direct):
+    def updateSelection(self, tests):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) == 1 and \

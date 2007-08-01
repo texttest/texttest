@@ -40,7 +40,6 @@ class CVSAction(guiplugins.InteractiveAction):
     def __init__(self, cvsArgs, dynamic=False):
         guiplugins.InteractiveAction.__init__(self)
         self.currTestSelection = []
-        self.currFileSelection = []
         self.cvsArgs = cvsArgs
         self.recursive = False
         self.dynamic = dynamic
@@ -57,12 +56,12 @@ class CVSAction(guiplugins.InteractiveAction):
             except OSError:
                 raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
         return process.stdout.readlines()
-    def notifyNewTestSelection(self, tests, direct):
+    def updateSelection(self, tests):
         self.currTestSelection = tests
         if not self.dynamic: # See bugzilla 17653
             self.currFileSelection = []
     def notifyNewFileSelection(self, files):
-        self.currFileSelection = files
+        self.updateFileSelection(files)
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) > 0 
     def separatorBeforeInMainMenu(self):

@@ -343,6 +343,13 @@ class Test(plugins.Observable):
         return plugins.relpath(self.getDirectory(), self.app.getDirectory())
     def getDirectory(self, temporary=False, forFramework=False):
         return self.dircache.dir
+    def remove(self, removeFromTestFile = True):
+        dir = self.getDirectory()
+        if os.path.isdir(dir) and self.parent: # might have already removed the enclosing suite
+            self.parent.removeTest(self, removeFromTestFile)
+            return True
+        else:
+            return False
     def rename(self, newName, newDescription):
         # Correct all testsuite files ...
         for testSuiteFileName in self.parent.findTestSuiteFiles():

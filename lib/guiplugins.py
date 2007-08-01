@@ -675,8 +675,113 @@ class KillTests(SelectionAction):
         tests = reduce(operator.add, [ suite.getRunningTests() for suite in reversed(self.rootTestSuites) ])
         if len(tests) > 0:
             self.killTests(tests)
-                
-    
+
+class CopyTests(SelectionAction):
+    def getStockId(self):
+        return "copy"
+    def _getTitle(self):
+        return "_Copy"
+    def _getScriptTitle(self):
+        return "Copy selected tests"
+    def performOnCurrent(self):
+        self.notify("Clipboard", self.currTestSelection, cut=False)
+
+class CutTests(SelectionAction):
+    def getStockId(self):
+        return "cut"
+    def _getTitle(self):
+        return "_Cut"
+    def _getScriptTitle(self):
+        return "Cut selected tests"
+    def performOnCurrent(self):
+        self.notify("Clipboard", self.currTestSelection, cut=True)
+
+class PasteTests(InteractiveTestAction):
+    def __init__(self):
+        InteractiveTestAction.__init__(self)
+        self.clipboardTests = []
+        self.removeAfter = False
+    def getStockId(self):
+        return "paste"
+    def _getTitle(self):
+        return "_Paste"
+    def _getScriptTitle(self):
+        return "Paste tests from clipboard"
+    def notifyClipboard(self, tests, cut=False):
+        self.clipboardTests = tests
+        self.removeAfter = cut
+        self.notify("Sensitivity", True)
+    def correctTestClass(self):
+        return True # Can paste after suites also
+    def isActiveOnCurrent(self, test=None, state=None):
+        return InteractiveTestAction.isActiveOnCurrent(self, test, state) and len(self.clipboardTests) > 0
+    def getDestinationSuite(self):
+        if self.currentTest.classId() == "test-suite":
+            return self.currentTest
+        else:
+            return self.currentTest.parent
+    def getNewTestName(self, suite, oldName):
+        if suite.findSubtest(oldName):
+            nextNameCandidate = self.findNextNameCandidate(oldName)
+            return self.getNewTestName(suite, nextNameCandidate)
+        else:
+            return oldName
+    def findNextNameCandidate(self, name):
+        copyPos = name.find("_copy_")
+        if copyPos != -1:
+            copyEndPos = copyPos + 6
+            number = int(name[copyEndPos:])
+            return name[:copyEndPos] + str(number + 1)
+        elif name.endswith("copy"):
+            return name + "_2"
+        else:
+            return name + "_copy"
+    def getNewDescription(self, test):
+        if len(test.description) or self.removeAfter:
+            return test.description
+        else:
+            return "Copy of " + test.name
+    def getPlacement(self, suite):
+        if suite is self.currentTest:
+            return 0
+        else:
+            return suite.testcases.index(self.currentTest) + 1   
+    def performOnCurrent(self):
+        suite = self.getDestinationSuite()
+        placement = self.getPlacement(suite)
+        newTests = []
+        for test in self.clipboardTests:
+            newName = self.getNewTestName(suite, test.name)
+            
+            guilog.info("Pasting test " + newName + " under test suite " + \
+                        repr(suite) + ", in position " + str(placement))
+            newDesc = self.getNewDescription(test)
+            testDir = suite.writeNewTest(newName, newDesc, placement)
+            testImported = self.createTestContents(test, suite, testDir, newDesc, placement)
+            if self.removeAfter:
+                newTests.append(testImported)
+                test.remove()
+        if self.removeAfter:
+            # After a paste from cut, subsequent pastes should behave like copies of the new tests
+            self.clipboardTests = newTests
+            self.removeAfter = False
+        suite.contentChanged()
+    def createTestContents(self, testToCopy, suite, testDir, description, placement):
+        stdFiles, defFiles = testToCopy.listStandardFiles(allVersions=True)
+        for sourceFile in stdFiles + defFiles:
+            dirname, local = os.path.split(sourceFile)
+            if dirname == testToCopy.getDirectory():
+                targetFile = os.path.join(testDir, local)
+                shutil.copy2(sourceFile, targetFile)
+        dataFiles = testToCopy.listDataFiles()
+        for sourcePath in dataFiles:
+            if os.path.isdir(sourcePath):
+                continue
+            targetPath = sourcePath.replace(testToCopy.getDirectory(), testDir)
+            plugins.ensureDirExistsForFile(targetPath)
+            shutil.copy2(sourcePath, targetPath)
+        return suite.addTestCase(os.path.basename(testDir), description, placement)
+        
 # And a generic import test. Note acts on test suites
 class ImportTest(InteractiveTestAction):
     def __init__(self):
@@ -1424,11 +1529,8 @@ Are you sure you wish to proceed?\n"""
         for test in self.currTestSelection:
             if not test.parent:
                 warnings += "\nThe root suite\n'" + test.name + " (" + test.app.name + ")'\ncannot be removed.\n"
-            else:
-                dir = test.getDirectory()
-                if os.path.isdir(dir): # might have already removed the enclosing suite
-                    test.parent.removeTest(test)
-                    namesRemoved.append(test.name)
+            elif test.remove():
+                namesRemoved.append(test.name)
         self.notify("Status", "Removed test(s) " + ",".join(namesRemoved))
         if warnings:
             self.notify("Warning", warnings)
@@ -1451,104 +1553,6 @@ Are you sure you wish to proceed?\n"""
             self.notify("Warning", warnings)
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
-
-class CopyTest(ImportTest):
-    def __init__(self):
-        ImportTest.__init__(self)
-        self.testToCopy = None
-        self.optionGroup.removeOption("testpos")
-        self.optionGroup.addOption("suite", "Copy to suite", "current", allocateNofValues = 2, description = "Which suite should the test be copied to?", changeMethod = self.updatePlacements)
-        self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues = 2, description = "Where in the test suite should the test be placed?")
-        self.optionGroup.addSwitch("keeporig", "Keep original", value = 1, description = "Should the original test be kept or removed?")
-    def isActiveOnCurrent(self, *args):
-        return self.testToCopy
-    def testType(self):
-        return "Test"
-    def getTabTitle(self):
-        return "Copying"
-    def getNameTitle(self):
-        return "Name of copy"
-    def getDescTitle(self):
-        return "Description"
-    def getPlaceTitle(self):
-        return "Place copy"
-    def getDefaultName(self):
-        if self.testToCopy:
-            return self.testToCopy.name + "_copy"
-        else:
-            return ""
-    def getDefaultDesc(self):
-        if self.testToCopy:
-            if len(self.testToCopy.description) > 0:
-                return plugins.extractComment(self.testToCopy.description)
-            else:
-                return "Copy of " + self.testToCopy.name
-        else:
-            return ""
-    def _getTitle(self):
-        return "_Copy"
-    def getScriptTitle(self, tab):
-        return "Copy Test"
-    def updateOptions(self):
-        self.fillSuiteList()
-        return ImportTest.updateOptions(self)
-    def updatePlacements(self, w):
-        # Get the suite from the 'suite' option, adjust placement possibilities
-        chosenSuite = self.optionGroup.getOptionValue("suite")
-        if chosenSuite: # We first catch an event for an empty gtk.Entry ..
-            suite = self.suiteMap[chosenSuite]
-            self.setPlacements(suite)
-    def fillSuiteList(self):
-        suiteNames = [ "current" ]
-        self.suiteMap = { "current" : self.currentTest }
-        root = self.currentTest       
-        while root.parent != None:
-            root = root.parent
-
-        toCheck = [ root ]
-        path = { root : root.name }
-        while len(toCheck) > 0:
-            suite = toCheck[len(toCheck) - 1]
-            toCheck = toCheck[0:len(toCheck) - 1]
-            if suite.classId() == "test-suite":
-                thisPath = path[suite]
-                suiteNames.append(thisPath)
-                self.suiteMap[thisPath] = suite
-                for i in xrange(len(suite.testcases) - 1, -1, -1):
-                    path[suite.testcases[i]] = path[suite] + "/" + suite.testcases[i].name
-                    toCheck.append(suite.testcases[i])
-        self.optionGroup.setPossibleValues("suite", suiteNames)
-        self.optionGroup.getOption("suite").reset()
-    def getDestinationSuite(self):
-        return self.suiteMap[self.optionGroup.getOptionValue("suite")]
-    def updateSelection(self, tests):
-        # apply to parent
-        ImportTest.updateSelection(self, tests)
-        if self.currentTest and self.currentTest.classId() == "test-case":
-            self.testToCopy = self.currentTest
-            self.currentTest = self.currentTest.parent
-        else:
-            self.testToCopy = None
-    def createTestContents(self, suite, testDir, description, placement):
-        stdFiles, defFiles = self.testToCopy.listStandardFiles(allVersions=True)
-        for sourceFile in stdFiles + defFiles:
-            dirname, local = os.path.split(sourceFile)
-            if dirname == self.testToCopy.getDirectory():
-                targetFile = os.path.join(testDir, local)
-                shutil.copy2(sourceFile, targetFile)
-        dataFiles = self.testToCopy.listDataFiles()
-        for sourcePath in dataFiles:
-            if os.path.isdir(sourcePath):
-                continue
-            targetPath = sourcePath.replace(self.testToCopy.getDirectory(), testDir)
-            plugins.ensureDirExistsForFile(targetPath)
-            shutil.copy2(sourcePath, targetPath)
-        originalTest = self.testToCopy # Set to new test in call below ...
-        originalSuite = self.currentTest # Also reset
-        ret =  suite.addTestCase(os.path.basename(testDir), description, placement)
-        if not self.optionGroup.getSwitchValue("keeporig"):
-            originalSuite.removeTest(originalTest)
-        return ret
     
 class ReportBugs(InteractiveTestAction):
     def __init__(self):
@@ -1928,7 +1932,7 @@ class InteractiveActionHandler:
         self.actionPreClasses = [ Quit, ViewInEditor ]
         self.actionDynamicClasses = [ ViewFilteredInEditor, ViewFileDifferences, ViewFilteredFileDifferences, FollowFile, \
                                       SaveTests, SaveSelection, RecomputeTest, KillTests ]
-        self.actionStaticClasses = [ RecordTest, CopyTest, ImportTestCase, ImportTestSuite, \
+        self.actionStaticClasses = [ RecordTest, CopyTests, CutTests, PasteTests, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups, RenameTest, RemoveTests, \
                                      SortTestSuiteFileAscending, SortTestSuiteFileDescending, \

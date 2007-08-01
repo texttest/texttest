@@ -10,6 +10,10 @@
     </menu>
 
     <menu action="editmenu">
+      <menuitem action="Cut"/>
+      <menuitem action="Copy"/>
+      <menuitem action="Paste"/>
+      <menuitem name="Remove..." action="Remove..."/>
       <menuitem name="Rename..." action="Rename..."/>
       <menuitem name="Remove..." action="Remove..."/>
       <separator/>
@@ -44,8 +48,11 @@
   </toolbar>
 
   <popup name="TestPopupMenu">
-    <menuitem name="Rename..." action="Rename..."/>
-    <menuitem name="Remove..." action="Remove..."/>
+    <menuitem action="Cut"/>
+    <menuitem action="Copy"/>
+    <menuitem action="Paste"/>
+    <menuitem action="Rename..."/>
+    <menuitem action="Remove..."/>
     <separator/>
     <menu action="reordermenu">
       <menuitem name="Move to first" action="Move to first"/>

@@ -392,14 +392,14 @@ class ThreadedNotificationHandler:
         self.active = False
     def pollQueue(self):
         try:
-            observable, args = self.workQueue.get_nowait()
-            observable.notify(*args)
+            observable, args, kwargs = self.workQueue.get_nowait()
+            observable.notify(*args, **kwargs)
         except Empty:
             # Idle handler. We must sleep for a bit if we don't do anything, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
         return self.active
-    def transfer(self, observable, *args):
-        self.workQueue.put((observable, args))
+    def transfer(self, observable, *args, **kwargs):
+        self.workQueue.put((observable, args, kwargs))
 
 class Observable:
     threadedNotificationHandler = ThreadedNotificationHandler()
@@ -412,38 +412,38 @@ class Observable:
         self.observers = observers
     def inMainThread(self):
         return currentThread().getName() == "MainThread"
-    def notify(self, *args):
+    def notify(self, *args, **kwargs):
         if self.threadedNotificationHandler.active and not self.inMainThread():
-            self.threadedNotificationHandler.transfer(self, *args)
+            self.threadedNotificationHandler.transfer(self, *args, **kwargs)
         else:
-            self.performNotify(*args)
-    def notifyThreaded(self, *args):
+            self.performNotify(*args, **kwargs)
+    def notifyThreaded(self, *args, **kwargs):
         # join the idle handler queue even if we're the main thread
         if self.threadedNotificationHandler.active:
-            self.threadedNotificationHandler.transfer(self, *args)
+            self.threadedNotificationHandler.transfer(self, *args, **kwargs)
         else:
-            self.performNotify(*args)        
-    def notifyIfMainThread(self, *args):
+            self.performNotify(*args, **kwargs)        
+    def notifyIfMainThread(self, *args, **kwargs):
         if not self.inMainThread():
             return
         else:
-            self.performNotify(*args)
-    def performNotify(self, name, *args):
+            self.performNotify(*args, **kwargs)
+    def performNotify(self, name, *args, **kwargs):
         methodName = "notify" + name
         for observer in self.observers:
             if hasattr(observer, methodName):
-                retValue = self.notifyObserver(observer, methodName, *args)
+                retValue = self.notifyObserver(observer, methodName, *args, **kwargs)
                 if retValue is not None: # break off the chain if we get a non-None value back
                     break
-    def notifyObserver(self, observer, methodName, *args):
+    def notifyObserver(self, observer, methodName, *args, **kwargs):
         # doesn't matter if only some of the observers have the method
         method = eval("observer." + methodName)
         # unpickled objects have not called __init__, and
         # hence do not have self.passSelf ...
         if hasattr(self, "passSelf") and self.passSelf:
-            return method(self, *args)
+            return method(self, *args, **kwargs)
         else:
-            return method(*args)
+            return method(*args, **kwargs)
             
 # Generic state which tests can be in, should be overridden by subclasses
 # Acts as a static state for tests which have not run (yet)

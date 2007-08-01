@@ -758,6 +758,7 @@ class PasteTests(InteractiveTestAction):
             newDesc = self.getNewDescription(test)
             testDir = suite.writeNewTest(newName, newDesc, placement)
             testImported = self.createTestContents(test, suite, testDir, newDesc, placement)
+            placement += 1 # for several tests, insert them in order
             if self.removeAfter:
                 newTests.append(testImported)
                 test.remove()

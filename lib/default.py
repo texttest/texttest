@@ -868,7 +868,7 @@ class PrepareWriteDirectory(plugins.Action):
         return envVarDict.get(configName)
     def copyTestPath(self, test, fullPath, target):
         if os.path.isfile(fullPath):
-            shutil.copy(fullPath, target)
+            self.copyfile(fullPath, target) 
         if os.path.isdir(fullPath):
             self.copytree(fullPath, target)
     def copytimes(self, src, dst):

@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.8 2007/08/01 08:32:52 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.9 2007/08/03 13:11:41 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -53,7 +53,7 @@ class StudioConfig(ravebased.Config):
                         if name:
                             rulesetName = os.path.basename(name)
                             break
-                except Exception, x:
+                except Exception:
                     pass
         if self.macroBuildsRuleset(test, rulesetName):
             # Don't want to manage the ruleset separately if the macro is going to build it...

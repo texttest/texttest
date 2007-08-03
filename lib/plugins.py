@@ -29,7 +29,6 @@ def posixexpandvars(path, getenvFunc=os.getenv):
     if '$' not in path:
         return path
     if not _varprog:
-        import re
         _varprog = re.compile(r'\$(\w+|\{[^}]*\})')
     i = 0
     while True:
@@ -57,7 +56,6 @@ def ntexpandvars(path, getenvFunc=os.getenv):
     Unknown variables are left unchanged."""
     if '$' not in path:
         return path
-    import string
     varchars = string.ascii_letters + string.digits + '_-'
     res = ''
     index = 0
@@ -949,7 +947,7 @@ class TextOption(Option):
             if os.path.isdir(os.path.abspath(dir[1])) and \
                    len(os.listdir(os.path.abspath(dir[1]))) > 0:
                 return (self.possibleDirs, dir[1])
-        return (self.possibleDirs, dirs[0][1])
+        return (self.possibleDirs, self.possibleDirs[0][1])
         
 class Switch(Option):
     def __init__(self, name, defaultValue, options, description, changeMethod):
@@ -1011,10 +1009,6 @@ class OptionGroup:
             return self.options[key].getValue()
         else:
             return defValue
-    def getOption(self, key):
-        return self.options[key]
-    def getSwitch(self, key):
-        return self.switches[key]
     def setSwitchValue(self, key, value):
         if self.switches.has_key(key):
             self.switches[key].setValue(value)

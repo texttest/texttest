@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import sys, string, os, plugins, types, subprocess
+import sys, os, plugins, subprocess
 from jobprocess import JobProcess
 from usecase import ScriptEngine
 

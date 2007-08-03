@@ -170,7 +170,7 @@ class TestRunner:
         try:
             return method(*args)
         except plugins.TextTestError, e:
-            self.failTest(str(sys.exc_value))
+            self.failTest(str(e))
         except:
             plugins.printWarning("Caught exception while running " + repr(self.test) + " changing state to UNRUNNABLE :")
             exceptionText = plugins.printException()

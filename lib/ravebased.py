@@ -42,7 +42,7 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
                              the specified time. Default time is 1440 minutes.
 """
 
-import default, os, string, shutil, plugins, sys, signal, stat, guiplugins, subprocess
+import default, os, string, shutil, plugins, sys, stat, guiplugins, subprocess
 from socket import gethostname, SHUT_WR
 from respond import Responder
 from copy import copy
@@ -562,7 +562,6 @@ class CompileRules(plugins.Action):
         if not rulecomp:
             return
         
-        raveInfo = ""
         for ruleset in rulecomp.rulesetsForSelf:
             self.describe(test, " - ruleset " + ruleset.name)
 
@@ -920,7 +919,7 @@ class TraverseCarmUsers(plugins.Action):
             else:
                 self.Command = string.join(args)
         if not self.Command:
-            raise "No command given"
+            raise plugins.TextTestError, "No command given"
     def __repr__(self):
         return "Traversing CARMUSR "
     def __call__(self, test):

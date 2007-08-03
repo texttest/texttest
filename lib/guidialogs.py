@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 import gtk
-import gobject
 
-import guiplugins, plugins, os, string, time, sys, locale
+import plugins, os, sys
+scriptEngine = None
+guilog = None
 from gtkusecase import ScriptEngine, TreeModelIndexer
 
 def setupScriptEngine(engine):

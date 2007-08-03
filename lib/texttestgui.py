@@ -26,17 +26,15 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, os, time, sys, locale, paths, operator
+import guiplugins, plugins, os, sys, paths, operator
 from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
 from respond import Responder
 from copy import copy
 from glob import glob
 
-import guidialogs, helpdialogs
+import guidialogs
 from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog
-
-import traceback
 
 def renderParentsBold(column, cell, model, iter):
     if model.iter_has_child(iter):
@@ -123,7 +121,7 @@ class SubGUI(plugins.Observable):
     def createView(self):
         pass
 
-    def shouldShow(self, *args):
+    def shouldShow(self):
         return True # should this be shown/created at all this run
 
     def shouldShowCurrent(self, *args):
@@ -1030,7 +1028,6 @@ class TestTreeGUI(ContainerGUI):
                 del self.collapsedRows[realPath]
         self.expandLevel(treeview, self.filteredModel.iter_children(iter), not self.collapseStatic)
     def rowInserted(self, model, path, iter):
-        realPath = self.filteredModel.convert_path_to_child_path(path)
         self.expandRow(self.filteredModel.iter_parent(iter), False)
     def expandRow(self, iter, recurse):
         if iter == None:
@@ -1121,7 +1118,6 @@ class TestTreeGUI(ContainerGUI):
         # This way, the signals are generated one at a time and we call back into here.
         model = view.get_model()
         while (iter != None):
-            test = model.get_value(iter, 2)
             if recursive:
                 view.expand_row(model.get_path(iter), open_all=False)
              
@@ -1180,7 +1176,7 @@ class TestTreeGUI(ContainerGUI):
         suiteIter = self.itermap[suite]
         follower = suite.getFollower(test)
         followIter = self.itermap.get(follower)
-        iter = self.addSuiteWithParent(test, suiteIter, followIter)
+        self.addSuiteWithParent(test, suiteIter, followIter)
     def notifyRemove(self, test):
         self.removeTest(test)
         guilog.info("Removing test with path " + test.getRelPath())
@@ -1372,12 +1368,15 @@ class ButtonActionGUI(ActionGUI):
         self.tooltips = gtk.Tooltips()
     def actionOrButton(self):
         return self.button
-    def createView(self, alwaysSensitive=False):
+    def createView(self):
+        self.createButton()
+        if not self.action.isActiveOnCurrent():
+            self.button.set_property("sensitive", False)
+        return self.button
+    def createButton(self):
         self.button = gtk.Button(self.action.getTitle(includeMnemonics=True))
         self.tooltips.set_tip(self.button, self.scriptTitle)
         scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
-        if not alwaysSensitive and not self.action.isActiveOnCurrent():
-            self.button.set_property("sensitive", False)
         self.button.show()
         return self.button
     
@@ -1506,7 +1505,7 @@ class ActionTabGUI(SubGUI):
             hbox = self.createSwitchBox(switch)
             self.vbox.pack_start(hbox, expand=False, fill=False)
         if self.buttonGUI:
-            button = self.buttonGUI.createView(alwaysSensitive=True)
+            button = self.buttonGUI.createButton()
             buttonbox = gtk.HBox()
             buttonbox.pack_start(button, expand=True, fill=False)
             buttonbox.show()
@@ -2079,7 +2078,6 @@ class FileViewGUI(SubGUI):
     def addFileToModel(self, iter, name, comp, colour):
         fciter = self.model.insert_before(iter, None)
         baseName = os.path.basename(name)
-        heading = self.model.get_value(iter, 0)
         self.model.set_value(fciter, 0, baseName)
         self.model.set_value(fciter, 1, colour)
         self.model.set_value(fciter, 2, name)
@@ -2154,7 +2152,7 @@ class ApplicationFileGUI(FileViewGUI):
                     if app:
                         file = app.configPath(file)
                     imports.append(file)
-                except Exception, e: # App. file not found ...
+                except Exception: # App. file not found ...
                     continue
             return imports
 

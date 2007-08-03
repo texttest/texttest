@@ -1,4 +1,4 @@
-import os, sys, default, unixonly, performance, plugins, socket, time, subprocess, operator
+import os, sys, default, unixonly, performance, plugins, socket, subprocess, operator
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from time import sleep
@@ -324,7 +324,7 @@ class SlaveRequestHandler(StreamRequestHandler):
         else:
             expectedHost, expectedPid = self.server.testClientInfo[test]
             sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
-                             hostname + " (process " + clientPid + ")\n")
+                             hostname + " (process " + identifier + ")\n")
             sys.stderr.write("Slave already registered from " + expectedHost + " (process " + expectedPid + ")\n")
             sys.stderr.write("Ignored all communication from this unexpected TextTest slave")
             sys.stderr.flush()
@@ -620,7 +620,7 @@ class QueueSystemServer:
         self.queueSystems[queueModule] = system
         return system
 
-class KillTestSubmission(plugins.Action):
+class KillTestSubmission:
     def __init__(self):
         self.diag = plugins.getDiagnostics("Kill Test")
     def changeState(self, test, newState):
@@ -696,7 +696,7 @@ class KillTestSubmission(plugins.Action):
         for attempt in range(1, 61):
             if test.state.isComplete():
                 return
-            time.sleep(1)
+            sleep(1)
             print "T: Cancellation in progress for test", test.uniqueName + \
                   ", waited " + str(attempt) + " seconds so far."
         name = queueSystemName(test.app)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, os, string, socket
+import sys, os, socket
 
 def createSocket():
     servAddr = os.getenv("TEXTTEST_MIM_SERVER")

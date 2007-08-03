@@ -33,7 +33,7 @@ helpOptions = """
              the graphical information also
 """
 
-import queuesystem, default, performance, os, shutil, plugins, respond, time
+import queuesystem, default, performance, os, plugins, respond, time
 from ndict import seqdict
 from jobprocess import JobProcess
 from threading import Thread

@@ -719,7 +719,7 @@ class TestEnvironmentCreator:
         if outVarName and self.testCase():
             self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
     def setTraceDiagnostics(self):
-        if self.topLevel:
+        if self.topLevel():
             envVarName = self.diagDict.get("trace_level_variable")
             self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
             self.test.setEnvironment(envVarName, self.optionMap["trace"])
@@ -1285,7 +1285,7 @@ class Cancelled(plugins.TestState):
         plugins.TestState.__init__(self, "cancelled", briefText=briefText, freeText=freeText, \
                                    started=1, completed=1, lifecycleChange="complete")
 
-class KillTest(plugins.Action):
+class KillTest:
     def __init__(self):
         self.diag = plugins.getDiagnostics("Kill Test")
     def __call__(self, test, killReason="KILLED"):

@@ -1,11 +1,10 @@
 
-import plugins, os, sys, shutil, types, time, paths, subprocess, operator
+import plugins, os, sys, shutil, time, paths, subprocess, operator
 from jobprocess import JobProcess
 from copy import copy, deepcopy
 from threading import Thread
 from glob import glob
-global scriptEngine
-global processTerminationMonitor
+scriptEngine = None
 from log4py import LOGLEVEL_NORMAL
 
 class GUIConfig:
@@ -936,8 +935,8 @@ class RecordTest(InteractiveTestAction):
         plugins.ensureDirectoryExists(writeDir)
         logFile = self.getLogFile(writeDir, usecase, "output")
         errFile = self.getLogFile(writeDir, usecase)
-        process = self.startExtProgramNewUsecase(cmdArgs, usecase, logFile, errFile, \
-                                                 exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase))
+        self.startExtProgramNewUsecase(cmdArgs, usecase, logFile, errFile, \
+                                       exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase))
     def getLogFile(self, writeDir, usecase, type="errors"):
         return os.path.join(writeDir, usecase + "_" + type + ".log")
     def textTestCompleted(self, test, usecase):

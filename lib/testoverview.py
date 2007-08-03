@@ -1,7 +1,7 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, performance, plugins, respond, sys, string, time, types, shutil, HTMLgen, HTMLcolors, re
+import os, plugins, time, re, HTMLgen, HTMLcolors
 from cPickle import Pickler, loads, UnpicklingError
 from ndict import seqdict
 HTMLgen.PRINTECHO = 0
@@ -33,7 +33,7 @@ class ColourFinder:
 colourFinder = ColourFinder()
 
 def getDisplayText(tag):
-    displayText = string.join(tag.split("_")[1:], "_")
+    displayText = "_".join(tag.split("_")[1:])
     if displayText:
         return displayText
     else:
@@ -111,7 +111,7 @@ class GenerateWebPages:
         for subVersion in version.split("."):
             if not subVersion in pageSubVersions:
                 leftVersions.append(subVersion)
-        return string.join(leftVersions, ".")
+        return ".".join(leftVersions)
     def processTestStateFile(self, stateFile, categoryHandler, loggedTests, tagsFound, repository):
         state = self.readState(stateFile)
         if not state:
@@ -407,9 +407,8 @@ class Selector:
 class SelectorLast6Days(Selector):
     def __init__(self, tags):
         if len(tags) > 6:
-            self.selectedTags = tags[-6:]
-        else:
-            self.selectedTags = tags
+            tags = tags[-6:]
+        Selector.__init__(self, tags)
     def __repr__(self):
         return "Last six days"
 

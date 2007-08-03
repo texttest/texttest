@@ -414,10 +414,7 @@ class Test(plugins.Observable):
         if not len(relPath):
             return ""
         dirCount = string.count(relPath, "/") + 1
-        retstring = ""
-        for i in range(dirCount):
-            retstring = retstring + "  "
-        return retstring
+        return " " * (dirCount * 2) 
     def isAcceptedByAll(self, filters):
         for filter in filters:
             if not self.isAcceptedBy(filter):
@@ -593,7 +590,7 @@ class TestSuite(Test):
                 method = self.warnDuplicateTest
             else:
                 method = None
-            for name, comment in plugins.readListWithComments(fileName, duplicateMethod=self.warnDuplicateTest).items():
+            for name, comment in plugins.readListWithComments(fileName, duplicateMethod=method).items():
                 self.diagnose("Read " + name)
                 if warn and not self.fileExists(name):
                     plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
@@ -1275,9 +1272,7 @@ class Application:
         print helpIntro
         header = "Description of the " + self.getConfigValue("config_module") + " configuration"
         length = len(header)
-        header += "\n"
-        for x in range(length):
-            header += "-"
+        header += "\n" + "-" * length
         print header
         self.configObject.printHelpText()
     def getConfigValue(self, key, expandVars=True, getenvFunc=os.getenv):

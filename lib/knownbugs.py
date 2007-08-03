@@ -110,7 +110,7 @@ class FileBugData:
             self.absentList.append(bugTrigger)
         else:
             self.presentList.append(bugTrigger)
-    def insert(self, bugData):
+    def add(self, bugData):
         self.presentList += bugData.presentList
         self.absentList += bugData.absentList
         self.checkUnchanged |= bugData.checkUnchanged
@@ -189,10 +189,10 @@ class BugMap(seqdict):
             if not self.has_key(fileStem):
                 self[fileStem] = FileBugData()
             self[fileStem].addBugTrigger(getOption)
-    def insert(self, bugMap):
+    def add(self, bugMap):
         for fileStem, testBugData in bugMap.items():
             if self.has_key(fileStem):
-                self[fileStem].insert(testBugData)
+                self[fileStem].add(testBugData)
             else:
                 self[fileStem] = testBugData
     def remove(self, bugMap):
@@ -304,7 +304,7 @@ class CheckForBugs(plugins.Action):
         if not self.testBugMap.has_key(suite):
             self.testBugMap[suite] = self.makeBugMap(suite)
     def activateBugs(self, suite):     
-        self.activeBugs.insert(self.testBugMap[suite])
+        self.activeBugs.add(self.testBugMap[suite])
     def deactivateBugs(self, suite):
         self.activeBugs.remove(self.testBugMap[suite])
             

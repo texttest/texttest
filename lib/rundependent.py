@@ -260,7 +260,7 @@ class LineFilter:
         for index in range(len(words)):
             realWordNumber = -1 - index
             word = words[realWordNumber]
-            if len(words[realWordNumber]):
+            if len(word):
                 if wordNumber == self.wordNumber:
                     return realWordNumber
                 wordNumber -= 1

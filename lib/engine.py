@@ -127,7 +127,6 @@ class TextTest:
         except (testmodel.BadConfigError, plugins.TextTestError), e:
             sys.stderr.write("Could not use application '" + appName +  "' - " + str(e) + "\n")
     def addApplication(self, appName, dircache, version, allVersions):
-        raisedError = False
         app = self.createApplication(appName, dircache, version)
         if not app:
             return

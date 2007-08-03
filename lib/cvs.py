@@ -1,8 +1,9 @@
 
-import sys, os, guiplugins, guidialogs, gobject, datetime, time, subprocess
-import default, texttestgui, gtk, plugins, custom_widgets
+import os, guiplugins, guidialogs, gobject, datetime, time, subprocess
+import texttestgui, gtk, plugins, custom_widgets
 
-from guidialogs import guilog, scriptEngine
+guilog = guiplugins.guilog
+scriptEngine = guiplugins.scriptEngine
 from gtkusecase import TreeModelIndexer
 
 #
@@ -272,6 +273,7 @@ class CVSLog(CVSAction):
         currentFile = ""
         currentLastDate = ""
         now = datetime.datetime.utcnow()
+        prevLine = ""
         for line in outputLines:
             if line.find("there is no version here; do ") != -1:
                 dir = prevLine[prevLine.find("in directory ") + 13:-2]
@@ -442,6 +444,7 @@ class CVSDiff(CVSAction):
         # need to add the prefix to <file>
         currentOutput = ""
         currentFile = ""
+        prevLine = ""
         for line in outputLines:
             if line.find("there is no version here; do ") != -1:
                 dir = prevLine[prevLine.find("in directory ") + 13:-2]
@@ -536,10 +539,9 @@ class CVSStatus(CVSAction):
         # need to add the prefix to <file>
         currentOutput = ""
         currentFile = ""
-        currentDir = ""
+        prevLine = ""
         for line in outputLines:
             if line.startswith("cvs status: Examining "):
-                currentDir = line[22:].strip(" \n")
                 continue
             if line.startswith("File: "):
                 spaceAfterNamePos = line.find("\t", 7)
@@ -634,6 +636,7 @@ class CVSAnnotate(CVSAction):
         # ***************
         currentOutput = ""
         currentFile = ""
+        prevLine = ""
         for line in outputLines:
             if line.find("there is no version here; do ") != -1:
                 dir = prevLine[prevLine.find("in directory ") + 13:-2]

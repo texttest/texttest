@@ -204,7 +204,8 @@ class CVSAction(guiplugins.InteractiveAction):
         if len(files) == 0:
             if test.state.hasResults():
                 for comparison in test.state.allResults:
-                    files.append(os.path.basename(comparison.stdFile))
+                    if comparison.stdFile: # New files have no std file ...
+                        files.append(os.path.basename(comparison.stdFile))
         return files
     def getAbsPath(self, filePath, testPath):
         if os.path.isabs(filePath):

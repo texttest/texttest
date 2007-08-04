@@ -2337,55 +2337,41 @@ class ProgressBarGUI(SubGUI):
         self.dynamic = dynamic
         self.totalNofTests = 0
         self.nofCompletedTests = 0
-        self.nofFailedTests = 0
         self.widget = None
+
     def shouldShow(self):
         return self.dynamic
+
     def describe(self):
         guilog.info("Progress bar set to fraction " + str(self.widget.get_fraction()) + ", text '" + self.widget.get_text() + "'")
+
     def createView(self):
         self.widget = gtk.ProgressBar()
         self.resetBar()
         self.widget.show()
         return self.widget
+
     def addSuites(self, suites):
         self.totalNofTests = sum([ suite.size() for suite in suites ])
+
     def notifyLifecycleChange(self, test, state, changeDesc):
-        failed = state.hasFailed()
         if changeDesc == "complete":
             self.nofCompletedTests += 1
-            if failed:
-                self.nofFailedTests += 1
             self.resetBar()
             self.contentsChanged()
-        elif state.isComplete() and not failed and self.nofFailedTests > 0: # test saved, possibly partially so still check 'failed'
-            self.nofFailedTests -= 1
-            self.adjustFailCount()
             
     def resetBar(self):
         message = self.getFractionMessage()
-        message += self.getFailureMessage(self.nofFailedTests)
         fraction = float(self.nofCompletedTests) / float(self.totalNofTests)
         self.widget.set_text(message)
         self.widget.set_fraction(fraction)
+
     def getFractionMessage(self):
         if self.nofCompletedTests >= self.totalNofTests:
             completionTime = plugins.localtime()
             return "All " + str(self.totalNofTests) + " tests completed at " + completionTime
         else:
             return str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed"
-    def getFailureMessage(self, failCount):
-        if failCount != 0:
-            return " (" + str(failCount) + " tests failed)"
-        else:
-            return ""
-    def adjustFailCount(self):
-        message = self.widget.get_text()
-        oldFailMessage = self.getFailureMessage(self.nofFailedTests + 1)
-        newFailMessage = self.getFailureMessage(self.nofFailedTests)
-        message = message.replace(oldFailMessage, newFailMessage)
-        guilog.info("Progress bar detected save, new text is '" + message + "'")
-        self.widget.set_text(message)
 
 class ClassificationTree(seqdict):
     def addClassification(self, path):
@@ -2396,7 +2382,7 @@ class ClassificationTree(seqdict):
             if prevElement and element not in self[prevElement]:
                 self[prevElement].append(element)
             prevElement = element
-            
+        
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor(SubGUI):
@@ -2464,6 +2450,7 @@ class TestProgressMonitor(SubGUI):
     def getClassifiers(self, state):
         classifiers = ClassificationTree()
         catDesc = self.getCategoryDescription(state)
+        
         if not state.isComplete() or not state.hasFailed():
             classifiers.addClassification([ catDesc ])
             return classifiers

@@ -1,11 +1,9 @@
-#!/usr/local/bin/python
-
-
 import os, filecmp, string, plugins
 from ndict import seqdict
 from tempfile import mktemp
 from comparefile import FileComparison
 from performance import PerformanceFileComparison
+from sets import Set
 
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
@@ -128,8 +126,6 @@ class TestComparison(BaseTestComparison):
         return self.category == "success"
     def warnOnSave(self):
         return bool(self.failedPrediction)
-    def hasDifferences(self):
-        return len(self.changedResults) > 0
     def needsRecalculation(self):
         for comparison in self.allResults:
             self.diag.info(comparison.stem + " dates " + comparison.modifiedDates())
@@ -356,12 +352,18 @@ class MakeComparisons(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
     
-class RemoveObsoleteVersions(plugins.Action):
-    scriptDoc = "Removes (from CVS) all files with version IDs that are equivalent to a non-versioned file"
+class PrintObsoleteVersions(plugins.Action):
+    scriptDoc = "Lists all files with version IDs that are equivalent to a non-versioned file"
     def __init__(self):
         self.filesToRemove = []
     def __repr__(self):
         return "Removing obsolete versions for"
+    def __del__(self):
+        if len(self.filesToRemove):
+            print "Summary : Remove these files!"
+            print "============================="
+            for file in self.filesToRemove:
+                print file         
     def __call__(self, test):
         self.describe(test)
         compFiles = {}
@@ -377,9 +379,7 @@ class RemoveObsoleteVersions(plugins.Action):
                 for index2 in range(index1 + 1, len(compFilesMatchingStem)):
                     self.compareFiles(test, compFilesMatchingStem[index1], compFilesMatchingStem[index2])
                 os.remove(compFilesMatchingStem[index1][1])
-        for file in self.filesToRemove:
-            print file #os.system("cvs rm -f " + file)
-        self.filesToRemove = []
+        
     def cmpFile(self, test, file):
         basename = os.path.basename(file)
         return mktemp(basename + "cmp")
@@ -400,10 +400,12 @@ class RemoveObsoleteVersions(plugins.Action):
         if filecmp.cmp(cmpFile1, cmpFile2, 0):
             local1 = os.path.basename(origFile1)
             local2 = os.path.basename(origFile2)
-            if local1.find(local2) != -1:
+            vlist1 = Set(local1.split(".")[2:])
+            vlist2 = Set(local2.split(".")[2:])
+            if vlist1.issuperset(vlist2):
                 print test.getIndent() + local1, "obsolete due to", local2
                 self.filesToRemove.append(origFile1)
-            elif local2.find(local1) != -1:
+            elif vlist2.issuperset(vlist1):
                 print test.getIndent() + local2, "obsolete due to", local1
                 self.filesToRemove.append(origFile2)
             else:

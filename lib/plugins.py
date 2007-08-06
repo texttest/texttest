@@ -323,8 +323,6 @@ class TextFilter(Filter):
             if trigger.matches(searchString):
                 return True
         return False
-    def equalsText(self, test):
-        return test.name in self.texts
 
 class TestPathFilter(TextFilter):
     option = "tp"
@@ -586,13 +584,6 @@ def relpath(fullpath, parentdir):
     else:
         return relPath
     
-def nullRedirect():
-    stdoutRedirect = " > " + os.devnull
-    if os.name == "posix":  
-        return stdoutRedirect + " 2>&1"
-    else:
-        return stdoutRedirect + " 2> nul"
-
 def canExecute(program):
     localName = program.split()[0]
     if os.name == "nt" and localName.find(".") == -1:
@@ -622,20 +613,6 @@ def modifiedTime(filename):
     except OSError:
         # Dead links etc.
         return None
-
-# Another useful utility, for moving files around and copying where not possible
-def movefile(sourcePath, targetFile):
-    try:
-        # This generally fails due to cross-device link problems
-        os.rename(sourcePath, targetFile)
-        os.utime(targetFile, None)
-    except:
-        shutil.copyfile(sourcePath, targetFile)
-        try:
-            # This can also fail due to permissions, but we don't care
-            os.remove(sourcePath)
-        except OSError:
-            pass
 
 # portable version of shlex.split
 # See http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470
@@ -733,10 +710,6 @@ def replaceComment(comment, newComment):
         return newComment
     else:
         return comment[0:lastEmptyLinePos + len(emptyLineSymbol) + 1] + newComment
-
-def chdir(dir):
-    ensureDirectoryExists(dir)
-    os.chdir(dir)
 
 def openForWrite(path):
     ensureDirExistsForFile(path)
@@ -1031,22 +1004,10 @@ class OptionGroup:
         option = self.options.get(key)
         if option:
             option.setPossibleValues(possibleValues)
-    def addPossibleValue(self, key, possibleValue):
-        option = self.options.get(key)
-        if option:
-            return option.addPossibleValue(possibleValue)
-        else:
-            return False
     def getOption(self, key):
         return self.options.get(key)
     def getSwitch(self, key):
         return self.switches.get(key)
-    def removeOption(self, key):
-        if self.options.has_key(key):
-            del self.options[key]
-    def removeSwitch(self, key):
-        if self.switches.has_key(key):
-            del self.switches[key]
     def setOptionValue(self, key, value):
         if self.options.has_key(key):
             return self.options[key].setValue(value)

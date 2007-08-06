@@ -308,6 +308,7 @@ class CheckForBugs(plugins.Action):
     def deactivateBugs(self, suite):
         self.activeBugs.remove(self.testBugMap[suite])
             
+# For migrating from knownbugs files which are from TextTest 3.7 and older
 class MigrateFiles(plugins.Action):
     def setUpSuite(self, suite):
         self.migrate(suite)
@@ -362,26 +363,3 @@ class MigrateFiles(plugins.Action):
             if not letter in string.digits:
                 return None
         return "bugzilla"
-
-class MigrateInternalErrors(plugins.Action):
-    def setUpApplication(self, app):
-        errNo = 0
-        fileName = os.path.join(app.getDirectory(), "knownbugs." + app.name + app.versionSuffix())
-        print "Writing to", fileName
-        writeFile = open(fileName, "a")
-            
-        for text in app.getConfigValue("internal_error_text"):
-            errNo += 1
-            self.writeSection(writeFile, errNo, text, absent=False)
-        for text in app.getConfigValue("internal_compulsory_text"):
-            errNo += 1
-            self.writeSection(writeFile, errNo, text, absent=True)
-    def writeSection(self, writeFile, errNo, text, absent):
-        writeFile.write("\n[Migrated internal error " + str(errNo) + "]\n")
-        writeFile.write("search_string:" + text + "\n")
-        writeFile.write("search_file:output\n")
-        if absent:
-            writeFile.write("trigger_on_absence:1\n")
-        writeFile.write("full_description:" + text + "\n")
-        writeFile.write("brief_description:" + text + "\n")
-        writeFile.write("internal_error:1\n")

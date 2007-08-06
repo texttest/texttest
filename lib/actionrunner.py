@@ -61,12 +61,8 @@ class ActionRunner(Responder):
         while len(self.testQueue):
             self.currentTestRunner = self.testQueue[0]
             self.diag.info("Running actions for test " + self.currentTestRunner.test.getRelPath())
-            runToCompletion = len(self.testQueue) == 1
-            completed = self.currentTestRunner.performActions(self.previousTestRunner, runToCompletion)
+            self.currentTestRunner.performActions(self.previousTestRunner)
             self.testQueue.pop(0)
-            if not completed:
-                self.diag.info("Incomplete - putting to back of queue")
-                self.testQueue.append(self.currentTestRunner)
             self.previousTestRunner = self.currentTestRunner
         self.diag.info("Finishing the action runner.")
         
@@ -179,7 +175,7 @@ class TestRunner:
         execHosts = self.test.state.executionHosts
         failState = plugins.Unrunnable(freeText=excString, executionHosts=execHosts)
         self.test.changeState(failState)
-    def performActions(self, previousTestRunner, runToCompletion):
+    def performActions(self, previousTestRunner):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
         for suite in tearDownSuites:
             self.handleExceptions(previousTestRunner.appRunner.tearDownSuite, suite)
@@ -193,43 +189,25 @@ class TestRunner:
                 continue
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
             self.handleExceptions(self.appRunner.setUpSuites, action, self.test)
-            completed, tryOthersNow = self.performAction(action, runToCompletion)
-            self.diag.info("<-End Performing action " + str(action) + self.returnString(completed, tryOthersNow))
-            if completed:
-                self.actionSequence.pop(0)
-                if not abandon and self.test.state.shouldAbandon():
-                    self.diag.info("Abandoning test...")
-                    abandon = True
-            if tryOthersNow:
-                return 0
+            self.performAction(action)
+            self.diag.info("<-End Performing action " + str(action))
+            self.actionSequence.pop(0)
+            if not abandon and self.test.state.shouldAbandon():
+                self.diag.info("Abandoning test...")
+                abandon = True
+
         self.test.actionsCompleted()
-        return 1
-    def returnString(self, completed, tryOthersNow):
-        retString = " - "
-        if completed:
-            retString += "COMPLETE"
-        else:
-            retString += "RETRY"
-        if tryOthersNow:
-            retString += ", CHANGE TEST"
-        else:
-            retString += ", CONTINUE"
-        return retString
-    def performAction(self, action, runToCompletion):
+
+    def performAction(self, action):
         while 1:
             retValue = self.callAction(action)
             if not retValue:
                 # No return value: we've finished and should proceed
-                return 1, 0
-
-            completed = not retValue & plugins.Action.RETRY
-            tryOthers = retValue & plugins.Action.WAIT and not runToCompletion
-            # Don't busy-wait : assume lack of completion is a sign we might keep doing this
-            if not completed:
+                return
+            else:
+                # Don't busy-wait : assume lack of completion is a sign we might keep doing this
                 time.sleep(0.1)
-            if completed or tryOthers:
-                # Don't attempt to retry the action, mark complete
-                return completed, tryOthers 
+             
     def callAction(self, action):
         return self.handleExceptions(self.test.callAction, action)
     def findSuitesToChange(self, previousTestRunner):

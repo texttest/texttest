@@ -343,6 +343,11 @@ class Test(plugins.Observable):
         return plugins.relpath(self.getDirectory(), self.app.getDirectory())
     def getDirectory(self, temporary=False, forFramework=False):
         return self.dircache.dir
+    def positionInParent(self):
+        if self.parent:
+            return self.parent.testcases.index(self)
+        else:
+            return 0
     def remove(self, removeFromTestFile = True):
         dir = self.getDirectory()
         if os.path.isdir(dir) and self.parent: # might have already removed the enclosing suite
@@ -671,6 +676,8 @@ class TestSuite(Test):
         for testcase in self.testcases:
             size += testcase.size()
         return size
+    def maxIndex(self):
+        return len(self.testcases) - 1
 # private:
     # Observe: orderedTestNames can be both list and seqdict ... (it will be seqdict if read from file)
     def getOrderedTestNames(self, orderedTestNames = None): # We assume that tests exists, we just want to re-order ...
@@ -724,34 +731,17 @@ class TestSuite(Test):
         for test in self.testcases:
             if test.name == testName:
                 return test
-    def repositionTest(self, test, position):
+    def repositionTest(self, test, newIndex):
         # Find test in list
         testSuiteFileName = self.getContentFileName()
         tests = plugins.readListWithComments(testSuiteFileName)
-        try:
-            currIndex = tests.index(test.name)
-        except:
-            return False
-
-        # Depending on 'position', move test in list
-        if position == "first":
-            newIndex = 0
-        elif position == "up":
-            newIndex = currIndex - 1
-        elif position == "down":
-            newIndex = currIndex + 1
-        else:
-            newIndex = len(tests) - 1
-
-        # To be on the safe side, check for out-of-bounds indices
-        if newIndex < 0:
-            newIndex = 0
-        if newIndex >= len(tests):
-            newIndex = len(tests) - 1
-
+        
         # Delete old entry
         newEntry = seqdict()
-        newEntry[test.name] = tests[test.name]
+        oldTestData = tests.get(test.name)
+        if oldTestData is None:
+            return False
+        newEntry[test.name] = oldTestData
         del tests[test.name]
         tests.insert(newIndex, newEntry)
                 

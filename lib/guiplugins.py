@@ -714,17 +714,21 @@ class PasteTests(InteractiveTestAction):
         return True # Can paste after suites also
     def isActiveOnCurrent(self, test=None, state=None):
         return InteractiveTestAction.isActiveOnCurrent(self, test, state) and len(self.clipboardTests) > 0
-    def getDestinationSuite(self):
+    def getDestinationInfo(self):
         if self.currentTest.classId() == "test-suite":
-            return self.currentTest
+            return self.currentTest, 0
         else:
-            return self.currentTest.parent
+            return self.currentTest.parent, self.currentTest.positionInParent() + 1
+
     def getNewTestName(self, suite, oldName):
-        if suite.findSubtest(oldName):
-            nextNameCandidate = self.findNextNameCandidate(oldName)
-            return self.getNewTestName(suite, nextNameCandidate)
-        else:
+        existingTest = suite.findSubtest(oldName)
+        if not existingTest or self.willBeRemoved(existingTest):
             return oldName
+
+        nextNameCandidate = self.findNextNameCandidate(oldName)
+        return self.getNewTestName(suite, nextNameCandidate)
+    def willBeRemoved(self, test):
+        return self.removeAfter and test in self.clipboardTests
     def findNextNameCandidate(self, name):
         copyPos = name.find("_copy_")
         if copyPos != -1:
@@ -740,33 +744,40 @@ class PasteTests(InteractiveTestAction):
             return test.description
         else:
             return "Copy of " + test.name
-    def getPlacement(self, suite):
-        if suite is self.currentTest:
-            return 0
+    def getRepositionPlacement(self, test, placement):
+        currPos = test.positionInParent()
+        if placement > currPos:
+            return placement - 1
         else:
-            return suite.testcases.index(self.currentTest) + 1   
+            return placement
     def performOnCurrent(self):
-        suite = self.getDestinationSuite()
-        placement = self.getPlacement(suite)
+        suite, placement = self.getDestinationInfo()
         newTests = []
         for test in self.clipboardTests:
             newName = self.getNewTestName(suite, test.name)
-            
             guilog.info("Pasting test " + newName + " under test suite " + \
                         repr(suite) + ", in position " + str(placement))
-            newDesc = self.getNewDescription(test)
-            testDir = suite.writeNewTest(newName, newDesc, placement)
-            testImported = self.createTestContents(test, suite, testDir, newDesc, placement)
-            placement += 1 # for several tests, insert them in order
-            if self.removeAfter:
-                newTests.append(testImported)
-                test.remove()
+            if self.removeAfter and newName == test.name and suite is test.parent:
+                # Cut + paste to the same suite is basically a reposition, do it as one action
+                test.parent.repositionTest(test, self.getRepositionPlacement(test, placement))
+                newTests.append(test)
+                self.notify("SetTestSelection", [ test ])
+            else:
+                newDesc = self.getNewDescription(test)
+                testDir = suite.writeNewTest(newName, newDesc, placement)
+                testImported = self.createTestContents(test, suite, testDir, newDesc, placement)
+                placement += 1 # for several tests, insert them in order
+                if self.removeAfter:
+                    newTests.append(testImported)
+                    test.remove()
         if self.removeAfter:
             # After a paste from cut, subsequent pastes should behave like copies of the new tests
             self.clipboardTests = newTests
             self.removeAfter = False
         suite.contentChanged()
     def createTestContents(self, testToCopy, suite, testDir, description, placement):
+        if testDir == testToCopy.getDirectory():
+            return testToCopy
         stdFiles, defFiles = testToCopy.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
             dirname, local = os.path.split(sourceFile)
@@ -1728,9 +1739,8 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
         self.performRecursively(self.currTestSelection[0], False)
 
 class RepositionTest(InteractiveAction):
-    def __init__(self, position):
+    def __init__(self):
         InteractiveAction.__init__(self)
-        self.position = position
         self.currTestSelection = []
         self.testToMove = None
     def updateSelection(self, tests):
@@ -1743,16 +1753,16 @@ class RepositionTest(InteractiveAction):
         return len(self.currTestSelection) == 1 and \
                self.currTestSelection[0].parent and \
                not self.currTestSelection[0].parent.autoSortOrder
+
     def performOnCurrent(self):
-        if self.testToMove.parent.repositionTest(self.testToMove, self.position):
+        newIndex = self.findNewIndex()
+        if self.testToMove.parent.repositionTest(self.testToMove, newIndex):
             self.notify("RefreshTestSelection")
         else:
             raise plugins.TextTestError, "\nThe test\n'" + self.testToMove.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
 
     
 class RepositionTestDown(RepositionTest):
-    def __init__(self):
-        RepositionTest.__init__(self, "down")
     def getStockId(self):
         return "go-down"
     def _getTitle(self):
@@ -1761,14 +1771,14 @@ class RepositionTestDown(RepositionTest):
         return "Moved " + repr(self.testToMove) + " one step down in suite."
     def _getScriptTitle(self):
         return "Move selected test down in suite"
+    def findNewIndex(self):
+        return min(self.testToMove.positionInParent() + 1, self.testToMove.parent.maxIndex())
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
         return self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1] != self.currTestSelection[0]
 
 class RepositionTestUp(RepositionTest):
-    def __init__(self):
-        RepositionTest.__init__(self, "up")
     def getStockId(self):
         return "go-up"
     def _getTitle(self):
@@ -1777,14 +1787,14 @@ class RepositionTestUp(RepositionTest):
         return "Moved " + repr(self.testToMove) + " one step up in suite."
     def _getScriptTitle(self):
         return "Move selected test up in suite"
+    def findNewIndex(self):
+        return max(self.testToMove.positionInParent() - 1, 0)
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
         return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
 
 class RepositionTestFirst(RepositionTest):
-    def __init__(self):
-        RepositionTest.__init__(self, "first")
     def getStockId(self):
         return "goto-top"
     def _getTitle(self):
@@ -1793,14 +1803,14 @@ class RepositionTestFirst(RepositionTest):
         return "Moved " + repr(self.testToMove) + " to first in suite."
     def _getScriptTitle(self):
         return "Move selected test to first in suite"
+    def findNewIndex(self):
+        return 0
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
         return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
 
 class RepositionTestLast(RepositionTest):
-    def __init__(self):
-        RepositionTest.__init__(self, "last")
     def getStockId(self):
         return "goto-bottom"
     def _getTitle(self):
@@ -1809,6 +1819,8 @@ class RepositionTestLast(RepositionTest):
         return "Moved " + repr(self.testToMove) + " to last in suite."
     def _getScriptTitle(self):
         return "Move selected test to last in suite"
+    def findNewIndex(self):
+        return self.testToMove.parent.maxIndex()
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False

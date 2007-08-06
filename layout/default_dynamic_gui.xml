@@ -10,6 +10,8 @@
     </menu>
     <menu action="actionsmenu">
       <menuitem action="Kill"/>
+      <menuitem action="Mark"/>
+      <menuitem action="Unmark"/>
     </menu>
   </menubar>
 
@@ -19,6 +21,11 @@
     <toolitem action="Save"/>
     <separator/>
   </toolbar>
+
+  <popup name="TestPopupMenu">
+    <menuitem action="Mark"/>
+    <menuitem action="Unmark"/>
+  </popup>
 
   <popup name="TestFilePopupMenu">
     <menuitem action="View File"/>

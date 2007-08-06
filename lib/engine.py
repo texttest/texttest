@@ -347,8 +347,5 @@ class TextTest:
             return "CPULIMIT"
         elif sig == signal.SIGUSR2:
             return "RUNLIMIT2"
-        elif sig == signal.SIGINT:
-            return "" # mostly for historical reasons to be compatible with the default handler
         else:
-            return "signal " + str(sig)
-    
+            return "" # mostly for historical reasons to be compatible with the default handler

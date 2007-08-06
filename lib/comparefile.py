@@ -78,11 +78,6 @@ class FileComparison:
             return False
         
         stdCmpModTime = plugins.modifiedTime(self.stdCmpFile)
-        tmpCmpModTime = plugins.modifiedTime(self.tmpCmpFile)
-        if tmpModTime > tmpCmpModTime:
-            self.diag.info("Filter for tmp file out of date")
-            return True
-
         self.diag.info("Comparing timestamps for standard files")
         return stdCmpModTime is not None and stdModTime is not None and stdModTime >= stdCmpModTime
     def getType(self):

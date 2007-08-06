@@ -20,9 +20,6 @@ class Responder:
     # Full suite of tests, get notified of it at the start...
     def addSuite(self, suite):
         pass
-    # Called when anything changes at all, not related to lifecycle below
-    def notifyChange(self, test):
-        pass
     # Called when the state of the test "moves on" in its lifecycle
     def notifyLifecycleChange(self, test, state, changeDesc):
         pass

@@ -114,10 +114,6 @@ class GenerateWebPages:
         return ".".join(leftVersions)
     def processTestStateFile(self, stateFile, categoryHandler, loggedTests, tagsFound, repository):
         state = self.readState(stateFile)
-        if not state:
-            print "Ignoring file at", stateFile
-            return
-
         tag = os.path.basename(stateFile).replace("teststate_", "")
         if tagsFound.count(tag) == 0:
             tagsFound.append(tag)
@@ -183,13 +179,7 @@ class GenerateWebPages:
         return dir.replace(repository + os.sep, "").replace(os.sep, " ")
     def getTagTimeInSeconds(self, tag):
         timePart = tag.split("_")[0]
-        try:
-            return time.mktime(time.strptime(timePart, "%d%b%Y"))
-        except ValueError:
-            # As the Python docs say, strptime is buggy on some platforms (e.g. parisc)
-            # Seems to work if you insert spaces though...
-            spacedTimePart = timePart[:2] + " " + timePart[2:5] + " " + timePart[5:]
-            return time.mktime(time.strptime(spacedTimePart, "%d %b %Y"))
+        return time.mktime(time.strptime(timePart, "%d%b%Y"))
     def getOverviewPageName(self, sel):
         return "test_" + self.pageVersion + sel + ".html"
 
@@ -401,8 +391,6 @@ class Selector:
         return self.selectedTags
     def getFileNameExtension(self):
         return ""
-    def __repr__(self):
-        return "default"
 
 class SelectorLast6Days(Selector):
     def __init__(self, tags):

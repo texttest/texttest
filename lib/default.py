@@ -573,6 +573,7 @@ class Config:
         dict["not_started"] = "white"
         dict["pending"] = "white"
         dict["static"] = "grey90"
+        dict["marked by user"] = "orange"
         return dict
     def getDefaultAccelerators(self):
         dict = {}
@@ -592,6 +593,8 @@ class Config:
         dict["move_up"] = "<control>Page_Up"
         dict["move_to_first"] = "<control>Home"
         dict["move_to_last"] = "<control>End"
+        dict["mark"] = "<control><shift>m"
+        dict["unmark"] = "<control><shift>u"
         return dict
     def getWindowSizeSettings(self):
         dict = {}

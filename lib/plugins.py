@@ -508,6 +508,8 @@ class TestState(Observable):
         return 0
     def hasFailed(self):
         return self.isComplete() and not self.hasSucceeded()
+    def isMarked(self):
+        return False
     def hasResults(self):
         # Do we have actual results that can be compared
         return 0
@@ -529,6 +531,19 @@ class Unrunnable(TestState):
         TestState.__init__(self, "unrunnable", freeText, briefText, completed=1, \
                            executionHosts=executionHosts, lifecycleChange=lifecycleChange)
     def shouldAbandon(self):
+        return True
+
+class MarkedTestState(TestState):
+    def __init__(self, freeText, briefText, oldState, executionHosts=[]):
+        fullText = freeText + "\n\nORIGINAL STATE:\nTest " + repr(oldState) + "\n " + oldState.freeText
+        TestState.__init__(self, "marked by user", fullText, briefText, completed=1, \
+                           executionHosts=executionHosts, lifecycleChange="marked")
+        self.oldState = oldState
+    # We must implement this ourselves, since we want to be neither successful nor
+    # failed, and by default hasFailed is implemented as 'not hasSucceeded()'.
+    def hasFailed(self):
+        return False
+    def isMarked(self):
         return True
 
 # Simple handle to get diagnostics object. Better than using log4py directly,

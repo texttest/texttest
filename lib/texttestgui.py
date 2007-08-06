@@ -1127,7 +1127,9 @@ class TestTreeGUI(ContainerGUI):
         self.updateStateInModel(test, iter, state)
         self.diagnoseTest(test, iter)
 
-        if state.hasSucceeded():
+        # We don't want to affect the success count
+        # when we unmark a previously successful test ...
+        if state.hasSucceeded() and changeDesc != "unmarked":
             self.updateSuiteSuccess(test.parent)
         if test in self.selectedTests:
             self.notify("LifecycleChange", test, state, changeDesc)
@@ -2202,14 +2204,17 @@ class TestFileGUI(FileViewGUI):
     def addFilesToModel(self, state):
         if not state:
             return
-        if state.hasStarted():
-            if hasattr(state, "correctResults"):
+        realState = state
+        if state.isMarked():
+            realState = state.oldState
+        if realState.hasStarted():
+            if hasattr(realState, "correctResults"):
                 # failed on comparison
-                self.addComparisonsToModel(state)
-            elif not state.isComplete():
-                self.addTmpFilesToModel(state)
+                self.addComparisonsToModel(realState)
+            elif not realState.isComplete():
+                self.addTmpFilesToModel(realState)
         else:
-            self.addStaticFilesToModel(state)
+            self.addStaticFilesToModel(realState)
 
     def monitorEvents(self, indexer):
         scriptEngine.connect("select file", "row_activated", self.selection.get_tree_view(), self.fileActivated, indexer)
@@ -2450,7 +2455,10 @@ class TestProgressMonitor(SubGUI):
     def getClassifiers(self, state):
         classifiers = ClassificationTree()
         catDesc = self.getCategoryDescription(state)
-        
+        if state.isMarked():
+            classifiers.addClassification([ catDesc, state.briefText ])
+            return classifiers
+
         if not state.isComplete() or not state.hasFailed():
             classifiers.addClassification([ catDesc ])
             return classifiers
@@ -2489,7 +2497,7 @@ class TestProgressMonitor(SubGUI):
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
     def addTestForNode(self, test, state, nodeClassifier, classifiers, parentIter=None):
-        self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier)
+        self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + " (" + repr(classifiers) + ")")
         nodeIter = self.findIter(nodeClassifier, parentIter)
         if nodeIter:
             self.insertTestAtIter(nodeIter, test, state.category)

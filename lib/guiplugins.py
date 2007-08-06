@@ -461,6 +461,50 @@ class SaveTests(SelectionAction):
             test.changeState(newState)
 
         self.notify("Status", "Saved " + testDesc + ".")
+        
+class MarkTest(SelectionAction):
+    def __init__(self):
+        SelectionAction.__init__(self)
+        self.newBriefText = ""
+        self.newFreeText = ""
+    def _getTitle(self):
+        return "_Mark"
+    def _getScriptTitle(self):
+        return "Mark the selected tests"
+    def getDialogType(self):
+        return "guidialogs.MarkTestDialog" # Since guiplugins cannot depend on gtk, we cannot call dialog ourselves ...
+    def performOnCurrent(self):
+        for test in self.currTestSelection:
+            oldState = test.state
+            if test.state.isMarked():
+                oldState = test.state.oldState # Keep the old state so as not to build hierarchies ...
+            newState = plugins.MarkedTestState(self.newFreeText, self.newBriefText, oldState)
+            test.changeState(newState)
+    def isActiveOnCurrent(self, test=None, state=None):
+        if state and state.isComplete():
+            return True
+        for seltest in self.currTestSelection:
+            if seltest is not test and seltest.state.isComplete():
+                return True
+        return False
+
+class UnmarkTest(SelectionAction):
+    def __init__(self):
+        SelectionAction.__init__(self)
+    def _getTitle(self):
+        return "_Unmark"
+    def _getScriptTitle(self):
+        return "Unmark the selected tests"
+    def performOnCurrent(self):
+        for test in self.currTestSelection:
+            if test.state.isMarked():
+                test.state.oldState.lifecycleChange = "unmarked" # To avoid triggering completion ...
+                test.changeState(test.state.oldState)
+    def isActiveOnCurrent(self, *args):
+        for test in self.currTestSelection:
+            if test.state.isMarked():
+                return True
+        return False
 
 class FileViewAction(InteractiveTestAction):
     def __init__(self):
@@ -1941,7 +1985,7 @@ class InteractiveActionHandler:
     def __init__(self):
         self.actionPreClasses = [ Quit, ViewInEditor ]
         self.actionDynamicClasses = [ ViewFilteredInEditor, ViewFileDifferences, ViewFilteredFileDifferences, FollowFile, \
-                                      SaveTests, SaveSelection, RecomputeTest, KillTests ]
+                                      SaveTests, SaveSelection, RecomputeTest, KillTests, MarkTest, UnmarkTest ]
         self.actionStaticClasses = [ RecordTest, CopyTests, CutTests, PasteTests, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups, RenameTest, RemoveTests, \

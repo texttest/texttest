@@ -375,6 +375,7 @@ class RenameDialog(ActionConfirmationDialog):
         hbox2.pack_start(gtk.Label("\nNew name:"), expand=False, fill=False)        
         vbox.pack_start(hbox2)
         self.entry = gtk.Entry()
+        self.entry.set_activates_default(True)
         self.entry.set_text(self.plugin.newName)
         scriptEngine.registerEntry(self.entry, "enter new name ")
         vbox.pack_start(self.entry)
@@ -382,6 +383,7 @@ class RenameDialog(ActionConfirmationDialog):
         hbox3.pack_start(gtk.Label("\nNew description:"), expand=False, fill=False)
         vbox.pack_start(hbox3)
         self.descriptionEntry = gtk.Entry()
+        self.descriptionEntry.set_activates_default(True)
         self.descriptionEntry.set_text(self.plugin.newDescription)
         scriptEngine.registerEntry(self.descriptionEntry, "enter new description ")
         vbox.pack_start(self.descriptionEntry)
@@ -400,6 +402,43 @@ class RenameDialog(ActionConfirmationDialog):
                 return
         ActionConfirmationDialog.respond(self, button, saidOK, *args)
         
+class MarkTestDialog(ActionConfirmationDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin):
+        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        
+    def addContents(self):        
+        alignment = gtk.Alignment()
+        alignment.set(1.0, 1.0, 1.0, 1.0)
+        alignment.set_padding(5, 5, 5, 5)
+        vbox = gtk.VBox()
+        alignment.add(vbox)
+        self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
+
+        hbox = gtk.HBox()
+        hbox.pack_start(gtk.Label("Brief text:"), expand=False, fill=False)
+        vbox.pack_start(hbox)
+        self.briefEntry = gtk.Entry()
+        self.briefEntry.set_text("Marked")
+        self.briefEntry.set_activates_default(True)
+        scriptEngine.registerEntry(self.briefEntry, "enter new test state brief text ")
+        vbox.pack_start(self.briefEntry)
+
+        hbox2 = gtk.HBox()
+        hbox2.pack_start(gtk.Label("Free text:"), expand=False, fill=False)
+        vbox.pack_start(hbox2)
+        self.freeEntry = gtk.Entry()
+        self.freeEntry.set_text("Marked at " + plugins.localtime("%d%b%H:%M"))
+        self.freeEntry.set_activates_default(True)
+        scriptEngine.registerEntry(self.freeEntry, "enter new test state free text ")
+        vbox.pack_start(self.freeEntry)
+        
+    def respond(self, button, saidOK, *args):
+        if saidOK:
+            self.plugin.newBriefText = self.briefEntry.get_text()
+            self.plugin.newFreeText = self.freeEntry.get_text()
+        ActionConfirmationDialog.respond(self, button, saidOK, *args)
+        
 # It's a bit unfortunate that this has to be here, but unfortunately texttestgui
 # cannot load dialogs from matador without some additional work. Also, having it
 # here avoids matador importing guidialogs, and hence gtk.
@@ -412,6 +451,8 @@ class CreatePerformanceReportDialog(ActionConfirmationDialog):
         # A simple entry for the path, and one for the versions ...
         self.dirEntry = gtk.Entry()
         self.versionsEntry = gtk.Entry()
+        self.dirEntry.set_activates_default(True)
+        self.versionsEntry.set_activates_default(True)
         self.dirEntry.set_text(self.plugin.rootDir)
         self.versionsEntry.set_text(",".join(self.plugin.versions).rstrip(","))
         

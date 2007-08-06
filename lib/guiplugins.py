@@ -270,9 +270,6 @@ class SelectionAction(InteractiveAction):
         return len(self.currTestSelection) > 0
     def describeTests(self):
         return str(len(self.currTestSelection)) + " tests"
-    def getAnyApp(self):
-        if len(self.currTestSelection) > 0:
-            return self.currTestSelection[0].app
     def isSelected(self, test):
         return test in self.currTestSelection
     def isNotSelected(self, test):
@@ -313,11 +310,6 @@ class InteractiveTestAction(InteractiveAction):
     def __init__(self):
         InteractiveAction.__init__(self)
         self.currentTest = None
-    def getCompositeConfigValue(self, section, name):
-        if self.currentTest:
-            return self.currentTest.getCompositeConfigValue(section, name)
-        else:
-            return guiConfig.getCompositeValue(section, name)
     def isActiveOnCurrent(self, *args):
         return self.currentTest is not None and self.correctTestClass()
     def correctTestClass(self):
@@ -820,8 +812,6 @@ class PasteTests(InteractiveTestAction):
             self.removeAfter = False
         suite.contentChanged()
     def createTestContents(self, testToCopy, suite, testDir, description, placement):
-        if testDir == testToCopy.getDirectory():
-            return testToCopy
         stdFiles, defFiles = testToCopy.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
             dirname, local = os.path.split(sourceFile)
@@ -880,8 +870,6 @@ class ImportTest(InteractiveTestAction):
         self.setPlacements(self.currentTest)
         return True
     def setPlacements(self, suite):
-        if suite.classId() == "test-case":
-            suite = suite.parent
         # Add suite and its children
         placements = [ "first in suite" ]
         for test in suite.testcases:

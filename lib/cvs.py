@@ -65,16 +65,6 @@ class CVSAction(guiplugins.InteractiveAction):
         self.updateFileSelection(files)
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) > 0 
-    def separatorBeforeInMainMenu(self):
-        return not self.recursive
-    def separatorBeforeInTestPopupMenu(self):
-        return self.separatorBeforeInMainMenu()
-    def inToolBar(self):
-        return False
-    def getMainMenuPath(self):
-        return "_CVS"
-    def getTestPopupMenuPath(self):
-        return "_CVS"
     def messageAfterPerform(self):
         return "Performed " + self._getScriptTitle() + "."
     def getResultDialogTwoColumnsInTreeView(self):

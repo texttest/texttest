@@ -311,8 +311,6 @@ class Config:
             return UNIXRunTest(self.hasAutomaticCputimeChecking)
         else:
             return RunTest()
-    def isReconnectingFast(self):
-        return self.isReconnecting() and not self.optionMap.has_key("reconnfull")
     def getTestEvaluator(self):
         return [ self.getFileExtractor(), rundependent.FilterTemporary(), self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
@@ -786,8 +784,6 @@ class TestEnvironmentCreator:
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeWriteDirectory()
-    def __repr__(self):
-        return "Make write directory for"
     def setUpApplication(self, app):
         app.makeWriteDirectory()
 
@@ -797,8 +793,6 @@ class PrepareWriteDirectory(plugins.Action):
         self.ignoreCatalogues = ignoreCatalogues
         if self.ignoreCatalogues:
             self.diag.info("Ignoring all information in catalogue files")
-    def __repr__(self):
-        return "Prepare write directory for"
     def __call__(self, test):
         self.collatePaths(test, "copy_test_path", self.copyTestPath)
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
@@ -1218,9 +1212,6 @@ class RunTest(plugins.Action):
     def getBriefText(self, execMachines):
         # Default to not bothering to print the machine name: all is local anyway
         return ""
-    def updateStateAfterRun(self, test):
-        # space to add extra states after running
-        pass
     def runTest(self, test):
         if test.state.hasStarted():
             if test.state.processCompleted():
@@ -1453,10 +1444,7 @@ class CreateCatalogue(plugins.Action):
             toRemove.remove(path)
     def outputPathName(self, path, writeDir):
         self.diag.info("Output name for " + path)
-        if path.startswith(writeDir):
-            return path.replace(writeDir, "<Test Directory>")
-        else:
-            return path
+        return path.replace(writeDir, "<Test Directory>")
                     
 class CountTest(plugins.Action):
     scriptDoc = "report on the number of tests selected, by application"
@@ -1632,27 +1620,15 @@ class UNIXPerformanceInfoFinder:
     def setUpApplication(self, app):
         self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
 
-class WindowsPerformanceInfoFinder:
-    def findTimesUsedBy(self, test):
-        # On Windows, these are collected by the process polling
-        return test.state.getProcessCpuTime(), None
-    def setUpApplication(self, app):
-        pass
-
 # Class for making a performance file directly from system-collected information,
 # rather than parsing reported entries in a log file
 class MakePerformanceFile(PerformanceFileCreator):
     def __init__(self, machineInfoFinder):
         PerformanceFileCreator.__init__(self, machineInfoFinder)
-        if os.name == "posix":
-            self.systemPerfInfoFinder = UNIXPerformanceInfoFinder(self.diag)
-        else:
-            self.systemPerfInfoFinder = WindowsPerformanceInfoFinder()
+        self.systemPerfInfoFinder = UNIXPerformanceInfoFinder(self.diag)
     def setUpApplication(self, app):
         PerformanceFileCreator.setUpApplication(self, app)
         self.systemPerfInfoFinder.setUpApplication(app)
-    def __repr__(self):
-        return "Making performance file for"
     def makePerformanceFiles(self, test):
         # Check that all of the execution machines are also performance machines
         if not self.allMachinesTestPerformance(test, "cputime"):
@@ -1820,8 +1796,6 @@ class DocumentOptions(plugins.Action):
     def groupOutput(self, group):
         if group.name == "Invisible":
             return "N/A"
-        elif group.name == "SGE":
-            return "SGE/LSF"
         else:
             return group.name
     def optionOutput(self, key, group, docs):

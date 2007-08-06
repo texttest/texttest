@@ -849,13 +849,12 @@ class TextTrigger:
             return line.replace(self.text, newText)
     
 class Option:    
-    def __init__(self, name, value, description, changeMethod):
+    def __init__(self, name, value, description):
         self.name = name
         self.defaultValue = value
         self.valueMethod = None
         self.updateMethod = None
         self.description = description
-        self.changeMethod = changeMethod
     def getValue(self):
         if self.valueMethod:
             return self.valueMethod()
@@ -875,8 +874,8 @@ class Option:
             self.valueMethod = None
 
 class TextOption(Option):
-    def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1, selectDir=False, selectFile=False, possibleDirs=[], description="", changeMethod=None):
-        Option.__init__(self, name, value, description, changeMethod)
+    def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1, selectDir=False, selectFile=False, possibleDirs=[], description=""):
+        Option.__init__(self, name, value, description)
         self.possValAppendMethod = None
         self.possValListMethod = None
         self.nofValues = allocateNofValues
@@ -938,8 +937,8 @@ class TextOption(Option):
         return (self.possibleDirs, self.possibleDirs[0][1])
         
 class Switch(Option):
-    def __init__(self, name, defaultValue, options, description, changeMethod):
-        Option.__init__(self, name, int(defaultValue), description, changeMethod)
+    def __init__(self, name, value=0, options=[], description=""):
+        Option.__init__(self, name, int(value), description)
         self.options = options
         self.resetMethod = None
     def setValue(self, value):
@@ -977,10 +976,10 @@ class OptionGroup:
             self.switches[key].setValue(value)
             return 1
         return 0
-    def addSwitch(self, key, name, value = 0, options = [], description = "", changeMethod = None):
+    def addSwitch(self, key, *args, **kwargs):
         if self.switches.has_key(key):
             return False
-        self.switches[key] = Switch(name, value, options, description, changeMethod)
+        self.switches[key] = Switch(*args, **kwargs)
         return True
     def addOption(self, key, *args, **kwargs): 
         if self.options.has_key(key):

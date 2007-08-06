@@ -277,9 +277,7 @@ class IdleHandlerManager:
         # Activate idle function again, see comment in notifyActionStart
         if self.sourceId > 0:
             self.enableHandler()
-    def notifySetUpGUIComplete(self):
-        self.enableHandler()
-        
+            
     def enableHandler(self):
         self.sourceId = self._enableHandler()
 
@@ -596,13 +594,7 @@ class TopWindowGUI(ContainerGUI):
             proportion = float(guiConfig.getWindowOption(dimensionName + "_screen"))
             descriptor = "Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen."
             return int(fullSize * proportion), descriptor
-
-    def getDefaultWindowProportion(self, dimensionName):
-        if dimensionName == "height":
-            return float(5.0) / 6
-        else:
-            return 0.6
-
+        
 
 class MenuBarGUI(SubGUI):
     def __init__(self, dynamic, uiManager, actionGUIs):
@@ -1564,8 +1556,6 @@ class ActionTabGUI(SubGUI):
             scriptEngine.connect("activate from " + option.name, "activate", entry, self.buttonGUI.runInteractive)
         entry.set_text(option.getValue())
         option.setMethods(entry.get_text, entry.set_text)
-        if option.changeMethod:
-            entry.connect("changed", option.changeMethod)
         return label, widget
     
     def createSwitchBox(self, switch):
@@ -2248,31 +2238,10 @@ class TestFileGUI(FileViewGUI):
         filelist.sort()
         self.addStandardFilesUnderIter(state, iter, filelist, fileCompMap)    
     def addStandardFilesUnderIter(self, state, iter, files, compMap = {}):
-        for relDir, relDirFiles in self.classifyByRelDir(files).items():
-            iterToUse = iter
-            if relDir:
-                iterToUse = self.addFileToModel(iter, relDir, None, self.getStaticColour())
-            for file in relDirFiles:
-                comparison = compMap.get(file)
-                colour = self.getComparisonColour(state, comparison)
-                self.addFileToModel(iterToUse, file, comparison, colour)
-    def classifyByRelDir(self, files):
-        dict = {}
         for file in files:
-            relDir = self.getRelDir(file)
-            if not dict.has_key(relDir):
-                dict[relDir] = []
-            dict[relDir].append(file)
-        return dict
-    def getRelDir(self, file):
-        relPath = self.currentTest.getTestRelPath(file)
-        if relPath is None:
-            print "Warning: unrelated", file, "and", self.currentTest.getDirectory()
-        if relPath.find(os.sep) != -1:
-            dir, local = os.path.split(relPath)
-            return dir
-        else:
-            return ""
+            comparison = compMap.get(file)
+            colour = self.getComparisonColour(state, comparison)
+            self.addFileToModel(iter, file, comparison, colour)
     def getComparisonColour(self, state, fileComp):
         if not state.hasStarted():
             return self.getStaticColour()

@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, os, sys, paths, operator
+import guiplugins, plugins, os, sys, operator
 from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
 from respond import Responder
@@ -1634,7 +1634,7 @@ class ActionTabGUI(SubGUI):
         scriptEngine.connect("cancel file selection", "response", dialog, self.respond, gtk.RESPONSE_CANCEL, entry, folders)
         dialog.connect_after("selection-changed", self.selectionChanged)
         # If current entry forms a valid path, set that as default
-        currPath = paths.getAbsolutePath(folders, entry.get_text())
+        currPath = entry.get_text()
         currDir, currFile = os.path.split(currPath)
         if os.path.isdir(currDir):
             dialog.set_current_folder(currDir)
@@ -1649,7 +1649,7 @@ class ActionTabGUI(SubGUI):
             scriptEngine.applicationEvent("dialog to be displayed")        
     def respond(self, dialog, response, entry, folders):
         if response == gtk.RESPONSE_OK:
-            entry.set_text(paths.getRelativeOrAbsolutePath(folders, dialog.get_filename()))
+            entry.set_text(dialog.get_filename())
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
         dialog.destroy()
         

@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, time, paths, subprocess, operator
+import plugins, os, sys, shutil, time, subprocess, operator
 from jobprocess import JobProcess
 from copy import copy, deepcopy
 from threading import Thread
@@ -1239,8 +1239,7 @@ class SaveSelection(SelectionAction):
         except IOError, e:
             self.notify("Error", "\nFailed to save selection:\n" + str(e) + "\n")
     def messageAfterPerform(self):
-        nameToPresent = paths.getRelativeOrAbsolutePath(self.folders[0], self.fileName)
-        return "Saved " + self.describeTests() + " in file '" + nameToPresent + "'."
+        return "Saved " + self.describeTests() + " in file '" + self.fileName + "'."
 
 class LoadSelection(SelectTests):
     def __init__(self, commandOptionGroups):
@@ -1266,7 +1265,7 @@ class LoadSelection(SelectTests):
             oldFileName = self.optionGroup.getOption("f").getValue()
             oldSwitchValue = self.optionGroup.getSwitch("select_in_collapsed_suites").getValue()
             try:
-                self.optionGroup.getOption("f").setValue(paths.getRelativeOrAbsolutePath(self.folders[0], self.fileName))
+                self.optionGroup.getOption("f").setValue(self.fileName)
                 self.optionGroup.getSwitch("select_in_collapsed_suites").setValue(1)        
                 SelectTests.performOnCurrent(self)
             finally:
@@ -1276,8 +1275,7 @@ class LoadSelection(SelectTests):
         return "Loading test selection ..."
     def messageAfterPerform(self):
         if self.fileName:
-            nameToPresent = paths.getRelativeOrAbsolutePath(self.folders[0], self.fileName)
-            return "Loaded test selection from file '" + nameToPresent + "'."
+            return "Loaded test selection from file '" + self.fileName + "'."
         else:
             return "No test selection loaded."
 
@@ -1776,7 +1774,7 @@ class RepositionTestDown(RepositionTest):
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
-        return self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1] != self.currTestSelection[0]
+        return self.currTestSelection[0].parent.testcases[self.currTestSelection[0].parent.maxIndex()] != self.currTestSelection[0]
 
 class RepositionTestUp(RepositionTest):
     def getStockId(self):

@@ -1,4 +1,4 @@
-import os, shutil, plugins, respond, rundependent, performance, comparetest, sys, batch, re, stat, paths, subprocess, operator, glob
+import os, shutil, plugins, respond, rundependent, performance, comparetest, sys, batch, re, stat, subprocess, operator, glob
 from threading import currentThread
 from knownbugs import CheckForBugs, CheckForCrashes
 from traffic import SetUpTrafficHandlers
@@ -261,17 +261,13 @@ class Config:
                     dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
                     realFilename = app.getFileName(dirsToSearchIn, filename)
             else:
-                realFilename = self.findFirstFilterFileMatching(app, filename)                
+                realFilename = filename                
             fileData = ",".join(plugins.readList(realFilename))
             optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
             return self.getFiltersFromMap(optionFinder, app)
         except Exception, e:
             raise plugins.TextTestError, "\nFailed to get filters from file '" + filename + "':\n" + str(e) + "\n"
-    def findFirstFilterFileMatching(self, app, filename):
-        if os.path.isabs(filename) and os.path.isfile(filename):
-            return filename
-        dirsToSearchIn = self.getFilterFileDirectories([app])
-        return paths.getAbsolutePath(dirsToSearchIn, filename)
+    
     def getFiltersFromMap(self, optionMap, app):
         filters = []
         for filterClass in self.getFilterClasses():

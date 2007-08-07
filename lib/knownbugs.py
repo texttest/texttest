@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import plugins, os, string
+import plugins, os, string, shutil, sys
 from ConfigParser import ConfigParser, NoOptionError
 from copy import copy
 from ndict import seqdict
@@ -328,6 +328,7 @@ class MigrateFiles(plugins.Action):
                 continue
             if not parser.has_section("Migrated section 1"):
                 self.describe(test, " - " + os.path.basename(bugFileName))
+                sys.stdout.flush()
                 self.updateFile(bugFileName, parser)
             else:
                 self.describe(test, " (already migrated)")
@@ -337,7 +338,7 @@ class MigrateFiles(plugins.Action):
         self.writeNew(parser, newBugFile)
         newBugFile.close()
         os.system("diff " + bugFileName + " " + newBugFileName)
-        os.rename(newBugFileName, bugFileName)
+        shutil.move(newBugFileName, bugFileName)
     def writeNew(self, parser, newBugFile):
         sectionNo = 0
         for fileStem in parser.sections():

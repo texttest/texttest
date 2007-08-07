@@ -278,7 +278,7 @@ class SaveSelectionDialog(ActionConfirmationDialog):
 
     def setOptionsAndExit(self, saidOK):
         # Transfer file name and options back to plugin
-        self.plugin.fileName = self.fileChooser.get_filename()
+        self.plugin.fileName = self.fileChooser.get_filename().replace("\\", "/")
         if self.enableOptions:
             self.plugin.saveTestList = self.radio1.get_active()
         self.doExit(saidOK)
@@ -344,7 +344,7 @@ class LoadSelectionDialog(ActionConfirmationDialog):
             self.doExit(saidOK)
 
     def setOptionsAndExit(self, saidOK):
-        self.plugin.fileName = self.fileChooser.get_filename()
+        self.plugin.fileName = self.fileChooser.get_filename().replace("\\", "/")
         self.doExit(saidOK)
         
     def doExit(self, saidOK):

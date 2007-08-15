@@ -597,7 +597,7 @@ class MarkApcLogDir(RunWithParallelAction):
         viewLogScript = test.makeTmpFileName("view_apc_log", forFramework=1)
         file = open(viewLogScript, "w")
         logFileName = os.path.join(apcTmpDir, "apclog")
-        cmdArgs = [ "xon", gethostname(), "xterm -bg white -T " + test.name + " -e \"less +F " + logFileName + "\"" ]
+        cmdArgs = [ "xon", gethostname(), "xterm -bg white -T " + test.name + " -e less +F " + logFileName ]
         file.write(repr(cmdArgs))
         file.close()
     def performParallelAction(self, test, execProcess, parentProcess):

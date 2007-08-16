@@ -2071,3 +2071,85 @@ class ConfigEtableParser:
         if tok == "":
             return None
         return tok
+class FeatureFilter(plugins.Filter):
+    def __init__(self, features,anyAll):
+        self.any = (anyAll == 0)
+        self.features = []
+        for feature,val in features:
+            tmp = feature.split()
+            vals = tmp[2].split(",")
+            self.features.append([tmp[0],tmp[1],int(vals[val])])
+    def checkCondition(self,op,val1,val2):
+        operators = ["=",">=","<=","!="]
+        if operators.count(op) == 0:
+            raise plugins.TextTestError, "Invalid operator "+op
+        if op == "=" and val1 == val2:
+            return True
+        if op == "!=" and val1 != val2:
+            return True
+        if op == ">=" and val1 >= val2:
+            return True
+        if op == "<=" and val1 <= val2:
+            return True
+        return False
+    def getFeatureMap(self,test):
+        featureFile = test.getFileName("features")
+        if not featureFile:
+            return {}
+        featureFileLines = plugins.readList(featureFile)
+        tmp = map(lambda x:x.split(),featureFileLines)
+        return dict(map(lambda x:(x[0],int(x[1])),tmp));
+    def acceptsTestCase(self, test):    
+        featureMap = self.getFeatureMap(test);
+        # no or empty feature file means that the test will not be selected
+        if len(featureMap) == 0:
+            return False
+        for feature in self.features:
+            key = feature[0]
+            if not featureMap.has_key(key):
+                raise plugins.TextTestError, "Case %s lacks feature %s"%(repr(test),key)
+            op = feature[1]
+            if self.checkCondition(op,featureMap[key],feature[2]):
+                if self.any:
+                    return True
+            else:
+                if not self.any:
+                    return False
+        return not self.any
+    
+class SelectTests(guiplugins.SelectTests):
+    def __init__(self, commandOptionGroup):
+        #import pdb
+        #pdb.set_trace()
+        guiplugins.SelectTests.__init__(self, commandOptionGroup)
+        self.features = []
+    def addSuites(self, suites):
+        guiplugins.SelectTests.addSuites(self, suites)
+        for suite in suites:
+            featureFile = suite.getFileName("feature_defs")
+            if featureFile:
+                self.addSwitch("Selection type", "Selection type", 0,["ANY","ALL"]);
+                for featureEntry in plugins.readList(featureFile):
+                    tmp = featureEntry.split();
+                    featureName = tmp[0].replace("_"," ") + " " + tmp[1]
+                    featureValues =["off"]
+                    featureValues.extend(tmp[-1].split(","))
+                    self.addSwitch(featureEntry, featureName, 0,featureValues);
+                    self.features.append(featureEntry)
+    def getFilterList(self, app):
+        filters = guiplugins.SelectTests.getFilterList(self, app)    
+        selectedFeatures = self.getSelectedFeatures()
+        if len(selectedFeatures) > 0:
+            guiplugins.guilog.info("Selected " + str(len(selectedFeatures)) + " features...")
+            andOr = self.optionGroup.getSwitchValue("Selection type", 0)
+            filters.append(FeatureFilter(selectedFeatures,andOr))
+        return filters
+    def getSelectedFeatures(self):
+        result = []
+        for feature in self.features:
+            val = self.optionGroup.getSwitchValue(feature, 0)
+            if val:
+                # -1 due to the frist option being "off"
+                result.append((feature,val-1))
+        return result
+

@@ -520,6 +520,14 @@ class TestCase(Test):
             if file.endswith("." + self.app.name):
                 tmpFiles.append(os.path.join(self.writeDirectory, file))
         return tmpFiles
+    def getAllTmpFiles(self): # Also checks comparison files, if present.
+        files = self.listTmpFiles()
+        if len(files) == 0:
+            if self.state.hasResults():
+                for comparison in self.state.allResults:
+                    if comparison.stdFile: # New files have no std file ...
+                        files.append(os.path.basename(comparison.stdFile))
+        return files
     def listUnownedTmpPaths(self):
         paths = []
         filelist = os.listdir(self.writeDirectory)

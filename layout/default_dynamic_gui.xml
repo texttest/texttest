@@ -35,6 +35,9 @@
     <menuitem action="View Raw Differences"/>
     <separator/>
     <menuitem action="Follow File Progress"/>
+    <separator/>
+    <menuitem name="File Properties" action="File Properties"/>
+    <separator/>
   </popup>
 
 </ui>

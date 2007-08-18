@@ -438,6 +438,58 @@ class MarkTestDialog(ActionConfirmationDialog):
             self.plugin.newBriefText = self.briefEntry.get_text()
             self.plugin.newFreeText = self.freeEntry.get_text()
         ActionConfirmationDialog.respond(self, button, saidOK, *args)
+
+class FilePropertiesDialog(ActionResultDialog):
+    def __init__(self, parent, okMethod, plugin):
+        ActionResultDialog.__init__(self, parent, okMethod, plugin)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+    # xalign = 1.0 means right aligned, 0.0 means left aligned
+    def justify(self, text, xalign = 0.0):
+        alignment = gtk.Alignment()
+        alignment.set(xalign, 0.0, 0.0, 0.0)
+        from pango import FontDescription
+        label = gtk.Label(text)
+        alignment.add(label)
+        return alignment
+
+    def addContents(self):
+        dirToProperties = {}
+        for prop in self.plugin.properties:
+            if not dirToProperties.has_key(prop.dir):
+                dirToProperties[prop.dir] = [ prop ]
+            else:
+                dirToProperties[prop.dir].append(prop)
+
+        vbox = gtk.VBox()
+        for dir, properties in dirToProperties.items():
+            expander = gtk.Expander()
+            expander.set_label_widget(self.justify(dir))
+            table = gtk.Table(len(properties), 7)
+            table.set_col_spacings(5)
+            row = 0
+            for prop in properties:
+                values = prop.getUnixRepresentation()
+                table.attach(self.justify(values[0] + values[1], 1.0), 0, 1, row, row + 1)
+                table.attach(self.justify(values[2], 1.0), 1, 2, row, row + 1)
+                table.attach(self.justify(values[3], 0.0), 2, 3, row, row + 1)
+                table.attach(self.justify(values[4], 0.0), 3, 4, row, row + 1)
+                table.attach(self.justify(values[5], 1.0), 4, 5, row, row + 1)
+                table.attach(self.justify(values[6], 1.0), 5, 6, row, row + 1)
+                table.attach(self.justify(prop.filename, 0.0), 6, 7, row, row + 1)
+                row += 1
+            hbox = gtk.HBox()
+            hbox.pack_start(table, expand=False, fill=False)
+            innerBorder = gtk.Alignment()
+            innerBorder.set_padding(5, 0, 0, 0)
+            innerBorder.add(hbox)
+            expander.add(innerBorder)
+            expander.set_expanded(True)
+            border = gtk.Alignment()
+            border.set_padding(5, 5, 5, 5)
+            border.add(expander)
+            vbox.pack_start(border, expand=False, fill=False)
+        self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
         
 # It's a bit unfortunate that this has to be here, but unfortunately texttestgui
 # cannot load dialogs from matador without some additional work. Also, having it

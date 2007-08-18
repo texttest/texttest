@@ -1087,3 +1087,77 @@ def encodeToLocale(unicodeInfo, log = None):
                          "' using strict '" + localeEncoding + "' encoding.\nReverting to non-strict UTF-8 " + \
                          "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
     return unicodeInfo.encode('utf-8', 'replace')
+
+# pwd and grp doesn't exist on windows ...
+import stat
+try:
+    import pwd, grp
+except:
+    pass
+
+class FileProperties:
+    def __init__(self, path):
+        self.abspath = os.path.abspath(path)
+        self.filename = os.path.basename(self.abspath)
+        self.dir = os.path.dirname(self.abspath)
+        self.status = os.stat(self.abspath)
+        self.now = int(time.time())
+        self.recent = self.now - (6 * 30 * 24 * 60 * 60) #6 months ago
+    def inqType(self):
+        # The stat.S_IS* functions don't seem to work on links ...
+        if os.path.islink(self.abspath):
+            return "l"
+        elif os.path.isdir(self.abspath):
+            return "d"
+        else:
+            return "-"
+    def inqMode(self):
+        permissions = ""
+        for who in "USR", "GRP", "OTH":
+            for what in "R", "W", "X":
+               #lookup attribute at runtime using getattr
+               if self.status[stat.ST_MODE] & getattr(stat,"S_I" + what + who):
+                   permissions = permissions + what.lower()
+               else:
+                   permissions = permissions + "-"
+        return permissions
+    def inqLinks(self):
+        return self.status[stat.ST_NLINK]
+    def inqOwner(self):
+        try:
+            uid = self.status[stat.ST_UID]
+            return str(pwd.getpwuid(uid)[0])
+        except:
+            return "?"        
+    def inqGroup(self):        
+        try:
+            gid = self.status[stat.ST_GID]
+            return str(grp.getgrgid(gid)[0])
+        except:
+            return "?"        
+    def inqSize(self):
+        return self.status[stat.ST_SIZE]
+    def formatTime(self, timeStamp):
+        # %e is more appropriate than %d below, as it fills with space
+        # rather than 0, but it is not supported on Windows, it seems.
+        if timeStamp < self.recent or \
+               timeStamp > self.now: 
+            timeFormat = "%b %d  %Y"
+        else:
+            timeFormat = "%b %d %H:%M"
+        return time.strftime(timeFormat, time.gmtime(timeStamp))
+    def inqCTime(self):
+        return self.formatTime(self.status[stat.ST_CTIME])
+    def inqModificationTime(self):
+        return self.formatTime(self.status[stat.ST_MTIME])
+    def inqAccessTime(self):
+        return self.formatTime(self.status[stat.ST_ATIME])
+    # Return the *nix type format:
+    # -rwxr--r--    1 mattias carm       1675 Nov 16  1998 .xinitrc_old
+    def getUnixRepresentation(self):
+        return (self.inqType(), self.inqMode(),
+                self.inqLinks(), self.inqOwner(),
+                self.inqGroup(), self.inqSize(),
+                self.inqModificationTime(), self.filename)
+    def getUnixStringRepresentation(self):
+        return "%s%s %3d %-8s %-8s %8d %s %s" % self.getUnixRepresentation()

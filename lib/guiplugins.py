@@ -4,6 +4,7 @@ from jobprocess import JobProcess
 from copy import copy, deepcopy
 from threading import Thread
 from glob import glob
+from stat import *
 scriptEngine = None
 from log4py import LOGLEVEL_NORMAL
 
@@ -1923,7 +1924,38 @@ class RenameTest(InteractiveAction):
             self.notify("Error", "Failed to rename test:\n" + str(e))
         except OSError, e:
             self.notify("Error", "Failed to rename test:\n" + str(e))
-
+ 
+class ShowFileProperties(InteractiveAction):
+    def __init__(self, dynamic):
+        InteractiveAction.__init__(self)
+        self.currTestSelection = []
+        self.dynamic = dynamic
+    def isActiveOnCurrent(self, *args):
+        return len(self.currTestSelection) == 1 and \
+               len(self.currFileSelection) > 0
+    def notifyNewFileSelection(self, files):
+        self.updateFileSelection(files)
+    def updateSelection(self, tests):
+        self.currTestSelection = tests
+    def getResultDialogType(self):
+        return "guidialogs.FilePropertiesDialog"
+    def _getTitle(self):
+        return "_File Properties"
+    def _getScriptTitle(self):
+        return "Show properties of selected files"
+    def describeTests(self):
+        return str(len(self.currFileSelection)) + " files"
+    def performOnCurrent(self):
+        self.properties = []
+        for file, comp in self.currFileSelection:
+            prop = plugins.FileProperties(file)
+            if self.dynamic and comp:
+                propTmp = plugins.FileProperties(comp.tmpFile)
+                guilog.info("Showing properties of the file " + comp.tmpFile + ":\n" + propTmp.getUnixStringRepresentation())
+                self.properties.append(propTmp)
+            guilog.info("Showing properties of the file " + file + ":\n" + prop.getUnixStringRepresentation())
+            self.properties.append(prop)
+            
 class VersionInformation(InteractiveAction):
     def __init__(self, dynamic):
         InteractiveAction.__init__(self)
@@ -1971,7 +2003,7 @@ class MigrationNotes(InteractiveAction):
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.actionPreClasses = [ Quit, ViewInEditor ]
+        self.actionPreClasses = [ Quit, ViewInEditor, ShowFileProperties ]
         self.actionDynamicClasses = [ ViewFilteredInEditor, ViewFileDifferences, ViewFilteredFileDifferences, FollowFile, \
                                       SaveTests, SaveSelection, RecomputeTest, KillTests, MarkTest, UnmarkTest ]
         self.actionStaticClasses = [ RecordTest, CopyTests, CutTests, PasteTests, ImportTestCase, ImportTestSuite, \

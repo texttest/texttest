@@ -174,7 +174,7 @@ class CVSAction(guiplugins.InteractiveAction):
             else:
                 return filter(os.path.exists, allFiles)
     def getDynamicGUIFiles(self, test):
-        tmpFiles = map(lambda l: os.path.basename(l) + test.app.versionSuffix(), self.getTmpFiles(test))
+        tmpFiles = map(lambda l: os.path.basename(l) + test.app.versionSuffix(), test.getAllTmpFiles())
         testPath = test.getDirectory()
         correctedTmpFiles = []
         # The tmp files don't have correct version suffixes, so we'll find the
@@ -190,14 +190,6 @@ class CVSAction(guiplugins.InteractiveAction):
             if os.path.exists(os.path.join(testPath, adjustedFile)):
                 correctedTmpFiles.append(self.getAbsPath(adjustedFile, testPath))
         return correctedTmpFiles
-    def getTmpFiles(self, test):
-        files = test.listTmpFiles()
-        if len(files) == 0:
-            if test.state.hasResults():
-                for comparison in test.state.allResults:
-                    if comparison.stdFile: # New files have no std file ...
-                        files.append(os.path.basename(comparison.stdFile))
-        return files
     def getAbsPath(self, filePath, testPath):
         if os.path.isabs(filePath):
             return filePath

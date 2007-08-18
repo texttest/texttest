@@ -71,6 +71,8 @@
     <separator/>
     <menuitem name="Remove..." action="Remove..."/>
     <separator/>
+    <menuitem name="File Properties" action="File Properties"/>
+    <separator/>
   </popup>
 
 </ui>

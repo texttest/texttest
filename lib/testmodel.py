@@ -136,6 +136,13 @@ class EnvironmentReader:
         return pathVars
     def expandReferences(self, test, referenceVars = []):
         childReferenceVars = copy(referenceVars)
+        while self.expandLocalReferences(test, childReferenceVars):
+            pass # do it repeatedly to pick up all convoluted references in different orders
+        self.expandParentReferences(test, referenceVars, childReferenceVars)
+        return childReferenceVars
+
+    def expandLocalReferences(self, test, childReferenceVars):
+        changed = False
         for var, value in test.environment.items():
             # Our own hacked version of expandvars, so as not to change the environment for real
             # See top of plugins.py
@@ -146,8 +153,12 @@ class EnvironmentReader:
                 if not selfRef:
                     childReferenceVars.append((var, value))
                 test.setEnvironment(var, expValue)
+                changed = True
             else:
                 self.diag.info("Variable " + var + " left as " + value)
+        return changed
+
+    def expandParentReferences(self, test, referenceVars, childReferenceVars):
         for var, value in referenceVars:
             self.diag.info("Trying reference variable " + var)
             if test.environment.has_key(var):
@@ -159,8 +170,8 @@ class EnvironmentReader:
                 self.diag.info("Adding reference variable " + var + " as " + expValue)
             else:
                 self.diag.info("Not adding reference " + var + " as same as local value " + expValue)
-        return childReferenceVars
 
+        
     def expandVariable(self, value, test):
         testVar = os.path.expandvars(value, test.getEnvironment)
         if testVar.find("$") == -1:

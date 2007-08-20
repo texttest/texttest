@@ -339,7 +339,7 @@ class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
             self.collatePath(test, "$CARMUSR", self.partialCopyTestPath)
 
 def getCrcCompileVars():
-    return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMGROUP", "_AUTOTEST__LOCAL_COMPILE_", "USER" ] 
+    return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMGROUP", "_AUTOTEST__LOCAL_COMPILE_", "PATH", "USER" ] 
     
 class RuleBuildActivator(Activator):
     def run(self):

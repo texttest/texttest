@@ -537,7 +537,7 @@ class FileViewAction(InteractiveTestAction):
         stem = os.path.basename(fileName).split(".")[0]
         return guiConfig.getCompositeValue(self.getToolConfigEntry(), stem)
     def differencesActive(self, comparison):
-        if not comparison or comparison.newResult() or comparison.missingResult():
+        if not comparison or comparison.newResult() or comparison.missingResult(): 
             return False
         return comparison.hasDifferences()
     def messageAfterPerform(self):
@@ -616,7 +616,10 @@ class ViewFileDifferences(FileViewAction):
     def getToolConfigEntry(self):
         return "diff_program"
     def _isActiveForFile(self, fileName, comparison):
-        return bool(comparison)
+        if bool(comparison):
+            if not (comparison.newResult() or comparison.missingResult()):
+                return True
+        return False
     def performOnFile(self, fileName, comparison, diffProgram):
         stdFile = comparison.getStdFile(self.useFiltered())
         tmpFile = comparison.getTmpFile(self.useFiltered())

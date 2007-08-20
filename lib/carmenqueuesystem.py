@@ -93,7 +93,7 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
     def getMajorReleaseResourceType(self):
         return "run"
     def getEnvironmentPerfCategory(self):
-        return os.getenv("QUEUE_SYSTEM_PERF_CATEGORY", "")
+        return self.test.getEnvironment("QUEUE_SYSTEM_PERF_CATEGORY", "")
     def getShortQueueSeconds(self):
         return plugins.getNumberOfSeconds(str(self.test.getConfigValue("maximum_cputime_for_short_queue")))
     # Return "short", "medium" or "long"

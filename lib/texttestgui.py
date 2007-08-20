@@ -999,8 +999,10 @@ class TestTreeGUI(ContainerGUI):
         return self.addScrollBars(self.treeView)
     def performStoredSelection(self):
         if len(self.selectedTests) > 0:
-            actualSelection = self.selectTestRows(self.selectedTests)
-            self.notify("NewTestSelection", actualSelection, True)        
+            newSelection = self.getSelected()
+            if newSelection != self.selectedTests:
+                actualSelection = self.selectTestRows(self.selectedTests)
+                self.notify("NewTestSelection", actualSelection, True)        
     def describeTree(self, *args):
         SubGUI.contentsChanged(self) # don't describe the column too...
 

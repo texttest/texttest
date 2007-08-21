@@ -323,6 +323,12 @@ class Test(plugins.Observable):
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse._getFileName([ self.dircache ], stem)
+    def getAllFileNames(self, stem, refVersion = None):
+        self.diagnose("Getting file from " + stem)
+        appToUse = self.app
+        if refVersion:
+            appToUse = self.app.getRefVersionApplication(refVersion)
+        return appToUse._getAllFileNames([ self.dircache ], stem)
     def getConfigValue(self, key, expandVars=True, getenvFunc=os.getenv):
         return self.app.getConfigValue(key, expandVars, getenvFunc)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
@@ -1022,12 +1028,17 @@ class Application:
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem, versionListMethod=versionListMethod)
     def _getFileName(self, dircaches, stem, versionListMethod=None):
+        allFiles = self._getAllFileNames(dircaches, stem, versionListMethod)
+        if len(allFiles):
+            return allFiles[-1]
+    def _getAllFileNames(self, dircaches, stem, versionListMethod=None):
         allowedExtensions = self.getFileExtensions()
         for dircache in dircaches:
             allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists, versionListMethod)
             self.diag.info("Files for stem " + stem + " found " + repr(allFiles) + " from " + repr(allowedExtensions))
             if len(allFiles):
-                return allFiles[-1]
+                return allFiles
+        return []
     def getRefVersionApplication(self, refVersion):
         return Application(self.name, self.dircache, refVersion.split("."), self.inputOptions)
     def getPreviousWriteDirInfo(self, previousTmpInfo):

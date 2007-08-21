@@ -1,4 +1,4 @@
-import os, filecmp, string, plugins
+import os, filecmp, string, plugins, shutil
 from ndict import seqdict
 from tempfile import mktemp
 from comparefile import FileComparison
@@ -403,12 +403,23 @@ class PrintObsoleteVersions(plugins.Action):
             vlist1 = Set(local1.split(".")[2:])
             vlist2 = Set(local2.split(".")[2:])
             if vlist1.issuperset(vlist2):
-                print test.getIndent() + local1, "obsolete due to", local2
-                self.filesToRemove.append(origFile1)
+                self.checkObsolete(test, origFile1, local1, origFile2)
             elif vlist2.issuperset(vlist1):
-                print test.getIndent() + local2, "obsolete due to", local1
-                self.filesToRemove.append(origFile2)
+                self.checkObsolete(test, origFile2, local2, origFile1)
             else:
                 print test.getIndent() + local1, "equivalent to", local2
+    def checkObsolete(self, test, obsoleteFile, obsoleteLocal, causeFile):
+        fallbackFile = self.getFallbackFile(test, obsoleteFile)
+        if plugins.samefile(fallbackFile, causeFile):
+            print test.getIndent() + obsoleteLocal, "obsolete due to", os.path.basename(causeFile)
+            self.filesToRemove.append(obsoleteFile)
+        else:
+            print test.getIndent() + obsoleteLocal, "is a version-priority-fixing copy of", os.path.basename(causeFile)
+    def getFallbackFile(self, test, fileName):
+        parts = os.path.basename(fileName).split(".", 2)
+        names = test.getAllFileNames(parts[0], parts[-1])
+        if len(names) > 1:
+            return names[-2]
+        
     def setUpSuite(self, suite):
         self.describe(suite)

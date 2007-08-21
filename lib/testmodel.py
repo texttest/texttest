@@ -136,14 +136,18 @@ class EnvironmentReader:
         return pathVars
     def expandReferences(self, test, referenceVars = []):
         childReferenceVars = copy(referenceVars)
-        while self.expandLocalReferences(test, childReferenceVars):
-            pass # do it repeatedly to pick up all convoluted references in different orders
+        varsToCheck = copy(test.environment.keys())
+        while len(varsToCheck) > 0:
+            # do it repeatedly to pick up all convoluted references in different orders
+            self.diag.info("Expanding references for variables " + repr(varsToCheck))
+            varsToCheck = self.expandLocalReferences(test, varsToCheck, childReferenceVars)
         self.expandParentReferences(test, referenceVars, childReferenceVars)
         return childReferenceVars
 
-    def expandLocalReferences(self, test, childReferenceVars):
-        changed = False
-        for var, value in test.environment.items():
+    def expandLocalReferences(self, test, varsToCheck, childReferenceVars):
+        changedVars = []
+        for var in varsToCheck:
+            value = test.environment[var]
             selfRef = self.isSelfReference(var, value)
             if selfRef:
                 # temporarily wipe the stored value to prevent infinite expansion
@@ -152,16 +156,18 @@ class EnvironmentReader:
             # See top of plugins.py
             expValue = os.path.expandvars(value, test.getEnvironment)
             test.setEnvironment(var, expValue)
-            if expValue != value:
+            if self.isSelfReference(var, expValue):
+                self.diag.info("Expanded variable " + var + " still self-referencing, not trying again: " + expValue)
+            elif expValue != value:
                 self.diag.info("Expanded variable " + var + " to " + expValue)
                 # Check for self-referential variables: don't multiple-expand
                 if not selfRef:
                     childReferenceVars.append((var, value))
                     
-                changed = True    
+                changedVars.append(var)
             else:
                 self.diag.info("Variable " + var + " left as " + value)
-        return changed
+        return changedVars
 
     def expandParentReferences(self, test, referenceVars, childReferenceVars):
         for var, value in referenceVars:

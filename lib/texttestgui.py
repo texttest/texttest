@@ -1623,10 +1623,8 @@ class ActionTabGUI(SubGUI):
         # where 'short name' means the name given in the config file, e.g.
         # 'temporary_filter_files' or 'filter_files' ...
         folders, defaultFolder = option.getDirectories()
-        scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder")
-        scriptEngine.connect("open selected file", "response", dialog, self.respond, gtk.RESPONSE_OK, entry, folders)
-        scriptEngine.connect("cancel file selection", "response", dialog, self.respond, gtk.RESPONSE_CANCEL, entry, folders)
-        dialog.connect_after("selection-changed", self.selectionChanged)
+        scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
+                                             "open selected file", "cancel file selection", self.respond, respondMethodArg=entry)
         # If current entry forms a valid path, set that as default
         currPath = entry.get_text()
         currDir, currFile = os.path.split(currPath)
@@ -1638,10 +1636,7 @@ class ActionTabGUI(SubGUI):
             dialog.add_shortcut_folder(folders[i][1])
         dialog.set_default_response(gtk.RESPONSE_OK)
         dialog.show()
-    def selectionChanged(self, dialog, *args):
-        if dialog.get_filename():
-            scriptEngine.applicationEvent("dialog to be displayed")        
-    def respond(self, dialog, response, entry, folders):
+    def respond(self, dialog, response, entry):
         if response == gtk.RESPONSE_OK:
             entry.set_text(dialog.get_filename())
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 

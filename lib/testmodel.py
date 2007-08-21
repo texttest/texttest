@@ -144,16 +144,21 @@ class EnvironmentReader:
     def expandLocalReferences(self, test, childReferenceVars):
         changed = False
         for var, value in test.environment.items():
+            selfRef = self.isSelfReference(var, value)
+            if selfRef:
+                # temporarily wipe the stored value to prevent infinite expansion
+                del test.environment[var]
             # Our own hacked version of expandvars, so as not to change the environment for real
             # See top of plugins.py
-            expValue, selfRef = self.expandVariable(value, test)
+            expValue = os.path.expandvars(value, test.getEnvironment)
+            test.setEnvironment(var, expValue)
             if expValue != value:
                 self.diag.info("Expanded variable " + var + " to " + expValue)
                 # Check for self-referential variables: don't multiple-expand
                 if not selfRef:
                     childReferenceVars.append((var, value))
-                test.setEnvironment(var, expValue)
-                changed = True
+                    
+                changed = True    
             else:
                 self.diag.info("Variable " + var + " left as " + value)
         return changed
@@ -164,33 +169,16 @@ class EnvironmentReader:
             if test.environment.has_key(var):
                 childReferenceVars.remove((var, value))
                 continue
-            expValue, selfRef = self.expandVariable(value, test)
+            expValue = os.path.expandvars(value, test.getEnvironment)
             if expValue != value:
                 test.setEnvironment(var, expValue)
                 self.diag.info("Adding reference variable " + var + " as " + expValue)
             else:
                 self.diag.info("Not adding reference " + var + " as same as local value " + expValue)
-
         
-    def expandVariable(self, value, test):
-        testVar = os.path.expandvars(value, test.getEnvironment)
-        if testVar.find("$") == -1:
-            return testVar, False
-        # self-referential variables
-        parentExpanded = self.expandParentEnvironment(test, value)
-        self.diag.info("Self-reference: expanded parent environment from " + value + " to " + parentExpanded)
-        if parentExpanded.find("$") == -1:
-            return parentExpanded, True
-        else:
-            # Might also refer to a variable in the same dir as well as self...
-            return os.path.expandvars(parentExpanded, test.getEnvironment), True
-
-    def expandParentEnvironment(self, test, value):
-        if test.parent:
-            return os.path.expandvars(value, test.parent.getEnvironment)
-        else:
-            return os.path.expandvars(value)
-    
+    def isSelfReference(self, var, value):
+        return value.find("$" + var) != -1 or value.find("${" + var) != -1
+            
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
     def __init__(self, name, description, dircache, app, parent = None):

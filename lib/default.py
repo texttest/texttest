@@ -30,6 +30,7 @@ class Config:
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("Basic"):
                 group.addOption("c", "Use checkout", app.checkout)
+                group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 diagDict = app.getConfigValue("diagnostics")

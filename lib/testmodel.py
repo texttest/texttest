@@ -1191,7 +1191,7 @@ class Application:
         saveableVersions = []
         unsaveableVersions = self.getConfigValue("unsaveable_version")
         for version in versions:
-            if not version in unsaveableVersions:
+            if not version in unsaveableVersions and not version.startswith("copy_"):
                 saveableVersions.append(version)
         return saveableVersions
     def getFileExtensions(self):
@@ -1384,6 +1384,15 @@ class OptionFinder(plugins.OptionFinder):
             rootLogger = log4py.Logger().get_root()        
             rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
     def findVersionList(self):
+        versionList = []
+        givenVersions = self.findGivenVersions()
+        versionList += givenVersions
+        copyCount = int(self.get("cp", 1))
+        for copyNum in range(1, copyCount):
+            versionList += [ version + ".copy_" + str(copyNum) for version in givenVersions ]
+
+        return versionList
+    def findGivenVersions(self):
         versionList = []
         for version in plugins.commasplit(self.get("v", "")):
             if version in versionList:

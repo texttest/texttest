@@ -522,11 +522,30 @@ class TopWindowGUI(ContainerGUI):
             if not suite.app in self.allApps:
                 self.allApps.append(suite.app)
     def allAppNames(self):
+        appNames = []
+        for app in self.allUniqueApps():
+            appNames.append(app.fullName + app.versionSuffix())
+        return appNames
+    def allUniqueApps(self):
         allNames = []
+        uniqueApps = []
         for app in self.allApps:
             if not app.fullName in allNames:
                 allNames.append(app.fullName)
-        return allNames
+                uniqueApps.append(app)
+        return uniqueApps
+    def getCheckoutTitle(self):
+        allCheckouts = []
+        for app in self.allApps:
+            if app.checkout and not app.checkout in allCheckouts:
+                allCheckouts.append(app.checkout)
+        if len(allCheckouts) == 0:
+            return ""
+        elif len(allCheckouts) == 1:
+            return " under " + allCheckouts[0]
+        else:
+            return " from various checkouts"
+        
     def createView(self):
         # Create toplevel window to show it all.
         self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)        
@@ -539,11 +558,14 @@ class TopWindowGUI(ContainerGUI):
         global globalTopWindow
         globalTopWindow = self.topWindow
         self.topWindow.set_icon_from_file(self.getIcon())
+        appNames = ",".join(self.allAppNames())
         if self.dynamic:
-            self.topWindow.set_title("TextTest dynamic GUI (tests started at " + plugins.startTimeString() + ")")
+            checkoutTitle = self.getCheckoutTitle()
+            self.topWindow.set_title("TextTest dynamic GUI : testing " + appNames + checkoutTitle + \
+                                     " (started at " + plugins.startTimeString() + ")")
         else:
             self.topWindow.set_title("TextTest static GUI : management of tests for " + \
-                                     ",".join(self.allAppNames()))
+                                     appNames)
             
         self.topWindow.add(self.subguis[0].createView())
         self.topWindow.show()

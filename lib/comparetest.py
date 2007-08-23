@@ -21,6 +21,8 @@ class BaseTestComparison(plugins.TestState):
 
     def hasResults(self):
         return len(self.allResults) > 0
+    def isAllNew(self):
+        return len(self.newResults) == len(self.allResults)
     
     def computeFor(self, test):
         self.makeComparisons(test)

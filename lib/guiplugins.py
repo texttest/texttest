@@ -415,6 +415,8 @@ class SaveTests(SelectionAction):
     def getExactness(self):
         return int(self.optionGroup.getSwitchValue("ex", 1))
     def getVersion(self, test):
+        if test.state.isAllNew():
+            return ""
         versionString = self.optionGroup.getOptionValue("v")
         if versionString.startswith("<default>"):
             return self.getDefaultSaveVersion(test.app)

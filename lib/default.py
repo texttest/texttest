@@ -388,7 +388,7 @@ class Config:
             self.reconnDir = reconnector.findReconnectDir(suite.app, self.optionValue("reconnect"))
             
     def checkBinaryExists(self, suite):
-        binary = suite.app.getConfigValue("binary", getenvFunc=suite.getEnvironment)
+        binary = suite.getConfigValue("binary")
         if not binary:
             raise plugins.TextTestError, "config file entry 'binary' not defined"
         if self.binaryShouldBeFile(suite.app, binary) and not os.path.isfile(binary):
@@ -1244,7 +1244,7 @@ class RunTest(plugins.Action):
         interpreter = test.getConfigValue("interpreter")
         if interpreter:
             args.append(interpreter)
-        args.append(test.getConfigValue("binary", getenvFunc=test.getEnvironment))
+        args.append(test.getConfigValue("binary"))
         args.append(self.getOptions(test))
         return args
     def getExecuteCmdArgs(self, test):

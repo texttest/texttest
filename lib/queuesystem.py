@@ -610,7 +610,7 @@ class QueueSystemServer:
         self.killedTests.append(test)
         return jobExisted
     def getQueueSystem(self, test):
-        queueModule = test.app.getConfigValue("queue_system_module").lower()
+        queueModule = queueSystemName(test).lower()
         if self.queueSystems.has_key(queueModule):
             return self.queueSystems[queueModule]
         

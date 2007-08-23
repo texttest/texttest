@@ -215,7 +215,7 @@ class Config(CarmenConfig):
         CarmenConfig.checkSanity(self, suite)
         if self.optionMap.has_key("build"):
             builder = BuildCode(self.optionValue("build"))
-            builder.build(suite.app, suite.getEnvironment("CARMSYS"))
+            builder.build(suite)
     def _getLocalPlanPath(self, test):
         # Key assumption : to avoid reading Carmen Resource system LocalPlanPath
         # If this does not hold changing the CARMUSR is needed
@@ -818,11 +818,11 @@ class BuildCode:
     buildFailedDirs = {}
     def __init__(self, target):
         self.target = target
-    def build(self, app, carmsys):
-        targetDir = app.getConfigValue("build_targets")
+    def build(self, suite):
+        targetDir = suite.getConfigValue("build_targets")
         if not targetDir.has_key(self.target):
             return
-        arch = getArchitecture(app)
+        arch = getArchitecture(suite.app)
         if not self.builtDirs.has_key(arch):
             self.builtDirs[arch] = []
             self.buildFailedDirs[arch] = []
@@ -832,11 +832,11 @@ class BuildCode:
                 print "Already built on", arch, "under", absPath, "- skipping build"
                 continue
             if absPath in self.buildFailedDirs[arch]:
-                raise plugins.TextTestError, "BUILD ERROR: " + repr(app) + " depends on already failed build " + os.linesep \
+                raise plugins.TextTestError, "BUILD ERROR: " + repr(suite.app) + " depends on already failed build " + os.linesep \
                       + "(Build in " + absPath + " on " + arch + ")"
             
             if os.path.isdir(absPath):
-                self.buildLocal(absPath, app, makeTargets, carmsys)
+                self.buildLocal(absPath, suite, makeTargets)
             else:
                 print "Not building in", absPath, "which doesn't exist!"
     def getPathAndTargets(self, optValue):
@@ -874,7 +874,8 @@ class BuildCode:
         if arch == "sparc_64" or arch == "x86_64_linux":
             commandLine = "setenv BITMODE 64; " + commandLine
         return commandLine
-    def buildLocal(self, absPath, app, makeTargets, carmsys):
+    def buildLocal(self, absPath, suite, makeTargets):
+        app = suite.app
         arch = getArchitecture(app)
         buildFile = os.path.join(absPath, "build.default." + arch)
         extra = ""
@@ -892,6 +893,7 @@ class BuildCode:
         print "Product", app, "built correctly in", absPath
         self.builtDirs[arch].append(absPath)
         os.remove(buildFile)
+        carmsys = suite.getEnvironment("CARMSYS")
         if carmsys:
             makeCommand = "gmake install " + extra + "CARMSYS=" + carmsys
             commandLine = self.getRemoteCommandLine(arch, absPath, makeCommand)

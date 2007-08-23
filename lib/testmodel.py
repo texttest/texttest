@@ -335,10 +335,10 @@ class Test(plugins.Observable):
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse._getAllFileNames([ self.dircache ], stem)
-    def getConfigValue(self, key, expandVars=True, getenvFunc=os.getenv):
-        return self.app.getConfigValue(key, expandVars, getenvFunc)
+    def getConfigValue(self, key, expandVars=True):
+        return self.app.getConfigValue(key, expandVars, self.getEnvironment)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
-        return self.app.getCompositeConfigValue(key, subKey)
+        return self.app.getCompositeConfigValue(key, subKey, expandVars, self.getEnvironment)
     def makePathName(self, fileName):
         if self.dircache.exists(fileName):
             return self.dircache.pathName(fileName)
@@ -1310,8 +1310,8 @@ class Application:
             return newDict
         else:
             return value
-    def getCompositeConfigValue(self, key, subKey, expandVars=True):
-        dict = self.getConfigValue(key, expandVars)
+    def getCompositeConfigValue(self, key, subKey, expandVars=True, getenvFunc=os.getenv):
+        dict = self.getConfigValue(key, expandVars, getenvFunc)
         listVal = []
         for currSubKey, currValue in dict.items():
             if fnmatch(subKey, currSubKey):
@@ -1504,23 +1504,12 @@ class MultiEntryDictionary(seqdict):
         return self
     def addLine(self, line, insert, errorOnUnknown, separator = ':'):
         entryName, entry = line.split(separator, 1)
-        self.addEntry(self.expandvars(entryName), entry, "", insert, errorOnUnknown)
+        self.addEntry(os.path.expandvars(entryName), entry, "", insert, errorOnUnknown)
     def getVarName(self, name):
         if name.startswith("${"):
             return name[2:-1]
         else:
             return name[1:]
-    def expandvars(self, name):
-        # os.path.expandvars fails on windows, assume entire name is the env variable
-        if name.startswith("$"):
-            varName = self.getVarName(name)
-            value = os.getenv(varName)
-            if value:
-                return value
-            else:
-                return name
-        else:
-            return name
     def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
         if sectionName:
             self.currDict = self[sectionName]

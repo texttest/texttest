@@ -39,26 +39,27 @@ TEXTTEST_HOME and the Self-Tests:
     Your tests should be placed in product-specific subdirectories alongside the "texttest" and "Diagnostics"
     directories.
 
-    If you plan to change the code you are strongly recommended to run them and test your changes. 
-    They also function as working examples as described above, read source/doc/quickstart.txt for more 
-    details.
-
     The expected results provided are those from my own environment (RHEL4 Linux, currently). Unless your 
     environment is identical you should transform the test suite to be suited to the environment and OS 
     you are running in by running the script configure_tests.py which is included with these tests 
     (under tests/texttest).
 
+    Note that the self-tests expect that Java is installed on your machine (it mostly is by default) and also
+    a couple of tests rely on the "optional" baretail program on Windows.
+
+    If you plan to change the code you are strongly recommended to run the self-tests and test your changes. 
+    They also function as working examples as described above, read source/doc/quickstart.txt for more 
+    details.
+
 Known bugs:
 
-    (1) TextTest drives the system under test partly by setting and unsetting environment variables. 
-    However, some UNIX platforms (e.g. Sparc solaris) do not support unsetting environment variables: you can 
-    only set them to new values. The install script will warn you if this is the case with your system. If so, 
-    when adding entries to environment files, be aware that they will never be cleaned. If this will cause problems 
-    you will need to set them to harmless values elsewhere.
-
-    (2) When testing GUIs on Windows, TextTest hides the window as it does via the virtual DISPLAY on UNIX. However,
+    (1) When testing GUIs on Windows, TextTest hides the window as it does via the virtual DISPLAY on UNIX. However,
     this isn't recursive so any dialogs, other windows, other apps etc. started by the test will still pop up. This
     is very obvious if you run the self-tests on Windows...
+
+    (2) Windows Vista has an annoying habit of not setting up the automatic file handling for Python correctly so
+    that command-line arguments are lost. If this happens (for example the TrafficInterception self-tests fail), 
+    you need to run the registry editor and add "%*" to the end of the line for Python. Hopefully M$ will fix it soon... 
 
 Bugs and Support:
     

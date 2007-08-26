@@ -633,6 +633,8 @@ class Config:
         app.setConfigDefault("query_kill_processes", { "default" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
+        app.setConfigDefault("gui_entry_completions", { "default" : [] }, "Add these completions to the entry completion lists initially")
+        app.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
         app.setConfigDefault("gui_accelerators", self.getDefaultAccelerators(), "Custom action accelerators.")
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")

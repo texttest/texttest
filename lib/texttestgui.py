@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, os, sys, operator
+import guiplugins, plugins, os, sys, operator, entrycompletion
 from gtkusecase import ScriptEngine, TreeModelIndexer, RadioGroupIndexer
 from ndict import seqdict
 from respond import Responder
@@ -396,6 +396,10 @@ class TextTestGUI(Responder, plugins.Observable):
         for observer in self.getAddSuitesObservers():
             observer.addSuites(suites)
             
+        # Must be done after suites are added, to
+        # make sure config options are available ...
+        entrycompletion.manager.start()
+
         self.topWindowGUI.createView()
         self.topWindowGUI.activate()
         self.idleManager.enableHandler()
@@ -1308,6 +1312,8 @@ class ActionGUI(SubGUI):
     def runInteractive(self, *args):
         if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
             return
+        # Each time we perform an action we collect and save the current registered entries
+        entrycompletion.manager.collectCompletions()
         dialogType = self.action.getDialogType()
         if dialogType is not None:
             if dialogType:
@@ -1579,6 +1585,10 @@ class ActionTabGUI(SubGUI):
         if self.buttonGUI:
             scriptEngine.connect("activate from " + option.name, "activate", entry, self.buttonGUI.runInteractive)
         entry.set_text(option.getValue())
+        entrycompletion.manager.registerCompletion(entry)
+        # Options in drop-down lists don't change, so we just add them once and for all.
+        for text in option.listPossibleValues():
+            entrycompletion.manager.addTextCompletion(text)
         option.setMethods(entry.get_text, entry.set_text)
         return label, widget
     
@@ -2356,8 +2366,9 @@ class ProgressBarGUI(SubGUI):
     def resetBar(self):
         message = self.getFractionMessage()
         fraction = float(self.nofCompletedTests) / float(self.totalNofTests)
-        self.widget.set_text(message)
-        self.widget.set_fraction(fraction)
+        if self.widget:
+            self.widget.set_text(message)
+            self.widget.set_fraction(fraction)
 
     def getFractionMessage(self):
         if self.nofCompletedTests >= self.totalNofTests:

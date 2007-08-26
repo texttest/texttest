@@ -1,6 +1,6 @@
 
 import os, guiplugins, guidialogs, gobject, datetime, time, subprocess
-import texttestgui, gtk, plugins, custom_widgets
+import texttestgui, gtk, plugins, custom_widgets, entrycompletion
 
 guilog = guiplugins.guilog
 scriptEngine = guiplugins.scriptEngine
@@ -782,7 +782,9 @@ class CVSTreeViewDialog(guidialogs.ActionResultDialog):
         label2 = gtk.Label(" and ")
         self.revision1 = gtk.Entry()
         self.revision1.set_text("HEAD")
+        entrycompletion.manager.registerCompletion(self.revision1)
         self.revision2 = gtk.Entry()
+        entrycompletion.manager.registerCompletion(self.revision2)
         self.revision1.set_alignment(1.0)
         self.revision2.set_alignment(1.0)
         self.revision1.set_width_chars(6)

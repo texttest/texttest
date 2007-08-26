@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import gtk
+import gtk, entrycompletion
 
 import plugins, os, sys
 scriptEngine = None
@@ -130,6 +130,7 @@ class ActionConfirmationDialog(GenericActionDialog):
         scriptEngine.connect("press ok", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
 
     def respond(self, button, saidOK, *args):
+        entrycompletion.manager.collectCompletions()
         self.dialog.hide()
         self.dialog.response(gtk.RESPONSE_NONE)
         if saidOK and self.okMethod:
@@ -157,6 +158,7 @@ class ActionResultDialog(GenericActionDialog):
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
     def respond(self, button, saidOK, *args):
+        entrycompletion.manager.collectCompletions()
         self.dialog.hide()
         self.dialog.response(gtk.RESPONSE_NONE)
         if self.okMethod:
@@ -279,6 +281,7 @@ class SaveSelectionDialog(ActionConfirmationDialog):
         self.doExit(saidOK)
         
     def doExit(self, saidOK):
+        entrycompletion.manager.collectCompletions()
         self.dialog.hide()
         self.dialog.response(gtk.RESPONSE_NONE)
         if saidOK:
@@ -332,11 +335,13 @@ class LoadSelectionDialog(ActionConfirmationDialog):
         self.plugin.fileName = self.fileChooser.get_filename().replace("\\", "/")
         self.clearDialog()
         self.okMethod()
+
     def clearDialog(self):
         self.dialog.hide()
         self.dialog.response(gtk.RESPONSE_NONE)
 
     def doExit(self):
+        entrycompletion.manager.collectCompletions()
         self.clearDialog()
         self.cancelMethod()
            
@@ -362,6 +367,7 @@ class RenameDialog(ActionConfirmationDialog):
         self.entry = gtk.Entry()
         self.entry.set_activates_default(True)
         self.entry.set_text(self.plugin.newName)
+        entrycompletion.manager.registerCompletion(self.entry)
         scriptEngine.registerEntry(self.entry, "enter new name ")
         vbox.pack_start(self.entry)
         hbox3 = gtk.HBox()
@@ -370,6 +376,7 @@ class RenameDialog(ActionConfirmationDialog):
         self.descriptionEntry = gtk.Entry()
         self.descriptionEntry.set_activates_default(True)
         self.descriptionEntry.set_text(self.plugin.newDescription)
+        entrycompletion.manager.registerCompletion(self.descriptionEntry)
         scriptEngine.registerEntry(self.descriptionEntry, "enter new description ")
         vbox.pack_start(self.descriptionEntry)
         
@@ -405,6 +412,7 @@ class MarkTestDialog(ActionConfirmationDialog):
         vbox.pack_start(hbox)
         self.briefEntry = gtk.Entry()
         self.briefEntry.set_text("Marked")
+        entrycompletion.manager.registerCompletion(self.briefEntry)
         self.briefEntry.set_activates_default(True)
         scriptEngine.registerEntry(self.briefEntry, "enter new test state brief text ")
         vbox.pack_start(self.briefEntry)
@@ -414,6 +422,7 @@ class MarkTestDialog(ActionConfirmationDialog):
         vbox.pack_start(hbox2)
         self.freeEntry = gtk.Entry()
         self.freeEntry.set_text("Marked at " + plugins.localtime("%d%b%H:%M"))
+        entrycompletion.manager.registerCompletion(self.freeEntry)
         self.freeEntry.set_activates_default(True)
         scriptEngine.registerEntry(self.freeEntry, "enter new test state free text ")
         vbox.pack_start(self.freeEntry)
@@ -492,6 +501,8 @@ class CreatePerformanceReportDialog(ActionConfirmationDialog):
         self.versionsEntry.set_activates_default(True)
         self.dirEntry.set_text(self.plugin.rootDir)
         self.versionsEntry.set_text(",".join(self.plugin.versions).rstrip(","))
+        entrycompletion.manager.registerCompletion(self.dirEntry)
+        entrycompletion.manager.registerCompletion(self.versionsEntry)
         
         table = gtk.Table(2, 2, homogeneous=False)
         table.set_row_spacings(1)

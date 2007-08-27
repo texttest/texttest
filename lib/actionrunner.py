@@ -38,8 +38,7 @@ class ActionRunner(Responder):
                 self.addTestRunner(extraTest, appRunner)
         else:
             newApp = Application(appName, self.makeDirectoryCache(appName), versions, self.inputOptions)
-            newTestSuite = self.createTestSuite(newApp, testPath)
-            self.addTestActions(newTestSuite)
+            self.createTestSuite(newApp, testPath)
     def makeDirectoryCache(self, appName):
         configFile = "config." + appName
         rootDir = self.inputOptions.directoryName
@@ -52,7 +51,10 @@ class ActionRunner(Responder):
     def createTestSuite(self, app, testPath):
         filter = plugins.TestPathFilter(testPath)
         responders = self.appRunners[0].testSuite.observers
-        return app.createTestSuite(responders, [ filter ])
+        suite = app.createTestSuite(responders, [ filter ])
+        for responder in responders:
+            responder.addSuites([ suite ]) # This will recursively notify ourselves(!) along with everyone else
+       
     def findApplicationRunner(self, appName, versions):
         for appRunner in self.appRunners:
             if appRunner.matches(appName, versions):

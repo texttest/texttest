@@ -1476,6 +1476,8 @@ class AllCompleteResponder(Responder,plugins.Observable):
             self.unfinishedTests -= 1
         else:
             self.notify("AllComplete")
+    def notifyExtraTest(self, *args):
+        self.unfinishedTests += 1
             
 class MultiEntryDictionary(seqdict):
     def __init__(self):

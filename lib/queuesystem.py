@@ -77,7 +77,7 @@ class SocketResponder(Responder,plugins.Observable):
             appDesc, testPath = response.strip().split(":")
             appParts = appDesc.split(".")
             self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
-    
+        
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
         default.Config.addToOptionGroups(self, app, groups)
@@ -143,7 +143,11 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getExecHostFinder(self)
     def getSlaveResponderClasses(self):
-        return [ SocketResponder, default.ActionRunner ]
+        classes = [ SocketResponder, default.ActionRunner ]
+        if not self.isActionReplay():
+            classes.append(unixonly.VirtualDisplayResponder)
+        return classes
+
     def getResponderClasses(self, allApps):
         if self.slaveRun():
             return self.getSlaveResponderClasses()
@@ -162,9 +166,13 @@ class QueueSystemConfig(default.Config):
         return Activator
     def getEnvironmentCreator(self, test):
         if self.slaveRun() or self.useQueueSystem():
-            return TestEnvironmentCreator(test, self.optionMap, self.getInteractiveReplayOptions())
+            return TestEnvironmentCreator(test, self.optionMap)
         else:
             return default.Config.getEnvironmentCreator(self, test)
+    def useVirtualDisplay(self):
+        if self.useQueueSystem():
+            return False
+        return default.Config.useVirtualDisplay(self)
     def getTextDisplayResponderClass(self):
         if self.useQueueSystem():
             return MasterTextResponder
@@ -717,7 +725,6 @@ class TestEnvironmentCreator(default.TestEnvironmentCreator):
             self.setDiagEnvironment()
             self.setUseCaseEnvironment()
         else:
-            self.setDisplayEnvironment()
             self.clearUseCaseEnvironment() # don't have the slave using these
     def clearUseCaseEnvironment(self):
         if self.testCase() and os.environ.has_key("USECASE_REPLAY_SCRIPT"):

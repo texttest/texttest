@@ -107,11 +107,25 @@ class Config:
             classes.append(self.getTextDisplayResponderClass())
         if self.batchMode() and not self.optionMap.has_key("coll"):
             classes.append(batch.BatchResponder)
+        if self.useVirtualDisplay():
+            from unixonly import VirtualDisplayResponder
+            classes.append(VirtualDisplayResponder)
         if self.keepTemporaryDirectories():
             classes.append(self.getStateSaver())
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
         return classes
+    def isActionReplay(self):
+        for option, desc in self.getInteractiveReplayOptions():
+            if self.optionMap.has_key(option):
+                return True
+        return False
+        
+    def useVirtualDisplay(self):
+        # Don't try to set it if we're using the static GUI or
+        # we've requested a slow motion replay or we're trying to record a new usecase.
+        return not self.optionMap.has_key("record") and not self.optionMap.has_key("gx") and not self.isActionReplay()
+    
     def getThreadRunnerClasses(self):
         classes = []
         if self.useGUI():
@@ -341,7 +355,7 @@ class Config:
         testEnvironmentCreator = self.getEnvironmentCreator(test)
         testEnvironmentCreator.setUp()
     def getEnvironmentCreator(self, test):
-        return TestEnvironmentCreator(test, self.optionMap, self.getInteractiveReplayOptions())
+        return TestEnvironmentCreator(test, self.optionMap)
     def getInteractiveReplayOptions(self):
         return [ ("actrep", "slow motion") ]
     def getTextResponder(self):
@@ -497,10 +511,8 @@ class Config:
         app.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
         app.setConfigDefault("slow_motion_replay_speed", 3, "How long in seconds to wait between each GUI action")
         if os.name == "posix":
-            app.setConfigDefault("virtual_display_machine", [], \
+            app.setConfigDefault("virtual_display_machine", [ "localhost" ], \
                                  "(UNIX) List of machines to run virtual display server (Xvfb) on")
-            app.setConfigDefault("virtual_display_number", "42", \
-                                 "(UNIX) Number to use for running virtual display server (Xvfb)")
     def defaultSeverities(self):
         severities = {}
         severities["errors"] = 1
@@ -662,10 +674,9 @@ class Config:
 
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:
-    def __init__(self, test, optionMap, intvReplayOptions):
+    def __init__(self, test, optionMap):
         self.test = test
         self.optionMap = optionMap
-        self.intvReplayOptions = intvReplayOptions
         self.usecaseFile = self.test.getFileName("usecase")
         self.diagDict = self.test.getConfigValue("diagnostics")
         self.diag = plugins.getDiagnostics("Environment Creator")
@@ -676,35 +687,13 @@ class TestEnvironmentCreator:
         if self.runsTests():
             self.doSetUp()
     def doSetUp(self):
-        self.setDisplayEnvironment()
         self.setDiagEnvironment()
         self.setUseCaseEnvironment()
     def topLevel(self):
         return self.test.parent is None
     def testCase(self):
         return self.test.classId() == "test-case"
-    def setDisplayEnvironment(self):
-        if not self.setVirtualDisplay():
-            return
-        if os.name == "posix":
-            from unixonly import VirtualDisplayFinder
-            finder = VirtualDisplayFinder(self.test.app)
-            display = finder.getDisplay()
-            if display:
-                self.test.setEnvironment("DISPLAY", display)
-                print "Tests will run with DISPLAY variable set to", display
-        else:
-            self.test.setEnvironment("DISPLAY", "HIDE_WINDOWS")
-    def setVirtualDisplay(self):
-        # Set a virtual display for the top level test
-        # Don't set it if we've requested a slow motion replay or we're trying to record a new usecase.
-        # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
-        if not self.topLevel() or self.isRecording():
-            return False
-        for option, desc in self.intvReplayOptions:
-            if self.optionMap.has_key(option):
-                return False
-        return True
+    
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
             self.setTraceDiagnostics()

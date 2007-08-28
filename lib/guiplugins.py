@@ -1416,7 +1416,15 @@ class RunTests(RunningAction):
     def getGroupTabTitle(self):
         return "Running"
     def performedDescription(self):
-        return "Started"
+        timesToRun = int(self.optionGroups[0].getOptionValue("cp"))
+        numberOfTests = len(self.currTestSelection)
+        if timesToRun != 1:
+            if numberOfTests > 1:
+                return "Started " + str(timesToRun) + " copies each of"
+            else:
+                return "Started " + str(timesToRun) + " copies of"
+        else:
+            return "Started"
     def getUseCaseName(self):
         return "dynamic"
     def getInteractiveReplayDescription(self):

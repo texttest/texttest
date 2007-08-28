@@ -45,7 +45,8 @@ class VirtualDisplayResponder(Responder):
     def setHideWindows(self, suites):
         for suite in suites:
             suite.setEnvironment("DISPLAY", "HIDE_WINDOWS")
-            
+        print "Tests will run with windows hidden"
+        
     def setUpVirtualDisplay(self, guiSuites):
         machines = self.findMachines(guiSuites)
         display = self.getDisplay(machines)

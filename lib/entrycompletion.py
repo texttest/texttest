@@ -36,7 +36,7 @@ class EntryCompletionManager:
 
     def addTextCompletion(self, text):
         if self.enabled and text and text not in [row[0] for row in self.completions]:
-            guiplugins.guilog.info("Adding entry completion " + repr(text) + " ...")
+            guiplugins.guilog.info("Adding entry completion " + repr(text).replace("\\", "/") + " ...")
             self.completions.append([text])            
 
     def collectCompletions(self):

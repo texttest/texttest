@@ -914,11 +914,13 @@ class CVSTreeViewDialog(guidialogs.ActionResultDialog):
         self.treeView.set_enable_search(False)
         fileRenderer = gtk.CellRendererText()
         fileColumn = gtk.TreeViewColumn("File", fileRenderer, markup=0)
+        fileColumn.set_resizable(True)
         self.treeView.append_column(fileColumn)
         self.treeView.set_expander_column(fileColumn)
         if self.plugin.getResultDialogTwoColumnsInTreeView():
             infoRenderer = gtk.CellRendererText()
             self.infoColumn = custom_widgets.ButtonedTreeViewColumn(self.plugin.getResultDialogSecondColumnTitle(), infoRenderer, markup=2)
+            self.infoColumn.set_resizable(True)
             self.treeView.append_column(self.infoColumn)
             guilog.info("CVS tree view dialog: Showing two columns")
         self.treeView.get_selection().connect("changed", self.showOutput)

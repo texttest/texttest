@@ -823,7 +823,8 @@ class TestColumnGUI(SubGUI):
                 self.allSuites.append(suite)
     def createView(self):
         testRenderer = gtk.CellRendererText()
-        self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)        
+        self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)
+        self.column.set_resizable(True)
         self.column.set_cell_data_func(testRenderer, renderSuitesBold)
         if not self.dynamic:
             self.column.set_clickable(True)
@@ -1003,6 +1004,7 @@ class TestTreeGUI(ContainerGUI):
         if self.dynamic:
             detailsRenderer = gtk.CellRendererText()
             perfColumn = gtk.TreeViewColumn("Details", detailsRenderer, text=4, background=5)
+            perfColumn.set_resizable(True)
             self.treeView.append_column(perfColumn)
 
         modelIndexer = TreeModelIndexer(self.filteredModel, testsColumn, 3)
@@ -2059,6 +2061,7 @@ class FileViewGUI(SubGUI):
         renderer = gtk.CellRendererText()
         self.nameColumn = gtk.TreeViewColumn(self.title, renderer, text=0, background=1)
         self.nameColumn.set_cell_data_func(renderer, renderParentsBold)
+        self.nameColumn.set_resizable(True)
         view.append_column(self.nameColumn)
         detailsColumn = self.makeDetailsColumn(renderer)
         if detailsColumn:
@@ -2078,7 +2081,9 @@ class FileViewGUI(SubGUI):
         return not self.model.iter_has_child(pathIter)
     def makeDetailsColumn(self, renderer):
         if self.dynamic:
-            return gtk.TreeViewColumn("Details", renderer, text=4)
+            column = gtk.TreeViewColumn("Details", renderer, text=4)
+            column.set_resizable(True)
+            return column
     def fileActivated(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
@@ -2417,6 +2422,8 @@ class TestProgressMonitor(SubGUI):
         numberRenderer.set_property('xalign', 1)
         statusColumn = gtk.TreeViewColumn("Status", textRenderer, text=0, background=3, font=4)
         numberColumn = gtk.TreeViewColumn("Number", numberRenderer, text=1, background=3, font=4)
+        statusColumn.set_resizable(True)
+        numberColumn.set_resizable(True)
         self.treeView.append_column(statusColumn)
         self.treeView.append_column(numberColumn)
         toggle = gtk.CellRendererToggle()
@@ -2425,6 +2432,7 @@ class TestProgressMonitor(SubGUI):
         scriptEngine.connect("toggle progress report category ", "toggled", toggle, self.showToggled, indexer)
         scriptEngine.monitor("set progress report filter selection to", selection, indexer)
         toggleColumn = gtk.TreeViewColumn("Visible", toggle, active=2)
+        toggleColumn.set_resizable(True)
         toggleColumn.set_alignment(0.5)
         self.treeView.append_column(toggleColumn)
         self.treeView.show()

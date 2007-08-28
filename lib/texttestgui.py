@@ -1312,8 +1312,6 @@ class ActionGUI(SubGUI):
     def runInteractive(self, *args):
         if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
             return
-        # Each time we perform an action we collect and save the current registered entries
-        entrycompletion.manager.collectCompletions()
         dialogType = self.action.getDialogType()
         if dialogType is not None:
             if dialogType:
@@ -1321,6 +1319,9 @@ class ActionGUI(SubGUI):
                                                    self._runInteractive, self._dontRun, self.action)
                 dialog.run()
             else:
+                # Each time we perform an action we collect and save the current registered entries
+                # Actions showing dialogs will handle this in the dialog code.
+                entrycompletion.manager.collectCompletions()
                 self._runInteractive()
     def _dontRun(self):
         statusMonitor.notifyStatus("Action cancelled.")
@@ -1585,7 +1586,7 @@ class ActionTabGUI(SubGUI):
         if self.buttonGUI:
             scriptEngine.connect("activate from " + option.name, "activate", entry, self.buttonGUI.runInteractive)
         entry.set_text(option.getValue())
-        entrycompletion.manager.registerCompletion(entry)
+        entrycompletion.manager.register(entry)
         # Options in drop-down lists don't change, so we just add them once and for all.
         for text in option.listPossibleValues():
             entrycompletion.manager.addTextCompletion(text)

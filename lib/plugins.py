@@ -184,9 +184,12 @@ def getTimeDifference(now, then, markup = True, \
         stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
     return stringDiff
 
-def printWarning(message):
-    print "WARNING: " + message
-
+def printWarning(message, stdout = True, stderr = False):
+    if stdout:
+        print "WARNING: " + message
+    if stderr:
+        sys.stderr.write("WARNING: " + message + "\n")
+        
 # Useful stuff to handle regular expressions
 regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
 def isRegularExpression(text):

@@ -18,7 +18,7 @@ class EntryCompletionManager:
             for completion in completions:
                 self.addTextCompletion(completion)
             
-    def registerCompletion(self, entry):
+    def register(self, entry):
         if self.enabled:
             completion = gtk.EntryCompletion()
             completion.set_model(self.completions)

@@ -1495,14 +1495,14 @@ class MultiEntryDictionary(seqdict):
         elif line.find(":") != -1:
             self.addLine(line, insert, errorOnUnknown)
         else:
-            plugins.printWarning("Could not parse config line " + line)
+            plugins.printWarning("Could not parse config line " + line, stdout = False, stderr = True)
     def changeSectionMarker(self, name, errorOnUnknown):
         if name == "end":
             return self
         if self.has_key(name) and type(self[name]) == types.DictType:
             return self[name]
         if errorOnUnknown:
-            print "ERROR: Config section name '" + name + "' not recognised."
+            plugins.printWarning("Config section name '" + name + "' not recognised.", stdout = False, stderr = True)
         return self
     def addLine(self, line, insert, errorOnUnknown, separator = ':'):
         entryName, entry = line.split(separator, 1)
@@ -1528,7 +1528,7 @@ class MultiEntryDictionary(seqdict):
                 else:
                     self.currDict[entryName] = entry
             elif errorOnUnknown:
-                print "ERROR : config entry name '" + entryName + "' not recognised"
+                plugins.printWarning("Config entry name '" + entryName + "' not recognised.", stdout = False, stderr = True)
         # Make sure we reset...
         if sectionName:
             self.currDict = self

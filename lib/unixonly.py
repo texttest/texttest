@@ -34,12 +34,13 @@ class VirtualDisplayResponder(Responder):
         self.diag = plugins.getDiagnostics("virtual display")
     
     def addSuites(self, suites):
-        guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
-        # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
-        if os.name != "posix":
-            self.setHideWindows(guiSuites)
-        else:
-            self.setUpVirtualDisplay(guiSuites)
+        if not self.serverInfo:
+            guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
+            # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
+            if os.name != "posix":
+                self.setHideWindows(guiSuites)
+            else:
+                self.setUpVirtualDisplay(guiSuites)
 
     def setHideWindows(self, suites):
         for suite in suites:

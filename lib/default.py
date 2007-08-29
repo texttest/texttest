@@ -683,11 +683,14 @@ class TestEnvironmentCreator:
         return not self.optionMap.has_key("gx") and not self.optionMap.has_key("s") and \
                not self.optionMap.has_key("reconnect")
     def setUp(self):
+        if self.topLevel():
+            self.test.setEnvironment("TEXTTEST_CHECKOUT", self.test.app.checkout)
         if self.runsTests():
             self.doSetUp()
     def doSetUp(self):
         self.setDiagEnvironment()
         self.setUseCaseEnvironment()
+        self.setPathEnvironment()
     def topLevel(self):
         return self.test.parent is None
     def testCase(self):
@@ -772,6 +775,24 @@ class TestEnvironmentCreator:
                 self.addJusecaseProperty("record", recordScript)
             else:
                 self.test.setEnvironment("USECASE_RECORD_SCRIPT", recordScript)
+    def setPathEnvironment(self):
+        if self.testCase():
+            # Always include the working directory of the test in PATH, to pick up fake
+            # executables provided as test data. Allow for later expansion...
+            for pathVar in self.getPathVars():
+                newPathVal = self.test.getDirectory(temporary=1) + os.pathsep + "$" + pathVar
+                self.test.setEnvironment(pathVar, newPathVal)
+
+    def getPathVars(self):
+        pathVars = [ "PATH" ]
+        for dataFile in self.test.app.getDataFileNames():
+            if dataFile.endswith(".py") and "PYTHONPATH" not in pathVars:
+                pathVars.append("PYTHONPATH")
+            elif (dataFile.endswith(".jar") or dataFile.endswith(".class")) and "CLASSPATH" not in pathVars:
+                pathVars.append("CLASSPATH")
+        return pathVars
+    
+
     
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):

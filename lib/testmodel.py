@@ -184,7 +184,6 @@ class TestEnvironment(MultiEntryDictionary):
         self.parent = None
         if test.parent:
             self.parent = test.parent.environment
-        self.pathVars = self.getPathVars()
         self.diag = plugins.getDiagnostics("read environment")
     def getSingleValue(self, var, defaultValue=None):
         if self.has_key(var):
@@ -211,15 +210,8 @@ class TestEnvironment(MultiEntryDictionary):
     def read(self, referenceVars = []):
         self.diag.info("Reading environment for " + repr(self.test))
         self.app.setEnvironment(self.test) # wanders throught the configuration picking up environment variables
-        if self.parent is None:
-            self["TEXTTEST_CHECKOUT"] = self.app.checkout
-        elif isinstance(self.test, TestCase):
-            # Always include the working directory of the test in PATH, to pick up fake
-            # executables provided as test data. Allow for later expansion...
-            for pathVar in self.pathVars:
-                self[pathVar] = self.test.writeDirectory + os.pathsep + "$" + pathVar
-
         self.app.readValues(self, "environment", self.dircache)
+        
         for key, value in self.items():
             self.diag.info("Set " + key + " to " + value)
         # Should do this, but not quite yet...
@@ -230,14 +222,6 @@ class TestEnvironment(MultiEntryDictionary):
             for subTest in self.test.testcases:
                 subTest.readEnvironment(childReferenceVars)
         self.diag.info("End Expanding " + self.test.name)
-    def getPathVars(self):
-        pathVars = [ "PATH" ]
-        for dataFile in self.app.getDataFileNames():
-            if dataFile.endswith(".py") and "PYTHONPATH" not in pathVars:
-                pathVars.append("PYTHONPATH")
-            elif (dataFile.endswith(".jar") or dataFile.endswith(".class")) and "CLASSPATH" not in pathVars:
-                pathVars.append("CLASSPATH")
-        return pathVars
     def expandReferences(self, referenceVars = []):
         childReferenceVars = copy(referenceVars)
         varsToCheck = copy(self.keys())

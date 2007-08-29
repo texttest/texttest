@@ -722,8 +722,7 @@ class Abandoned(plugins.TestState):
 class TestEnvironmentCreator(default.TestEnvironmentCreator):
     def doSetUp(self):
         if self.optionMap.has_key("slave"):
-            self.setDiagEnvironment()
-            self.setUseCaseEnvironment()
+            default.TestEnvironmentCreator.doSetUp(self)
         else:
             self.clearUseCaseEnvironment() # don't have the slave using these
     def clearUseCaseEnvironment(self):

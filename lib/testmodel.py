@@ -176,14 +176,9 @@ class MultiEntryDictionary(seqdict):
     
 
 class TestEnvironment(MultiEntryDictionary):
-    def __init__(self, dircache, app, test):
+    def __init__(self, parent):
         MultiEntryDictionary.__init__(self)
-        self.dircache = dircache
-        self.app = app
-        self.test = test # remove
-        self.parent = None
-        if test.parent:
-            self.parent = test.parent.environment
+        self.parent = parent
         self.diag = plugins.getDiagnostics("read environment")
     def getSingleValue(self, var, defaultValue=None):
         if self.has_key(var):
@@ -207,22 +202,12 @@ class TestEnvironment(MultiEntryDictionary):
                 environ[var] = value
         return environ
 
-    def read(self, referenceVars = []):
-        self.diag.info("Reading environment for " + repr(self.test))
-        self.app.setEnvironment(self.test) # wanders throught the configuration picking up environment variables
-        self.app.readValues(self, "environment", self.dircache)
-        
+    def expandReferences(self, referenceVars):
+        self.diag.info("Before expanding references, current values:")
         for key, value in self.items():
-            self.diag.info("Set " + key + " to " + value)
+            self.diag.info("  " + key + "=" + value)
         # Should do this, but not quite yet...
         # self.properties.readValues("properties", self.dircache)
-        self.diag.info("Expanding references for " + self.test.name)
-        childReferenceVars = self.expandReferences(referenceVars)
-        if isinstance(self.test, TestSuite):
-            for subTest in self.test.testcases:
-                subTest.readEnvironment(childReferenceVars)
-        self.diag.info("End Expanding " + self.test.name)
-    def expandReferences(self, referenceVars = []):
         childReferenceVars = copy(referenceVars)
         varsToCheck = copy(self.keys())
         while len(varsToCheck) > 0:
@@ -286,12 +271,15 @@ class Test(plugins.Observable):
         self.parent = parent
         self.dircache = dircache
         self.paddedName = self.name
-        self.environment = TestEnvironment(dircache, app, self)
+        self.environment = TestEnvironment(self.getParentEnvironment())
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
         self.diag = plugins.getDiagnostics("test objects")
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started", freeText=self.getDescription())
+    def getParentEnvironment(self):
+        if self.parent:
+            return self.parent.environment
     def getDescription(self):
         description = plugins.extractComment(self.description)
         if description:
@@ -305,8 +293,17 @@ class Test(plugins.Observable):
             self.notify("DescriptionChange")
     def classDescription(self):
         return self.classId().replace("-", " ")
-    def readEnvironment(self, childReferenceVars=[]):
-        self.environment.read(childReferenceVars)
+    def readEnvironment(self, referenceVars=[]):
+        return self._readEnvironment(referenceVars)
+    def _readEnvironment(self, referenceVars=[]):
+        self.environment.diag.info("Reading environment for " + repr(self))
+        self.app.setEnvironment(self) # wanders throught the configuration picking up environment variables
+        self.app.readValues(self.environment, "environment", self.dircache)
+        
+        childReferenceVars = self.environment.expandReferences(referenceVars) 
+        self.environment.diag.info("End reading environment for " + repr(self))
+        return childReferenceVars
+    
     def diagnose(self, message):
         self.diag.info("In test " + self.uniqueName + " : " + message)
     def getWordsInFile(self, stem):
@@ -660,6 +657,12 @@ class TestSuite(Test):
         self.autoSortOrder = self.getConfigValue("auto_sort_test_suites")
     def getDescription(self):
         return "\nDescription:\n" + Test.getDescription(self)
+    def readEnvironment(self, referenceVars=[]):
+        childReferenceVars = self._readEnvironment(referenceVars)
+        for subTest in self.testcases:
+            subTest.readEnvironment(childReferenceVars)
+        self.environment.diag.info("Completed reading environment in test suite " + self.name)
+            
     def readContents(self, filters, forTestRuns):
         testNames = self.readTestNames(forTestRuns)
         self.testcases = self.getTestCases(filters, testNames, forTestRuns)

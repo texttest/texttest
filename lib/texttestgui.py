@@ -1673,7 +1673,7 @@ class ActionTabGUI(SubGUI):
         dialog.show()
     def respond(self, dialog, response, entry):
         if response == gtk.RESPONSE_OK:
-            entry.set_text(dialog.get_filename())
+            entry.set_text(dialog.get_filename().replace("\\", "/"))
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
         dialog.destroy()
         

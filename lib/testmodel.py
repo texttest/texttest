@@ -99,33 +99,137 @@ class DirectoryCache:
                 return False
         return True
 
-class EnvironmentReader:
-    def __init__(self, app):
+class MultiEntryDictionary(seqdict):
+    def __init__(self):
+        seqdict.__init__(self)
+        self.currDict = self
+    def readValues(self, fileNames, insert=True, errorOnUnknown=False):
+        self.currDict = self
+        for filename in fileNames:
+            for line in plugins.readList(filename):
+                self.parseConfigLine(line, insert, errorOnUnknown)
+            self.currDict = self
+    def parseConfigLine(self, line, insert, errorOnUnknown):
+        if line.startswith("[") and line.endswith("]"):
+            self.currDict = self.changeSectionMarker(line[1:-1], errorOnUnknown)
+        elif line.find(":") != -1:
+            self.addLine(line, insert, errorOnUnknown)
+        else:
+            plugins.printWarning("Could not parse config line " + line, stdout = False, stderr = True)
+    def changeSectionMarker(self, name, errorOnUnknown):
+        if name == "end":
+            return self
+        if self.has_key(name) and type(self[name]) == types.DictType:
+            return self[name]
+        if errorOnUnknown:
+            plugins.printWarning("Config section name '" + name + "' not recognised.", stdout = False, stderr = True)
+        return self
+    def addLine(self, line, insert, errorOnUnknown, separator = ':'):
+        entryName, entry = line.split(separator, 1)
+        self.addEntry(os.path.expandvars(entryName), entry, "", insert, errorOnUnknown)
+    def getVarName(self, name):
+        if name.startswith("${"):
+            return name[2:-1]
+        else:
+            return name[1:]
+    def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
+        if sectionName:
+            self.currDict = self[sectionName]
+        entryExists = self.currDict.has_key(entryName)
+        if entryExists:
+            self.insertEntry(entryName, entry)
+        else:
+            if insert or not self.currDict is self:
+                dictValType = self.getDictionaryValueType()
+                if dictValType == types.ListType:
+                    self.currDict[entryName] = [ entry ]
+                elif dictValType == types.IntType:
+                    self.currDict[entryName] = int(entry)
+                else:
+                    self.currDict[entryName] = entry
+            elif errorOnUnknown:
+                plugins.printWarning("Config entry name '" + entryName + "' not recognised.", stdout = False, stderr = True)
+        # Make sure we reset...
+        if sectionName:
+            self.currDict = self
+    def getDictionaryValueType(self):
+        val = self.currDict.values()
+        if len(val) == 0:
+            return types.StringType
+        else:
+            return type(val[0])
+    def insertEntry(self, entryName, entry):
+        currType = type(self.currDict[entryName]) 
+        if currType == types.ListType:
+            if entry == "{CLEAR LIST}":
+                self.currDict[entryName] = []
+            elif not entry in self.currDict[entryName]:
+                self.currDict[entryName].append(entry)
+        elif currType == types.IntType:
+            self.currDict[entryName] = int(entry)
+        elif currType == types.DictType:
+            self.currDict = self.currDict[entryName]
+            self.insertEntry("default", entry)
+            self.currDict = self
+        else:
+            self.currDict[entryName] = entry        
+    
+
+class TestEnvironment(MultiEntryDictionary):
+    def __init__(self, dircache, app, test):
+        MultiEntryDictionary.__init__(self)
+        self.dircache = dircache
         self.app = app
+        self.test = test # remove
+        self.parent = None
+        if test.parent:
+            self.parent = test.parent.environment
         self.pathVars = self.getPathVars()
         self.diag = plugins.getDiagnostics("read environment")
-    def read(self, test, referenceVars = []):
-        self.diag.info("Reading environment for " + repr(test))
-        self.app.setEnvironment(test)
-        if test.parent == None:
-            test.setEnvironment("TEXTTEST_CHECKOUT", self.app.checkout)
-        elif isinstance(test, TestCase):
+    def getSingleValue(self, var, defaultValue=None):
+        if self.has_key(var):
+            return self[var]
+        elif self.parent is not None:
+            return self.parent.getSingleValue(var, defaultValue)
+        else:
+            return os.getenv(var, defaultValue)
+
+    def getValues(self, onlyVars = []):
+        # Get a complete copy that we can use for running a test
+        if self.parent is not None:
+            environ = self.parent.getValues(onlyVars)
+        else:
+            # deepcopy(os.environ) still seems to affect the environment in weird ways
+            environ = {}
+            for var, value in os.environ.items():
+                environ[var] = value
+        for var, value in self.items():
+            if len(onlyVars) == 0 or (var in onlyVars):
+                environ[var] = value
+        return environ
+
+    def read(self, referenceVars = []):
+        self.diag.info("Reading environment for " + repr(self.test))
+        self.app.setEnvironment(self.test) # wanders throught the configuration picking up environment variables
+        if self.parent is None:
+            self["TEXTTEST_CHECKOUT"] = self.app.checkout
+        elif isinstance(self.test, TestCase):
             # Always include the working directory of the test in PATH, to pick up fake
             # executables provided as test data. Allow for later expansion...
             for pathVar in self.pathVars:
-                test.setEnvironment(pathVar, test.writeDirectory + os.pathsep + "$" + pathVar)
+                self[pathVar] = self.test.writeDirectory + os.pathsep + "$" + pathVar
 
-        self.app.readValues(test.environment, "environment", test.dircache)
-        for key, value in test.environment.items():
+        self.app.readValues(self, "environment", self.dircache)
+        for key, value in self.items():
             self.diag.info("Set " + key + " to " + value)
         # Should do this, but not quite yet...
         # self.properties.readValues("properties", self.dircache)
-        self.diag.info("Expanding references for " + test.name)
-        childReferenceVars = self.expandReferences(test, referenceVars)
-        if isinstance(test, TestSuite):
-            for subTest in test.testcases:
-                self.read(subTest, childReferenceVars)
-        self.diag.info("End Expanding " + test.name)
+        self.diag.info("Expanding references for " + self.test.name)
+        childReferenceVars = self.expandReferences(referenceVars)
+        if isinstance(self.test, TestSuite):
+            for subTest in self.test.testcases:
+                subTest.readEnvironment(childReferenceVars)
+        self.diag.info("End Expanding " + self.test.name)
     def getPathVars(self):
         pathVars = [ "PATH" ]
         for dataFile in self.app.getDataFileNames():
@@ -134,28 +238,28 @@ class EnvironmentReader:
             elif (dataFile.endswith(".jar") or dataFile.endswith(".class")) and "CLASSPATH" not in pathVars:
                 pathVars.append("CLASSPATH")
         return pathVars
-    def expandReferences(self, test, referenceVars = []):
+    def expandReferences(self, referenceVars = []):
         childReferenceVars = copy(referenceVars)
-        varsToCheck = copy(test.environment.keys())
+        varsToCheck = copy(self.keys())
         while len(varsToCheck) > 0:
             # do it repeatedly to pick up all convoluted references in different orders
             self.diag.info("Expanding references for variables " + repr(varsToCheck))
-            varsToCheck = self.expandLocalReferences(test, varsToCheck, childReferenceVars)
-        self.expandParentReferences(test, referenceVars, childReferenceVars)
+            varsToCheck = self.expandLocalReferences(varsToCheck, childReferenceVars)
+        self.expandParentReferences(referenceVars, childReferenceVars)
         return childReferenceVars
 
-    def expandLocalReferences(self, test, varsToCheck, childReferenceVars):
+    def expandLocalReferences(self, varsToCheck, childReferenceVars):
         changedVars = []
         for var in varsToCheck:
-            value = test.environment[var]
+            value = self[var]
             selfRef = self.isSelfReference(var, value)
             if selfRef:
                 # temporarily wipe the stored value to prevent infinite expansion
-                del test.environment[var]
+                del self[var]
             # Our own hacked version of expandvars, so as not to change the environment for real
             # See top of plugins.py
-            expValue = os.path.expandvars(value, test.getEnvironment)
-            test.setEnvironment(var, expValue)
+            expValue = os.path.expandvars(value, self.getSingleValue)
+            self[var] = expValue
             if self.isSelfReference(var, expValue):
                 self.diag.info("Expanded variable " + var + " still self-referencing, not trying again: " + expValue)
             elif expValue != value:
@@ -169,15 +273,15 @@ class EnvironmentReader:
                 self.diag.info("Variable " + var + " left as " + value)
         return changedVars
 
-    def expandParentReferences(self, test, referenceVars, childReferenceVars):
+    def expandParentReferences(self, referenceVars, childReferenceVars):
         for var, value in referenceVars:
             self.diag.info("Trying reference variable " + var)
-            if test.environment.has_key(var):
+            if self.has_key(var):
                 childReferenceVars.remove((var, value))
                 continue
-            expValue = os.path.expandvars(value, test.getEnvironment)
+            expValue = os.path.expandvars(value, self.getSingleValue)
             if expValue != value:
-                test.setEnvironment(var, expValue)
+                self[var] = expValue
                 self.diag.info("Adding reference variable " + var + " as " + expValue)
             else:
                 self.diag.info("Not adding reference " + var + " as same as local value " + expValue)
@@ -198,7 +302,7 @@ class Test(plugins.Observable):
         self.parent = parent
         self.dircache = dircache
         self.paddedName = self.name
-        self.environment = MultiEntryDictionary()
+        self.environment = TestEnvironment(dircache, app, self)
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
         self.diag = plugins.getDiagnostics("test objects")
@@ -217,9 +321,8 @@ class Test(plugins.Observable):
             self.notify("DescriptionChange")
     def classDescription(self):
         return self.classId().replace("-", " ")
-    def readEnvironment(self):
-        envReader = EnvironmentReader(self.app)
-        envReader.read(self)
+    def readEnvironment(self, childReferenceVars=[]):
+        self.environment.read(childReferenceVars)
     def diagnose(self, message):
         self.diag.info("In test " + self.uniqueName + " : " + message)
     def getWordsInFile(self, stem):
@@ -232,12 +335,7 @@ class Test(plugins.Observable):
     def setEnvironment(self, var, value):
         self.environment[var] = value
     def getEnvironment(self, var, defaultValue=None):
-        if self.environment.has_key(var):
-            return self.environment[var]
-        elif self.parent:
-            return self.parent.getEnvironment(var, defaultValue)
-        else:
-            return os.getenv(var, defaultValue)
+        return self.environment.getSingleValue(var, defaultValue)
     def getTestRelPath(self, file):
         # test suites don't use this mechanism currently
         return ""
@@ -413,18 +511,7 @@ class Test(plugins.Observable):
             self.parent.removeTest(self, False)
         self.parent.contentChanged()
     def getRunEnvironment(self, onlyVars = []):
-        if self.parent:
-            environ = self.parent.getRunEnvironment(onlyVars)
-        else:
-            # deepcopy(os.environ) still seems to affect the environment in weird ways
-            environ = {}
-            for var, value in os.environ.items():
-                environ[var] = value
-        for var, value in self.environment.items():
-            if len(onlyVars) == 0 or (var in onlyVars):
-                environ[var] = value
-                self.diagnose("Setting " + var + " to " + value)
-        return environ
+        return self.environment.getValues(onlyVars)
     def getIndent(self):
         relPath = self.getRelPath()
         if not len(relPath):
@@ -1479,77 +1566,3 @@ class AllCompleteResponder(Responder,plugins.Observable):
     def notifyExtraTest(self, *args):
         self.unfinishedTests += 1
             
-class MultiEntryDictionary(seqdict):
-    def __init__(self):
-        seqdict.__init__(self)
-        self.currDict = self
-    def readValues(self, fileNames, insert=True, errorOnUnknown=False):
-        self.currDict = self
-        for filename in fileNames:
-            for line in plugins.readList(filename):
-                self.parseConfigLine(line, insert, errorOnUnknown)
-            self.currDict = self
-    def parseConfigLine(self, line, insert, errorOnUnknown):
-        if line.startswith("[") and line.endswith("]"):
-            self.currDict = self.changeSectionMarker(line[1:-1], errorOnUnknown)
-        elif line.find(":") != -1:
-            self.addLine(line, insert, errorOnUnknown)
-        else:
-            plugins.printWarning("Could not parse config line " + line, stdout = False, stderr = True)
-    def changeSectionMarker(self, name, errorOnUnknown):
-        if name == "end":
-            return self
-        if self.has_key(name) and type(self[name]) == types.DictType:
-            return self[name]
-        if errorOnUnknown:
-            plugins.printWarning("Config section name '" + name + "' not recognised.", stdout = False, stderr = True)
-        return self
-    def addLine(self, line, insert, errorOnUnknown, separator = ':'):
-        entryName, entry = line.split(separator, 1)
-        self.addEntry(os.path.expandvars(entryName), entry, "", insert, errorOnUnknown)
-    def getVarName(self, name):
-        if name.startswith("${"):
-            return name[2:-1]
-        else:
-            return name[1:]
-    def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
-        if sectionName:
-            self.currDict = self[sectionName]
-        entryExists = self.currDict.has_key(entryName)
-        if entryExists:
-            self.insertEntry(entryName, entry)
-        else:
-            if insert or not self.currDict is self:
-                dictValType = self.getDictionaryValueType()
-                if dictValType == types.ListType:
-                    self.currDict[entryName] = [ entry ]
-                elif dictValType == types.IntType:
-                    self.currDict[entryName] = int(entry)
-                else:
-                    self.currDict[entryName] = entry
-            elif errorOnUnknown:
-                plugins.printWarning("Config entry name '" + entryName + "' not recognised.", stdout = False, stderr = True)
-        # Make sure we reset...
-        if sectionName:
-            self.currDict = self
-    def getDictionaryValueType(self):
-        val = self.currDict.values()
-        if len(val) == 0:
-            return types.StringType
-        else:
-            return type(val[0])
-    def insertEntry(self, entryName, entry):
-        currType = type(self.currDict[entryName]) 
-        if currType == types.ListType:
-            if entry == "{CLEAR LIST}":
-                self.currDict[entryName] = []
-            elif not entry in self.currDict[entryName]:
-                self.currDict[entryName].append(entry)
-        elif currType == types.IntType:
-            self.currDict[entryName] = int(entry)
-        elif currType == types.DictType:
-            self.currDict = self.currDict[entryName]
-            self.insertEntry("default", entry)
-            self.currDict = self
-        else:
-            self.currDict[entryName] = entry        

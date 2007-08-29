@@ -34,26 +34,34 @@ class VirtualDisplayResponder(Responder):
         self.diag = plugins.getDiagnostics("virtual display")
     
     def addSuites(self, suites):
-        if not self.serverInfo:
-            guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
-            # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
-            if os.name != "posix":
-                self.setHideWindows(guiSuites)
-            else:
-                self.setUpVirtualDisplay(guiSuites)
+        guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
+        # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
+        if os.name != "posix":
+            self.setHideWindows(guiSuites)
+        elif self.serverInfo:
+            self.setExistingDisplay(guiSuites)
+        else:
+            self.setUpVirtualDisplay(guiSuites)
+    def setExistingDisplay(self, guiSuites):
+        machine, pid = self.serverInfo
+        displayName = self.getDisplayName(machine, str(os.getpid()))
+        self.setDisplayVariable(guiSuites, displayName)
 
     def setHideWindows(self, suites):
         for suite in suites:
             suite.setEnvironment("DISPLAY", "HIDE_WINDOWS")
-        if len(suites) > 0:
+        if len(suites) > 0 and not self.serverInfo:
             print "Tests will run with windows hidden"
-        
+
+    def setDisplayVariable(self, guiSuites, displayName):
+        for suite in guiSuites:
+            suite.setEnvironment("DISPLAY", displayName)
+
     def setUpVirtualDisplay(self, guiSuites):
         machines = self.findMachines(guiSuites)
         display = self.getDisplay(machines)
         if display:
-            for suite in guiSuites:
-                suite.setEnvironment("DISPLAY", display)
+            self.setDisplayVariable(guiSuites, display)
             print "Tests will run with DISPLAY variable set to", display
         elif len(machines) > 0:
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")

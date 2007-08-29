@@ -677,7 +677,6 @@ class TestEnvironmentCreator:
     def __init__(self, test, optionMap):
         self.test = test
         self.optionMap = optionMap
-        self.usecaseFile = self.test.getFileName("usecase")
         self.diagDict = self.test.getConfigValue("diagnostics")
         self.diag = plugins.getDiagnostics("Environment Creator")
     def runsTests(self):
@@ -730,15 +729,16 @@ class TestEnvironmentCreator:
         # apps to tell us which to do...
         if self.useJavaRecorder():
             self.test.properties.addEntry("jusecase", {}, insert=1)
-        usecaseFile = self.findReplayUseCase()
-        if usecaseFile:
-            self.setReplay(usecaseFile)
-        if self.usecaseFile or self.isRecording():
+        usecaseFile = self.test.getFileName("usecase")
+        replayUseCase = self.findReplayUseCase(usecaseFile)
+        if replayUseCase:
+            self.setReplay(replayUseCase)
+        if usecaseFile or self.isRecording():
             # Re-record if recorded files are already present or recording explicitly requested
             self.setRecord(self.test.makeTmpFileName("usecase"))
     def isRecording(self):
         return self.optionMap.has_key("record")
-    def findReplayUseCase(self):
+    def findReplayUseCase(self, usecaseFile):
         if self.isRecording():
             if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
                 # For self-testing, to allow us to record TextTest performing recording
@@ -749,7 +749,7 @@ class TestEnvironmentCreator:
                 # Don't replay when recording - let the user do it...
                 return None
         else:
-            return self.usecaseFile
+            return usecaseFile
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
     def addJusecaseProperty(self, name, value):

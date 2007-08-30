@@ -1124,6 +1124,7 @@ class SelectTests(SelectionAction):
         return True
     def getStockId(self):
         return "refresh"
+        #return "find"
     def _getTitle(self):
         return "_Select"
     def _getScriptTitle(self):
@@ -1455,6 +1456,8 @@ class CreateDefinitionFile(InteractiveTestAction):
         return True
     def _getTitle(self):
         return "Create _File"
+    def getStockId(self):
+        return "new" 
     def getTabTitle(self):
         return "New File" 
     def getScriptTitle(self, tab):

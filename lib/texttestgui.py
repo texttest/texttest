@@ -1291,6 +1291,10 @@ class ActionGUI(SubGUI):
     def __init__(self, action):
         SubGUI.__init__(self)
         self.action = action
+    def getStockId(self):
+        stockId = self.action.getStockId()
+        if stockId:
+            return "gtk-" + stockId 
     def describe(self):
         message = "Viewing action with title '" + self.action.getTitle(includeMnemonics=True) + "'"
         message += self.detailDescription()
@@ -1357,10 +1361,6 @@ class DefaultActionGUI(ActionGUI):
         
     def actionOrButton(self):
         return self.gtkAction
-    def getStockId(self):
-        stockId = self.action.getStockId()
-        if stockId:
-            return "gtk-" + stockId 
         
     def getAccelerator(self):
         realAcc = guiConfig.getCompositeValue("gui_accelerators", self.action.getTitle().rstrip("."))
@@ -1402,6 +1402,8 @@ class ButtonActionGUI(ActionGUI):
         return self.button
     def createButton(self):
         self.button = gtk.Button(self.action.getTitle(includeMnemonics=True))
+        if self.getStockId():
+            self.button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
         self.tooltips.set_tip(self.button, self.scriptTitle)
         scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
         self.button.show()

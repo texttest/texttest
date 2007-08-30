@@ -13,7 +13,10 @@ class EntryCompletionManager:
         if self.matching != 0:
             self.enabled = True
             guiplugins.guilog.info("Enabling entry completion, using matching " + str(self.matching))
-
+            self.inlineCompletions = guiplugins.guiConfig.getValue("gui_entry_completion_inline")            
+            if self.inlineCompletions:
+                guiplugins.guilog.info(" - Inlining common completion prefixes in entries.")
+                
             completions = guiplugins.guiConfig.getCompositeValue("gui_entry_completions", "", modeDependent=True)
             for completion in completions:
                 self.addTextCompletion(completion)
@@ -22,6 +25,8 @@ class EntryCompletionManager:
         if self.enabled:
             completion = gtk.EntryCompletion()
             completion.set_model(self.completions)
+            if self.inlineCompletions:
+                completion.set_inline_completion(True)
             completion.set_text_column(0)        
             if self.matching == 2: # Matching on start is default for gtk.EntryCompletion
                 completion.set_match_func(self.containsMatchFunction)        
@@ -37,7 +42,7 @@ class EntryCompletionManager:
     def addTextCompletion(self, text):
         if self.enabled and text and text not in [row[0] for row in self.completions]:
             guiplugins.guilog.info("Adding entry completion " + repr(text) + " ...")
-            self.completions.append([text])            
+            self.completions.prepend([text])            
 
     def collectCompletions(self):
         if self.enabled:

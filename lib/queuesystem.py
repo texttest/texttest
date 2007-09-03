@@ -164,15 +164,12 @@ class QueueSystemConfig(default.Config):
         return SlaveServerResponder
     def getActivatorClass(self):
         return Activator
-    def getEnvironmentCreator(self, test):
-        if self.slaveRun() or self.useQueueSystem():
-            return TestEnvironmentCreator(test, self.optionMap)
-        else:
-            return default.Config.getEnvironmentCreator(self, test)
     def useVirtualDisplay(self):
-        if self.useQueueSystem():
+        if self.useQueueSystem() and not self.slaveRun():
             return False
-        return default.Config.useVirtualDisplay(self)
+        else:
+            return default.Config.useVirtualDisplay(self)
+        
     def getTextDisplayResponderClass(self):
         if self.useQueueSystem():
             return MasterTextResponder
@@ -520,7 +517,7 @@ class QueueSystemServer:
         command = self.getSlaveCommand(test)
         submissionRules = test.app.getSubmissionRules(test)
         print "Q: Submitting test", test.uniqueName, submissionRules.getSubmitSuffix()
-        if not self.submitJob(test, submissionRules, command):
+        if not self.submitJob(test, submissionRules, command, self.getSlaveEnvironment()):
             return
         
         self.testCount -= 1
@@ -530,6 +527,15 @@ class QueueSystemServer:
             test.changeState(self.getPendingState(test))
         if self.testsSubmitted == self.maxCapacity:
             self.sendServerState("Completed submission of tests up to capacity")
+    def getSlaveEnvironment(self):
+        # Make sure we clear out the master scripts so the slave doesn't use them too,
+        # otherwise just use the environment as is
+        if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
+            env = plugins.copyEnvironment()
+            env["USECASE_REPLAY_SCRIPT"] = ""
+            env["USECASE_RECORD_SCRIPT"] = ""
+            return env
+
     def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
@@ -558,8 +564,7 @@ class QueueSystemServer:
             slaveWriteDir = os.path.join(self.optionMap.diagWriteDir, "slave")
             runOptions.append("-xw " + slaveWriteDir)
         return " ".join(runOptions)
-    def submitJob(self, test, submissionRules, command, \
-                  envVars = [ "DISPLAY", "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT" ]):
+    def submitJob(self, test, submissionRules, command, slaveEnv):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
         self.diag.info("Creating job at " + plugins.localtime())
         queueSystem = self.getQueueSystem(test)
@@ -571,7 +576,7 @@ class QueueSystemServer:
         jobName = submissionRules.getJobName()
         self.diag.info("Creating job " + jobName + " with command arguments : " + repr(cmdArgs))
         process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   cwd=test.getDirectory(temporary=1), env=test.getRunEnvironment(envVars))
+                                   cwd=test.getDirectory(temporary=1), env=slaveEnv)
         stdout, stderr = process.communicate()
         errorMessage = self.findErrorMessage(stderr, queueSystem)
         if not errorMessage:
@@ -717,19 +722,6 @@ class Abandoned(plugins.TestState):
                                                       freeText=freeText, completed=1, lifecycleChange="complete")
     def shouldAbandon(self):
         return 1
-
-# Only used when actually running master + slave
-class TestEnvironmentCreator(default.TestEnvironmentCreator):
-    def doSetUp(self):
-        if self.optionMap.has_key("slave"):
-            default.TestEnvironmentCreator.doSetUp(self)
-        else:
-            self.clearUseCaseEnvironment() # don't have the slave using these
-    def clearUseCaseEnvironment(self):
-        if self.testCase() and os.environ.has_key("USECASE_REPLAY_SCRIPT"):
-            # If we're in the master, make sure we clear the scripts so the slave doesn't use them too...
-            self.test.setEnvironment("USECASE_REPLAY_SCRIPT", "")
-            self.test.setEnvironment("USECASE_RECORD_SCRIPT", "")
         
 class MachineInfoFinder(default.MachineInfoFinder):
     def __init__(self):

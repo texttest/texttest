@@ -565,6 +565,13 @@ def abspath(relpath):
     else:
         return os.path.abspath(relpath)
 
+# deepcopy(os.environ) still seems to retain links to the actual environment, create a clean copy
+def copyEnvironment():
+    environ = {}
+    for var, value in os.environ.items():
+        environ[var] = value
+    return environ
+
 def getInterpreter(binary):
     if binary.endswith(".py"):
         return "python"

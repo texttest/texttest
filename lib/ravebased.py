@@ -375,13 +375,13 @@ class RuleBuildActivator(Activator):
     def submitRuleCompilation(self, test, rulecomp):
         submissionRules = test.app.getRaveSubmissionRules(test)
         remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
-        rulecompEnvVars = getCrcCompileVars()
+        rulecompEnv = test.getRunEnvironment(getCrcCompileVars())
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
             print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for test " + test.uniqueName + ")", postText
             compileArgs = [ remoteCmd, ruleset.targetFiles[0], SlaveServerResponder.submitAddress ] + ruleset.getCompilationArgs(remote=True)
             command = " ".join(compileArgs)
-            QueueSystemServer.instance.submitJob(test, submissionRules, command, rulecompEnvVars)
+            QueueSystemServer.instance.submitJob(test, submissionRules, command, rulecompEnv)
         
         if test.state.category == "need_rulecompile":
             test.changeState(PendingRuleCompilation(rulecomp))

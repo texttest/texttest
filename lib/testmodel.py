@@ -193,10 +193,7 @@ class TestEnvironment(MultiEntryDictionary):
         if self.parent is not None:
             environ = self.parent.getValues(onlyVars)
         else:
-            # deepcopy(os.environ) still seems to affect the environment in weird ways
-            environ = {}
-            for var, value in os.environ.items():
-                environ[var] = value
+            environ = plugins.copyEnvironment()
         for var, value in self.items():
             if len(onlyVars) == 0 or (var in onlyVars):
                 environ[var] = value

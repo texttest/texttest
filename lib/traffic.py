@@ -2,7 +2,7 @@
 
 import os, sys, plugins, shutil, socket, subprocess
 from ndict import seqdict
-from SocketServer import TCPServer, StreamRequestHandler, ThreadingMixIn
+from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
 from types import StringType
 
@@ -235,7 +235,7 @@ class TrafficRequestHandler(StreamRequestHandler):
                 return self.parseDict[key](value, self.wfile)
         return ClientSocketTraffic(text, self.wfile)
             
-class TrafficServer(TCPServer, ThreadingMixIn):
+class TrafficServer(TCPServer):
     instance = None
     def __init__(self):
         self.recordFile = None
@@ -243,13 +243,10 @@ class TrafficServer(TCPServer, ThreadingMixIn):
         self.diag = plugins.getDiagnostics("Traffic Server")
         TrafficServer.instance = self
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
-        ThreadingMixIn.daemon_threads = True
         self.setAddressVariable()
         self.thread = Thread(target=self.serve_forever)
         self.thread.setDaemon(1)
         self.thread.start()
-    def process_request(self, request, client_address):
-        return ThreadingMixIn.process_request(self, request, client_address)
     def setAddressVariable(self):
         host, port = self.socket.getsockname()
         address = host + ":" + str(port)

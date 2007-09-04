@@ -811,7 +811,7 @@ class PrepareWriteDirectory(plugins.Action):
         self.collatePaths(test, "copy_test_path", self.copyTestPath)
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
         self.collatePaths(test, "link_test_path", self.linkTestPath)
-        self.createPropertiesFiles(test)
+        test.createPropertiesFiles()
     def collatePaths(self, test, configListName, collateMethod):
         for configName in test.getConfigValue(configListName, expandVars=False):
             self.collatePath(test, configName, collateMethod)
@@ -1014,14 +1014,6 @@ class PrepareWriteDirectory(plugins.Action):
         indent = len(dashes) / 4
         fileName = line.strip()[pos:]
         return fileName, indent
-    def createPropertiesFiles(self, test):
-        for var, value in test.properties.items():
-            propFileName = test.makeTmpFileName(var + ".properties", forComparison=0)
-            self.diag.info("Writing " + propFileName + " for " + var + " : " + repr(value))
-            file = open(propFileName, "w")
-            for subVar, subValue in value.items():
-                # Don't write windows separators, they get confused with escape characters...
-                file.write(subVar + " = " + subValue.replace(os.sep, "/") + "\n")
     
 class CollateFiles(plugins.Action):
     def __init__(self):

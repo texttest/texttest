@@ -766,6 +766,14 @@ def printException():
     sys.stderr.write(exceptionString)
     return exceptionString
 
+class Callable:
+    def __init__(self, method, *args):
+        self.method = method
+        self.extraArgs = args
+    def __call__(self, *calledArgs):
+        toUse = self.extraArgs + calledArgs
+        return self.method(*toUse)
+
 class PreviewGenerator:
     def __init__(self, maxWidth, maxLength, startEndRatio=1):
         self.maxWidth = maxWidth

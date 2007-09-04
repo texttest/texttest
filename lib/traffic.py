@@ -6,13 +6,6 @@ from SocketServer import TCPServer, StreamRequestHandler, ThreadingMixIn
 from threading import Thread
 from types import StringType
 
-class MethodWrap:
-    def __init__(self, method, firstArg):
-        self.method = method
-        self.firstArg = firstArg
-    def __call__(self, arg):
-        return self.method(self.firstArg, arg)
-
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
         self.record = record
@@ -27,25 +20,22 @@ class SetUpTrafficHandlers(plugins.Action):
             self.makeIntercepts(test)
     def configureServer(self, test):
         recordFile = test.makeTmpFileName("traffic")
-        envVarMethod = MethodWrap(test.getCompositeConfigValue, "collect_traffic_environment")
-        writeDir = test.getDirectory(temporary=1)
-        runEnv = test.getRunEnvironment()
         if self.record:
-            self.setServerState(recordFile, None, envVarMethod, runEnv, writeDir)
+            self.setServerState(recordFile, None, test)
             return True
         else:
             trafficReplay = test.getFileName("traffic")
             if trafficReplay:
-                self.setServerState(recordFile, trafficReplay, envVarMethod, runEnv, writeDir)
+                self.setServerState(recordFile, trafficReplay, test)
                 return True
             else:
-                self.setServerState(None, None, envVarMethod, runEnv, writeDir)
+                self.setServerState(None, None, test)
                 return False
-    def setServerState(self, recordFile, replayFile, envVarMethod, environ, writeDir):
+    def setServerState(self, recordFile, replayFile, test):
         if recordFile or replayFile and not TrafficServer.instance:
             TrafficServer.instance = TrafficServer()
         if TrafficServer.instance:
-            TrafficServer.instance.setState(recordFile, replayFile, envVarMethod, environ, writeDir)
+            TrafficServer.instance.setState(recordFile, replayFile, test)
     def makeIntercepts(self, test):
         for cmd in test.getConfigValue("collect_traffic"):
             linkName = test.makeTmpFileName(cmd, forComparison=0)
@@ -140,9 +130,7 @@ class ServerStateTraffic(ServerTraffic):
 class CommandLineTraffic(Traffic):
     typeId = "CMD"
     direction = "<-"
-    envVarMethod = None
-    origEnviron = {}
-    origCwd = None
+    currentTest = None
     realCommands = {}
     def __init__(self, inText, responseFile):
         self.diag = plugins.getDiagnostics("Traffic Server")
@@ -161,21 +149,21 @@ class CommandLineTraffic(Traffic):
         Traffic.__init__(self, text, responseFile)
     def filterEnvironment(self, cmdEnviron):
         interestingEnviron = []
-        for var in self.envVarMethod(self.commandName):
+        for var in self.currentTest.getCompositeConfigValue("collect_traffic_environment", self.commandName):
             value = cmdEnviron.get(var)
-            if value is not None and value != self.origEnviron.get(var):
+            if value is not None and value != self.currentTest.getEnvironment(var):
                 interestingEnviron.append((var, value))
         return interestingEnviron
     def getEnvString(self):
         recStr = ""
-        if not plugins.samefile(self.cmdCwd, self.origCwd):
+        if not plugins.samefile(self.cmdCwd, self.currentTest.getDirectory(temporary=1)):
             recStr += "cd " + self.cmdCwd + "; "
         if len(self.environ) == 0:
             return recStr
         recStr += "env "
         for var, value in self.environ:
             recLine = "'" + var + "=" + value + "' "
-            oldVal = self.origEnviron.get(var)
+            oldVal = self.currentTest.getEnvironment(var)
             if oldVal and oldVal != value:
                 recLine = recLine.replace(oldVal, "$" + var)
             recStr += recLine
@@ -270,16 +258,14 @@ class TrafficServer(TCPServer, ThreadingMixIn):
     def setRealVersion(self, command, realCommand):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
-    def setState(self, recordFile, replayFile, envVarMethod, environ, writeDir):
+    def setState(self, recordFile, replayFile, test):
         self.recordFile = recordFile
         self.replayInfo = ReplayInfo(replayFile)
         if recordFile or replayFile:
             self.setAddressVariable()
         else:
             os.environ["TEXTTEST_MIM_SERVER"] = ""
-        CommandLineTraffic.envVarMethod = envVarMethod
-        CommandLineTraffic.origEnviron = environ
-        CommandLineTraffic.origCwd = writeDir
+        CommandLineTraffic.currentTest = test
         ClientSocketTraffic.destination = None
         # Assume testing client until a server contacts us
         ClientSocketTraffic.direction = "<-"

@@ -56,7 +56,7 @@ def getConfig(optionMap):
     return Config(optionMap)
 
 def isUserSuite(suite):
-    return suite.environment.has_key("CARMUSR")
+    return suite.hasEnvironment("CARMUSR")
 
 class UserFilter(plugins.TextFilter):
     option = "u"
@@ -244,26 +244,26 @@ class Config(CarmenConfig):
                     readDirs["Ruleset"] = rulesets
             except plugins.TextTestError:
                 pass
-        elif test.environment.has_key("CARMUSR"):
+        elif test.hasEnvironment("CARMUSR"):
             files = self.getResourceFiles(test)
             if len(files):
                 readDirs["Resources"] = files
-        elif test.environment.has_key("CARMSYS"):
+        elif test.hasEnvironment("CARMSYS"):
             raveModule = self.getRaveModule(test)
             if os.path.isfile(raveModule):
                 readDirs["RAVE module"] = [ raveModule ]
         return readDirs
     def getResourceFiles(self, test):
         files = []
-        customerFile = os.path.join(test.environment["CARMUSR"], "Resources", "CarmResources", "Customer.etab")
+        customerFile = os.path.join(test.getEnvironment("CARMUSR"), "Resources", "CarmResources", "Customer.etab")
         if os.path.isfile(customerFile):
             files.append(customerFile)
-        impFile = os.path.join(test.environment["CARMUSR"], "data", "config", "CarmResources", "Implementation.etab")
+        impFile = os.path.join(test.getEnvironment("CARMUSR"), "data", "config", "CarmResources", "Implementation.etab")
         if os.path.isfile(impFile):
             files.append(impFile)
         return files
     def getRaveModule(self, test):
-        return os.path.join(test.environment["CARMSYS"], \
+        return os.path.join(test.getEnvironment("CARMSYS"), \
                             "carmusr_default", "crc", "modules", getBasicRaveName(test))
     def filesFromSubplan(self, test, subplanDir):
         return []
@@ -271,14 +271,12 @@ class Config(CarmenConfig):
         pass
     def setEnvironment(self, test):
         CarmenConfig.setEnvironment(self, test)
-        # Change PATH so we can intercept crc_compile calls
-        if test.parent and test.parent.parent is None and not self.slaveRun() and not self.useQueueSystem():
-            carmsys = test.getEnvironment("CARMSYS")
-            if carmsys and (not test.parent.environment.has_key("PATH") or \
-                            test.parent.environment["PATH"].find("$CARMSYS/bin") == -1):
+        if not test.parent and not self.slaveRun():
+            if self.useQueueSystem():
+                test.setEnvironment("_AUTOTEST__LOCAL_COMPILE_", "1")
+            else:
+                # Change PATH so we can intercept crc_compile calls
                 test.setEnvironment("PATH", "$PATH:$CARMSYS/bin")
-        if not test.parent and self.useQueueSystem():
-            test.setEnvironment("_AUTOTEST__LOCAL_COMPILE_", "1")
     def printHelpOptions(self):
         CarmenConfig.printHelpOptions(self)
         print helpOptions

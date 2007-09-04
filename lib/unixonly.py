@@ -29,6 +29,7 @@ class RunTest(default.RunTest):
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
 class VirtualDisplayResponder(Responder):
+    MAX_DISPLAY = 32768
     def __init__(self, optionMap):
         self.serverInfo = None
         self.diag = plugins.getDiagnostics("virtual display")
@@ -44,7 +45,7 @@ class VirtualDisplayResponder(Responder):
             self.setUpVirtualDisplay(guiSuites)
     def setExistingDisplay(self, guiSuites):
         machine, pid = self.serverInfo
-        displayName = self.getDisplayName(machine, str(os.getpid()))
+        displayName = self.getDisplayName(machine, self.getDisplayNumber())
         self.setDisplayVariable(guiSuites, displayName)
 
     def setHideWindows(self, suites):
@@ -67,16 +68,19 @@ class VirtualDisplayResponder(Responder):
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
 
     def getDisplay(self, machines):
-        # We use the device of making the display number match our process ID!
-        # And we hope that works :) Should prevent clashes with others using the same strategy anyway
-        # Display numbers up to 59535 seem to be allowed, which is less than most process IDs on systems I've observed...
-        displayNumber = str(os.getpid())
+        displayNumber = self.getDisplayNumber()
         for machine in machines:
             if self.createDisplay(machine, displayNumber):
                 return self.getDisplayName(machine, displayNumber)
             else:
                 plugins.printWarning("Virtual display program Xvfb not available on " + machine) 
-                        
+
+    def getDisplayNumber(self):
+        # We use the device of making the display number match our process ID (mod 32768)!
+        # And we hope that works :) Should prevent clashes with others using the same strategy anyway
+        # Display numbers up to 32768 seem to be allowed, which is less than most process IDs on systems I've observed...
+        return str(os.getpid() % self.MAX_DISPLAY)
+    
     def findMachines(self, suites):
         allMachines = []
         for suite in suites:
@@ -105,7 +109,7 @@ class VirtualDisplayResponder(Responder):
         process = subprocess.Popen(psArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         outstr, errstr = process.communicate()
         for line in outstr.splitlines():
-            if line.find("Xvfb") != -1 and line.find(str(os.getpid())) != -1 and line.find("csh") == -1:
+            if line.find("Xvfb") != -1 and line.find(self.getDisplayNumber()) != -1 and line.find("csh") == -1:
                 self.diag.info("Found Xvfb process running:\n" + line)
                 # Assumes linux ps output (!)
                 return line.split()[3]

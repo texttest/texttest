@@ -1267,11 +1267,16 @@ class Application:
 
         self.diag.info("Creating test suite with filters " + repr(filters))
         suite = TestSuite(os.path.basename(self.dircache.dir), "Root test suite", self.dircache, self)
+        # allow the configurations to decide whether to accept the application in the presence of
+        # the suite's environment
+        self.configObject.checkSanity(suite)
         suite.setObservers(responders)
         suite.readContents(filters, forTestRuns)
         self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
-        self.configObject.checkSanity(suite) # allow the configurations to decide whether to accept the suite
-        return suite
+        if suite.size() == 0 and not self.configObject.allowEmpty():
+            raise plugins.TextTestError, "no tests matching the selection criteria found."
+        else:
+            return suite
     def description(self, includeCheckout = False):
         description = "Application " + self.fullName
         if len(self.versions):

@@ -386,9 +386,6 @@ class Config:
         elif not os.path.isdir(checkoutPath):
             raise plugins.TextTestError, "checkout '" + checkoutPath + "' does not exist"
     def checkSanity(self, suite):
-        if suite.size() == 0 and not self.allowEmpty():
-            raise plugins.TextTestError, "no tests matching the selection criteria found."
-
         if not self.ignoreBinary() and not self.optionMap.has_key("gx"):
             self.checkBinaryExists(suite)
         

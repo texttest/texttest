@@ -681,7 +681,7 @@ class TestSuite(Test):
             
     def readContents(self, filters, forTestRuns):
         testNames = self.readTestNames(forTestRuns)
-        self.testcases = self.getTestCases(filters, testNames, forTestRuns)
+        self.createTestCases(filters, testNames, forTestRuns)
         if len(self.testcases):
             maxNameLength = max([len(test.name) for test in self.testcases])
             for test in self.testcases:
@@ -799,8 +799,7 @@ class TestSuite(Test):
             else:
                 orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
         return orderedTestNames
-    def getTestCases(self, filters, testNames, forTestRuns):
-        testCaseList = []
+    def createTestCases(self, filters, testNames, forTestRuns):
         orderedTestNames = testNames.keys()
         testCaches = {}
         for testName in orderedTestNames:
@@ -811,31 +810,50 @@ class TestSuite(Test):
                 orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
             else:
                 orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
+
         for testName in orderedTestNames:
-            newTest = self.createTest(testName, testNames[testName], testCaches[testName], filters, forTestRuns)
-            if newTest:
-                testCaseList.append(newTest)
-        return testCaseList
+            dirCache = testCaches[testName]
+            className = self.getSubtestClass(dirCache)
+            subTest = self.createSubtest(testName, testNames[testName], dirCache, className)
+            if subTest.isAcceptedByAll(filters) and \
+                   (className is TestCase or subTest.readContents(filters, forTestRuns)):
+                self.testcases.append(subTest)
+
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))
-    def createTest(self, testName, description, cache, filters = [], forTestRuns=0):
+    def getSubtestClass(self, cache):
         allFiles = cache.findAllFiles("testsuite", compulsory = [ self.app.name ])
         if len(allFiles) > 0:
-            return self.createTestSuite(testName, description, cache, filters, forTestRuns)
+            return TestSuite
         else:
-            return self.createTestCase(testName, description, cache, filters)
-    def createTestCase(self, testName, description, cache, filters):
-        newTest = TestCase(testName, description, cache, self.app, self)
-        if newTest.isAcceptedByAll(filters):
-            newTest.setObservers(self.observers)
-            return newTest
-    def createTestSuite(self, testName, description, cache, filters, forTestRuns):
-        newSuite = TestSuite(testName, description, cache, self.app, self)
-        if not newSuite.isAcceptedByAll(filters):
-            return
-        newSuite.setObservers(self.observers)
-        if newSuite.readContents(filters, forTestRuns):
-            return newSuite
+            return TestCase
+    def createSubtest(self, testName, description, cache, className):
+        test = className(testName, description, cache, self.app, self)
+        test.setObservers(self.observers)
+        return test
+    
+    def addTestCase(self, testName, description="", placement=-1):
+        return self.addTest(testName, description, placement, TestCase)
+    def addTestSuite(self, testName, description="", placement=-1):
+        return self.addTest(testName, description, placement, TestSuite)
+    def addTest(self, testName, description, placement, className):
+        cache = self.createTestCache(testName)
+        test = self.createSubtest(testName, description, cache, className)
+        self.testcases.insert(placement, test) 
+        test.notify("Add")
+        return test
+    def addTestCaseWithPath(self, testPath):
+        pathElements = testPath.split("/", 1)
+        subSuite = self.findSubtest(pathElements[0])
+        if len(pathElements) == 1:
+            if not subSuite:
+                return self.addTestCase(testPath)
+            # if it already exists, don't return anything
+        else:
+            if not subSuite:
+                subSuite = self.addTestSuite(pathElements[0])
+            return subSuite.addTestCaseWithPath(pathElements[1])
+    
     def findSubtest(self, testName):
         for test in self.testcases:
             if test.name == testName:
@@ -914,28 +932,6 @@ class TestSuite(Test):
         currContent.insert(placement, newEntry)
         self.writeNewTestSuiteFile(contentFileName, currContent)
         return self.makeSubDirectory(testName)
-    def addTestCaseWithPath(self, testPath):
-        pathElements = testPath.split("/", 1)
-        subSuite = self.findSubtest(pathElements[0])
-        if len(pathElements) == 1:
-            if not subSuite:
-                return self.addTestCase(testPath)
-            # if it already exists, don't return anything
-        else:
-            if not subSuite:
-                subSuite = self.addTestSuite(pathElements[0])
-            return subSuite.addTestCaseWithPath(pathElements[1])
-    def addTestCase(self, testName, description="", placement=-1):
-        return self.addTest(testName, description, placement, TestCase)
-    def addTestSuite(self, testName, description="", placement=-1):
-        return self.addTest(testName, description, placement, TestSuite)
-    def addTest(self, testName, description, placement, className):
-        cache = DirectoryCache(os.path.join(self.getDirectory(), testName))
-        test = className(testName, description, cache, self.app, self)
-        test.setObservers(self.observers)
-        self.testcases.insert(placement, test) 
-        test.notify("Add")
-        return test
     def getFollower(self, test):
         position = self.testcases.index(test)
         try:
@@ -1262,21 +1258,24 @@ class Application:
             return ""
         return "." + fullVersion
     def createTestSuite(self, responders=[], filters=[], forTestRuns = True):
-        if len(filters) == 0:
-            filters = self.configObject.getFilterList(self)
-
-        self.diag.info("Creating test suite with filters " + repr(filters))
         suite = TestSuite(os.path.basename(self.dircache.dir), "Root test suite", self.dircache, self)
         # allow the configurations to decide whether to accept the application in the presence of
         # the suite's environment
         self.configObject.checkSanity(suite)
         suite.setObservers(responders)
+        self.readContents(suite, filters, forTestRuns)
+        return suite
+    def readContents(self, suite, filters, forTestRuns):
+        if len(filters) == 0:
+            filters = self.configObject.getFilterList(self)
+
+        self.diag.info("Creating test suite with filters " + repr(filters))
+        
         suite.readContents(filters, forTestRuns)
         self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
         if suite.size() == 0 and not self.configObject.allowEmpty():
             raise plugins.TextTestError, "no tests matching the selection criteria found."
-        else:
-            return suite
+
     def description(self, includeCheckout = False):
         description = "Application " + self.fullName
         if len(self.versions):

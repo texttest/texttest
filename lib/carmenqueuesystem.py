@@ -235,8 +235,21 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
                  "weekly_publish", "weekly_publish.lsf", "small_publish", "test_nightjob" ]
     def getDefaultMaxCapacity(self):
         return 70 # roughly number of R&D i386_linux machines, with a bit extra for luck
+    def getDataLocation(self, app):
+        return os.path.join("/carm/proj", app.fullName.lower())
+    def getAutomountLocations(self, app):
+        return [ app.getDirectory(), os.getenv("TEXTTEST_TMP"), self.getDataLocation(app) ]
+    def fixAutomounting(self, app):
+        origCwd = os.getcwd()
+        for dir in self.getAutomountLocations(app):
+            try:
+                os.chdir(dir) # hopefully this will cause it to be mounted and prevent later trouble
+            except:
+                pass
+        os.chdir(origCwd)
     def setApplicationDefaults(self, app):
         queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
+        self.fixAutomounting(app)
         app.setConfigDefault("default_architecture", "i386_linux", "Which Carmen architecture to run tests on by default")
         app.setConfigDefault("default_major_release", "master", "Which Carmen major release to run by default")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10, "Maximum time a test can take and be sent to the short queue")

@@ -955,7 +955,9 @@ class GraphPlotResponder(Responder):
     def __init__(self, optionMap):
         Responder.__init__(self, optionMap)
         self.testGraph = TestGraph()
-        self.testGraph.readCommandLine(optionMap["plot"].split())
+        plotStr = optionMap["plot"]
+        if plotStr:
+            self.testGraph.readCommandLine(plotStr.split())
         self.writeDir = None
     def addSuite(self, suite):
         if not self.writeDir:

@@ -52,11 +52,17 @@ class InteractiveResponder(Responder):
         Responder.__init__(self, optionMap)
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
+        self.overwriteVersion = optionMap.get("o")
     def notifyComplete(self, test):
         if self.shouldSave(test):
-            self.save(test, test.app.getFullVersion(forSave=1))
+            self.save(test, self.getOverwriteVersion(test))
         elif self.useInteractiveResponse(test):
             self.presentInteractiveDialog(test)
+    def getOverwriteVersion(self, test):
+        if self.overwriteVersion is None:
+            return test.app.getFullVersion(forSave=1)
+        else:
+            return self.overwriteVersion
     def shouldSave(self, test):
         if not test.state.hasResults():
             return 0

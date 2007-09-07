@@ -766,14 +766,6 @@ def printException():
     sys.stderr.write(exceptionString)
     return exceptionString
 
-class Callable:
-    def __init__(self, method, *args):
-        self.method = method
-        self.extraArgs = args
-    def __call__(self, *calledArgs):
-        toUse = self.extraArgs + calledArgs
-        return self.method(*toUse)
-
 class PreviewGenerator:
     def __init__(self, maxWidth, maxLength, startEndRatio=1):
         self.maxWidth = maxWidth
@@ -828,12 +820,14 @@ class OptionFinder(seqdict):
     def buildOptions(self, args, defaultKey):
         optionKey = None                                                                                         
         for item in args:    
-            if item[0] == "-":                         
+            if item.startswith("-"):                         
                 optionKey = self.stripMinuses(item)
-                self[optionKey] = ""
+                self[optionKey] = None
             elif optionKey:
-                if len(self[optionKey]):
+                if self[optionKey] is not None:
                     self[optionKey] += " "
+                else:
+                    self[optionKey] = ""
                 self[optionKey] += item.strip()
             else:
                 self[defaultKey] = item

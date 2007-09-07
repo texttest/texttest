@@ -47,11 +47,11 @@ class Config:
                 group.addSwitch("g", "use dynamic GUI", 1)
                 group.addSwitch("gx", "use static GUI")
                 group.addSwitch("con", "use console interface")
-                group.addSwitch("o", "Overwrite all failures")
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addOption("fd", "Private: Directory to search for filter files in")
                 group.addOption("name", "Batch run not identified by date, but by name")
+                group.addOption("o", "Overwrite failures, optionally using version")
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
                 group.addSwitch("n", "Create new results files (overwrite everything)")
@@ -1471,7 +1471,7 @@ class ReconnectApp:
     def findReconnectDir(self, app, reconnectTmpInfo):
         fetchDir = app.getPreviousWriteDirInfo(reconnectTmpInfo)
         if not os.path.isdir(fetchDir):
-            if fetchDir == reconnectTmpInfo or len(reconnectTmpInfo) == 0:
+            if fetchDir == reconnectTmpInfo or not reconnectTmpInfo:
                 raise plugins.TextTestError, "Could not find TextTest temporary directory at " + fetchDir
             else:
                 raise plugins.TextTestError, "Could not find TextTest temporary directory for " + reconnectTmpInfo + " at " + fetchDir

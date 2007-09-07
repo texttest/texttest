@@ -959,25 +959,33 @@ class RecordTest(InteractiveTestAction):
             return True
         else:
             return False
+    def getUseCaseFile(self, test):
+        return test.getFileName("usecase", self.optionGroup.getOptionValue("v"))
     def updateRecordTime(self, test):
-        if self.updateRecordTimeForFile(test, "usecase", "USECASE_RECORD_SCRIPT", "target_record"):
-            return True
-        return False
-    def updateRecordTimeForFile(self, test, stem, envVar, prefix):
-        file = test.getFileName(stem, self.optionGroup.getOptionValue("v"))
-        if not file:
-            return False
+        file = self.getUseCaseFile(test)
+        if file:
+            self._updateRecordTime(file)
+    def _updateRecordTime(self, file):
         newTime = plugins.modifiedTime(file)
         if newTime != self.recordTime:
             self.recordTime = newTime
-            if os.environ.has_key(envVar):
+            outerRecord = os.getenv("USECASE_RECORD_SCRIPT")
+            if outerRecord:
                 # If we have an "outer" record going on, provide the result as a target recording...
-                target = plugins.addLocalPrefix(os.getenv(envVar), prefix)
+                target = plugins.addLocalPrefix(outerRecord, "target_record")
                 shutil.copyfile(file, target)
             return True
-        return False
-    def startTextTestProcess(self, test, usecase):
-        ttOptions = self.getRunOptions(test, usecase)
+        else:
+            return False
+    def getChangedUseCaseVersion(self, test):
+        file = self.getUseCaseFile(test)
+        if not file or not self._updateRecordTime(file):
+            return
+
+        parts = os.path.basename(file).split(".")
+        return ".".join(parts[2:])
+    def startTextTestProcess(self, test, usecase, overwriteVersion=""):
+        ttOptions = self.getRunOptions(test, usecase, overwriteVersion)
         guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         cmdArgs = self.getTextTestArgs() + ttOptions
         writeDir = self.getWriteDir(test)
@@ -1007,9 +1015,10 @@ class RecordTest(InteractiveTestAction):
             if len(errText):
                 self.notify("Status", "Recording failed for " + repr(test))
                 return self.notify("Error", "Recording use-case failed, with the following errors:\n" + errText)
-                            
-        if self.updateRecordTime(test) and self.optionGroup.getSwitchValue("rep"):
-            self.startTextTestProcess(test, usecase="replay")
+
+        changedUseCaseVersion = self.getChangedUseCaseVersion(test)
+        if changedUseCaseVersion is not None and self.optionGroup.getSwitchValue("rep"):
+            self.startTextTestProcess(test, "replay", changedUseCaseVersion)
             message = "Recording completed for " + repr(test) + \
                       ". Auto-replay of test now started. Don't submit the test manually!"
             self.notify("Status", message)
@@ -1017,19 +1026,19 @@ class RecordTest(InteractiveTestAction):
             self.notify("Status", "Recording completed for " + repr(test) + ", not auto-replaying")
     def setTestReady(self, test, usecase=""):
         self.notify("Status", "Recording and auto-replay completed for " + repr(test))
-    def getRunOptions(self, test, usecase):
+    def getRunOptions(self, test, usecase, overwriteVersion):
         version = self.optionGroup.getOptionValue("v")
         checkout = self.optionGroup.getOptionValue("c")
-        basicOptions = [ self.getRunModeOption(usecase), "-tp", test.getRelPath() ] + \
+        basicOptions = self.getRunModeOptions(usecase, overwriteVersion) + [ "-tp", test.getRelPath() ] + \
                        test.app.getRunOptions(version, checkout)
         if usecase == "record":
             basicOptions.append("-record")
         return basicOptions
-    def getRunModeOption(self, usecase):
+    def getRunModeOptions(self, usecase, overwriteVersion):
         if usecase == "record" or self.optionGroup.getSwitchValue("repgui"):
-            return "-g"
+            return [ "-g" ]
         else:
-            return "-o"
+            return [ "-o", overwriteVersion ]
     def _getTitle(self):
         return "Record _Use-Case"
     

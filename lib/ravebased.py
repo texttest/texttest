@@ -815,7 +815,9 @@ class BuildCode:
     builtDirs = {}
     buildFailedDirs = {}
     def __init__(self, target):
-        self.target = target
+        self.target = "" # no option corresponds to empty string
+        if target:
+            self.target = target
     def build(self, suite):
         targetDir = suite.getConfigValue("build_targets")
         if not targetDir.has_key(self.target):

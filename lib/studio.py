@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.9 2007/08/03 13:11:41 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.10 2007/09/07 14:30:46 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins
 import os, shutil, string
@@ -187,6 +187,7 @@ class RecordTest(guiplugins.RecordTest):
     def __init__(self):
         guiplugins.RecordTest.__init__(self)
         self.optionGroup.addOption("rset", "Compile this ruleset first")
+        self.changedUseCaseVersion = ""
     def updateOptions(self):
         retValue = guiplugins.RecordTest.updateOptions(self)
         self.optionGroup.setOptionValue("rset", "")
@@ -203,16 +204,20 @@ class RecordTest(guiplugins.RecordTest):
             return []
     def isRuleSource(self, fileName):
         return not fileName.startswith(".")
-    def getRunOptions(self, test, usecase):
-        basicOptions = guiplugins.RecordTest.getRunOptions(self, test, usecase)
+    def getRunOptions(self, test, usecase, overwriteVersion):
+        basicOptions = guiplugins.RecordTest.getRunOptions(self, test, usecase, overwriteVersion)
         ruleset = self.optionGroup.getOptionValue("rset")
         if usecase == "record" and ruleset:
             return [ "-rulecomp", "-rset", ruleset ] + basicOptions
         return basicOptions
+    def getChangedUseCaseVersion(self, test):
+        ret = guiplugins.RecordTest.getChangedUseCaseVersion(self, test)
+        self.changedUseCaseVersion = ret # cache the result, for using in our auto-replay
+        return ret
     # We want to generate a second auto-replay...
     def setTestReady(self, test, usecase=""):
         if usecase == "replay":
-            self.startTextTestProcess(test, usecase="replay2")
+            self.startTextTestProcess(test, "replay2", self.changedUseCaseVersion)
             message = "First auto-replay completed for " + repr(test) + \
                       ". Second auto-replay now started. Don't submit the test manually!"
             self.notify("Status", message)

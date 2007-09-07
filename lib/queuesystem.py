@@ -554,10 +554,10 @@ class QueueSystemServer:
     def getRunOptions(self, app):
         runOptions = []
         for slaveSwitch in app.getSlaveSwitches():
-            value = self.optionMap.get(slaveSwitch)
-            if value is not None:
+            if self.optionMap.has_key(slaveSwitch):
                 option = "-" + slaveSwitch
-                if len(value) > 0:
+                value = self.optionMap.get(slaveSwitch)
+                if value:
                     option += " " + value
                 runOptions.append(option)
 

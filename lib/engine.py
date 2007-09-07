@@ -160,12 +160,7 @@ class TextTest:
         responderClasses += [ testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
         allResponders = map(lambda x : x(self.inputOptions), responderClasses)
         self.allResponders = self.removeBaseClasses(allResponders)
-        for responder in self.allResponders:
-            # For all observable responders, set them to be observed by the others if they
-            # haven't fixed their own observers
-            if isinstance(responder, plugins.Observable) and len(responder.observers) == 0:
-                self.diag.info("All responders now observing " + str(responder.__class__))
-                responder.setObservers(allResponders)
+        
     def createThreadRunners(self, allApps):
         threadRunnerClasses = []
         threadRunners = []
@@ -261,6 +256,11 @@ class TextTest:
         return self.allResponders + filter(lambda runner: runner not in self.allResponders, threadRunners)
     def addSuites(self, threadRunners):
         for object in self.getObjectsToAddSuites(threadRunners):
+            # For all observable responders, set them to be observed by the others if they
+            # haven't fixed their own observers
+            if isinstance(object, plugins.Observable) and len(object.observers) == 0:
+                self.diag.info("All responders now observing " + str(object.__class__))
+                object.setObservers(self.allResponders)
             suites = self.getSuitesToAdd(object, threadRunners)
             self.diag.info("Adding suites " + repr(suites) + " for " + str(object.__class__))
             object.addSuites(suites)

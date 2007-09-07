@@ -403,7 +403,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI.createView()
         self.topWindowGUI.activate()
         self.idleManager.enableHandler()
-    def run(self):        
+    def run(self):
         gtk.main()
     def createTopWindowGUI(self, rightWindowGUI):
         mainWindowGUI = PaneGUI(self.testTreeGUI, rightWindowGUI, horizontal=True)
@@ -2351,7 +2351,7 @@ class ProgressBarGUI(SubGUI):
         self.widget = None
 
     def shouldShow(self):
-        return self.dynamic
+        return self.dynamic and self.totalNofTests > 0
 
     def describe(self):
         guilog.info("Progress bar set to fraction " + str(self.widget.get_fraction()) + ", text '" + self.widget.get_text() + "'")

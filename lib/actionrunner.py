@@ -4,9 +4,10 @@ from respond import Responder
 from testmodel import Application, DirectoryCache
 from glob import glob
 
-class ActionRunner(Responder):
+class ActionRunner(Responder, plugins.Observable):
     def __init__(self, optionMap):
         Responder.__init__(self, optionMap)
+        plugins.Observable.__init__(self)
         self.inputOptions = optionMap
         self.previousTestRunner = None
         self.currentTestRunner = None
@@ -15,16 +16,14 @@ class ActionRunner(Responder):
         self.testQueue = []
         self.appRunners = []
         self.diag = plugins.getDiagnostics("Action Runner")
-    def addSuites(self, suites):
-        for suite in suites:
-            self.addTestActions(suite)
-    def addTestActions(self, suite):
+    def addSuite(self, suite):
         print "Using", suite.app.description(includeCheckout=True)
         self.diag.info("Processing test suite of size " + str(suite.size()) + " for app " + suite.app.name)
         appRunner = ApplicationRunner(suite, self.script, self.diag)
         self.appRunners.append(appRunner)
         for test in suite.testCaseList():
             self.addTestRunner(test, appRunner)
+            
     def addTestRunner(self, test, appRunner):
         self.diag.info("Adding test runner for test " + test.getRelPath())
         testRunner = TestRunner(test, appRunner, self.diag)
@@ -50,9 +49,8 @@ class ActionRunner(Responder):
             return DirectoryCache(os.path.dirname(allFiles[0]))
     def createTestSuite(self, app, testPath):
         filter = plugins.TestPathFilter(testPath)
-        responders = self.appRunners[0].testSuite.observers
-        suite = app.createTestSuite(responders, [ filter ])
-        for responder in responders:
+        suite = app.createTestSuite(self.observers, [ filter ])
+        for responder in self.observers:
             responder.addSuites([ suite ]) # This will recursively notify ourselves(!) along with everyone else
        
     def findApplicationRunner(self, appName, versions):
@@ -75,14 +73,14 @@ class ApplicationRunner:
         self.suitesToSetUp = {}
         self.diag = diag
         self.actionSequence = self.getActionSequence(script)
-        self.setUpApplications(self.actionSequence)
+        self.setUpApplications()
     def matches(self, appName, versions):
         app = self.testSuite.app
         return app.name == appName and app.versions == versions
     def addExtraTest(self, testPath):
         return self.testSuite.addTestCaseWithPath(testPath)
-    def setUpApplications(self, sequence):
-        for action in sequence:
+    def setUpApplications(self):
+        for action in self.actionSequence:
             self.setUpApplicationFor(action)
     def setUpApplicationFor(self, action):
         self.diag.info("Performing " + str(action) + " set up on " + repr(self.testSuite.app))

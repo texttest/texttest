@@ -422,11 +422,14 @@ class QueueSystemServer:
         QueueSystemServer.instance = self
     def addSuites(self, suites):
         for suite in suites:
+            size = suite.size()
+            if size == 0:
+                continue
             currCap = suite.getConfigValue("queue_system_max_capacity")
             if currCap < self.maxCapacity:
                 self.maxCapacity = currCap
             print "Using", queueSystemName(suite.app), "queues for", suite.app.description(includeCheckout=True)
-            self.testCount += suite.size()
+            self.testCount += size
     def submit(self, test, initial=True):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
         if self.reuseOnly and self.testsSubmitted == 0:

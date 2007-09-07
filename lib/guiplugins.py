@@ -445,17 +445,26 @@ class SaveTests(SelectionAction):
         tests = self.getSaveableTests()
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Saving " + testDesc + " ...")
-        for test in tests:
-            version = self.getVersion(test)
-            fullDesc = " - version " + version + saveDesc
-            self.describe(test, fullDesc)
-            testComparison = test.state
-            testComparison.setObservers(self.observers)
-            testComparison.save(test, self.getExactness(), version, overwriteSuccess, self.newFilesAsDiags(), stemsToSave)
-            newState = testComparison.makeNewState(test.app)
-            test.changeState(newState)
+        try:
+            for test in tests:
+                version = self.getVersion(test)
+                fullDesc = " - version " + version + saveDesc
+                self.describe(test, fullDesc)
+                testComparison = test.state
+                testComparison.setObservers(self.observers)
+                testComparison.save(test, self.getExactness(), version, overwriteSuccess, self.newFilesAsDiags(), stemsToSave)
+                newState = testComparison.makeNewState(test.app)
+                test.changeState(newState)
 
-        self.notify("Status", "Saved " + testDesc + ".")
+            self.notify("Status", "Saved " + testDesc + ".")
+        except OSError, e:
+            self.notify("Status", "Failed to save " + testDesc + ".")
+            errorStr = str(e)
+            if errorStr.find("Permission") != -1:
+                raise plugins.TextTestError, "Failed to save " + testDesc + \
+                      " : didn't have sufficient write permission to the test files"
+            else:
+                raise plugins.TextTestError, errorStr
         
 class MarkTest(SelectionAction):
     def __init__(self):

@@ -62,13 +62,13 @@ class DirectoryCache:
             versions = methodToUse(fileName, stem)
             if not versions is None:
                 versionLists.append(versions)
-                versionInfo[string.join(versions, ".")] = fileName
+                versionInfo[".".join(versions)] = fileName
         return versionLists, versionInfo
     def findAndSortFiles(self, stem, allowed, priorityFunction, versionListMethod=None):
         versionLists, versionInfo = self.findVersionLists(stem, versionListMethod)
         versionLists = filter(lambda vlist: self.allVersionsAllowed(vlist, allowed), versionLists)
         versionLists.sort(priorityFunction)
-        return map(lambda vlist: self.pathName(versionInfo[string.join(vlist, ".")]), versionLists)
+        return map(lambda vlist: self.pathName(versionInfo[".".join(vlist)]), versionLists)
     def findAllStems(self):
         stems = []
         for file in self.contents:
@@ -82,7 +82,7 @@ class DirectoryCache:
             versionLists = filter(lambda vlist: self.matchVersions(vlist, compulsory, forbidden), versionLists)
         if priorityFunction:
             versionLists.sort(priorityFunction)
-        return map(lambda vlist: self.pathName(versionInfo[string.join(vlist, ".")]), versionLists)
+        return map(lambda vlist: self.pathName(versionInfo[".".join(vlist)]), versionLists)
     def allVersionsAllowed(self, vlist, allowed):
         for version in vlist:
             if not version in allowed:
@@ -539,7 +539,7 @@ class TestCase(Test):
     def __init__(self, name, description, abspath, app, parent):
         Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
-        self.writeDirectory = os.path.join(app.writeDirectory, self.getRelPath())       
+        self.writeDirectory = os.path.join(app.writeDirectory, app.name + app.versionSuffix(), self.getRelPath())       
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
@@ -953,7 +953,7 @@ class TestSuite(Test):
                 raise plugins.TextTestError, errorStr
     def writeNewTestSuiteFile(self, fileName, content):
         testEntries = self.makeWriteEntries(content)
-        output = string.join(testEntries, "\n")
+        output = "\n".join(testEntries)
         if not output.endswith("\n"):
             output += "\n"
         newFile = plugins.openForWrite(fileName)
@@ -1043,7 +1043,7 @@ class Application:
         for module in self.getConfigValue("interactive_action_module"):
             interactiveActionHandler.loadModules.append(module)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
-        self.writeDirectory = self.configObject.getWriteDirectoryName(self)
+        self.writeDirectory = os.path.join(self.rootTmpDir, self.getWriteDirectoryName())    
         self.diag.info("Write directory at " + self.writeDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
@@ -1098,7 +1098,7 @@ class Application:
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):
         allowedExtensions = self.getFileExtensions()
         allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists)
-        self.diag.info("Reading values for " + stem + " from files : " + string.join(allFiles, "\n"))
+        self.diag.info("Reading values for " + stem + " from files : " + "\n".join(allFiles))
         multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
     def setEnvironment(self, test):
         self.configObject.setEnvironment(test) # wanders throught the configuration picking up environment variables
@@ -1175,7 +1175,7 @@ class Application:
         self.setConfigDefault("binary", "", "Full path to the System Under Test")
         self.setConfigDefault("config_module", "default", "Configuration module to use")
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
-        self.setConfigDefault("full_name", string.upper(self.name), "Expanded name to use for application")
+        self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
         self.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
         # various varieties of test data
@@ -1243,15 +1243,11 @@ class Application:
             else:
                 os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
         return os.path.expanduser(os.getenv("TEXTTEST_TMP"))
-    def getStandardWriteDirectoryName(self):
-        timeStr = plugins.startTimeString().replace(":", "")
-        localName = self.name + self.versionSuffix() + "." + timeStr
-        return os.path.join(self.rootTmpDir, localName)
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:
             versionsToUse = self.filterUnsaveable(self.versions)
-        return string.join(versionsToUse, ".")
+        return ".".join(versionsToUse)
     def versionSuffix(self):
         fullVersion = self.getFullVersion()
         if len(fullVersion) == 0:
@@ -1279,7 +1275,7 @@ class Application:
     def description(self, includeCheckout = False):
         description = "Application " + self.fullName
         if len(self.versions):
-            description += ", version " + string.join(self.versions, ".")
+            description += ", version " + ".".join(self.versions)
         if includeCheckout and self.checkout:
             description += ", checkout " + self.checkout
         return description
@@ -1357,7 +1353,7 @@ class Application:
     def tryCleanPreviousWriteDirs(self, rootDir):
         if not self.cleanMode.cleanPrevious or not os.path.isdir(rootDir):
             return
-        searchParts = [ self.name ] + self.versions
+        searchParts = os.path.basename(self.writeDirectory).split(".")[:-1]
         for file in os.listdir(rootDir):
             fileParts = file.split(".")
             if fileParts[:-1] == searchParts:

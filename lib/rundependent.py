@@ -14,7 +14,7 @@ class FilterAction(plugins.Action):
             runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
             unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
             if len(runDepTexts) > 0 or len(unorderedTexts) > 0 or self.changedOs(test.app):
-                fileFilter= RunDependentTextFilter(test.getRelPath(), test.app.name, runDepTexts, unorderedTexts)
+                fileFilter= RunDependentTextFilter(test.getRelPath(), runDepTexts, unorderedTexts)
                 filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
                 newFileName = filterFileBase + self.getPostfix(test)
                 if self.shouldRemove(newFileName, fileName):
@@ -57,10 +57,10 @@ class FilterRecompute(FilterOriginal):
             return "partcmp"
 
 class RunDependentTextFilter(plugins.Observable):
-    def __init__(self, testId, appId, runDepTexts, unorderedTexts):
+    def __init__(self, testId, runDepTexts, unorderedTexts):
         plugins.Observable.__init__(self)
         self.diag = plugins.getDiagnostics("Run Dependent Text")
-        regexp = self.getWriteDirRegexp(testId, appId)
+        regexp = self.getWriteDirRegexp(testId)
         self.contentFilters = [ LineFilter(text, regexp, self.diag) for text in runDepTexts ]
         self.orderFilters = seqdict()
         for text in unorderedTexts:
@@ -103,9 +103,9 @@ class RunDependentTextFilter(plugins.Observable):
                 newFile.write(line)
             newFile.write("\n")
             self.orderFilters[filter] = []
-    def getWriteDirRegexp(self, testId, appId):
-        dateRegexp = "[0-3][0-9][A-Za-z][a-z][a-z][0-9][0-9][0-9][0-9][0-9][0-9]"
-        return "[^ \"=]*/" + appId + "[^/]*" + dateRegexp + "/" + testId
+    def getWriteDirRegexp(self, testId):
+        # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
+        return "[^ \"=]*/[^ \"=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ \"=]*/" + testId
 
 class LineNumberTrigger:
     def __init__(self, lineNumber):

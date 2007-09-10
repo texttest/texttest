@@ -146,15 +146,28 @@ class Config:
         else:
             return []
     def getWriteDirectoryName(self, app):
-        defaultName = app.getStandardWriteDirectoryName()
+        parts = self.getBasicRunDescriptors(app) + self.getDescriptors("v") + [ self.getTimeDescriptor() ]
+        return ".".join(parts)
+    def getBasicRunDescriptors(self, app):
+        appDescriptors = self.getDescriptors("a")
         if self.useStaticGUI(app):
-            dirname, local = os.path.split(defaultName)
-            versionSuffix = app.versionSuffix()
-            if versionSuffix:
-                local = local.replace(versionSuffix, "")
-            return os.path.join(dirname, "static_gui." + local)
+            return [ "static_gui" ] + appDescriptors
+        elif appDescriptors:
+            return appDescriptors
+        elif self.batchMode():
+            return [ self.optionValue("b") ]
+        elif self.optionMap.has_key("g"):
+            return [ "dynamic_gui" ]
         else:
-            return defaultName
+            return [ "console" ]
+    def getTimeDescriptor(self):
+        return plugins.startTimeString().replace(":", "")
+    def getDescriptors(self, key):
+        givenVersion = self.optionValue(key)
+        if givenVersion and givenVersion.find(",") == -1:
+            return [ givenVersion ]
+        else:
+            return []
     def addGuiResponder(self, classes):
         from texttestgui import TextTestGUI
         classes.append(TextTestGUI)
@@ -1476,21 +1489,28 @@ class ReconnectApp:
             else:
                 raise plugins.TextTestError, "Could not find TextTest temporary directory for " + reconnectTmpInfo + " at " + fetchDir
 
-        rootDirToCopy = self.findReconnDirectory(fetchDir, app)
+        rootDirToCopy = app.getFileName([ fetchDir ], "", self.getVersionListTopDir)
         if rootDirToCopy:
-            return rootDirToCopy
-        else:
-            raise plugins.TextTestError, "Could not find any runs matching " + app.name + app.versionSuffix() + " under " + fetchDir
+            appRoot = app.getFileName([ rootDirToCopy ], app.name, self.getVersionListSubDir)
+            if appRoot:
+                return appRoot
+        raise plugins.TextTestError, "Could not find any runs matching " + app.description() + " under " + fetchDir
     def findReconnDirectory(self, fetchDir, app):
         return app.getFileName([ fetchDir ], app.name, self.getVersionList)
-    def getVersionList(self, fileName, stem):
+    def getVersionListTopDir(self, fileName, *args):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
         parts = fileName.split(".")
-        if len(parts) < 2 or stem != parts[0]:
-            return
-        # drop the application at the start and the date/time at the end
-        return parts[1:-1]
+        if len(parts) > 1 and parts[0] != "static_gui":
+            # drop the run descriptor at the start and the date/time at the end
+            return parts[1:-1]
+    def getVersionListSubDir(self, fileName, stem):
+        # Show the framework how to find the version list given a file name
+        # If it doesn't match, return None
+        parts = fileName.split(".")
+        if stem == parts[0]:
+            # drop the application at the start 
+            return parts[1:]
 
 class ReconnectTest(plugins.Action):
     def __init__(self, rootDirToCopy, fullRecalculate):

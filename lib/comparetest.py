@@ -391,7 +391,7 @@ class PrintObsoleteVersions(plugins.Action):
         runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
         unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)    
         from rundependent import RunDependentTextFilter
-        filter = RunDependentTextFilter(test.getRelPath(), test.app.name, runDepTexts, unorderedTexts)
+        filter = RunDependentTextFilter(test.getRelPath(), runDepTexts, unorderedTexts)
         filter.filterFile(file, newFile)
         return newFile
     def compareFiles(self, test, filePair1, filePair2):

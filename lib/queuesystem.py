@@ -104,13 +104,12 @@ class QueueSystemConfig(default.Config):
         return [ "-l" ] + default.Config.getRunOptions(self, checkout)
     def slaveRun(self):
         return self.optionMap.has_key("slave")
-    def getTimeDescriptor(self):
+    def getWriteDirectoryName(self, app):
         slaveDir = self.optionMap.get("slave")
         if slaveDir:
-            parts = os.path.basename(slaveDir).split(".")
-            return parts[-1]
+            return slaveDir
         else:
-            return default.Config.getTimeDescriptor(self)
+            return default.Config.getWriteDirectoryName(self, app)
     def useExtraVersions(self, app):
         return default.Config.useExtraVersions(self, app) and not self.slaveRun()
     def getCleanMode(self):

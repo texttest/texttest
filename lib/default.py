@@ -67,7 +67,7 @@ class Config:
         if self.isReconnecting():
             return self.getReconnectSequence()
 
-        return self._getActionSequence(makeDirs=1)
+        return self.getTestProcessor()
     def useGUI(self):
         return self.optionMap.has_key("g") or self.optionMap.has_key("gx")
     def useStaticGUI(self, app):
@@ -171,11 +171,6 @@ class Config:
     def addGuiResponder(self, classes):
         from texttestgui import TextTestGUI
         classes.append(TextTestGUI)
-    def _getActionSequence(self, makeDirs):
-        actions = [ self.getTestProcessor() ]
-        if makeDirs:
-            actions = [ self.getWriteDirectoryMaker() ] + actions
-        return actions
     def getReconnectSequence(self):
         actions = [ ReconnectTest(self.reconnDir, self.optionMap.has_key("reconnfull")) ]
         actions += [ rundependent.FilterOriginal(), rundependent.FilterTemporary(), \
@@ -185,7 +180,8 @@ class Config:
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
-        return [ self.getExecHostFinder(), self.getWriteDirectoryPreparer(ignoreCatalogues), \
+        return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
+                 self.getWriteDirectoryPreparer(ignoreCatalogues), \
                  SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
                  catalogueCreator, collator, rundependent.FilterOriginal(), self.getTestRunner(), \
                  catalogueCreator, collator, self.getTestEvaluator() ]

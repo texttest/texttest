@@ -212,11 +212,10 @@ class Activator:
         self.allApps = [ suite.app for suite in suites ]
     def makeAppWriteDirectories(self):
         for app in self.allApps:
-            app.makeWriteDirectory()            
+            app.makeWriteDirectory("slavelogs")            
     def run(self):
         self.makeAppWriteDirectories()
         for test in self.allTests:
-            test.makeWriteDirectory()
             QueueSystemServer.instance.submit(test)
 
 class SubmissionRules:
@@ -284,7 +283,8 @@ class SubmissionRules:
 
         return performanceMachines
     def getJobFiles(self):
-        return "framework_tmp/slavelog", "framework_tmp/slaveerrs"
+        jobName = self.getJobName()
+        return jobName + ".log", jobName + ".errors"
     def forceOnPerformanceMachines(self):
         if self.optionMap.has_key("perf"):
             return 1
@@ -322,6 +322,7 @@ class SlaveRequestHandler(StreamRequestHandler):
                         self.wfile.write(socketSerialise(newTest))
                 else:
                     self.server.storeClient(test, (hostname, identifier))
+                self.connection.shutdown(socket.SHUT_WR)
         else:
             expectedHost, expectedPid = self.server.testClientInfo[test]
             sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
@@ -352,6 +353,7 @@ class SlaveServerResponder(Responder,TCPServer):
         sendServerState("TextTest slave server started on " + serverAddress)
         self.diag.info("Starting slave server at " + serverAddress)
         while not self.terminate:
+            self.diag.info("Waiting for a new request...")
             self.handle_request()
         
         self.diag.info("Terminating slave server")
@@ -460,6 +462,7 @@ class QueueSystemServer:
                 return newTest
             else:
                 self.reuseFailureQueue.put(newTest)
+                
         # Allowed a submitted job to terminate
         self.testsSubmitted -= 1
     def allowReuse(self, oldTest, newTest):
@@ -563,6 +566,8 @@ class QueueSystemServer:
             slaveWriteDir = os.path.join(self.optionMap.diagWriteDir, "slave")
             runOptions.append("-xw " + slaveWriteDir)
         return " ".join(runOptions)
+    def getSlaveLogDir(self, test):
+        return os.path.join(test.app.writeDirectory, "slavelogs")
     def submitJob(self, test, submissionRules, command, slaveEnv):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
         self.diag.info("Creating job at " + plugins.localtime())
@@ -575,7 +580,7 @@ class QueueSystemServer:
         jobName = submissionRules.getJobName()
         self.diag.info("Creating job " + jobName + " with command arguments : " + repr(cmdArgs))
         process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   cwd=test.getDirectory(temporary=1), env=slaveEnv)
+                                   cwd=self.getSlaveLogDir(test), env=slaveEnv)
         stdout, stderr = process.communicate()
         errorMessage = self.findErrorMessage(stderr, queueSystem)
         if not errorMessage:
@@ -611,6 +616,21 @@ class QueueSystemServer:
         queueSystem = self.getQueueSystem(test)
         jobId, jobName = self.jobs[test]
         return queueSystem.getJobFailureInfo(jobId)
+    def getSlaveErrors(self, test):
+        slaveErrFile = self.getSlaveErrFile(test)
+        if slaveErrFile:
+            errStr = open(slaveErrFile).read()
+            if errStr and errStr.find("Traceback") != -1:
+                return errStr
+
+    def getSlaveErrFile(self, test):
+        jobId, jobName = self.getJobInfo(test)
+        if not jobName:
+            return
+        errFile = os.path.join(self.getSlaveLogDir(test), jobName + ".errors")
+        if os.path.isfile(errFile):
+            return errFile
+    
     def getJobInfo(self, test):
         return self.jobs.get(test, (None, None))
     def killJob(self, test):
@@ -689,14 +709,13 @@ class KillTestSubmission:
         fullText = failReason + "\n" + fullText
         self.changeState(test, plugins.Unrunnable(briefText=failReason, freeText=fullText, lifecycleChange="complete"))
     def getSlaveFailure(self, test):
-        slaveErrFile = test.makeTmpFileName("slaveerrs", forFramework=1)
-        if os.path.isfile(slaveErrFile):
-            errStr = open(slaveErrFile).read()
-            if errStr and errStr.find("Traceback") != -1:
-                return "Slave exited", errStr
-        name = queueSystemName(test.app)
-        return name + "/system error", "Full accounting info from " + name + " follows:\n" + \
-               QueueSystemServer.instance.getJobFailureInfo(test)
+        slaveErrors = QueueSystemServer.instance.getSlaveErrors(test)
+        if slaveErrors:
+            return "Slave exited", slaveErrors
+        else:
+            name = queueSystemName(test.app)
+            return name + "/system error", "Full accounting info from " + name + " follows:\n" + \
+                   QueueSystemServer.instance.getJobFailureInfo(test)
     def getPostText(self, test, jobId):
         name = queueSystemName(test.app)
         return "in " + name + " (job " + jobId + ")"

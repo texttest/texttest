@@ -1339,13 +1339,16 @@ class Application:
         fullList.append(current)
         fullList += fromRemaining
         return fullList
-    def makeWriteDirectory(self):
+    def makeWriteDirectory(self, subdir=None):
         if os.path.isdir(self.writeDirectory):
             return
         root, tmpId = os.path.split(self.writeDirectory)
         self.tryCleanPreviousWriteDirs(root)
-        plugins.ensureDirectoryExists(self.writeDirectory)
-        self.diag.info("Made root directory at " + self.writeDirectory)
+        dirToMake = self.writeDirectory
+        if subdir:
+            dirToMake = os.path.join(self.writeDirectory, subdir)
+        plugins.ensureDirectoryExists(dirToMake)
+        self.diag.info("Made root directory at " + dirToMake)
     def removeWriteDirectory(self):
         if self.cleanMode.cleanSelf and os.path.isdir(self.writeDirectory):
             self.diag.info("Removing write directory at " + self.writeDirectory)

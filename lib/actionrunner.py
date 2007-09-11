@@ -189,7 +189,7 @@ class TestRunner:
                 continue
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
             self.handleExceptions(self.appRunner.setUpSuites, action, self.test)
-            self.performAction(action)
+            self.callAction(action)
             self.diag.info("<-End Performing action " + str(action))
             self.actionSequence.pop(0)
             if not abandon and self.test.state.shouldAbandon():
@@ -197,16 +197,6 @@ class TestRunner:
                 abandon = True
 
         self.test.actionsCompleted()
-
-    def performAction(self, action):
-        while 1:
-            retValue = self.callAction(action)
-            if not retValue:
-                # No return value: we've finished and should proceed
-                return
-            else:
-                # Don't busy-wait : assume lack of completion is a sign we might keep doing this
-                time.sleep(0.1)
              
     def callAction(self, action):
         return self.handleExceptions(self.test.callAction, action)

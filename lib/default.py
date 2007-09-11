@@ -1225,18 +1225,13 @@ class RunTest(plugins.Action):
         # Default to not bothering to print the machine name: all is local anyway
         return ""
     def runTest(self, test):
-        if test.state.hasStarted():
-            if test.state.processCompleted():
-                self.diag.info("Process completed.")
-                return
-            else:
-                self.diag.info("Process not complete yet, retrying...")
-                return self.RETRY
-
         self.describe(test)
         process = self.getTestProcess(test)
         self.changeToRunningState(test, process)
-        return self.RETRY
+        try:
+            process.wait()
+        except OSError:
+            pass # rely on signal handlers to slay the process via a roundabout route...
     def getOptions(self, test):
         optionsFile = test.getFileName("options")
         if optionsFile:

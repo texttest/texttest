@@ -546,7 +546,10 @@ class FileViewAction(InteractiveTestAction):
             return viewProgram
     def getViewToolName(self, fileName):
         stem = os.path.basename(fileName).split(".")[0]
-        return guiConfig.getCompositeValue(self.getToolConfigEntry(), stem)
+        if self.currentTest:
+            return self.currentTest.getCompositeConfigValue(self.getToolConfigEntry(), stem)
+        else:
+            return guiConfig.getCompositeValue(self.getToolConfigEntry(), stem)
     def differencesActive(self, comparison):
         if not comparison or comparison.newResult() or comparison.missingResult(): 
             return False

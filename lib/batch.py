@@ -519,8 +519,8 @@ class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
     def __init__(self, args=[""]):
         argDict = self.parseArguments(args)
-        batchSession = argDict.get("batch", "default")
-        self.mailSender = MailSender(batchSession)
+        self.batchSession = argDict.get("batch", "default")
+        self.mailSender = MailSender(self.batchSession)
         self.runId = "" # depends on what we pick up from collected files
         self.diag = plugins.getDiagnostics("batch collect")
         self.userName = argDict.get("tmp", "")
@@ -539,7 +539,7 @@ class CollectFiles(plugins.ScriptWithArgs):
         dirlist.sort()
         for dir in dirlist:
             fullDir = os.path.join(rootDir, dir)
-            if os.path.isdir(fullDir) and dir.startswith(app.name + app.versionSuffix()):
+            if os.path.isdir(fullDir) and self.matchesApp(dir, app):
                 fileBodies += self.parseDirectory(fullDir, app, totalValues)
         if len(fileBodies) == 0:
             self.diag.info("No information found in " + rootDir)
@@ -549,6 +549,9 @@ class CollectFiles(plugins.ScriptWithArgs):
         mailContents = self.mailSender.createMailHeaderForSend(self.runId, mailTitle, app)
         mailContents += self.getBody(fileBodies)
         self.mailSender.sendOrStoreMail(app, mailContents)
+    def matchesApp(self, dir, app):
+        suffix = app.versionSuffix()
+        return dir.startswith(app.name + suffix) or dir.startswith(self.batchSession + suffix)
     def parseDirectory(self, fullDir, app, totalValues):
         prefix = "batchreport." + app.name + app.versionSuffix()
         # Don't collect to more collections!

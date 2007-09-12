@@ -1156,7 +1156,7 @@ class SelectTests(SelectionAction):
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def getFilterList(self, app):
         app.updateConfigOptions(self.appSelectGroup)
-        return app.getFilterList(extendFileNames=False)
+        return app.getFilterList()
     def performOnCurrent(self): 
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")

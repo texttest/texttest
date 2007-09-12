@@ -683,7 +683,7 @@ class TestSuite(Test):
     def getDescription(self):
         return "\nDescription:\n" + Test.getDescription(self)
             
-    def readContents(self, filters, forTestRuns):
+    def readContents(self, filters, forTestRuns=True):
         testNames = self.readTestNames(forTestRuns)
         self.createTestCases(filters, testNames, forTestRuns)
         if len(self.testcases):
@@ -1073,12 +1073,6 @@ class Application:
             plugins.printException()
             raise BadConfigError, "config_module " + moduleName + " contained errors and could not be imported"
         return getConfig(self.inputOptions)
-    def updateConfigOptions(self, optionGroup):
-        for key, option in optionGroup.options.items():
-            if len(option.getValue()):
-                self.configObject.optionMap[key] = option.getValue()
-            elif self.configObject.optionMap.has_key(key):
-                del self.configObject.optionMap[key]
     def __getattr__(self, name): # If we can't find a method, assume the configuration has got one
         if hasattr(self.configObject, name):
             return ConfigurationCall(name, self)
@@ -1258,27 +1252,21 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
-    def createTestSuite(self, responders=[], filters=[], forTestRuns = True):
+    def makeTestSuite(self, responders):
         suite = TestSuite(os.path.basename(self.dircache.dir), "Root test suite", self.dircache, self)
+        suite.setObservers(responders)
+        return suite
+    def createInitialTestSuite(self, responders):
+        suite = self.makeTestSuite(responders)
         # allow the configurations to decide whether to accept the application in the presence of
         # the suite's environment
         self.configObject.checkSanity(suite)
-        suite.setObservers(responders)
-        self.readContents(suite, filters, forTestRuns)
         return suite
-    def readContents(self, suite, filters, forTestRuns):
-        if len(filters) == 0:
-            filters = self.configObject.getFilterList(self)
-
-        self.diag.info("Creating test suite with filters " + repr(filters))
-        
-        suite.readContents(filters, forTestRuns)
-        self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
-        if suite.size() > 0 or self.configObject.allowEmpty():
-            suite.notify("Add", initial=True)
-        else:
-            raise plugins.TextTestError, "no tests matching the selection criteria found."
-
+    def createExtraTestSuite(self, filters, responders=[]):
+        suite = self.makeTestSuite(responders)
+        suite.readContents(filters)
+        return suite
+    
     def description(self, includeCheckout = False):
         description = "Application " + self.fullName
         if len(self.versions):

@@ -48,8 +48,8 @@ class ActionRunner(Responder, plugins.Observable):
             allFiles = glob(os.path.join(rootDir, "*", configFile))
             return DirectoryCache(os.path.dirname(allFiles[0]))
     def createTestSuite(self, app, testPath):
-        filter = plugins.TestPathFilter(testPath)
-        suite = app.createTestSuite(self.observers, [ filter ])
+        filters = [ plugins.TestPathFilter(testPath) ]
+        suite = app.createExtraTestSuite(filters, self.observers)
         for responder in self.observers:
             responder.addSuites([ suite ]) # This will recursively notify ourselves(!) along with everyone else
        

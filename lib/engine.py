@@ -6,6 +6,7 @@ from usecase import ScriptEngine
 from ndict import seqdict
 from time import sleep
 from respond import Responder
+from sets import Set
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder(Responder):
@@ -186,16 +187,15 @@ class TextTest:
         return threadRunnerClass(self.inputOptions)
     def createTestSuites(self, allApps):
         appSuites = seqdict()
-        forTestRuns = self.needsTestRuns()
         for app in allApps:
             errorMessages = []
             appGroup = [ app ] + app.extras
             for partApp in appGroup:
                 try:
-                    testSuite = partApp.createTestSuite(responders=self.allResponders, forTestRuns=forTestRuns)
+                    testSuite = partApp.createInitialTestSuite(self.allResponders)
                     appSuites[partApp] = testSuite
                 except plugins.TextTestError, e:
-                    errorMessages.append("Rejected " + partApp.description() + " - " + str(e) + "\n")
+                    errorMessages.append(self.rejectionMessage(partApp, str(e)))
                 except KeyboardInterrupt:
                     raise
                 except:  
@@ -208,6 +208,9 @@ class TextTest:
             else:
                 sys.stdout.write(fullMsg)
         return appSuites
+    def rejectionMessage(self, app, message):
+        return "Rejected " + app.description() + " - " + str(message) + "\n"
+
     def deleteTempFiles(self):
         for app, testSuite in self.appSuites.items():
             app.removeWriteDirectory()
@@ -239,12 +242,45 @@ class TextTest:
             # do anything about them) and no way to get partial errors.
             sys.stderr.write(str(e) + "\n")
             return
-        self.appSuites = self.createTestSuites(allApps)
+        emptySuites = self.createTestSuites(allApps)
+        self.appSuites = self.readContents(emptySuites)
         if len(self.appSuites) == 0:
             return
         threadRunners = self.createThreadRunners(allApps)
         self.addSuites(threadRunners)
         self.runThreads(threadRunners)
+    def readContents(self, appSuites):
+        goodSuites = seqdict()
+        rejectedApps = Set()
+        forTestRuns = self.needsTestRuns()
+        for app, suite in appSuites.items():
+            filters = app.getFilterList()
+            self.diag.info("Creating test suite with filters " + repr(filters))
+        
+            suite.readContents(filters, forTestRuns)
+            self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
+            if suite.size() > 0 or app.allowEmpty():
+                suite.notify("Add", initial=True)
+                goodSuites[app] = suite
+            else:
+                rejectedApps.add(suite.app)
+
+        if len(rejectedApps) > 0:
+            self.writeErrors(appSuites, rejectedApps)
+        return goodSuites
+    
+    def writeErrors(self, appSuites, rejectedApps):
+        # Don't write errors if only some of a group are rejected
+        extras = []
+        for suite in appSuites.values():
+            app = suite.app
+            if app in extras:
+                continue
+            extras += app.extras
+            appGroup = Set([ app ] + app.extras)
+            if appGroup.issubset(rejectedApps):
+                sys.stderr.write(self.rejectionMessage(app, "no tests matching the selection criteria found."))
+
     def getObjectsToAddSuites(self, threadRunners):
         return self.allResponders + filter(lambda runner: runner not in self.allResponders, threadRunners)
     def addSuites(self, threadRunners):

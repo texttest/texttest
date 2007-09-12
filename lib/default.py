@@ -17,6 +17,7 @@ def getConfig(optionMap):
 class Config:
     def __init__(self, optionMap):
         self.optionMap = optionMap
+        self.filterFileMap = {}
     def addToOptionGroups(self, app, groups):
         recordsUseCases = app.getConfigValue("use_case_record_mode") != "disabled"
         for group in groups:
@@ -256,41 +257,47 @@ class Config:
             return ("temporary_filter_files", os.path.join(app.writeDirectory, "temporary_filter_files"))
     def getFilterClasses(self):
         return [ TestNameFilter, plugins.TestPathFilter, TestSuiteFilter, performance.TimeFilter ]
-    def getFilterList(self, app, extendFileNames = True):
+    def checkFilterFileSanity(self, app):
+        # Turn any input relative files into absolute ones, throw if we can't
+        filterFileName = self.findFilterFileName(app)
+        if filterFileName and not os.path.isabs(filterFileName):
+             dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
+             realFilename = app.getFileName(dirsToSearchIn, filterFileName)
+             if realFilename:
+                 self.filterFileMap[app] = realFilename
+             else:
+                 raise plugins.TextTestError, "filter file '" + filterFileName + "' could not be found."
+             
+    def findFilterFileName(self, app):
+        if self.filterFileMap.has_key(app):
+            return self.filterFileMap[app]
+        elif self.optionMap.has_key("f"):
+            return self.optionMap["f"]
+        elif self.batchMode():
+            return app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
+
+    def getFilterList(self, app):
         filters = self.getFiltersFromMap(self.optionMap, app)
-
-        filterFileName = ""
-        if self.optionMap.has_key("f"):
-            filterFileName = self.optionMap["f"]
-        if self.batchMode():
-            filterFileName = app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
-
+        filterFileName = self.findFilterFileName(app)
         if filterFileName:
-            if extendFileNames:
-                try:
-                    filters += self.getFiltersFromFile(app, filterFileName, extendFileNames)
-                except:
-                    raise plugins.TextTestError, "filter file '" + filterFileName + "' could not be found."
-            else:
-                # When running from the GUI, it's more appropriate to propagate the TextTestError ...
-                filters += self.getFiltersFromFile(app, filterFileName, extendFileNames)
+            filters += self.getFiltersFromFile(app, filterFileName)
         return filters
-    def getFiltersFromFile(self, app, filename, extendFileNames):        
-        try:
-            if extendFileNames:
-                if os.path.isabs(filename):
-                    dir, file = os.path.split(filename)
-                    realFilename = app.getFileName([dir], file)
-                else:
-                    dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
-                    realFilename = app.getFileName(dirsToSearchIn, filename)
-            else:
-                realFilename = filename                
-            fileData = ",".join(plugins.readList(realFilename))
-            optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
-            return self.getFiltersFromMap(optionFinder, app)
-        except Exception, e:
-            raise plugins.TextTestError, "\nFailed to get filters from file '" + filename + "':\n" + str(e) + "\n"
+
+    def updateConfigOptions(self, optionGroup):
+        self.filterFileMap = {} # wipe the cache, it's irrelevant now
+        for key, option in optionGroup.options.items():
+            if len(option.getValue()):
+                self.optionMap[key] = option.getValue()
+            elif self.optionMap.has_key(key):
+                del self.optionMap[key]
+    
+    def getFiltersFromFile(self, app, filename):        
+        if not os.path.isfile(filename):
+            raise plugins.TextTestError, "\nCould not find filter file at '" + filename + "'"
+
+        fileData = ",".join(plugins.readList(filename))
+        optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
+        return self.getFiltersFromMap(optionFinder, app)
     
     def getFiltersFromMap(self, optionMap, app):
         filters = []
@@ -397,7 +404,8 @@ class Config:
     def checkSanity(self, suite):
         if not self.ignoreBinary() and not self.optionMap.has_key("gx"):
             self.checkBinaryExists(suite)
-        
+
+        self.checkFilterFileSanity(suite.app)
         self.checkConfigSanity(suite.app)
         batchSession = self.optionMap.get("b")
         if batchSession:

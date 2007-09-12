@@ -325,6 +325,10 @@ class Test(plugins.Observable):
             return contents.split()
         else:
             return []
+    def setUniqueName(self, newName):
+        if newName != self.uniqueName:
+            self.uniqueName = newName
+            self.notify("UniqueNameChange")
     def setEnvironment(self, var, value):
         self.environment[var] = value
     def getEnvironment(self, var, defaultValue=None):
@@ -501,7 +505,7 @@ class Test(plugins.Observable):
             test.setObservers(self.observers)
             currIndex = self.parent.testcases.index(self)
             self.parent.testcases.insert(currIndex, test)
-            test.notify("Add")
+            test.notify("Add", initial=False)
             self.parent.removeTest(self, False)
         self.parent.contentChanged()
     def getRunEnvironment(self, onlyVars = []):
@@ -818,6 +822,7 @@ class TestSuite(Test):
             if subTest.isAcceptedByAll(filters) and \
                    (className is TestCase or subTest.readContents(filters, forTestRuns)):
                 self.testcases.append(subTest)
+                subTest.notify("Add", initial=True)
 
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))
@@ -840,7 +845,7 @@ class TestSuite(Test):
         cache = self.createTestCache(testName)
         test = self.createSubtest(testName, description, cache, className)
         self.testcases.insert(placement, test) 
-        test.notify("Add")
+        test.notify("Add", initial=False)
         return test
     def addTestCaseWithPath(self, testPath):
         pathElements = testPath.split("/", 1)
@@ -1269,7 +1274,9 @@ class Application:
         
         suite.readContents(filters, forTestRuns)
         self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
-        if suite.size() == 0 and not self.configObject.allowEmpty():
+        if suite.size() > 0 or self.configObject.allowEmpty():
+            suite.notify("Add", initial=True)
+        else:
             raise plugins.TextTestError, "no tests matching the selection criteria found."
 
     def description(self, includeCheckout = False):

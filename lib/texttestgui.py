@@ -492,8 +492,10 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notify("FileChange", test)
     def notifyContentChange(self, suite):
         self.notify("ContentChange", suite)
-    def notifyAdd(self, test):
-        self.notify("Add", test)
+    def notifyAdd(self, *args, **kwargs):
+        self.notify("Add", *args, **kwargs)
+    def notifyUniqueNameChange(self, *args, **kwargs):
+        self.notify("UniqueNameChange", *args, **kwargs)
     def notifyRemove(self, test):
         self.notify("Remove", test)
     def notifyAllComplete(self):
@@ -815,9 +817,6 @@ class TestColumnGUI(SubGUI):
         self.dynamic = dynamic
         self.allSuites = []
     def addSuites(self, suites):
-        size = sum([ suite.size() for suite in suites ])
-        self.totalNofTests += size
-        self.totalNofTestsShown += size
         for suite in suites:
             if not suite in self.allSuites:
                 self.allSuites.append(suite)
@@ -894,9 +893,10 @@ class TestColumnGUI(SubGUI):
             self.contentsChanged()
     def describe(self):
         guilog.info("Test column header set to '" + self.column.get_title() + "'")
-    def notifyAdd(self, test):
+    def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.totalNofTests += 1
+            self.totalNofTestsShown += 1
             self.updateTitle()
     def notifyRemove(self, test):
         self.totalNofTests -= test.size()
@@ -947,12 +947,8 @@ class TestTreeGUI(ContainerGUI):
     def addSuites(self, suites):
         if not self.dynamic:
             self.collapseStatic = guiConfig.getValue("static_collapse_suites")
-        totalSize = 0
-        for suite in suites:
-            size = suite.size()
-            totalSize += size
-            if not self.dynamic or size > 0:
-                self.addSuiteWithParent(suite, None)
+
+        totalSize = sum(suite.size() for suite in suites)    
         if self.dynamic and totalSize == 1:
             self.selectedTests = reduce(operator.add, [ suite.testCaseList() for suite in suites ])
     def addSuiteWithParent(self, suite, parent, follower=None):    
@@ -969,9 +965,6 @@ class TestTreeGUI(ContainerGUI):
         storeIter = iter.copy()
         self.itermap[suite] = storeIter
         self.updateStateInModel(suite, iter, suite.state)
-        if suite.classId() == "test-suite":
-            for test in suite.testcases:
-                self.addSuiteWithParent(test, iter)
         return iter
     def updateStateInModel(self, test, iter, state):
         if not self.dynamic:
@@ -1189,18 +1182,30 @@ class TestTreeGUI(ContainerGUI):
 
         if suite.getConfigValue("auto_collapse_successful") == 1:
             self.collapseRow(iter)
-            
-    def notifyAdd(self, test):
-        self.addTest(test)
-        guilog.info("Selecting new test " + test.name)
-        self.notifySetTestSelection([ test ])
-        self.describeTree()
-    def addTest(self, test):
+
+    def notifyUniqueNameChange(self, test):
+        iter = self.itermap.get(test)
+        self.model.set_value(iter, 3, test.uniqueName)
+        
+    def notifyAdd(self, test, initial):
+        self.tryAddTest(test, initial)
+        if not initial:
+            guilog.info("Selecting new test " + test.name)
+            self.notifySetTestSelection([ test ])
+            self.describeTree()
+    def tryAddTest(self, test, initial=False):
+        iter = self.itermap.get(test)
+        if iter:
+            return iter
         suite = test.parent
-        suiteIter = self.itermap[suite]
-        follower = suite.getFollower(test)
-        followIter = self.itermap.get(follower)
-        self.addSuiteWithParent(test, suiteIter, followIter)
+        suiteIter, followIter = None, None
+        if suite:
+            suiteIter = self.tryAddTest(suite, initial)
+        if not initial:
+            follower = suite.getFollower(test)
+            followIter = self.itermap.get(follower)
+        return self.addSuiteWithParent(test, suiteIter, followIter)
+    
     def notifyRemove(self, test):
         self.removeTest(test)
         guilog.info("Removing test with path " + test.getRelPath())
@@ -1212,14 +1217,24 @@ class TestTreeGUI(ContainerGUI):
         self.model.remove(iter)
         del self.itermap[test]
     def notifyContentChange(self, suite):
-        self.selecting = True
-        self.selection.unselect_all()
-        for test in suite.testcases:
-            self.removeTest(test)
-        for test in suite.testcases:
-            self.addTest(test)
-        self.expandRow(self.findIter(suite), True)
-        self.selectTestRows(self.selectedTests) # don't notify observers as nothing has changed except order
+        suiteIter = self.itermap.get(suite)
+        newOrder = self.findNewOrder(suite, suiteIter)
+        self.model.reorder(suiteIter, newOrder)
+        self.describeTree()
+    def findNewOrder(self, suite, suiteIter):
+        child = self.model.iter_children(suiteIter)
+        index = 0
+        posMap = {}
+        while (child != None):
+            subTest = self.model.get_value(child, 2)
+            posMap[subTest] = index
+            child = self.model.iter_next(child)
+            index += 1
+        newOrder = []
+        for subTest in suite.testcases:
+            newOrder.append(posMap.get(subTest))
+        return newOrder
+    
     def notifyVisibility(self, tests, newValue):
         if not newValue:
             self.selecting = True

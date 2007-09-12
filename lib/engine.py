@@ -5,20 +5,15 @@ from threading import Thread
 from usecase import ScriptEngine
 from ndict import seqdict
 from time import sleep
+from respond import Responder
 
 # Class to allocate unique names to tests for script identification and cross process communication
-class UniqueNameFinder:
-    def __init__(self):
+class UniqueNameFinder(Responder):
+    def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
         self.name2test = {}
         self.diag = plugins.getDiagnostics("Unique Names")
-    def addSuite(self, test):
-        self.store(test)
-        try:
-            for subtest in test.testcases:
-                self.addSuite(subtest)
-        except AttributeError:
-            pass
-    def store(self, test):
+    def notifyAdd(self, test, initial):
         if self.name2test.has_key(test.name):
             oldTest = self.name2test[test.name]
             self.storeUnique(oldTest, test)
@@ -58,7 +53,7 @@ class UniqueNameFinder:
     def storeBothWays(self, name, test):
         self.diag.info("Setting unique name for test " + test.name + " to " + name)
         self.name2test[name] = test
-        test.uniqueName = name
+        test.setUniqueName(name)
 
 class TextTest:
     def __init__(self):
@@ -157,7 +152,7 @@ class TextTest:
                     self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.append(respClass)
         # Make sure we send application events when tests change state
-        responderClasses += [ testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
+        responderClasses += [ UniqueNameFinder, testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
         allResponders = map(lambda x : x(self.inputOptions), responderClasses)
         self.allResponders = self.removeBaseClasses(allResponders)
         
@@ -190,7 +185,6 @@ class TextTest:
                 return responder
         return threadRunnerClass(self.inputOptions)
     def createTestSuites(self, allApps):
-        uniqueNameFinder = UniqueNameFinder()
         appSuites = seqdict()
         forTestRuns = self.needsTestRuns()
         for app in allApps:
@@ -200,7 +194,6 @@ class TextTest:
                 try:
                     testSuite = partApp.createTestSuite(responders=self.allResponders, forTestRuns=forTestRuns)
                     appSuites[partApp] = testSuite
-                    uniqueNameFinder.addSuite(testSuite)
                 except plugins.TextTestError, e:
                     errorMessages.append("Rejected " + partApp.description() + " - " + str(e) + "\n")
                 except KeyboardInterrupt:

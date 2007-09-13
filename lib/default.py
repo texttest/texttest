@@ -1525,6 +1525,7 @@ class ReconnectTest(plugins.Action):
             test.changeState(newState)
     def getReconnectState(self, test):
         reconnLocation = os.path.join(self.rootDirToCopy, test.getRelPath())
+        self.diag.info("Reconnecting to test at " + reconnLocation)
         if os.path.isdir(reconnLocation):
             return self.getReconnectStateFrom(test, reconnLocation)
         else:
@@ -1570,7 +1571,7 @@ class ReconnectTest(plugins.Action):
                 newState.lifecycleChange = "" # otherwise it's regarded as complete
                 return True
         else:
-            newState.updateTmpPath(self.rootDirToCopy)
+            newState.updateTmpPath(os.path.dirname(self.rootDirToCopy))
             return True
     def setUpApplication(self, app):
         print "Reconnecting to test results in directory", self.rootDirToCopy

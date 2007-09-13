@@ -1,8 +1,7 @@
 #!/usr/local/bin/python
 
-import default, plugins, os, subprocess
+import default, plugins, os, subprocess, signal
 from respond import Responder
-from jobprocess import JobProcess
                 
 class RunTest(default.RunTest):
     def __init__(self, hasAutomaticCputimeChecking):
@@ -94,7 +93,10 @@ class VirtualDisplayResponder(Responder):
             machine, pid = self.serverInfo
             if machine == "localhost":
                 print "Killing Xvfb process", pid
-                JobProcess(pid).killAll()
+                try:
+                    os.kill(pid, signal.SIGINT)
+                except OSError:
+                    print "Process had already terminated"
             else:
                 self.killRemoteServer(machine)
     def killRemoteServer(self, machine):

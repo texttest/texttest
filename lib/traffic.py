@@ -61,9 +61,18 @@ class Traffic:
         return len(self.text) > 0
     def getDescription(self):
         return self.direction + self.typeId + ":" + self.text
-    def forwardToDestination(self):
+    def write(self, message):
         if self.responseFile:
-            self.responseFile.write(self.text)
+            try:
+                self.responseFile.write(message)
+            except socket.error:
+                # The system under test has died or is otherwise unresponsive
+                # Should handle this, probably. For now, ignoring it is better than stack dumps
+                pass
+                
+    def forwardToDestination(self):
+        self.write(self.text)
+        if self.responseFile:
             self.responseFile.close()
         return []
     def filterReplay(self, trafficList):
@@ -75,15 +84,13 @@ class ResponseTraffic(Traffic):
 class StdoutTraffic(ResponseTraffic):
     typeId = "OUT"
     def forwardToDestination(self):
-        if self.responseFile:
-            self.responseFile.write(self.text + "|TT_CMD_SEP|")
+        self.write(self.text + "|TT_CMD_SEP|")
         return []
 
 class StderrTraffic(ResponseTraffic):
     typeId = "ERR"
     def forwardToDestination(self):
-        if self.responseFile:
-            self.responseFile.write(self.text + "|TT_CMD_SEP|")
+        self.write(self.text + "|TT_CMD_SEP|")
         return []
 
 class SysExitTraffic(ResponseTraffic):

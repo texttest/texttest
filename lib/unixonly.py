@@ -97,6 +97,13 @@ class VirtualDisplayResponder(Responder):
                     os.kill(pid, signal.SIGINT)
                 except OSError:
                     print "Process had already terminated"
+                # Xvfb sometimes leaves lock files lying around, clean up
+                lockFile = "/tmp/.X" + self.getDisplayNumber() + "-lock"
+                if os.path.isfile(lockFile):
+                    try:
+                        os.remove(lockFile)
+                    except:
+                        pass
             else:
                 self.killRemoteServer(machine)
     def killRemoteServer(self, machine):

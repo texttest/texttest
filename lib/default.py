@@ -1163,8 +1163,6 @@ class TestSuiteFilter(plugins.TextFilter):
     option = "ts"
     def acceptsTestCase(self, test):
         return self.stringContainsText(test.parent.getRelPath())
-    def acceptsTestSuiteContents(self, suite):
-        return not suite.isEmpty()
 
 class GrepFilter(plugins.TextFilter):
     def __init__(self, filterText, fileStem):

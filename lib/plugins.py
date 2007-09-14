@@ -326,6 +326,8 @@ class TextFilter(Filter):
             if trigger.matches(searchString):
                 return True
         return False
+    def acceptsTestSuiteContents(self, suite):
+        return not suite.isEmpty()
 
 class TestPathFilter(TextFilter):
     option = "tp"

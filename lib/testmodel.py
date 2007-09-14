@@ -1138,7 +1138,9 @@ class Application:
     def getPreviousWriteDirInfo(self, previousTmpInfo):
         # previousTmpInfo can be either a directory, which should be returned if it exists,
         # a user name, which should be expanded and checked
-        if not previousTmpInfo:
+        if previousTmpInfo:
+            previousTmpInfo = os.path.expanduser(previousTmpInfo)
+        else:
             previousTmpInfo = self.rootTmpDir
         if os.path.isdir(previousTmpInfo):
             return previousTmpInfo

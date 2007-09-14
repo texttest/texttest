@@ -107,6 +107,9 @@ class Config:
         else:
             classes.append(self.getTextDisplayResponderClass())
         if self.batchMode() and not self.optionMap.has_key("coll"):
+            if self.optionValue("b") is None:
+                print "No batch session identifier provided, using 'default'"
+                self.optionMap["b"] = "default"
             classes.append(batch.BatchResponder)
         if self.useVirtualDisplay():
             from unixonly import VirtualDisplayResponder
@@ -155,7 +158,7 @@ class Config:
             return [ "static_gui" ] + appDescriptors
         elif appDescriptors:
             return appDescriptors
-        elif self.batchMode():
+        elif self.optionValue("b"):
             return [ self.optionValue("b") ]
         elif self.optionMap.has_key("g"):
             return [ "dynamic_gui" ]
@@ -407,8 +410,8 @@ class Config:
 
         self.checkFilterFileSanity(suite.app)
         self.checkConfigSanity(suite.app)
-        batchSession = self.optionMap.get("b")
-        if batchSession:
+        if self.batchMode():
+            batchSession = self.optionMap.get("b")
             batchFilter = batch.BatchVersionFilter(batchSession)
             batchFilter.verifyVersions(suite.app)
         if self.isReconnecting():

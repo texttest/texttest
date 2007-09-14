@@ -54,7 +54,9 @@ def repeatedOpen(fileName, *args, **kwargs):
             if errMsg.find("Permission denied") != -1:
                 raise
             else:
-                print "Failed to open file", fileName, "(" + errMsg + "), assuming automount trouble and trying again!"
+                from socket import gethostname
+                print "Failed to open file", fileName, ": assuming automount trouble and trying again!"
+                print "(Automount trouble:" + plugins.localtime() + ":" + gethostname() + ":" + errMsg + ")"
                 time.sleep(0.1)
     return origOpen(fileName, *args, **kwargs)
 

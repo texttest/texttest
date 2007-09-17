@@ -176,7 +176,7 @@ class OptimizationConfig(ravebased.Config):
         return self.optionMap.has_key("plot") or ravebased.Config.ignoreBinary(self)
     def getResponderClasses(self, allApps):
         if self.optionMap.has_key("plot"):
-            return [ GraphPlotResponder ]
+            return [ GraphPlotResponder ] + self.getThreadActionClasses()
         else:
             return ravebased.Config.getResponderClasses(self, allApps)
     def getTestComparator(self):

@@ -99,6 +99,9 @@ class Config:
                self.optionMap.has_key("o") or self.optionMap.has_key("s")
     def getResponderClasses(self, allApps):
         classes = []
+        if self.optionMap.runScript():
+            return self.getThreadActionClasses()
+        
         if not self.hasExplicitInterface():
             self.setDefaultInterface(allApps)
         # Put the GUI first ... first one gets the script engine - see respond module :)
@@ -106,6 +109,9 @@ class Config:
             self.addGuiResponder(classes)
         else:
             classes.append(self.getTextDisplayResponderClass())
+        if not self.optionMap.has_key("gx"):
+            classes += self.getThreadActionClasses()
+
         if self.batchMode() and not self.optionMap.has_key("coll"):
             if self.optionValue("b") is None:
                 print "No batch session identifier provided, using 'default'"
@@ -119,6 +125,7 @@ class Config:
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
         return classes
+
     def isActionReplay(self):
         for option, desc in self.getInteractiveReplayOptions():
             if self.optionMap.has_key(option):
@@ -130,13 +137,6 @@ class Config:
         # we've requested a slow motion replay or we're trying to record a new usecase.
         return not self.optionMap.has_key("record") and not self.optionMap.has_key("gx") and not self.isActionReplay()
     
-    def getThreadRunnerClasses(self):
-        classes = []
-        if self.useGUI():
-            self.addGuiResponder(classes)
-        if not self.optionMap.has_key("gx"):
-            classes += self.getThreadActionClasses()
-        return classes
     def getThreadActionClasses(self):
         return [ ActionRunner ]
     def getTextDisplayResponderClass(self):

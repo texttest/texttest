@@ -56,12 +56,12 @@ class UniqueNameFinder(Responder):
         self.name2test[name] = test
         test.setUniqueName(name)
 
-class TextTest:
+class TextTest(plugins.Observable):
     def __init__(self):
+        plugins.Observable.__init__(self)
         self.setSignalHandlers(self.handleSignalWhileStarting)
         if os.environ.has_key("FAKE_OS"):
             os.name = os.environ["FAKE_OS"]
-        self.allResponders = []
         self.inputOptions = testmodel.OptionFinder()
         self.diag = plugins.getDiagnostics("Find Applications")
         self.appSuites = seqdict()
@@ -138,14 +138,11 @@ class TextTest:
                 app.extras.append(extraApp)
         return app
     def needsTestRuns(self):
-        for responder in self.allResponders:
+        for responder in self.observers:
             if not responder.needsTestRuns():
                 return False
         return True
     def createResponders(self, allApps):
-        # With scripts, we ignore all responder options, we're just transforming data
-        if self.inputOptions.runScript():
-            return
         responderClasses = []
         for app in allApps:
             for respClass in app.getResponderClasses(allApps):
@@ -153,38 +150,23 @@ class TextTest:
                     self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.append(respClass)
         # Make sure we send application events when tests change state
-        responderClasses += [ UniqueNameFinder, testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
-        allResponders = map(lambda x : x(self.inputOptions), responderClasses)
-        self.allResponders = self.removeBaseClasses(allResponders)
-        
-    def createThreadRunners(self, allApps):
-        threadRunnerClasses = []
-        threadRunners = []
-        for app in allApps:
-            for threadClass in app.getThreadRunnerClasses():
-                if not threadClass in threadRunnerClasses:
-                    self.diag.info("Adding thread runner " + repr(threadClass))
-                    threadRunnerClasses.append(threadClass)
-                    threadRunners.append(self.makeThreadRunner(threadClass))
-        return self.removeBaseClasses(threadRunners)
-    def removeBaseClasses(self, objects):
+        responderClasses += self.getBuiltinResponderClasses()
+        filteredClasses = self.removeBaseClasses(responderClasses)
+        self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
+        self.observers = map(lambda x : x(self.inputOptions), filteredClasses)
+    def getBuiltinResponderClasses(self):
+        return [ UniqueNameFinder, testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
+    def removeBaseClasses(self, classes):
         # Different apps can produce different versions of the same responder/thread runner
         # We should make sure we only include the most specific ones
         toRemove = []
-        for i in range(len(objects)):
-            for j in range(i + 1, len(objects)):
-                obj1 = objects[i]
-                obj2 = objects[j]
-                if isinstance(obj1, obj2.__class__):
-                    toRemove.append(obj2)
-                elif isinstance(obj2, obj1.__class__):
-                    toRemove.append(obj1)
-        return filter(lambda obj: obj not in toRemove, objects)
-    def makeThreadRunner(self, threadRunnerClass):
-        for responder in self.allResponders:
-            if isinstance(responder, threadRunnerClass):
-                return responder
-        return threadRunnerClass(self.inputOptions)
+        for i, class1 in enumerate(classes):
+            for j, class2 in enumerate(classes[i+1:]):
+                if issubclass(class1, class2):
+                    toRemove.append(class2)
+                elif issubclass(class2, class1):
+                    toRemove.append(class1)
+        return filter(lambda x: x not in toRemove, classes)
     def createTestSuites(self, allApps):
         appSuites = seqdict()
         for app in allApps:
@@ -192,7 +174,7 @@ class TextTest:
             appGroup = [ app ] + app.extras
             for partApp in appGroup:
                 try:
-                    testSuite = partApp.createInitialTestSuite(self.allResponders)
+                    testSuite = partApp.createInitialTestSuite(self.observers)
                     appSuites[partApp] = testSuite
                 except plugins.TextTestError, e:
                     errorMessages.append(self.rejectionMessage(partApp, str(e)))
@@ -246,9 +228,8 @@ class TextTest:
         self.appSuites = self.readContents(emptySuites)
         if len(self.appSuites) == 0:
             return
-        threadRunners = self.createThreadRunners(allApps)
-        self.addSuites(threadRunners)
-        self.runThreads(threadRunners)
+        self.addSuites()
+        self.runThreads()
     def readContents(self, appSuites):
         goodSuites = seqdict()
         rejectedApps = Set()
@@ -281,33 +262,35 @@ class TextTest:
             if appGroup.issubset(rejectedApps):
                 sys.stderr.write(self.rejectionMessage(app, "no tests matching the selection criteria found."))
 
-    def getObjectsToAddSuites(self, threadRunners):
-        return self.allResponders + filter(lambda runner: runner not in self.allResponders, threadRunners)
-    def addSuites(self, threadRunners):
-        for object in self.getObjectsToAddSuites(threadRunners):
+    def addSuites(self):
+        for object in self.observers:
             # For all observable responders, set them to be observed by the others if they
             # haven't fixed their own observers
             if isinstance(object, plugins.Observable) and len(object.observers) == 0:
                 self.diag.info("All responders now observing " + str(object.__class__))
-                object.setObservers(self.allResponders)
-            suites = self.getSuitesToAdd(object, threadRunners)
+                object.setObservers(self.observers)
+            suites = self.getSuitesToAdd(object)
             self.diag.info("Adding suites " + repr(suites) + " for " + str(object.__class__))
             object.addSuites(suites)
-    def getSuitesToAdd(self, responderOrThreadRunner, threadRunners):
-        if not responderOrThreadRunner in threadRunners:
-            return [ suite for app, suite in self.appSuites.items() ]
+    def getSuitesToAdd(self, observer):
+        for responderClass in self.getBuiltinResponderClasses():
+            if isinstance(observer, responderClass):
+                return self.appSuites.values()
         suites = []
         for app, testSuite in self.appSuites.items():
-            for threadRunnerClass in app.getThreadRunnerClasses():
-                if isinstance(responderOrThreadRunner, threadRunnerClass):
+            for responderClass in app.getResponderClasses():
+                if isinstance(observer, responderClass):
                     suites.append(testSuite)
                     break
-        return suites        
-    def runThreads(self, threadRunners):
+        return suites
+    def findThreadRunners(self):
+        return filter(lambda x: hasattr(x, "run"), self.observers)
+    def runThreads(self):
         # Set the signal handlers to use when running
         self.setSignalHandlers(self.handleSignalWhileRunning)
         # Run the first one as the main thread and the rest in subthreads
         # Make sure all of them are finished before we stop
+        threadRunners = self.findThreadRunners()
         allThreads = []
         for subThreadRunner in threadRunners[1:]:
             thread = Thread(target=subThreadRunner.run)

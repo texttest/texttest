@@ -63,6 +63,7 @@ class SocketResponder(Responder,plugins.Observable):
                 return
             except socket.error:
                 sleep(1)
+        print "Trouble connecting to", self.serverAddress
         sendSocket.connect(self.serverAddress)
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
@@ -203,7 +204,7 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
         app.setConfigDefault("queue_system_max_capacity", self.getDefaultMaxCapacity(), "Maximum possible number of parallel similar jobs in the available grid")
 
-class Activator:
+class Activator(Responder):
     def __init__(self, optionMap):
         self.allTests = []
         self.allApps = []
@@ -351,6 +352,7 @@ class SlaveServerResponder(Responder,TCPServer):
         # Tell the man-in-the-middle (MIM), if any, where we are
         serverAddress = self.getAddress()
         sendServerState("TextTest slave server started on " + serverAddress)
+        self.diag.info("Submitting to " + self.submitAddress)
         self.diag.info("Starting slave server at " + serverAddress)
         while not self.terminate:
             self.diag.info("Waiting for a new request...")
@@ -401,7 +403,7 @@ class MasterInteractiveResponder(InteractiveResponder):
     def describeViewOptions(self, test, options):
         print options
 
-class QueueSystemServer:
+class QueueSystemServer(Responder):
     instance = None
     def __init__(self, optionMap):
         self.optionMap = optionMap

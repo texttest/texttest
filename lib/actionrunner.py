@@ -64,6 +64,8 @@ class ActionRunner(Responder, plugins.Observable):
             self.currentTestRunner.performActions(self.previousTestRunner)
             self.testQueue.pop(0)
             self.previousTestRunner = self.currentTestRunner
+        for appRunner in self.appRunners:
+            appRunner.cleanActions()
         self.diag.info("Finishing the action runner.")
         
 class ApplicationRunner:
@@ -74,6 +76,11 @@ class ApplicationRunner:
         self.diag = diag
         self.actionSequence = self.getActionSequence(script)
         self.setUpApplications()
+    def cleanActions(self):
+        # clean up the actions before we exit
+        self.suitesToSetUp = {}
+        self.suitesSetUp = {}
+        self.actionSequence = []
     def matches(self, appName, versions):
         app = self.testSuite.app
         return app.name == appName and app.versions == versions

@@ -2,6 +2,7 @@
 
 import default, plugins, os, subprocess, signal
 from respond import Responder
+from socket import gethostname
                 
 class RunTest(default.RunTest):
     def __init__(self, hasAutomaticCputimeChecking):
@@ -57,19 +58,24 @@ class VirtualDisplayResponder(Responder):
         for suite in guiSuites:
             suite.setEnvironment("DISPLAY", displayName)
 
+    def getXvfbLogDir(self, guiSuites):
+        if len(guiSuites) > 0:
+            return os.path.join(guiSuites[0].app.writeDirectory, "Xvfb") 
+                              
     def setUpVirtualDisplay(self, guiSuites):
         machines = self.findMachines(guiSuites)
-        display = self.getDisplay(machines)
+        logDir = self.getXvfbLogDir(guiSuites)
+        display = self.getDisplay(machines, logDir)
         if display:
             self.setDisplayVariable(guiSuites, display)
             print "Tests will run with DISPLAY variable set to", display
         elif len(machines) > 0:
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
 
-    def getDisplay(self, machines):
+    def getDisplay(self, machines, logDir):
         displayNumber = self.getDisplayNumber()
         for machine in machines:
-            if self.createDisplay(machine, displayNumber):
+            if self.createDisplay(machine, displayNumber, logDir):
                 return self.getDisplayName(machine, displayNumber)
             else:
                 plugins.printWarning("Virtual display program Xvfb not available on " + machine) 
@@ -97,15 +103,24 @@ class VirtualDisplayResponder(Responder):
                     os.kill(pid, signal.SIGINT)
                 except OSError:
                     print "Process had already terminated"
-                # Xvfb sometimes leaves lock files lying around, clean up
-                lockFile = "/tmp/.X" + self.getDisplayNumber() + "-lock"
-                if os.path.isfile(lockFile):
-                    try:
-                        os.remove(lockFile)
-                    except:
-                        pass
+                self.cleanLeakedLockFiles()
             else:
                 self.killRemoteServer(machine)
+    def cleanLeakedLockFiles(self):
+        # Xvfb sometimes leaves lock files lying around, clean up
+        for lockFile in self.getLockFiles():
+            if os.path.isfile(lockFile):
+                try:
+                    os.remove(lockFile)
+                except:
+                    pass
+                
+    def getLockFiles(self):
+        num = self.getDisplayNumber()
+        lockFile = "/tmp/.X" + num + "-lock"
+        xFile = "/tmp/.X11-unix/X" + num
+        return [ lockFile, xFile ]
+
     def killRemoteServer(self, machine):
         self.diag.info("Getting ps output from " + machine)
         pid = self.findRemoteServerPid(machine)
@@ -123,14 +138,16 @@ class VirtualDisplayResponder(Responder):
                 # Assumes linux ps output (!)
                 return line.split()[3]
 
-    def createDisplay(self, machine, displayNumber):
+    def createDisplay(self, machine, displayNumber, logDir):
         if machine != "localhost" and not self.canRunVirtualServer(machine):
             return False
             
         startArgs = self.getVirtualServerArgs(machine, displayNumber)
         self.diag.info("Starting Xvfb using args " + repr(startArgs))
         try:
-            proc = subprocess.Popen(startArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+            local = "Xvfb." + machine.replace("localhost", gethostname()) + "." + displayNumber
+            logFile = plugins.openForWrite(os.path.join(logDir, local))
+            proc = subprocess.Popen(startArgs, stdout=logFile, stderr=subprocess.STDOUT)
             self.serverInfo = machine, proc.pid
             return True
         except OSError:

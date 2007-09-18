@@ -1337,10 +1337,9 @@ class Application:
         fullList += fromRemaining
         return fullList
     def makeWriteDirectory(self, subdir=None):
-        if os.path.isdir(self.writeDirectory):
-            return
-        root, tmpId = os.path.split(self.writeDirectory)
-        self.tryCleanPreviousWriteDirs(root)
+        if not os.path.isdir(self.writeDirectory):
+            root, tmpId = os.path.split(self.writeDirectory)
+            self.tryCleanPreviousWriteDirs(root)
         dirToMake = self.writeDirectory
         if subdir:
             dirToMake = os.path.join(self.writeDirectory, subdir)

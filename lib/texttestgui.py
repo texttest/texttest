@@ -335,7 +335,8 @@ class TextTestGUI(Responder, plugins.Observable):
         return hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile")
     def getExitObservers(self):
         exitActions = filter(lambda action: hasattr(action, "notifyExit"), self.intvActions)
-        return exitActions + [ guiplugins.processTerminationMonitor, self ]
+        # We are one ourselves, but we get that automatically as we're a Responder
+        return exitActions + [ guiplugins.processTerminationMonitor ] 
     def getTestColumnObservers(self):
         return [ self.testTreeGUI, statusMonitor, self.idleManager ]
     def getHideableGUIs(self):
@@ -527,6 +528,8 @@ class TopWindowGUI(ContainerGUI):
         for suite in suites:
             if not suite.app in self.allApps:
                 self.allApps.append(suite.app)
+        if len(suites) > 0:
+            self.observers += suites[0].observers
     def allAppNames(self):
         appNames = []
         for app in self.allUniqueApps():

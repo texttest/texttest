@@ -95,6 +95,10 @@ class VirtualDisplayResponder(Responder):
         return allMachines
     
     def notifyAllComplete(self):
+        self.cleanXvfb()
+    def notifyExit(self):
+        self.cleanXvfb()
+    def cleanXvfb(self):
         if self.serverInfo:
             machine, pid = self.serverInfo
             if machine == "localhost":
@@ -106,6 +110,8 @@ class VirtualDisplayResponder(Responder):
                 self.cleanLeakedLockFiles()
             else:
                 self.killRemoteServer(machine)
+            self.serverInfo = None
+            
     def cleanLeakedLockFiles(self):
         # Xvfb sometimes leaves lock files lying around, clean up
         for lockFile in self.getLockFiles():

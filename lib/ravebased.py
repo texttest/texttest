@@ -495,6 +495,7 @@ class FilterRuleBuilds(plugins.Action):
             print e
             return [], []
 
+        self.ensureCarmTmpExists(test)
         for rulesetName in rulesetNames:
             ruleset = RuleSet(rulesetName, test)
             
@@ -503,7 +504,6 @@ class FilterRuleBuilds(plugins.Action):
                 continue
 
             if self.shouldCompileFor(test, ruleset):
-                self.ensureCarmTmpExists(test)
                 targetName = ruleset.targetFiles[0]
                 origRuleset = self.rulesetNamesToRulesets.get(targetName)
                 if origRuleset:

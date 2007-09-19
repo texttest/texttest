@@ -234,10 +234,19 @@ class GUIStatusMonitor(SubGUI):
         if self.label:
             self.label.set_markup(plugins.convertForMarkup(message))
             self.contentsChanged()
-
+            
     def createView(self):
         hbox = gtk.HBox()
         self.label = gtk.Label()
+        import pango
+        self.label.set_ellipsize(pango.ELLIPSIZE_END)
+        # It seems difficult to say 'ellipsize when you'd otherwise need
+        # to enlarge the window', so we'll have to settle for a fixed number
+        # of max char's ... The current setting (90) is just a good choice
+        # based on my preferred window size, on the test case I used to
+        # develop this code. (since different chars have different widths,
+        # the optimal number depends on the string to display) \ Mattias++
+        self.label.set_max_width_chars(90)
         self.label.set_use_markup(True)
         self.label.set_markup(plugins.convertForMarkup("TextTest started at " + plugins.localtime() + "."))
         hbox.pack_start(self.label, expand=False, fill=False)

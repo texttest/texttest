@@ -98,6 +98,9 @@ class MatadorConfig(optimization.OptimizationConfig):
         rotRules = test.getEnvironment("ROTATION_OPTIMIZATION_RULESET")
         if rotRules:
             extras.append(rotRules)
+        depotRules = test.getEnvironment("DEPOT_OPTIMIZATION_RULESET")
+        if depotRules:
+            extras.append(depotRules)
         return extras
     def getRuleBuildFilterer(self):
         return FilterRuleBuilds()

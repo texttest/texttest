@@ -488,6 +488,7 @@ class FilterRuleBuilds(plugins.Action):
             test.changeState(NeedRuleCompilation(rulecomp))
     def makeRulesets(self, test):
         unknown, known = [], []
+        self.ensureCarmTmpExists(test)
         try:
             rulesetNames = test.app.getRuleSetNames(test)
         except plugins.TextTestError, e:
@@ -495,7 +496,7 @@ class FilterRuleBuilds(plugins.Action):
             print e
             return [], []
 
-        self.ensureCarmTmpExists(test)
+        self.diag.info("Making rulesets for " + repr(rulesetNames))
         for rulesetName in rulesetNames:
             ruleset = RuleSet(rulesetName, test)
             

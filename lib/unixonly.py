@@ -44,7 +44,7 @@ class VirtualDisplayResponder(Responder):
         else:
             self.setUpVirtualDisplay(guiSuites)
     def setExistingDisplay(self, guiSuites):
-        machine, pid = self.serverInfo
+        machine, proc = self.serverInfo
         displayName = self.getDisplayName(machine, self.getDisplayNumber())
         self.setDisplayVariable(guiSuites, displayName)
 
@@ -100,13 +100,14 @@ class VirtualDisplayResponder(Responder):
         self.cleanXvfb()
     def cleanXvfb(self):
         if self.serverInfo:
-            machine, pid = self.serverInfo
+            machine, proc = self.serverInfo
             if machine == "localhost":
-                print "Killing Xvfb process", pid
+                print "Killing Xvfb process", proc.pid
                 try:
-                    os.kill(pid, signal.SIGINT)
+                    os.kill(proc.pid, signal.SIGINT)
                 except OSError:
                     print "Process had already terminated"
+                proc.wait()
                 self.cleanLeakedLockFiles()
             else:
                 self.killRemoteServer(machine)
@@ -154,7 +155,7 @@ class VirtualDisplayResponder(Responder):
             local = "Xvfb." + machine.replace("localhost", gethostname()) + "." + displayNumber
             logFile = plugins.openForWrite(os.path.join(logDir, local))
             proc = subprocess.Popen(startArgs, stdout=logFile, stderr=subprocess.STDOUT)
-            self.serverInfo = machine, proc.pid
+            self.serverInfo = machine, proc
             return True
         except OSError:
             return False

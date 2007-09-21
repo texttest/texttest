@@ -519,8 +519,9 @@ class FilterRuleBuilds(plugins.Action):
                 
         return unknown, known
     def ensureCarmTmpExists(self, test):
-        carmTmp = os.path.normpath(test.getEnvironment("CARMTMP"))
-        if not os.path.isdir(carmTmp):
+        carmTmp = test.getEnvironment("CARMTMP")
+        if carmTmp and not os.path.isdir(carmTmp):
+            carmTmp = os.path.normpath(carmTmp)
             if os.path.islink(carmTmp):
                 print "CARMTMP", carmTmp, "seems to be a deadlink"
             else:

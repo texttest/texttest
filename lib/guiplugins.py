@@ -600,9 +600,13 @@ class ViewInEditor(FileViewAction):
             viewProgram = self.getViewToolName(fileName)
             if plugins.canExecute(viewProgram):
                 self.performOnFile(fileName, comparison, viewProgram)
+            elif viewProgram:
+                self.notify("Error", "Cannot find file viewing program '" + viewProgram + \
+                            "'.\nPlease install it somewhere on your PATH or\nchange the configuration entry 'view_program'.")
             else:
-                self.notify("Error", "Cannot find file editing program '" + viewProgram + \
-                            "'\nPlease install it somewhere on your PATH or point the view_program setting at a different tool")
+                self.notify("Warning", "No file viewing program is defined for files of type '" + \
+                            os.path.basename(fileName).split(".")[0] + \
+                            "'.\nPlease point the configuration entry 'view_program' at a valid program to view the file.")
     def isTestDefinition(self, stem, fileName):
         if not self.currentTest:
             return False
@@ -657,9 +661,13 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
             diffProgram = self.getViewToolName(fileName)
             if plugins.canExecute(diffProgram):
                 self.performOnFile(fileName, comparison, diffProgram)
-            else:
+            elif diffProgram:
                 self.notify("Error", "Cannot find graphical difference program '" + diffProgram + \
-                            "'\nPlease install it somewhere on your PATH or point the diff_program setting at a different tool")
+                            "'.\nPlease install it somewhere on your PATH or change the\nconfiguration entry 'diff_program'.")
+            else:
+                self.notify("Warning", "No graphical difference program is defined for files of type '" + \
+                            os.path.basename(fileName).split(".")[0] + \
+                            "'.\nPlease point the configuration entry 'diff_program' at a valid program to visualize the differences.")
         
 
 class FollowFile(FileViewAction):

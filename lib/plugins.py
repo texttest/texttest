@@ -595,6 +595,8 @@ def relpath(fullpath, parentdir):
         return relPath
     
 def canExecute(program):
+    if not program:
+        return False
     localName = program.split()[0]
     if os.name == "nt" and localName.find(".") == -1:
         localName += ".exe"

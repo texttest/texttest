@@ -569,6 +569,7 @@ class Config:
         app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
         app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")
+        app.setConfigDefault("binary_file", [], "Which output files are known to be binary, and hence should not be shown/diffed?")
         
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")

@@ -28,6 +28,12 @@ class FileComparison:
         self.displayPriority = test.getCompositeConfigValue("failure_display_priority", self.stem)
         maxLength = test.getConfigValue("lines_of_text_difference")
         maxWidth = test.getConfigValue("max_width_text_difference")
+        # It would be nice if this could be replaced by some automagic file type detection
+        # mechanism, such as the *nix 'file' command, but as the first implementation I've
+        # chosen to use a manually created list instead.
+        self.binaryFile = False
+        if self.stem in test.getConfigValue("binary_file"):
+            self.binaryFile = True
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getConfigValue("text_diff_program_max_file_size"))
@@ -139,7 +145,12 @@ class FileComparison:
         titleText += " " + repr(self)
         return "-" * 10 + " " + titleText + " " + "-" * 10
     def getFreeTextBody(self):
-        if self.newResult():
+        if self.binaryFile and \
+               (self.newResult() or self.missingResult()):
+            message = "Binary file, not showing any preview. " + \
+                      "Edit the configuration entry 'binary_file' and re-run if you suspect that this file contains only text.\n"
+            return self.previewGenerator.getWrappedLine(message)
+        elif self.newResult():
             return self.previewGenerator.getPreview(open(self.tmpCmpFile))
         elif self.missingResult():
             return self.previewGenerator.getPreview(open(self.stdCmpFile))
@@ -147,10 +158,12 @@ class FileComparison:
         if plugins.canExecute(self.textDiffTool):
             stdFileSize = os.stat(self.stdCmpFile)[stat.ST_SIZE]
             tmpFileSize = os.stat(self.tmpCmpFile)[stat.ST_SIZE]
-            if self.textDiffToolMaxSize >= 0 and (stdFileSize > self.textDiffToolMaxSize or tmpFileSize > self.textDiffToolMaxSize):
-                message = "Warning: The files were too large to compare - " + str(stdFileSize) + " and " + \
+            if self.textDiffToolMaxSize >= 0 and \
+                   (stdFileSize > self.textDiffToolMaxSize or \
+                    tmpFileSize > self.textDiffToolMaxSize):
+                message = "The result files were too large to compare - " + str(stdFileSize) + " and " + \
                           str(tmpFileSize) + " bytes, compared to the limit of " + str(self.textDiffToolMaxSize) + \
-                          " bytes. Double-click on the file to see the difference, or adjust text_diff_program_max_file_size" + \
+                          " bytes. Double-click on the file to see the difference, or adjust the configuration entry 'text_diff_program_max_file_size'" + \
                           " and re-run to see the difference in this text view.\n"
                 return self.previewGenerator.getWrappedLine(message)
             

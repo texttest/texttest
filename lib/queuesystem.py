@@ -329,8 +329,10 @@ class SlaveRequestHandler(StreamRequestHandler):
             sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
                              hostname + " (process " + identifier + ")\n")
             sys.stderr.write("Slave already registered from " + expectedHost + " (process " + expectedPid + ")\n")
-            sys.stderr.write("Ignored all communication from this unexpected TextTest slave")
+            sys.stderr.write("Ignored all communication from this unexpected TextTest slave\n")
             sys.stderr.flush()
+            self.connection.shutdown(socket.SHUT_RDWR)
+            
     def getHostName(self, ipAddress):
         return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
 

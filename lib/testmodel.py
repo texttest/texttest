@@ -1053,11 +1053,32 @@ class Application:
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(inputOptions)
+        self.setupEnvironmentDirCache()
         interactiveActionHandler.setCommandOptionGroups(self.optionGroups)
     def __repr__(self):
         return self.fullName
     def __hash__(self):
         return id(self)
+    def setupEnvironmentDirCache(self):
+        self.environmentDirCaches = []
+        envDirs = self.getConfigValue("environment_directory")
+        for envDir in envDirs:
+            added = False
+            if envDir == "":
+                continue
+            if os.path.isabs(envDir):
+                if os.path.isdir(envDir):
+                    self.environmentDirCaches.append(DirectoryCache(os.path.abspath(envDir)))
+                    added = True
+            else:
+                if os.path.isdir(plugins.joinpath(os.getenv("TEXTTEST_HOME"), envDir)):
+                    self.environmentDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(os.getenv("TEXTTEST_HOME"), envDir))))
+                    added = True
+                if os.path.isdir(plugins.joinpath(self.dircache.dir, envDir)):            
+                    self.environmentDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(self.dircache.dir, envDir))))
+                    added = True
+            if not added:
+                plugins.printWarning("The directory '" + envDir + "' could not be found, ignoring 'environment_directory' config entry.")
     def makeConfigObject(self):
         moduleName = self.getConfigValue("config_module")
         importCommand = "from " + moduleName + " import getConfig"
@@ -1101,8 +1122,10 @@ class Application:
         multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
     def setEnvironment(self, test):
         self.configObject.setEnvironment(test) # wanders throught the configuration picking up environment variables
+        if not test.parent: # In top suite, also check extra environment dir 
+            for environmentDirCache in self.environmentDirCaches:
+                self.readValues(test.environment, "environment", environmentDirCache) 
         self.readValues(test.environment, "environment", test.dircache) # picks up variables from the environment files
-
     def getConfigFilesToImport(self):
         return map(self.configPath, self.getConfigValue("import_config_file"))
     def configPath(self, fileName):

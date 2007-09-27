@@ -1061,7 +1061,7 @@ class Application:
         return id(self)
     def setupEnvironmentDirCache(self):
         self.environmentDirCaches = []
-        envDirs = self.getConfigValue("environment_directory")
+        envDirs = self.getConfigValue("extra_config_directory")
         for envDir in envDirs:
             added = False
             if envDir == "":
@@ -1078,7 +1078,7 @@ class Application:
                     self.environmentDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(self.dircache.dir, envDir))))
                     added = True
             if not added:
-                plugins.printWarning("The directory '" + envDir + "' could not be found, ignoring 'environment_directory' config entry.")
+                plugins.printWarning("The directory '" + envDir + "' could not be found, ignoring 'extra_config_directory' config entry.")
     def makeConfigObject(self):
         moduleName = self.getConfigValue("config_module")
         importCommand = "from " + moduleName + " import getConfig"
@@ -1133,10 +1133,21 @@ class Application:
             return fileName
         if self.dircache.exists(fileName):
             return self.dircache.pathName(fileName)
+
+        # Look in the extra config dirs ...
+        extraDirs = self.getConfigValue("extra_config_directory")
+        for dir in extraDirs:
+            extraFile = plugins.joinpath(dir, fileName)
+            if os.path.isabs(extraFile):
+                if os.path.isfile(extraFile):
+                    return os.path.abspath(extraFile)
+            elif os.path.isfile(plugins.joinpath(os.getenv("TEXTTEST_HOME"), extraFile)):
+                return os.path.abspath(plugins.joinpath(os.getenv("TEXTTEST_HOME"), extraFile))
+
         oneLevelUp = os.path.join(os.getenv("TEXTTEST_HOME"), fileName)
         if os.path.isfile(oneLevelUp):
             return oneLevelUp
-        else:
+        else:            
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
     def getDataFileNames(self):
         return self.getConfigValue("link_test_path") + self.getConfigValue("copy_test_path") + \
@@ -1213,6 +1224,7 @@ class Application:
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \
                               "Mapping of version names to a priority order in case of conflict.") 
+        self.setConfigDefault("extra_config_directory", [], "Directories containing shared configuration and environment files")
     def setDependentConfigDefaults(self):
         binary = self.getConfigValue("binary")
         # Set values which default to other values

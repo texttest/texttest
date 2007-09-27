@@ -681,7 +681,6 @@ class Config:
         app.addConfigEntry("definition_file_stems", "input")
         app.addConfigEntry("definition_file_stems", "knownbugs")
         app.addConfigEntry("definition_file_stems", "logging")
-        app.setConfigDefault("environment_directory", [], "Directories containing shared environment files")
     def setApplicationDefaults(self, app):
         self.setComparisonDefaults(app)
         self.setExternalToolDefaults(app)

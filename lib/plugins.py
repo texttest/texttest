@@ -1160,7 +1160,7 @@ class FileProperties:
             timeFormat = "%b %d  %Y"
         else:
             timeFormat = "%b %d %H:%M"
-        return time.strftime(timeFormat, time.gmtime(timeStamp))
+        return time.strftime(timeFormat, time.localtime(timeStamp))
     def inqCTime(self):
         return self.formatTime(self.status[stat.ST_CTIME])
     def inqModificationTime(self):

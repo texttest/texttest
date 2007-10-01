@@ -66,7 +66,7 @@ def getConfig(optionMap):
     return CarmenConfig(optionMap)
 
 architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris", "ia64_hpux", "x86_64_linux" ]
-majorReleases = [ "11", "12", "13", "14", "master", "tracking" ]
+majorReleases = [ "11", "12", "13", "14", "master", "TRACKING_1" ]
 
 def getArchitecture(app):
     for version in app.versions:
@@ -96,7 +96,7 @@ def getBitMode(app):
         return "32"
 
 def fullVersionName(version):
-    if version == "master" or version == "tracking" or version == "none":
+    if version == "master" or version == "none":
         return version
     else:
         return "carmen_" + version
@@ -170,14 +170,8 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
                 return priority
             else:
                 return -1023
-    def getSGEReleaseID(self):
-        version = getMajorReleaseVersion(self.test.app)
-        if version == "tracking":
-            return "TRACKING_1" # SGE is a bit confused about all these branches...
-        else:
-            return version
     def getMajorReleaseResource(self):
-        majRelease = self.getSGEReleaseID()
+        majRelease = getMajorReleaseVersion(self.test.app)
         if majRelease == "none":
             return ""
         else:

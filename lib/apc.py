@@ -521,10 +521,10 @@ class CreateHTMLFiles(plugins.Action):
             htmlFile = test.makeTmpFileName("optinfo")
             xslFile = os.path.join(carmsys, test.app.getConfigValue("optinfo_xml_file"))
             majorRelease = getMajorReleaseVersion(test.app)
-            if majorRelease == "master":
-                xsltprocArchs = [ "i386_linux", "x86_64_linux", "sparc", "sparc_64" ]
-            else:
+            if majorRelease in [ "11", "12", "13" ]:
                 xsltprocArchs = [ "i386_linux", "x86_64_linux" ]
+            else:
+                xsltprocArchs = [ "i386_linux", "x86_64_linux", "sparc", "sparc_64" ]
             arch = getArchitecture(test.app)
             if arch in xsltprocArchs:
                 os.system("xsltproc " + xslFile + " " + xmlAllFile + " > " + htmlFile)

@@ -72,7 +72,8 @@ Run
 > make install
 > cd $SOURCE_DIR
 
-Now, to make sure the build system finds our newly installed glib (and other packages, as we continue), set
+# Now, to make sure the build system finds our newly installed glib (and other packages, as we continue), set
+# We include /usr/lib/pkgconfig in the config path since on our system libxml-2.0 is installed in /usr/lib.
 
 > setenv PKG_CONFIG_PATH ${INSTALLATION_DIR}/lib/pkgconfig/:/usr/lib/pkgconfig
 > setenv LD_LIBRARY_PATH $INSTALLATION_DIR/lib/:${LD_LIBRARY_PATH}

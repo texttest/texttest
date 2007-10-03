@@ -64,7 +64,7 @@ setenv PATH $INSTALLATION_DIR/bin/:${PATH}
 
 PyGTK.2.6.3
 -----------
-Build all the PyGTK libraries required as described in pygtk_build.txt
+Build all the PyGTK libraries required as described in pygtk_2.6_build.txt
 
 ***************************************
 RUN INSTRUCTIONS

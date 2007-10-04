@@ -942,13 +942,21 @@ class TextOption(Option):
             try:
                 os.makedirs(dir[1])
             except:
-                pass # makedir throws if dir exists ...
+                pass # makedir throws if dir exists ...                    
         # Set first non-empty dir as default ...)
+        existingDirs = []
+        defaultDir = None
         for dir in self.possibleDirs:
-            if os.path.isdir(os.path.abspath(dir[1])) and \
-                   len(os.listdir(os.path.abspath(dir[1]))) > 0:
-                return (self.possibleDirs, dir[1])
-        return (self.possibleDirs, self.possibleDirs[0][1])
+            if os.path.isdir(os.path.abspath(dir[1])):
+                if len(os.listdir(os.path.abspath(dir[1]))) > 0 and \
+                       not defaultDir:                
+                    defaultDir = dir[1]
+                existingDirs.append(dir)
+
+        if not defaultDir:
+            defaultDir = self.possibleDirs[0][1]
+            
+        return (existingDirs, defaultDir)
         
 class Switch(Option):
     def __init__(self, name, value=0, options=[], description=""):

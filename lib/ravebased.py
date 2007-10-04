@@ -526,7 +526,7 @@ class FilterRuleBuilds(plugins.Action):
                 print "CARMTMP", carmTmp, "seems to be a deadlink"
             else:
                 print "CARMTMP", carmTmp, "did not exist, attempting to create it"
-                os.makedirs(carmTmp)
+                plugins.ensureDirectoryExists(carmTmp)
     def getStaticLibrary(self, test):
         carmsys = test.getEnvironment("CARMSYS")
         libFile = test.getConfigValue("rave_static_library").replace("$CARMSYS", carmsys).replace("${CARMSYS}", carmsys)

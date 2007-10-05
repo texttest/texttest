@@ -532,9 +532,13 @@ class CreateHTMLFiles(plugins.Action):
                 os.system("Xalan " + xmlAllFile + " " + xslFile + " > " + htmlFile)
             # Create links to the images dir, so we get the pics when looking
             # in mozilla.
+            imagesLink = os.path.realpath(test.makeTmpFileName("images", forComparison=0))
+            frameworkImagesLink = os.path.realpath(test.makeTmpFileName("images",
+                                                                        forComparison=0,
+                                                                        forFramework=1))
             imagesDir = os.path.join(carmsys, "data/apc/feedback/images/")
-            os.system("ln -s " + imagesDir)
-            os.system("cd framework_tmp; ln -s " + imagesDir)
+            os.system("ln -s " + imagesDir + " " + imagesLink)
+            os.system("ln -s " + imagesDir + " " + frameworkImagesLink)
 
 class GoogleProfilePrepare(plugins.Action):
     def __init__(self, arg):

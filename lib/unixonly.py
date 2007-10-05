@@ -117,10 +117,11 @@ class VirtualDisplayResponder(Responder):
         # Xvfb sometimes leaves lock files lying around, clean up
         for lockFile in self.getLockFiles():
             if os.path.isfile(lockFile):
+                print "Xvfb leaked lock file at", lockFile, "attempting to remove it"
                 try:
                     os.remove(lockFile)
                 except:
-                    pass
+                    print "Failed to do so: ", plugins.getExceptionString()
                 
     def getLockFiles(self):
         num = self.getDisplayNumber()
@@ -162,9 +163,9 @@ class VirtualDisplayResponder(Responder):
     def getVirtualServerArgs(self, machine, displayNumber):
         # -ac option disables all access control so we can get at it from elsewhere
         if machine == "localhost":
-            return [ "Xvfb", "-ac", ":" + displayNumber ]
+            return [ "Xvfb", "-ac", "-audit", "2", ":" + displayNumber ]
         else:
-            return [ "rsh", machine, "Xvfb -ac :" + displayNumber ]
+            return [ "rsh", machine, "Xvfb -ac -audit 2 :" + displayNumber ]
     def getDisplayName(self, machine, displayNumber):
         return machine + ":" + displayNumber + ".0"
 

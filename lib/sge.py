@@ -116,13 +116,11 @@ class MachineInfo:
         return jobs
 
 # Interpret what the limit signals mean...
-def getLimitInterpretation(origLimitText):
-    if origLimitText == "RUNLIMIT1":
-        return "RUNLIMIT"
-    elif origLimitText == "RUNLIMIT2":
-        return "KILLED"
+def getUserSignalKillInfo(userSignalNumber, explicitKillMethod):
+    if userSignalNumber == "1":
+        return "RUNLIMIT", "exceeded maximum wallclock time allowed by SGE (s_rt parameter)"
     else:
-        return origLimitText
+        return explicitKillMethod()
     
 # Used by slave to find all execution machines    
 def getExecutionMachines():

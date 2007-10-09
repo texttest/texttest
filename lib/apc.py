@@ -174,7 +174,7 @@ class ApcConfig(optimization.OptimizationConfig):
         else:
             baseRunner = optimization.OptimizationConfig.getTestRunner(self)
             if self.slaveRun():
-                return [ MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, self.optionMap.has_key("extractlogs")), baseRunner ]
+                return [ MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, baseRunner, self.optionMap.has_key("extractlogs")), baseRunner ]
             else:
                 return baseRunner
     def isExecutable(self, process, test):
@@ -442,8 +442,7 @@ class RunApcTestInDebugger(default.RunTest):
         # Check for personal .gdbinit.
         if os.path.isfile(os.path.join(os.environ["HOME"], ".gdbinit")):
             print "Warning: You have a personal .gdbinit. This may create unexpected behaviour."
-        # Change to running state, without an associated process
-        self.changeToRunningState(test, None)
+        self.changeToRunningState(test)
         # Source the CONFIG file to get the environment correct and run gdb with the script.
         configFile = os.path.join(test.getEnvironment("CARMSYS"), "CONFIG")
         subprocess.call(". " + configFile + "; " + executeCommand, env=test.getRunEnvironment(), shell=True)
@@ -561,8 +560,8 @@ class GoogleProfileExtract(plugins.Action):
         os.system("rsh abbeville \"" + command + "\"")
         
 class MarkApcLogDir(RunWithParallelAction):
-    def __init__(self, isExecutable, hasAutomaticCpuTimeChecking, keepLogs):
-        RunWithParallelAction.__init__(self, isExecutable, hasAutomaticCpuTimeChecking)
+    def __init__(self, isExecutable, hasAutomaticCpuTimeChecking, baseRunner, keepLogs):
+        RunWithParallelAction.__init__(self, isExecutable, hasAutomaticCpuTimeChecking, baseRunner)
         self.keepLogs = keepLogs
     def getApcHostTmp(self, test):
         resLine = ravebased.getEnvVarFromCONFIG("APC_TEMP_DIR", test)

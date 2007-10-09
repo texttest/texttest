@@ -225,7 +225,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def getTestRunner(self):
         baseRunner = queuesystem.QueueSystemConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):
-            return [ RunLprof(self.isExecutable, self.hasAutomaticCputimeChecking), baseRunner ]
+            return [ RunLprof(self.isExecutable, self.hasAutomaticCputimeChecking, baseRunner), baseRunner ]
         else:
             return baseRunner
     def isExecutable(self, process, test):
@@ -283,10 +283,18 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         return envVars
     
 class RunWithParallelAction(plugins.Action):
-    def __init__(self, isExecutable, hasAutomaticCpuTimeChecking):
+    def __init__(self, isExecutable, hasAutomaticCpuTimeChecking, baseRunner):
         self.isExecutable = isExecutable
         self.hasAutomaticCpuTimeChecking = hasAutomaticCpuTimeChecking
+        self.baseRunner = self.findRealBaseRunner(baseRunner)
         self.diag = plugins.getDiagnostics("Parallel Action")
+    def findRealBaseRunner(self, baseRunner):
+        if hasattr(baseRunner, "currentProcess"):
+            return baseRunner
+        for runner in baseRunner:
+            if hasattr(runner, "currentProcess"):
+                return runner
+            
     def __call__(self, test):
         parallelActionThread = Thread(target=self.runParallelAction, args=(test,))
         parallelActionThread.setDaemon(True)
@@ -301,11 +309,12 @@ class RunWithParallelAction(plugins.Action):
         state = test.state # cache to avoid race conditions
         if state.isComplete():
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
-        elif not state.hasStarted():
+        elif not self.baseRunner.currentProcess:
+            self.diag.info("No process yet, sleeping...")
             time.sleep(0.1)
             return self.getTestProcess(test)
         else:
-            jobProc = JobProcess(test.state.bkgProcess.pid)
+            jobProc = JobProcess(self.baseRunner.currentProcess.pid)
             if self.hasAutomaticCpuTimeChecking(test.app):
                 # Here we expect the given process to be "time", with a shell subprocess
                 for attempt in range(5):

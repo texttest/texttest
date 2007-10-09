@@ -31,6 +31,8 @@ class Responder:
         pass
     def needsTestRuns(self):
         return 1
+    def canBeMainThread(self):
+        return True
 
 class TextDisplayResponder(Responder):
     def notifyComplete(self, test):

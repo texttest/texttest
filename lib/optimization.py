@@ -765,6 +765,7 @@ class MakeProgressReport(plugins.Action):
         self.testCount = 0
         self.bestKpi = 1.0
         self.worstKpi = 0.00001
+        self.currentApp = None
     def __del__(self):
         if self.testCount > 0:
             avg = math.pow(self.totalKpi, 1.0 / float(self.testCount))
@@ -773,7 +774,7 @@ class MakeProgressReport(plugins.Action):
             print "Worst KPI with respect to version", self.referenceVersion, "=", self.percent(self.worstKpi)
     def __repr__(self):
         return "Comparison on"
-    def setUpApplication(self, app):
+    def writeApplicationHeader(self, app):
         currentText = ""
         if self.currentVersion != None:
             currentText = " Version " + self.currentVersion
@@ -784,6 +785,10 @@ class MakeProgressReport(plugins.Action):
         print os.linesep + header
         print underline
     def __call__(self, test):
+        if test.app is not self.currentApp:
+            self.writeApplicationHeader(test.app)
+            self.currentApp = test.app
+            
         # Values that must be present for a solution to be considered
         definingValues = [ costEntryName, timeEntryName ]
         # Values that should be reported if present, but should not be fatal if not

@@ -48,8 +48,9 @@ from respond import Responder
 from copy import copy
 from traffic_cmd import sendServerState
 from carmenqueuesystem import getArchitecture, CarmenConfig, CarmenSgeSubmissionRules
-from queuesystem import Activator, KillTestSubmission, queueSystemName, SlaveServerResponder, SlaveRequestHandler, QueueSystemServer
+from queuesystem import queueSystemName, SlaveServerResponder, SlaveRequestHandler, QueueSystemServer
 from ndict import seqdict
+from Queue import Queue
 RuleBuildFailed = plugins.Unrunnable # for backwards compatibility with old website files
 
 def getConfig(optionMap):
@@ -147,11 +148,11 @@ class Config(CarmenConfig):
             return RuleBuildSlaveServer
         else:
             return CarmenConfig.getSlaveServerClass(self)
-    def getActivatorClass(self):
+    def getQueueServerClass(self):
         if self.buildRules():
-            return RuleBuildActivator
+            return RuleBuildSubmitServer
         else:
-            return CarmenConfig.getActivatorClass(self)
+            return CarmenConfig.getQueueServerClass(self)
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true"
     def getTestProcessor(self): # active for slave and local runs
@@ -202,8 +203,6 @@ class Config(CarmenConfig):
             return RaveSubmissionRules(self.optionMap, test, self.getRuleSetNames)
     def getRuleBuildObject(self):
         return CompileRules()
-    def getSubmissionKiller(self):
-        return KillRuleBuildOrTestSubmission()
     def raveMode(self):
         if self.optionMap.has_key("raveexp"):
             return "-explorer"
@@ -339,50 +338,115 @@ class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
 def getCrcCompileVars():
     return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMGROUP", "BITMODE", "_AUTOTEST__LOCAL_COMPILE_", "PATH", "USER" ] 
     
-class RuleBuildActivator(Activator):
-    def run(self):
-        self.makeAppWriteDirectories()
+class RuleBuildSubmitServer(QueueSystemServer):
+    def __init__(self, optionMap):
+        QueueSystemServer.__init__(self, optionMap)
+        self.ruleBuildQueue = Queue()
+        self.testsForRuleBuild = 0
+        self.actualAddress = None
+    def findQueueForTest(self, test):
         # push the non-rules tests last, to avoid indeterminism and decrease total time as these need two
         # SGE submissions
-        testsNoRuleBuild = []
-        ruleCompilations = []
-        for test in self.allTests:
-            rulecomp = self.getRuleCompilation(test)
-            if rulecomp:
-                test.changeState(NeedRuleCompilation(rulecomp))
-                ruleCompilations.append((test, rulecomp))
-            else:
-                testsNoRuleBuild.append(test)
+        rulecomp = self.getRuleCompilation(test)
+        if rulecomp:
+            self.testsForRuleBuild += 1
+            test.changeState(NeedRuleCompilation(rulecomp))
+            return self.ruleBuildQueue
+        else:
+            return QueueSystemServer.findQueueForTest(self, test)
+    def setSlaveServerAddress(self, address):
+        self.submitAddress = os.getenv("TEXTTEST_MIM_SERVER", address)
+        self.actualAddress = address
+
+    def notifyAllRead(self, suites):
+        self.ruleBuildQueue.put(None)
+        if self.testsForRuleBuild > 0:
+            self.testQueue.put("Completed submission of all rule compilations and tests that don't require rule compilation")
+        else:
+            QueueSystemServer.notifyAllRead(self, suites)
+            
+    def notifyRulesetCompiled(self, test):
+        if test.state.isComplete(): # failed
+            self.handleLocalError(test, previouslySubmitted=False)
+        else:
+            queue = QueueSystemServer.findQueueForTest(self, test)
+            queue.put(test)
+
+        self.ruleBuildCompleted()
         
-        for test, rulecomp in ruleCompilations:
-            test.makeWriteDirectory()
-            self.submitRuleCompilation(test, rulecomp)
-            
-        for test in testsNoRuleBuild:
-            test.makeWriteDirectory()
-            QueueSystemServer.instance.submit(test)
-            
-        if len(ruleCompilations) > 0:
-            QueueSystemServer.instance.submit("Completed submission of all rule compilations and tests that don't require rule compilation")
+    def run(self):
+        self.sendServerState("TextTest slave server started on " + self.actualAddress)
+        self.runQueue(self.ruleBuildQueue.get, self.submitRuleCompilation, "submitting rule compilations for")
+        if self.testCount > 0:
+            QueueSystemServer.run(self)
+        
     def getRuleCompilation(self, test):
         try:
             filterer = test.app.getRuleBuildFilterer()
+            return filterer.getRuleCompilation(test)
         except AttributeError:
             return
-        return filterer.getRuleCompilation(test)
-    def submitRuleCompilation(self, test, rulecomp):
+
+    def submitRuleCompilation(self, test):
         submissionRules = test.app.getRaveSubmissionRules(test)
         remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
         rulecompEnv = test.getRunEnvironment(getCrcCompileVars())
+        rulecomp = test.state.rulecomp
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
-            print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for test " + test.uniqueName + ")", postText
-            compileArgs = [ remoteCmd, ruleset.targetFiles[0], SlaveServerResponder.submitAddress ] + ruleset.getCompilationArgs(remote=True)
+            print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for " + repr(test) + ")", postText
+            targetFile = ruleset.targetFiles[0]
+            compileArgs = [ remoteCmd, targetFile, self.submitAddress ] + ruleset.getCompilationArgs(remote=True)
             command = " ".join(compileArgs)
-            QueueSystemServer.instance.submitJob(test, submissionRules, command, rulecompEnv)
+            affectedTests = FilterRuleBuilds.rulesetNamesToTests.get(targetFile, [])
+            if not self.submitJob(test, submissionRules, command, rulecompEnv, affectedTests):
+                self.testsForRuleBuild -= 1
         
         if test.state.category == "need_rulecompile":
             test.changeState(PendingRuleCompilation(rulecomp))
+    def ruleBuildCompleted(self):
+        self.testsForRuleBuild -= 1
+        if self.testsForRuleBuild == 0:
+            self.testQueue.put(None)
+            
+    def isRuleBuild(self, test):
+        return test.state.category == "running_rulecompile"
+    def jobStarted(self, test):
+        return self.isRuleBuild(test) or test.state.hasStarted()
+    def shouldWaitFor(self, test):
+        if self.isRuleBuild(test):
+            timeStr =  plugins.localtime("%H:%M")
+            briefText = "Ruleset build killed at " + timeStr
+            freeText = "Ruleset compilation killed explicitly at " + timeStr
+            self.ruleBuildCompleted()
+            self.cancel(test, briefText, freeText, previouslySubmitted=False)
+            return False
+        else:
+            return QueueSystemServer.shouldWaitFor(self, test)
+    def setKilledPending(self, test):
+        if self.isRuleBuild(test):
+            timeStr =  plugins.localtime("%H:%M")
+            briefText = "killed pending rule compilation at " + timeStr
+            freeText = "Rule compilation job was killed (while still pending in " + queueSystemName(test.app) +\
+                     ") at " + timeStr
+            self.ruleBuildCompleted()
+            self.cancel(test, freeText, briefText, previouslySubmitted=False)
+        else:
+            QueueSystemServer.setKilledPending(self, test)
+    def setSlaveLost(self, test):
+        if self.isRuleBuild(test):
+            failReason = "no report from rule compilation (possibly killed with SIGKILL)"
+            fullText = failReason + "\n" + self.getJobFailureInfo(test)
+            self.ruleBuildCompleted()
+            self.changeState(test, plugins.Unrunnable(fullText, failReason), previouslySubmitted=False)
+        else:
+            QueueSystemServer.setSlaveLost(self, test)
+    def describeJob(self, test, jobId, jobName):
+        if self.isRuleBuild(test):
+            postText = self.getPostText(test, jobId)
+            print "T: Cancelling job", jobName, postText
+        else:
+            QueueSystemServer.describeJob(self, test, jobId, jobName)
 
 class RuleBuildRequestHandler(SlaveRequestHandler):        
     def handleRequestFromHost(self, hostname, requestId):
@@ -400,7 +464,7 @@ class RuleBuildRequestHandler(SlaveRequestHandler):
         ruleset = self.findRuleset(name)
         testsToSubmit = []
         for test in self.findTestsForRuleset(name):
-            diag.info("Found test " + test.uniqueName)
+            diag.info("Found test " + repr(test))
             if test.state.isComplete():
                 continue
             if status == "start":
@@ -410,13 +474,9 @@ class RuleBuildRequestHandler(SlaveRequestHandler):
                     ruleset.succeeded(raveOutput)
                 else:
                     ruleset.failed(raveOutput)
-                if evaluator.buildsSucceeded(test):
-                    testsToSubmit.append(test)
-                elif test.state.isComplete():
-                    QueueSystemServer.instance.handleLocalError(test)
-        # do this at the end to avoid output problems
-        for test in testsToSubmit:
-            QueueSystemServer.instance.submit(test)
+                if evaluator.buildsSucceeded(test) or test.state.isComplete():
+                    test.notify("RulesetCompiled")
+
         diag.info("Completed handling response for " + name)
     def findRuleset(self, name):
         return FilterRuleBuilds.rulesetNamesToRulesets.get(name)
@@ -439,7 +499,7 @@ class EvaluateRuleBuild(plugins.Action):
     def __call__(self, test):
         self.buildsSucceeded(test)
     def buildsSucceeded(self, test):
-        self.diag.info("Evaluating rule build for " + test.uniqueName)
+        self.diag.info("Evaluating rule build for " + repr(test))
         if not hasattr(test.state, "rulecomp"):
             return False
         rulecomp = test.state.rulecomp
@@ -454,8 +514,7 @@ class EvaluateRuleBuild(plugins.Action):
             test.changeState(plugins.Unrunnable(freeText, "Ruleset build failed"))
             return False
         elif rulecomp.allSucceeded():
-            print "S: All rulesets compiled for", test.uniqueName, \
-                  "(ruleset" + rulecomp.description() + ")"
+            print "S: All rulesets compiled for", test, "(ruleset" + rulecomp.description() + ")"
             sys.stdout.flush() # don't get mixed up with what the submit thread might write
             return True
         else:
@@ -588,42 +647,6 @@ class CompileRules(plugins.Action):
     def setUpSuite(self, suite):
         if suite.parent is None or isUserSuite(suite):
             self.describe(suite)
- 
-class KillRuleBuildOrTestSubmission(KillTestSubmission):
-    def isRuleBuild(self, test):
-        return test.state.category == "running_rulecompile"
-    def jobStarted(self, test):
-        return self.isRuleBuild(test) or test.state.hasStarted()
-    def setKilled(self, test, killReason, jobId):
-        if self.isRuleBuild(test):
-            timeStr =  plugins.localtime("%H:%M")
-            briefText = "Ruleset build killed at " + timeStr
-            freeText = "Ruleset compilation killed explicitly at " + timeStr
-            self.changeState(test, default.Cancelled(briefText, freeText))
-        else:
-            KillTestSubmission.setKilled(self, test, killReason, jobId)
-    def setKilledPending(self, test):
-        if self.isRuleBuild(test):
-            timeStr =  plugins.localtime("%H:%M")
-            briefText = "killed pending rule compilation at " + timeStr
-            freeText = "Rule compilation job was killed (while still pending in " + queueSystemName(test.app) +\
-                     ") at " + timeStr
-            self.changeState(test, default.Cancelled(freeText, briefText))
-        else:
-            KillTestSubmission.setKilledPending(self, test)
-    def setSlaveLost(self, test):
-        if self.isRuleBuild(test):
-            failReason = "no report from rule compilation (possibly killed with SIGKILL)"
-            fullText = failReason + "\n" + self.getJobFailureInfo(test)
-            self.changeState(test, plugins.Unrunnable(fullText, failReason))
-        else:
-            KillTestSubmission.setSlaveLost(self, test)
-    def describeJob(self, test, jobId, jobName):
-        if self.isRuleBuild(test):
-            postText = self.getPostText(test, jobId)
-            print "T: Cancelling job", jobName, postText
-        else:
-            KillTestSubmission.describeJob(self, test, jobId, jobName)
 
 class TestRuleCompilation:
     rulesCompiled = {}

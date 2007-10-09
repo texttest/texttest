@@ -349,6 +349,8 @@ class Action:
         pass
     def tearDownSuite(self, suite):
         pass
+    def kill(self, test, sig):
+        pass
     def callDuringAbandon(self, test):
         # set to True if tests should have this action called even after all is reckoned complete (e.g. UNRUNNABLE)
         return False
@@ -407,8 +409,8 @@ class Observable:
         self.passSelf = passSelf
     def addObserver(self, observer):
         self.observers.append(observer)
-    def setObservers(self, observers):
-        self.observers = observers
+    def setObservers(self, observers):    
+        self.observers = filter(lambda x: x is not self, observers)
     def inMainThread(self):
         return currentThread().getName() == "MainThread"
     def notify(self, *args, **kwargs):

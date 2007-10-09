@@ -1,5 +1,5 @@
-import os, shutil, plugins, respond, rundependent, performance, comparetest, sys, batch, re, stat, subprocess, operator, glob
-from threading import currentThread
+import os, shutil, plugins, respond, rundependent, performance, comparetest, sys, batch, re, stat, subprocess, operator, glob, signal
+from threading import currentThread, Lock
 from knownbugs import CheckForBugs, CheckForCrashes
 from traffic import SetUpTrafficHandlers
 from cPickle import Unpickler
@@ -9,7 +9,6 @@ from ndict import seqdict
 from actionrunner import ActionRunner
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
-plugins.addCategory("cancelled", "cancelled", "were cancelled before starting")
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -190,11 +189,6 @@ class Config:
                  SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
                  catalogueCreator, collator, rundependent.FilterOriginal(), self.getTestRunner(), \
                  catalogueCreator, collator, self.getTestEvaluator() ]
-    def killTest(self, test, killReason="KILLED"):
-        killer = self.getTestKiller()
-        killer(test, killReason)
-    def getTestKiller(self):
-        return KillTest()
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
     def getPossibleResultFiles(self, app):
@@ -383,8 +377,6 @@ class Config:
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         return self.optionMap.get(option, "")
-    def allowEmpty(self):
-        return self.optionMap.has_key("gx") or self.optionMap.runScript()
     def ignoreBinary(self):
         return self.optionMap.runScript() or self.isReconnecting()
     def setUpCheckout(self, app):
@@ -1205,32 +1197,34 @@ class GrepFilter(plugins.TextFilter):
         return False
  
 class Running(plugins.TestState):
-    def __init__(self, execMachines, bkgProcess = None, freeText = "", briefText = ""):
+    def __init__(self, execMachines, freeText = "", briefText = ""):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
                                    executionHosts = execMachines, lifecycleChange="start")
-        self.bkgProcess = bkgProcess
-    def processCompleted(self):
-        return self.bkgProcess.poll() is not None
-    def killProcess(self):
-        if self.bkgProcess and self.bkgProcess.pid:
-            print "Killing running test (process id", str(self.bkgProcess.pid) + ")"
-            job = JobProcess(self.bkgProcess.pid)
-            job.killAll()
-        return 1
+
+class Killed(plugins.TestState):
+    def __init__(self, briefText, freeText, prevState):
+        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
+                                   started=1, completed=1, executionHosts=prevState.executionHosts)
+        # Cache running information, it can be useful to have this available...
+        self.prevState = prevState
 
 class RunTest(plugins.Action):
     def __init__(self):
         self.diag = plugins.getDiagnostics("run test")
+        self.currentProcess = None
+        self.killedTests = []
+        self.killSignal = None
+        self.lock = Lock()
     def __repr__(self):
         return "Running"
     def __call__(self, test):
         return self.runTest(test)
-    def changeToRunningState(self, test, process):
+    def changeToRunningState(self, test):
         execMachines = test.state.executionHosts
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
         briefText = self.getBriefText(execMachines)
         freeText = "Running on " + ",".join(execMachines)
-        newState = Running(execMachines, process, briefText=briefText, freeText=freeText)
+        newState = Running(execMachines, briefText=briefText, freeText=freeText)
         test.changeState(newState)
     def getBriefText(self, execMachines):
         # Default to not bothering to print the machine name: all is local anyway
@@ -1238,11 +1232,70 @@ class RunTest(plugins.Action):
     def runTest(self, test):
         self.describe(test)
         process = self.getTestProcess(test)
-        self.changeToRunningState(test, process)
+        self.changeToRunningState(test)
+        
+        self.registerProcess(test, process)
+        self.wait(process)
+        self.checkAndClear(test)
+    
+    def registerProcess(self, test, process):
+        self.lock.acquire()
+        self.currentProcess = process
+        if test in self.killedTests:
+            self.killProcess()
+        self.lock.release()
+
+    def checkAndClear(self, test):        
+        self.lock.acquire()
+        self.currentProcess = None
+        if test in self.killedTests:
+            self.changeToKilledState(test)
+        self.lock.release()
+
+    def changeToKilledState(self, test):
+        self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
+        briefText, fullText = self.getKillInfo(test)
+        freeText = "Test " + fullText + "\n"
+        test.changeState(Killed(briefText, freeText, test.state))
+
+    def getKillInfo(self, test):
+        if self.killSignal == signal.SIGUSR1:
+            return self.getUserSignalKillInfo(test, "1")
+        elif self.killSignal == signal.SIGUSR2:
+            return self.getUserSignalKillInfo(test, "2")
+        elif self.killSignal == signal.SIGXCPU:
+            return "CPULIMIT", "exceeded maximum cpu time allowed"
+        elif self.killSignal == signal.SIGINT:
+            return "INTERRUPT", "terminated via a keyboard interrupt (Ctrl-C)"
+        elif self.killSignal is not None:
+            briefText = "signal " + str(self.killSignal)
+            return briefText, "terminated by " + briefText
+        else:
+            return self.getExplicitKillInfo()
+    def getExplicitKillInfo(self):
+        timeStr = plugins.localtime("%H:%M")
+        return "KILLED", "killed explicitly at " + timeStr
+    def getUserSignalKillInfo(self, test, userSignalNumber):
+        return "SIGUSR" + userSignalNumber, "terminated by user signal " + userSignalNumber
+
+    def kill(self, test, sig):
+        self.lock.acquire()
+        self.killedTests.append(test)
+        self.killSignal = sig
+        if self.currentProcess:
+            self.killProcess()
+        self.lock.release()
+    def killProcess(self):
+        print "Killing running test (process id", str(self.currentProcess.pid) + ")"
+        proc = JobProcess(self.currentProcess.pid)
+        proc.killAll(self.killSignal)    
+    
+    def wait(self, process):
         try:
-            process.wait()
+            plugins.retryOnInterrupt(process.wait)
         except OSError:
-            pass # rely on signal handlers to slay the process via a roundabout route...
+            pass # safest, as there are python bugs in this area
+        
     def getOptions(self, test):
         optionsFile = test.getFileName("options")
         if optionsFile:
@@ -1279,56 +1332,6 @@ class RunTest(plugins.Action):
     def setUpSuite(self, suite):
         self.describe(suite)
 
-class Killed(plugins.TestState):
-    def __init__(self, briefText, freeText, prevState):
-        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
-                                   started=1, completed=1, executionHosts=prevState.executionHosts)
-        # Cache running information, it can be useful to have this available...
-        self.prevState = prevState
-    def processCompleted(self):
-        return self.prevState.processCompleted()
-
-class Cancelled(plugins.TestState):
-    def __init__(self, briefText="cancelled", freeText="Test run was cancelled before it had started"):
-        plugins.TestState.__init__(self, "cancelled", briefText=briefText, freeText=freeText, \
-                                   started=1, completed=1, lifecycleChange="complete")
-
-class KillTest:
-    def __init__(self):
-        self.diag = plugins.getDiagnostics("Kill Test")
-    def __call__(self, test, killReason="KILLED"):
-        self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
-        if test.state.hasStarted():
-            self.killTest(test, killReason)
-        else:
-            test.changeState(Cancelled())
-    def killTest(self, test, killReason):
-        briefText, fullText = self.getKillInfo(test, killReason)
-        freeText = "Test " + fullText + "\n"
-        newState = Killed(briefText, freeText, test.state)
-        if not test.state.isComplete(): # minimise racing
-            test.changeState(newState)
-            test.state.prevState.killProcess()        
-    def interpret(self, test, descriptor):
-        return descriptor
-    def getKillInfo(self, test, killReason):
-        briefText = self.interpret(test, killReason)
-        if briefText:
-            return briefText, self.getFullText(briefText)
-        else:
-            return "quit", "terminated by quitting"
-    def getFullText(self, briefText):
-        if briefText.startswith("RUNLIMIT"):
-            return "exceeded maximum wallclock time allowed"
-        elif briefText == "CPULIMIT":
-            return "exceeded maximum cpu time allowed"
-        elif briefText.startswith("signal"):
-            return "terminated by " + briefText
-        elif briefText.startswith("KILLED"):
-            timeStr = plugins.localtime("%H:%M")
-            return "killed explicitly at " + timeStr
-        else:
-            return briefText
 
 class FindExecutionHosts(plugins.Action):
     def __call__(self, test):
@@ -1901,3 +1904,4 @@ class ReplaceText(plugins.ScriptWithArgs):
         if not self.logFile:
             self.logFile = app.getConfigValue("log_file")
         self.textDiffTool = app.getConfigValue("text_diff_program")
+

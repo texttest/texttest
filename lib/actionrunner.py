@@ -1,73 +1,135 @@
 
 import plugins, os, sys, time
 from respond import Responder
-from testmodel import Application, DirectoryCache
-from glob import glob
+from Queue import Queue, Empty
+from ndict import seqdict
+from threading import Lock
 
-class ActionRunner(Responder, plugins.Observable):
-    def __init__(self, optionMap):
+plugins.addCategory("cancelled", "cancelled", "were cancelled before starting")
+
+class Cancelled(plugins.TestState):
+    def __init__(self, briefText, freeText):
+        plugins.TestState.__init__(self, "cancelled", briefText=briefText, freeText=freeText, \
+                                   started=1, completed=1, lifecycleChange="complete")
+
+class BaseActionRunner(Responder, plugins.Observable):
+    def __init__(self, optionMap, diagName):
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
-        self.inputOptions = optionMap
-        self.previousTestRunner = None
+        self.optionMap = optionMap
+        self.testQueue = Queue()
+        self.exited = False
+        self.lock = Lock()
+        self.killSignal = None
+        self.diag = plugins.getDiagnostics(diagName)
+        self.lockDiag = plugins.getDiagnostics("locks")
+    def notifyAdd(self, test, initial):
+        if test.classId() == "test-case":
+            self.diag.info("Adding test " + repr(test))
+            self.addTest(test)
+    def addTest(self, test):
+        self.testQueue.put(test)
+    def notifyAllRead(self, suites):
+        self.diag.info("All read, adding terminator")
+        self.testQueue.put(None)    
+    def run(self):
+        self.runQueue(self.getTestForRun, self.runTest, "running")
+        self.cleanup()
+        self.diag.info("Terminating")
+    def notifyAllComplete(self):
+        self.exited = True
+    
+    def notifyKill(self, test):
+        self.lock.acquire()
+        self.killOrCancel(test)
+        self.lock.release()
+        
+    def notifyExit(self, sig=None):
+        self.diag.info("Got exit!")
+        if self.exited:
+            return
+        self.lockDiag.info("Trying to get lock for killing")
+        self.lock.acquire()
+        self.lockDiag.info("Got lock for killing")
+        self.notify("Status", "Killing all running tests ...")
+        self.killSignal = sig
+        self.exited = True
+        self.killTests()
+        self.notify("Status", "Killed all running tests.")
+        self.lock.release()
+        
+    def cancel(self, test, briefText="cancelled", freeText="Test run was cancelled before it had started", **kwargs):
+        if not test.state.isComplete():
+            self.changeState(test, Cancelled(briefText, freeText), **kwargs)
+    def changeState(self, test, state):
+        test.changeState(state) # for overriding in case we need other notifiers
+    def runQueue(self, getMethod, runMethod, desc):
+        while True:
+            test = getMethod()
+            if not test: # completed normally
+                break
+
+            if self.exited:
+                self.cancel(test)
+                self.diag.info("Cancelled " + desc + " " + repr(test))
+            elif not test.state.isComplete():
+                self.diag.info(desc.capitalize() + " test " + repr(test))
+                runMethod(test)
+                self.diag.info("Completed " + desc + " " + repr(test))
+    def getItemFromQueue(self, queue, block):
+        try:
+            item = queue.get(block=block)
+            if item is None:
+                item = self.getItemFromQueue(queue, False) # In case more stuff comes after the terminator
+                queue.put(None) # Put the terminator back, we'll probably need it again
+            return item
+        except Empty:
+            return
+
+    def getTestForRun(self):
+        return self.getItemFromQueue(self.testQueue, block=True)
+    def cleanup(self):
+        pass
+    def canBeMainThread(self):
+        return False # We block, so we shouldn't be the main thread...
+            
+class ActionRunner(BaseActionRunner):
+    def __init__(self, optionMap):
+        BaseActionRunner.__init__(self, optionMap, "Action Runner")
         self.currentTestRunner = None
+        self.previousTestRunner = None
         self.script = optionMap.runScript()
-        self.allTests = []
-        self.testQueue = []
-        self.appRunners = []
-        self.diag = plugins.getDiagnostics("Action Runner")
+        self.appRunners = seqdict()
     def addSuite(self, suite):
         print "Using", suite.app.description(includeCheckout=True)
-        self.diag.info("Processing test suite of size " + str(suite.size()) + " for app " + suite.app.name)
         appRunner = ApplicationRunner(suite, self.script, self.diag)
-        self.appRunners.append(appRunner)
-        for test in suite.testCaseList():
-            self.addTestRunner(test, appRunner)
-            
-    def addTestRunner(self, test, appRunner):
-        self.diag.info("Adding test runner for test " + test.getRelPath())
-        testRunner = TestRunner(test, appRunner, self.diag)
-        self.testQueue.append(testRunner)
-        self.allTests.append(testRunner)
-    def notifyExtraTest(self, testPath, appName, versions):
-        appRunner = self.findApplicationRunner(appName, versions)
+        self.appRunners[suite.app] = appRunner
+    def runTest(self, test):
+        # We have the lock coming in to here...
+        appRunner = self.appRunners.get(test.app)
         if appRunner:
-            extraTest = appRunner.addExtraTest(testPath)
-            if extraTest:
-                self.addTestRunner(extraTest, appRunner)
-        else:
-            newApp = Application(appName, self.makeDirectoryCache(appName), versions, self.inputOptions)
-            self.createTestSuite(newApp, testPath)
-    def makeDirectoryCache(self, appName):
-        configFile = "config." + appName
-        rootDir = self.inputOptions.directoryName
-        rootConfig = os.path.join(rootDir, configFile)
-        if os.path.isfile(rootConfig):
-            return DirectoryCache(rootDir)
-        else:
-            allFiles = glob(os.path.join(rootDir, "*", configFile))
-            return DirectoryCache(os.path.dirname(allFiles[0]))
-    def createTestSuite(self, app, testPath):
-        filters = [ plugins.TestPathFilter(testPath) ]
-        suite = app.createExtraTestSuite(filters, self.observers)
-        for responder in self.observers:
-            responder.addSuites([ suite ]) # This will recursively notify ourselves(!) along with everyone else
-       
-    def findApplicationRunner(self, appName, versions):
-        for appRunner in self.appRunners:
-            if appRunner.matches(appName, versions):
-                return appRunner
-    def run(self):
-        while len(self.testQueue):
-            self.currentTestRunner = self.testQueue[0]
-            self.diag.info("Running actions for test " + self.currentTestRunner.test.getRelPath())
+            self.lock.acquire()
+            self.currentTestRunner = TestRunner(test, appRunner, self.diag, self.exited, self.killSignal)
+            self.lock.release()
+
             self.currentTestRunner.performActions(self.previousTestRunner)
-            self.testQueue.pop(0)
             self.previousTestRunner = self.currentTestRunner
-        for appRunner in self.appRunners:
+
+            self.lock.acquire()
+            self.currentTestRunner = None
+            self.lock.release()
+    def killTests(self):
+        if self.currentTestRunner:
+            self.currentTestRunner.kill(self.killSignal)
+    def killOrCancel(self, test):
+        if self.currentTestRunner and self.currentTestRunner.test is test:
+            self.currentTestRunner.kill()
+        else:
+            self.cancel(test)
+    def cleanup(self):
+        for appRunner in self.appRunners.values():
             appRunner.cleanActions()
-        self.diag.info("Finishing the action runner.")
-        
+    
 class ApplicationRunner:
     def __init__(self, testSuite, script, diag):
         self.testSuite = testSuite
@@ -81,11 +143,6 @@ class ApplicationRunner:
         self.suitesToSetUp = {}
         self.suitesSetUp = {}
         self.actionSequence = []
-    def matches(self, appName, versions):
-        app = self.testSuite.app
-        return app.name == appName and app.versions == versions
-    def addExtraTest(self, testPath):
-        return self.testSuite.addTestCaseWithPath(testPath)
     def setUpApplications(self):
         for action in self.actionSequence:
             self.setUpApplicationFor(action)
@@ -158,12 +215,18 @@ class ApplicationRunner:
             return []
 
 class TestRunner:
-    def __init__(self, test, appRunner, diag):
+    def __init__(self, test, appRunner, diag, killed, killSignal):
         self.test = test
         self.diag = diag
         self.actionSequence = []
         self.appRunner = appRunner
+        self.killed = killed
+        self.killSignal = killSignal
+        self.currentAction = None
+        self.lock = Lock()
         self.setActionSequence(appRunner.actionSequence)
+    def __repr__(self):
+        return repr(self.test)
     def setActionSequence(self, actionSequence):
         self.actionSequence = []
         # Copy the action sequence, so we can edit it and mark progress
@@ -204,9 +267,27 @@ class TestRunner:
                 abandon = True
 
         self.test.actionsCompleted()
-             
+    def kill(self, sig=None):
+        self.diag.info("Killing test " + repr(self.test))
+        self.lock.acquire()
+        self.killed = True
+        self.killSignal = sig
+        if self.currentAction:
+            self.currentAction.kill(self.test, sig)
+        self.lock.release()
     def callAction(self, action):
-        return self.handleExceptions(self.test.callAction, action)
+        self.lock.acquire()
+        self.currentAction = action
+        if self.killed:
+            action.kill(self.test, self.killSignal)
+        self.lock.release()
+
+        self.handleExceptions(self.test.callAction, action)
+
+        self.lock.acquire()
+        self.currentAction = None
+        self.lock.release()
+        
     def findSuitesToChange(self, previousTestRunner):
         tearDownSuites = []
         commonAncestor = None

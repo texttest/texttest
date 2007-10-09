@@ -35,6 +35,7 @@ class BatchCategory(plugins.Filter):
             postText = ""
         elif len(postText) > 0:
             postText = " : " + postText
+            return test.getIndent() + "- " + test.paddedRepr() + postText + "\n"
         return test.getIndent() + "- " + repr(test) + postText + "\n"
     def size(self):
         return len(self.tests)
@@ -156,17 +157,21 @@ class BatchResponder(respond.Responder):
         self.batchAppData = seqdict()
         self.allApps = seqdict()
     def notifyComplete(self, test):
+        if not self.batchAppData.has_key(test.app):
+            self.addApplication(test)
         self.batchAppData[test.app].storeCategory(test)
-    def addSuite(self, suite):
-        # Don't do anything with empty suites
-        if suite.size() == 0:
-            return
-        app = suite.app
-        self.batchAppData[app] = BatchApplicationData(suite)
-        if not self.allApps.has_key(app.name):
-            self.allApps[app.name] = [ app ]
+    def getRootSuite(self, test):
+        if test.parent:
+            return self.getRootSuite(test.parent)
         else:
-            self.allApps[app.name].append(app)
+            return test
+        
+    def addApplication(self, test):
+        rootSuite = self.getRootSuite(test)
+        app = test.app
+        self.batchAppData[app] = BatchApplicationData(rootSuite)
+        self.allApps.setdefault(app.name, []).append(app)
+
     def notifyAllComplete(self):
         mailSender = MailSender(self.sessionName, self.runId)
         for appList in self.allApps.values():
@@ -215,7 +220,7 @@ class MailSender:
         file.write(mailContents)
         file.close()
     def sendOrStoreMail(self, app, mailContents, useCollection=False):
-        sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + repr(app) + " ...")
+        sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + app.fullName + " ...")
         sys.stdout.flush()
         if useCollection:
             self.storeMail(app, mailContents)
@@ -269,7 +274,7 @@ class MailSender:
         return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
     def getMailHeader(self, app, batchDataList):
         versions = self.findCommonVersions(app, batchDataList)
-        return repr(app) + self.getVersionString(versions) + " : "
+        return app.fullName + self.getVersionString(versions) + " : "
     def getCategoryNames(self, batchDataList):
         names = []
         for resp in batchDataList:

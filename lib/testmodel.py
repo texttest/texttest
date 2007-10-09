@@ -7,6 +7,7 @@ from ndict import seqdict
 from copy import copy
 from cPickle import Pickler, Unpickler, UnpicklingError
 from respond import Responder
+from threading import Lock
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -291,7 +292,6 @@ class Test(plugins.Observable):
         self.app = app
         self.parent = parent
         self.dircache = dircache
-        self.paddedName = self.name
         populateFunction = Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(self.getParentEnvironment(), populateFunction)
         # Java equivalent of the environment mechanism...
@@ -299,6 +299,15 @@ class Test(plugins.Observable):
         self.diag = plugins.getDiagnostics("test objects")
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started", freeText=self.getDescription())
+    def __repr__(self):
+        return repr(self.app) + " " + self.classId() + " " + self.name
+    def paddedRepr(self):
+        return repr(self.app) + " " + self.classId() + " " + self.paddedName()
+    def paddedName(self):
+        if not self.parent:
+            return self.name
+        maxLength = max(len(test.name) for test in self.parent.testcases)
+        return self.name.ljust(maxLength)
     def getParentEnvironment(self):
         if self.parent:
             return self.parent.environment
@@ -544,8 +553,6 @@ class TestCase(Test):
         Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
         self.writeDirectory = os.path.join(app.writeDirectory, app.name + app.versionSuffix(), self.getRelPath())       
-    def __repr__(self):
-        return repr(self.app) + " " + self.classId() + " " + self.paddedName
     def classId(self):
         return "test-case"
     def testCaseList(self):
@@ -686,11 +693,7 @@ class TestSuite(Test):
     def readContents(self, filters, forTestRuns=True):
         testNames = self.readTestNames(forTestRuns)
         self.createTestCases(filters, testNames, forTestRuns)
-        if len(self.testcases):
-            maxNameLength = max([len(test.name) for test in self.testcases])
-            for test in self.testcases:
-                test.paddedName = string.ljust(test.name, maxNameLength)
-        elif forTestRuns or len(testNames) > 0:
+        if len(self.testcases) == 0 and (forTestRuns or len(testNames) > 0):
             # If we want to run tests, there is no point in empty test suites. For other purposes they might be useful...
             # If the contents are filtered away we shouldn't include the suite either though.
             return False
@@ -721,8 +724,6 @@ class TestSuite(Test):
                              "Please check the file at " + fileName)
     def fileExists(self, name):
         return self.dircache.exists(name)
-    def __repr__(self):
-        return repr(self.app) + " " + self.classId() + " " + self.name
     def testCaseList(self):
         list = []
         for case in self.testcases:
@@ -804,26 +805,37 @@ class TestSuite(Test):
                 orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
         return orderedTestNames
     def createTestCases(self, filters, testNames, forTestRuns):
+        if self.autoSortOrder:
+            self.createAndSortTestCases(filters, testNames, forTestRuns)
+        else:
+            for testName, desc in testNames.items():
+                dirCache = self.createTestCache(testName)
+                self.createTestOrSuite(testName, desc, dirCache, filters, forTestRuns)
+
+    def createAndSortTestCases(self, filters, testNames, forTestRuns):
         orderedTestNames = testNames.keys()
         testCaches = {}
         for testName in orderedTestNames:
             testCaches[testName] = self.createTestCache(testName)
-        if self.autoSortOrder:
-            testCaseNames = filter(lambda l: len(testCaches[l].findAllFiles("testsuite", compulsory = [ self.app.name ])) == 0, orderedTestNames)
-            if self.autoSortOrder == 1:
-                orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
-            else:
-                orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
+
+        testCaseNames = filter(lambda l: len(testCaches[l].findAllFiles("testsuite", compulsory = [ self.app.name ])) == 0, orderedTestNames)
+        if self.autoSortOrder == 1:
+            orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
+        else:
+            orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
 
         for testName in orderedTestNames:
             dirCache = testCaches[testName]
-            className = self.getSubtestClass(dirCache)
-            subTest = self.createSubtest(testName, testNames[testName], dirCache, className)
-            if subTest.isAcceptedByAll(filters) and \
-                   (className is TestCase or subTest.readContents(filters, forTestRuns)):
-                self.testcases.append(subTest)
-                subTest.notify("Add", initial=True)
+            self.createTestOrSuite(testName, testNames[testName], dirCache, filters, forTestRuns)
 
+    def createTestOrSuite(self, testName, description, dirCache, filters, forTestRuns):
+        className = self.getSubtestClass(dirCache)
+        subTest = self.createSubtest(testName, description, dirCache, className)
+        if subTest.isAcceptedByAll(filters) and \
+               (className is TestCase or subTest.readContents(filters, forTestRuns)):
+            self.testcases.append(subTest)
+            subTest.notify("Add", initial=True)
+                
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))
     def getSubtestClass(self, cache):
@@ -1056,7 +1068,7 @@ class Application:
         self.setupEnvironmentDirCache()
         interactiveActionHandler.setCommandOptionGroups(self.optionGroups)
     def __repr__(self):
-        return self.fullName
+        return self.fullName + self.versionSuffix()
     def __hash__(self):
         return id(self)
     def setupEnvironmentDirCache(self):
@@ -1311,6 +1323,9 @@ class Application:
         if includeCheckout and self.checkout:
             description += ", checkout " + self.checkout
         return description
+    def rejectionMessage(self, message):
+        return "Rejected " + self.description() + " - " + str(message) + "\n"
+
     def filterUnsaveable(self, versions):
         saveableVersions = []
         unsaveableVersions = self.getConfigValue("unsaveable_version")
@@ -1574,12 +1589,18 @@ class ApplicationEventResponder(Responder):
         category = test.uniqueName
         timeDelay = self.getTimeDelay()
         self.scriptEngine.applicationEvent(eventName, category, timeDelay)
-
+    def notifyAdd(self, test, initial):
+        if initial and test.classId() == "test-case":
+            eventName = "test " + test.uniqueName + " to be read"
+            self.scriptEngine.applicationEvent(eventName, test.uniqueName)
+    
     def getTimeDelay(self):
         try:
             return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
         except ValueError:
             return 1
+    def notifyAllRead(self, *args):
+        self.scriptEngine.applicationEvent("all tests to be read")
     def notifyAllComplete(self):
         self.scriptEngine.applicationEvent("completion of test actions")
     def notifyCloseDynamic(self, test, name):
@@ -1595,13 +1616,26 @@ class AllCompleteResponder(Responder,plugins.Observable):
         Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.unfinishedTests = 0
-    def addSuites(self, suites):
-        self.unfinishedTests = sum([ suite.size() for suite in suites ])
-    def notifyComplete(self, test):
-        if self.unfinishedTests > 1:
-            self.unfinishedTests -= 1
-        else:
+        self.lock = Lock()
+        self.checkInCompletion = False
+        self.hadCompletion = False
+        self.diag = plugins.getDiagnostics("test objects")
+    def notifyAdd(self, test, initial):
+        if test.classId() == "test-case":
+            self.unfinishedTests += 1
+    def notifyAllRead(self, *args):
+        self.lock.acquire()
+        if self.unfinishedTests == 0 and self.hadCompletion:
             self.notify("AllComplete")
-    def notifyExtraTest(self, *args):
-        self.unfinishedTests += 1
-            
+        else:
+            self.checkInCompletion = True
+        self.lock.release()
+    def notifyComplete(self, test):
+        self.diag.info("Complete " + str(self.unfinishedTests))
+        self.lock.acquire()
+        self.unfinishedTests -= 1
+        if self.checkInCompletion and self.unfinishedTests == 0:
+            self.notify("AllComplete")
+        self.hadCompletion = True
+        self.lock.release()
+        

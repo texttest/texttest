@@ -2,11 +2,11 @@
 
 import plugins, os, sys, testmodel, signal
 from threading import Thread
-from usecase import ScriptEngine
 from ndict import seqdict
 from time import sleep
 from respond import Responder
 from sets import Set
+from glob import glob
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder(Responder):
@@ -14,7 +14,7 @@ class UniqueNameFinder(Responder):
         Responder.__init__(self, optionMap)
         self.name2test = {}
         self.diag = plugins.getDiagnostics("Unique Names")
-    def notifyAdd(self, test, initial):
+    def notifyAdd(self, test, initial=True):
         if self.name2test.has_key(test.name):
             oldTest = self.name2test[test.name]
             self.storeUnique(oldTest, test)
@@ -56,7 +56,57 @@ class UniqueNameFinder(Responder):
         self.name2test[name] = test
         test.setUniqueName(name)
 
-class TextTest(plugins.Observable):
+class Activator(Responder, plugins.Observable):
+    def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
+        plugins.Observable.__init__(self)
+        self.allowEmpty = optionMap.has_key("gx") or optionMap.runScript()
+        self.suites = []
+        self.diag = plugins.getDiagnostics("Activator")
+    def addSuites(self, suites):
+        self.suites = suites
+    def needsTestRuns(self):
+        for responder in self.observers:
+            if not responder.needsTestRuns():
+                return False
+        return True
+    
+    def run(self):
+        goodSuites = []
+        rejectedApps = Set()
+        forTestRuns = self.needsTestRuns()
+        for suite in self.suites:
+            filters = suite.app.getFilterList()
+            self.diag.info("Creating test suite with filters " + repr(filters))
+        
+            suite.readContents(filters, forTestRuns)
+            self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
+            if suite.size() > 0 or self.allowEmpty:
+                goodSuites.append(suite)
+                suite.notify("Add", initial=True)
+            else:
+                rejectedApps.add(suite.app)
+
+        self.notify("AllRead", goodSuites)
+            
+        if len(rejectedApps) > 0:
+            self.writeErrors(rejectedApps)
+        return goodSuites
+    
+    def writeErrors(self, rejectedApps):
+        # Don't write errors if only some of a group are rejected
+        extras = []
+        for suite in self.suites:
+            app = suite.app
+            if app in extras:
+                continue
+            extras += app.extras
+            appGroup = Set([ app ] + app.extras)
+            if appGroup.issubset(rejectedApps):
+                sys.stderr.write(app.rejectionMessage("no tests matching the selection criteria found."))
+
+
+class TextTest(Responder, plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
         self.setSignalHandlers(self.handleSignalWhileStarting)
@@ -137,11 +187,6 @@ class TextTest(plugins.Observable):
             if extraApp:
                 app.extras.append(extraApp)
         return app
-    def needsTestRuns(self):
-        for responder in self.observers:
-            if not responder.needsTestRuns():
-                return False
-        return True
     def createResponders(self, allApps):
         responderClasses = []
         for app in allApps:
@@ -155,7 +200,7 @@ class TextTest(plugins.Observable):
         self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
         self.observers = map(lambda x : x(self.inputOptions), filteredClasses)
     def getBuiltinResponderClasses(self):
-        return [ UniqueNameFinder, testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
+        return [ UniqueNameFinder, Activator, testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
     def removeBaseClasses(self, classes):
         # Different apps can produce different versions of the same responder/thread runner
         # We should make sure we only include the most specific ones
@@ -167,6 +212,7 @@ class TextTest(plugins.Observable):
                 elif issubclass(class2, class1):
                     toRemove.append(class1)
         return filter(lambda x: x not in toRemove, classes)
+
     def createTestSuites(self, allApps):
         appSuites = seqdict()
         for app in allApps:
@@ -177,7 +223,7 @@ class TextTest(plugins.Observable):
                     testSuite = partApp.createInitialTestSuite(self.observers)
                     appSuites[partApp] = testSuite
                 except plugins.TextTestError, e:
-                    errorMessages.append(self.rejectionMessage(partApp, str(e)))
+                    errorMessages.append(partApp.rejectionMessage(str(e)))
                 except KeyboardInterrupt:
                     raise
                 except:  
@@ -190,8 +236,6 @@ class TextTest(plugins.Observable):
             else:
                 sys.stdout.write(fullMsg)
         return appSuites
-    def rejectionMessage(self, app, message):
-        return "Rejected " + app.description() + " - " + str(message) + "\n"
 
     def deleteTempFiles(self):
         for app, testSuite in self.appSuites.items():
@@ -224,83 +268,81 @@ class TextTest(plugins.Observable):
             # do anything about them) and no way to get partial errors.
             sys.stderr.write(str(e) + "\n")
             return
-        emptySuites = self.createTestSuites(allApps)
-        self.appSuites = self.readContents(emptySuites)
-        if len(self.appSuites) == 0:
-            return
-        self.addSuites()
-        self.runThreads()
-    def readContents(self, appSuites):
-        goodSuites = seqdict()
-        rejectedApps = Set()
-        forTestRuns = self.needsTestRuns()
-        for app, suite in appSuites.items():
-            filters = app.getFilterList()
-            self.diag.info("Creating test suite with filters " + repr(filters))
-        
-            suite.readContents(filters, forTestRuns)
-            self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
-            if suite.size() > 0 or app.allowEmpty():
-                suite.notify("Add", initial=True)
-                goodSuites[app] = suite
-            else:
-                rejectedApps.add(suite.app)
+        self.appSuites = self.createTestSuites(allApps)
+        if len(self.appSuites) > 0:
+            self.addSuites(self.appSuites.values())
+            self.runThreads()
 
-        if len(rejectedApps) > 0:
-            self.writeErrors(appSuites, rejectedApps)
-        return goodSuites
-    
-    def writeErrors(self, appSuites, rejectedApps):
-        # Don't write errors if only some of a group are rejected
-        extras = []
-        for suite in appSuites.values():
-            app = suite.app
-            if app in extras:
-                continue
-            extras += app.extras
-            appGroup = Set([ app ] + app.extras)
-            if appGroup.issubset(rejectedApps):
-                sys.stderr.write(self.rejectionMessage(app, "no tests matching the selection criteria found."))
-
-    def addSuites(self):
+    def addSuites(self, emptySuites):
         for object in self.observers:
             # For all observable responders, set them to be observed by the others if they
             # haven't fixed their own observers
             if isinstance(object, plugins.Observable) and len(object.observers) == 0:
                 self.diag.info("All responders now observing " + str(object.__class__))
-                object.setObservers(self.observers)
-            suites = self.getSuitesToAdd(object)
+                object.setObservers(self.observers + [ self ])
+            suites = self.getSuitesToAdd(object, emptySuites)
             self.diag.info("Adding suites " + repr(suites) + " for " + str(object.__class__))
             object.addSuites(suites)
-    def getSuitesToAdd(self, observer):
+    def getSuitesToAdd(self, observer, emptySuites):
         for responderClass in self.getBuiltinResponderClasses():
             if isinstance(observer, responderClass):
-                return self.appSuites.values()
+                return emptySuites
+
         suites = []
-        for app, testSuite in self.appSuites.items():
-            for responderClass in app.getResponderClasses():
+        for testSuite in emptySuites:
+            for responderClass in testSuite.app.getResponderClasses():
                 if isinstance(observer, responderClass):
                     suites.append(testSuite)
                     break
         return suites
+    def getRootSuite(self, appName, versions):
+        for app, testSuite in self.appSuites.items():
+            if app.name == appName and app.versions == versions:
+                return testSuite
+
+        newApp = testmodel.Application(appName, self.makeDirectoryCache(appName), versions, self.inputOptions)
+        emptySuite = newApp.createInitialTestSuite(self.observers)
+        self.appSuites[newApp] = emptySuite
+        self.addSuites([ emptySuite ])
+        return emptySuite
+    
+    def makeDirectoryCache(self, appName):
+        configFile = "config." + appName
+        rootDir = self.inputOptions.directoryName
+        rootConfig = os.path.join(rootDir, configFile)
+        if os.path.isfile(rootConfig):
+            return testmodel.DirectoryCache(rootDir)
+        else:
+            allFiles = glob(os.path.join(rootDir, "*", configFile))
+            return testmodel.DirectoryCache(os.path.dirname(allFiles[0]))
+            
+    def notifyExtraTest(self, testPath, appName, versions):
+        rootSuite = self.getRootSuite(appName, versions)
+        rootSuite.addTestCaseWithPath(testPath)
+            
     def findThreadRunners(self):
-        return filter(lambda x: hasattr(x, "run"), self.observers)
+        allRunners = filter(lambda x: hasattr(x, "run"), self.observers)
+        if len(allRunners) == 0:
+            return None, []
+        mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[0]
+        allRunners.remove(mainThreadRunner)
+        return mainThreadRunner, allRunners
     def runThreads(self):
         # Set the signal handlers to use when running
         self.setSignalHandlers(self.handleSignalWhileRunning)
         # Run the first one as the main thread and the rest in subthreads
         # Make sure all of them are finished before we stop
-        threadRunners = self.findThreadRunners()
+        mainThreadRunner, subThreadRunners = self.findThreadRunners()
         allThreads = []
-        for subThreadRunner in threadRunners[1:]:
+        for subThreadRunner in subThreadRunners:
             thread = Thread(target=subThreadRunner.run)
             allThreads.append(thread)
             self.diag.info("Running " + str(subThreadRunner.__class__) + " in a subthread")
             thread.start()
             
-        if len(threadRunners) > 0:
-            self.diag.info("Running " + str(threadRunners[0].__class__) + " in main thread")
-            threadRunners[0].run()
+        if mainThreadRunner:
+            self.diag.info("Running " + str(mainThreadRunner.__class__) + " in main thread")
+            mainThreadRunner.run()
             
         self.waitForThreads(allThreads)
     def waitForThreads(self, allThreads):
@@ -339,13 +381,8 @@ class TextTest(plugins.Observable):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
         signalText = self.getSignalText(sig)
-        self.writeTermMessage(signalText)    
-        self.killAllTests(signalText)
-    def killAllTests(self, signalText):
-        # Kill all the tests and wait for the action runner to finish
-        for app, suite in reversed(self.appSuites.items()):
-            for test in suite.getRunningTests():
-                app.killTest(test, signalText)
+        self.writeTermMessage(signalText)
+        self.notify("Exit", sig)
     def writeTermMessage(self, signalText):
         message = "Terminating testing due to external interruption"
         if signalText:

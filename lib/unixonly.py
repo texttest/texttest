@@ -96,7 +96,7 @@ class VirtualDisplayResponder(Responder):
     
     def notifyAllComplete(self):
         self.cleanXvfb()
-    def notifyExit(self):
+    def notifyExit(self, *args):
         self.cleanXvfb()
     def cleanXvfb(self):
         if self.serverInfo:

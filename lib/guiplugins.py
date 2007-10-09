@@ -90,7 +90,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         return running
     def getRunningProcesses(self):
         return filter(lambda (process, desc): process.poll() is None, self.processes)
-    def notifyExit(self):
+    def notifyExit(self, sig=None):
         # Don't leak processes
         runningProcesses = self.getRunningProcesses()
         if len(runningProcesses) == 0:
@@ -99,7 +99,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         for process, description in runningProcesses:
             self.notify("ActionProgress", "")
             guilog.info("Killing '" + description + "' interactive process")
-            JobProcess(process.pid).killAll()
+            JobProcess(process.pid).killAll(sig)
 
 processTerminationMonitor = ProcessTerminationMonitor()
        
@@ -296,7 +296,7 @@ class Quit(InteractiveAction):
     def notifyNewTestSelection(self, tests, direct):
         pass # we don't care and don't want to screw things up...
     def performOnCurrent(self):
-        self.notify("Exit")
+        self.notify("Quit")
     def getConfirmationMessage(self):
         processesToReport = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         runningProcesses = processTerminationMonitor.listRunning(processesToReport)
@@ -722,21 +722,15 @@ class KillTests(SelectionAction):
     def performOnCurrent(self):
         tests = filter(lambda test: not test.state.isComplete(), self.currTestSelection)
         tests.reverse() # best to cut across the action thread rather than follow it and disturb it excessively
-        self.killTests(tests)
-    def killTests(self, tests):
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Killing " + testDesc + " ...")
         for test in tests:
             self.notify("ActionProgress", "")
             self.describe(test)
-            test.app.killTest(test)
+            test.notify("Kill")
 
         self.notify("Status", "Killed " + testDesc + ".")
-    def notifyExit(self):
-        tests = reduce(operator.add, [ suite.getRunningTests() for suite in reversed(self.rootTestSuites) ])
-        if len(tests) > 0:
-            self.killTests(tests)
-
+    
 class CopyTests(SelectionAction):
     def getStockId(self):
         return "copy"

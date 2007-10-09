@@ -32,7 +32,7 @@ class SetUpTrafficHandlers(plugins.Action):
                 self.setServerState(None, None, test)
                 return False
     def setServerState(self, recordFile, replayFile, test):
-        if recordFile or replayFile and not TrafficServer.instance:
+        if (recordFile or replayFile) and not TrafficServer.instance:
             TrafficServer.instance = TrafficServer()
         if TrafficServer.instance:
             TrafficServer.instance.setState(recordFile, replayFile, test)
@@ -231,9 +231,11 @@ class CommandLineTraffic(Traffic):
 class TrafficRequestHandler(StreamRequestHandler):
     parseDict = { "SUT_SERVER" : ServerStateTraffic, "SUT_COMMAND_LINE" : CommandLineTraffic }
     def handle(self):
+        self.server.diag.info("Received incoming request...")
         text = self.rfile.read()
         traffic = self.parseTraffic(text)
         self.server.process(traffic)
+        self.server.diag.info("Finished processing incoming request")
     def parseTraffic(self, text):
         for key in self.parseDict.keys():
             prefix = key + ":"
@@ -250,15 +252,16 @@ class TrafficServer(TCPServer):
         self.diag = plugins.getDiagnostics("Traffic Server")
         TrafficServer.instance = self
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
-        self.setAddressVariable()
         self.thread = Thread(target=self.serve_forever)
         self.thread.setDaemon(1)
+        self.diag.info("Starting traffic server thread")
         self.thread.start()
-    def setAddressVariable(self):
+    def setAddressVariable(self, test):
         host, port = self.socket.getsockname()
         address = host + ":" + str(port)
-        os.environ["TEXTTEST_MIM_SERVER"] = address
-        self.diag.info("Starting traffic server on " + address)
+        test.setEnvironment("TEXTTEST_MIM_SERVER", address)
+        self.diag.info("Setting traffic server address to '" + address + "'")
+        
     def setRealVersion(self, command, realCommand):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
@@ -266,14 +269,13 @@ class TrafficServer(TCPServer):
         self.recordFile = recordFile
         self.replayInfo = ReplayInfo(replayFile)
         if recordFile or replayFile:
-            self.setAddressVariable()
-        else:
-            os.environ["TEXTTEST_MIM_SERVER"] = ""
+            self.setAddressVariable(test)
         CommandLineTraffic.currentTest = test
         ClientSocketTraffic.destination = None
         # Assume testing client until a server contacts us
         ClientSocketTraffic.direction = "<-"
         ServerTraffic.direction = "->"
+        
     def process(self, traffic):
         self.diag.info("Processing traffic " + repr(traffic.__class__))
         self.record(traffic)

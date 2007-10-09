@@ -105,14 +105,12 @@ class MachineInfo:
         return jobs
 
 # Interpret what the limit signals mean...
-def getLimitInterpretation(origLimitText):
-    if origLimitText == "RUNLIMIT1":
-        return "KILLED"
-    elif origLimitText == "RUNLIMIT2":
-        return "RUNLIMIT"
+def getUserSignalKillInfo(userSignalNumber, explicitKillMethod):
+    if userSignalNumber == "2":
+        return "RUNLIMIT", "exceeded maximum wallclock time allowed by LSF (RUNLIMIT parameter)"
     else:
-        return origLimitText
-    
+        return explicitKillMethod()
+        
 # Need to get all hosts for parallel
 def getExecutionMachines():
     if os.environ.has_key("LSB_HOSTS"):

@@ -1259,7 +1259,9 @@ class RunTest(plugins.Action):
         test.changeState(Killed(briefText, freeText, test.state))
 
     def getKillInfo(self, test):
-        if self.killSignal == signal.SIGUSR1:
+        if self.killSignal is None:
+            return self.getExplicitKillInfo()
+        elif self.killSignal == signal.SIGUSR1:
             return self.getUserSignalKillInfo(test, "1")
         elif self.killSignal == signal.SIGUSR2:
             return self.getUserSignalKillInfo(test, "2")
@@ -1267,11 +1269,9 @@ class RunTest(plugins.Action):
             return "CPULIMIT", "exceeded maximum cpu time allowed"
         elif self.killSignal == signal.SIGINT:
             return "INTERRUPT", "terminated via a keyboard interrupt (Ctrl-C)"
-        elif self.killSignal is not None:
+        else:
             briefText = "signal " + str(self.killSignal)
             return briefText, "terminated by " + briefText
-        else:
-            return self.getExplicitKillInfo()
     def getExplicitKillInfo(self):
         timeStr = plugins.localtime("%H:%M")
         return "KILLED", "killed explicitly at " + timeStr

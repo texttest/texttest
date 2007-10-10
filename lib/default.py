@@ -7,6 +7,7 @@ from jobprocess import JobProcess
 from socket import gethostname
 from ndict import seqdict
 from actionrunner import ActionRunner
+from time import sleep
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -1246,11 +1247,22 @@ class RunTest(plugins.Action):
         self.lock.release()
 
     def checkAndClear(self, test):        
+        returncode = self.currentProcess.returncode
+        self.diag.info("Process terminated with return code " + repr(returncode))
+        if os.name == "posix" and test not in self.killedTests and returncode < 0:
+            # Process externally killed, but we haven't been notified. Wait for a while to see if we get kill notification
+            self.waitForKill()
+            
         self.lock.acquire()
         self.currentProcess = None
         if test in self.killedTests:
             self.changeToKilledState(test)
         self.lock.release()
+    def waitForKill(self):
+        for i in range(10):
+            sleep(0.2)
+            if self.killSignal is not None:
+                return
 
     def changeToKilledState(self, test):
         self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)

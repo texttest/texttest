@@ -410,7 +410,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
             self.testQueue.put(None)
             
     def isRuleBuild(self, test):
-        return test.state.category == "running_rulecompile"
+        return test.state.category.endswith("_rulecompile")
     def jobStarted(self, test):
         return self.isRuleBuild(test) or test.state.hasStarted()
     def shouldWaitFor(self, test):

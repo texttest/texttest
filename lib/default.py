@@ -747,7 +747,7 @@ class TestEnvironmentCreator:
             self.test.properties.addEntry("jusecase", {}, insert=1)
         usecaseFile = self.test.getFileName("usecase")
         replayUseCase = self.findReplayUseCase(usecaseFile)
-        if replayUseCase:
+        if replayUseCase is not None:
             self.setReplay(replayUseCase)
         if usecaseFile or self.isRecording():
             # Re-record if recorded files are already present or recording explicitly requested
@@ -765,7 +765,11 @@ class TestEnvironmentCreator:
                 # Don't replay when recording - let the user do it...
                 return None
         else:
-            return usecaseFile
+            if usecaseFile:
+                return usecaseFile
+            elif os.environ.has_key("USECASE_REPLAY_SCRIPT") and not self.useJavaRecorder():
+                return "" # Clear our own script, if any, for further apps wanting to use PyUseCase
+            
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
     def addJusecaseProperty(self, name, value):

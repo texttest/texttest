@@ -19,6 +19,7 @@ class BaseActionRunner(Responder, plugins.Observable):
         self.optionMap = optionMap
         self.testQueue = Queue()
         self.exited = False
+        self.allComplete = False
         self.lock = Lock()
         self.killSignal = None
         self.diag = plugins.getDiagnostics(diagName)
@@ -37,7 +38,7 @@ class BaseActionRunner(Responder, plugins.Observable):
         self.cleanup()
         self.diag.info("Terminating")
     def notifyAllComplete(self):
-        self.exited = True
+        self.allComplete = True
     
     def notifyKill(self, test):
         self.lock.acquire()
@@ -46,7 +47,7 @@ class BaseActionRunner(Responder, plugins.Observable):
         
     def notifyExit(self, sig=None):
         self.diag.info("Got exit!")
-        if self.exited:
+        if self.allComplete:
             return
         self.lockDiag.info("Trying to get lock for killing")
         self.lock.acquire()

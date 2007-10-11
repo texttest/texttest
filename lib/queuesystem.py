@@ -617,18 +617,16 @@ class QueueSystemServer(BaseActionRunner):
     
     def getJobInfo(self, test):
         return self.jobs.get(test, (None, None))
-    def killJob(self, test):
-        if not self.jobs.has_key(test):
-            return False
-
-        queueSystem = self.getQueueSystem(test)
-        jobId, jobName = self.jobs[test]
-        if self.killedJobs.has_key(jobId):
-            return self.killedJobs[jobId]
+    def killJob(self, test, jobId, jobName):
+        prevTest, prevJobExisted = self.killedJobs.get(jobId, (None, False))
+        # Killing the same job for other tests should result in the cached result being returned
+        if prevTest and test is not prevTest:
+            return prevJobExisted
 
         self.describeJob(test, jobId, jobName)
+        queueSystem = self.getQueueSystem(test)
         jobExisted = queueSystem.killJob(jobId)
-        self.killedJobs[jobId] = jobExisted
+        self.killedJobs[jobId] = test, jobExisted
         return jobExisted
     def getQueueSystem(self, test):
         queueModule = queueSystemName(test).lower()
@@ -683,9 +681,9 @@ class QueueSystemServer(BaseActionRunner):
             return self.cancel(test)
         
     def killTest(self, test, jobId, jobName, wantStatus):
-        jobExisted = self.killJob(test)
+        jobExisted = self.killJob(test, jobId, jobName)
         startNotified = self.jobStarted(test)
-        if jobExisted or not wantStatus:
+        if jobExisted:
             if startNotified:
                 return self.shouldWaitFor(test)
             else:
@@ -695,9 +693,9 @@ class QueueSystemServer(BaseActionRunner):
             # might get here when the test completed since we checked...
             if not test.state.isComplete():
                 if startNotified:
-                    self.setSlaveLost(test)
+                    self.setSlaveLost(test, wantStatus)
                 else:
-                    self.setSlaveFailed(test)
+                    self.setSlaveFailed(test, wantStatus)
         return False
     def shouldWaitFor(self, test):
         return True
@@ -709,26 +707,31 @@ class QueueSystemServer(BaseActionRunner):
         freeText = "Test job was cancelled (while still pending in " + queueSystemName(test.app) +\
                    ") at " + timeStr
         self.cancel(test, briefText, freeText)
-    def setSlaveLost(self, test):
+    def setSlaveLost(self, test, wantStatus):
         failReason = "no report, possibly killed with SIGKILL"
-        fullText = failReason + "\n" + self.getJobFailureInfo(test)
+        fullText = failReason + "\n" + self.getJobFailureInfo(test, wantStatus)
         self.changeState(test, plugins.TestState("killed", briefText=failReason, \
                                                  freeText=fullText, completed=1, lifecycleChange="complete"))
-    def getJobFailureInfo(self, test):
-        name = queueSystemName(test.app)
-        return "Full accounting info from " + name + " follows:\n" + \
-               self._getJobFailureInfo(test)
-    def setSlaveFailed(self, test):
-        failReason, fullText = self.getSlaveFailure(test)
+    def getJobFailureInfo(self, test, wantStatus):
+        if wantStatus:
+            name = queueSystemName(test.app)
+            return "Full accounting info from " + name + " follows:\n" + \
+                   self._getJobFailureInfo(test)
+        else:
+            # Job accounting info can take ages to find, don't do it from GUI quit
+            return "No accounting info found as quitting..."
+        
+    def setSlaveFailed(self, test, wantStatus):
+        failReason, fullText = self.getSlaveFailure(test, wantStatus)
         fullText = failReason + "\n" + fullText
         self.changeState(test, plugins.Unrunnable(briefText=failReason, freeText=fullText, lifecycleChange="complete"))
-    def getSlaveFailure(self, test):
+    def getSlaveFailure(self, test, wantStatus):
         slaveErrors = self.getSlaveErrors(test)
         if slaveErrors:
             return "Slave exited", slaveErrors
         else:
             name = queueSystemName(test.app)
-            return name + "/system error", self.getJobFailureInfo(test)
+            return name + "/system error", self.getJobFailureInfo(test, wantStatus)
     def getPostText(self, test, jobId):
         name = queueSystemName(test.app)
         return "in " + name + " (job " + jobId + ")"

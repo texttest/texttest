@@ -107,11 +107,10 @@ class QueueSystemConfig(default.Config):
             return default.Config.getWriteDirectoryName(self, app)
     def useExtraVersions(self, app):
         return default.Config.useExtraVersions(self, app) and not self.slaveRun()
-    def getCleanMode(self):
-        if self.slaveRun():
-            return plugins.CleanMode()
-        else:
-            return default.Config.getCleanMode(self)
+    def cleanWriteDirectory(self, app):
+        if not self.slaveRun():
+            default.Config.cleanWriteDirectory(self, app)
+        # Slaves leave their files for the master process to clean
     def getTextResponder(self):
         if self.useQueueSystem():
             return MasterInteractiveResponder

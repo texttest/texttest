@@ -301,11 +301,6 @@ def parseBytes(text):
 def convertForMarkup(message):
     return message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-class CleanMode:
-    def __init__(self, cleanSelf=False, cleanPrevious=False):
-        self.cleanSelf = cleanSelf
-        self.cleanPrevious = cleanPrevious
-
 # Filter interface: all must provide these three methods
 class Filter:
     def acceptsTestCase(self, test):

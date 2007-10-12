@@ -624,7 +624,7 @@ class TopWindowGUI(ContainerGUI):
         self.notify("Exit")
     def removeWriteDirsAndWindow(self):
         for app in self.allApps:
-            app.removeWriteDirectory()
+            app.cleanWriteDirectory()
         self.topWindow.destroy()
     def notifyError(self, message):
         showErrorDialog(message, self.topWindow)

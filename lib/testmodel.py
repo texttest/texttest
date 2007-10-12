@@ -1047,7 +1047,6 @@ class Application:
         self.fullName = self.getConfigValue("full_name")
         self.diag.info("Found application " + repr(self))
         self.configObject = self.makeConfigObject()
-        self.cleanMode = self.configObject.getCleanMode()
         self.rootTmpDir = self._getRootTmpDir()
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
@@ -1395,12 +1394,9 @@ class Application:
             dirToMake = os.path.join(self.writeDirectory, subdir)
         plugins.ensureDirectoryExists(dirToMake)
         self.diag.info("Made root directory at " + dirToMake)
-    def removeWriteDirectory(self):
-        if self.cleanMode.cleanSelf and os.path.isdir(self.writeDirectory):
-            self.diag.info("Removing write directory at " + self.writeDirectory)
-            plugins.rmtree(self.writeDirectory)
     def tryCleanPreviousWriteDirs(self, rootDir):
-        if not self.cleanMode.cleanPrevious or not os.path.isdir(rootDir):
+        # If we keep our own temporary directories, wipe previously existing other ones
+        if not self.configObject.keepTemporaryDirectories() or not os.path.isdir(rootDir):
             return
         searchParts = os.path.basename(self.writeDirectory).split(".")[:-1]
         for file in os.listdir(rootDir):

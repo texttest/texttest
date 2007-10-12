@@ -320,11 +320,9 @@ class Config:
         return self.optionMap.has_key("b")
     def keepTemporaryDirectories(self):
         return self.optionMap.has_key("keeptmp") or (self.batchMode() and not self.isReconnecting())
-    def getCleanMode(self):
-        if self.keepTemporaryDirectories():
-            return plugins.CleanMode(cleanPrevious=True)
-        
-        return plugins.CleanMode(cleanSelf=True)
+    def cleanWriteDirectory(self, app):
+        if not self.keepTemporaryDirectories() and os.path.isdir(app.writeDirectory):
+            plugins.rmtree(app.writeDirectory)
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):

@@ -198,25 +198,25 @@ Run
 > make install
 > cd $SOURCE_DIR
 
-librsvg-2.12.7
+librsvg-2.16.1
 --------------
 
 Run
 
-> tar jxvf librsvg-2.12.7.tar.bz2
-> cd librsvg-2.12.7
+> tar jxvf librsvg-2.16.1.tar.bz2
+> cd librsvg-2.16.1
 > ./configure --prefix=$INSTALLATION_DIR
 > make
 > make install
 > cd $SOURCE_DIR
 
-pygtk-2.6.3
------------
+pygtk-2.10.6
+------------
 
 Run
 
-> tar jxvf pygtk-2.6.3.tar.bz2
-> cd pygtk-2.6.3
+> tar jxvf pygtk-2.10.6.tar.bz2
+> cd pygtk-2.10.6
 > ./configure --prefix=$INSTALLATION_DIR
 > make
 > make install

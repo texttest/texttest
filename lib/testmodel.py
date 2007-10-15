@@ -443,6 +443,8 @@ class Test(plugins.Observable):
         return appToUse._getAllFileNames([ self.dircache ], stem)
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars, self.getEnvironment)
+    def getDataFileNames(self):
+        return self.app.getDataFileNames(self.getEnvironment)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
         return self.app.getCompositeConfigValue(key, subKey, expandVars, self.getEnvironment)
     def makePathName(self, fileName):
@@ -1160,9 +1162,10 @@ class Application:
             return oneLevelUp
         else:            
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
-    def getDataFileNames(self):
-        return self.getConfigValue("link_test_path") + self.getConfigValue("copy_test_path") + \
-               self.getConfigValue("partial_copy_test_path")
+    def getDataFileNames(self, getenvFunc=os.getenv):
+        return self.getConfigValue("link_test_path", getenvFunc=getenvFunc) + \
+               self.getConfigValue("copy_test_path", getenvFunc=getenvFunc) + \
+               self.getConfigValue("partial_copy_test_path", getenvFunc=getenvFunc)
     def getFileName(self, dirList, stem, versionListMethod=None):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem, versionListMethod=versionListMethod)

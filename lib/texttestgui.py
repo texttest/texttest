@@ -542,12 +542,10 @@ class TopWindowGUI(ContainerGUI):
         ContainerGUI.__init__(self, [ contentGUI ])
         self.dynamic = dynamic
         self.topWindow = None
-        self.allApps = []
+        self.allSuites = []
         self.windowSizeDescriptor = ""
     def addSuites(self, suites):
-        for suite in suites:
-            if not suite.app in self.allApps:
-                self.allApps.append(suite.app)
+        self.allSuites = suites
         if len(suites) > 0:
             newObservers = filter(self.shouldAddExitObserver, suites[0].observers)
             self.observers = newObservers + self.observers
@@ -564,16 +562,17 @@ class TopWindowGUI(ContainerGUI):
     def allUniqueApps(self):
         allNames = []
         uniqueApps = []
-        for app in self.allApps:
-            if not app.fullName in allNames:
-                allNames.append(app.fullName)
-                uniqueApps.append(app)
+        for suite in self.allSuites:
+            if not suite.app.fullName in allNames:
+                allNames.append(suite.app.fullName)
+                uniqueApps.append(suite.app)
         return uniqueApps
     def getCheckoutTitle(self):
         allCheckouts = []
-        for app in self.allApps:
-            if app.checkout and not app.checkout in allCheckouts:
-                allCheckouts.append(app.checkout)
+        for suite in self.allSuites:
+            checkout = suite.app.checkout
+            if checkout and not checkout in allCheckouts:
+                allCheckouts.append(checkout)
         if len(allCheckouts) == 0:
             return ""
         elif len(allCheckouts) == 1:
@@ -623,8 +622,8 @@ class TopWindowGUI(ContainerGUI):
     def notifyQuit(self, *args):
         self.notify("Exit")
     def removeWriteDirsAndWindow(self):
-        for app in self.allApps:
-            app.cleanWriteDirectory()
+        for suite in self.allSuites:
+            suite.app.cleanWriteDirectory(suite)
         self.topWindow.destroy()
     def notifyError(self, message):
         showErrorDialog(message, self.topWindow)

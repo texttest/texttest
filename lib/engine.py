@@ -239,7 +239,7 @@ class TextTest(Responder, plugins.Observable):
 
     def deleteTempFiles(self):
         for app, testSuite in self.appSuites.items():
-            app.cleanWriteDirectory()
+            app.cleanWriteDirectory(testSuite)
     def run(self):
         try:
             self._run()

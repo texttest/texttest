@@ -83,6 +83,7 @@ class QueueSystemConfig(default.Config):
             elif group.name.startswith("Advanced"):
                 group.addOption("R", "Request " + queueSystem + " resource", possibleValues = self.getPossibleResources(queueSystem))
                 group.addOption("q", "Request " + queueSystem + " queue", possibleValues = self.getPossibleQueues(queueSystem))
+                group.addSwitch("keepslave", "Keep data files and successful tests until termination")
                 group.addSwitch("perf", "Run on performance machines only")
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
@@ -107,17 +108,35 @@ class QueueSystemConfig(default.Config):
             return default.Config.getWriteDirectoryName(self, app)
     def useExtraVersions(self, app):
         return default.Config.useExtraVersions(self, app) and not self.slaveRun()
-    def cleanWriteDirectory(self, app):
-        if not self.slaveRun():
-            default.Config.cleanWriteDirectory(self, app)
-        # Slaves leave their files for the master process to clean
+    def keepTemporaryDirectories(self):
+        return default.Config.keepTemporaryDirectories(self) or (self.slaveRun() and self.optionMap.has_key("keepslave"))
+    def cleanSlaveFiles(self, test):
+        if test.state.hasSucceeded():
+            writeDir = test.getDirectory(temporary=1)
+            if os.path.isdir(writeDir):
+                plugins.rmtree(writeDir)
+        else:
+            for dataFile in test.getDataFileNames():
+                fullPath = test.makeTmpFileName(dataFile, forComparison=0)
+                if os.path.isfile(fullPath) or os.path.islink(fullPath):
+                    os.remove(fullPath)
+                elif os.path.isdir(fullPath):
+                    plugins.rmtree(fullPath)
+                
+    def _cleanWriteDirectory(self, suite):
+        if self.slaveRun():
+            # Slaves leave their files for the master process to clean
+            for test in suite.testCaseList():
+                self.cleanSlaveFiles(test)
+        else:
+            default.Config._cleanWriteDirectory(self, suite)
     def getTextResponder(self):
         if self.useQueueSystem():
             return MasterInteractiveResponder
         else:
             return InteractiveResponder
     def getSlaveSwitches(self):
-        return [ "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp" ]
+        return [ "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp", "keepslave" ]
     def getExecHostFinder(self):
         if self.slaveRun():
             return FindExecutionHosts()

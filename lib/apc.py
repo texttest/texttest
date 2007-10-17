@@ -152,8 +152,6 @@ class ApcConfig(optimization.OptimizationConfig):
     def getSlaveSwitches(self):
         return optimization.OptimizationConfig.getSlaveSwitches(self) + [ "rundebug", "extractlogs", "goprof" ]
     def useQueueSystem(self):
-        if self.optionMap.has_key("rundebug"):
-            return 0
         return optimization.OptimizationConfig.useQueueSystem(self)
     def getProgressReportBuilder(self):
         if self.optionMap.has_key("prrepgraphical"):
@@ -341,7 +339,7 @@ class ViewApcLog(guiplugins.InteractiveTestAction):
 #
 # Runs the test in gdb and displays the log file. 
 #
-class RunApcTestInDebugger(default.RunTest):
+class RunApcTestInDebugger(queuesystem.RunTestInSlave):
     def __init__(self, options, keepTmpFiles):
         default.RunTest.__init__(self)
         self.process = None
@@ -383,7 +381,7 @@ class RunApcTestInDebugger(default.RunTest):
         if self.process:
             JobProcess(self.process.pid).killAll()
     def __call__(self, test):
-        os.chdir(test.getDirectory()) # for backwards compatibility with when this was done by default...
+        os.chdir(test.getDirectory(temporary=True)) # for backwards compatibility with when this was done by default...
         self.describe(test)
         # Get the options that are sent to APCbatch.sh
         opts = test.getWordsInFile("options")
@@ -392,7 +390,7 @@ class RunApcTestInDebugger(default.RunTest):
         apcLogFile = open(apcLog, "w")
         apcLogFile.write("")
         apcLogFile.close()
-        if self.showLogFile:
+        if not test.app.slaveRun() and self.showLogFile:
             cmdArgs = [ "xterm", "-bg", "white", "-fg", "black", "-T", "APCLOG-" + test.name, "-e", "less +F " + apcLog ]
             self.process = subprocess.Popen(cmdArgs)
             print "Created process : log file viewer :", self.process.pid
@@ -545,7 +543,7 @@ class GoogleProfilePrepare(plugins.Action):
     def __call__(self, test):
         os.environ["LD_LIBRARY_PATH"] += ";/users/johani/lib/"
         os.environ["CPUPROFILE"] = test.makeTmpFileName("profiledata", forFramework=0)
-        if self.arg.startswith("exppreload"):
+        if self.arg and self.arg.startswith("exppreload"):
             os.environ["LD_PRELOAD"] = "/users/johani/lib/libprofiler.so"
 
 

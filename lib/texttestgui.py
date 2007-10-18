@@ -1949,6 +1949,7 @@ class PaneGUI(ContainerGUI):
         self.horizontal = horizontal
         self.panedTooltips = gtk.Tooltips()
         self.paned = None
+        self.separatorHandler = None
     def getSeparatorPositionFromConfig(self):
         if self.horizontal:
             return float(guiConfig.getWindowOption("vertical_separator_position"))
@@ -1969,7 +1970,7 @@ class PaneGUI(ContainerGUI):
     def createView(self):
         self.paned = self.createPaned()
         self.paned.connect('notify::position', self.paneHasChanged)
-        self.paned.connect('notify::max-position', self.adjustSeparator)
+        self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
         scriptEngine.registerPaned(self.paned, self.scriptCommand())
         frames = []
         for subgui in self.subguis:
@@ -1985,7 +1986,6 @@ class PaneGUI(ContainerGUI):
 
         self.paned.pack1(frames[0], resize=True)
         self.paned.pack2(frames[1], resize=True)
-        self.adjustSeparator()
         self.paned.show()
         return self.paned
         
@@ -2019,6 +2019,9 @@ class PaneGUI(ContainerGUI):
     def adjustSeparator(self, *args):
         pos = int(self.paned.get_property("max-position") * self.getSeparatorPositionFromConfig())
         self.paned.set_position(pos)
+        # Only want to do this once, providing we actually change something
+        if pos > 0:
+            self.paned.disconnect(self.separatorHandler)
     
 class TextInfoGUI(SubGUI):
     def __init__(self):

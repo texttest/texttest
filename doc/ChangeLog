@@ -857,3 +857,104 @@ Fixes for older bugs:
 	Windows line-ending trouble again
     - Fixed bug where terminated processes on UNIX got named "CMD" (jobprocess.py)
 	Could lead to occasional confusing printouts. 
+
+Version 3.10
+============
+System requirements (see Migration Notes):
+    - TextTest GUI now requires at least PyGTK 2.10.
+	The most recent major release. Due to serious bugs found in version 2.6.
+    - Windows Vista is now supported
+Major Enhancements:
+    - Big performance improvement in startup for larger suites (testmodel.py)
+	The tests are now read in a separate thread so that execution and display can start before all are read.
+	Environment files are also only read on demand.
+    - Radical rework to improve throughput for grid engines (queuesystem.py)
+	Instead of submitting every new test as a new job, introduced socket communication to reuse jobs. 
+	Improves response time greatly if running a lot of short tests, by eliminating dispatch time.
+General GUI Enhancements:
+    - TextTest now has its own icons! (texttestgui.py)
+	Different for the static and dynamic GUIs.
+    - Pressing Enter when in a tab now "presses" the button at the bottom of it, if any (texttestgui.py)
+	This is generally what's expected...
+    - Selecting multiple tests now wipes the file selection (texttestgui.py)
+    - Entry completion now possible (entrycompletion.py)
+	Various config file settings...
+    - Long status messages now ellipsized to stop them widening the window (texttestgui.py)
+Static GUI Enhancements:
+    - Cut/Copy/Paste of tests is now much more like what file managers usually do. (guiplugins.py)
+	"Copying" tab is removed, ctrl-X, ctrl-C, ctrl-V behave as expected. See Migration Notes.
+    - Imported config files now appear in the Config tab (texttestgui.py)
+    - Can now view the file properties from the file view window (guiplugins.py)
+Dynamic GUI Enhancements:
+    - Can now kill individual tests directly from the GUI (guiplugins.py)
+	Could only kill them en masse by terminating testing before, or externally to TextTest
+    - Quitting no longer freezes the dynamic GUI (texttestgui.py)
+	Informs you about what its doing (killing tests, viewers, removing files etc.)
+    - "Double Quit" now properly supported (texttestgui.py)
+	Useful for cleaning up when tests refuse to be killed. See docs.
+    - Can now mark tests when they have been viewed (texttestgui.py)
+	Useful when wading through lots of changes, so already examined tests can be hidden.
+    - Performance of "Update Info" button greatly improved. (guiplugins.py)
+	We filter the original file for the test before running it
+    - Window header now displays version and checkout information (texttestgui.py)
+    - Now disallow saving versioned files for totally new tests (guiplugins.py)
+	Tended to be easy to do if new tests were created in a non-default version.
+    - Status tab column separators are now adjustable (texttestgui.py)
+    - Status tab no longer displays tests killed at different timestamps in separate categories (testmodel.py)
+	This seemed to be a pain as test killing can easily cross a minute-boundary.
+Framework Enhancements:
+    - Now possible to easily run multiple copies of the same test (default.py)
+	Command line option -copy, or "Times to run" box in static GUI
+    - Reorganised the temporary directory structure to have one top directory per run (default.py)
+	Previously had one directory per application run which could lead to confusion. 
+	Has a few implications, see Migration Notes.
+    - Virtual display mechanism for testing GUIs on UNIX rewritten (unixonly.py)
+	Instead of running all tests against a single central display, start one local virtual display per test
+	Less conflicts and network traffic that way. See Migration Notes.
+    - Environment is now modified only in child processes (testmodel.py)
+	Previously TextTest maintained it in its own environment which could lead to a variety of unexpected effects
+    - Traffic mechanism now transfers, sets and replays current working directory (traffic.py)
+	Recorded as a "cd" command
+    - Script comparetest.RemoveObsoleteVersions rewritten as PrintObsoleteVersions (comparetest.py)
+	Old one assumed CVS and had a few bugs in it. See Migration Notes.
+    - Environment files no longer insist upon an order of elements (testmodel.py)
+	OK for variables to refer to definitions below them in the file now
+    - "view_program" config setting now expands environment variables from the tests (guiplugins.py)
+    - Can now inform TextTest about binary files in the tests so it doesn't try to do tkdiff on them... (default.py)
+    - New mechanism for sharing enviroment files between different tested applications (testmodel.py) 
+	Use "shared_config_directory"
+Grid Engine (LSF/SGE) enhancements:
+    - Remote jobs remove the bulk of their own files
+	Unless -keepslave is specified, slave jobs will remove all files in succeeded tests, and all data files.
+	See Migration Notes.
+    - Job bookkeeping improved	
+	Fixed problems to do with the wrong SGE/LSF job being found when tests are killed hard.
+Installation and self-test changes:
+    - Much better coverage of filechooser handling in tests
+	Mostly a consequence of improvements in PyUseCase. Removed "magical" setting of paths.
+    - Test naming scheme improved so added tests can reliably be found.
+    - Tests no longer depend on the contents of ~/.config
+	This is an undocumented feature of GTK that seemed capable of causing lots of trouble
+	if certain entries were present.
+Bug Fixes:
+    - Movements of the horizontal pane separator are no longer lost when the right window is hidden (texttestgui.py)
+	This could previously happen when test selection was cleared and then tests selected again.
+    - Interrupting GUI before it has come up now works properly (engine.py)
+    - Automatic selection of single tests doesn't force viewing of running test if it's been explicitly hidden (texttestgui.py)
+    - Fixed occasional stack trace in interpretcore.py script for getting stack traces out of UNIX core files (interpretcore.py)
+    - Saving tests that have crashed now works properly (knownbugs.py)
+	Previously leaked a file that caused trouble next time the test was run
+    - CVS plugin : CVS commands on multiple files in dynamic GUI fixed (cvs.py)
+    - Fixed bug where lack of performance file could lead to negative performance differences being reported (performance.py)
+    - Fixed occasional clash between traffic mechanism and knownbugs mechanism (knownbugs.py)
+	Really a side-effect of environment cleanup mentioned above
+    - Current working directory now set correctly again when automatic cputime checking is enabled (unixonly.py)
+	Vital for finding core files correctly
+    - Fixed replay bug in traffic mechanism where repeated input has no associated reply second time around (traffic.py) 
+    - Fixed stacktrace when doing "view raw differences" on a new file in the dynamic GUI
+    - Fixed bug where hidden tests that aren't being viewed becoming visible wipes the files selected in the viewed test (texttestgui.py)
+    - Fixed some inconsistencies between different error messages for config file inconsistency (testmodel.py)
+    - If a GUI test is recorded with a version but saved without, no longer get given identical versioned files (guiplugins.py)
+    - Now get a nice error message rather than silence if saving a test fails due to permission trouble (guiplugins.py)
+    - Static GUI now doesn't present empty test suites if a test filter (-t) given on the command line (testmodel.py)
+    - Reconnecting now expands ~ correctly before user names (default.py)

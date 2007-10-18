@@ -1,0 +1,91 @@
+
+There isn't much migration to do in this release apart from upgrade PyGTK if you haven't done that 
+yet. Most of the major work done for the 3.10 release is about improving the performance of various 
+key operations, particularly in larger test suites. 
+
+This file also details behaviour of TextTest 3.10 which will be different in TextTest 3.9. You can
+probably figure much of this out by just seeing what happens...
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) System requirements
+=======================
+You now need at least PyGTK 2.10 in the GUI (3.9 supported PyGTK 2.6)
+This is due to serious bugs found in 2.6 which had been fixed in later versions, and an aim to
+keep up to date with current development in PyGTK.
+
+(Windows Vista is now also supported)
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR
+=========================================================
+
+(1) Temporary directory structure	
+=================================
+
+This structure is laid out in a different way now to ensure every run writes under only
+one temporary directory. This has two user implications :
+
+a) It won't be possible to reconnect to TextTest 3.9 runs using TextTest 3.10.
+b) TextTest 3.10 won't clean up old TextTest 3.9 runs in the way new runs of TextTest 3.9
+would have done.
+
+If you rely on the feature that one batch run removes temporary files written by the previous
+one, it's a good idea to clean your 3.9 runs by hand before switching to 3.10,
+otherwise they might stay there forever...
+
+For advanced users who were used to traversing this structure, it's now organised by application.
+When using a grid engine the remote process logs are now all written in a directory at the top
+called "slavelogs" instead of in framework_tmp for each individual test.
+
+(2) Copying tests (static GUI)
+==============================
+This has previously worked via the "Copying" tab. Now there are Cut/Copy/Paste entries in the 
+test tree popup menu, with the expected shortcuts (Ctrl-X, Ctrl-C, Ctrl-V). Should be
+possible to use it in much the same way as in e.g. Windows Explorer.
+
+Note there is no visible effect of cutting a test currently. Changes are only performed when
+pasting it.
+
+(3) Virtual displays for GUI testing on UNIX
+============================================
+This has been decentralised, so that each test now starts a new instance of the virtual display
+(Xvfb) and closes it again when done. The "virtual_display_machine" setting now has a different meaning :
+it will only be used if starting the virtual display on the local host fails. (Previously
+it indicated a single machine on which a global TextTest virtual display would be maintained).
+The "virtual_display_number" setting is removed as there is no hardcoded display number to
+use in any case.
+
+The idea is to localise effects, minimise network traffic and occasional resource clashes
+in the virtual server.
+
+Unfortunately Xvfb has been observed to leak lock files sometimes, which can lead to occasional
+GUI test failures due to lock file clashes. TextTest tries to work around this but it's difficult
+to do so entirely reliably. If this problem occurs frequently you might need to clean up externally
+to TextTest: look for files in /tmp/.X*-lock and /tmp/.X11-unix/.X*
+
+(4) Cleaning temporary files when using grid engines
+====================================================
+Previously no temporary files have been removed until the dynamic GUI is closed. In large
+test suites this can lead to a substantial delay closing the GUI while all tests are removed.
+
+So TextTest will now make sure the remote processes do some cleaning when a grid engine is
+used. In particular all files belonging to successful tests will be removed, and all test data
+will be removed. To get the old behaviour of leaving everything until the GUI is closed,
+specify the flag -keepslave, or the equivalent checkbox under the Advanced tab in the static GUI.
+
+There is no difference in the behaviour when running tests locally, as removing files during
+the process would slow down feedback.
+
+(5) comparetest.RemoveObsoleteVersions -> comparetest.PrintObsoleteVersions
+===========================================================================
+This script is for tracking down superfluous versioned files, i.e. the situation
+where output.app and output.app.2 are identical, rendering the existence of the second
+one unnecessary. The old script was untested, a bit buggy and removed files directly in CVS, which
+was not well liked. In consequence it was not used much. 
+
+So we've cleaned up the script, renamed it to PrintObsoleteVersions, added a load of tests and fixed
+a load of bugs. It now merely informs you of obsolete files, and leaves it up to you what to do
+with them. It doesn't assume you use CVS for your version control either (!)

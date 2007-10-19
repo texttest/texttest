@@ -25,8 +25,8 @@ helpOptions = """-rundebug <options>
                The log file is not displayed.
              - valgrind
                Run valgrind on the problem 
-             - val_output=<filename>
-               Dump valgrinds output in the file <filename>.pid
+             - val_output
+               Dump valgrinds output in the file valgrind.
              - valdebug
                Instruct valgrind to attach to a debugger when encountering
                a memory problem. Note that this option means that output will
@@ -352,12 +352,12 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         self.noRun = None
         self.keepTmps = keepTmpFiles;
         self.valOutput = None
+        self.valDebug = None
         self.parseOptions(options)
     def parseOptions(self, options):
         opts = options.split(" ")
         if opts[0] == "":
             return
-        self.valopt = ""
         for opt in opts:
             if opt == "xemacs":
                 self.inXEmacs = 1
@@ -373,13 +373,10 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
                 self.useDbx = 1
             elif opt == "valgrind":
                 self.runValgrind = 1
-            elif opt.find("val_output=")==0:
-                tmp = opt.split("=")
-                self.valOutput = tmp[1]
-                self.valopt += "--log-file=" + self.valOutput + " "
+            elif opt.find("val_output")==0:
+                self.valOutput = 1
             elif opt == "valdebug":
-                self.valopt += "--db-attach=yes "
-
+                self.valDebug = 1
             else:
                 print "Ignoring unknown option " + opt
     def __repr__(self):
@@ -401,16 +398,20 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         configFile = os.path.join(test.getEnvironment("CARMSYS"), "CONFIG")
         subprocess.call(". " + configFile + "; " + executeCommand, env=test.getRunEnvironment(), shell=True)
         self.removeRunDebugFiles()
-        self.extractValgrindOutput(test)
     def getExecuteCommand(self, test, binName, apcbinOptions, apcLog):
         if self.runPlain:
             executeCommand = binName + apcbinOptions + " > " + apcLog
         elif self.runValgrind:
             #no redirecting output when attaching to debugger
             redir = " >& " + apcLog
-            if self.valopt.find("db-attach") != -1:
-                redir = "";
-            executeCommand = "valgrind --tool=memcheck -v " + self.valopt + binName + apcbinOptions + redir
+            valopt = ""
+            if self.valOutput:
+                valout = test.makeTmpFileName("valgrind")
+                valopt += " --log-file-exactly=" + valout
+            if self.valDebug:
+                valopt += " --db-attach=yes"
+                redir = ""
+            executeCommand = self.getValgrind() + " --tool=memcheck -v " + valopt + " " + binName + apcbinOptions + redir
         elif self.useDbx:
             executeCommand = "dbx -r " + binName + apcbinOptions
         else:
@@ -501,7 +502,14 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         if self.filesToRemove:
             for file in self.filesToRemove: 
                 os.remove(file)
+    def getValgrind(self):
+        processorType = os.popen("uname -p").readlines()[0]
+        if processorType.startswith("x86_64"):
+            return "valgrind64"
+        else:
+            return "valgrind"
     def extractValgrindOutput(self, test):
+        # NOT used anymore-trying with --log-file-exactly
         # Valgrind adds a .pid in the end of the output file, this makes texttest
         # not extract the file. Now we simply change it back. In later versions of
         # valgrind, there is an --log-file-exact, we shall remove this code and use

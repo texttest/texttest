@@ -66,13 +66,16 @@ class SocketResponder(Responder,plugins.Observable):
         self.connect(sendSocket)
         sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
         sendSocket.shutdown(socket.SHUT_WR)
-        response = sendSocket.makefile().read()
-        sendSocket.close()
-        if len(response) > 0:
-            appDesc, testPath = response.strip().split(":")
-            appParts = appDesc.split(".")
-            self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
-        
+        try:
+            response = sendSocket.makefile().read()
+            sendSocket.close()
+            if len(response) > 0:
+                appDesc, testPath = response.strip().split(":")
+                appParts = appDesc.split(".")
+                self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
+        except socket.error:
+            print "Terminating as failed to read response from master process, got error :\n" + plugins.getExceptionString()
+            
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):
         default.Config.addToOptionGroups(self, app, groups)

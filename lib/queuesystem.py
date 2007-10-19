@@ -417,7 +417,8 @@ class QueueSystemServer(BaseActionRunner):
     def addTest(self, test):
         self.testCount += 1
         queue = self.findQueueForTest(test)
-        queue.put(test)
+        if queue:
+            queue.put(test)
     def findQueueForTest(self, test):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
         if self.reuseOnly and self.testsSubmitted == 0:
@@ -504,7 +505,7 @@ class QueueSystemServer(BaseActionRunner):
         command = self.getSlaveCommand(test, submissionRules)
         print "Q: Submitting", test, submissionRules.getSubmitSuffix()
         sys.stdout.flush()
-        if not self.submitJob(test, submissionRules, command, self.getSlaveEnvironment(), [ test ]):
+        if not self.submitJob(test, submissionRules, command, self.getSlaveEnvironment()):
             return
         
         self.testCount -= 1
@@ -553,7 +554,7 @@ class QueueSystemServer(BaseActionRunner):
         return " ".join(runOptions)
     def getSlaveLogDir(self, test):
         return os.path.join(test.app.writeDirectory, "slavelogs")
-    def submitJob(self, test, submissionRules, command, slaveEnv, affectedTests):
+    def submitJob(self, test, submissionRules, command, slaveEnv):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
         self.diag.info("Creating job at " + plugins.localtime())
         queueSystem = self.getQueueSystem(test)
@@ -566,10 +567,9 @@ class QueueSystemServer(BaseActionRunner):
         self.diag.info("Creating job " + jobName + " with command arguments : " + repr(cmdArgs))
         self.lock.acquire()
         if self.exited:
-            for affectedTest in affectedTests:
-                self.cancel(affectedTest)
+            self.cancel(test)
             self.lock.release()
-            print "Q: Submission cancelled for", affectedTest, "- exit underway"
+            print "Q: Submission cancelled for", test, "- exit underway"
             return False
         
         self.lockDiag.info("Got lock for submission")
@@ -580,24 +580,25 @@ class QueueSystemServer(BaseActionRunner):
         if not errorMessage:
             jobId = queueSystem.findJobId(stdout)
             self.diag.info("Job created with id " + jobId)
-            for affectedTest in affectedTests:
-                self.jobs[affectedTest] = jobId, jobName
+            self.jobs[test] = jobId, jobName
             self.lockDiag.info("Releasing lock for submission...")
             self.lock.release()
             return True
         else:
             self.lock.release()
             self.diag.info("Job not created : " + errorMessage)
-            qname = queueSystemName(test.app)
-            fullError = "Failed to submit to " + qname + " (" + errorMessage.strip() + ")\n" + \
-                      "Submission command was '" + " ".join(cmdArgs[:-1]) + " ... '\n"
-            for affectedTest in affectedTests:
-                affectedTest.changeState(plugins.Unrunnable(freeText=fullError))
-                self.handleErrorState(affectedTest)
+            fullError = self.getFullSubmitError(test, errorMessage, cmdArgs)
+            test.changeState(plugins.Unrunnable(freeText=fullError))
+            self.handleErrorState(test)
             return False
     def findErrorMessage(self, stderr, queueSystem):
         if len(stderr) > 0:
             return queueSystem.findSubmitError(stderr)
+    def getFullSubmitError(self, test, errorMessage, cmdArgs):
+        qname = queueSystemName(test.app)
+        return "Failed to submit to " + qname + " (" + errorMessage.strip() + ")\n" + \
+               "Submission command was '" + " ".join(cmdArgs[:-1]) + " ... '\n"
+
     def handleErrorState(self, test, previouslySubmitted=False):
         if previouslySubmitted:
             self.testsSubmitted -= 1
@@ -690,7 +691,6 @@ class QueueSystemServer(BaseActionRunner):
 
     def killOrCancel(self, test):
         # Explicitly chose test to kill (from the GUI)
-        self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
         jobId, jobName = self.getJobInfo(test)
         if jobId:
             self.killTest(test, jobId, jobName, wantStatus=True)
@@ -699,6 +699,7 @@ class QueueSystemServer(BaseActionRunner):
             return self.cancel(test)
         
     def killTest(self, test, jobId, jobName, wantStatus):
+        self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
         jobExisted = self.killJob(test, jobId, jobName)
         startNotified = self.jobStarted(test)
         if jobExisted:

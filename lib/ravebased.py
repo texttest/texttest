@@ -348,12 +348,22 @@ class RuleBuildSubmitServer(QueueSystemServer):
         # push the non-rules tests last, to avoid indeterminism and decrease total time as these need two
         # SGE submissions
         rulecomp = self.getRuleCompilation(test)
-        if rulecomp:
+        if not rulecomp or rulecomp.allSucceeded():
+            self.diag.info("Inserting new test into normal queue")
+            return QueueSystemServer.findQueueForTest(self, test)
+
+        ruleset = rulecomp.findFailedRuleset()
+        if ruleset:
+            testForRuleset = self.getTestsForRuleset(ruleset)[0]
+            test.changeState(copy(testForRuleset.state))
+            self.diag.info("Previously detected failed ruleset found, not using test")
+            self.handleLocalError(test, previouslySubmitted=False)
+        else:
             self.testsForRuleBuild += 1
             test.changeState(NeedRuleCompilation(rulecomp))
+            self.diag.info("Test submitted to queue for rule compilation")
             return self.ruleBuildQueue
-        else:
-            return QueueSystemServer.findQueueForTest(self, test)
+
     def setSlaveServerAddress(self, address):
         self.submitAddress = os.getenv("TEXTTEST_MIM_SERVER", address)
         self.actualAddress = address
@@ -386,7 +396,9 @@ class RuleBuildSubmitServer(QueueSystemServer):
             return filterer.getRuleCompilation(test)
         except AttributeError:
             return
-
+    def getTestsForRuleset(self, ruleset):
+        targetFile = ruleset.targetFiles[0]
+        return FilterRuleBuilds.rulesetNamesToTests.get(targetFile, [])
     def submitRuleCompilation(self, test):
         submissionRules = test.app.getRaveSubmissionRules(test)
         remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
@@ -395,22 +407,54 @@ class RuleBuildSubmitServer(QueueSystemServer):
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
             print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for " + repr(test) + ")", postText
-            targetFile = ruleset.targetFiles[0]
-            compileArgs = [ remoteCmd, targetFile, self.submitAddress ] + ruleset.getCompilationArgs(remote=True)
+            compileArgs = [ remoteCmd, ruleset.targetFiles[0], self.submitAddress ] + ruleset.getCompilationArgs(remote=True)
             command = " ".join(compileArgs)
-            affectedTests = FilterRuleBuilds.rulesetNamesToTests.get(targetFile, [])
-            if not self.submitJob(test, submissionRules, command, rulecompEnv, affectedTests):
+            if not self.submitJob(test, submissionRules, command, rulecompEnv):
                 self.testsForRuleBuild -= 1
+        else:
+            self.associateJobs(test, rulecomp)            
         
         if test.state.category == "need_rulecompile":
             test.changeState(PendingRuleCompilation(rulecomp))
+    def getFullSubmitError(self, test, errorMessage, cmdArgs):
+        qname = queueSystemName(test.app)
+        return "Failed to submit rule compilation to " + qname + " (" + errorMessage.strip() + ")\n" + \
+               "Submission command was '" + " ".join(cmdArgs[:-1]) + " ... '\n"
+        
+    def associateJobs(self, test, rulecomp):
+        for ruleset in rulecomp.rulesetsFromOthers:
+            targetFile = ruleset.targetFiles[0]
+            rulesetTests = FilterRuleBuilds.rulesetNamesToTests.get(targetFile, [])
+            if len(rulesetTests) > 0 and self.isRuleBuild(rulesetTests[0]):
+                self.lock.acquire()
+                if self.exited:
+                    self.cancel(test)
+                else:
+                    jobId, jobName = self.getJobInfo(rulesetTests[0])
+                    if jobId:
+                        self.diag.info("Associated " + repr(test) + " with job info " + repr((jobId, jobName)))
+                        self.jobs[test] = jobId, jobName
+                    else:
+                        test.changeState(copy(rulesetTests[0].state))
+                        self.diag.info("No previous job found, " + repr(test) + " changed to state " + test.state.category)
+                        self.handleLocalError(test, previouslySubmitted=False)
+                self.lock.release()
+        
     def ruleBuildCompleted(self):
         self.testsForRuleBuild -= 1
         if self.testsForRuleBuild == 0:
             self.testQueue.put(None)
             
+    def ruleBuildKilled(self, test, freetext):
+        if hasattr(test.state, "rulecomp"):
+            for ruleset in test.state.rulecomp.rulesetsForSelf:
+                ruleset.failed(freetext)
+                
+        self.ruleBuildCompleted()
+        
     def isRuleBuild(self, test):
-        return test.state.category.endswith("_rulecompile")
+        return test.state.category.endswith("_rulecompile") or \
+               (test.state.isComplete() and test.state.freeText.find("Failed to submit rule compilation") != -1)
     def jobStarted(self, test):
         return self.isRuleBuild(test) or test.state.hasStarted()
     def shouldWaitFor(self, test):
@@ -418,7 +462,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
             timeStr =  plugins.localtime("%H:%M")
             briefText = "Ruleset build killed at " + timeStr
             freeText = "Ruleset compilation killed explicitly at " + timeStr
-            self.ruleBuildCompleted()
+            self.ruleBuildKilled(test, freeText)
             self.cancel(test, briefText, freeText, previouslySubmitted=False)
             return False
         else:
@@ -429,7 +473,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
             briefText = "killed pending rule compilation at " + timeStr
             freeText = "Rule compilation job was killed (while still pending in " + queueSystemName(test.app) +\
                      ") at " + timeStr
-            self.ruleBuildCompleted()
+            self.ruleBuildKilled(test, freeText)
             self.cancel(test, freeText, briefText, previouslySubmitted=False)
         else:
             QueueSystemServer.setKilledPending(self, test)
@@ -437,7 +481,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
         if self.isRuleBuild(test):
             failReason = "no report from rule compilation (possibly killed with SIGKILL)"
             fullText = failReason + "\n" + self.getJobFailureInfo(test)
-            self.ruleBuildCompleted()
+            self.ruleBuildKilled(test, fullText)
             self.changeState(test, plugins.Unrunnable(fullText, failReason), previouslySubmitted=False)
         else:
             QueueSystemServer.setSlaveLost(self, test)

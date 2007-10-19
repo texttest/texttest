@@ -344,12 +344,16 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         default.RunTest.__init__(self)
         self.process = None
         self.inXEmacs = None
+        self.XEmacsTestingKill = None
         self.runPlain = None
         self.runValgrind = None
+        self.useDbx = None
         self.showLogFile = 1
         self.noRun = None
         self.keepTmps = keepTmpFiles;
         self.valOutput = None
+        self.parseOptions(options)
+    def parseOptions(self, options):
         opts = options.split(" ")
         if opts[0] == "":
             return
@@ -357,12 +361,16 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         for opt in opts:
             if opt == "xemacs":
                 self.inXEmacs = 1
+            elif opt == "xemacstestingkill":
+                self.XEmacsTestingKill = 1
             elif opt == "nolog":
                 self.showLogFile = None
             elif opt == "plain":
                 self.runPlain = 1
             elif opt == "norun":
                 self.noRun = 1
+            elif opt == "dbx":
+                self.useDbx = 1
             elif opt == "valgrind":
                 self.runValgrind = 1
             elif opt.find("val_output=")==0:
@@ -382,23 +390,62 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
             JobProcess(self.process.pid).killAll()
     def __call__(self, test):
         os.chdir(test.getDirectory(temporary=True)) # for backwards compatibility with when this was done by default...
+        self.filesToRemove = []
         self.describe(test)
+        binName, apcbinOptions, subplan = self.getApcBinAndOptions(test)
+        apcLog = self.setupApcLog(test)
+        self.setupOutputFile(test, subplan)
+        executeCommand = self.getExecuteCommand(test, binName, apcbinOptions, apcLog)
+        self.changeToRunningState(test)
+        # Source the CONFIG file to get the environment correct and run gdb with the script.
+        configFile = os.path.join(test.getEnvironment("CARMSYS"), "CONFIG")
+        subprocess.call(". " + configFile + "; " + executeCommand, env=test.getRunEnvironment(), shell=True)
+        self.removeRunDebugFiles()
+        self.extractValgrindOutput(test)
+    def getExecuteCommand(self, test, binName, apcbinOptions, apcLog):
+        if self.runPlain:
+            executeCommand = binName + apcbinOptions + " > " + apcLog
+        elif self.runValgrind:
+            #no redirecting output when attaching to debugger
+            redir = " >& " + apcLog
+            if self.valopt.find("db-attach") != -1:
+                redir = "";
+            executeCommand = "valgrind --tool=memcheck -v " + self.valopt + binName + apcbinOptions + redir
+        elif self.useDbx:
+            executeCommand = "dbx -r " + binName + apcbinOptions
+        else:
+            # We will run gbd, either in the console or in xemacs.
+            gdbArgs = self.createGdbArgsFile(test, apcbinOptions, apcLog)
+            if self.inXEmacs:
+                gdbStart = self.runInXEmacs(test, binName, gdbArgs)
+                executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
+            else:
+                # I set the SHELL to be sh since if csh or tcsh is used, an init file is loaded
+                # that executes "stty erase". This command hangs due to that it gets the signal SIGTOOU.
+                # On the other hand, with sh, something weird happens when running with the GUI, gdb
+                # don't end sucessfully. This might be due to that it's not run in the main thread.
+                # It works fine when texttest is run in console mode. The problem might be related to
+                # bugzilla 1659! :-)
+                executeCommand = "SHELL=/bin/sh; gdb " + binName + " -silent -x " + gdbArgs
+            # Check for personal .gdbinit.
+            if os.path.isfile(os.path.join(os.environ["HOME"], ".gdbinit")):
+                print "Warning: You have a personal .gdbinit. This may create unexpected behaviour."
+        return executeCommand
+    def getApcBinAndOptions(self, test):
         # Get the options that are sent to APCbatch.sh
         opts = test.getWordsInFile("options")
-        # Create and show the log file.
-        apcLog = test.makeTmpFileName("apclog")
-        apcLogFile = open(apcLog, "w")
-        apcLogFile.write("")
-        apcLogFile.close()
-        if not test.app.slaveRun() and self.showLogFile:
-            cmdArgs = [ "xterm", "-bg", "white", "-fg", "black", "-T", "APCLOG-" + test.name, "-e", "less +F " + apcLog ]
-            self.process = subprocess.Popen(cmdArgs)
-            print "Created process : log file viewer :", self.process.pid
+        # Create execute command.
+        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
+        if test.app.raveMode() == "-debug":
+            binName += "_g"
+        options = " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1]
+        return binName, options, opts[0] # Also return the subplan name.
+    def createGdbArgsFile(self, test, apcbinOptions, apcLog):
         # Create a script for gdb to run.
         gdbArgs = test.makeTmpFileName("gdb_args")
         gdbArgsFile = open(gdbArgs, "w")
         gdbArgsFile.write("set pagination off" + os.linesep)
-        cmdLine = "set args -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " >& " + apcLog + os.linesep
+        cmdLine = "set args" + apcbinOptions + " >& " + apcLog + os.linesep
         gdbArgsFile.write(os.path.expandvars(cmdLine, test.getEnvironment))
         if not self.noRun:
             gdbArgsFile.write("run" + os.linesep)
@@ -409,48 +456,52 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
             gdbArgsFile.write("quit" + os.linesep)
             gdbArgsFile.write("end" + os.linesep)
         gdbArgsFile.close()
+        self.filesToRemove += [ gdbArgs ]
+        return gdbArgs
+    def runInXEmacs(self, test, binName, gdbArgs):
+        gdbStart = test.makeTmpFileName("gdb_start")
+        gdbWithArgs = test.makeTmpFileName("gdb_w_args")
+        gdbStartFile = open(gdbStart, "w")
+        gdbStartFile.write("(defun gdbwargs () \"\"" + os.linesep)
+        gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
+        gdbStartFile.write("(gdbsrc \"" + binName + "\")" + os.linesep)
+        if self.XEmacsTestingKill:
+            gdbStartFile.write("(sit-for 20)" + os.linesep)
+            gdbStartFile.write("(kill-emacs)" + os.linesep)
+        gdbStartFile.write(")" + os.linesep)
+        gdbStartFile.close()
+        gdbWithArgsFile = open(gdbWithArgs, "w")
+        gdbWithArgsFile.write("#!/bin/sh" + os.linesep)
+        gdbWithArgsFile.write("gdb -x " + gdbArgs + " $*" + os.linesep)
+        gdbWithArgsFile.close()
+        os.chmod(gdbWithArgs, stat.S_IXUSR | stat.S_IRWXU)
+        self.filesToRemove += [ gdbStart, gdbWithArgs]
+        return gdbStart
+    def setupApcLog(self, test):
+        # Create and show the log file.
+        apcLog = test.makeTmpFileName("apclog")
+        apcLogFile = open(apcLog, "w")
+        apcLogFile.write("")
+        apcLogFile.close()
+        if not self.keepTmps:
+            self.filesToRemove += [ apcLog ]
+        if not test.app.slaveRun() and self.showLogFile:
+            cmdArgs = [ "xterm", "-bg", "white", "-fg", "black", "-T", "APCLOG-" + test.name, "-e", "less +F " + apcLog ]
+            self.process = subprocess.Popen(cmdArgs)
+            print "Created process : log file viewer :", self.process.pid
+        return apcLog
+    def setupOutputFile(self, test, subplan):
         # Create an output file. This file is read by LogFileFinder if we use PlotTest.
         out = test.makeTmpFileName("output")
         outFile = open(out, "w")
-        outFile.write("SUBPLAN " + opts[0] + os.linesep)
+        outFile.write("SUBPLAN " + subplan + os.linesep)
         outFile.close()
-        # Create execute command.
-        binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
-        if test.app.raveMode() == "-debug":
-            binName += "_g"
-        if self.inXEmacs:
-            gdbStart, gdbWithArgs = self.runInXEmacs(test, binName, gdbArgs)
-            executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
-        elif self.runPlain:
-            executeCommand = binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + " > " + apcLog
-        elif self.runValgrind:
-            #no redirecting output when attaching to debugger
-            redir = " >& " + apcLog
-            if self.valopt.find("db-attach") != -1:
-                redir = "";
-            executeCommand = "valgrind --tool=memcheck -v " + self.valopt + binName + " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1] + redir
-        else:
-            # I set the SHELL to be sh since if csh or tcsh is used, an init file is loaded
-            # that executes "stty erase". This command hangs due to that it gets the signal SIGTOOU.
-            # On the other hand, with sh, something weird happens when running with the GUI, gdb
-            # don't end sucessfully. This might be due to that it's not run in the main thread.
-            # It works fine when texttest is run in console mode. The problem might be related to
-            # bugzilla 1659! :-)
-            executeCommand = "SHELL=/bin/sh; gdb " + binName + " -silent -x " + gdbArgs
-        # Check for personal .gdbinit.
-        if os.path.isfile(os.path.join(os.environ["HOME"], ".gdbinit")):
-            print "Warning: You have a personal .gdbinit. This may create unexpected behaviour."
-        self.changeToRunningState(test)
-        # Source the CONFIG file to get the environment correct and run gdb with the script.
-        configFile = os.path.join(test.getEnvironment("CARMSYS"), "CONFIG")
-        subprocess.call(". " + configFile + "; " + executeCommand, env=test.getRunEnvironment(), shell=True)
+    def removeRunDebugFiles(self):
         # Remove the temp files, texttest will compare them if we dont remove them.
-        os.remove(gdbArgs)
-        if not self.keepTmps:
-            os.remove(apcLog)
-        if self.inXEmacs:
-            os.remove(gdbStart)
-            os.remove(gdbWithArgs)
+        if self.filesToRemove:
+            for file in self.filesToRemove: 
+                os.remove(file)
+    def extractValgrindOutput(self, test):
         # Valgrind adds a .pid in the end of the output file, this makes texttest
         # not extract the file. Now we simply change it back. In later versions of
         # valgrind, there is an --log-file-exact, we shall remove this code and use
@@ -460,20 +511,6 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
             for file in files:
                 if file.startswith(self.valOutput):
                     os.rename(file, self.valOutput + "." + test.app.name)
-    def runInXEmacs(self, test, binName, gdbArgs):
-        gdbStart = test.makeTmpFileName("gdb_start")
-        gdbWithArgs = test.makeTmpFileName("gdb_w_args")
-        gdbStartFile = open(gdbStart, "w")
-        gdbStartFile.write("(defun gdbwargs () \"\"" + os.linesep)
-        gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
-        gdbStartFile.write("(gdbsrc \"" + binName + "\"))" + os.linesep)
-        gdbStartFile.close()
-        gdbWithArgsFile = open(gdbWithArgs, "w")
-        gdbWithArgsFile.write("#!/bin/sh" + os.linesep)
-        gdbWithArgsFile.write("gdb -x " + gdbArgs + " $*" + os.linesep)
-        gdbWithArgsFile.close()
-        os.chmod(gdbWithArgs, stat.S_IXUSR | stat.S_IRWXU)
-        return gdbStart, gdbWithArgs
     def setUpSuite(self, suite):
         self.describe(suite)
     

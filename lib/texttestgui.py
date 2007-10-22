@@ -301,7 +301,7 @@ class TextTestGUI(Responder, plugins.Observable):
     EXIT_NOTIFIED = 1
     COMPLETION_NOTIFIED = 2
     def __init__(self, optionMap):
-        self.readGtkRCFile()
+        self.readGtkRCFiles()
         self.dynamic = not optionMap.has_key("gx")
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
@@ -387,8 +387,11 @@ class TextTestGUI(Responder, plugins.Observable):
         for observer in self.getExitObservers():
             self.topWindowGUI.addObserver(observer)
     
-    def readGtkRCFile(self):
-        configDir = plugins.getPersonalConfigDir()
+    def readGtkRCFiles(self):
+        self.readGtkRCFile(plugins.installationDir("layout"))
+        self.readGtkRCFile(plugins.getPersonalConfigDir())
+
+    def readGtkRCFile(self, configDir):
         if not configDir:
             return
 
@@ -2068,8 +2071,7 @@ class TextInfoGUI(SubGUI):
         self.updateView()
     def createView(self):
         self.view = gtk.TextView()
-        from pango import FontDescription
-        self.view.modify_font(FontDescription("courier 10"))
+        self.view.set_name(self.getTabTitle())
         self.view.set_editable(False)
         self.view.set_cursor_visible(False)
         self.view.set_wrap_mode(gtk.WRAP_WORD)

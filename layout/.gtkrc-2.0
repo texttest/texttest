@@ -1,0 +1,8 @@
+
+style "_TextInfo"
+{
+  font_name = "Courier 10"
+}
+
+widget "*.Text Info" style "_TextInfo"
+

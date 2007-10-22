@@ -413,10 +413,11 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
                 redir = ""
             executeCommand = self.getValgrind() + " --tool=memcheck -v " + valopt + " " + binName + apcbinOptions + redir
         elif self.useDbx:
-            executeCommand = "dbx -r " + binName + apcbinOptions
+            dbxArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog, Dbx = True)
+            executeCommand = "dbx -c runapc -s" + dbxArgs + " " + binName
         else:
             # We will run gbd, either in the console or in xemacs.
-            gdbArgs = self.createGdbArgsFile(test, apcbinOptions, apcLog)
+            gdbArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog)
             if self.inXEmacs:
                 gdbStart = self.runInXEmacs(test, binName, gdbArgs)
                 executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
@@ -441,24 +442,42 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
             binName += "_g"
         options = " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1]
         return binName, options, opts[0] # Also return the subplan name.
-    def createGdbArgsFile(self, test, apcbinOptions, apcLog):
-        # Create a script for gdb to run.
-        gdbArgs = test.makeTmpFileName("gdb_args")
-        gdbArgsFile = open(gdbArgs, "w")
-        gdbArgsFile.write("set pagination off" + os.linesep)
-        cmdLine = "set args" + apcbinOptions + " >& " + apcLog + os.linesep
-        gdbArgsFile.write(os.path.expandvars(cmdLine, test.getEnvironment))
+    def createDebugArgsFile(self, test, apcbinOptions, apcLog, Dbx = False):
+        # Create a script for gdb or dbx to run.
+        if not Dbx:
+            stem = "gdb_args"
+        else:
+            stem = "dbx_args"
+        debugArgs = test.makeTmpFileName(stem)
+        debugArgsFile = open(debugArgs, "w")
+        if Dbx:
+            debugArgsFile.write("function runapc" + os.linesep)
+            debugArgsFile.write("{" + os.linesep)
+            cmdLine = "runargs " + apcbinOptions + " >> " + apcLog + os.linesep 
+        else:
+            cmdLine = "set args" + apcbinOptions + " >& " + apcLog + os.linesep
+            debugArgsFile.write("set pagination off" + os.linesep)
+        debugArgsFile.write(os.path.expandvars(cmdLine, test.getEnvironment))
         if not self.noRun:
-            gdbArgsFile.write("run" + os.linesep)
-            gdbArgsFile.write("if $_exitcode" + os.linesep)
-            gdbArgsFile.write("print fflush(0)" + os.linesep)
-            gdbArgsFile.write("where" + os.linesep)
-            gdbArgsFile.write("else" + os.linesep)
-            gdbArgsFile.write("quit" + os.linesep)
-            gdbArgsFile.write("end" + os.linesep)
-        gdbArgsFile.close()
-        self.filesToRemove += [ gdbArgs ]
-        return gdbArgs
+            debugArgsFile.write("run" + os.linesep)
+            if not Dbx:
+                debugArgsFile.write("if $_exitcode" + os.linesep)
+            else:
+                debugArgsFile.write("if $exitcode" + os.linesep)
+                debugArgsFile.write("then" + os.linesep)
+            debugArgsFile.write("print fflush(0)" + os.linesep)
+            debugArgsFile.write("where" + os.linesep)
+            debugArgsFile.write("else" + os.linesep)
+            debugArgsFile.write("quit" + os.linesep)
+            if not Dbx:
+                debugArgsFile.write("end" + os.linesep)
+            else:
+                debugArgsFile.write("fi" + os.linesep)
+        if Dbx: 
+            debugArgsFile.write("}" + os.linesep)
+        debugArgsFile.close()
+        self.filesToRemove += [ debugArgs ]
+        return debugArgs
     def runInXEmacs(self, test, binName, gdbArgs):
         gdbStart = test.makeTmpFileName("gdb_start")
         gdbWithArgs = test.makeTmpFileName("gdb_w_args")

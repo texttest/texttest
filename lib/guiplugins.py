@@ -484,6 +484,7 @@ class MarkTest(SelectionAction):
                 oldState = test.state.oldState # Keep the old state so as not to build hierarchies ...
             newState = plugins.MarkedTestState(self.newFreeText, self.newBriefText, oldState)
             test.changeState(newState)
+            self.notify("ActionProgress", "") # Just to update gui ...            
     def isActiveOnCurrent(self, test=None, state=None):
         if state and state.isComplete():
             return True
@@ -504,6 +505,7 @@ class UnmarkTest(SelectionAction):
             if test.state.isMarked():
                 test.state.oldState.lifecycleChange = "unmarked" # To avoid triggering completion ...
                 test.changeState(test.state.oldState)
+                self.notify("ActionProgress", "") # Just to update gui ...            
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.state.isMarked():

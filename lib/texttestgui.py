@@ -1730,6 +1730,7 @@ class ActionTabGUI(SubGUI):
         # Folders is a list of pairs (short name, absolute path),
         # where 'short name' means the name given in the config file, e.g.
         # 'temporary_filter_files' or 'filter_files' ...
+        dialog.set_modal(True)
         folders, defaultFolder = option.getDirectories()
         scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
                                              "open selected file", "cancel file selection", self.respond, respondMethodArg=entry)
@@ -2568,7 +2569,9 @@ class TestProgressMonitor(SubGUI):
             return classifiers
 
         for fileComp in state.getComparisons():
-            classifiers.addClassification(self.getFileClassification(fileComp, state))
+            fileClass = self.getFileClassification(fileComp, state)
+            self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
+            classifiers.addClassification(fileClass)
 
         return classifiers
     def getFileClassification(self, fileComp, state):

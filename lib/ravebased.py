@@ -477,14 +477,14 @@ class RuleBuildSubmitServer(QueueSystemServer):
             self.cancel(test, freeText, briefText, previouslySubmitted=False)
         else:
             QueueSystemServer.setKilledPending(self, test)
-    def setSlaveLost(self, test):
+    def setSlaveLost(self, test, wantStatus):
         if self.isRuleBuild(test):
             failReason = "no report from rule compilation (possibly killed with SIGKILL)"
-            fullText = failReason + "\n" + self.getJobFailureInfo(test)
+            fullText = failReason + "\n" + self.getJobFailureInfo(test, wantStatus)
             self.ruleBuildKilled(test, fullText)
             self.changeState(test, plugins.Unrunnable(fullText, failReason), previouslySubmitted=False)
         else:
-            QueueSystemServer.setSlaveLost(self, test)
+            QueueSystemServer.setSlaveLost(self, test, wantStatus)
     def describeJob(self, test, jobId, jobName):
         if self.isRuleBuild(test):
             postText = self.getPostText(test, jobId)

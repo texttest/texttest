@@ -139,10 +139,11 @@ class PerformanceComparison:
             else:
                 return self.getDescriptor("performance") + postfix
     def getSummary(self, includeNumbers=True):
-        perc = int(self.percentageChange)        
         if self.newPerformance < 0:
             return "Performance comparison failed"
-        elif perc == 0:
+
+        perc = self.getRoundedPercentage()
+        if perc == 0:
             return ""
         elif perc == -1:
             return "infinitely " + self.descriptor
@@ -150,6 +151,12 @@ class PerformanceComparison:
             return str(perc) + "% " + self.descriptor
         else:
             return self.descriptor
+    def getRoundedPercentage(self):
+        perc = int(self.percentageChange)
+        if perc == 0:
+            return float("%.0e" % self.percentageChange) # Print one significant figure
+        else:
+            return perc
     def isSignificant(self, minPerf, minVar):
         longEnough = self.newPerformance > minPerf or self.oldPerformance > minPerf
         varianceEnough = self.percentageChange < 0 or self.percentageChange > minVar

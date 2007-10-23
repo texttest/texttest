@@ -1516,6 +1516,8 @@ class ReconnectApp:
             appRoot = app.getFileName([ rootDirToCopy ], app.name, self.getVersionListSubDir)
             if appRoot:
                 return appRoot
+            else:
+                raise plugins.TextTestError, "Could not find an application directory matching " + app.description() + " for run under " + rootDirToCopy
         raise plugins.TextTestError, "Could not find any runs matching " + app.description() + " under " + fetchDir
     def findReconnDirectory(self, fetchDir, app):
         return app.getFileName([ fetchDir ], app.name, self.getVersionList)

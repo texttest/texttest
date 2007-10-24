@@ -244,6 +244,8 @@ class ApcConfig(optimization.OptimizationConfig):
         app.addConfigEntry("select_kpi_group", "<control>k", "gui_accelerators")
     def getDefaultCollations(self):
         return { "stacktrace" : "apc_tmp_dir/core*" }
+    def getPerformanceExtractor(self):
+        return ExtractPerformanceFiles(self.getMachineInfoFinder())
 
 class CheckFilesForApc(plugins.Action):
     def __call__(self, test):
@@ -2218,3 +2220,9 @@ class SelectTests(guiplugins.SelectTests):
                 result.append((feature,val-1))
         return result
 
+
+class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
+    # Override the default accumulation of time
+    def makeTimeLine(self, values, fileStem):
+        roundedVal = float(int(10*values[-1]))/10
+        return "Total " + fileStem.capitalize() + "  :      " + str(roundedVal) + " seconds"

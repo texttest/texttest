@@ -343,6 +343,9 @@ class SaveTests(SelectionAction):
         self.addOption("v", "Version to save")
         self.addSwitch("over", "Replace successfully compared files also", 0)
         self.currApps = []
+    def addSuites(self, suites):
+        if self.hasPerformance(suites):
+            self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
     def getStockId(self):
         return "save"
     def getTabTitle(self):
@@ -379,9 +382,6 @@ class SaveTests(SelectionAction):
         self.optionGroup.setOptionValue("v", defaultSaveOption)
         self.diag.info("Setting default save version to " + defaultSaveOption)
         self.optionGroup.setPossibleValues("v", self.getPossibleVersions(apps))
-        if self.hasPerformance(apps) and not self.optionGroup.switches.has_key("ex"):
-            self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
-            self.notify("AddOptions")
         return True
     def getDefaultSaveOption(self, apps):
         saveVersions = self.getSaveVersions(apps)
@@ -407,9 +407,9 @@ class SaveTests(SelectionAction):
         return ",".join(saveVersions)
     def getDefaultSaveVersion(self, app):
         return app.getFullVersion(forSave = 1)
-    def hasPerformance(self, apps):
-        for app in apps:
-            if app.hasPerformance():
+    def hasPerformance(self, suites):
+        for suite in suites:
+            if suite.app.hasPerformance():
                 return True
         return False
     def getExactness(self):

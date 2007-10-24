@@ -1566,16 +1566,7 @@ class ActionTabGUI(SubGUI):
         self.optionGroup.reset()
         self.contentsChanged()
     def notifyUpdateOptions(self):
-        self.contentsChanged()
-    def notifyAddOptions(self):
-        if not self.vbox:
-            return
-        container = self.vbox.get_parent()
-        if container:
-            container.remove(self.vbox)
-            container.add(self.createVBox())
-            container.show()
-        
+        self.contentsChanged()        
     def createVBox(self):
         self.vbox = gtk.VBox()
         if len(self.optionGroup.options) > 0:

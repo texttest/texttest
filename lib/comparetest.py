@@ -168,14 +168,9 @@ class TestComparison(BaseTestComparison):
     # Sort according to failure_display_priority. Lower means show earlier,
     # files with the same prio should be not be shuffled. 
     def getSortedComparisons(self):
-        # sort() sorts in-place, so we want to copy first ...
-        changed = self.changedResults[:]
-        changed.sort(self.lessDisplayPriority)        
-        new = self.newResults[:]
-        new.sort(self.lessDisplayPriority)
-        missing = self.missingResults[:]
-        missing.sort(self.lessDisplayPriority)
-        return changed + new + missing
+        return sorted(self.changedResults, self.lessDisplayPriority) + \
+               sorted(self.newResults, self.lessDisplayPriority) + \
+               sorted(self.missingResults, self.lessDisplayPriority)
     def lessDisplayPriority(self, first, second):
         if first.displayPriority == second.displayPriority:
             return cmp(first.stem, second.stem)

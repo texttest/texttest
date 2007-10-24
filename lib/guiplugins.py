@@ -540,12 +540,19 @@ class FileViewAction(InteractiveTestAction):
         return False
     def performOnCurrent(self):
         for fileName, comparison in self.currFileSelection:
-            if os.path.isfile(fileName):
+            fileToView = self.getFileToView(fileName, comparison)
+            if os.path.isfile(fileToView):
                 if self.isActiveForFile(fileName, comparison):
                     viewTool = self.viewTools.get(fileName)
-                    self.performOnFile(fileName, comparison, viewTool)
+                    self.performOnFile(fileToView, comparison, viewTool)
             else:
-                self.handleNoFile(fileName)
+                self.handleNoFile(fileToView)
+    def getFileToView(self, fileName, comparison):
+        if comparison:
+            return comparison.existingFile(self.useFiltered())
+        else:
+            return fileName
+        
     def handleNoFile(self, fileName):
         self.notify("Error", "File '" + os.path.basename(fileName) + "' cannot be viewed"
                     " as it has been removed in the file system.\n"
@@ -587,11 +594,7 @@ class ViewInEditor(FileViewAction):
     def getViewCommand(self, fileName, viewProgram):
         # viewProgram might have arguments baked into it...
         return plugins.splitcmd(viewProgram) + [ fileName ], viewProgram
-    def getFileToView(self, fileName, comparison):
-        if comparison:
-            return comparison.existingFile(self.useFiltered())
-        else:
-            return fileName
+    
     def findExitHandler(self, fileName):
         if self.dynamic:
             return None
@@ -603,24 +606,24 @@ class ViewInEditor(FileViewAction):
             # refresh order of tests if this edited
             return self.currentTest.contentChanged
     def performOnFile(self, fileName, comparison, viewTool):
-        fileToView = self.getFileToView(fileName, comparison)
-        exitHandler = self.findExitHandler(fileToView)
-        return self.viewFile(fileToView, viewTool, exitHandler)
+        exitHandler = self.findExitHandler(fileName)
+        return self.viewFile(fileName, viewTool, exitHandler)
     def notifyViewFile(self, fileName, comparison):
         if not self.differencesActive(comparison):
-            if os.path.isfile(fileName):
-                viewProgram = self.getViewToolName(fileName)
+            fileToView = self.getFileToView(fileName, comparison)
+            if os.path.isfile(fileToView):
+                viewProgram = self.getViewToolName(fileToView)
                 if plugins.canExecute(viewProgram):
-                    self.performOnFile(fileName, comparison, viewProgram)
+                    self.performOnFile(fileToView, comparison, viewProgram)
                 elif viewProgram:
                     self.notify("Error", "Cannot find file viewing program '" + viewProgram + \
                                 "'.\nPlease install it somewhere on your PATH or\nchange the configuration entry 'view_program'.")
                 else:
                     self.notify("Warning", "No file viewing program is defined for files of type '" + \
-                                os.path.basename(fileName).split(".")[0] + \
+                                os.path.basename(fileToView).split(".")[0] + \
                                 "'.\nPlease point the configuration entry 'view_program' at a valid program to view the file.")
             else:
-                self.handleNoFile(fileName)
+                self.handleNoFile(fileToView)
             
     def isTestDefinition(self, stem, fileName):
         if not self.currentTest:
@@ -653,9 +656,8 @@ class ViewFileDifferences(FileViewAction):
             if not (comparison.newResult() or comparison.missingResult()):
                 return True
         return False
-    def performOnFile(self, fileName, comparison, diffProgram):
+    def performOnFile(self, tmpFile, comparison, diffProgram):
         stdFile = comparison.getStdFile(self.useFiltered())
-        tmpFile = comparison.getTmpFile(self.useFiltered())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
         guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
         guilog.info("-- original file : " + stdFile)
@@ -673,19 +675,20 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
         return self.differencesActive(comparison)
     def notifyViewFile(self, fileName, comparison):
         if self.differencesActive(comparison):
-            if os.path.isfile(fileName):
-                diffProgram = self.getViewToolName(fileName)
+            tmpFile = self.getFileToView(fileName, comparison)
+            if os.path.isfile(tmpFile):
+                diffProgram = self.getViewToolName(tmpFile)
                 if plugins.canExecute(diffProgram):
-                    self.performOnFile(fileName, comparison, diffProgram)
+                    self.performOnFile(tmpFile, comparison, diffProgram)
                 elif diffProgram:
                     self.notify("Error", "Cannot find graphical difference program '" + diffProgram + \
                                 "'.\nPlease install it somewhere on your PATH or change the\nconfiguration entry 'diff_program'.")
                 else:
                     self.notify("Warning", "No graphical difference program is defined for files of type '" + \
-                                os.path.basename(fileName).split(".")[0] + \
+                                os.path.basename(tmpFile).split(".")[0] + \
                                 "'.\nPlease point the configuration entry 'diff_program' at a valid program to visualize the differences.")
             else:
-                self.handleNoFile(fileName)
+                self.handleNoFile(tmpFile)
 
 class FollowFile(FileViewAction):
     def _getTitle(self):

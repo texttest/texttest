@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import default, plugins, os, subprocess, signal
+import default, plugins, os, sys, subprocess, signal
 from respond import Responder
 from socket import gethostname
                 
@@ -25,13 +25,18 @@ class RunTest(default.RunTest):
         testCommand += " > " + outfile
         errfile = test.makeTmpFileName("errors")
         return testCommand + " 2> " + errfile
+
+# Exists only to turn a signal into an exception
+class ConnectionComplete:
+    pass
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
 class VirtualDisplayResponder(Responder):
-    MAX_DISPLAY = 32768
     def __init__(self, optionMap):
-        self.serverInfo = None
+        self.displayName = None
+        self.displayMachine = None
+        self.displayPid = None
         self.diag = plugins.getDiagnostics("virtual display")
     
     def addSuites(self, suites):
@@ -39,24 +44,20 @@ class VirtualDisplayResponder(Responder):
         # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
         if os.name != "posix":
             self.setHideWindows(guiSuites)
-        elif self.serverInfo:
-            self.setExistingDisplay(guiSuites)
+        elif self.displayName:
+            self.setDisplayVariable(guiSuites)
         else:
             self.setUpVirtualDisplay(guiSuites)
-    def setExistingDisplay(self, guiSuites):
-        machine, proc = self.serverInfo
-        displayName = self.getDisplayName(machine, self.getDisplayNumber())
-        self.setDisplayVariable(guiSuites, displayName)
 
     def setHideWindows(self, suites):
         for suite in suites:
             suite.setEnvironment("DISPLAY", "HIDE_WINDOWS")
-        if len(suites) > 0 and not self.serverInfo:
+        if len(suites) > 0 and not self.displayName:
             print "Tests will run with windows hidden"
 
-    def setDisplayVariable(self, guiSuites, displayName):
+    def setDisplayVariable(self, guiSuites):
         for suite in guiSuites:
-            suite.setEnvironment("DISPLAY", displayName)
+            suite.setEnvironment("DISPLAY", self.displayName)
 
     def getXvfbLogDir(self, guiSuites):
         if len(guiSuites) > 0:
@@ -65,26 +66,24 @@ class VirtualDisplayResponder(Responder):
     def setUpVirtualDisplay(self, guiSuites):
         machines = self.findMachines(guiSuites)
         logDir = self.getXvfbLogDir(guiSuites)
-        display = self.getDisplay(machines, logDir)
+        machine, display, pid = self.getDisplay(machines, logDir)
         if display:
-            self.setDisplayVariable(guiSuites, display)
+            self.displayName = display
+            self.displayMachine = machine
+            self.displayPid = pid
+            self.setDisplayVariable(guiSuites)
             print "Tests will run with DISPLAY variable set to", display
         elif len(machines) > 0:
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
 
     def getDisplay(self, machines, logDir):
-        displayNumber = self.getDisplayNumber()
         for machine in machines:
-            if self.createDisplay(machine, displayNumber, logDir):
-                return self.getDisplayName(machine, displayNumber)
+            displayName, pid = self.createDisplay(machine, logDir)
+            if displayName:
+                return machine, displayName, pid
             else:
-                plugins.printWarning("Virtual display program Xvfb not available on " + machine) 
-
-    def getDisplayNumber(self):
-        # We use the device of making the display number match our process ID (mod 32768)!
-        # And we hope that works :) Should prevent clashes with others using the same strategy anyway
-        # Display numbers up to 32768 seem to be allowed, which is less than most process IDs on systems I've observed...
-        return str(os.getpid() % self.MAX_DISPLAY)
+                plugins.printWarning("Virtual display program Xvfb not available on " + machine)
+        return None, None, None
     
     def findMachines(self, suites):
         allMachines = []
@@ -99,79 +98,64 @@ class VirtualDisplayResponder(Responder):
     def notifyExit(self, *args):
         self.cleanXvfb()
     def cleanXvfb(self):
-        if self.serverInfo:
-            machine, proc = self.serverInfo
-            if machine == "localhost":
-                print "Killing Xvfb process", proc.pid
+        if self.displayName:
+            if self.displayMachine == "localhost":
+                print "Killing Xvfb process", self.displayPid
                 try:
-                    os.kill(proc.pid, signal.SIGINT)
+                    os.kill(int(self.displayPid), signal.SIGTERM)
                 except OSError:
                     print "Process had already terminated"
-                proc.wait()
-                self.cleanLeakedLockFiles()
             else:
-                self.killRemoteServer(machine)
-            self.serverInfo = None
-            
-    def cleanLeakedLockFiles(self):
-        # Xvfb sometimes leaves lock files lying around, clean up
-        for lockFile in self.getLockFiles():
-            if os.path.isfile(lockFile):
-                print "Xvfb leaked lock file at", lockFile, "attempting to remove it"
-                try:
-                    os.remove(lockFile)
-                except:
-                    print "Failed to do so: ", plugins.getExceptionString()
-                
-    def getLockFiles(self):
-        num = self.getDisplayNumber()
-        lockFile = "/tmp/.X" + num + "-lock"
-        xFile = "/tmp/.X11-unix/X" + num
-        return [ lockFile, xFile ]
+                self.killRemoteServer()
+            self.displayName = None
 
-    def killRemoteServer(self, machine):
-        self.diag.info("Getting ps output from " + machine)
-        pid = self.findRemoteServerPid(machine)
-        if pid:
-            print "Killing remote Xvfb process on", machine, "with pid", pid
-            subprocess.call([ "rsh", machine, "kill", pid ])
-                
-    def findRemoteServerPid(self, machine):
-        psArgs = [ "rsh", machine, "ps -efl" ]
-        process = subprocess.Popen(psArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        outstr, errstr = process.communicate()
-        for line in outstr.splitlines():
-            if line.find("Xvfb") != -1 and line.find(self.getDisplayNumber()) != -1 and line.find("csh") == -1:
-                self.diag.info("Found Xvfb process running:\n" + line)
-                # Assumes linux ps output (!)
-                return line.split()[3]
+    def killRemoteServer(self):
+        self.diag.info("Getting ps output from " + self.displayMachine)
+        print "Killing remote Xvfb process on", self.displayMachine, "with pid", self.displayPid
+        subprocess.call([ "rsh", self.displayMachine, "kill", self.displayPid ])
 
-    def createDisplay(self, machine, displayNumber, logDir):
-        if machine != "localhost" and not self.canRunVirtualServer(machine):
-            return False
-            
-        startArgs = self.getVirtualServerArgs(machine, displayNumber)
+    def createDisplay(self, machine, logDir):
+        if not self.canRunVirtualServer(machine):
+            return None, None
+
+        plugins.ensureDirectoryExists(logDir)
+        startArgs = self.getVirtualServerArgs(machine, logDir)
         self.diag.info("Starting Xvfb using args " + repr(startArgs))
+        proc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        line = proc.stdout.readline()
+        proc.stdout.close()
         try:
-            local = "Xvfb." + machine.replace("localhost", gethostname()) + "." + displayNumber
-            logFile = plugins.openForWrite(os.path.join(logDir, local))
-            proc = subprocess.Popen(startArgs, stdout=logFile, stderr=subprocess.STDOUT)
-            self.serverInfo = machine, proc
-            return True
-        except OSError:
-            return False
-    def getVirtualServerArgs(self, machine, displayNumber):
-        # -ac option disables all access control so we can get at it from elsewhere
+            displayNum, pid = line.strip().split(",")
+            return self.getDisplayName(machine, displayNum), pid
+        except ValueError:
+            print "Failed to parse line :\n " + line
+            return None, None
+            
+    def getVirtualServerArgs(self, machine, logDir):
+        binDir = plugins.installationDir("bin")
+        fullPath = os.path.join(binDir, "startXvfb.py")
         if machine == "localhost":
-            return [ "Xvfb", "-ac", "-audit", "2", ":" + displayNumber ]
+            return [ sys.executable, fullPath, logDir ]
         else:
-            return [ "rsh", machine, "Xvfb -ac -audit 2 :" + displayNumber ]
+            remotePython = self.findRemotePython(binDir)
+            return [ "rsh", machine, remotePython + " -u " + fullPath + " " + logDir ]
+
+    def findRemotePython(self, binDir):
+        # In case it isn't the default, allow for a ttpython script in the installation
+        localPointer = os.path.join(binDir, "ttpython")
+        if os.path.isfile(localPointer):
+            return localPointer
+        else:
+            return "python"
+        
     def getDisplayName(self, machine, displayNumber):
         return machine + ":" + displayNumber + ".0"
 
     def canRunVirtualServer(self, machine):
         # If it's not localhost, we need to make sure it exists and has Xvfb installed
-        whichArgs = [ "rsh", machine, "which", "Xvfb" ]
-        whichProc = subprocess.Popen(whichArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        whichArgs = [ "which", "Xvfb" ]
+        if machine != "localhost":
+            whichArgs = [ "rsh", machine ] + whichArgs
+        whichProc = subprocess.Popen(whichArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         outStr, errStr = whichProc.communicate()
         return len(errStr) == 0 and outStr.find("not found") == -1

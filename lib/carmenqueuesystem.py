@@ -274,8 +274,15 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         if test.parent is None:
             for var, value in self.getCarmenEnvironment(test.app):
                 test.setEnvironment(var, value)
+    def cleanGtkEnvironment(self, var):
+        # Remove all paths from our tested GTK environment, so that tested apps get the system defaults
+        allPaths = os.getenv(var).split(os.pathsep)
+        filteredPaths = filter(lambda path: not path.startswith("/usr/local/tt-env"), allPaths)
+        return os.pathsep.join(filteredPaths)
     def getCarmenEnvironment(self, app):
-        envVars = [ ("ARCHITECTURE", getArchitecture(app)), ("BITMODE", getBitMode(app)) ]
+        envVars = [ ("ARCHITECTURE", getArchitecture(app)), ("BITMODE", getBitMode(app)), \
+                    ("LD_LIBRARY_PATH", self.cleanGtkEnvironment("LD_LIBRARY_PATH")), \
+                    ("PYTHONPATH", self.cleanGtkEnvironment("PYTHONPATH")) ]
         majReleaseVersion = getMajorReleaseVersion(app)
         if majReleaseVersion != "none":
             envVars += [ ("MAJOR_RELEASE_VERSION", majReleaseVersion), \

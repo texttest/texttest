@@ -1,11 +1,4 @@
 
-style "_TextTest"
-{ 
-  font_name = "Luxi Sans 10"
-}
-
-widget "*" style "_TextTest"
-
 style "_TextInfo"
 {
   font_name = "Courier 10"

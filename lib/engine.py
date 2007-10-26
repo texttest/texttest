@@ -20,6 +20,8 @@ class UniqueNameFinder(Responder):
             self.storeUnique(oldTest, test)
         else:
             self.name2test[test.name] = test
+    def notifyRemove(self, test):
+        del self.name2test[test.name]
     def findParentIdentifiers(self, oldTest, newTest):
         oldParentId = " at top level"
         if oldTest.parent:

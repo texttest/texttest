@@ -511,7 +511,8 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notify("AllRead", suites)
         if self.dynamic and len(suites) == 0:
             guilog.info("There weren't any tests to run, terminating...")
-            self.terminate()
+            self.exitStatus |= self.COMPLETION_NOTIFIED
+            self.topWindowGUI.notifyQuit()
             
     def notifyAdd(self, *args, **kwargs):
         self.notify("Add", *args, **kwargs)

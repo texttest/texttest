@@ -431,7 +431,7 @@ class QueueSystemServer(BaseActionRunner):
                 
     def handleLocalError(self, test, previouslySubmitted):
         self.handleErrorState(test, previouslySubmitted)
-        if self.testCount == 0:
+        if self.testCount == 0 or (self.reuseOnly and self.testsSubmitted == 0):
             self.diag.info("Submitting terminators after local error")
             self.submitTerminators()
     def submitTerminators(self):
@@ -480,22 +480,31 @@ class QueueSystemServer(BaseActionRunner):
     def sendServerState(self, state):
         self.diag.info("Sending server state '" + state + "'")
         sendServerState(state)
+    def getTestForRunNormalMode(self):
+        self.reuseOnly = False
+        reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=False)
+        if reuseFailure:
+            self.diag.info("Found a reuse failure...")
+            return reuseFailure
+        else:
+            self.diag.info("Waiting for new tests...")
+            return self.getTest(block=True)
+    def getTestForRunReuseOnlyMode(self):
+        self.reuseOnly = True
+        self.diag.info("Waiting for reuse failures...")
+        reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=True)
+        if reuseFailure:
+            return reuseFailure
+        elif self.testCount > 0 and self.testsSubmitted < self.maxCapacity:
+            # Try again, the capacity situation has changed...
+            return self.getTestForRunNormalMode()
+
     def getTestForRun(self):
         if self.testsSubmitted < self.maxCapacity:
-            self.reuseOnly = False
-            reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=False)
-            if reuseFailure:
-                self.diag.info("Found a reuse failure...")
-                return reuseFailure
-            else:
-                self.diag.info("Waiting for new tests...")
-                return self.getTest(block=True)
-        else:
-            if self.testCount == 0:
-                return 
-            self.reuseOnly = True
-            self.diag.info("Waiting for reuse failures...")
-            return self.getItemFromQueue(self.reuseFailureQueue, block=True)
+            return self.getTestForRunNormalMode()
+        elif self.testCount > 0:
+            return self.getTestForRunReuseOnlyMode()
+    
     def cleanup(self):
         self.sendServerState("Completed submission of all tests")
     def remainStr(self):

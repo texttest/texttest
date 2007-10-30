@@ -113,12 +113,12 @@ class VirtualDisplayResponder(Responder):
         self.diag.info("Starting Xvfb using args " + repr(startArgs))
         proc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         line = proc.stdout.readline()
-        proc.stdout.close()
         try:
             displayNum, pid = line.strip().split(",")
+            proc.stdout.close()
             return self.getDisplayName(machine, displayNum), pid
         except ValueError:
-            print "Failed to parse line :\n " + line
+            print "Failed to parse line :\n " + line + proc.stdout.read()
             return None, None
             
     def getVirtualServerArgs(self, machine, logDir):

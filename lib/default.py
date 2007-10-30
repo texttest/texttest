@@ -1305,7 +1305,7 @@ class RunTest(plugins.Action):
     def killProcess(self):
         print "Killing running test (process id", str(self.currentProcess.pid) + ")"
         proc = JobProcess(self.currentProcess.pid)
-        proc.killAll(self.killSignal)    
+        proc.killAll()    
     
     def wait(self, process):
         try:
@@ -1323,9 +1323,17 @@ class RunTest(plugins.Action):
     def getTestProcess(self, test):
         commandArgs = self.getExecuteCmdArgs(test)
         self.diag.info("Running test with args : " + repr(commandArgs))
-        return subprocess.Popen(commandArgs, stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
+        return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
+                                stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
                                 stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
                                 env=test.getRunEnvironment(), startupinfo=plugins.getProcessStartUpInfo(test.getEnvironment))
+    def getPreExecFunction(self):
+        if os.name == "posix":
+            return self.ignoreJobControlSignals
+    def ignoreJobControlSignals(self):
+        for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
+            signal.signal(signum, signal.SIG_IGN)
+            
     def getCmdParts(self, test):
         args = []
         interpreter = test.getConfigValue("interpreter")

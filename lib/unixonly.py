@@ -8,23 +8,13 @@ class RunTest(default.RunTest):
     def __init__(self, hasAutomaticCputimeChecking):
         default.RunTest.__init__(self)
         self.hasAutomaticCputimeChecking = hasAutomaticCputimeChecking
-    def getTestProcess(self, test):
-        if not self.hasAutomaticCputimeChecking(test.app):
-            return default.RunTest.getTestProcess(self, test) # Don't bother with this if we aren't measuring CPU time!
-
-        cmdArgs = [ "time", "-p", "sh", "-c", self.getExecuteCommand(test) ]
-        self.diag.info("Running performance-test with args : " + repr(cmdArgs))
-        stderrFile = test.makeTmpFileName("unixperf", forFramework=1)
-        return subprocess.Popen(cmdArgs, stdin=open(os.devnull), cwd=test.getDirectory(temporary=1),\
-                                env=test.getRunEnvironment(), stdout=open(os.devnull, "w"), stderr=open(stderrFile, "w"))
-    def getExecuteCommand(self, test):
-        cmdParts = self.getCmdParts(test)
-        testCommand = " ".join(cmdParts)
-        testCommand += " < " + self.getInputFile(test)
-        outfile = test.makeTmpFileName("output")
-        testCommand += " > " + outfile
-        errfile = test.makeTmpFileName("errors")
-        return testCommand + " 2> " + errfile
+    def getExecuteCmdArgs(self, test):
+        origArgs = default.RunTest.getExecuteCmdArgs(self, test)
+        if self.hasAutomaticCputimeChecking(test.app):
+            perfFile = test.makeTmpFileName("unixperf", forFramework=1)
+            return [ "time", "-p", "-o", perfFile ] + origArgs
+        else:
+            return origArgs
 
 # Exists only to turn a signal into an exception
 class ConnectionComplete:

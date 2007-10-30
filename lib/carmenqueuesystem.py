@@ -323,16 +323,11 @@ class RunWithParallelAction(plugins.Action):
         else:
             jobProc = JobProcess(self.baseRunner.currentProcess.pid)
             if self.hasAutomaticCpuTimeChecking(test.app):
-                # Here we expect the given process to be "time", with a shell subprocess
+                # Here we expect the given process to be "time"
                 for attempt in range(5):
                     childProcs = jobProc.findChildProcesses()
-                    if len(childProcs) > 1:
-                        if childProcs[1].getName():
-                            return childProcs[1]
-                        else:
-                            # For powerpc, there is one less process level.
-                            # ChildProcs[1] is the ps process, which is dead
-                            return childProcs[0]
+                    if len(childProcs) > 0:
+                        return childProcs[0]
                 raise plugins.TextTestError, "Child processes didn't look as expected when running with automatic CPU time checking"
             return jobProc
     def findProcessInfo(self, test):

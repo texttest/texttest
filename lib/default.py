@@ -131,6 +131,9 @@ class Config:
             if self.optionMap.has_key(option):
                 return True
         return False
+    def noFileAdvice(self):
+        # What can we suggest if files aren't present? In this case, not much
+        return ""
         
     def useVirtualDisplay(self):
         # Don't try to set it if we're using the static GUI or

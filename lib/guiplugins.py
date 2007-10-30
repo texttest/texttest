@@ -552,11 +552,15 @@ class FileViewAction(InteractiveTestAction):
             return comparison.existingFile(self.useFiltered())
         else:
             return fileName
-        
+    def noFileAdvice(self):
+        if self.currentTest:
+            return "\n" + self.currentTest.app.noFileAdvice()
+        else:
+            return ""
+    
     def handleNoFile(self, fileName):
         self.notify("Error", "File '" + os.path.basename(fileName) + "' cannot be viewed"
-                    " as it has been removed in the file system.\n"
-                    "Try adjusting your temporary file options and rerunning.")
+                    " as it has been removed in the file system." + self.noFileAdvice())
          
     def getViewTool(self, fileName):
         viewProgram = self.getViewToolName(fileName)

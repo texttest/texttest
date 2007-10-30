@@ -109,6 +109,12 @@ class QueueSystemConfig(default.Config):
             return slaveDir
         else:
             return default.Config.getWriteDirectoryName(self, app)
+    def noFileAdvice(self):
+        if self.useQueueSystem():
+            return "Try re-running the test, and either use local mode, or check the box for keeping\n" + \
+                   "successful test files under the Running/Advanced tab in the static GUI"
+        else:
+            return ""
     def useExtraVersions(self, app):
         return default.Config.useExtraVersions(self, app) and not self.slaveRun()
     def keepTemporaryDirectories(self):

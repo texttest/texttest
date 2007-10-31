@@ -272,17 +272,22 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def setEnvironment(self, test):
         queuesystem.QueueSystemConfig.setEnvironment(self, test)
         if test.parent is None:
-            for var, value in self.getCarmenEnvironment(test.app):
+            for var, value in self.getCarmenEnvironment(test.app) + self.getCleanedGtkEnvironment():
                 test.setEnvironment(var, value)
     def cleanGtkEnvironment(self, var):
         # Remove all paths from our tested GTK environment, so that tested apps get the system defaults
         allPaths = os.getenv(var).split(os.pathsep)
         filteredPaths = filter(lambda path: not path.startswith("/usr/local/tt-env"), allPaths)
         return os.pathsep.join(filteredPaths)
+    def getCleanedGtkEnvironment(self):
+        gtkEnvVars = [ "LD_LIBRARY_PATH", "PYTHONPATH", "GTK2_RC_FILES",
+                       "GTK_PATH", "GTK_DATA_PREFIX", "XDG_DATA_DIRS" ]
+        envVars = []
+        for envVar in gtkEnvVars:
+            envVars.append((envVar, self.cleanGtkEnvironment(envVar)))
+        return envVars
     def getCarmenEnvironment(self, app):
-        envVars = [ ("ARCHITECTURE", getArchitecture(app)), ("BITMODE", getBitMode(app)), \
-                    ("LD_LIBRARY_PATH", self.cleanGtkEnvironment("LD_LIBRARY_PATH")), \
-                    ("PYTHONPATH", self.cleanGtkEnvironment("PYTHONPATH")) ]
+        envVars = [ ("ARCHITECTURE", getArchitecture(app)), ("BITMODE", getBitMode(app)) ]
         majReleaseVersion = getMajorReleaseVersion(app)
         if majReleaseVersion != "none":
             envVars += [ ("MAJOR_RELEASE_VERSION", majReleaseVersion), \

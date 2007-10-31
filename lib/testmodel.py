@@ -1061,7 +1061,8 @@ class Application:
         for module in self.getConfigValue("interactive_action_module"):
             interactiveActionHandler.loadModules.append(module)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
-        self.writeDirectory = os.path.join(self.rootTmpDir, self.getWriteDirectoryName())    
+        self.writeDirectory = self.getWriteDirectory()
+        self.rootTmpDir = os.path.dirname(self.writeDirectory)
         self.diag.info("Write directory at " + self.writeDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
@@ -1288,11 +1289,9 @@ class Application:
                 return optionGroup
     def _getRootTmpDir(self):
         if not os.getenv("TEXTTEST_TMP"):
-            if os.name == "nt" and os.getenv("TEMP"):
-                os.environ["TEXTTEST_TMP"] = os.getenv("TEMP").replace("\\", "/")
-            else:
-                os.environ["TEXTTEST_TMP"] = "~/texttesttmp"
+            os.environ["TEXTTEST_TMP"] = self.configObject.getDefaultTextTestTmp()
         return os.path.expanduser(os.getenv("TEXTTEST_TMP"))
+
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:

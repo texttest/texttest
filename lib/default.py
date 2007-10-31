@@ -153,6 +153,18 @@ class Config:
             return [ "-c", checkout ]
         else:
             return []
+    def getRootTmpDir(self):
+        if not os.getenv("TEXTTEST_TMP"):
+            os.environ["TEXTTEST_TMP"] = self.getDefaultTextTestTmp()
+        return os.path.expanduser(os.getenv("TEXTTEST_TMP"))
+    def getDefaultTextTestTmp(self):
+        if os.name == "nt" and os.getenv("TEMP"):
+            return os.getenv("TEMP").replace("\\", "/")
+        else:
+            return "~/texttesttmp"
+
+    def getWriteDirectory(self, app):
+        return os.path.join(self.getRootTmpDir(), self.getWriteDirectoryName(app))
     def getWriteDirectoryName(self, app):
         parts = self.getBasicRunDescriptors(app) + self.getDescriptors("v") + [ self.getTimeDescriptor() ]
         return ".".join(parts)

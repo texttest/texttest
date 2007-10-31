@@ -241,6 +241,9 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return queuesystem.QueueSystemConfig.getSubmissionRules(self, test)
         else:
             return CarmenSgeSubmissionRules(self.optionMap, test, self.isNightJob())
+    def getDefaultTextTestTmp(self):
+        # Have a special disk for this...
+        return os.path.join("/carm/proj/texttest-tmp/", os.getenv("USER"))
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession != "release" and batchSession in self.getFilteredBatchSessions()
@@ -315,7 +318,8 @@ class RunWithParallelAction(plugins.Action):
         try:
             execProcess, parentProcess = self.findProcessInfo(test)
             self.performParallelAction(test, execProcess, parentProcess)
-        except plugins.TextTestError:
+        except plugins.TextTestError, e:
+            self.diag.info("Caught no time available exception :\n" + str(e))
             self.handleNoTimeAvailable(test)
     def getTestProcess(self, test):
         state = test.state # cache to avoid race conditions
@@ -333,6 +337,7 @@ class RunWithParallelAction(plugins.Action):
                     childProcs = jobProc.findChildProcesses()
                     if len(childProcs) > 0:
                         return childProcs[0]
+                    time.sleep(0.1)
                 raise plugins.TextTestError, "Child processes didn't look as expected when running with automatic CPU time checking"
             return jobProc
     def findProcessInfo(self, test):

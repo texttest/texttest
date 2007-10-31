@@ -141,6 +141,7 @@ itemNamesConfigKey = "_itemnames_map"
 # Names of reported entries
 costEntryName = "cost of plan"
 timeEntryName = "cpu time"
+execTimeEntryName = "execution time"
 memoryEntryName = "memory"
 methodEntryName = "Running.*\.\.\."
 periodEntryName = "Period\."
@@ -622,6 +623,8 @@ class OptimizationValueCalculator:
     def calculateEntry(self, item, line):
         if item == timeEntryName:
             return self.convertTime(line)
+        elif item == execTimeEntryName:
+            return self.getExecTime(line)
         elif item == memoryEntryName:
             return self.getMemory(line)
         elif item == methodEntryName:
@@ -643,7 +646,7 @@ class OptimizationValueCalculator:
         except ValueError:
             return lastField.strip()
     def convertTime(self, timeLine):
-        # Get line _after_ timeEntryName
+        # Get part of line _after_ timeEntryName
         position = self.regexps[timeEntryName].search(timeLine.strip())
         cutLine = timeLine[position.start():]
         # Find first pattern after timeEntryName
@@ -654,6 +657,16 @@ class OptimizationValueCalculator:
         entries = timeEntry[0].split(":")
         timeInSeconds = int(entries[0]) * 3600 + int(entries[1]) * 60 + int(entries[2].strip()) 
         return float(timeInSeconds) / 60.0
+    def getExecTime(self, timeLine):
+        # Get part of line _after_ timeEntryName
+        position = self.regexps[execTimeEntryName].search(timeLine.strip())
+        cutLine = timeLine[position.start():]
+        # Find first pattern after timeEntryName
+        timeEntry = re.findall(r'[0-9]+\.?[0-9]*', cutLine)
+        if len(timeEntry) == 0:
+            # No match, return 0
+            return 0
+        return float(timeEntry[0]) / 60.0;
     def getMethod(self, methodLine):
         method = methodLine.replace("Running ", "")
         return method.replace("...", "")
@@ -1106,7 +1119,7 @@ class TestGraph:
                                                     "overcovers", "uncovered legs\.\.", "illegal trips........................", \
                                                     "overcovers,uncovered legs\.\.,illegal trips........................",
                                                     "apctimes","memory"]),
-                    ("ix", "Log file item to plot against", [timeEntryName, "Colgen iterations"]),
+                    ("ix", "Log file item to plot against", [timeEntryName, "Colgen iterations", execTimeEntryName]),
                     ("v", "Extra versions to plot", [""]),
                     ("title", "Title of the plot", [""]),
                     ("size", "size of the plot", [""]),
@@ -1289,22 +1302,27 @@ class TestGraph:
             xItem = timeEntryName
         plotTimeScale = self.optionGroup.getOptionValue("ts")
         plotAgainstSolution = self.optionGroup.getSwitchValue("s")
-        if xItem != timeEntryName:
-            self.axisXLabel = xItem
-        elif plotAgainstSolution:
+        if plotAgainstSolution:
             self.axisXLabel = "Solution number"
-        else:
+        elif xItem in [timeEntryName, execTimeEntryName]:
+            if xItem == timeEntryName:
+                timeLabel = "CPU time"
+            else:
+                timeLabel = "Execution time"
             if plotTimeScale == "hours":
                 self.xScaleFactor = 1.0/60.0
-                self.axisXLabel = "CPU time (hours)"
+                self.axisXLabel = timeLabel + " (hours)"
             elif plotTimeScale == "days":
                 self.xScaleFactor = 1.0/(60.0*24.0)
-                self.axisXLabel = "CPU time (days)"
+                self.axisXLabel = timeLabel + " (days)"
             else:
                 if not plotTimeScale == "minutes":
                     print "Unknown time scale unit", plotTimeScale, ", using minutes."
                 self.xScaleFactor = 1.0
-                self.axisXLabel = "CPU time (min)"
+                self.axisXLabel = timeLabel + " (min)"
+        else:
+            self.axisXLabel = xItem
+
     def getXAxisLabel(self):
         return self.axisXLabel
     # The routines below are the ones creating all the PlotLine instances for ONE test.

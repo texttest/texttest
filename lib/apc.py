@@ -231,6 +231,7 @@ class ApcConfig(optimization.OptimizationConfig):
         optimization.OptimizationConfig.setApplicationDefaults(self, app)
         self.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
         self.itemNamesInFile[optimization.timeEntryName] = "cpu time|cpu-tid|cpu-zeit"
+        self.itemNamesInFile[optimization.execTimeEntryName] = "^Time: "
         self.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
         if app.name == "cas_apc":
             self.itemNamesInFile[optimization.costEntryName] = "rule cost"
@@ -1950,7 +1951,7 @@ class ApcTestTable(optimization.TestTable):
         colourFinder = testoverview.colourFinder
         bgcol = colourFinder.find("failure_bg")
         fgcol = colourFinder.find("test_default_fg")
-        if type == "faster" or type == "slower":
+        if type.find("faster") == 0 or type.find("slower") == 0:
             bgcol = colourFinder.find("performance_bg")
             result = self.getPercent(detail)
             if result[0] and result[1] >= 5:

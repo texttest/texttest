@@ -242,6 +242,8 @@ class TestTable:
         result = re.sub('used less memory','', result)
         result = re.sub('ran faster','', result)
         result = re.sub('ran slower','', result)
+        result = re.sub('faster\([^ ]+\) ','', result)
+        result = re.sub('slower\([^ ]+\) ','', result)
         return result
     
     def getColors(self, type, detail):

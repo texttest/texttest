@@ -1049,7 +1049,6 @@ class Application:
         self.fullName = self.getConfigValue("full_name")
         self.diag.info("Found application " + repr(self))
         self.configObject = self.makeConfigObject()
-        self.rootTmpDir = self._getRootTmpDir()
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
@@ -1287,11 +1286,7 @@ class Application:
         for optionGroup in optionGroups:
             if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):
                 return optionGroup
-    def _getRootTmpDir(self):
-        if not os.getenv("TEXTTEST_TMP"):
-            os.environ["TEXTTEST_TMP"] = self.configObject.getDefaultTextTestTmp()
-        return os.path.expanduser(os.getenv("TEXTTEST_TMP"))
-
+    
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:

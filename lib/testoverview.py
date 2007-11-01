@@ -128,7 +128,9 @@ class GenerateWebPages:
         loggedTests[keyExtraVersion][key][tag] = state
         categoryHandler.registerInCategory(tag, key, state, keyExtraVersion)
     def findExtraVersion(self, repository):
-        for version in os.path.basename(repository).split("."):
+        versions = os.path.basename(repository).split(".")
+        for i in xrange(len(versions)):
+            version = ".".join(versions[i:])
             if version in self.extraVersions:
                 return version
         return "None"

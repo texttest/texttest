@@ -505,15 +505,21 @@ class GenerateHistoricalReport(plugins.Action):
         dirlist.sort()
         for dir in dirlist:
             dirVersions = dir.split(".")
-            if self.isSubset(app.versions, dirVersions) and not dirVersions[-1] in extraVersions:
-                subdirs.append(os.path.join(repository, dir))
+            if self.isSubset(app.versions, dirVersions):
+                # Check all tails that this is not an extraVersion
+                inExtraVersions = False;
+                for pos in xrange(len(dirVersions)):
+                    inExtraVersions = inExtraVersions or ".".join(dirVersions[pos:]) in extraVersions
+                if not inExtraVersions:
+                    subdirs.append(os.path.join(repository, dir))
         return subdirs
     def getExtraVersions(self, app):
         extraVersions = []
+        length = len(app.versions)
         for extraApp in app.extras:
-            for version in extraApp.versions:
-                if not version in app.versions:
-                    extraVersions.append(version)
+            version = ".".join(extraApp.versions[length:])
+            if not version in app.versions:
+                extraVersions.append(version)
         return extraVersions
     def isSubset(self, appVersions, dirVersions):
         for version in appVersions:

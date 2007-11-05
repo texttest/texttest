@@ -100,6 +100,7 @@ def createTests(reldir):
     testDir = os.path.join(reldir, "tests")
     os.rename("Testing/Automatic", testDir)
     updateConfigFile(os.path.join(testDir, "texttest", "config.texttest"))
+    updateConfigFile(os.path.join(testDir, "texttest", "config.ttinst"))
     extensions = [ "parisc_2_0", "powerpc", "sparc", "nonlinux", "carmen", "rhel3", "newgtk", "cover", "ttrel" ]
     pruneFilesWithExtensions(testDir, extensions)
 

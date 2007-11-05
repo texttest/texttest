@@ -15,15 +15,12 @@ class RunTest(default.RunTest):
             return [ "time", "-p", "-o", perfFile ] + origArgs
         else:
             return origArgs
-
-# Exists only to turn a signal into an exception
-class ConnectionComplete:
-    pass
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
 class VirtualDisplayResponder(Responder):
     def __init__(self, optionMap):
+        Responder.__init__(self, optionMap)
         self.displayName = None
         self.displayMachine = None
         self.displayPid = None
@@ -92,7 +89,7 @@ class VirtualDisplayResponder(Responder):
             if self.displayMachine == "localhost":
                 print "Killing Xvfb process", self.displayPid
                 try:
-                    os.kill(int(self.displayPid), signal.SIGTERM)
+                    os.kill(self.displayPid, signal.SIGTERM)
                 except OSError:
                     print "Process had already terminated"
             else:
@@ -102,7 +99,7 @@ class VirtualDisplayResponder(Responder):
     def killRemoteServer(self):
         self.diag.info("Getting ps output from " + self.displayMachine)
         print "Killing remote Xvfb process on", self.displayMachine, "with pid", self.displayPid
-        subprocess.call([ "rsh", self.displayMachine, "kill", self.displayPid ])
+        subprocess.call([ "rsh", self.displayMachine, "kill", str(self.displayPid) ])
 
     def createDisplay(self, machine, logDir):
         if not self.canRunVirtualServer(machine):
@@ -112,9 +109,9 @@ class VirtualDisplayResponder(Responder):
         startArgs = self.getVirtualServerArgs(machine, logDir)
         self.diag.info("Starting Xvfb using args " + repr(startArgs))
         proc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        line = proc.stdout.readline()
+        line = plugins.retryOnInterrupt(proc.stdout.readline)
         try:
-            displayNum, pid = line.strip().split(",")
+            displayNum, pid = map(int, line.strip().split(","))
             proc.stdout.close()
             return self.getDisplayName(machine, displayNum), pid
         except ValueError:
@@ -139,7 +136,7 @@ class VirtualDisplayResponder(Responder):
             return "python"
         
     def getDisplayName(self, machine, displayNumber):
-        return machine + ":" + displayNumber + ".0"
+        return machine + ":" + str(displayNumber) + ".0"
 
     def canRunVirtualServer(self, machine):
         # If it's not localhost, we need to make sure it exists and has Xvfb installed

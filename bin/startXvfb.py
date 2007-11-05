@@ -16,6 +16,9 @@ Xvfb_ready = False
 
 class ConnectionComplete:
     pass
+
+class ConnectionTimeout:
+    pass
     
 def setReadyFlag(self, *args):
     global Xvfb_ready
@@ -23,6 +26,9 @@ def setReadyFlag(self, *args):
 
 def connectionComplete(self, *args):
     raise ConnectionComplete()
+
+def connectionFailed(self, *args):
+    raise ConnectionTimeout()
 
 def ignoreSignals():
     for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
@@ -58,8 +64,14 @@ def runXvfb(logDir):
                             stdout=open(logFile, "w"), stderr=subprocess.STDOUT, stdin=open(os.devnull))
     try:
         signal.signal(signal.SIGUSR1, connectionComplete)
+        signal.signal(signal.SIGALRM, connectionFailed)
         if not Xvfb_ready:
-            signal.pause() # Wait until we know Xvfb is ready to be connected to before proceeding
+            signal.alarm(int(os.getenv("TEXTTEST_XVFB_WAIT", 30)))
+            signal.pause() # Wait until we know Xvfb is ready to be connected to before proceeding, or we time out
+    except ConnectionTimeout:
+        # Just kill it and try again. This should only happen very rarely and it will probably work next time round...
+        os.kill(proc.pid, signal.SIGTERM)
+        return runXvfb(logDir)
     except ConnectionComplete:
         pass
 

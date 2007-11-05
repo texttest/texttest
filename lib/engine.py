@@ -331,7 +331,7 @@ class TextTest(Responder, plugins.Observable):
         return mainThreadRunner, allRunners
     def runThreads(self):
         # Set the signal handlers to use when running
-        self.setSignalHandlers(self.handleSignalWhileRunning)
+        self.setSignalHandlers(self.handleSignal)
         # Run the first one as the main thread and the rest in subthreads
         # Make sure all of them are finished before we stop
         mainThreadRunner, subThreadRunners = self.findThreadRunners()
@@ -373,18 +373,17 @@ class TextTest(Responder, plugins.Observable):
     def setSignalHandlers(self, handler):
         for sig in self.getSignals():
             signal.signal(sig, handler)
-    def handleSignalWhileStarting(self, sig, stackFrame):
-        # Don't respond to the same signal more than once!
-        signal.signal(sig, signal.SIG_IGN)
-        signalText = self.getSignalText(sig)
-        self.writeTermMessage(signalText)
-        raise KeyboardInterrupt, signalText
-    def handleSignalWhileRunning(self, sig, stackFrame):
+    def handleSignal(self, sig, stackFrame):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
         signalText = self.getSignalText(sig)
         self.writeTermMessage(signalText)
         self.notify("Exit", sig)
+        return signalText
+    def handleSignalWhileStarting(self, sig, stackFrame):
+        signalText = self.handleSignal(sig, stackFrame)
+        raise KeyboardInterrupt, signalText
+
     def writeTermMessage(self, signalText):
         message = "Terminating testing due to external interruption"
         if signalText:

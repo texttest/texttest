@@ -1211,21 +1211,11 @@ class Application:
             if appName != self.name and not appName in names:
                 names.append(appName)
         return names
-    def getExtraVersions(self, forUse=True):
-        if forUse and not self.useExtraVersions():
-            return []
-        
-        extraVersions = self.getConfigValue("extra_version")
-        for extra in extraVersions:
-            if extra in self.versions:
-                return []
-        return extraVersions
     def setConfigDefaults(self):
         self.setConfigDefault("binary", "", "Full path to the System Under Test")
         self.setConfigDefault("config_module", "default", "Configuration module to use")
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
-        self.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
         # various varieties of test data
         self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")

@@ -78,6 +78,25 @@ class Config:
         return self.optionMap.has_key("con")
     def useExtraVersions(self, app):
         return not self.useStaticGUI(app)
+    def getExtraVersions(self, app, forUse=True):
+        if forUse and not self.useExtraVersions(app):
+            return []
+        
+        extraVersions = self.getExtraVersionsFromConfig(app)
+        for extra in extraVersions:
+            if extra in app.versions:
+                return []
+        return extraVersions
+
+    def getExtraVersionsFromConfig(self, app):
+        basic = app.getConfigValue("extra_version")
+        batchSession = self.optionMap.get("b")
+        if batchSession is not None:
+            for batchExtra in app.getCompositeConfigValue("batch_extra_version", batchSession):
+                if batchExtra not in basic:
+                    basic.append(batchExtra)
+        return basic
+
     def getDefaultInterface(self, allApps):
         defaultIntf = None
         for app in allApps:
@@ -684,6 +703,8 @@ class Config:
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
+        app.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
+        app.setConfigDefault("batch_extra_version", { "default" : [] }, "Versions to be run in addition to the one specified, for particular batch sessions")
         app.addConfigEntry("definition_file_stems", "options")
         app.addConfigEntry("definition_file_stems", "usecase")
         app.addConfigEntry("definition_file_stems", "traffic")

@@ -988,10 +988,19 @@ class TestTreeGUI(ContainerGUI):
         if not self.dynamic:
             self.collapseStatic = guiConfig.getValue("static_collapse_suites")
     def notifyAllRead(self, suites):
-        self.treeView.connect('row-expanded', self.describeTree) # later expansions should cause description...
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)
+        else:
+            self.newTestsVisible = True
+            self.model.foreach(self.makeRowVisible)
+            if self.collapseStatic:
+                self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
+            else:
+                self.treeView.expand_all()
+        self.treeView.connect('row-expanded', self.describeTree) # later expansions should cause description...
         self.contentsChanged()
+    def makeRowVisible(self, model, path, iter):
+        self.model.set_value(iter, 6, True)
     def addSuiteWithParent(self, suite, parent, follower=None):    
         iter = self.model.insert_before(parent, follower)
         nodeName = suite.name
@@ -1008,9 +1017,8 @@ class TestTreeGUI(ContainerGUI):
         self.updateStateInModel(suite, iter, suite.state)
         path = self.model.get_path(iter)
         if self.newTestsVisible and parent is not None:
-            if not self.collapseStatic or not suite.parent.parent:
-                filterPath = self.filteredModel.convert_child_path_to_path(path)
-                self.treeView.expand_to_path(filterPath)
+            filterPath = self.filteredModel.convert_child_path_to_path(path)
+            self.treeView.expand_to_path(filterPath)
                 
         return iter
     def updateStateInModel(self, test, iter, state):
@@ -2497,6 +2505,8 @@ class TestProgressMonitor(SubGUI):
     def addSuites(self, suites):
         if self.dynamic:
             self.notify("DefaultVisibility", self.showByDefault("not_started"))
+        else:
+            self.notify("DefaultVisibility", False)
     def getGroupTabTitle(self):
         return "Status"
     def shouldShow(self):

@@ -207,7 +207,7 @@ class CheckForCrashes(plugins.Action):
             return
         # Hard-coded prediction: check test didn't crash
         comparison, newList = test.state.findComparison("stacktrace")
-        if comparison:
+        if comparison and comparison.newResult():
             stackTraceFile = comparison.tmpFile
             self.diag.info("Parsing " + stackTraceFile)
             summary, errorInfo = self.parseStackTrace(test, stackTraceFile)

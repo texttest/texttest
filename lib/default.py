@@ -1555,14 +1555,17 @@ class ReconnectApp:
             else:
                 raise plugins.TextTestError, "Could not find TextTest temporary directory for " + reconnectTmpInfo + " at " + fetchDir
 
-        rootDirToCopy = app.getFileName([ fetchDir ], "", self.getVersionListTopDir)
-        if rootDirToCopy:
+        rootDirs = app.getAllFileNames([ fetchDir ], "", self.getVersionListTopDir)
+        if len(rootDirs) == 0:
+            raise plugins.TextTestError, "Could not find any runs matching " + app.description() + " under " + fetchDir
+
+        for rootDirToCopy in reversed(rootDirs):
             appRoot = app.getFileName([ rootDirToCopy ], app.name, self.getVersionListSubDir)
             if appRoot:
                 return appRoot
-            else:
-                raise plugins.TextTestError, "Could not find an application directory matching " + app.description() + " for run under " + rootDirToCopy
-        raise plugins.TextTestError, "Could not find any runs matching " + app.description() + " under " + fetchDir
+
+        raise plugins.TextTestError, "Could not find an application directory matching " + app.description() + \
+              " for any of the runs found under " + fetchDir
     def findReconnDirectory(self, fetchDir, app):
         return app.getFileName([ fetchDir ], app.name, self.getVersionList)
     def getVersionListTopDir(self, fileName, *args):

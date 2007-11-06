@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, types, string, plugins, exceptions, log4py, shutil
+import os, sys, types, string, plugins, exceptions, log4py, shutil, operator
 from time import time
 from fnmatch import fnmatch
 from usecase import ScriptEngine, UseCaseScriptError
@@ -62,14 +62,19 @@ class DirectoryCache:
         for fileName in self.contents:
             versions = methodToUse(fileName, stem)
             if not versions is None:
-                versionLists.append(versions)
-                versionInfo[".".join(versions)] = fileName
+                if versions not in versionLists:
+                    versionLists.append(versions)
+                versionInfo.setdefault(".".join(versions), []).append(fileName)
         return versionLists, versionInfo
     def findAndSortFiles(self, stem, allowed, priorityFunction, versionListMethod=None):
         versionLists, versionInfo = self.findVersionLists(stem, versionListMethod)
         versionLists = filter(lambda vlist: self.allVersionsAllowed(vlist, allowed), versionLists)
         versionLists.sort(priorityFunction)
-        return map(lambda vlist: self.pathName(versionInfo[".".join(vlist)]), versionLists)
+        return self.convertToPaths(versionLists, versionInfo)
+    def convertToPaths(self, versionLists, versionInfo):
+        allPathNames = [ map(self.pathName, versionInfo[".".join(vlist)]) for vlist in versionLists ]
+        return reduce(operator.add, allPathNames, [])
+    
     def findAllStems(self):
         stems = []
         for file in self.contents:
@@ -83,7 +88,7 @@ class DirectoryCache:
             versionLists = filter(lambda vlist: self.matchVersions(vlist, compulsory, forbidden), versionLists)
         if priorityFunction:
             versionLists.sort(priorityFunction)
-        return map(lambda vlist: self.pathName(versionInfo[".".join(vlist)]), versionLists)
+        return self.convertToPaths(versionLists, versionInfo)
     def allVersionsAllowed(self, vlist, allowed):
         for version in vlist:
             if not version in allowed:
@@ -1169,6 +1174,9 @@ class Application:
     def getFileName(self, dirList, stem, versionListMethod=None):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem, versionListMethod=versionListMethod)
+    def getAllFileNames(self, dirList, stem, versionListMethod=None):
+        dircaches = map(lambda dir: DirectoryCache(dir), dirList)
+        return self._getAllFileNames(dircaches, stem, versionListMethod=versionListMethod)
     def _getFileName(self, dircaches, stem, versionListMethod=None):
         allFiles = self._getAllFileNames(dircaches, stem, versionListMethod)
         if len(allFiles):

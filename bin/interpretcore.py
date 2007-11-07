@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import os, sys, string
+import os, sys
+from tempfile import mktemp
 
 def interpretCore(corefile):
     if os.path.getsize(corefile) == 0:
@@ -51,12 +52,12 @@ def getBinary(corefile):
     parts = local.split(".")
     # pick up temporary binaries (Carmen-hack...)
     if len(parts) > 2 and len(parts[0]) == 0 and parts[-2] == os.getenv("USER"):
-        return os.path.join(dirname, string.join(parts[1:-2], "."))
+        return os.path.join(dirname, ".".join(parts[1:-2]))
     else:
         return binary
 
 def writeCmdFile():
-    fileName = "coreCommands.gdb"
+    fileName = mktemp("coreCommands.gdb")
     file = open(fileName, "w")
     file.write("bt\n")
     file.close()
@@ -101,7 +102,7 @@ def writeStackTrace(corefile, binary):
     if len(stackLines) > 1:
         summary += " in " + stackLines[0].strip()
     details = summaryLine + "\nStack trace from gdb :\n" + \
-              string.join(stackLines[:100], "\n")
+              "\n".join(stackLines[:100])
     # Sometimes you get enormous stacktraces from GDB, for example, if you have
     # an infinite recursive loop.
     if len(stackLines) > 100:

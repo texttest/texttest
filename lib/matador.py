@@ -196,7 +196,7 @@ class MakeComparisons(comparetest.MakeComparisons):
         comparetest.MakeComparisons.__init__(self, testComparisonClass)
         self.getRuleSetting = getRuleSetting
     def __call__(self, test):
-        if self.isSeniority(test):
+        if self.isSeniority(test) and not self.isSeniorityEvaluation(test):
             self.testComparisonClass = comparetest.TestComparison
         else:
             self.testComparisonClass = optimization.OptimizationTestComparison
@@ -204,6 +204,10 @@ class MakeComparisons(comparetest.MakeComparisons):
     def isSeniority(self, test):
         ruleVal = self.getRuleSetting(test, "map_seniority")
         return ruleVal and not ruleVal.startswith("#")
+    def isSeniorityEvaluation(self, test):
+        output = test.getFileName("output")
+        log = open(output).read()
+        return log.rfind("Adjusted cost of plan") != -1
 
 def staticLinkageInCustomerFile(carmUsr):
     resourceFile = os.path.join(carmUsr, "Resources", "CarmResources", "Customer.etab")

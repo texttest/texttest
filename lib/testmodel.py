@@ -1566,7 +1566,7 @@ class OptionFinder(plugins.OptionFinder):
         if self.has_key("d"):
             return plugins.abspath(self["d"])
         elif os.environ.has_key("TEXTTEST_HOME"):
-            return os.environ["TEXTTEST_HOME"]
+            return plugins.abspath(os.environ["TEXTTEST_HOME"])
         else:
             return os.getcwd()
     

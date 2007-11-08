@@ -279,7 +279,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
                 test.setEnvironment(var, value)
     def cleanGtkEnvironment(self, var):
         # Remove all paths from our tested GTK environment, so that tested apps get the system defaults
-        allPaths = os.getenv(var).split(os.pathsep)
+        allPaths = os.getenv(var, "").split(os.pathsep)
         filteredPaths = filter(lambda path: not path.startswith("/usr/local/tt-env"), allPaths)
         return os.pathsep.join(filteredPaths)
     def getCleanedGtkEnvironment(self):

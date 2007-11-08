@@ -9,7 +9,7 @@ abspath()
         ;;
 
     *)
-        eval $2=`pwd`/`basename $1`
+        eval $2=`pwd`/$1
         ;;
     esac
 }

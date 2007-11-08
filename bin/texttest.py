@@ -9,7 +9,7 @@ except ImportError:
 
 import sys, os
 
-install_root = os.path.dirname(os.path.dirname(sys.argv[0]))
+install_root = os.path.dirname(os.path.dirname(os.path.normpath(sys.argv[0])))
 libDir = os.path.join(install_root, "lib")
 if os.path.isdir(libDir):
     sys.path.insert(0, libDir)

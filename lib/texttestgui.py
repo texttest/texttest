@@ -1976,7 +1976,6 @@ class PaneGUI(ContainerGUI):
         
     def createView(self):
         self.paned = self.createPaned()
-        self.paned.connect('notify::position', self.paneHasChanged)
         self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
         scriptEngine.registerPaned(self.paned, self.scriptCommand())
         frames = []
@@ -1996,12 +1995,6 @@ class PaneGUI(ContainerGUI):
         self.paned.show()
         return self.paned
         
-    def paneHasChanged(self, *args):
-        pos = self.paned.get_position()
-        size = self.paned.get_property("max-position")
-        if size:
-            self.panedTooltips.set_tip(self.paned, "Position: " + str(pos) + "/" + str(size) + \
-                                       " (" + self.positionDescription(float(pos) / size) + ")")
     def positionDescription(self, proportion):
         message = str(int(100 * proportion + 0.5)) + "% from the "
         if self.horizontal:

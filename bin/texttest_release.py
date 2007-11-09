@@ -66,7 +66,7 @@ def getNames(fileName, key):
             return [ os.path.join(sourceDir, fileName) for fileName in fileStr.split() ]
 
 disallowedPrefixes = [ "optimization", "apc", "matador", "studio" ]
-disallowedFiles = [ "texttest", "texttest_release.py", ".cvsignore", "carmenqueuesystem.py", "ravebased.py", "barchart.py", "ddts.py" ]
+disallowedFiles = [ "texttest", "texttest_release.py", "ttpython", "remotecmd.py", ".cvsignore", "carmenqueuesystem.py", "ravebased.py", "barchart.py", "ddts.py" ]
 
 def isAllowed(file):
     if file in disallowedFiles:

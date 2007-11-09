@@ -1369,10 +1369,14 @@ class RunTest(plugins.Action):
     def ignoreJobControlSignals(self):
         for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
-            
+    def getInterpreter(self, test):
+        interpreter = test.getConfigValue("interpreter")
+        if interpreter == "ttpython" and not plugins.canExecute("ttpython"):
+            return "python"
+        return interpreter
     def getCmdParts(self, test):
         args = []
-        interpreter = test.getConfigValue("interpreter")
+        interpreter = self.getInterpreter(test)
         if interpreter:
             args.append(interpreter)
         args.append(test.getConfigValue("binary"))

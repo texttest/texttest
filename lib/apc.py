@@ -417,7 +417,11 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
             executeCommand = self.getValgrind() + " --tool=memcheck -v " + valopt + " " + binName + apcbinOptions + redir
         elif self.useDbx:
             dbxArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog, Dbx = True)
-            executeCommand = "dbx -c runapc -s" + dbxArgs + " " + binName
+            if self.inXEmacs:
+                dbxStart = self.runInXEmacs(test, binName, dbxArgs)
+                executeCommand = "xemacs -l " + dbxStart + " -f gdbwargs"
+            else:
+                executeCommand = "dbx -c runapc -s" + dbxArgs + " " + binName
         else:
             # We will run gbd, either in the console or in xemacs.
             gdbArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog)
@@ -486,8 +490,9 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         gdbWithArgs = test.makeTmpFileName("gdb_w_args")
         gdbStartFile = open(gdbStart, "w")
         gdbStartFile.write("(defun gdbwargs () \"\"" + os.linesep)
-        gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
-        gdbStartFile.write("(gdbsrc \"" + binName + "\")" + os.linesep)
+        #gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
+        gdbStartFile.write("(load \"/users/johani/emacs/dbxtt.el\")" + os.linesep)
+        gdbStartFile.write("(dbxtt \"" + binName + "\")" + os.linesep)
         if self.XEmacsTestingKill:
             gdbStartFile.write("(sit-for 20)" + os.linesep)
             gdbStartFile.write("(kill-emacs)" + os.linesep)
@@ -2227,3 +2232,41 @@ class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
     def makeTimeLine(self, values, fileStem):
         roundedVal = float(int(10*values[-1]))/10
         return "Total " + fileStem.capitalize() + "  :      " + str(roundedVal) + " seconds"
+
+
+#
+# A template script that extract some (run-dependent) times from the status file.
+#
+
+class ExtractFromStatusFile(plugins.Action):
+    def __init__(self, args = None):
+        self.versions = [ "" ]
+        if args:
+            self.versions = args[0].split(",")
+    def __call__(self, test):
+        for version in self.versions:
+            logFileStem = test.app.getConfigValue("log_file")
+            statusFile = test.getFileName(logFileStem, version)
+            self.extractColgenData(test.app, statusFile)
+    def extractColgenData(self, app, statusFile):
+        tsValues =  [ "Preprocessing time", "DH setup time",
+                      "Network generation time", "Generation time", "Coordination time", "Conn fixing time",
+                      "DH post processing \(", "OC to DH time"]
+
+        tsValues += [ "Preprocessing exec time", "DH setup exec time",
+                      "Network generation exec time", "Generation exec time", "Coordination exec time", "Conn fixing exec time",
+                      "DH post processing exec time" ]
+
+        optRun = optimization.OptimizationRun(app,  [ optimization.timeEntryName, optimization.activeMethodEntryName], tsValues, statusFile)
+        solutions = optRun.solutions
+        while solutions:
+            lastSolution = solutions.pop()
+            if lastSolution["Active method"] == "column generator":
+                break
+        if not lastSolution["Active method"] == "column generator":
+            print "Warning: didn't find last colgen solution!"
+            return 0, 0
+        
+        totCpuTime = int(lastSolution["cpu time"]*60)
+        print "Total time in seconds", totCpuTime
+        print lastSolution

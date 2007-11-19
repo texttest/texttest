@@ -38,6 +38,8 @@ helpOptions = """-rundebug <options>
               is linked against the profile library, see also exppreload.
               - exppreload
                 Experimental preload of profile library in order to avoid linking.
+              - keepbindata
+                Do not remove the google binary data file after extracting symboolic data.
                
 -extractlogs <option>
            - (only APC) Executes the command specified by the config value extract_logs_<option>,
@@ -185,7 +187,7 @@ class ApcConfig(optimization.OptimizationConfig):
         baseExtractor = optimization.OptimizationConfig.getFileExtractor(self)
         subActions = [ baseExtractor, CreateHTMLFiles(), FetchApcCore() ]
         if self.optionMap.has_key("goprof"):
-            subActions.append(GoogleProfileExtract())
+            subActions.append(GoogleProfileExtract(self.optionMap["goprof"]))
         if self.slaveRun():
             useExtractLogs = self.optionValue("extractlogs")
             if useExtractLogs == "":
@@ -613,21 +615,26 @@ class GoogleProfilePrepare(plugins.Action):
     def __init__(self, arg):
         self.arg = arg
     def __call__(self, test):
-        os.environ["LD_LIBRARY_PATH"] += ";/users/johani/lib/"
+        os.environ["LD_LIBRARY_PATH"] += ";/carm/proj/apc/lib/"
         os.environ["CPUPROFILE"] = test.makeTmpFileName("profiledata", forFramework=0)
         if self.arg and self.arg.startswith("exppreload"):
-            os.environ["LD_PRELOAD"] = "/users/johani/lib/libprofiler.so"
+            os.environ["LD_PRELOAD"] = "/carm/proj/apc/lib/libprofiler.so"
 
 
 class GoogleProfileExtract(plugins.Action):
+    def __init__(self,arg):
+        self.arg = arg
     def __call__(self, test):
         datafile = test.makeTmpFileName("profiledata", forFramework=0)
-        profilefile = test.makeTmpFileName("profile", forFramework=0)
         opts = test.getWordsInFile("options")
         binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
-        command = "/users/johani/bin/pprof --text " + binName + " " + datafile + " > " + profilefile
+        symdumpfile = test.makeTmpFileName("symbolicdata", forFramework=0)
+        command = "/carm/proj/apc/bin/pprof --dump " + binName + " " + datafile + "  | gzip > " + symdumpfile
         # Have to make sure it runs on a 32-bit machine.
         os.system("rsh abbeville \"" + command + "\"")
+        if not self.arg.startswith("keepbindata"):
+            os.remove(datafile)
+            
         
 class MarkApcLogDir(RunWithParallelAction):
     def __init__(self, isExecutable, hasAutomaticCpuTimeChecking, baseRunner, keepLogs):
@@ -1787,6 +1794,108 @@ class PlotTestInGUIAPC(optimization.PlotTestInGUI):
     def getRunningTmpFile(self, test, logFileStem):
         return test.makeTmpFileName("APC_FILES/" + logFileStem, forComparison=0)
     
+# Specialization of plotting in the GUI for APC
+class PlotProfileInGUIAPC(guiplugins.SelectionAction):
+    def __init__(self, dynamic):
+        path = "/carm/proj/apc/bin"
+        if not sys.path.count(path):
+            sys.path.append(path)
+        guiplugins.SelectionAction.__init__(self)
+        self.dynamic = dynamic
+        self.sizes = ["a4","a4l","a3","a3l"]
+        self.addSwitch("size", "Size of plot:     ", 0, self.sizes);
+        self.addOption("focus", "Focus on function", "")
+        self.addOption("base", "Baseline profile version", "")
+        self.addSwitch("aggregate", "Aggregate all selections")
+        self.numPlottedTests = 0
+    def __repr__(self):
+        return "Plotting Profile"
+    def _getTitle(self):
+        return "_Plot Profile"
+    def __repr__(self):
+        return "Plotting Profile"
+    def getStockId(self):
+        return "clear"    
+    def getTabTitle(self):
+        return "Profile"
+    def getGroupTabTitle(self):
+        return "Profile"
+    def messageBeforePerform(self):
+        return "Plotting profiles for tests ..."
+    def messageAfterPerform(self):
+        return "Plotted " + self.describeTests() + " profiles."    
+    def describeTests(self):
+        return str(self.numPlottedTests) + " tests"
+    def performOnCurrent(self):
+        tests = self.currTestSelection
+        if len(tests) == 0:
+            return
+        writeDir = self.currTestSelection[0].app.writeDirectory
+        if self.optionGroup.getSwitchValue("aggregate"):
+            data = self.getProfileObj(tests[0])
+            self.numPlottedTests +=1
+            for test in tests[1:]:
+                d2 = self.getProfileObj(test)
+                data.add_profile(d2,1)
+                self.numPlottedTests +=1
+            self.profileTest(data,"aggregate",writeDir)
+        else:
+            for test in tests:
+                data = self.getProfileObj(test)
+                self.profileTest(data,test.name,writeDir)
+                self.numPlottedTests +=1
+        
+    def setPlotOptions(self,options):
+        self.optionString = ""
+        options["size"] = self.sizes[self.optionGroup.getSwitchValue("size")]
+        options["focus"] = self.optionGroup.getOptionValue("focus")
+    
+    def profileTest(self,data,name,writeDir):
+        import sym_analyze
+        if not os.path.isdir(writeDir):
+            os.makedirs(writeDir)
+        ops = sym_analyze.get_default_options();
+        self.setPlotOptions(ops)
+        if ops["focus"] != "" and not data.has_function_name(ops["focus"]):
+            raise "Failed to find focus function"
+        sin,sout = os.popen2("dot -Tps")
+        sym_analyze.print_dot(data,ops,sin)
+        sin.close()
+        ofname = os.path.join(writeDir,"%s.ps"%name)
+        outfile = open(ofname,"w")
+        outfile.writelines(sout.readlines())
+        outfile.close()
+        cmd = "ggv %s"%ofname
+        os.system(cmd)
+    
+    def getProfileObj(self,test):
+        import sym_analyze
+        profileStem = "symbolicdata"
+        dataFile = ""
+        if self.dynamic:
+            try:
+                fileComp, storageList = test.state.findComparison(profileStem, includeSuccess=True)
+                if fileComp:
+                    dataFile= fileComp.tmpFile
+            except AttributeError:
+                pass
+        else:
+            dataFile = test.getFileName(profileStem)
+        if dataFile == "":
+                raise "Did not find symbolic data file"
+            
+        data = sym_analyze.data_file(dataFile)
+        if self.optionGroup.getOptionValue("base"):
+            refFile = test.getFileName(profileStem,self.optionGroup.getOptionValue("base"))
+            if refFile:
+                base = sym_analyze.data_file(refFile)
+                data.add_profile(base,-1)
+            else:
+                raise "Did not find reference symbolic data file"
+        return data
+        
+            
+    
 class Quit(guiplugins.Quit):
     def __init__(self, dynamic):
         self.dynamic = dynamic
@@ -1803,7 +1912,7 @@ class Quit(guiplugins.Quit):
                     return "Tests have been runnning for %d minutes,\n are you sure you want to quit?" % elapsedTime
         return ""
 
-guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC, SelectKPIGroup ]
+guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC, SelectKPIGroup, PlotProfileInGUIAPC ]
 guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ]
 
 # A script that mimics _PlotTest in optimization.py, but that is specialized for
@@ -2192,8 +2301,6 @@ class FeatureFilter(plugins.Filter):
     
 class SelectTests(guiplugins.SelectTests):
     def __init__(self, commandOptionGroup):
-        #import pdb
-        #pdb.set_trace()
         guiplugins.SelectTests.__init__(self, commandOptionGroup)
         self.features = []
     def addSuites(self, suites):

@@ -77,6 +77,15 @@ apc.PlotKPIGroups          - A specialization of optimization.PlotTest for APC w
                              that PlotTest supports, do however note that some of the options doesn't make sense
                              to use for several KPI groups, for example, p, print to file.
 
+apc.ExtractFromStatusFile <versions> [<filter>]
+                           - Extracts timing information from the last colgen solution in APC status file
+                             given by the version. Only statusfiles ending with the version identifier is used.
+                             If two versions are given, the values are compared, giving the difference in
+                             percent. If filter is used, only values matching the given regexp are printed.
+                               - Example: -s apc.ExtractFromStatusFile 13, 'Coordination time|cpu time'
+                             compares execution time and total cpu time data from status.apc.13 and status.apc.
+                             At the end, the report gives accumulation of data for all the tests, as well
+                             as for all the tests that exists in all the versions.
 """
 
 import default, ravebased, queuesystem, performance, os, copy, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview, subprocess
@@ -419,11 +428,7 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
             executeCommand = self.getValgrind() + " --tool=memcheck -v " + valopt + " " + binName + apcbinOptions + redir
         elif self.useDbx:
             dbxArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog, Dbx = True)
-            if self.inXEmacs:
-                dbxStart = self.runInXEmacs(test, binName, dbxArgs)
-                executeCommand = "xemacs -l " + dbxStart + " -f gdbwargs"
-            else:
-                executeCommand = "dbx -c runapc -s" + dbxArgs + " " + binName
+            executeCommand = "dbx -c runapc -s" + dbxArgs + " " + binName
         else:
             # We will run gbd, either in the console or in xemacs.
             gdbArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog)
@@ -492,9 +497,8 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         gdbWithArgs = test.makeTmpFileName("gdb_w_args")
         gdbStartFile = open(gdbStart, "w")
         gdbStartFile.write("(defun gdbwargs () \"\"" + os.linesep)
-        #gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
-        gdbStartFile.write("(load \"/users/johani/emacs/dbxtt.el\")" + os.linesep)
-        gdbStartFile.write("(dbxtt \"" + binName + "\")" + os.linesep)
+        gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
+        gdbStartFile.write("(gdbsrc \"" + binName + "\")" + os.linesep)
         if self.XEmacsTestingKill:
             gdbStartFile.write("(sit-for 20)" + os.linesep)
             gdbStartFile.write("(kill-emacs)" + os.linesep)
@@ -2340,40 +2344,154 @@ class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
         roundedVal = float(int(10*values[-1]))/10
         return "Total " + fileStem.capitalize() + "  :      " + str(roundedVal) + " seconds"
 
-
 #
 # A template script that extract some (run-dependent) times from the status file.
 #
 
+def stringify(data):
+    if type(data) == type(""):
+        return data
+    if type(data) == type(0.0):
+        return "%.1f"%data
+    return repr(data)
+        
 class ExtractFromStatusFile(plugins.Action):
     def __init__(self, args = None):
         self.versions = [ "" ]
+        self.printOnlyMatch = ""
         if args:
             self.versions = args[0].split(",")
+            if len(args)>1:
+                self.printOnlyMatch = args[1]
+
+        self.tsValues =  [ "Preprocessing time", "DH setup time",
+                           "Network generation time", "Generation time", "Coordination time", "Conn fixing time",
+                           "DH post processing \(", "OC to DH time"]
+
+        self.tsValues += [ "Preprocessing exec time", "DH setup exec time",
+                           "Network generation exec time", "Generation exec time", "Coordination exec time", "Conn fixing exec time",
+                           "DH post processing exec time", "execution time"]
+        self.currentSuite = ""
+        self.accumulatedAll = [ {} for v in self.versions]
+        self.accumulatedCountAll = [ {} for v in self.versions]
+        self.accumulatedCommon = [ {} for v in self.versions]
+        self.accumulatedCountCommon = [ {} for v in self.versions]
+
     def __call__(self, test):
+        allData = []
+        statusFiles = []
         for version in self.versions:
             logFileStem = test.app.getConfigValue("log_file")
-            statusFile = test.getFileName(logFileStem, version)
-            self.extractColgenData(test.app, statusFile)
+            isExactMatch = False
+            if logFileStem:
+                statusFile = test.getFileName(logFileStem, version)
+                if statusFile:
+                    isExactMatch = statusFile.endswith(version)
+            if isExactMatch:
+                allData.append(self.extractColgenData(test.app, statusFile))
+                statusFiles.append(os.path.basename(statusFile))
+            else:
+                statusFiles.append("Not Found")
+                allData.append({})
+        if test.parent.name != self.currentSuite:
+            self.currentSuite = test.parent.name
+            print "============================== " + "%-32s"%self.currentSuite + "=============================="
+        self.printCase(test.parent.name + "/" +test.name,allData)
+        print "used statusfiles: " + ", ".join(statusFiles)
+        accumulateData(self.accumulatedAll, self.accumulatedCountAll, allData)
+        accumulateCommonData(self.accumulatedCommon, self.accumulatedCountCommon, allData)
+
+    def __del__(self):
+        print "============================== " + "%-32s"%"Total for all cases" + "=============================="
+        self.printCase("Accumulated values in testcases", self.accumulatedAll)
+        self.printCase("Count of all values in testcases", self.accumulatedCountAll)
+        self.printCase("Accumulated common values in testcases", self.accumulatedCommon)
+        self.printCase("Count of all common values in testcases", self.accumulatedCountCommon)
+        
+    def printCase(self,name,data):
+        print "****************************** " + name
+        import copy
+        ver = copy.deepcopy(self.versions)
+        prints = re.compile(self.printOnlyMatch)
+        printValues = []
+        for t in self.tsValues:
+            if prints.search(t):
+                printValues.append(t)
+        if prints.search("cpu time"):
+            printValues.append("cpu time")
+        while len(data) < len(ver):
+            data.append({})
+        if len(ver) ==2:
+            ver.append("diff (%)")
+            data.append({})
+            anyToPrint = False
+            for t in printValues:
+                if data[0].has_key(t) or data[1].has_key(t):
+                    anyToPrint = True
+                if data[0].has_key(t) and data[1].has_key(t) and float(data[0][t]) > 0.0:
+                    data[2][t] = "%3.1f"%(100*(float(data[1][t])/float(data[0][t])-1))
+                else:
+                    data[2][t] = "-"
+        else:
+          anyToPrint = True;
+        if anyToPrint:
+            line = "%30s"%""
+            line2 = "%30s"%""
+            line2Added = 0
+            for v in ver:
+                line +=" %20s"%v[0:20]
+                line2 +=" %20s"%v[20:40]
+                if v[20:40]:
+                    line2Added = 1;
+            print line
+            if line2Added:
+                print line2
+            for t in printValues:
+                line = "%30s"%t
+                for v in range(len(ver)):
+                    line +=" %20s"%stringify(data[v].get(t,"-"))
+                print line
+        else:
+            print "------------------------------ No data"
+
     def extractColgenData(self, app, statusFile):
-        tsValues =  [ "Preprocessing time", "DH setup time",
-                      "Network generation time", "Generation time", "Coordination time", "Conn fixing time",
-                      "DH post processing \(", "OC to DH time"]
 
-        tsValues += [ "Preprocessing exec time", "DH setup exec time",
-                      "Network generation exec time", "Generation exec time", "Coordination exec time", "Conn fixing exec time",
-                      "DH post processing exec time" ]
-
-        optRun = optimization.OptimizationRun(app,  [ optimization.timeEntryName, optimization.activeMethodEntryName], tsValues, statusFile)
+        optRun = optimization.OptimizationRun(app,  [ optimization.timeEntryName, optimization.activeMethodEntryName], self.tsValues, statusFile)
         solutions = optRun.solutions
+        found= 0
         while solutions:
             lastSolution = solutions.pop()
             if lastSolution["Active method"] == "column generator":
+                found = 1
                 break
-        if not lastSolution["Active method"] == "column generator":
-            print "Warning: didn't find last colgen solution!"
-            return 0, 0
+            
+        if not found:
+            return {}
         
         totCpuTime = int(lastSolution["cpu time"]*60)
-        print "Total time in seconds", totCpuTime
-        print lastSolution
+        return lastSolution
+        
+def accumulateData(toDictArr, toDictCountArr, fromDictArr):
+    for v in xrange(len(toDictArr)):
+        for d in fromDictArr[v]:
+            if not toDictArr[v].has_key(d):
+                toDictArr[v][d] = 0
+                toDictCountArr[v][d] = 0
+            if not type(fromDictArr[v].get(d,0)) == type(""):
+                toDictArr[v][d] += fromDictArr[v].get(d,0)
+                toDictCountArr[v][d] += 1
+
+def accumulateCommonData(toDictArr, toDictCountArr, fromDictArr):
+    for d in fromDictArr[0]:
+        inAll = True
+        for v in xrange(len(toDictArr)):
+            inAll = inAll and fromDictArr[v].has_key(d) and type(fromDictArr[v][d]) != type("")
+        if inAll:
+            for v in xrange(len(toDictArr)):
+                if not toDictArr[v].has_key(d):
+                    toDictArr[v][d] = 0
+                    toDictCountArr[v][d] = 0
+                if not type(fromDictArr[v].get(d,0)) == type(""):
+                    toDictArr[v][d] += fromDictArr[v].get(d,0)
+                    toDictCountArr[v][d] += 1
+    

@@ -4,15 +4,16 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.10 2007/09/07 14:30:46 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.11 2007/11/23 16:20:34 geoff Exp $
 #
-import ravebased, default, plugins, guiplugins
+import ravebased, default, plugins, guiplugins, subprocess
 import os, shutil, string
 
 def getConfig(optionMap):
     return StudioConfig(optionMap)
 
 class StudioConfig(ravebased.Config):
+    defaultRulesetCache = {}
     def addToOptionGroups(self, app, groups):
         for group in groups:
             if group.name.startswith("Basic"):
@@ -27,38 +28,55 @@ class StudioConfig(ravebased.Config):
     def getPerformanceExtractor(self):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def _getRuleSetNames(self, test):
-        rulesetName = ""
+        rulesets = []
+        subplanRuleset = self.getSubplanRuleset(test)
+        if subplanRuleset:
+            rulesets.append(subplanRuleset)
+                
+        defaultRuleset = self.getDefaultRuleset(test)
+        if defaultRuleset and defaultRuleset != subplanRuleset:
+            rulesets.append(defaultRuleset)
+        return rulesets
+    def getSubplanRuleset(self, test):
         subplanDir = self._getSubPlanDirName(test)
         if subplanDir:
             headerFile = os.path.join(subplanDir, "subplanHeader")
             origPath = self.findOrigRulePath(headerFile)
-            rulesetName = os.path.basename(origPath)
-        if not rulesetName:
-            # get default ruleset from resources
-            carmSys = test.getEnvironment("CARMSYS")
-            carmUsr = test.getEnvironment("CARMUSR")
-            carmTmp = test.getEnvironment("CARMTMP")
-            userId = "nightjob"
-            if carmSys and carmUsr and carmTmp:
-                script = os.path.join(carmSys, "bin", "crsutil")
-                cmd = "/usr/bin/env USER=" + userId + \
-                            " CARMUSR=" + carmUsr + \
-                            " CARMTMP=" + carmTmp + \
-                            " " + script + " -f 'CrcDefaultRuleSet: %s\n'  -g CrcDefaultRuleSet"
-                try:
-                    for l in os.popen(cmd):
-                        if not l.startswith("CrcDefaultRuleSet:"):
-                            continue
-                        name = l[:-1]
-                        if name:
-                            rulesetName = os.path.basename(name)
-                            break
-                except Exception:
-                    pass
-        if self.macroBuildsRuleset(test, rulesetName):
+            subplanRuleset = os.path.basename(origPath)
             # Don't want to manage the ruleset separately if the macro is going to build it...
-            return []
-        return [ rulesetName ]
+            if not self.macroBuildsRuleset(test, subplanRuleset):
+                return subplanRuleset
+    
+    def getDefaultRuleset(self, test):
+        # get default ruleset from resources
+        runEnv = test.getRunEnvironment(ravebased.getCrcCompileVars())
+        carmUsr = runEnv.get("CARMUSR")
+        if self.defaultRulesetCache.has_key(carmUsr):
+            return self.defaultRulesetCache[carmUsr]
+
+        ruleset = self.calculateDefaultRuleset(test, runEnv)
+        self.defaultRulesetCache[carmUsr] = ruleset
+        return ruleset
+    
+    def calculateDefaultRuleset(self, test, runEnv):
+        script = os.path.join(runEnv.get("CARMSYS"), "bin", "crsutil")
+        cmdArgs = [ script, "-f", "CrcDefaultRuleSet: %s\n", "-g", "CrcDefaultRuleSet" ]
+        try:
+            proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), env=runEnv)
+            output = proc.communicate()[0]
+            for line in output.splitlines():
+                if line.startswith("CrcDefaultRuleSet:"):
+                    rulesetName = os.path.basename(line.strip().split()[-1])
+                    if rulesetName == "NO": # seems to some magic way to say there isn't one
+                        return
+                    else:
+                        return rulesetName
+
+            print "crsutil didn't return anything, hence default ruleset not found"
+        except OSError:
+            # If crsutil isn't there we won't get the default ruleset
+            print "Warning - could not run crsutil, hence default ruleset not found!"            
+                
     def findOrigRulePath(self, headerFile):
         if not os.path.isfile(headerFile):
             return ""
@@ -240,4 +258,3 @@ class ViewInEditor(guiplugins.ViewInEditor):
         envArgs = [ "env", "USER=nightjob", "CARMSYS=" + carmSys, "CARMUSR=" + carmUsr ]
         cmdArgs = envArgs + [ viewProgram, fileName ]
         return cmdArgs, "macro editor"
-    

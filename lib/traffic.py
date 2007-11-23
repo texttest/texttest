@@ -410,3 +410,50 @@ class ReplayedResponseHandler:
                     responses.append(trafficClass(trafficStr[6:], traffic.responseFile))
         self.timesChosen += 1
         return traffic.filterReplay(responses)
+
+class ModifyTraffic(plugins.ScriptWithArgs):
+    # For now, only bother with the client server traffic which is mostly what needs tweaking...
+    scriptDoc = "Apply a script to all the client server data"
+    def __init__(self, args):
+        argDict = self.parseArguments(args)
+        self.script = argDict.get("script")
+    def __repr__(self):
+        return "Updating traffic in"
+    def __call__(self, test):
+        try:
+            fileName = test.getFileName("traffic")
+            if fileName:
+                self.describe(test)
+                newFileName = fileName + "tmpedit"
+                newFile = open(newFileName, "w")
+                replayInfo = ReplayInfo(None)
+                for item in replayInfo.readIntoList(fileName):
+                    self.writeTraffic(newFile, item, test.getDirectory())
+                newFile.close()
+                os.rename(newFileName, fileName)
+        except plugins.TextTestError, e:
+            print e
+            
+    def writeTraffic(self, newFile, fullLine, dir):
+        self.write(newFile, self.getModified(fullLine, dir))
+
+    def getModified(self, fullLine, dir):
+        trafficType = fullLine[2:5]
+        if trafficType in [ "CLI", "SRV" ]:
+            proc = subprocess.Popen([ self.script, fullLine[6:]], cwd=dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = proc.communicate()
+            if len(stderr) > 0:
+                raise plugins.TextTestError, "Couldn't modify traffic :\n " + stderr
+            else:
+                return fullLine[:6] + stdout
+        else:
+            return fullLine
+            
+    def write(self, newFile, desc):
+        if not desc.endswith("\n"):
+            desc += "\n"
+        newFile.write(desc)
+
+    def setUpSuite(self, suite):
+        self.describe(suite)
+        

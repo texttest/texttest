@@ -163,6 +163,10 @@ class Config(CarmenConfig):
             return baseProc
     def getSlaveSwitches(self):
         return CarmenConfig.getSlaveSwitches(self) + [ "debug", "lprof", "raveexp" ]
+    def ignoreBinary(self):
+        if self.optionMap.runScript() and self.optionMap["s"].endswith("PrintRulesets"):
+            return False
+        return CarmenConfig.ignoreBinary(self)
     def isRaveRun(self):
         return self.optionValue("a").find("rave") != -1 or self.optionValue("v").find("rave") != -1
     def rebuildAllRulesets(self):
@@ -1019,3 +1023,12 @@ class TraverseCarmUsers(plugins.Action):
     def getSwitches(self):
         switches = {}
         return switches
+
+class PrintRulesets(plugins.Action):
+    def __repr__(self):
+        return "Printing rulesets for"
+    def __call__(self, test):
+        rulesets = test.app.getRuleSetNames(test)
+        self.describe(test, " - " + ",".join(rulesets))
+    def setUpSuite(self, suite):
+        self.describe(suite)

@@ -31,6 +31,12 @@ helpOptions = """-rundebug <options>
                Instruct valgrind to attach to a debugger when encountering
                a memory problem. Note that this option means that output will
                not be redirected.
+             - strace
+               Run strace on the problem, with some timing info for each traced call.
+               (using strace -T -tt)
+             - summary
+               Together with the strace option, gives a summary of the system calls
+               (using strace -c)
 -goprof <options>
            - (only APC) Applies the Google profiler to the test, output is a profile file including
               both a flat and call graph profile, and profiledata that contains the rawdata for
@@ -361,6 +367,8 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         self.XEmacsTestingKill = None
         self.runPlain = None
         self.runValgrind = None
+        self.runStrace = None
+        self.collectSummary = None
         self.useDbx = None
         self.showLogFile = 1
         self.noRun = None
@@ -391,6 +399,10 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
                 self.valOutput = 1
             elif opt == "valdebug":
                 self.valDebug = 1
+            elif opt == "strace":
+                self.runStrace = 1
+            elif opt == "summary":
+                self.collectSummary = 1
             else:
                 print "Ignoring unknown option " + opt
     def __repr__(self):
@@ -426,6 +438,13 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
                 valopt += " --db-attach=yes"
                 redir = ""
             executeCommand = self.getValgrind() + " --tool=memcheck -v " + valopt + " " + binName + apcbinOptions + redir
+        elif self.runStrace:
+            outfile = test.makeTmpFileName("strace")
+            if self.collectSummary:
+                straceopt = "-c";
+            else:
+                straceopt = "-T -tt";
+            executeCommand = " ".join(["strace", straceopt, "-o", outfile, binName, apcbinOptions, ">", apcLog]);
         elif self.useDbx:
             dbxArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog, Dbx = True)
             executeCommand = "dbx -c runapc -s" + dbxArgs + " " + binName

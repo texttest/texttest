@@ -548,7 +548,7 @@ class QueueSystemServer(BaseActionRunner):
     def shellWrap(self, command):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
-        return "exec " + os.getenv("SHELL") + " -c \"exec " + command + "\""
+        return "exec $SHELL -c \"exec " + command + "\""
     def getSlaveCommand(self, test, submissionRules):
         return plugins.textTestName + " " + " ".join(test.app.getRunOptions()) + " -tp " + test.getRelPath() \
                + self.getSlaveArgs(test) + " " + self.getRunOptions(test.app, submissionRules)

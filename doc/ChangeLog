@@ -880,6 +880,9 @@ General GUI Enhancements:
     - Entry completion now possible (entrycompletion.py)
 	Various config file settings...
     - Long status messages now ellipsized to stop them widening the window (texttestgui.py)
+    - Removed tooltip showing the pane positions (texttestgui.py)
+	It wasn't very useful and on some GTK setups it caused the GUI not to be startable
+	Also tended to be shown in weird places on some other GTK setups...
 Static GUI Enhancements:
     - Cut/Copy/Paste of tests is now much more like what file managers usually do. (guiplugins.py)
 	"Copying" tab is removed, ctrl-X, ctrl-C, ctrl-V behave as expected. See Migration Notes.
@@ -923,12 +926,20 @@ Framework Enhancements:
     - Can now inform TextTest about binary files in the tests so it doesn't try to do tkdiff on them... (default.py)
     - New mechanism for sharing enviroment files between different tested applications (testmodel.py) 
 	Use "shared_config_directory"
+Batch Report Enhancements:
+    - Can now have extra_versions that are only used in particular batch sessions (default.py)
+	New config file setting "batch_extra_version"
+    - Nightjob website can now handle composite extra_versions (testoverview.py)
 Grid Engine (LSF/SGE) enhancements:
     - Remote jobs remove the bulk of their own files
 	Unless -keepslave is specified, slave jobs will remove all files in succeeded tests, and all data files.
 	See Migration Notes.
     - Job bookkeeping improved	
 	Fixed problems to do with the wrong SGE/LSF job being found when tests are killed hard.
+    - TextTest now manages job control signals itself
+	Installs default handlers for SIGXCPU, SIGUSR1 and SIGUSR2 to tested programs as these are a fact
+	of life with LSF/SGE. No longer get core dumps for SIGXCPU therefore.
+    - Now works with a grid engine if TEXTTEST_HOME is a relative path
 Installation and self-test changes:
     - Much better coverage of filechooser handling in tests
 	Mostly a consequence of improvements in PyUseCase. Removed "magical" setting of paths.
@@ -936,12 +947,19 @@ Installation and self-test changes:
     - Tests no longer depend on the contents of ~/.config
 	This is an undocumented feature of GTK that seemed capable of causing lots of trouble
 	if certain entries were present.
+    - UITesting tests no longer try to wipe GTK settings
+	This was really there because of our local environment and could cause trouble in others
+    - Filtering fixed in queuesystem tests
+    - Tests no longer assume a default locale that can handle Swedish characters (!)
+    - Self-test installation script now warns you and exits if you're missing any software required for the self-tests.
+    - Tests for the self-test installation script should now work anywhere out of the box
 Bug Fixes:
     - Movements of the horizontal pane separator are no longer lost when the right window is hidden (texttestgui.py)
 	This could previously happen when test selection was cleared and then tests selected again.
     - Interrupting GUI before it has come up now works properly (engine.py)
     - Automatic selection of single tests doesn't force viewing of running test if it's been explicitly hidden (texttestgui.py)
     - Fixed occasional stack trace in interpretcore.py script for getting stack traces out of UNIX core files (interpretcore.py)
+    - Made sure the same script doesn't write temporary files in the CWD, leading to occasional clashes (interpretcore.py)
     - Saving tests that have crashed now works properly (knownbugs.py)
 	Previously leaked a file that caused trouble next time the test was run
     - CVS plugin : CVS commands on multiple files in dynamic GUI fixed (cvs.py)
@@ -958,3 +976,6 @@ Bug Fixes:
     - Now get a nice error message rather than silence if saving a test fails due to permission trouble (guiplugins.py)
     - Static GUI now doesn't present empty test suites if a test filter (-t) given on the command line (testmodel.py)
     - Reconnecting now expands ~ correctly before user names (default.py)
+    - Traffic mechanism no longer breaks down if TextTest started via a relative path (texttest.py)
+    - Fixed bug with removing a test and then re-adding it with the same name (engine.py)
+    - Fixed recursive status view if performance_variation_% = 0, variation between 0 and 1% and other diffs present (performance.py)

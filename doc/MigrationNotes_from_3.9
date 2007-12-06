@@ -22,7 +22,24 @@ keep up to date with current development in PyGTK.
 CHANGES IN DEFAULT BEHAVIOUR
 =========================================================
 
-(1) Temporary directory structure	
+(1) Reading tests visible in the GUI
+====================================
+Previously the GUI wouldn't come up until all the tests had been read. If file reading was
+slow and the testsuite was large this could lead to long delays before observing anything.
+
+Now the GUI comes up instantly and progress in how many tests have been read so far can be seen
+in the test view column header.
+
+While mostly an improvement, this has some side-effects. In environments where rendering
+is very slow (using remote displays like VNC) it will probably take longer overall to
+bring up the GUI. Also, the dynamic GUI progress bar can look a little odd : as we start
+running tests before we know how many there will be the progress bar can bounce backwards
+and forwards a bit as the number completed and total known are both increasing at the same
+time.
+
+We hope to address these issues in TextTest 3.11.
+
+(2) Temporary directory structure	
 =================================
 
 This structure is laid out in a different way now to ensure every run writes under only
@@ -40,7 +57,7 @@ For advanced users who were used to traversing this structure, it's now organise
 When using a grid engine the remote process logs are now all written in a directory at the top
 called "slavelogs" instead of in framework_tmp for each individual test.
 
-(2) Copying tests (static GUI)
+(3) Copying tests (static GUI)
 ==============================
 This has previously worked via the "Copying" tab. Now there are Cut/Copy/Paste entries in the 
 test tree popup menu, with the expected shortcuts (Ctrl-X, Ctrl-C, Ctrl-V). Should be
@@ -49,7 +66,7 @@ possible to use it in much the same way as in e.g. Windows Explorer.
 Note there is no visible effect of cutting a test currently. Changes are only performed when
 pasting it.
 
-(3) Virtual displays for GUI testing on UNIX
+(4) Virtual displays for GUI testing on UNIX
 ============================================
 This has been decentralised, so that each test now starts a new instance of the virtual display
 (Xvfb) and closes it again when done. The "virtual_display_machine" setting now has a different meaning :
@@ -66,7 +83,7 @@ GUI test failures due to lock file clashes. TextTest tries to work around this b
 to do so entirely reliably. If this problem occurs frequently you might need to clean up externally
 to TextTest: look for files in /tmp/.X*-lock and /tmp/.X11-unix/.X*
 
-(4) Cleaning temporary files when using grid engines
+(5) Cleaning temporary files when using grid engines
 ====================================================
 Previously no temporary files have been removed until the dynamic GUI is closed. In large
 test suites this can lead to a substantial delay closing the GUI while all tests are removed.
@@ -79,7 +96,7 @@ specify the flag -keepslave, or the equivalent checkbox under the Advanced tab i
 There is no difference in the behaviour when running tests locally, as removing files during
 the process would slow down feedback.
 
-(5) comparetest.RemoveObsoleteVersions -> comparetest.PrintObsoleteVersions
+(6) comparetest.RemoveObsoleteVersions -> comparetest.PrintObsoleteVersions
 ===========================================================================
 This script is for tracking down superfluous versioned files, i.e. the situation
 where output.app and output.app.2 are identical, rendering the existence of the second

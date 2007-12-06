@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.11 2007/11/23 16:20:34 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.12 2007/12/06 11:16:45 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins, subprocess
 import os, shutil, string
@@ -34,9 +34,19 @@ class StudioConfig(ravebased.Config):
             rulesets.append(subplanRuleset)
                 
         defaultRuleset = self.getDefaultRuleset(test)
-        if defaultRuleset and defaultRuleset != subplanRuleset:
+        if defaultRuleset and defaultRuleset not in rulesets:
             rulesets.append(defaultRuleset)
+
+        extraRuleset = self.getExtraRuleset(test)
+        if extraRuleset and extraRuleset not in rulesets:
+            rulesets.append(extraRuleset)
+            
         return rulesets
+    def getExtraRuleset(self, test):
+        fileName = test.makePathName("extra_ruleset")
+        if fileName:
+            return open(fileName).read().strip()
+        
     def getSubplanRuleset(self, test):
         subplanDir = self._getSubPlanDirName(test)
         if subplanDir:

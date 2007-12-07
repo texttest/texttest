@@ -153,10 +153,13 @@ class MatadorConfig(optimization.OptimizationConfig):
         if os.path.isfile(file):
             return file
         carmusr = test.getEnvironment("CARMUSR")
-        fullPath = os.path.join(carmusr, "apc_scripts", file)
+        fullPath = os.path.join(carmusr, "matador_scripts", file)
         if os.path.isfile(fullPath):
             return fullPath
-        fullPath = os.path.join(carmusr, "matador_scripts", file)
+        fullPath = os.path.join(carmusr, "tail_scripts", file)
+        if os.path.isfile(fullPath):
+            return fullPath
+        fullPath = os.path.join(carmusr, "apc_scripts", file)
         return fullPath
     def printHelpDescription(self):
         print helpDescription

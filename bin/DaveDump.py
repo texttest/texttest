@@ -54,4 +54,5 @@ class DaveContext:
 firebirdFile = sys.argv[1]
 
 dataContext = DaveContext(firebirdFile)
+sys.stdout.close()
 dataContext.dump("database.studio")

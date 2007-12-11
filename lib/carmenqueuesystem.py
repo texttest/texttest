@@ -65,7 +65,8 @@ __builtin__.open = repeatedOpen
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
 
-architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "parisc_1_1", "i386_solaris", "ia64_hpux", "x86_64_linux" ]
+architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "parisc_1_1",
+                  "i386_solaris", "ia64_hpux", "x86_64_linux", "x86_64_solaris" ]
 majorReleases = [ "11", "12", "13", "14", "master", "TRACKING_1" ]
 
 def getArchitecture(app):

@@ -1185,7 +1185,7 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            currProc = subprocess.Popen(args, stdin=stdin, stdout=stdout, stderr=stderr)
+            currProc = subprocess.Popen(args, stdin=stdin, stdout=stdout, stderr=stderr, cwd=test.getDirectory(temporary=1))
             
         if currProc:
             currProc.wait()

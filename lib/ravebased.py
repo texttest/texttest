@@ -849,9 +849,12 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
     def openFile(self, fileName):
         guiplugins.guilog.info("Writing file " + os.path.basename(fileName))
         return open(fileName, "w")
-    def writeLine(self, file, line):
-        file.write(line + os.linesep)
-        guiplugins.guilog.info(line)
+    def setEnvironment(self, suite, file, var, value):
+        suite.setEnvironment(var, value)
+        line = var + ":" + value
+        file.write(line + "\n")
+        if guiplugins.guilog:
+            guiplugins.guilog.info(line)
     def getCarmtmpDirName(self, carmUsr):
         # Important not to get basename clashes - this can lead to isolation problems
         baseName = os.path.basename(carmUsr)
@@ -861,27 +864,30 @@ class ImportTestSuite(guiplugins.ImportTestSuite):
             return baseName + "_tmp"
     def getEnvironmentFileName(self, suite):
         return "environment." + suite.app.name
-    def writeEnvironmentFiles(self, suite, testDir):
+    def writeEnvironmentFiles(self, suite):
         carmUsr = self.getCarmValue("usr")
         if not carmUsr:
             return
-        envFile = os.path.join(testDir, self.getEnvironmentFileName(suite))
+        envFile = os.path.join(suite.getDirectory(), self.getEnvironmentFileName(suite))
         file = self.openFile(envFile)
-        self.writeLine(file, "CARMUSR:" + carmUsr)
+        self.setEnvironment(suite, file, "CARMUSR", carmUsr)
         carmData = self.getCarmValue("data")
         if carmData:
-            self.writeLine(file, "CARMDATA:" + carmData)
+            self.setEnvironment(suite, file, "CARMDATA", carmData)
         carmtmp = self.getCarmtmpDirName(carmUsr)
         if self.hasStaticLinkage(carmUsr):
-            self.writeLine(file, "CARMTMP:$CARMSYS/" + carmtmp)
+            self.setEnvironment(suite, file, "CARMTMP", "$CARMSYS/" + carmtmp)
             return
 
-        self.writeLine(file, "CARMTMP:" + self.getCarmtmpPath(carmtmp))
-        envLocalFile = os.path.join(testDir, "environment.local")
+        self.setEnvironment(suite, file, "CARMTMP", self.getCarmtmpPath(carmtmp))
+        self.cacheCarmusrInfo(suite, file)
+        envLocalFile = os.path.join(suite.getDirectory(), "environment.local")
         localFile = self.openFile(envLocalFile)
-        self.writeLine(localFile, "CARMTMP:$CARMSYS/" + carmtmp)
+        self.setEnvironment(suite, localFile, "CARMTMP", "$CARMSYS/" + carmtmp)
     def getCarmtmpPath(self, carmtmp):
         pass
+    def cacheCarmusrInfo(self, suite, file):
+        pass # Used by studio module for default rulesets
     # getCarmtmpPath implemented by subclasses
 
 class BuildCode:

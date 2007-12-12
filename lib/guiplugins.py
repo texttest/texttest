@@ -1130,13 +1130,12 @@ class ImportTestSuite(ImportTest):
     def testType(self):
         return "Suite"
     def createTestContents(self, suite, testDir, description, placement):
-        self.writeEnvironmentFiles(suite, testDir)
-        return suite.addTestSuite(os.path.basename(testDir), description, placement)
+        return suite.addTestSuite(os.path.basename(testDir), description, placement, self.writeEnvironmentFiles)
     def addEnvironmentFileOptions(self):
         self.addSwitch("env", "Add environment file")
-    def writeEnvironmentFiles(self, suite, testDir):
+    def writeEnvironmentFiles(self, newSuite):
         if self.optionGroup.getSwitchValue("env"):
-            envFile = os.path.join(testDir, "environment")
+            envFile = os.path.join(newSuite.getDirectory(), "environment")
             file = open(envFile, "w")
             file.write("# Dictionary of environment to variables to set in test suite\n")
 

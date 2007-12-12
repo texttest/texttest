@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.12 2007/12/06 11:16:45 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.13 2007/12/12 14:08:51 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins, subprocess
 import os, shutil, string
@@ -13,7 +13,6 @@ def getConfig(optionMap):
     return StudioConfig(optionMap)
 
 class StudioConfig(ravebased.Config):
-    defaultRulesetCache = {}
     def addToOptionGroups(self, app, groups):
         for group in groups:
             if group.name.startswith("Basic"):
@@ -33,20 +32,19 @@ class StudioConfig(ravebased.Config):
         if subplanRuleset:
             rulesets.append(subplanRuleset)
                 
-        defaultRuleset = self.getDefaultRuleset(test)
+        defaultRuleset = test.getEnvironment("DEFAULT_RULESET_NAME")
         if defaultRuleset and defaultRuleset not in rulesets:
             rulesets.append(defaultRuleset)
 
-        extraRuleset = self.getExtraRuleset(test)
+        extraRuleset = test.getEnvironment("EXTRA_RULESET_NAME")
         if extraRuleset and extraRuleset not in rulesets:
             rulesets.append(extraRuleset)
             
         return rulesets
-    def getExtraRuleset(self, test):
-        fileName = test.makePathName("extra_ruleset")
-        if fileName:
-            return open(fileName).read().strip()
-        
+    def ignoreBinary(self):
+        if self.optionMap.runScript() and self.optionMap["s"].endswith("CacheDefaultRuleset"):
+            return False
+        return ravebased.Config.ignoreBinary(self)  
     def getSubplanRuleset(self, test):
         subplanDir = self._getSubPlanDirName(test)
         if subplanDir:
@@ -55,37 +53,7 @@ class StudioConfig(ravebased.Config):
             subplanRuleset = os.path.basename(origPath)
             # Don't want to manage the ruleset separately if the macro is going to build it...
             if not self.macroBuildsRuleset(test, subplanRuleset):
-                return subplanRuleset
-    
-    def getDefaultRuleset(self, test):
-        # get default ruleset from resources
-        runEnv = test.getRunEnvironment(ravebased.getCrcCompileVars())
-        carmUsr = runEnv.get("CARMUSR")
-        if self.defaultRulesetCache.has_key(carmUsr):
-            return self.defaultRulesetCache[carmUsr]
-
-        ruleset = self.calculateDefaultRuleset(test, runEnv)
-        self.defaultRulesetCache[carmUsr] = ruleset
-        return ruleset
-    
-    def calculateDefaultRuleset(self, test, runEnv):
-        script = os.path.join(runEnv.get("CARMSYS"), "bin", "crsutil")
-        cmdArgs = [ script, "-f", "CrcDefaultRuleSet: %s\n", "-g", "CrcDefaultRuleSet" ]
-        try:
-            proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), env=runEnv)
-            output = proc.communicate()[0]
-            for line in output.splitlines():
-                if line.startswith("CrcDefaultRuleSet:"):
-                    rulesetName = os.path.basename(line.strip().split()[-1])
-                    if rulesetName == "NO": # seems to some magic way to say there isn't one
-                        return
-                    else:
-                        return rulesetName
-
-            print "crsutil didn't return anything, hence default ruleset not found"
-        except OSError:
-            # If crsutil isn't there we won't get the default ruleset
-            print "Warning - could not run crsutil, hence default ruleset not found!"            
+                return subplanRuleset    
                 
     def findOrigRulePath(self, headerFile):
         if not os.path.isfile(headerFile):
@@ -177,6 +145,45 @@ class ImportTestSuite(ravebased.ImportTestSuite):
         return False
     def getCarmtmpPath(self, carmtmp):
         return os.path.join("/carm/proj/studio/carmtmps/${MAJOR_RELEASE_ID}/${ARCHITECTURE}", carmtmp)
+
+    def cacheCarmusrInfo(self, suite, file):
+        defaultRuleset = self.calculateDefaultRuleset(suite)
+        if defaultRuleset:
+            self.setEnvironment(suite, file, "DEFAULT_RULESET_NAME", defaultRuleset)
+
+    def calculateDefaultRuleset(self, test):
+        # We cache this when importing the test suite, because it's very slow to recompute
+        # and crsutil isn't always present and correct
+        runEnv = test.getRunEnvironment(ravebased.getCrcCompileVars())
+        runEnv["CARMTMP"] = "/" # It's not important but it must exist!
+        script = os.path.join(runEnv.get("CARMSYS"), "bin", "crsutil")
+        cmdArgs = [ script, "-f", "CrcDefaultRuleSet: %s\n", "-g", "CrcDefaultRuleSet" ]
+        try:
+            proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), env=runEnv)
+            output = proc.communicate()[0]
+            for line in output.splitlines():
+                if line.startswith("CrcDefaultRuleSet:"):
+                    rulesetName = os.path.basename(line.strip().split()[-1])
+                    if len (rulesetName) == 0 or rulesetName == "NO": # seems to some magic way to say there isn't one
+                        return
+                    else:
+                        return rulesetName
+
+            print "crsutil didn't return anything, hence default ruleset not found"
+        except OSError:
+            # If crsutil isn't there we won't get the default ruleset
+            print "Warning - could not run crsutil, hence default ruleset not found!"
+        
+class CacheDefaultRuleset(plugins.Action):
+    def __repr__(self):
+        return "Caching default ruleset"
+    def setUpSuite(self, suite):
+        if ravebased.isUserSuite(suite) and not suite.hasEnvironment("DEFAULT_RULESET_NAME"):
+            self.describe(suite)
+            envFile = suite.getFileName("environment")
+            file = open(envFile, "a")
+            importer = ImportTestSuite()
+            importer.cacheCarmusrInfo(suite, file)
 
 # Graphical import test
 class ImportTestCase(guiplugins.ImportTestCase):

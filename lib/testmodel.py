@@ -856,13 +856,15 @@ class TestSuite(Test):
         test.setObservers(self.observers)
         return test
     
-    def addTestCase(self, testName, description="", placement=-1):
-        return self.addTest(testName, description, placement, TestCase)
-    def addTestSuite(self, testName, description="", placement=-1):
-        return self.addTest(testName, description, placement, TestSuite)
-    def addTest(self, testName, description, placement, className):
+    def addTestCase(self, *args, **kwargs):
+        return self.addTest(TestCase, *args, **kwargs)
+    def addTestSuite(self, *args, **kwargs):
+        return self.addTest(TestSuite, *args, **kwargs)
+    def addTest(self, className, testName, description="", placement=-1, postProcFunc=None):
         cache = self.createTestCache(testName)
         test = self.createSubtest(testName, description, cache, className)
+        if postProcFunc:
+            postProcFunc(test)
         self.testcases.insert(placement, test) 
         test.notify("Add", initial=False)
         return test

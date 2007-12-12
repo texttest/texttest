@@ -1,4 +1,4 @@
-#!/usr/bin/env /carm/master/Products/standard_gpc/CARMSYS/bin/carmrunner
+#!/usr/bin/env /carm/master/nightjob/standard_gpc/CARMSYS/bin/carmrunner
 
 import sys, os
 try:

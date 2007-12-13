@@ -57,8 +57,7 @@ class Config:
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
                 group.addSwitch("n", "Create new results files (overwrite everything)")
                 if recordsUseCases:
-                    group.addSwitch("record", "Record usecase rather than replay what is present")
-                    group.addSwitch("holdshell", "Hold shells running system under test...")
+                    group.addSwitch("record", "Private: Record usecase rather than replay what is present")
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
             batchSession = self.optionValue("b")

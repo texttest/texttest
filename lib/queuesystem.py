@@ -353,6 +353,10 @@ class SlaveServerResponder(Responder, TCPServer):
             self.handle_request()
         
         self.diag.info("Terminating slave server")
+    def notifyAllRead(self, suites):
+        if len(self.testMap) == 0:
+            self.notifyAllComplete()
+            
     def notifyAllComplete(self):
         self.diag.info("Notified all complete, shutting down soon...")
         self.terminate = True

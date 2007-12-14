@@ -26,5 +26,6 @@ if [ $ARCH = "i386_linux" -o $ARCH = "x86_64_linux" ]; then
 
     exec ttpython -u ${fullpath}.py "$@"
 else
-    exec ttpython -u ${fullpath}.py "$@"
+    export ARCH
+    exec /usr/local/bin/carmen/master/python -u ${fullpath}.py "$@"
 fi

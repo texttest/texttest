@@ -16,11 +16,15 @@ abspath()
 
 abspath $0 fullpath
 
-TEXTTEST_SLAVE_CMD=$fullpath
-export TEXTTEST_SLAVE_CMD
+ARCH=`arch` 
+if [ $ARCH = "i386_linux" -o $ARCH = "x86_64_linux" ]; then
+    export TEXTTEST_SLAVE_CMD=$fullpath
 
-# Sets gtk/pygtk environment variables and sets PYTHON_TO_RUN 
-# to point to the full name of the python binary to run.
-. /usr/local/tt-env/gtk2.10/bin/setup_python_gtk.sh
+    # Sets gtk/pygtk environment variables and sets PYTHON_TO_RUN 
+    # to point to the full name of the python binary to run.
+    . /usr/local/tt-env/gtk2.10/bin/setup_python_gtk.sh
 
-exec $PYTHON_TO_RUN -u ${fullpath}.py "$@"
+    exec ttpython -u ${fullpath}.py "$@"
+else
+    exec ttpython -u ${fullpath}.py "$@"
+fi

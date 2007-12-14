@@ -205,30 +205,32 @@ class GUIStatusMonitor(SubGUI):
         self.animation = None
         self.pixbuf = None
         self.label = None
+        self.busy = False
 
-    def busy(self):
-        return self.pixbuf != None
     def getWidgetName(self):
         return "_Status bar"
     def describe(self):
         guilog.info("Changing GUI status to: '" + self.label.get_text() + "'")        
-    def notifyActionStart(self, message=""):
+    def notifyActionStart(self, message="", lock = True):        
         if self.throbber:
             if self.pixbuf: # We didn't do ActionStop ...
                 self.notifyActionStop()
             self.pixbuf = self.throbber.get_pixbuf()
             self.throbber.set_from_animation(self.animation)
-            self.throbber.grab_add()
+            if lock:
+                self.throbber.grab_add()
+                self.busy = True
             
     def notifyActionProgress(self, message=""):
         while gtk.events_pending():
             gtk.main_iteration(False)
 
     def notifyActionStop(self, message=""):
+        self.busy = False
         if self.throbber:
             self.throbber.set_from_pixbuf(self.pixbuf)
             self.pixbuf = None
-            self.throbber.grab_remove()
+            self.throbber.grab_remove()            
         
     def notifyStatus(self, message):
         if self.label:
@@ -502,7 +504,14 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notify("FileChange", test)
     def notifyContentChange(self, suite):
         self.notify("ContentChange", suite)
+    def notifyStartRead(self):
+        if not self.dynamic:
+            self.notify("Status", "Reading tests ...")
+            self.notify("ActionStart", "", False)
     def notifyAllRead(self, suites):
+        if not self.dynamic:
+            self.notify("Status", "Reading tests completed at " + plugins.localtime() + ".")
+            self.notify("ActionStop")
         self.notify("AllRead", suites)
         if self.dynamic and len(suites) == 0:
             guilog.info("There weren't any tests to run, terminating...")
@@ -1399,7 +1408,7 @@ class ActionGUI(SubGUI):
         else:
             return " (greyed out)"
     def runInteractive(self, *args):
-        if statusMonitor.busy(): # If we're busy with some other action, ignore this one ...
+        if statusMonitor.busy: # If we're busy with some other action, ignore this one ...
             return
         dialogType = self.action.getDialogType()
         if dialogType is not None:

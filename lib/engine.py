@@ -77,6 +77,7 @@ class Activator(Responder, plugins.Observable):
         goodSuites = []
         rejectedApps = Set()
         forTestRuns = self.needsTestRuns()
+        self.notify("StartRead")
         for suite in self.suites:
             filters = suite.app.getFilterList()
             self.diag.info("Creating test suite with filters " + repr(filters))

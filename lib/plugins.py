@@ -191,7 +191,7 @@ def printWarning(message, stdout = True, stderr = False):
         sys.stderr.write("WARNING: " + message + "\n")
         
 # Useful stuff to handle regular expressions
-regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|]")    
+regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|\+]")    
 def isRegularExpression(text):
     return (regexChars.search(text) != None)
 def findRegularExpression(expr, text):

@@ -340,7 +340,7 @@ class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
             self.collatePath(test, "$CARMUSR", self.partialCopyTestPath)
 
 def getCrcCompileVars():
-    return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMGROUP", "BITMODE", "_AUTOTEST__LOCAL_COMPILE_", "PATH", "USER" ] 
+    return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMROLE", "CARMGROUP", "BITMODE", "_AUTOTEST__LOCAL_COMPILE_", "PATH", "USER" ] 
     
 class RuleBuildSubmitServer(QueueSystemServer):
     def __init__(self, optionMap):

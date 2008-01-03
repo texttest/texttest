@@ -618,7 +618,7 @@ class CreateHTMLFiles(plugins.Action):
             if majorRelease in [ "11", "12", "13" ]:
                 xsltprocArchs = [ "i386_linux", "x86_64_linux" ]
             else:
-                xsltprocArchs = [ "i386_linux", "x86_64_linux", "sparc", "sparc_64" ]
+                xsltprocArchs = [ "i386_linux", "x86_64_linux", "x86_64_solaris", "sparc", "sparc_64" ]
             arch = getArchitecture(test.app)
             if arch in xsltprocArchs:
                 os.system("xsltproc " + xslFile + " " + xmlAllFile + " > " + htmlFile)

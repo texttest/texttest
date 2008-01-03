@@ -4,6 +4,7 @@
 import os, filecmp, plugins, time, stat
 from ndict import seqdict
 from shutil import copyfile
+from fnmatch import fnmatch
 
 class FileComparison:
     def __init__(self, test, stem, standardFile, tmpFile, testInProgress = 0, observers={}):
@@ -31,9 +32,7 @@ class FileComparison:
         # It would be nice if this could be replaced by some automagic file type detection
         # mechanism, such as the *nix 'file' command, but as the first implementation I've
         # chosen to use a manually created list instead.
-        self.binaryFile = False
-        if self.stem in test.getConfigValue("binary_file"):
-            self.binaryFile = True
+        self.binaryFile = self.checkIfBinaryFile(test)
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getConfigValue("text_diff_program_max_file_size"))
@@ -53,6 +52,11 @@ class FileComparison:
             self.differenceCache = self.differenceId
     def __repr__(self):
         return self.stem
+    def checkIfBinaryFile(self, test):
+        for binPattern in test.getConfigValue("binary_file"):
+            if fnmatch(self.stem, binPattern):
+                return True
+        return False
     def modifiedDates(self):
         files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
         return " : ".join(map(self.modifiedDate, files))

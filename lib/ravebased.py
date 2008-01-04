@@ -297,7 +297,7 @@ class Config(CarmenConfig):
         # dictionary of lists
         app.setConfigDefault("build_targets", { "" : [] }, "Directories to build in when -build specified")
         app.addConfigEntry("need_rulecompile", "white", "test_colours")
-        app.addConfigEntry("pend_rulecompile", "white", "test_colours")
+        app.addConfigEntry("pending_rulecompile", "white", "test_colours")
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
         app.addConfigEntry("ruleset_compiled", "white", "test_colours")
 
@@ -738,7 +738,7 @@ class PendingRuleCompilation(plugins.TestState):
         briefText = "RULES PEND"
         freeText = "Build pending for ruleset" + self.rulecomp.description()
         lifecycleChange="become pending for rule compilation"
-        plugins.TestState.__init__(self, "pend_rulecompile", briefText=briefText, \
+        plugins.TestState.__init__(self, "pending_rulecompile", briefText=briefText, \
                                    freeText=freeText, lifecycleChange=lifecycleChange)
 
 class RunningRuleCompilation(plugins.TestState):

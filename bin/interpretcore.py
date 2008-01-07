@@ -115,7 +115,7 @@ def parseFailure(errMsg, debugger):
     if len(errMsg) > 50000:
         return summary, "Over 50000 error characters printed - suspecting binary output"
     else:
-        return summary, "GDB backtrace command failed : Stack trace not produced for crash\nErrors from " + debugger + ":\n" + errMsg
+        return summary, debugger + " backtrace command failed : Stack trace not produced for crash\nErrors from " + debugger + ":\n" + errMsg
 
 
 def assembleInfo(signalDesc, summaryLine, stackLines, debugger):
@@ -143,7 +143,7 @@ def writeGdbStackTrace(corefile, binary):
         return parseFailure(stderr.read(), "GDB")
 
 def writeDbxStackTrace(corefile, binary):
-    dbxCommand = "dbx -q -c 'where; quit' " + binary + " " + corefile + " < /dev/null"
+    dbxCommand = "dbx -f -q -c 'where; quit' " + binary + " " + corefile + " < /dev/null"
     stdin, stdout, stderr = os.popen3(dbxCommand)
     signalDesc, summaryLine, stackLines = parseDbxOutput(stdout)
     if summaryLine:

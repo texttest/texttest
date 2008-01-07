@@ -894,7 +894,7 @@ Dynamic GUI Enhancements:
     - Quitting no longer freezes the dynamic GUI (texttestgui.py)
 	Informs you about what its doing (killing tests, viewers, removing files etc.)
     - "Double Quit" now properly supported (texttestgui.py)
-	Useful for cleaning up when tests refuse to be killed. See docs.
+	Useful for cleaning up when tests refuse to be killed. 
     - Can now mark tests when they have been viewed (texttestgui.py)
 	Useful when wading through lots of changes, so already examined tests can be hidden.
     - Performance of "Update Info" button greatly improved. (guiplugins.py)
@@ -925,7 +925,7 @@ Framework Enhancements:
     - "view_program" config setting now expands environment variables from the tests (guiplugins.py)
     - Can now inform TextTest about binary files in the tests so it doesn't try to do tkdiff on them... (default.py)
     - New mechanism for sharing enviroment files between different tested applications (testmodel.py) 
-	Use "shared_config_directory"
+	Use "extra_config_directory"
 Batch Report Enhancements:
     - Can now have extra_versions that are only used in particular batch sessions (default.py)
 	New config file setting "batch_extra_version"
@@ -960,6 +960,7 @@ Bug Fixes:
     - Automatic selection of single tests doesn't force viewing of running test if it's been explicitly hidden (texttestgui.py)
     - Fixed occasional stack trace in interpretcore.py script for getting stack traces out of UNIX core files (interpretcore.py)
     - Made sure the same script doesn't write temporary files in the CWD, leading to occasional clashes (interpretcore.py)
+    - Fallback to DBX if GDB doesn't manage to get core file information out (interpretcore.py)
     - Saving tests that have crashed now works properly (knownbugs.py)
 	Previously leaked a file that caused trouble next time the test was run
     - CVS plugin : CVS commands on multiple files in dynamic GUI fixed (cvs.py)

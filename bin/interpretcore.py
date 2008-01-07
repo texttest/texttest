@@ -13,7 +13,15 @@ def interpretCore(corefile):
         details = "Could not find binary name '" + binary + "' from core file : Stack trace not produced for crash"
         return "No binary found from core", details
 
-    return writeStackTrace(corefile, binary)
+    summary, details = writeGdbStackTrace(corefile, binary)
+    if summary.find("Parse failure") != -1:
+        dbxSummary, dbxDetails = writeDbxStackTrace(corefile, binary)
+        if dbxSummary.find("Parse failure") == -1:
+            return dbxSummary, dbxDetails
+        else:
+            return "Parse failure from both GDB and DBX", details + dbxDetails
+    else:
+        return summary, details
 
 def getLocalName(corefile):
     data = os.popen("file " + corefile).readline()
@@ -63,13 +71,15 @@ def writeCmdFile():
     file.close()
     return fileName
 
-def findCoreInfo(stdout):
+def parseGdbOutput(stdout):
     summaryLine = ""
+    signalDesc = ""
     stackLines = []
     prevLine = ""
     for line in stdout.readlines():
         if line.find("Program terminated") != -1:
             summaryLine = line.strip()
+            signalDesc = summaryLine.split(",")[-1].strip().replace(".", "")
         if line.startswith("#") and line != prevLine:
             startPos = line.find("in ") + 3
             endPos = line.rfind("(")
@@ -79,35 +89,67 @@ def findCoreInfo(stdout):
                 methodName = methodName[:pointerPos]
             stackLines.append(methodName)
         prevLine = line
-    return summaryLine, stackLines    
+    return signalDesc, summaryLine, stackLines    
 
-def writeStackTrace(corefile, binary):
-    fileName = writeCmdFile()
-    gdbCommand = "gdb -q -batch -x " + fileName + " " + binary + " " + corefile
-    foundStack = False
+def parseDbxOutput(stdout):
+    summaryLine = ""
+    signalDesc = ""
+    stackLines = []
     prevLine = ""
-    printedStackLines = 0
-    stdin, stdout, stderr = os.popen3(gdbCommand)
-    summaryLine, stackLines = findCoreInfo(stdout)
-    os.remove(fileName)
-    if not summaryLine:
-        errMsg = stderr.read()
-        summary = "Parse failure on GDB output"
-        if len(errMsg) > 50000:
-            return summary, "Over 50000 error characters printed - suspecting binary output"
-        else:
-            return summary, "GDB backtrace command failed : Stack trace not produced for crash\nErrors from GDB:\n" + errMsg
+    for line in stdout.readlines():
+        stripLine = line.strip()
+        if line.find("program terminated") != -1:
+            summaryLine = stripLine
+            signalDesc = summaryLine.split("(")[-1].replace(")", "")
+        if (stripLine.startswith("[") or stripLine.startswith("=>[")) and line != prevLine:
+            startPos = line.find("]") + 2
+            endPos = line.rfind("(")
+            methodName = line[startPos:endPos]
+            stackLines.append(methodName)
+        prevLine = line
+    return signalDesc, summaryLine, stackLines    
 
-    summary = summaryLine.split(",")[-1].strip().replace(".", "")
+
+def parseFailure(errMsg, debugger):
+    summary = "Parse failure on " + debugger + " output"
+    if len(errMsg) > 50000:
+        return summary, "Over 50000 error characters printed - suspecting binary output"
+    else:
+        return summary, "GDB backtrace command failed : Stack trace not produced for crash\nErrors from " + debugger + ":\n" + errMsg
+
+
+def assembleInfo(signalDesc, summaryLine, stackLines, debugger):
+    summary = signalDesc
     if len(stackLines) > 1:
         summary += " in " + stackLines[0].strip()
-    details = summaryLine + "\nStack trace from gdb :\n" + \
+    details = summaryLine + "\nStack trace from " + debugger + " :\n" + \
               "\n".join(stackLines[:100])
     # Sometimes you get enormous stacktraces from GDB, for example, if you have
     # an infinite recursive loop.
     if len(stackLines) > 100:
         details += "\nStack trace print-out aborted after 100 function calls"
     return summary, details
+
+
+def writeGdbStackTrace(corefile, binary):
+    fileName = writeCmdFile()
+    gdbCommand = "gdb -q -batch -x " + fileName + " " + binary + " " + corefile
+    stdin, stdout, stderr = os.popen3(gdbCommand)
+    signalDesc, summaryLine, stackLines = parseGdbOutput(stdout)
+    os.remove(fileName)
+    if summaryLine:
+        return assembleInfo(signalDesc, summaryLine, stackLines, "GDB")
+    else:
+        return parseFailure(stderr.read(), "GDB")
+
+def writeDbxStackTrace(corefile, binary):
+    dbxCommand = "dbx -q -c 'where; quit' " + binary + " " + corefile + " < /dev/null"
+    stdin, stdout, stderr = os.popen3(dbxCommand)
+    signalDesc, summaryLine, stackLines = parseDbxOutput(stdout)
+    if summaryLine:
+        return assembleInfo(signalDesc, summaryLine, stackLines, "DBX")
+    else:
+        return parseFailure(stderr.read(), "DBX")
 
 def printCoreInfo(corefile):
     compression = corefile.endswith(".Z")

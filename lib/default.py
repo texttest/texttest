@@ -562,8 +562,9 @@ class Config:
         severities = {}
         severities["errors"] = 1
         severities["output"] = 1
+        severities["traffic"] = 1
+        severities["usecase"] = 1
         severities["performance"] = 2
-        severities["usecase"] = 2
         severities["catalogue"] = 2
         severities["default"] = 99
         return severities

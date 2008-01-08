@@ -1135,8 +1135,7 @@ class Application:
     def readImportedConfigFiles(self, configModuleInitialised):
         self.configDir.readValues(self.getConfigFilesToImport(), insert=False, errorOnUnknown=configModuleInitialised)
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):
-        allowedExtensions = self.getFileExtensions()
-        allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionLists)
+        allFiles = self._getAllFileNames([ dircache ], stem)
         self.diag.info("Reading values for " + stem + " from files : " + "\n".join(allFiles))
         multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
     def setEnvironment(self, test):

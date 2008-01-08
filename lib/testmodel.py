@@ -365,23 +365,22 @@ class Test(plugins.Observable):
         return stems
     def listStandardFiles(self, allVersions):
         resultFiles, defFiles = [],[]
-        allowedExtensions = self.app.getFileExtensions()
         self.diagnose("Looking for all standard files")
         for stem in self.defFileStems():
-            defFiles += self.listStdFilesWithStem(stem, allowedExtensions, allVersions)
+            defFiles += self.listStdFilesWithStem(stem, allVersions)
         for stem in self.resultFileStems():
-            resultFiles += self.listStdFilesWithStem(stem, allowedExtensions, allVersions)
+            resultFiles += self.listStdFilesWithStem(stem, allVersions)
         self.diagnose("Found " + repr(resultFiles) + " and " + repr(defFiles))
         return resultFiles, defFiles
-    def listStdFilesWithStem(self, stem, allowedExtensions, allVersions):
+    def listStdFilesWithStem(self, stem, allVersions):
         self.diagnose("Getting files for stem " + stem)
         files = []
         if allVersions:
             files += self.findAllStdFiles(stem)
         else:
-            allFiles = self.dircache.findAndSortFiles(stem, allowedExtensions, self.app.compareVersionLists)
-            if len(allFiles):
-                files.append(allFiles[-1])
+            currFile = self.getFileName(stem)
+            if currFile:
+                files.append(currFile)
         return files
     def listDataFiles(self):
         existingDataFiles = []

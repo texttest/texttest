@@ -23,10 +23,12 @@ class Config:
         recordsUseCases = app.getConfigValue("use_case_record_mode") != "disabled"
         for group in groups:
             if group.name.startswith("Select"):
-                group.addOption("t", "Test names containing")
+                group.addOption("t", "Test names containing", description="Select tests for which the name matches the entered text. The text can be a regular expression.")
+                group.addOption("ts", "Suite names containing", description="Select tests for which at least one parent suite name matches the entered text. The text can be a regular expression.")
+                group.addOption("app", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
                 possibleDirs = self.getFilterFileDirectories([ app ], createDirs=False)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
-                group.addOption("ts", "Suite names containing")
+                group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
                 group.addOption("grep", "Result files containing")
                 group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
@@ -289,7 +291,9 @@ class Config:
         else:
             return ("temporary_filter_files", os.path.join(app.writeDirectory, "temporary_filter_files"))
     def getFilterClasses(self):
-        return [ TestNameFilter, plugins.TestPathFilter, TestSuiteFilter, performance.TimeFilter ]
+        return [ TestNameFilter, plugins.TestPathFilter, \
+                 TestSuiteFilter, performance.TimeFilter, \
+                 ApplicationFilter, TestDescriptionFilter ]
     def checkFilterFileSanity(self, app):
         # Turn any input relative files into absolute ones, throw if we can't
         filterFileName = self.findFilterFileName(app)
@@ -1238,7 +1242,17 @@ class GrepFilter(plugins.TextFilter):
             if self.stringContainsText(line):
                 return True
         return False
- 
+
+class ApplicationFilter(plugins.TextFilter):
+    option = "app"
+    def acceptsTestCase(self, test):
+        return self.stringContainsText(test.app.name)
+
+class TestDescriptionFilter(plugins.TextFilter):
+    option = "desc"
+    def acceptsTestCase(self, test):
+        return self.stringContainsText(plugins.extractComment(test.description))
+
 class Running(plugins.TestState):
     def __init__(self, execMachines, freeText = "", briefText = ""):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,

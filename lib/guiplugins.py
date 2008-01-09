@@ -1144,8 +1144,8 @@ class SelectTests(SelectionAction):
         SelectionAction.__init__(self)
         self.rootTestSuites = []
         self.diag = plugins.getDiagnostics("Select Tests")
-        self.addOption("vs", "Tests for version")
-        self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0)
+        self.addOption("vs", "Tests for version", description="Select tests for a specific version.")
+        self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
         self.addSwitch("current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
         
         self.appSelectGroup = commandOptionGroups[0]

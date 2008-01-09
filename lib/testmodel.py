@@ -72,7 +72,7 @@ class DirectoryCache:
 
     def findAllFiles(self, stem, extensionPred=None):
         versionSets = self.findVersionSets(stem, extensionPred)
-        return self.convertToPaths(versionSets)
+        return reduce(operator.add, versionSets.values(), [])
     
     def findVersionSets(self, stem, predicate, versionSetMethod=None):
         methodToUse = self.findVersionSetMethod(versionSetMethod)
@@ -80,13 +80,9 @@ class DirectoryCache:
         for fileName in self.contents:
             versionSet = methodToUse(fileName, stem)
             if versionSet is not None and (predicate is None or predicate(versionSet)):
-                versionSets.setdefault(versionSet, []).append(fileName)
+                versionSets.setdefault(versionSet, []).append(self.pathName(fileName))
         return versionSets
-    
-    def convertToPaths(self, versionSets):
-        allPathNames = [ map(self.pathName, fileNames) for fileNames in versionSets.values() ]
-        return reduce(operator.add, allPathNames, [])
-    
+       
     def findAllStems(self):
         stems = []
         for file in self.contents:
@@ -1172,16 +1168,18 @@ class Application:
 
     def _getAllFileNames(self, dircaches, stem, allVersions=False, versionSetMethod=None):
         versionPred = self.getExtensionPredicate(allVersions)
+        versionSets = seqdict()
         for dircache in dircaches:
             # Sorts into order most specific first
-            versionSets = dircache.findVersionSets(stem, versionPred, versionSetMethod)
-            if not allVersions:
-                versionSets.sort(self.compareVersionSets)
-            allFiles = dircache.convertToPaths(versionSets)
-            self.diag.info("Files for stem " + stem + " found " + repr(allFiles))
-            if len(allFiles):
-                return allFiles
-        return []
+            currVersionSets = dircache.findVersionSets(stem, versionPred, versionSetMethod)
+            for vset, files in currVersionSets.items():
+                versionSets.setdefault(vset, []).extend(files)
+
+        if not allVersions:
+            versionSets.sort(self.compareVersionSets)
+        allFiles =  reduce(operator.add, versionSets.values(), [])
+        self.diag.info("Files for stem " + stem + " found " + repr(allFiles))
+        return allFiles
 
     def getRefVersionApplication(self, refVersion):
         return Application(self.name, self.dircache, refVersion.split("."), self.inputOptions)

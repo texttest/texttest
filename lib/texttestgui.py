@@ -2423,10 +2423,14 @@ class TestFileGUI(FileViewGUI):
         parentIter = iter
         for file in files:
             parent, local = os.path.split(file)
-            parentIter = dirIters[parent]
+            parentIter = dirIters.get(parent)
+            if parentIter is None:
+                subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour)
+                parentIter = subDirIters.get(parent)
             newiter = self.addFileToModel(parentIter, file, None, colour)
             if os.path.isdir(file):
                 dirIters[file] = newiter
+        return dirIters
 
 class ProgressBarGUI(SubGUI):
     def __init__(self, dynamic):

@@ -117,7 +117,7 @@ class MatadorConfig(optimization.OptimizationConfig):
             return []
     def getRuleSetting(self, test, paramName):
         raveParamName = "raveparameters." + test.app.name + test.app.versionSuffix()
-        raveParamFile = test.makePathName(raveParamName)
+        raveParamFile = test.getPathName(raveParamName)
         setting = self.getRuleSettingFromFile(raveParamFile, paramName)
         if setting:
             return setting

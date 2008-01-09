@@ -45,7 +45,7 @@ class SetUpTrafficHandlers(plugins.Action):
             # We might have written a fake version - store what it points to so we can
             # call it later, and remove the link
             localName = os.path.basename(linkName)
-            TrafficServer.instance.setRealVersion(localName, test.makePathName(localName))
+            TrafficServer.instance.setRealVersion(localName, test.getPathName(localName))
             os.remove(linkName)
         # Linking doesn't exist on windows!
         if os.name == "posix":

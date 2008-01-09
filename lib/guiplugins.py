@@ -1536,15 +1536,12 @@ class CreateDefinitionFile(InteractiveTestAction):
         self.optionGroup.setPossibleValues("type", defFiles)
         return True
     def getFileName(self, stem, version):
-        stem = self.optionGroup.getOptionValue("type")
+        fileName = stem
         if stem in self.currentTest.getConfigValue("definition_file_stems"):
-            base = stem + "." + self.currentTest.app.name
-            if version:
-                return base + "." + version
-            else:
-                return base
-        else:
-            return stem
+            fileName += "." + self.currentTest.app.name
+        if version:
+            fileName += "." + version
+        return fileName
     def getSourceFile(self, stem, version, targetFile):
         thisTestName = self.currentTest.getFileName(stem, version)
         if thisTestName and not plugins.samefile(thisTestName, targetFile):

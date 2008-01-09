@@ -904,7 +904,7 @@ class PrepareWriteDirectory(plugins.Action):
         if not fileName or os.path.isabs(fileName):
             return fileName
         
-        pathName = test.makePathName(fileName)
+        pathName = test.getPathName(fileName)
         if pathName:
             return pathName
         else:

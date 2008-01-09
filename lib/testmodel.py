@@ -58,10 +58,8 @@ class DirectoryCache:
         return parts[0], ImmutableSet(parts[1:])
 
     def findVersionSet(self, fileName, stem):
-        if fileName == stem:
-            return ImmutableSet()
-        fileStem, versions = self.splitStem(fileName)
-        if stem == fileStem:
+        if fileName.startswith(stem):
+            fileStem, versions = self.splitStem(fileName[len(stem):])
             return versions
 
     def findVersionSetMethod(self, versionSetMethod):
@@ -75,6 +73,11 @@ class DirectoryCache:
         return reduce(operator.add, versionSets.values(), [])
     
     def findVersionSets(self, stem, predicate, versionSetMethod=None):
+        if stem.find("/") != -1:
+            root, local = os.path.split(stem)
+            newCache = DirectoryCache(os.path.join(self.dir, root))
+            return newCache.findVersionSets(local, predicate, versionSetMethod)
+            
         methodToUse = self.findVersionSetMethod(versionSetMethod)
         versionSets = seqdict()
         for fileName in self.contents:
@@ -87,7 +90,7 @@ class DirectoryCache:
         stems = []
         for file in self.contents:
             stem, versionSet = self.splitStem(file)
-            if len(versionSet) > 0 and not stem in stems:
+            if len(stem) > 0 and len(versionSet) > 0 and not stem in stems:
                 stems.append(stem)
         return stems
 
@@ -371,8 +374,7 @@ class Test(plugins.Observable):
     def listDataFiles(self):
         existingDataFiles = []
         for dataFile in self.app.getDataFileNames():
-            fileName = self.getFileName(dataFile)
-            if fileName:
+            for fileName in self.dircache.findAllFiles(dataFile):
                 existingDataFiles += self.listFiles(fileName, dataFile)
         return existingDataFiles
     def listFiles(self, fileName, dataFile):
@@ -426,6 +428,14 @@ class Test(plugins.Observable):
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse._getFileName([ self.dircache ], stem)
+    def getPathName(self, stem):
+        return self.app._getFileName(self.getDirCachesToRoot(), stem)
+    def getDirCachesToRoot(self):
+        dircaches = [ self.dircache ]
+        if self.parent:
+            dircaches = self.parent.getDirCachesToRoot() + dircaches
+        return dircaches
+    
     def getAllFileNames(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
         appToUse = self.app
@@ -438,11 +448,6 @@ class Test(plugins.Observable):
         return self.app.getDataFileNames(self.getEnvironment)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
         return self.app.getCompositeConfigValue(key, subKey, expandVars, self.getEnvironment)
-    def makePathName(self, fileName):
-        if self.dircache.exists(fileName):
-            return self.dircache.pathName(fileName)
-        if self.parent:
-            return self.parent.makePathName(fileName)
     def actionsCompleted(self):
         self.diagnose("All actions completed")
         if self.state.isComplete() and not self.state.lifecycleChange:

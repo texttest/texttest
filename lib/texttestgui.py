@@ -2248,9 +2248,7 @@ class ApplicationFileGUI(FileViewGUI):
                 self.addFileToModel(importediter, importedFile, None, colour)
                 
     def getConfigFiles(self, app):
-        configFiles = app.dircache.findAllFiles("config", Set([ app.name ]))
-        configFiles.sort()
-        return configFiles
+        return app._getAllFileNames([ app.dircache ], "config", allVersions=True)
     def getPersonalFiles(self):
         personalDir = plugins.getPersonalConfigDir()
         if not os.path.isdir(personalDir):

@@ -21,61 +21,70 @@ class DirectoryCache:
         self.dir = dir
         self.contents = []
         self.refresh()
+
     def refresh(self):
         try:
             self.contents = os.listdir(self.dir)
             self.contents.sort()
         except OSError: # usually caused by people removing stuff externally
             self.contents = []
+
+    def hasStem(self, stem):
+        for fileName in self.contents:
+            if fileName.startswith(stem):
+                return True
+        return False
+
     def exists(self, fileName):
         if fileName.find("/") != -1:
             return os.path.exists(self.pathName(fileName))
         else:
             return fileName in self.contents
+
     def pathName(self, fileName):
         return os.path.join(self.dir, fileName)
-    def findFilesMatching(self, pattern, allowedExtensions):
-        matchingFiles = filter(lambda fileName : self.matchesPattern(fileName, pattern, allowedExtensions), self.contents)
+    def findFilesMatching(self, pattern, predicate):
+        matchingFiles = filter(lambda fileName : self.matchesPattern(fileName, pattern, predicate), self.contents)
         return map(self.pathName, matchingFiles)
-    def matchesPattern(self, fileName, pattern, allowedExtensions):
+
+    def matchesPattern(self, fileName, pattern, versionPredicate):
         if not fnmatch(fileName, pattern):
             return False
         stem, versions = self.splitStem(fileName)
-        return versions.issubset(allowedExtensions)
+        return versionPredicate(versions)
+
     def splitStem(self, fileName):
         parts = fileName.split(".")
         return parts[0], ImmutableSet(parts[1:])
+
     def findVersionSet(self, fileName, stem):
         if fileName == stem:
             return ImmutableSet()
         fileStem, versions = self.splitStem(fileName)
         if stem == fileStem:
             return versions
+
     def findVersionSetMethod(self, versionSetMethod):
         if versionSetMethod:
             return versionSetMethod
         else:
             return self.findVersionSet
-    def findVersionSets(self, stem, versionSetMethod=None):
+
+    def findAllFiles(self, stem, extensionPred=None):
+        versionSets = self.findVersionSets(stem, extensionPred)
+        return self.convertToPaths(versionSets)
+    
+    def findVersionSets(self, stem, predicate, versionSetMethod=None):
         methodToUse = self.findVersionSetMethod(versionSetMethod)
-        versionSets = []
-        versionInfo = {}
+        versionSets = seqdict()
         for fileName in self.contents:
             versionSet = methodToUse(fileName, stem)
-            if versionSet is None:
-                continue
-
-            if versionSet not in versionSets:
-                versionSets.append(versionSet)
-            versionInfo.setdefault(versionSet, []).append(fileName)
-        return versionSets, versionInfo
-    def findAndSortFiles(self, stem, allowed, priorityFunction, versionSetMethod=None):
-        versionSets, versionInfo = self.findVersionSets(stem, versionSetMethod)
-        versionSets = filter(lambda vset: vset.issubset(allowed), versionSets)
-        versionSets.sort(priorityFunction)
-        return self.convertToPaths(versionSets, versionInfo)
-    def convertToPaths(self, versionSets, versionInfo):
-        allPathNames = [ map(self.pathName, versionInfo[vset]) for vset in versionSets ]
+            if versionSet is not None and (predicate is None or predicate(versionSet)):
+                versionSets.setdefault(versionSet, []).append(fileName)
+        return versionSets
+    
+    def convertToPaths(self, versionSets):
+        allPathNames = [ map(self.pathName, fileNames) for fileNames in versionSets.values() ]
         return reduce(operator.add, allPathNames, [])
     
     def findAllStems(self):
@@ -85,13 +94,6 @@ class DirectoryCache:
             if len(versionSet) > 0 and not stem in stems:
                 stems.append(stem)
         return stems
-    def findAllFiles(self, stem, compulsory=Set(), forbidden=Set(), priorityFunction=None):
-        versionSets, versionInfo = self.findVersionSets(stem)
-        if len(compulsory) or len(forbidden):
-            versionSets = filter(lambda vset: vset.issuperset(compulsory) and len(vset.intersection(forbidden)) == 0, versionSets)
-        if priorityFunction:
-            versionSets.sort(priorityFunction)
-        return self.convertToPaths(versionSets, versionInfo)
 
 class MultiEntryDictionary(seqdict):
     def __init__(self):
@@ -406,9 +408,10 @@ class Test(plugins.Observable):
         if stem == "environment":
             otherApps = self.app.findOtherAppNames()
             self.diagnose("Finding environment files, excluding " + repr(otherApps))
-            return self.dircache.findAllFiles(stem, forbidden=otherApps)
+            otherAppExcludor = lambda vset: len(vset.intersection(otherApps)) == 0
+            return self.dircache.findAllFiles(stem, otherAppExcludor)
         else:
-            return self.dircache.findAllFiles(stem, compulsory=Set([ self.app.name ]))
+            return self.app._getAllFileNames([ self.dircache ], stem, allVersions=True)
     def makeSubDirectory(self, name):
         subdir = self.dircache.pathName(name)
         if os.path.isdir(subdir):
@@ -419,8 +422,8 @@ class Test(plugins.Observable):
         except OSError:
             raise plugins.TextTestError, "Cannot create test sub-directory : " + subdir
     def getFileNamesMatching(self, pattern):
-        allowedExtensions = self.app.getFileExtensions()
-        return self.dircache.findFilesMatching(pattern, allowedExtensions)
+        pred = self.app.getExtensionPredicate(allVersions=False)
+        return self.dircache.findFilesMatching(pattern, pred)
     def getFileName(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
         appToUse = self.app
@@ -740,11 +743,8 @@ class TestSuite(Test):
         if forTestRuns:
             return [ contentFile ]
         
-        compulsoryExts = Set([ self.app.name ] + self.app.versions)
-        self.diagnose("Finding test suite files, using all versions in " + repr(compulsoryExts))
         versionFiles = []
-        allFiles = self.dircache.findAllFiles("testsuite", compulsoryExts, priorityFunction=self.app.compareVersionSets)
-        allFiles.reverse() # sort function works the wrong way round for us...
+        allFiles = self.app._getAllFileNames([ self.dircache ], "testsuite", allVersions=True)
         for newFile in allFiles:
             if newFile != contentFile:
                 versionFiles.append(newFile)
@@ -812,8 +812,7 @@ class TestSuite(Test):
         for testName in orderedTestNames:
             testCaches[testName] = self.createTestCache(testName)
 
-        testCaseNames = filter(lambda l: len(testCaches[l].findAllFiles("testsuite", compulsory = Set([ self.app.name ]))) == 0,
-                               orderedTestNames)
+        testCaseNames = filter(lambda l: not testCaches[l].hasStem("testsuite"), orderedTestNames)
         if self.autoSortOrder == 1:
             orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
         else:
@@ -834,7 +833,7 @@ class TestSuite(Test):
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))
     def getSubtestClass(self, cache):
-        allFiles = cache.findAllFiles("testsuite", compulsory = Set([ self.app.name ]))
+        allFiles = self.app._getAllFileNames([ cache ], "testsuite", allVersions=True)
         if len(allFiles) > 0:
             return TestSuite
         else:
@@ -1167,17 +1166,23 @@ class Application:
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getAllFileNames(dircaches, stem, versionSetMethod=versionSetMethod)
     def _getFileName(self, dircaches, stem, versionSetMethod=None):
-        allFiles = self._getAllFileNames(dircaches, stem, versionSetMethod)
+        allFiles = self._getAllFileNames(dircaches, stem, versionSetMethod=versionSetMethod)
         if len(allFiles):
             return allFiles[-1]
-    def _getAllFileNames(self, dircaches, stem, versionSetMethod=None):
-        allowedExtensions = self.getFileExtensions()
+
+    def _getAllFileNames(self, dircaches, stem, allVersions=False, versionSetMethod=None):
+        versionPred = self.getExtensionPredicate(allVersions)
         for dircache in dircaches:
-            allFiles = dircache.findAndSortFiles(stem, allowedExtensions, self.compareVersionSets, versionSetMethod)
-            self.diag.info("Files for stem " + stem + " found " + repr(allFiles) + " from " + repr(allowedExtensions))
+            # Sorts into order most specific first
+            versionSets = dircache.findVersionSets(stem, versionPred, versionSetMethod)
+            if not allVersions:
+                versionSets.sort(self.compareVersionSets)
+            allFiles = dircache.convertToPaths(versionSets)
+            self.diag.info("Files for stem " + stem + " found " + repr(allFiles))
             if len(allFiles):
                 return allFiles
         return []
+
     def getRefVersionApplication(self, refVersion):
         return Application(self.name, self.dircache, refVersion.split("."), self.inputOptions)
     def getPreviousWriteDirInfo(self, previousTmpInfo):
@@ -1316,8 +1321,13 @@ class Application:
             if not version in unsaveableVersions and not version.startswith("copy_"):
                 saveableVersions.append(version)
         return saveableVersions
-    def getFileExtensions(self):
-        return Set([ self.name ] + self.getConfigValue("base_version") + self.versions)
+    def getExtensionPredicate(self, allVersions):
+        if allVersions:
+            # everything that has at least the given extensions
+            return Set([ self.name ]).issubset
+        else:
+            possVersions = [ self.name ] + self.getConfigValue("base_version") + self.versions
+            return Set(possVersions).issuperset
     def compareVersionSets(self, vset1, vset2):
         explicitVersions = Set([ self.name ] + self.versions)
         versionCount1 = len(vset1.intersection(explicitVersions))

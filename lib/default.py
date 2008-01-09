@@ -8,6 +8,7 @@ from socket import gethostname
 from ndict import seqdict
 from actionrunner import ActionRunner
 from time import sleep
+from sets import ImmutableSet
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -1559,33 +1560,31 @@ class ReconnectApp:
             else:
                 raise plugins.TextTestError, "Could not find TextTest temporary directory for " + reconnectTmpInfo + " at " + fetchDir
 
-        rootDirs = app.getAllFileNames([ fetchDir ], "", self.getVersionListTopDir)
+        rootDirs = app.getAllFileNames([ fetchDir ], "", self.getVersionSetTopDir)
         if len(rootDirs) == 0:
             raise plugins.TextTestError, "Could not find any runs matching " + app.description() + " under " + fetchDir
 
         for rootDirToCopy in reversed(rootDirs):
-            appRoot = app.getFileName([ rootDirToCopy ], app.name, self.getVersionListSubDir)
+            appRoot = app.getFileName([ rootDirToCopy ], app.name, self.getVersionSetSubDir)
             if appRoot:
                 return appRoot
 
         raise plugins.TextTestError, "Could not find an application directory matching " + app.description() + \
               " for any of the runs found under " + fetchDir
-    def findReconnDirectory(self, fetchDir, app):
-        return app.getFileName([ fetchDir ], app.name, self.getVersionList)
-    def getVersionListTopDir(self, fileName, *args):
+    def getVersionSetTopDir(self, fileName, *args):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
         parts = fileName.split(".")
         if len(parts) > 1 and parts[0] != "static_gui":
             # drop the run descriptor at the start and the date/time at the end
-            return parts[1:-1]
-    def getVersionListSubDir(self, fileName, stem):
+            return ImmutableSet(parts[1:-1])
+    def getVersionSetSubDir(self, fileName, stem):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
         parts = fileName.split(".")
         if stem == parts[0]:
             # drop the application at the start 
-            return parts[1:]
+            return ImmutableSet(parts[1:])
 
 class ReconnectTest(plugins.Action):
     def __init__(self, rootDirToCopy, fullRecalculate):

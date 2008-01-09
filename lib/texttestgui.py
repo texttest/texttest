@@ -32,6 +32,7 @@ from ndict import seqdict
 from respond import Responder
 from copy import copy
 from glob import glob
+from sets import Set
 
 import guidialogs
 from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog
@@ -2247,7 +2248,7 @@ class ApplicationFileGUI(FileViewGUI):
                 self.addFileToModel(importediter, importedFile, None, colour)
                 
     def getConfigFiles(self, app):
-        configFiles = app.dircache.findAllFiles("config", [ app.name ])
+        configFiles = app.dircache.findAllFiles("config", Set([ app.name ]))
         configFiles.sort()
         return configFiles
     def getPersonalFiles(self):

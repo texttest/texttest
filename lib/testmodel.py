@@ -60,7 +60,8 @@ class DirectoryCache:
     def findVersionSet(self, fileName, stem):
         if fileName.startswith(stem):
             fileStem, versions = self.splitStem(fileName[len(stem):])
-            return versions
+            if len(fileStem) == 0:
+                return versions
 
     def findVersionSetMethod(self, versionSetMethod):
         if versionSetMethod:

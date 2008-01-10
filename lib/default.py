@@ -836,10 +836,12 @@ class TestEnvironmentCreator:
                 self.test.setEnvironment("USECASE_RECORD_SCRIPT", recordScript)
     def setPathEnvironment(self):
         if self.testCase():
+            testDir = self.test.getDirectory(temporary=1)
+            self.test.setEnvironment("TEXTTEST_SANDBOX", testDir) 
             # Always include the working directory of the test in PATH, to pick up fake
             # executables provided as test data. Allow for later expansion...
             for pathVar in self.getPathVars():
-                newPathVal = self.test.getDirectory(temporary=1) + os.pathsep + "$" + pathVar
+                newPathVal = testDir + os.pathsep + "$" + pathVar
                 self.test.setEnvironment(pathVar, newPathVal)
 
     def getPathVars(self):

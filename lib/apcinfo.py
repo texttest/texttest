@@ -754,7 +754,7 @@ class PlotKPIGroupsAndGeneratePage(apc.PlotKPIGroups):
         if not self.dir:
             raise plugins.TextTestError, "No directory specified"
         argsRem.remove(self.dir)
-        self.dir = os.path.expanduser(self.dir[2:])
+        self.dir = os.path.abspath(os.path.expanduser(self.dir[2:]))
         if not os.path.isdir(self.dir):
             try:
                 os.mkdir(self.dir)

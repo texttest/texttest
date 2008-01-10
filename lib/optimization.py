@@ -127,7 +127,7 @@ optimization.PlotSubplans
 """
 
 
-import ravebased, os, sys, string, shutil, plugins, math, re, unixonly, guiplugins, copy, testoverview, time, testmodel
+import ravebased, os, sys, string, shutil, plugins, math, re, unixonly, guiplugins, copy, testoverview, time, testmodel, subprocess
 from ndict import seqdict
 from time import sleep
 from respond import Responder
@@ -1482,10 +1482,11 @@ class PlotEngine(PlotEngineCommon):
         # Before, this was done as a side effect when writing the PlotLines.
         if not os.path.isdir(writeDir):
             os.makedirs(writeDir)
-            
-        os.chdir(writeDir)
+
         errsFile = os.path.join(writeDir, "gnuplot.errors")
-        self.gnuplotFile, outputFile = os.popen2("gnuplot -persist -background white 2> " + errsFile)
+        cmdArgs = [ "gnuplot", "-persist", "-background", "white" ]
+        proc = subprocess.Popen(cmdArgs, cwd=writeDir, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=open(errsFile, "w"))
+        self.gnuplotFile = proc.stdin
         absTargetFile = None
         
         if targetFile:
@@ -1540,7 +1541,7 @@ class PlotEngine(PlotEngineCommon):
             return gnuplotProcess
         else:
             self.gnuplotFile.close()
-            tmppf = outputFile.read()
+            tmppf = proc.stdout.read()
             if len(tmppf) > 0:
                 open(absTargetFile, "w").write(tmppf)
             if printer:
@@ -1634,8 +1635,7 @@ class PlotEngineMPL(PlotEngineCommon):
         if targetFile:
             if not os.path.isdir(writeDir):
                 os.makedirs(writeDir)
-            os.chdir(writeDir)
-            absTargetFile = os.path.expanduser(targetFile)
+            absTargetFile = os.path.expanduser(os.path.join(writeDir, targetFile))
             orient = 'portrait'
             paper = 'a4'
             if printA3:

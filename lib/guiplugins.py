@@ -1493,7 +1493,6 @@ class RunTests(RunningAction):
 class CreateDefinitionFile(InteractiveTestAction):
     def __init__(self):
         InteractiveTestAction.__init__(self)
-        self.diagsEnabled = False
         self.addOption("type", "Type of definition file to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use") 
     def inMenuOrToolBar(self):
@@ -1508,13 +1507,8 @@ class CreateDefinitionFile(InteractiveTestAction):
         return "New File" 
     def getScriptTitle(self, tab):
         return "Create File"
-    def checkDiagsEnabled(self):
-        varName = self.currentTest.getCompositeConfigValue("diagnostics", "configuration_file_variable")
-        return len(varName) > 0
     def getDefinitionFiles(self):
         defFiles = []
-        if self.diagsEnabled:
-            defFiles.append("logging")
         defFiles.append("environment")
         if self.currentTest.classId() == "test-case":
             defFiles.append("options")
@@ -1530,7 +1524,6 @@ class CreateDefinitionFile(InteractiveTestAction):
                 defFiles.append(defFile)
         return defFiles + self.currentTest.app.getDataFileNames()
     def updateOptions(self):
-        self.diagsEnabled = self.checkDiagsEnabled()
         defFiles = self.getDefinitionFiles()
         self.optionGroup.setValue("type", defFiles[0])
         self.optionGroup.setPossibleValues("type", defFiles)

@@ -37,8 +37,7 @@ class Config:
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
-                diagDict = app.getConfigValue("diagnostics")
-                if diagDict.get("trace_level_variable"):
+                if app.getConfigValue("trace_level_variable"):
                     group.addOption("trace", "Target application trace level")
                 if self.isolatesDataUsingCatalogues(app):
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
@@ -669,12 +668,7 @@ class Config:
         dict["height_screen"] = float(5.0) / 6
         dict["width_screen"] = 0.6
         return dict
-    def getDefaultDiagSettings(self):
-        dict = {}
-        dict["write_directory_variable"] = ""
-        dict["configuration_file_variable"] = ""
-        dict["trace_level_variable"] = ""
-        return dict
+    
     def getDefaultHideWidgets(self):
         dict = {}
         dict["status_bar"] = 0
@@ -704,8 +698,9 @@ class Config:
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
-        app.setConfigDefault("diagnostics", self.getDefaultDiagSettings(), "Dictionary to define how SUT diagnostics are used")
+        app.setConfigDefault("trace_level_variable", "", "Environment variable that sets a simple trace-log level")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
+        app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
         app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
         app.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
@@ -715,7 +710,6 @@ class Config:
         app.addConfigEntry("definition_file_stems", "traffic")
         app.addConfigEntry("definition_file_stems", "input")
         app.addConfigEntry("definition_file_stems", "knownbugs")
-        app.addConfigEntry("definition_file_stems", "logging")
     def setApplicationDefaults(self, app):
         self.setComparisonDefaults(app)
         self.setExternalToolDefaults(app)
@@ -732,7 +726,6 @@ class TestEnvironmentCreator:
     def __init__(self, test, optionMap):
         self.test = test
         self.optionMap = optionMap
-        self.diagDict = self.test.getConfigValue("diagnostics")
         self.diag = plugins.getDiagnostics("Environment Creator")
     def runsTests(self):
         return not self.optionMap.has_key("gx") and not self.optionMap.has_key("s") and \
@@ -754,30 +747,11 @@ class TestEnvironmentCreator:
     def setDiagEnvironment(self):
         if self.optionMap.has_key("trace"):
             self.setTraceDiagnostics()
-        if self.diagDict.has_key("configuration_file_variable"):
-            self.setLog4xDiagnostics()
-    def setLog4xDiagnostics(self):        
-        diagConfigFile = self.test.getFileName("logging")
-        if diagConfigFile:
-            inVarName = self.diagDict.get("configuration_file_variable")
-            self.addDiagVariable(inVarName, diagConfigFile)
-        outVarName = self.diagDict.get("write_directory_variable")
-        if outVarName and self.testCase():
-            self.addDiagVariable(outVarName, self.test.getDirectory(temporary=1))
     def setTraceDiagnostics(self):
         if self.topLevel():
-            envVarName = self.diagDict.get("trace_level_variable")
+            envVarName = self.test.getConfigValue("trace_level_variable")
             self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
             self.test.setEnvironment(envVarName, self.optionMap["trace"])
-    def addDiagVariable(self, entryName, entry):
-        # Diagnostics are usually controlled from the environment, but in Java they have to work with properties...
-        if self.diagDict.has_key("properties_file"):
-            propFile = self.diagDict["properties_file"]
-            if not self.test.properties.has_key(propFile):
-                self.test.properties.addEntry(propFile, {}, insert=1)
-            self.test.properties.addEntry(entryName, entry, sectionName = propFile, insert=1)
-        elif entryName:
-            self.test.setEnvironment(entryName, entry)
     def setUseCaseEnvironment(self):
         if not self.testCase():
             return
@@ -882,10 +856,10 @@ class PrepareWriteDirectory(plugins.Action):
         if sourcePath:
             self.collateExistingPath(test, sourcePath, target, collateMethod)
             
-        envVarToSet = self.findEnvironmentVariable(test, configName)
+        envVarToSet, propFileName = self.findDataEnvironment(test, configName)
         if envVarToSet:
             self.diag.info("Setting env. variable " + envVarToSet + " to " + target)
-            test.setEnvironment(envVarToSet, target)
+            test.setEnvironment(envVarToSet, target, propFileName)
     def collateExistingPath(self, test, sourcePath, target, collateMethod):
         self.diag.info("Path for linking/copying at " + sourcePath)
         plugins.ensureDirExistsForFile(target)
@@ -927,12 +901,13 @@ class PrepareWriteDirectory(plugins.Action):
             if os.path.exists(fullPath):
                 self.diag.info("Found!")
                 return fullPath
-    def findEnvironmentVariable(self, test, configName):
+    def findDataEnvironment(self, test, configName):
         self.diag.info("Finding env. var name from " + configName)
         if configName.startswith("$"):
-            return configName[1:]
+            return configName[1:], None
         envVarDict = test.getConfigValue("test_data_environment")
-        return envVarDict.get(configName)
+        propFile = test.getCompositeConfigValue("test_data_properties", configName)
+        return envVarDict.get(configName), propFile
     def copyTestPath(self, test, fullPath, target):
         if os.path.isfile(fullPath):
             self.copyfile(fullPath, target) 

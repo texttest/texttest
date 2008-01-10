@@ -333,8 +333,14 @@ class Test(plugins.Observable):
         if newName != self.uniqueName:
             self.uniqueName = newName
             self.notify("UniqueNameChange")
-    def setEnvironment(self, var, value):
-        self.environment[var] = value
+    def setEnvironment(self, var, value, propFile=None):
+        if propFile:
+            if not self.properties.has_key(propFile):
+                self.properties.addEntry(propFile, {}, insert=1)
+            self.properties.addEntry(var, value, sectionName = propFile, insert=1)
+        else:
+            self.environment[var] = value
+            
     def getEnvironment(self, var, defaultValue=None):
         return self.environment.getSingleValue(var, defaultValue)
     def hasEnvironment(self, var):
@@ -348,9 +354,9 @@ class Test(plugins.Observable):
         return self.getConfigValue("definition_file_stems")
     def resultFileStems(self):
         stems = []
-        defStems = self.defFileStems()
+        exclude = self.defFileStems() + self.app.getDataFileNames()
         for stem in self.dircache.findAllStems():
-            if not stem in defStems:
+            if not stem in exclude:
                 stems.append(stem)
         return stems
     def listStandardFiles(self, allVersions):
@@ -1484,7 +1490,7 @@ class OptionFinder(plugins.OptionFinder):
             self.diagWriteDir = self.getSelfDiagWriteDir()
         elif os.environ.has_key("TEXTTEST_LOGCONFIG"):
             self.diagConfigFile = os.getenv("TEXTTEST_LOGCONFIG")
-            self.diagWriteDir = os.getenv("TEXTTEST_DIAGDIR")
+            self.diagWriteDir = os.getenv("TEXTTEST_DIAGDIR", os.getcwd())
 
         if self.diagConfigFile and not os.path.isfile(self.diagConfigFile):
             print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"

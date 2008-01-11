@@ -226,14 +226,11 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         ravebased.PrepareCarmdataWriteDir.__init__(self, ignoreCatalogues)
         self.subplanFunction = subplanFunction
         self.raveParameters = []
-    def setUpSuite(self, suite):
-        self.readRaveParameters(suite.getFileName("raveparameters"))
-    def tearDownSuite(self, suite):
-        self.unreadRaveParameters()
     def partialCopyTestPath(self, test, carmdataSource, carmdataTarget):
-        self.readRaveParameters(test.getFileName("raveparameters"))
+        for fileName in test.getAllPathNames("raveparameters"):
+            self.readRaveParameters(fileName)
         ravebased.PrepareCarmdataWriteDir.partialCopyTestPath(self, test, carmdataSource, carmdataTarget)
-        self.unreadRaveParameters()
+        self.raveParameters = []
     def getModifiedPaths(self, test, carmdataSource):
         modPathsBasic = ravebased.PrepareCarmdataWriteDir.getModifiedPaths(self, test, carmdataSource)
         if modPathsBasic is None:
@@ -315,14 +312,8 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             allOverrides += overrideItems
         return allOverrides
     def readRaveParameters(self, fileName):
-        if not fileName:
-            self.raveParameters.append([])
-        else:
-            self.raveParameters.append(open(fileName).readlines())
+        self.raveParameters.append(open(fileName).readlines())
         self.diag.info("Added to list : " + repr(self.raveParameters))    
-    def unreadRaveParameters(self):
-        self.raveParameters.pop()
-        self.diag.info("Removed from list : " + repr(self.raveParameters))
     def shouldLink(self, sourceFile):
         dirname, file = os.path.split(sourceFile)
         if file == "etable" or dirname.find("LOCAL_PLAN") == -1:

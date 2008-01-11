@@ -437,6 +437,8 @@ class Test(plugins.Observable):
         return appToUse._getFileName([ self.dircache ], stem)
     def getPathName(self, stem):
         return self.app._getFileName(self.getDirCachesToRoot(), stem)
+    def getAllPathNames(self, stem):
+        return self.app._getAllFileNames(self.getDirCachesToRoot(), stem)
     def getDirCachesToRoot(self):
         dircaches = [ self.dircache ]
         if self.parent:

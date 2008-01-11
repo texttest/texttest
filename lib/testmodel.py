@@ -1189,8 +1189,10 @@ class Application:
             for vset, files in currVersionSets.items():
                 versionSets.setdefault(vset, []).extend(files)
 
-        if not allVersions:
-            versionSets.sort(self.compareVersionSets)
+        if allVersions:
+            versionSets.sort(self.compareForDisplay)
+        else:
+            versionSets.sort(self.compareForPriority)
         allFiles =  reduce(operator.add, versionSets.values(), [])
         self.diag.info("Files for stem " + stem + " found " + repr(allFiles))
         return allFiles
@@ -1340,7 +1342,22 @@ class Application:
         else:
             possVersions = [ self.name ] + self.getConfigValue("base_version") + self.versions
             return Set(possVersions).issuperset
-    def compareVersionSets(self, vset1, vset2):
+    def compareForDisplay(self, vset1, vset2):
+        if vset1.issubset(vset2):
+            return -1
+        elif vset2.issubset(vset1):
+            return 1
+        
+        extraVersions = self.getExtraVersions(forUse=False)
+        extraIndex1 = self.extraVersionIndex(vset1, extraVersions)
+        extraIndex2 = self.extraVersionIndex(vset2, extraVersions)
+        return cmp(extraIndex1, extraIndex2)
+    def extraVersionIndex(self, vset, extraVersions):
+        for version in vset:
+            if version in extraVersions:
+                return extraVersions.index(version)
+        return 99
+    def compareForPriority(self, vset1, vset2):
         explicitVersions = Set([ self.name ] + self.versions)
         versionCount1 = len(vset1.intersection(explicitVersions))
         versionCount2 = len(vset2.intersection(explicitVersions))

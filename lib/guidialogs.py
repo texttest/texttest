@@ -422,7 +422,7 @@ class MarkTestDialog(ActionConfirmationDialog):
         vbox.pack_start(hbox2)
         self.freeEntry = gtk.Entry()
         entrycompletion.manager.register(self.freeEntry)
-        self.freeEntry.set_text("Marked at " + plugins.localtime("%d%b%H:%M"))
+        self.freeEntry.set_text("Marked at " + plugins.localtime())
         self.freeEntry.set_activates_default(True)
         scriptEngine.registerEntry(self.freeEntry, "enter new test state free text ")
         vbox.pack_start(self.freeEntry)

@@ -480,11 +480,12 @@ class MarkTest(SelectionAction):
     def performOnCurrent(self):
         for test in self.currTestSelection:
             oldState = test.state
-            if test.state.isMarked():
-                oldState = test.state.oldState # Keep the old state so as not to build hierarchies ...
-            newState = plugins.MarkedTestState(self.newFreeText, self.newBriefText, oldState)
-            test.changeState(newState)
-            self.notify("ActionProgress", "") # Just to update gui ...            
+            if oldState.isComplete():
+                if test.state.isMarked():
+                    oldState = test.state.oldState # Keep the old state so as not to build hierarchies ...
+                newState = plugins.MarkedTestState(self.newFreeText, self.newBriefText, oldState)
+                test.changeState(newState)
+                self.notify("ActionProgress", "") # Just to update gui ...            
     def isActiveOnCurrent(self, test=None, state=None):
         if state and state.isComplete():
             return True

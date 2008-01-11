@@ -59,6 +59,8 @@ class BugTrigger:
         self.ignoreOtherErrors = int(getOption("internal_error", "0"))
         self.bugInfo = self.createBugInfo(getOption)
         self.diag = plugins.getDiagnostics("Check For Bugs")
+    def __repr__(self):
+        return repr(self.textTrigger)
     def getTriggerHosts(self, getOption):
         hostStr = getOption("execution_hosts")
         if hostStr:
@@ -138,6 +140,7 @@ class FileBugData:
         currAbsent = copy(self.absentList)
         for line in lines:
             for bugTrigger in self.presentList:
+                self.diag.info("Checking for existence of " + repr(bugTrigger))
                 bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs, line)
                 if bug:
                     return bug
@@ -229,33 +232,24 @@ class CheckForCrashes(plugins.Action):
 
 class CheckForBugs(plugins.Action):
     def __init__(self):
-        self.activeBugs = BugMap()
-        self.testBugMap = {} # map from test to BugMap
         self.diag = plugins.getDiagnostics("Check For Bugs")
-    def setUpSuite(self, suite):
-        self.readBugs(suite)
-        self.activateBugs(suite)
-    def tearDownSuite(self, suite):
-        self.deactivateBugs(suite)
     def callDuringAbandon(self, test):
         # want to be able to mark UNRUNNABLE tests as known bugs too...
         return test.state.lifecycleChange != "complete"
     def __call__(self, test):
-        self.readBugs(test)
-        if not self.checkTest(test):
+        activeBugs = self.readBugs(test)
+        if not self.checkTest(test, activeBugs):
             return
 
-        self.activateBugs(test)
         multipleDiffs = self.hasMultipleDifferences(test)
-        for stem, fileBugData in self.activeBugs.items():
+        for stem, fileBugData in activeBugs.items():
             bug = self.findBug(test, stem, fileBugData, multipleDiffs)
             if bug:
                 category, briefText, fullText = bug.findInfo()
                 self.diag.info("Changing to " + category + " with text " + briefText)
                 bugState = FailedPrediction(category, fullText, briefText, completed=1)
                 self.changeState(test, bugState)
-                break # no point searching for more bugs...
-        self.deactivateBugs(test)
+                return # no point searching for more bugs...
     def findBug(self, test, stem, fileBugData, multipleDiffs):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
@@ -286,27 +280,21 @@ class CheckForBugs(plugins.Action):
             if comp.stem in perfStems:
                 diffCount -= 1
         return diffCount > 1
-    def checkTest(self, test):
-        if self.activeBugs.checkUnchanged() or self.testBugMap[test].checkUnchanged():
+    def checkTest(self, test, activeBugs):
+        if activeBugs.checkUnchanged():
             return True
         return test.state.hasFailed()
     def fileChanged(self, test, stem):
         comparison, list = test.state.findComparison(stem)
         return bool(comparison)
-    def makeBugMap(self, suite):
-        bugFile = suite.getFileName("knownbugs")
+    def readBugs(self, test):
         bugMap = BugMap()
-        if bugFile:
+        # Mostly for backwards compatibility, reverse the list so that more specific bugs
+        # get checked first.
+        for bugFile in reversed(test.getAllPathNames("knownbugs")):
             self.diag.info("Reading bugs from file " + bugFile)
             bugMap.readFromFile(bugFile)
         return bugMap
-    def readBugs(self, suite):
-        if not self.testBugMap.has_key(suite):
-            self.testBugMap[suite] = self.makeBugMap(suite)
-    def activateBugs(self, suite):     
-        self.activeBugs.add(self.testBugMap[suite])
-    def deactivateBugs(self, suite):
-        self.activeBugs.remove(self.testBugMap[suite])
             
 # For migrating from knownbugs files which are from TextTest 3.7 and older
 class MigrateFiles(plugins.Action):

@@ -900,6 +900,14 @@ class ImportTestCase(guiplugins.ImportTestCase):
         self.addOption("sp", "Subplan name")
     def getSubplanName(self):
         return self.optionGroup.getOptionValue("sp")
+    def checkName(self, suite, testName):
+        guiplugins.ImportTestCase.checkName(self, suite, testName)
+        if not suite.getEnvironment("CARMUSR"):
+            raise plugins.TextTestError, "Not allowed to create tests under a suite where CARMUSR isn't defined"
+        
+        if len(self.getSubplanName()) == 0:
+            raise plugins.TextTestError, "No subplan name given for new " + self.testType() + "!" + "\n" + \
+                  "Fill in the 'Adding " + self.testType() + "' tab below."
     def getNewTestName(self):
         nameEntered = guiplugins.ImportTestCase.getNewTestName(self)
         if len(nameEntered) > 0:

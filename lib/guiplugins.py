@@ -1518,7 +1518,7 @@ class CreateDefinitionFile(InteractiveTestAction):
             else:
                 defFiles.append("usecase")
         # these are created via the GUI, not manually via text editors (or are already handled above)
-        dontAppend = [ "testsuite", "knownbugs", "traffic", "input", "usecase", "logging", "environment", "options" ]
+        dontAppend = [ "testsuite", "knownbugs", "traffic", "input", "usecase", "environment", "options" ]
         for defFile in self.currentTest.getConfigValue("definition_file_stems"):
             if not defFile in dontAppend:
                 defFiles.append(defFile)
@@ -1537,7 +1537,7 @@ class CreateDefinitionFile(InteractiveTestAction):
         return fileName
     def getSourceFile(self, stem, version, targetFile):
         thisTestName = self.currentTest.getFileName(stem, version)
-        if thisTestName and not plugins.samefile(thisTestName, targetFile):
+        if thisTestName and not os.path.basename(thisTestName) == targetFile:
             return thisTestName
 
         test = self.currentTest.parent
@@ -1548,9 +1548,15 @@ class CreateDefinitionFile(InteractiveTestAction):
             test = test.parent
     def performOnCurrent(self):
         stem = self.optionGroup.getOptionValue("type")
-        version = self.optionGroup.getOptionValue("v") 
-        targetFile = os.path.join(self.currentTest.getDirectory(), self.getFileName(stem, version))
-        sourceFile = self.getSourceFile(stem, version, targetFile)
+        version = self.optionGroup.getOptionValue("v")
+        targetFileName = self.getFileName(stem, version)
+        sourceFile = self.getSourceFile(stem, version, targetFileName)
+        # If the source has an app identifier in it we need to get one, or we won't get prioritised!
+        stemWithApp = stem + "." + self.currentTest.app.name
+        if sourceFile and os.path.basename(sourceFile).startswith(stemWithApp) and not targetFileName.startswith(stemWithApp):
+            targetFileName = targetFileName.replace(stem, stemWithApp, 1)
+            
+        targetFile = os.path.join(self.currentTest.getDirectory(), targetFileName)
         plugins.ensureDirExistsForFile(targetFile)
         fileExisted = os.path.exists(targetFile)
         if sourceFile and os.path.isfile(sourceFile):

@@ -189,10 +189,12 @@ class MatadorConfig(optimization.OptimizationConfig):
             return "RailFleet"
         else:
             return "standard_gpc"
-    def setEnvironment(self, test):
-        optimization.OptimizationConfig.setEnvironment(self, test)
+    def getConfigEnvironment(self, test):
+        baseEnv, props = optimization.OptimizationConfig.getConfigEnvironment(self, test)
         if test.parent is None:
-            test.setEnvironment("MATADOR_CRS_NAME", ravebased.getBasicRaveName(test))
+            baseEnv.append(("MATADOR_CRS_NAME", ravebased.getBasicRaveName(test)))
+        return baseEnv, props
+
         
 class MakeComparisons(comparetest.MakeComparisons):
     def __init__(self, testComparisonClass, getRuleSetting):

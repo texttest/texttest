@@ -178,102 +178,64 @@ class Callable:
         toUse = calledArgs + self.extraArgs
         return self.method(*toUse)
 
-class TestEnvironment(MultiEntryDictionary):
-    def __init__(self, parent, populateFunction):
-        MultiEntryDictionary.__init__(self)
+class TestEnvironment(seqdict):
+    def __init__(self, populateFunction):
+        seqdict.__init__(self)
         self.diag = plugins.getDiagnostics("read environment")
-        self.parent = parent
-        self.level = self.getLevel()
         self.populateFunction = populateFunction
         self.populated = False
-    def getLevel(self):
-        if self.parent is not None:
-            return str(int(self.parent.level) + 1)
-        else:
-            return "1"
-    def diagnose(self, message):
-        self.diag.info("Level " + self.level + ": " + message)
     def checkPopulated(self):
         if not self.populated:
-            self.populateFunction()
             self.populated = True
+            self.populateFunction()
     def definesValue(self, var):
         self.checkPopulated()
         return self.has_key(var)
-    
-    def getSingleValue(self, var, defaultValue=None):
-        unexpandedValue = self.getUnexpandedValue(var, defaultValue)
-        return self.expandValue(var, unexpandedValue)
-
-    def expandValue(self, var, value):
-        if value is None:
-            return value
-        
-        self.diagnose("Got " + var + " = " + value)
-        getenvFunc = Callable(self.getSingleValueNoSelfRef, var, value)
-        retVal = os.path.expandvars(value, getenvFunc)
-        self.diagnose("Expanded to " + retVal)
-        return retVal
-
-    def getUnexpandedValue(self, var, defaultValue=None):
-        self.checkPopulated()
-        if self.has_key(var):
-            return self[var]
-        elif self.parent is not None:
-            return self.parent.getUnexpandedValue(var, defaultValue)
-        else:
-            return os.getenv(var, defaultValue)
-    
-    def getSingleValueNoSelfRef(self, var, originalVar, originalValue):
-        if var == originalVar:
-            if self.parent is not None:
-                self.diagnose("Self-reference in $" + var)
-                retVal = self.parent.getSelfReferenceValue(var, originalValue)
-                self.diagnose("Self-reference, value from parent = " + str(retVal))
-                return retVal
-            else:
-                return os.getenv(var)
-        else:
-            return self.getSingleValue(var)
-
-    def getSelfReferenceValue(self, var, value):
-        self.checkPopulated()
-        # only expand at the level where it actually exists
-        if self.has_key(var):
-            if self[var] == value:
-                if self.parent is not None:
-                    return self.parent.getSingleValue(var)
-                else:
-                    return os.getenv(var)
-            else:
-                return self.getSingleValue(var)
-        elif self.parent is not None:
-            return self.parent.getSelfReferenceValue(var, value)
-        else:
-            return os.getenv(var)
-        
     def getValues(self, onlyVars = []):
-        self.diagnose("Getting values for " + repr(onlyVars))
-        environ = self.getUnexpandedValues(onlyVars)
-        for var, value in environ.items():
-            environ[var] = self.expandValue(var, value)
+        self.checkPopulated()
+        values = {}
+        for key, value in self.items():
+            if len(onlyVars) == 0 or key in onlyVars:
+                values[key] = value
         # copy in the external environment last
         for var, value in os.environ.items():
-            if not environ.has_key(var):
-                environ[var] = value
-        return environ
+            if not values.has_key(var):
+                values[var] = value
+        return values
     
-    def getUnexpandedValues(self, onlyVars):
-        # Get a complete copy that we can use for running a test
+    def getSingleValue(self, var, defaultValue=None):
         self.checkPopulated()
-        if self.parent is not None:
-            environ = self.parent.getUnexpandedValues(onlyVars)
-        else:
-            environ = {}
+        return self._getSingleValue(var, defaultValue)
+    def _getSingleValue(self, var, defaultValue=None):
+        value = self.get(var, os.getenv(var, defaultValue))
+        self.diag.info("Single: got " + var + " = " + repr(value))
+        return value
+    def getSelfReference(self, var, originalVar):
+        if var == originalVar:
+            return self._getSingleValue(var)
+    def getSingleValueNoSelfRef(self, var, originalVar):
+        if var != originalVar:
+            return self._getSingleValue(var)
+    def storeVariables(self, vars):
+        for var, value in vars:
+            getenvFunc = Callable(self.getSelfReference, var)
+            newValue = os.path.expandvars(value, getenvFunc)
+            self.diag.info("Storing " + var + " = " + newValue)
+            self[var] = newValue
+
+        while self.expandVariables():
+            pass
+
+    def expandVariables(self):
+        expanded = False
         for var, value in self.items():
-            if len(onlyVars) == 0 or (var in onlyVars):
-                environ[var] = value
-        return environ
+            getenvFunc = Callable(self.getSingleValueNoSelfRef, var)
+            newValue = os.path.expandvars(value, getenvFunc)
+            if newValue != value:
+                expanded = True
+                self.diag.info("Expanded " + var + " = " + newValue)
+                self[var] = newValue
+        return expanded
             
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
@@ -288,7 +250,7 @@ class Test(plugins.Observable):
         self.parent = parent
         self.dircache = dircache
         populateFunction = Callable(app.setEnvironment, self)
-        self.environment = TestEnvironment(self.getParentEnvironment(), populateFunction)
+        self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
         self.properties = MultiEntryDictionary()
         self.diag = plugins.getDiagnostics("test objects")
@@ -303,9 +265,6 @@ class Test(plugins.Observable):
             return self.name
         maxLength = max(len(test.name) for test in self.parent.testcases)
         return self.name.ljust(maxLength)
-    def getParentEnvironment(self):
-        if self.parent:
-            return self.parent.environment
     def getDescription(self):
         description = plugins.extractComment(self.description)
         if description:
@@ -335,11 +294,13 @@ class Test(plugins.Observable):
             self.notify("UniqueNameChange")
     def setEnvironment(self, var, value, propFile=None):
         if propFile:
-            if not self.properties.has_key(propFile):
-                self.properties.addEntry(propFile, {}, insert=1)
-            self.properties.addEntry(var, value, sectionName = propFile, insert=1)
+            self.addProperty(var, value, propFile)
         else:
             self.environment[var] = value
+    def addProperty(self, var, value, propFile):
+        if not self.properties.has_key(propFile):
+            self.properties.addEntry(propFile, {}, insert=1)
+        self.properties.addEntry(var, value, sectionName = propFile, insert=1)
             
     def getEnvironment(self, var, defaultValue=None):
         return self.environment.getSingleValue(var, defaultValue)
@@ -439,11 +400,15 @@ class Test(plugins.Observable):
         return self.app._getFileName(self.getDirCachesToRoot(), stem)
     def getAllPathNames(self, stem):
         return self.app._getAllFileNames(self.getDirCachesToRoot(), stem)
-    def getDirCachesToRoot(self):
-        dircaches = [ self.dircache ]
+    def getAllTestsToRoot(self):
+        tests = [ self ]
         if self.parent:
-            dircaches = self.parent.getDirCachesToRoot() + dircaches
-        return dircaches
+            tests = self.parent.getAllTestsToRoot() + tests
+        return tests
+        
+    def getDirCachesToRoot(self):
+        fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
+        return self.app.extraDirCaches + fromTests
     
     def getAllFileNames(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
@@ -525,7 +490,6 @@ class Test(plugins.Observable):
             self.parent.removeTest(self, False)
         self.parent.contentChanged()
     def getRunEnvironment(self, onlyVars = []):
-        self.environment.diag.info("Getting run environment for test " + self.uniqueName)
         return self.environment.getValues(onlyVars)
     def createPropertiesFiles(self):
         self.environment.checkPopulated()
@@ -1042,11 +1006,14 @@ class Application:
         self.dircache = dircache
         # Place to store reference to extra_version applications
         self.extras = []
+        # Cache all environment files in the whole suite to stop constantly re-reading them
+        self.envFiles = {}
         self.versions = versions    
         self.diag = plugins.getDiagnostics("application")
         self.inputOptions = inputOptions
         self.configDir = MultiEntryDictionary()
         self.configDocs = {}
+        self.extraDirCaches = []
         self.setConfigDefaults()
         self.readConfigFiles(configModuleInitialised=False)
         self.readValues(self.configDir, "config", self.dircache, insert=0)
@@ -1070,14 +1037,13 @@ class Application:
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(inputOptions)
-        self.setupEnvironmentDirCache()
+        self.setupExtraDirCaches()
         interactiveActionHandler.setCommandOptionGroups(self.optionGroups)
     def __repr__(self):
         return self.fullName + self.versionSuffix()
     def __hash__(self):
         return id(self)
-    def setupEnvironmentDirCache(self):
-        self.environmentDirCaches = []
+    def setupExtraDirCaches(self):
         envDirs = self.getConfigValue("extra_config_directory")
         for envDir in envDirs:
             added = False
@@ -1085,14 +1051,14 @@ class Application:
                 continue
             if os.path.isabs(envDir):
                 if os.path.isdir(envDir):
-                    self.environmentDirCaches.append(DirectoryCache(os.path.abspath(envDir)))
+                    self.extraDirCaches.append(DirectoryCache(os.path.abspath(envDir)))
                     added = True
             else:
                 if os.path.isdir(plugins.joinpath(os.getenv("TEXTTEST_HOME"), envDir)):
-                    self.environmentDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(os.getenv("TEXTTEST_HOME"), envDir))))
+                    self.extraDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(os.getenv("TEXTTEST_HOME"), envDir))))
                     added = True
                 if os.path.isdir(plugins.joinpath(self.dircache.dir, envDir)):            
-                    self.environmentDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(self.dircache.dir, envDir))))
+                    self.extraDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(self.dircache.dir, envDir))))
                     added = True
             if not added:
                 plugins.printWarning("The directory '" + envDir + "' could not be found, ignoring 'extra_config_directory' config entry.")
@@ -1137,11 +1103,29 @@ class Application:
         self.diag.info("Reading values for " + stem + " from files : " + "\n".join(allFiles))
         multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
     def setEnvironment(self, test):
-        self.configObject.setEnvironment(test) # wanders throught the configuration picking up environment variables
-        if not test.parent: # In top suite, also check extra environment dir 
-            for environmentDirCache in self.environmentDirCaches:
-                self.readValues(test.environment, "environment", environmentDirCache) 
-        self.readValues(test.environment, "environment", test.dircache) # picks up variables from the environment files
+        test.environment.diag.info("Reading environment for " + repr(test))
+        envFiles = test.getAllPathNames("environment")
+        envVars = map(self.readEnvironment, envFiles)
+        allVars = reduce(operator.add, envVars, [])
+        allProps = []
+        for suite in test.getAllTestsToRoot():
+            vars, props = self.configObject.getConfigEnvironment(suite)
+            allVars += vars
+            allProps += props
+
+        test.environment.storeVariables(allVars)
+        for var, value, propFile in allProps:
+            test.addProperty(var, value, propFile)
+
+    def readEnvironment(self, envFile):
+        if self.envFiles.has_key(envFile):
+            return self.envFiles[envFile]
+
+        envDir = MultiEntryDictionary()
+        envDir.readValues([ envFile ])
+        envVars = envDir.items()
+        self.envFiles[envFile] = envVars
+        return envVars
     def getConfigFilesToImport(self):
         return map(self.configPath, self.getConfigValue("import_config_file"))
     def configPath(self, fileName):

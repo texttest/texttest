@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.13 2007/12/12 14:08:51 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.14 2008/01/14 13:33:10 geoff Exp $
 #
 import ravebased, default, plugins, guiplugins, subprocess
 import os, shutil, string
@@ -103,10 +103,11 @@ class StudioConfig(ravebased.Config):
             if line.find("Build ruleset " + rulesetName) != -1:
                 return True
         return False
-    def setEnvironment(self, test):
-        ravebased.Config.setEnvironment(self, test)
+    def getConfigEnvironment(self, test):
+        baseEnv, props = ravebased.Config.getConfigEnvironment(self, test)
         if not test.parent and self.optionMap.has_key("stepmacro"):
-            test.setEnvironment("USECASE_REPLAY_SINGLESTEP", "1")
+            baseEnv.append(("USECASE_REPLAY_SINGLESTEP", "1"))
+        return baseEnv, props
     def getInteractiveReplayOptions(self):
         return ravebased.Config.getInteractiveReplayOptions(self) + [ ("stepmacro", "single-step") ]
         

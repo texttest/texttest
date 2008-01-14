@@ -57,7 +57,7 @@ def getConfig(optionMap):
     return Config(optionMap)
 
 def isUserSuite(suite):
-    return suite.hasEnvironment("CARMUSR")
+    return suite.hasEnvironment("CARMUSR") and (not suite.parent or not suite.parent.hasEnvironment("CARMUSR"))
 
 class UserFilter(plugins.TextFilter):
     option = "u"
@@ -247,11 +247,11 @@ class Config(CarmenConfig):
                     readDirs["Ruleset"] = rulesets
             except plugins.TextTestError:
                 pass
-        elif test.hasEnvironment("CARMUSR"):
+        elif isUserSuite(test):
             files = self.getResourceFiles(test)
             if len(files):
                 readDirs["Resources"] = files
-        elif test.hasEnvironment("CARMSYS"):
+        elif test.hasEnvironment("CARMSYS") and not test.parent:
             raveModule = self.getRaveModule(test)
             if os.path.isfile(raveModule):
                 readDirs["RAVE module"] = [ raveModule ]
@@ -272,14 +272,15 @@ class Config(CarmenConfig):
         return []
     def ensureDebugLibrariesExist(self, test):
         pass
-    def setEnvironment(self, test):
-        CarmenConfig.setEnvironment(self, test)
+    def getConfigEnvironment(self, test):
+        baseEnv, props = CarmenConfig.getConfigEnvironment(self, test)
         if not test.parent and not self.slaveRun():
             if self.useQueueSystem():
-                test.setEnvironment("_AUTOTEST__LOCAL_COMPILE_", "1")
+                baseEnv.append(("_AUTOTEST__LOCAL_COMPILE_", "1"))
             else:
                 # Change PATH so we can intercept crc_compile calls
-                test.setEnvironment("PATH", "$PATH:$CARMSYS/bin")
+                baseEnv.append(("PATH", "$PATH:$CARMSYS/bin"))
+        return baseEnv, props
     def printHelpOptions(self):
         CarmenConfig.printHelpOptions(self)
         print helpOptions

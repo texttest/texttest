@@ -19,32 +19,27 @@ class RunTest(default.RunTest):
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
 class VirtualDisplayResponder(Responder):
+    instance = None
     def __init__(self, optionMap):
         Responder.__init__(self, optionMap)
         self.displayName = None
         self.displayMachine = None
         self.displayPid = None
         self.diag = plugins.getDiagnostics("virtual display")
-    
+        VirtualDisplayResponder.instance = self
+        
     def addSuites(self, suites):
         guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
         # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
         if os.name != "posix":
             self.setHideWindows(guiSuites)
-        elif self.displayName:
-            self.setDisplayVariable(guiSuites)
-        else:
+        elif not self.displayName:
             self.setUpVirtualDisplay(guiSuites)
 
     def setHideWindows(self, suites):
-        for suite in suites:
-            suite.setEnvironment("DISPLAY", "HIDE_WINDOWS")
         if len(suites) > 0 and not self.displayName:
+            self.displayName = "HIDE_WINDOWS"
             print "Tests will run with windows hidden"
-
-    def setDisplayVariable(self, guiSuites):
-        for suite in guiSuites:
-            suite.setEnvironment("DISPLAY", self.displayName)
 
     def getXvfbLogDir(self, guiSuites):
         if len(guiSuites) > 0:
@@ -58,7 +53,6 @@ class VirtualDisplayResponder(Responder):
             self.displayName = display
             self.displayMachine = machine
             self.displayPid = pid
-            self.setDisplayVariable(guiSuites)
             print "Tests will run with DISPLAY variable set to", display
         elif len(machines) > 0:
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")

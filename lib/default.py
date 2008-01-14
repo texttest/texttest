@@ -9,6 +9,7 @@ from ndict import seqdict
 from actionrunner import ActionRunner
 from time import sleep
 from sets import ImmutableSet
+from log4py import LOGLEVEL_NORMAL
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -404,9 +405,9 @@ class Config:
             return batch.SaveState
         else:
             return respond.SaveState
-    def setEnvironment(self, test):
+    def getConfigEnvironment(self, test):
         testEnvironmentCreator = self.getEnvironmentCreator(test)
-        testEnvironmentCreator.setUp()
+        return testEnvironmentCreator.getVariables()
     def getEnvironmentCreator(self, test):
         return TestEnvironmentCreator(test, self.optionMap)
     def getInteractiveReplayOptions(self):
@@ -730,44 +731,49 @@ class TestEnvironmentCreator:
     def runsTests(self):
         return not self.optionMap.has_key("gx") and not self.optionMap.has_key("s") and \
                not self.optionMap.has_key("reconnect")
-    def setUp(self):
+    def getVariables(self):
+        vars, props = [], []
         if self.topLevel():
-            self.test.setEnvironment("TEXTTEST_CHECKOUT", self.test.app.checkout)
-        if self.runsTests():
-            self.doSetUp()
-    def doSetUp(self):
-        self.setDiagEnvironment()
-        self.setUseCaseEnvironment()
-        self.setPathEnvironment()
+            vars.append(("TEXTTEST_CHECKOUT", self.test.app.checkout))
+            if self.test.getConfigValue("use_case_record_mode") == "GUI":
+                from unixonly import VirtualDisplayResponder
+                if VirtualDisplayResponder.instance:
+                    virtualDisplay = VirtualDisplayResponder.instance.displayName
+                    if virtualDisplay:
+                        vars.append(("DISPLAY", virtualDisplay))
+            if self.runsTests() and self.optionMap.has_key("trace"):
+                traceVarName = self.test.getConfigValue("trace_level_variable")
+                vars.append((traceVarName, self.optionMap["trace"]))
+        elif self.testCase():
+            useCaseVars = self.getUseCaseVariables()
+            if self.useJavaRecorder():
+                props += useCaseVars
+            else:
+                vars += useCaseVars
+            vars += self.getPathVariables()
+        return vars, props
     def topLevel(self):
         return self.test.parent is None
     def testCase(self):
         return self.test.classId() == "test-case"
     
-    def setDiagEnvironment(self):
-        if self.optionMap.has_key("trace"):
-            self.setTraceDiagnostics()
-    def setTraceDiagnostics(self):
-        if self.topLevel():
-            envVarName = self.test.getConfigValue("trace_level_variable")
-            self.diag.info("Setting " + envVarName + " to " + self.optionMap["trace"])
-            self.test.setEnvironment(envVarName, self.optionMap["trace"])
-    def setUseCaseEnvironment(self):
-        if not self.testCase():
-            return
+    def getUseCaseVariables(self):
         # Here we assume the application uses either PyUseCase or JUseCase
         # PyUseCase reads environment variables, but you can't do that from java,
         # so we have a "properties file" set up as well. Do both always, to save forcing
         # apps to tell us which to do...
-        if self.useJavaRecorder():
-            self.test.properties.addEntry("jusecase", {}, insert=1)
         usecaseFile = self.test.getFileName("usecase")
         replayUseCase = self.findReplayUseCase(usecaseFile)
+        vars = []
         if replayUseCase is not None:
-            self.setReplay(replayUseCase)
+            vars.append(self.getReplayScriptVariable(replayUseCase))
+            if self.optionMap.has_key("actrep"):
+                vars.append(self.getReplayDelayVariable())
         if usecaseFile or self.isRecording():
             # Re-record if recorded files are already present or recording explicitly requested
-            self.setRecord(self.test.makeTmpFileName("usecase"))
+            vars.append(self.getRecordScriptVariable(self.test.makeTmpFileName("usecase")))
+        return vars
+    
     def isRecording(self):
         return self.optionMap.has_key("record")
     def findReplayUseCase(self, usecaseFile):
@@ -788,35 +794,32 @@ class TestEnvironmentCreator:
             
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
-    def addJusecaseProperty(self, name, value):
-        self.test.properties.addEntry(name, value, sectionName="jusecase", insert=1)
-    def setReplay(self, replayScript):        
+    def getReplayScriptVariable(self, replayScript):        
         if self.useJavaRecorder():
-            self.addJusecaseProperty("replay", replayScript)
+            return "replay", replayScript, "jusecase"
         else:
-            self.test.setEnvironment("USECASE_REPLAY_SCRIPT", replayScript)
-        if self.optionMap.has_key("actrep"):
-            replaySpeed = self.test.getConfigValue("slow_motion_replay_speed")
-            if self.useJavaRecorder():
-                self.addJusecaseProperty("delay", str(replaySpeed))
-            else:
-                self.test.setEnvironment("USECASE_REPLAY_DELAY", str(replaySpeed))
-    def setRecord(self, recordScript):
+            return "USECASE_REPLAY_SCRIPT", replayScript
+    def getReplayDelayVariable(self):
+        replaySpeed = str(self.test.getConfigValue("slow_motion_replay_speed"))
+        if self.useJavaRecorder():
+            return "delay", replaySpeed, "jusecase"
+        else:
+            return "USECASE_REPLAY_DELAY", replaySpeed
+    def getRecordScriptVariable(self, recordScript):
         self.diag.info("Enabling recording")
-        if recordScript:
-            if self.useJavaRecorder():
-                self.addJusecaseProperty("record", recordScript)
-            else:
-                self.test.setEnvironment("USECASE_RECORD_SCRIPT", recordScript)
-    def setPathEnvironment(self):
-        if self.testCase():
-            testDir = self.test.getDirectory(temporary=1)
-            self.test.setEnvironment("TEXTTEST_SANDBOX", testDir) 
-            # Always include the working directory of the test in PATH, to pick up fake
-            # executables provided as test data. Allow for later expansion...
-            for pathVar in self.getPathVars():
-                newPathVal = testDir + os.pathsep + "$" + pathVar
-                self.test.setEnvironment(pathVar, newPathVal)
+        if self.useJavaRecorder():
+            return "record", recordScript, "jusecase"
+        else:
+            return "USECASE_RECORD_SCRIPT", recordScript
+    def getPathVariables(self):
+        testDir = self.test.getDirectory(temporary=1)
+        vars = [("TEXTTEST_SANDBOX", testDir)] 
+        # Always include the working directory of the test in PATH, to pick up fake
+        # executables provided as test data. Allow for later expansion...
+        for pathVar in self.getPathVars():
+            newPathVal = testDir + os.pathsep + "$" + pathVar
+            vars.append((pathVar, newPathVal))
+        return vars
 
     def getPathVars(self):
         pathVars = [ "PATH" ]
@@ -1348,13 +1351,20 @@ class RunTest(plugins.Action):
             return os.path.expandvars(open(optionsFile).read().strip(), test.getEnvironment)
         else:
             return ""
+    def diagnose(self, testEnv, commandArgs):
+        if self.diag.get_loglevel() >= LOGLEVEL_NORMAL:
+            for var, value in testEnv.items():
+                self.diag.info("Environment: " + var + " = " + value)
+            self.diag.info("Running test with args : " + repr(commandArgs))
+
     def getTestProcess(self, test):
         commandArgs = self.getExecuteCmdArgs(test)
-        self.diag.info("Running test with args : " + repr(commandArgs))
+        testEnv = test.getRunEnvironment()
+        self.diagnose(testEnv, commandArgs)
         return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
                                 stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
                                 stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
-                                env=test.getRunEnvironment(), startupinfo=plugins.getProcessStartUpInfo(test.getEnvironment))
+                                env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.getEnvironment))
     def getPreExecFunction(self):
         if os.name == "posix":
             return self.ignoreJobControlSignals

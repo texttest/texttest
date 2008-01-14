@@ -273,11 +273,12 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def defaultLoginShell(self):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"
-    def setEnvironment(self, test):
-        queuesystem.QueueSystemConfig.setEnvironment(self, test)
+    def getConfigEnvironment(self, test):
+        baseEnv, props = queuesystem.QueueSystemConfig.getConfigEnvironment(self, test)
         if test.parent is None:
-            for var, value in self.getCarmenEnvironment(test.app) + self.getCleanedGtkEnvironment():
-                test.setEnvironment(var, value)
+            return baseEnv + self.getCarmenEnvironment(test.app) + self.getCleanedGtkEnvironment(), props
+        else:
+            return baseEnv, props
     def cleanGtkEnvironment(self, var):
         # Remove all paths from our tested GTK environment, so that tested apps get the system defaults
         allPaths = os.getenv(var, "").split(os.pathsep)

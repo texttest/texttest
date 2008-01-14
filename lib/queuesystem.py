@@ -1,4 +1,4 @@
-import os, sys, default, unixonly, performance, plugins, socket, subprocess, operator, signal
+import os, sys, default, sandbox, unixonly, performance, plugins, socket, subprocess, operator, signal
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from time import sleep
@@ -29,7 +29,7 @@ class RunTestInSlave(unixonly.RunTest):
         exec command
         return _getUserSignalKillInfo(userSignalNumber, self.getExplicitKillInfo)
 
-class FindExecutionHosts(default.FindExecutionHosts):
+class FindExecutionHosts(sandbox.FindExecutionHosts):
     def getExecutionMachines(self, test):
         moduleName = queueSystemName(test.app).lower()
         command = "from " + moduleName + " import getExecutionMachines as _getExecutionMachines"
@@ -787,7 +787,7 @@ class Abandoned(plugins.TestState):
     def shouldAbandon(self):
         return 1
         
-class MachineInfoFinder(default.MachineInfoFinder):
+class MachineInfoFinder(sandbox.MachineInfoFinder):
     def __init__(self):
         self.queueMachineInfo = None
     def findPerformanceMachines(self, app, fileStem):
@@ -796,7 +796,7 @@ class MachineInfoFinder(default.MachineInfoFinder):
         for resource in resources:
             perfMachines += plugins.retryOnInterrupt(self.queueMachineInfo.findResourceMachines, resource)
 
-        rawPerfMachines = default.MachineInfoFinder.findPerformanceMachines(self, app, fileStem)
+        rawPerfMachines = sandbox.MachineInfoFinder.findPerformanceMachines(self, app, fileStem)
         for machine in rawPerfMachines:
             if machine != "any":
                 perfMachines += self.queueMachineInfo.findActualMachines(machine)
@@ -805,7 +805,7 @@ class MachineInfoFinder(default.MachineInfoFinder):
         else:
             return perfMachines
     def setUpApplication(self, app):
-        default.MachineInfoFinder.setUpApplication(self, app)
+        sandbox.MachineInfoFinder.setUpApplication(self, app)
         moduleName = queueSystemName(app).lower()
         command = "from " + moduleName + " import MachineInfo as _MachineInfo"
         exec command

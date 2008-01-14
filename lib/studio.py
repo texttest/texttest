@@ -4,9 +4,9 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.14 2008/01/14 13:33:10 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.15 2008/01/14 15:52:28 geoff Exp $
 #
-import ravebased, default, plugins, guiplugins, subprocess
+import ravebased, sandbox, plugins, guiplugins, subprocess
 import os, shutil, string
 
 def getConfig(optionMap):
@@ -111,7 +111,7 @@ class StudioConfig(ravebased.Config):
     def getInteractiveReplayOptions(self):
         return ravebased.Config.getInteractiveReplayOptions(self) + [ ("stepmacro", "single-step") ]
         
-class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
+class ExtractPerformanceFiles(sandbox.ExtractPerformanceFiles):
     def findValues(self, logFile, entryFinder):
         values = []
         currOperations = []

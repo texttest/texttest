@@ -94,7 +94,7 @@ apc.ExtractFromStatusFile <versions> [<filter>]
                              as for all the tests that exists in all the versions.
 """
 
-import default, ravebased, queuesystem, performance, os, copy, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview, subprocess
+import default, ravebased, queuesystem, performance, sandbox, os, copy, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview, subprocess
 from jobprocess import JobProcess
 from socket import gethostname
 from time import sleep
@@ -574,10 +574,10 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
     def setUpSuite(self, suite):
         self.describe(suite)
     
-class FetchApcCore(default.CollateFiles):
+class FetchApcCore(sandbox.CollateFiles):
     def extract(self, sourceFile, targetFile, collationErrFile):
         if not os.path.basename(targetFile).startswith("stacktrace") or self.extractCore():
-            default.CollateFiles.extract(self, sourceFile, targetFile, collationErrFile)
+            sandbox.CollateFiles.extract(self, sourceFile, targetFile, collationErrFile)
     def isApcLogFileKept(self, errorFileName):
         for line in open(errorFileName).xreadlines():
             if line.find("*** Keeping the logfiles in") != -1:
@@ -2362,7 +2362,7 @@ class SelectTests(guiplugins.SelectTests):
         return result
 
 
-class ExtractPerformanceFiles(default.ExtractPerformanceFiles):
+class ExtractPerformanceFiles(sandbox.ExtractPerformanceFiles):
     # Override the default accumulation of time
     def makeTimeLine(self, values, fileStem):
         roundedVal = float(int(10*values[-1]))/10

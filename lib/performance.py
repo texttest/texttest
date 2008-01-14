@@ -1,4 +1,3 @@
-#!/usr/local/bin/python
 
 import os, string, plugins, sys
 from comparefile import FileComparison
@@ -275,6 +274,3 @@ class PerformanceStatistics(plugins.Action):
         print self.getPaddedLine(entries)
     def setUpApplication(self, app):
         self.app = app
-
-# for back-compatibility, preserve old names...
-from comparetest import TestComparison as PerformanceTestComparison

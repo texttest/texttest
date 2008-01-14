@@ -42,7 +42,7 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
                              the specified time. Default time is 1440 minutes.
 """
 
-import default, os, string, shutil, plugins, sys, stat, guiplugins, subprocess
+import os, string, shutil, plugins, sandbox, sys, stat, guiplugins, subprocess
 from socket import gethostname, SHUT_WR
 from respond import Responder
 from copy import copy
@@ -331,9 +331,9 @@ def getCarmdata(test):
 
 # Pick up a temporary CARMUSR. Used directly by Studio, and a derived form used by the optimizers,
 # that includes the raveparamters functionality
-class PrepareCarmdataWriteDir(default.PrepareWriteDirectory):
+class PrepareCarmdataWriteDir(sandbox.PrepareWriteDirectory):
     def __call__(self, test):
-        default.PrepareWriteDirectory.__call__(self, test)
+        sandbox.PrepareWriteDirectory.__call__(self, test)
         # Collate the CARMUSR/CARMDATA. Hard to change config as we don't know which variable!
         if test.getEnvironment("CARMDATA"):
             self.collatePath(test, "$CARMDATA", self.partialCopyTestPath)

@@ -1,8 +1,7 @@
-import os, filecmp, string, plugins, shutil
+import os, performance, filecmp, string, plugins, shutil
 from ndict import seqdict
 from tempfile import mktemp
 from comparefile import FileComparison
-from performance import PerformanceFileComparison
 from sets import Set
 
 plugins.addCategory("success", "succeeded")
@@ -216,7 +215,7 @@ class TestComparison(BaseTestComparison):
     def createFileComparison(self, test, stem, standardFile, tmpFile):
         if stem in self.getPerformanceStems(test):
             if tmpFile:
-                return PerformanceFileComparison(test, stem, standardFile, tmpFile)
+                return performance.PerformanceFileComparison(test, stem, standardFile, tmpFile)
             else:
                 # Don't care if performance is missing
                 return None
@@ -284,6 +283,9 @@ class TestComparison(BaseTestComparison):
             newState.addComparison(comparison)
         newState.categorise()
         return newState
+
+# for back-compatibility, preserve old names
+performance.PerformanceTestComparison = TestComparison
 
 class ProgressTestComparison(BaseTestComparison):
     def __init__(self, previousInfo):

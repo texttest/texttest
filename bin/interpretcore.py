@@ -6,22 +6,22 @@ from tempfile import mktemp
 def interpretCore(corefile):
     if os.path.getsize(corefile) == 0:
         details = "Core file of zero size written - Stack trace not produced for crash\nCheck your coredumpsize limit"
-        return "Empty core file", details
+        return "Empty core file", details, None
     
     binary = getBinary(corefile)
     if not os.path.isfile(binary):
         details = "Could not find binary name '" + binary + "' from core file : Stack trace not produced for crash"
-        return "No binary found from core", details
+        return "No binary found from core", details, None
 
     summary, details = writeGdbStackTrace(corefile, binary)
     if summary.find("Parse failure") != -1:
         dbxSummary, dbxDetails = writeDbxStackTrace(corefile, binary)
         if dbxSummary.find("Parse failure") == -1:
-            return dbxSummary, dbxDetails
+            return dbxSummary, dbxDetails, binary
         else:
-            return "Parse failure from both GDB and DBX", details + dbxDetails
+            return "Parse failure from both GDB and DBX", details + dbxDetails, binary
     else:
-        return summary, details
+        return summary, details, binary
 
 def getLocalName(corefile):
     data = os.popen("file " + corefile).readline()
@@ -82,13 +82,13 @@ def parseGdbOutput(stdout):
             signalDesc = summaryLine.split(",")[-1].strip().replace(".", "")
         if line.startswith("#") and line != prevLine:
             startPos = line.find("in ") + 3
-            endPos = line.rfind("(")
-            methodName = line[startPos:endPos]
-            pointerPos = methodName.find("+0")
-            if pointerPos != -1:
-                methodName = methodName[:pointerPos]
+            methodName = line.strip()[startPos:]
             stackLines.append(methodName)
         prevLine = line
+        
+    if len(stackLines) > 1:
+        signalDesc += " in " + getGdbMethodName(stackLines[0])
+
     return signalDesc, summaryLine, stackLines    
 
 def parseDbxOutput(stdout):
@@ -107,8 +107,19 @@ def parseDbxOutput(stdout):
             methodName = line[startPos:endPos]
             stackLines.append(methodName)
         prevLine = line
+
+    if len(stackLines) > 1:
+        signalDesc += " in " + stackLines[0].strip()
+        
     return signalDesc, summaryLine, stackLines    
 
+def getGdbMethodName(line):
+    endPos = line.rfind("(")
+    methodName = line[:endPos]
+    pointerPos = methodName.find("+0")
+    if pointerPos != -1:
+        methodName = methodName[:pointerPos]
+    return methodName.strip()
 
 def parseFailure(errMsg, debugger):
     summary = "Parse failure on " + debugger + " output"
@@ -120,8 +131,6 @@ def parseFailure(errMsg, debugger):
 
 def assembleInfo(signalDesc, summaryLine, stackLines, debugger):
     summary = signalDesc
-    if len(stackLines) > 1:
-        summary += " in " + stackLines[0].strip()
     details = summaryLine + "\nStack trace from " + debugger + " :\n" + \
               "\n".join(stackLines[:100])
     # Sometimes you get enormous stacktraces from GDB, for example, if you have
@@ -156,9 +165,12 @@ def printCoreInfo(corefile):
     if compression:
         os.system("uncompress " + corefile)
         corefile = corefile[:-2]
-    summary, details = interpretCore(corefile)
+    summary, details, binary = interpretCore(corefile)
     print summary
     print "-" * len(summary)
+    print "(Core file at", corefile + ")"
+    if binary:
+        print "(Created by binary", binary + ")"
     print details
     if compression:
         os.system("compress " + corefile)

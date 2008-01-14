@@ -980,3 +980,26 @@ Bug Fixes:
     - Traffic mechanism no longer breaks down if TextTest started via a relative path (texttest.py)
     - Fixed bug with removing a test and then re-adding it with the same name (engine.py)
     - Fixed recursive status view if performance_variation_% = 0, variation between 0 and 1% and other diffs present (performance.py)
+
+Version 3.11
+============
+Major Enhancements:
+General GUI Enhancements:
+Static GUI Enhancements:
+    - Can now select tests by application (guiplugins.py)
+    - Can now select tests by textual description (guiplugins.py)
+Dynamic GUI Enhancements:
+Framework Enhancements:
+    - Can now have application and version endings on data files (testmodel.py)
+	Means the log4x plugin reduces to a special case of the data file mechanism. See migration notes.
+    - Prioritisation rules changed (testmodel.py)
+	Version specific files now get chosen above test-specific files. See migration notes.
+    - Now provide an environment variable TEXTTEST_SANDBOX to identify the sandbox directory (default.py)
+	Use with care. Mainly to handle applications that refuse relative paths or change directory internally.
+Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements:
+Installation and self-test changes:
+Bug Fixes:
+    - Can no longer mark running tests by selecting them together with completed tests (guiplugins.py)
+    - Tests from extra_versions now get displayed in the expected order (testmodel.py)
+	Previously they could end up in various funny orders.

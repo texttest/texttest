@@ -1,0 +1,83 @@
+
+This file also details behaviour of TextTest 3.11 which will be different from TextTest 3.10. You can
+probably figure much of this out by just seeing what happens...
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) log4x configuration files
+=============================
+If you're using TextTest's integration with log4x, the whole mechanism has been
+removed as everything needed by it can be covered by other existing functionality.
+This is mainly because the data files mechanism supports having application and version
+suffices now, but also because there is now a TEXTTEST_SANDBOX variable.
+
+So the [diagnostics] config entry is removed, and "logging" files are handled the same 
+as others. For example, you may have previously had
+
+[diagnostics]
+configuration_file_variable:DIAGNOSTICS_FILE
+write_directory_variable:DIAGNOSTICS_OUT
+[end]
+
+This can now be achieved via
+
+link_test_path:logging
+
+[test_data_environment]
+logging:DIAGNOSTICS_FILE
+
+in your config file.
+
+The write_directory_variable is generally only important for applications that change 
+directory internally. Others can just use relative paths and manage without it. 
+If it's needed, you use the new functionality above by adding
+
+DIAGNOSTICS_OUT:$TEXTTEST_SANDBOX
+
+to your environment file. In this way your application can find the sandbox to write its logs to.
+
+If you're using log4j and java, you can identify the properties file to use in a similar way:
+
+[test_data_properties]
+logging:my_props
+
+The actual properties reuse the "test_data_environment" construct - TextTest sees properties
+as the Java environment mechanism.
+
+As an additional note, if you're upgrading from TextTest 3.8 or earlier you don't need to rename
+all your files to be called "logging". Whatever they're called will work, just replace "logging"
+with the currently used name above.
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR
+=========================================================
+
+(1) Prioritising between different TextTest files
+=================================================
+
+There has been a change in how TextTest handles the situation when a test-specific
+file and a version-specific file conflict with each other. Historically, TextTest 
+has always given the test-specific file priority but this has proven to be awkward 
+a few times, and people have been calling for a change - which has now been introduced.
+This applies to all files that apply at more than one level of the hierarchy :
+data files, log configuration files (which are now data files also, see above), environment
+files and knownbugs files.
+
+As an example, if in your root suite you have
+a file "environment.version" containing
+
+MY_ENV_VAR:foo
+
+and in your test you have a file "environment" containing
+
+MY_ENV_VAR:bar
+
+the question is what value should MY_ENV_VAR have when your application is called?
+
+In TextTest 3.10 it is "bar". In TextTest 3.11 it is "foo".
+Hopefully such conflicting situations are fairly rare. But this might require some
+migration. Naturally, if in the above case you wish to preserve the 3.10 behaviour,
+copying the "environment.version" file to the test directory would achieve this.
+ 

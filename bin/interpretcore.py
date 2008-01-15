@@ -76,14 +76,21 @@ def parseGdbOutput(stdout):
     signalDesc = ""
     stackLines = []
     prevLine = ""
+    stackStarted = False
     for line in stdout.readlines():
         if line.find("Program terminated") != -1:
             summaryLine = line.strip()
             signalDesc = summaryLine.split(",")[-1].strip().replace(".", "")
-        if line.startswith("#") and line != prevLine:
-            startPos = line.find("in ") + 3
-            methodName = line.strip()[startPos:]
-            stackLines.append(methodName)
+        if line.startswith("#"):
+            stackStarted = True
+        if stackStarted and line != prevLine:
+            methodName = line.rstrip()
+            startPos = methodName.find("in ")
+            if startPos != -1:
+                methodName = methodName[startPos + 3:]
+                stackLines.append(methodName)
+            else:
+                stackLines.append(methodName)
         prevLine = line
         
     if len(stackLines) > 1:

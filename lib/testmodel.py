@@ -217,15 +217,19 @@ class TestEnvironment(seqdict):
         if var != originalVar:
             return self._getSingleValue(var)
     def storeVariables(self, vars):
-        for var, value in vars:
-            getenvFunc = Callable(self.getSelfReference, var)
-            newValue = os.path.expandvars(value, getenvFunc)
+        for var, valueOrMethod in vars:
+            newValue = self.expandSelfReferences(var, valueOrMethod)
             self.diag.info("Storing " + var + " = " + newValue)
             self[var] = newValue
 
         while self.expandVariables():
             pass
-
+    def expandSelfReferences(self, var, valueOrMethod):
+        if type(valueOrMethod) == types.StringType:
+            getenvFunc = Callable(self.getSelfReference, var)
+            return os.path.expandvars(valueOrMethod, getenvFunc)
+        else:
+            return valueOrMethod(var, self._getSingleValue(var, ""))
     def expandVariables(self):
         expanded = False
         for var, value in self.items():

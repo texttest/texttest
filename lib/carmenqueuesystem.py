@@ -279,9 +279,9 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return baseEnv + self.getCarmenEnvironment(test.app) + self.getCleanedGtkEnvironment(), props
         else:
             return baseEnv, props
-    def cleanGtkEnvironment(self, var):
+    def cleanGtkEnvironment(self, var, value):
         # Remove all paths from our tested GTK environment, so that tested apps get the system defaults
-        allPaths = os.getenv(var, "").split(os.pathsep)
+        allPaths = value.split(os.pathsep)
         filteredPaths = filter(lambda path: not path.startswith("/usr/local/tt-env"), allPaths)
         return os.pathsep.join(filteredPaths)
     def getCleanedGtkEnvironment(self):
@@ -289,7 +289,9 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
                        "GTK_PATH", "GTK_DATA_PREFIX", "XDG_DATA_DIRS" ]
         envVars = []
         for envVar in gtkEnvVars:
-            envVars.append((envVar, self.cleanGtkEnvironment(envVar)))
+            # Put the method itself in the list, to transform the variable after expansion
+            # via the config files
+            envVars.append((envVar, self.cleanGtkEnvironment))
         return envVars
     def getCarmenEnvironment(self, app):
         envVars = [ ("ARCHITECTURE", getArchitecture(app)), ("BITMODE", getBitMode(app)) ]

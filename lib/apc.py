@@ -774,11 +774,13 @@ class ExtractApcLogs(plugins.Action):
             errFile = test.makeTmpFileName("script_errors")
             if os.path.isfile(errFile):
                 os.remove(errFile)
+
+        realPath = os.path.realpath(apcTmpDir)
+        os.remove(apcTmpDir)
         if self.keepTmp:
-            apcTmpDirStored = test.makeTmpFileName("apc_tmp", forComparison=0)
-            shutil.copytree(apcTmpDir, apcTmpDirStored) 
+            shutil.copytree(realPath, apcTmpDir) 
         # Remove dir
-        plugins.rmtree(apcTmpDir)
+        plugins.rmtree(realPath)
     def __repr__(self):
         return "Extracting APC logfile for"
     def getInterruptActions(self, fetchResults):

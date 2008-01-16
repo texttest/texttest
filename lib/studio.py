@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.15 2008/01/14 15:52:28 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.16 2008/01/16 15:32:54 geoff Exp $
 #
 import ravebased, sandbox, plugins, guiplugins, subprocess
 import os, shutil, string
@@ -41,10 +41,10 @@ class StudioConfig(ravebased.Config):
             rulesets.append(extraRuleset)
             
         return rulesets
-    def ignoreBinary(self):
+    def ignoreExecutable(self):
         if self.optionMap.runScript() and self.optionMap["s"].endswith("CacheDefaultRuleset"):
             return False
-        return ravebased.Config.ignoreBinary(self)  
+        return ravebased.Config.ignoreExecutable(self)  
     def getSubplanRuleset(self, test):
         subplanDir = self._getSubPlanDirName(test)
         if subplanDir:

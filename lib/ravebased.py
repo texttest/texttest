@@ -163,10 +163,10 @@ class Config(CarmenConfig):
             return baseProc
     def getSlaveSwitches(self):
         return CarmenConfig.getSlaveSwitches(self) + [ "debug", "lprof", "raveexp" ]
-    def ignoreBinary(self):
+    def ignoreExecutable(self):
         if self.optionMap.runScript() and self.optionMap["s"].endswith("PrintRulesets"):
             return False
-        return CarmenConfig.ignoreBinary(self)
+        return CarmenConfig.ignoreExecutable(self)
     def isRaveRun(self):
         return self.optionValue("a").find("rave") != -1 or self.optionValue("v").find("rave") != -1
     def rebuildAllRulesets(self):

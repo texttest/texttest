@@ -35,7 +35,7 @@ class AboutTextTestDialog(guidialogs.ActionResultDialog):
         mainLabel = gtk.Label()
         mainLabel.set_markup("<span size='xx-large'>TextTest " + texttest_version.version + "</span>\n")
         messageLabel = gtk.Label()
-        messageLabel.set_markup("<i>TextTest is an application-independent tool for text-based\nfunctional testing. This means running a batch-mode binary\nin lots of different ways, and using the text output produced\nas a means of controlling the behaviour of that application.</i>\n")
+        messageLabel.set_markup("<i>TextTest is an application-independent tool for text-based\nfunctional testing. This means running a batch-mode program\nin lots of different ways, and using the text output produced\nas a means of controlling the behaviour of that application.</i>\n")
         messageLabel.set_justify(gtk.JUSTIFY_CENTER)
         urlLabel = gtk.Label()
         urlLabel.set_markup("<span foreground='blue' underline='single'>http://www.texttest.org/</span>\n")

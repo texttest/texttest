@@ -570,12 +570,12 @@ def copyEnvironment():
         environ[var] = value
     return environ
 
-def getInterpreter(binary):
-    if binary.endswith(".py"):
+def getInterpreter(executable):
+    if executable.endswith(".py"):
         return "python"
-    elif binary.endswith(".rb"):
+    elif executable.endswith(".rb"):
         return "ruby"
-    elif binary.endswith(".jar"):
+    elif executable.endswith(".jar"):
         return "java -jar"
     else:   
         return ""

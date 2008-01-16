@@ -416,10 +416,10 @@ class Config:
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         return self.optionMap.get(option, "")
-    def ignoreBinary(self):
+    def ignoreExecutable(self):
         return self.optionMap.runScript() or self.isReconnecting()
     def setUpCheckout(self, app):
-        if self.ignoreBinary():
+        if self.ignoreExecutable():
             return ""
         checkoutPath = self.getGivenCheckoutPath(app)
         # Allow empty checkout, means no checkout is set, basically
@@ -437,8 +437,8 @@ class Config:
         elif not os.path.isdir(checkoutPath):
             raise plugins.TextTestError, "checkout '" + checkoutPath + "' does not exist"
     def checkSanity(self, suite):
-        if not self.ignoreBinary() and not self.optionMap.has_key("gx"):
-            self.checkBinaryExists(suite)
+        if not self.ignoreExecutable() and not self.optionMap.has_key("gx"):
+            self.checkExecutableExists(suite)
 
         self.checkFilterFileSanity(suite.app)
         self.checkConfigSanity(suite.app)
@@ -450,16 +450,16 @@ class Config:
             reconnector = reconnect.ReconnectApp()
             self.reconnDir = reconnector.findReconnectDir(suite.app, self.optionValue("reconnect"))
             
-    def checkBinaryExists(self, suite):
-        binary = suite.getConfigValue("binary")
-        if not binary:
-            raise plugins.TextTestError, "config file entry 'binary' not defined"
-        if self.binaryShouldBeFile(suite.app, binary) and not os.path.isfile(binary):
-            raise plugins.TextTestError, binary + " has not been built."
-    def binaryShouldBeFile(self, app, binary):
+    def checkExecutableExists(self, suite):
+        executable = suite.getConfigValue("executable")
+        if not executable:
+            raise plugins.TextTestError, "config file entry 'executable' not defined"
+        if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
+            raise plugins.TextTestError, "The executable program '" + executable + "' does not exist."
+    def executableShouldBeFile(self, app, executable):
         # For finding java classes, don't warn if they don't exist as files...
         interpreter = app.getConfigValue("interpreter")
-        return not interpreter.startswith("java") or binary.endswith(".jar") 
+        return not interpreter.startswith("java") or executable.endswith(".jar") 
     def checkConfigSanity(self, app):
         for key in app.getConfigValue("collate_file"):
             if key.find(".") != -1:
@@ -701,7 +701,6 @@ class Config:
         app.setConfigDefault("trace_level_variable", "", "Environment variable that sets a simple trace-log level")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
-        app.setConfigDefault("test_data_searchpath", { "default" : [] }, "Locations to search for test data if not present in test structure")
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
         app.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         app.setConfigDefault("batch_extra_version", { "default" : [] }, "Versions to be run in addition to the one specified, for particular batch sessions")
@@ -928,7 +927,7 @@ class RunTest(plugins.Action):
         interpreter = self.getInterpreter(test)
         if interpreter:
             args.append(interpreter)
-        args.append(test.getConfigValue("binary"))
+        args.append(test.getConfigValue("executable"))
         args.append(self.getOptions(test))
         return args
     def getExecuteCmdArgs(self, test):

@@ -99,6 +99,11 @@ class MultiEntryDictionary(seqdict):
     def __init__(self):
         seqdict.__init__(self)
         self.currDict = self
+        self.aliases = {}
+    def setAlias(self, aliasName, realName):
+        self.aliases[aliasName] = realName
+    def getEntryName(self, fromConfig):
+        return self.aliases.get(fromConfig, fromConfig)
     def readValues(self, fileNames, insert=True, errorOnUnknown=False):
         self.currDict = self
         for filename in fileNames:
@@ -107,9 +112,12 @@ class MultiEntryDictionary(seqdict):
             self.currDict = self
     def parseConfigLine(self, line, insert, errorOnUnknown):
         if line.startswith("[") and line.endswith("]"):
-            self.currDict = self.changeSectionMarker(line[1:-1], errorOnUnknown)
+            sectionName = self.getEntryName(line[1:-1])
+            self.currDict = self.changeSectionMarker(sectionName, errorOnUnknown)
         elif line.find(":") != -1:
-            self.addLine(line, insert, errorOnUnknown)
+            key, value = line.split(":", 1)
+            entryName = self.getEntryName(os.path.expandvars(key))
+            self.addEntry(entryName, value, "", insert, errorOnUnknown)
         else:
             plugins.printWarning("Could not parse config line " + line, stdout = False, stderr = True)
     def changeSectionMarker(self, name, errorOnUnknown):
@@ -120,9 +128,6 @@ class MultiEntryDictionary(seqdict):
         if errorOnUnknown:
             plugins.printWarning("Config section name '" + name + "' not recognised.", stdout = False, stderr = True)
         return self
-    def addLine(self, line, insert, errorOnUnknown, separator = ':'):
-        entryName, entry = line.split(separator, 1)
-        self.addEntry(os.path.expandvars(entryName), entry, "", insert, errorOnUnknown)
     def getVarName(self, name):
         if name.startswith("${"):
             return name[2:-1]
@@ -400,19 +405,24 @@ class Test(plugins.Observable):
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse._getFileName([ self.dircache ], stem)
-    def getPathName(self, stem):
-        return self.app._getFileName(self.getDirCachesToRoot(), stem)
-    def getAllPathNames(self, stem):
-        return self.app._getAllFileNames(self.getDirCachesToRoot(), stem)
+    def getPathName(self, stem, configName=None):
+        return self.pathNameMethod(stem, configName, self.app._getFileName)
+    def getAllPathNames(self, stem, configName=None):
+        return self.pathNameMethod(stem, configName, self.app._getAllFileNames)
+    def pathNameMethod(self, stem, configName, method):
+        if configName is None:
+            configName = stem
+        return method(self.getDirCachesToRoot(configName), stem)
     def getAllTestsToRoot(self):
         tests = [ self ]
         if self.parent:
             tests = self.parent.getAllTestsToRoot() + tests
         return tests
         
-    def getDirCachesToRoot(self):
+    def getDirCachesToRoot(self, configName):
         fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
-        return self.app.extraDirCaches + fromTests
+        dirNames = self.getCompositeConfigValue("extra_search_directory", configName)
+        return self.app.getExtraDirCaches(dirNames) + fromTests
     
     def getAllFileNames(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
@@ -1009,7 +1019,7 @@ class Application:
         self.name = name
         self.dircache = dircache
         # Place to store reference to extra_version applications
-        self.extras = []
+        self.extras = [] 
         # Cache all environment files in the whole suite to stop constantly re-reading them
         self.envFiles = {}
         self.versions = versions    
@@ -1017,7 +1027,7 @@ class Application:
         self.inputOptions = inputOptions
         self.configDir = MultiEntryDictionary()
         self.configDocs = {}
-        self.extraDirCaches = []
+        self.extraDirCaches = {}
         self.setConfigDefaults()
         self.readConfigFiles(configModuleInitialised=False)
         self.readValues(self.configDir, "config", self.dircache, insert=0)
@@ -1041,31 +1051,42 @@ class Application:
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(inputOptions)
-        self.setupExtraDirCaches()
         interactiveActionHandler.setCommandOptionGroups(self.optionGroups)
     def __repr__(self):
         return self.fullName + self.versionSuffix()
     def __hash__(self):
         return id(self)
-    def setupExtraDirCaches(self):
-        envDirs = self.getConfigValue("extra_config_directory")
-        for envDir in envDirs:
-            added = False
-            if envDir == "":
-                continue
-            if os.path.isabs(envDir):
-                if os.path.isdir(envDir):
-                    self.extraDirCaches.append(DirectoryCache(os.path.abspath(envDir)))
-                    added = True
+                
+    def makeExtraDirCache(self, envDir):
+        if envDir == "":
+            return
+            
+        if os.path.isabs(envDir) and os.path.isdir(envDir):
+            return DirectoryCache(envDir)
+
+        rootPath = os.path.join(self.inputOptions.directoryName, envDir)
+        if os.path.isdir(rootPath):
+            return DirectoryCache(rootPath)
+        appPath = os.path.join(self.getDirectory(), envDir)
+        if os.path.isdir(appPath):
+            return DirectoryCache(appPath)
+
+    def getExtraDirCaches(self, dirNames):
+        dirCaches = []
+        for dirName in dirNames:
+            if self.extraDirCaches.has_key(dirName):
+                cached = self.extraDirCaches.get(dirName)
+                if cached:
+                    dirCaches.append(cached)
             else:
-                if os.path.isdir(plugins.joinpath(os.getenv("TEXTTEST_HOME"), envDir)):
-                    self.extraDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(os.getenv("TEXTTEST_HOME"), envDir))))
-                    added = True
-                if os.path.isdir(plugins.joinpath(self.dircache.dir, envDir)):            
-                    self.extraDirCaches.append(DirectoryCache(os.path.abspath(plugins.joinpath(self.dircache.dir, envDir))))
-                    added = True
-            if not added:
-                plugins.printWarning("The directory '" + envDir + "' could not be found, ignoring 'extra_config_directory' config entry.")
+                dirCache = self.makeExtraDirCache(dirName)
+                if dirCache:
+                    self.extraDirCaches[dirName] = dirCache
+                    dirCaches.append(dirCache)
+                else:
+                    self.extraDirCaches[dirName] = None # don't repeat the warning
+                    plugins.printWarning("The directory '" + dirName + "' could not be found, ignoring 'extra_search_directory' config entry.")
+        return dirCaches
     def makeConfigObject(self):
         moduleName = self.getConfigValue("config_module")
         importCommand = "from " + moduleName + " import getConfig"
@@ -1135,24 +1156,15 @@ class Application:
     def configPath(self, fileName):
         if os.path.isabs(fileName):
             return fileName
-        if self.dircache.exists(fileName):
-            return self.dircache.pathName(fileName)
-
-        # Look in the extra config dirs ...
-        extraDirs = self.getConfigValue("extra_config_directory")
-        for dir in extraDirs:
-            extraFile = plugins.joinpath(dir, fileName)
-            if os.path.isabs(extraFile):
-                if os.path.isfile(extraFile):
-                    return os.path.abspath(extraFile)
-            elif os.path.isfile(plugins.joinpath(os.getenv("TEXTTEST_HOME"), extraFile)):
-                return os.path.abspath(plugins.joinpath(os.getenv("TEXTTEST_HOME"), extraFile))
-
-        oneLevelUp = os.path.join(os.getenv("TEXTTEST_HOME"), fileName)
-        if os.path.isfile(oneLevelUp):
-            return oneLevelUp
-        else:            
+        dirCacheNames = self.getCompositeConfigValue("extra_search_directory", fileName)
+        dirCacheNames.append(".") # pick up the root directory
+        dirCaches = self.getExtraDirCaches(dirCacheNames)
+        dirCaches.append(self.dircache)
+        configPath = self._getFileName(dirCaches, fileName)
+        if not configPath:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
+        return configPath
+    
     def getDataFileNames(self, getenvFunc=os.getenv):
         return self.getConfigValue("link_test_path", getenvFunc=getenvFunc) + \
                self.getConfigValue("copy_test_path", getenvFunc=getenvFunc) + \
@@ -1216,7 +1228,8 @@ class Application:
                 names.add(appName)
         return names
     def setConfigDefaults(self):
-        self.setConfigDefault("binary", "", "Full path to the System Under Test")
+        self.setConfigDefault("executable", "", "Full path to the System Under Test")
+        self.setConfigAlias("binary", "executable")
         self.setConfigDefault("config_module", "default", "Configuration module to use")
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
@@ -1232,13 +1245,15 @@ class Application:
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \
                               "Mapping of version names to a priority order in case of conflict.") 
-        self.setConfigDefault("extra_config_directory", [], "Directories containing shared configuration and environment files")
+        self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for settings besides the test structure")
+        self.setConfigAlias("test_data_searchpath", "extra_search_directory")
+        self.setConfigAlias("extra_config_directory", "extra_search_directory")
     def setDependentConfigDefaults(self):
-        binary = self.getConfigValue("binary")
+        executable = self.getConfigValue("executable")
         # Set values which default to other values
         self.setConfigDefault("interactive_action_module", [ self.getConfigValue("config_module") ],
                               "Module to search for InteractiveActions for the GUI")
-        self.setConfigDefault("interpreter", plugins.getInterpreter(binary), "Program to use as interpreter for the SUT")
+        self.setConfigDefault("interpreter", plugins.getInterpreter(executable), "Program to use as interpreter for the SUT")
     def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]
         optionGroups = []
@@ -1479,6 +1494,8 @@ class Application:
         self.configDir[key] = value
         if len(docString) > 0:
             self.configDocs[key] = docString
+    def setConfigAlias(self, aliasName, realName):
+        self.configDir.setAlias(aliasName, realName)
             
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):

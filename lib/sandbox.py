@@ -55,27 +55,12 @@ class PrepareWriteDirectory(plugins.Action):
         if not fileName or os.path.isabs(fileName):
             return fileName
         
-        pathName = test.getPathName(fileName)
-        if pathName:
-            return pathName
-        else:
-            return self.getSourceFromSearchPath(test, fileName, configName)
+        return test.getPathName(fileName, configName)
     def getSourceFileName(self, configName, test):
         if configName.startswith("$"):
             return self.getEnvironmentSourcePath(configName, test)
         else:
             return configName
-    def getSourceFromSearchPath(self, test, fileName, configName):
-        self.diag.info("Searching for " + fileName + " in search path corresponding to " + configName)
-        # Need to get both expanded and unexpanded varieties to be sure...
-        searchPathDirs = test.getCompositeConfigValue("test_data_searchpath", configName) + \
-                         test.getCompositeConfigValue("test_data_searchpath", fileName)
-        for dir in searchPathDirs:
-            fullPath = os.path.join(dir, fileName)
-            self.diag.info("Trying " + fullPath)
-            if os.path.exists(fullPath):
-                self.diag.info("Found!")
-                return fullPath
     def findDataEnvironment(self, test, configName):
         self.diag.info("Finding env. var name from " + configName)
         if configName.startswith("$"):

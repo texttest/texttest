@@ -173,8 +173,8 @@ class OptimizationConfig(ravebased.Config):
         if self.optionMap.has_key("plot") or self.optionMap.has_key("prrep"):
             return False
         return ravebased.Config.useQueueSystem(self)
-    def ignoreBinary(self):
-        return self.optionMap.has_key("plot") or ravebased.Config.ignoreBinary(self)
+    def ignoreExecutable(self):
+        return self.optionMap.has_key("plot") or ravebased.Config.ignoreExecutable(self)
     def getResponderClasses(self, allApps):
         if self.optionMap.has_key("plot"):
             return [ GraphPlotResponder ] + self.getThreadActionClasses()

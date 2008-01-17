@@ -23,7 +23,11 @@ class GUIConfig:
         for app in self.apps:
             currValue = method(app, *args)
             if not prevValue is None and currValue != prevValue:
-                plugins.printWarning("GUI configuration differs between applications, ignoring that from " + repr(app))
+                # otherwise ignore silently
+                if not currValue is None:
+                    plugins.printWarning("GUI configuration '" + "::".join(args) +\
+                                         "' differs between applications, ignoring that from " + repr(app) + "\n" + \
+                                         "Value was " + repr(currValue) + ", change from " + repr(prevValue))
             else:
                 prevValue = currValue
         return prevValue

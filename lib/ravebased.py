@@ -233,6 +233,23 @@ class Config(CarmenConfig):
     def _subPlanName(self, test):
         # just a stub so this configuration can be used directly
         pass
+    def getSubplanRuleset(self, test):
+        subplanDir = self._getSubPlanDirName(test)
+        if subplanDir:
+            headerFile = os.path.join(subplanDir, "subplanHeader")
+            origPath = self.findOrigRulePath(headerFile)
+            return os.path.basename(origPath)
+                
+    def findOrigRulePath(self, headerFile):
+        if not os.path.isfile(headerFile):
+            return ""
+        index = -1
+        for line in open(headerFile).xreadlines():
+            if line.startswith("552"):
+                index = line.split(";").index("SUB_PLAN_HEADER_RULE_SET_NAME")
+            if line.startswith("554") and index > 0:
+                return line.split(";")[index]
+        return ""
     def extraReadFiles(self, test):
         readDirs = CarmenConfig.extraReadFiles(self, test)
         if test.classId() == "test-case":
@@ -402,8 +419,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
         except AttributeError:
             return
     def getTestsForRuleset(self, ruleset):
-        targetFile = ruleset.targetFiles[0]
-        return FilterRuleBuilds.rulesetNamesToTests.get(targetFile, [])
+        return FilterRuleBuilds.rulesetNamesToTests.get(ruleset.uniqueName, [])
     def submitRuleCompilation(self, test):
         submissionRules = test.app.getRaveSubmissionRules(test)
         remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
@@ -412,7 +428,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
             print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for " + repr(test) + ")", postText
-            compileArgs = [ remoteCmd, ruleset.targetFiles[0], self.submitAddress ] + ruleset.getCompilationArgs(remote=True)
+            compileArgs = [ remoteCmd, ruleset.uniqueName, self.submitAddress ] + ruleset.getCompilationArgs(remote=True)
             command = " ".join(compileArgs)
             if not self.submitJob(test, submissionRules, command, rulecompEnv):
                 self.testsForRuleBuild -= 1
@@ -428,8 +444,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
         
     def associateJobs(self, test, rulecomp):
         for ruleset in rulecomp.rulesetsFromOthers:
-            targetFile = ruleset.targetFiles[0]
-            rulesetTests = FilterRuleBuilds.rulesetNamesToTests.get(targetFile, [])
+            rulesetTests = FilterRuleBuilds.rulesetNamesToTests.get(ruleset.uniqueName, [])
             if len(rulesetTests) > 0 and self.isRuleBuild(rulesetTests[0]):
                 self.lock.acquire()
                 if self.exited:
@@ -613,15 +628,15 @@ class FilterRuleBuilds(plugins.Action):
                 continue
 
             if self.shouldCompileFor(test, ruleset):
-                targetName = ruleset.targetFiles[0]
-                origRuleset = self.rulesetNamesToRulesets.get(targetName)
+                origRuleset = self.rulesetNamesToRulesets.get(ruleset.uniqueName)
+                self.diag.info("Rule build of " + ruleset.uniqueName + " produced " + repr(origRuleset))
                 if origRuleset:
                     known.append(origRuleset)
                 else:
-                    FilterRuleBuilds.rulesetNamesToTests[targetName] = []
+                    FilterRuleBuilds.rulesetNamesToTests[ruleset.uniqueName] = []
                     unknown.append(ruleset)
-                    self.rulesetNamesToRulesets[targetName] = ruleset
-                self.rulesetNamesToTests[targetName].append(test)
+                    self.rulesetNamesToRulesets[ruleset.uniqueName] = ruleset
+                self.rulesetNamesToTests[ruleset.uniqueName].append(test)
             else:
                 self.diag.info("Filter rejected rule build for " + test.name)
                 
@@ -764,13 +779,10 @@ class RuleSet:
         self.arch = getArchitecture(test.app)
         self.modeString = test.app.raveMode()
         self.sourceFile = self.sourcePath(self.name)
-        self.targetFiles = []
         self.status = self.NOT_COMPILED
         self.output = ""
-        for raveName in self.raveNames:
-            self.targetFiles.append(self.targetPath("rule_set", raveName, self.arch, self.name))
-            if self.modeString == "-debug":
-                self.targetFiles[-1] += "_g"
+        self.uniqueName = self.name + "." + test.getEnvironment("CARMTMP")
+        self.targetFiles = [ self.targetPath("rule_set", raveName, self.arch, self.name) for raveName in self.raveNames ]
     def hasSucceeded(self):
         return self.status == self.COMPILED
     def hasFailed(self):
@@ -804,7 +816,10 @@ class RuleSet:
                 return False
         return True
     def targetPath(self, type, raveName, arch, name):
-        return os.path.join(self.envMethod("CARMTMP"), "crc", type, raveName.upper(), arch, name)
+        targetPath = os.path.join(self.envMethod("CARMTMP"), "crc", type, raveName.upper(), arch, name)
+        if self.modeString == "-debug":
+            targetPath += "_g"
+        return targetPath
     def sourcePath(self, name):
         return os.path.join(self.envMethod("CARMUSR"), "crc", "source", name)
     def backup(self):

@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.16 2008/01/16 15:32:54 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.17 2008/01/17 17:07:18 geoff Exp $
 #
 import ravebased, sandbox, plugins, guiplugins, subprocess
 import os, shutil, string
@@ -29,7 +29,8 @@ class StudioConfig(ravebased.Config):
     def _getRuleSetNames(self, test):
         rulesets = []
         subplanRuleset = self.getSubplanRuleset(test)
-        if subplanRuleset:
+        if subplanRuleset and not self.macroBuildsRuleset(test, subplanRuleset):
+            # Don't want to manage the ruleset separately if the macro is going to build it..
             rulesets.append(subplanRuleset)
                 
         defaultRuleset = test.getEnvironment("DEFAULT_RULESET_NAME")
@@ -45,26 +46,7 @@ class StudioConfig(ravebased.Config):
         if self.optionMap.runScript() and self.optionMap["s"].endswith("CacheDefaultRuleset"):
             return False
         return ravebased.Config.ignoreExecutable(self)  
-    def getSubplanRuleset(self, test):
-        subplanDir = self._getSubPlanDirName(test)
-        if subplanDir:
-            headerFile = os.path.join(subplanDir, "subplanHeader")
-            origPath = self.findOrigRulePath(headerFile)
-            subplanRuleset = os.path.basename(origPath)
-            # Don't want to manage the ruleset separately if the macro is going to build it...
-            if not self.macroBuildsRuleset(test, subplanRuleset):
-                return subplanRuleset    
-                
-    def findOrigRulePath(self, headerFile):
-        if not os.path.isfile(headerFile):
-            return ""
-        index = -1
-        for line in open(headerFile).xreadlines():
-            if line.startswith("552"):
-                index = line.split(";").index("SUB_PLAN_HEADER_RULE_SET_NAME")
-            if line.startswith("554") and index > 0:
-                return line.split(";")[index]
-        return ""
+    
     def filesFromSubplan(self, test, subplanDir):
         rulesFile = os.path.join(subplanDir, "subplanRules")
         if not os.path.isfile(rulesFile):

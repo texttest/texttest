@@ -459,12 +459,12 @@ class TextTestGUI(Responder, plugins.Observable):
 
         tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
-        tabInfo = seqdict()
+        tabInfo = []
         for name, notebookGUI in subNotebookGUIs.items():
             if name == "Test":
-                tabInfo[name] = PaneGUI(topTestViewGUI, notebookGUI, horizontal=False)
+                tabInfo.append((name, PaneGUI(topTestViewGUI, notebookGUI, horizontal=False)))
             else:
-                tabInfo[name] = notebookGUI
+                tabInfo.append((name, notebookGUI))
 
         notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"))
         return [ notebookGUI ] + subNotebookGUIs.values(), notebookGUI
@@ -476,10 +476,7 @@ class TextTestGUI(Responder, plugins.Observable):
             return "view sub-options for " + tabName.lower() + " :"
 
     def classifyByTitle(self, tabGUIs):
-        tabInfo = seqdict()
-        for tabGUI in tabGUIs:
-            tabInfo[tabGUI.getTabTitle()] = tabGUI
-        return tabInfo
+        return map(lambda tabGUI: (tabGUI.getTabTitle(), tabGUI), tabGUIs)
     def getGroupTabNames(self, tabGUIs):
         tabNames = [ "Test", "Selection", "Running" ]
         for tabGUI in tabGUIs:
@@ -1802,27 +1799,28 @@ class NotebookGUI(SubGUI):
         self.diag = plugins.getDiagnostics("GUI notebook")
         self.tabInfo = tabInfo
         self.notebook = None
-        self.currentPageName = ""
+        self.currentTabGUI = None
 
     def setActive(self, value):
         SubGUI.setActive(self, value)
-        if self.currentPageName:
-            self.tabInfo[self.currentPageName].setActive(value)
+        if self.currentTabGUI:
+            self.diag.info("Setting active flag " + repr(value) + " for '" + self.currentTabGUI.getTabTitle() + "'")
+            self.currentTabGUI.setActive(value)
 
     def contentsChanged(self):
         SubGUI.contentsChanged(self)
-        if self.currentPageName:
-            self.tabInfo[self.currentPageName].contentsChanged()
+        if self.currentTabGUI:
+            self.currentTabGUI.contentsChanged()
 
     def shouldShowCurrent(self, *args):
-        for tabGUI in self.tabInfo.values():
+        for name, tabGUI in self.tabInfo:
             if tabGUI.shouldShowCurrent(*args):
                 return True
         return False
 
     def createView(self):
         self.notebook = gtk.Notebook()
-        for tabName, tabGUI in self.tabInfo.items():
+        for tabName, tabGUI in self.tabInfo:
             label = gtk.Label(tabName)
             self.diag.info("Adding page " + tabName)
             page = tabGUI.createView()
@@ -1832,30 +1830,29 @@ class NotebookGUI(SubGUI):
 
         scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
         self.notebook.set_scrollable(True)
-        if not self.setCurrentPage(self.currentPageName):
-            self.currentPageName = self.findInitialCurrentPage()
-            self.diag.info("Current page set to '" + self.currentPageName + "'")
+        tabName, self.currentTabGUI = self.findInitialCurrentTab()
+        self.diag.info("Current page set to '" + tabName + "'")
         self.notebook.connect("switch-page", self.handlePageSwitch)
         self.notebook.show()
         return self.notebook
 
-    def findInitialCurrentPage(self):
-        for tabName, tabGUI in self.tabInfo.items():
+    def findInitialCurrentTab(self):
+        for tabName, tabGUI in self.tabInfo:
             if tabGUI.shouldShowCurrent():
-                return tabName
+                return tabName, tabGUI
 
-        return self.tabInfo.keys()[0]
+        return self.tabInfo[0]
             
     def handlePageSwitch(self, notebook, ptr, pageNum, *args):
         if not self.active:
             return
-        newPageName = self.getPageName(pageNum)
-        if newPageName == self.currentPageName:
+        newPageName, newTabGUI = self.tabInfo[pageNum]
+        if newTabGUI is self.currentTabGUI:
             return
-        self.currentPageName = newPageName 
-        self.diag.info("Switching to page " + self.currentPageName)
-        for tabName, tabGUI in self.tabInfo.items():
-            if tabName == self.currentPageName:
+        self.currentTabGUI = newTabGUI 
+        self.diag.info("Switching to page " + newPageName)
+        for tabName, tabGUI in self.tabInfo:
+            if tabGUI is self.currentTabGUI:
                 self.diag.info("Activating " + tabName)
                 tabGUI.activate()
             else:
@@ -1868,53 +1865,45 @@ class NotebookGUI(SubGUI):
             return self.notebook.get_tab_label_text(page)
         else:
             return ""
-
-    def findPage(self, name):
-        for child in self.notebook.get_children():
-            text = self.notebook.get_tab_label_text(child)
-            if text == name:
-                return child
-
+    def getVisiblePages(self):
+        return filter(lambda child: child.get_property("visible"), self.notebook.get_children())
     def getTabNames(self):
-        visibleChildren = filter(lambda child: child.get_property("visible"), self.notebook.get_children())
-        return map(self.notebook.get_tab_label_text, visibleChildren)
-
-    def hidePage(self, name):
-        oldPage = self.findPage(name)
-        if oldPage:
-            self.diag.info("Hiding page " + name)
-            oldPage.hide()
+        return map(self.notebook.get_tab_label_text, self.getVisiblePages())
 
     def describe(self):
         guilog.info("Tabs showing : " + ", ".join(self.getTabNames()))
 
-    def findFirstRemaining(self, pageNamesRemoved):
-        for tabName in self.getTabNames():
-            if tabName not in pageNamesRemoved:
-                return tabName
+    def findFirstRemaining(self, pagesRemoved):
+        for page in self.getVisiblePages():
+            pageNum = self.notebook.page_num(page)
+            if not pagesRemoved.has_key(pageNum):
+                return pageNum
     
     def showNewPages(self, *args):
         changed = False
-        for name, tabGUI in self.tabInfo.items():
-            page = self.findPage(name)
+        for pageNum, (name, tabGUI) in enumerate(self.tabInfo):
+            page = self.notebook.get_nth_page(pageNum)
             if tabGUI.shouldShowCurrent(*args) and not page.get_property("visible"):
                 self.diag.info("Showing page " + name)
                 page.show()
                 changed = True
         return changed
-    def setCurrentPage(self, newName):
-        self.diag.info("Resetting for current page " + self.currentPageName + " to page " + repr(newName))
-        try:
-            index = self.getTabNames().index(newName)
-            self.notebook.set_current_page(index)
-            self.currentPageName = newName
-            self.diag.info("Resetting done.")
-            return True
-        except ValueError:
-            return False
-
+    def setCurrentPage(self, newNum):
+        newName, newTabGUI = self.tabInfo[newNum]
+        self.diag.info("Resetting for current page " + repr(self.notebook.get_current_page()) + \
+                       " to page " + repr(newNum) + " = " + repr(newName))
+        self.notebook.set_current_page(newNum)
+        # Must do this afterwards, otherwise the above change doesn't propagate
+        self.currentTabGUI = newTabGUI
+        self.diag.info("Resetting done.")
+        
     def findPagesToHide(self, *args):
-        return filter(lambda name: not self.tabInfo[name].shouldShowCurrent(*args), self.getTabNames())
+        pages = seqdict()
+        for pageNum, (name, tabGUI) in enumerate(self.tabInfo):
+            page = self.notebook.get_nth_page(pageNum)
+            if not tabGUI.shouldShowCurrent(*args) and page.get_property("visible"):
+                pages[pageNum] = page
+        return pages
         
     def hideOldPages(self, *args):
         # Must reset the current page before removing it if we're viewing a removed page
@@ -1923,21 +1912,20 @@ class NotebookGUI(SubGUI):
         if len(pagesToHide) == 0:
             return False
 
-        if self.currentPageName in pagesToHide:
-            newCurrentPageName = self.findFirstRemaining(pagesToHide)
-            if newCurrentPageName:
-                self.setCurrentPage(newCurrentPageName)
+        if pagesToHide.has_key(self.notebook.get_current_page()):
+            newCurrentPageNum = self.findFirstRemaining(pagesToHide)
+            if newCurrentPageNum is not None:
+                self.setCurrentPage(newCurrentPageNum)
             
         # remove from the back, so we don't momentarily view them all if removing everything
-        pagesToHide.reverse()
-        for name in pagesToHide:
-            self.hidePage(name)
+        for page in reversed(pagesToHide.values()):
+            self.diag.info("Hiding page " + self.notebook.get_tab_label_text(page))
+            page.hide()
         return True
     def updateCurrentPage(self, tests):
-        allNames = self.getTabNames()
-        for name in allNames:
-            if self.tabInfo[name].forceVisible(tests):
-                self.setCurrentPage(name)
+        for pageNum, (tabName, tabGUI) in enumerate(self.tabInfo):            
+            if tabGUI.shouldShowCurrent() and tabGUI.forceVisible(tests):
+                self.setCurrentPage(pageNum)
 
     def notifyNewTestSelection(self, tests, direct):
         if not self.notebook:

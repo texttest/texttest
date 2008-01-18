@@ -371,8 +371,6 @@ class RunWithParallelAction(plugins.Action):
     def handleNoTimeAvailable(self, test):
         # Do nothing by default
         pass
-    def getInterruptActions(self, fetchResults):
-        return self.baseRunner.getInterruptActions(fetchResults)
                 
 class RunLprof(RunWithParallelAction):
     def __repr__(self):

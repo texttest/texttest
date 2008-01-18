@@ -1057,6 +1057,7 @@ class PlotTestInGUI(guiplugins.SelectionAction):
             self.testGraph = TestGraph(self.optionGroup)
 
 plotSubplanDone = None
+guiplugins.interactiveActionHandler.actionExternalClasses.append(PlotTestInGUI)
 
 class PlotSubplans(plugins.Action):
     def __init__(self, args = []):
@@ -1927,49 +1928,4 @@ class StartStudio(guiplugins.InteractiveTestAction):
         guiplugins.scriptEngine.monitorProcess("runs studio", process)
         
 guiplugins.interactiveActionHandler.actionStaticClasses += [ StartStudio ]
-
-class CVSLogInGUI(guiplugins.InteractiveTestAction):
-    def __init__(self, dynamic):
-        guiplugins.InteractiveTestAction.__init__(self)
-    def inMenuOrToolBar(self):
-        return False
-    def performOnCurrent(self):
-        logFileStem = self.currentTest.app.getConfigValue("log_file")
-        files = [ logFileStem ]
-        files += self.currentTest.app.getConfigValue("cvs_log_for_files").split(",")
-        cvsInfo = ""
-        path = self.currentTest.getDirectory()
-        for file in files:
-            fileName = self.currentTest.getFileName(file)
-            if fileName:
-                cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
-        self.notify("Information", "CVS Logs" + os.linesep + os.linesep + cvsInfo)
-    def _getTitle(self):
-        return "CVS _Log"
-    def getCVSInfo(self, path, file):
-        info = os.path.basename(file) + ":" + os.linesep
-        cvsCommand = "cd " + path + ";cvs log -N -rHEAD " + file
-        stdin, stdouterr = os.popen4(cvsCommand)
-        cvsLines = stdouterr.readlines()
-        if len(cvsLines) > 0:            
-            addLine = None
-            for line in cvsLines:
-                isMinusLine = None
-                if line.startswith("-----------------"):
-                    addLine = 1
-                    isMinusLine = 1
-                if line.startswith("================="):
-                    addLine = None
-                if line.find("nothing known about") != -1:
-                    info += "Not CVS controlled"
-                    break
-                if line.find("No CVSROOT specified") != -1:
-                    info += "No CVSROOT specified"
-                    break
-                if addLine and not isMinusLine:
-                    info += line
-            info += os.linesep
-        return info
-
-guiplugins.interactiveActionHandler.actionExternalClasses += [ CVSLogInGUI ]
 guiplugins.interactiveActionHandler.addMenu("optimization")

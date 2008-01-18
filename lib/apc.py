@@ -94,14 +94,12 @@ apc.ExtractFromStatusFile <versions> [<filter>]
                              as for all the tests that exists in all the versions.
 """
 
-import default, ravebased, queuesystem, performance, sandbox, os, copy, sys, stat, string, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview, subprocess
+import apc_basic, default, ravebased, queuesystem, performance, sandbox, os, copy, sys, stat, shutil, KPI, optimization, plugins, math, filecmp, re, popen2, unixonly, guiplugins, exceptions, time, testmodel, testoverview, subprocess
 from jobprocess import JobProcess
-from socket import gethostname
 from time import sleep
 from ndict import seqdict
 from tempfile import mktemp
-from carmenqueuesystem import getArchitecture, getMajorReleaseVersion, RunWithParallelAction
-from comparetest import ProgressTestComparison
+from carmenqueuesystem import getArchitecture, getMajorReleaseVersion
 
 def readKPIGroupFileCommon(suite):
     kpiGroupForTest = {}
@@ -142,9 +140,9 @@ def readKPIGroupFileCommon(suite):
 def getConfig(optionMap):
     return ApcConfig(optionMap)
 
-class ApcConfig(optimization.OptimizationConfig):
+class ApcConfig(apc_basic.Config):
     def addToOptionGroups(self, app, groups):
-        optimization.OptimizationConfig.addToOptionGroups(self, app, groups)
+        apc_basic.Config.addToOptionGroups(self, app, groups)
         for group in groups:
             if group.name.startswith("Basic"):
                 group.addOption("rundebug", "Run debugger")
@@ -165,11 +163,9 @@ class ApcConfig(optimization.OptimizationConfig):
         if self.optionMap.has_key("kpiData"):
             listKPIs = [KPI.cSimplePairingOptTimeKPI]
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
-        return optimization.OptimizationConfig.getActionSequence(self)
+        return apc_basic.Config.getActionSequence(self)
     def getSlaveSwitches(self):
-        return optimization.OptimizationConfig.getSlaveSwitches(self) + [ "rundebug", "extractlogs", "goprof" ]
-    def useQueueSystem(self):
-        return optimization.OptimizationConfig.useQueueSystem(self)
+        return apc_basic.Config.getSlaveSwitches(self) + [ "rundebug", "extractlogs", "goprof" ]
     def getProgressReportBuilder(self):
         if self.optionMap.has_key("prrepgraphical"):
             return MakeProgressReportGraphical(self.optionValue("prrep"))
@@ -187,43 +183,18 @@ class ApcConfig(optimization.OptimizationConfig):
         if self.optionMap.has_key("rundebug"):
             return RunApcTestInDebugger(self.optionValue("rundebug"), self.optionMap.has_key("keeptmp"))
         else:
-            baseRunner = optimization.OptimizationConfig.getTestRunner(self)
-            if self.slaveRun():
-                return [ MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, baseRunner, self.optionMap.has_key("extractlogs")), baseRunner ]
-            else:
-                return baseRunner
-    def isExecutable(self, process, test):
-        # Process name starts with a dot and may be truncated or have
-        # extra junk at the end added by APCbatch.sh
-        processData = process[1:]
-        rulesetName = self.getRuleSetNames(test)[0]
-        return processData.startswith(rulesetName) or rulesetName.startswith(processData)
+            return apc_basic.Config.getTestRunner(self)
     def getFileExtractor(self):
-        baseExtractor = optimization.OptimizationConfig.getFileExtractor(self)
-        subActions = [ baseExtractor, CreateHTMLFiles(), FetchApcCore() ]
+        baseExtractor = apc_basic.Config.getFileExtractor(self)
+        subActions = [ FetchApcCore(), baseExtractor, CreateHTMLFiles() ]
         if self.optionMap.has_key("goprof"):
             subActions.append(GoogleProfileExtract(self.optionMap["goprof"]))
-        if self.slaveRun():
-            useExtractLogs = self.optionValue("extractlogs")
-            if useExtractLogs == "":
-                useExtractLogs = "all"
-            subActions.append(ExtractApcLogs(useExtractLogs, self.optionMap.has_key("keeptmp")))
         return subActions
-    def getProgressComparisonClass(self):
-        return ApcProgressTestComparison
-    def getStatusFilePath(self, test):
-        rawStatusFile = test.getWordsInFile("options")[1]
-        statusFile = os.path.expandvars(rawStatusFile, test.getEnvironment)
-        return os.path.normpath(statusFile)
-    def _getSubPlanDirName(self, test):
-        statusFile = self.getStatusFilePath(test)
-        dirs = statusFile.split(os.sep)[:-2]
-        return os.path.normpath(string.join(dirs, os.sep))
-    def _getRuleSetNames(self, test):
-        for option in test.getWordsInFile("options"):
-            if option.find("crc" + os.sep + "rule_set") != -1:
-                return [ os.path.basename(option) ]
-        return []
+    def getApcTmpDirHandler(self):
+        useExtractLogs = self.optionValue("extractlogs")
+        if useExtractLogs == "":
+            useExtractLogs = "all"
+        return ExtractApcLogs(useExtractLogs, self.optionMap.has_key("keeptmp"))
     def ensureDebugLibrariesExist(self, test):
         libraries = [ ("data/crc", "librave_rts.a", "librave_rts_g.a"),
                       ("data/crc", "librave_private.a", "librave_private_g.a"),
@@ -237,22 +208,17 @@ class ApcConfig(optimization.OptimizationConfig):
                 os.symlink(origLib, debugLib)
     def printHelpDescription(self):
         print helpDescription
-        optimization.OptimizationConfig.printHelpDescription(self)
+        apc_basic.Config.printHelpDescription(self)
     def printHelpOptions(self):
-        optimization.OptimizationConfig.printHelpOptions(self)
+        apc_basic.Config.printHelpOptions(self)
         print helpOptions
     def printHelpScripts(self):
-        optimization.OptimizationConfig.printHelpScripts(self)
+        apc_basic.Config.printHelpScripts(self)
         print helpScripts
     def setApplicationDefaults(self, app):
-        optimization.OptimizationConfig.setApplicationDefaults(self, app)
-        self.itemNamesInFile[optimization.memoryEntryName] = "Time:.*memory"
-        self.itemNamesInFile[optimization.timeEntryName] = "cpu time|cpu-tid|cpu-zeit"
-        self.itemNamesInFile[optimization.execTimeEntryName] = "^Time: "
-        self.itemNamesInFile[optimization.costEntryName] = "TOTAL cost"
+        apc_basic.Config.setApplicationDefaults(self, app)
         if app.name == "cas_apc":
             self.itemNamesInFile[optimization.costEntryName] = "rule cost"
-        self.itemNamesInFile[optimization.newSolutionMarker] = "apc_status Solution"
         app.setConfigDefault("link_libs", "")
         app.setConfigDefault("extract_logs", {})
         app.setConfigDefault("apcinfo", {})
@@ -260,8 +226,6 @@ class ApcConfig(optimization.OptimizationConfig):
         app.setConfigDefault("xml_script_file", "bin/APCcreatexml.sh", "")
         app.setConfigDefault("optinfo_xml_file", "data/apc/feedback/optinfo_html_xsl.xml", "")
         app.addConfigEntry("select_kpi_group", "<control>k", "gui_accelerators")
-    def getDefaultCollations(self):
-        return { "stacktrace" : "apc_tmp_dir/core*" }
     def getPerformanceExtractor(self):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
 
@@ -318,25 +282,7 @@ def verifyLogFileDir(test):
             try:
                 os.makedirs(logFileDir)
             except OSError:
-                return
-
-class ApcProgressTestComparison(ProgressTestComparison):
-    def computeFor(self, test):
-        self.makeComparisons(test)
-        self.categorise()
-        self.freeText += "\n" + self.runStatusInfo(test)
-        test.changeState(self)
-        
-    def runStatusInfo(self, test):
-        runStatusHeadFile = test.makeTmpFileName("APC_FILES/run_status_head")
-        if os.path.isfile(runStatusHeadFile):
-            try:
-                return open(runStatusHeadFile).read()
-            except (OSError,IOError):
-                return "Error opening/reading " + runStatusHeadFile                 
-        else:
-            return "Run status file is not available yet."
-        
+                return        
 
 class ViewApcLog(guiplugins.InteractiveTestAction):
     def __repr__(self):
@@ -663,76 +609,18 @@ class GoogleProfileExtract(plugins.Action):
         if not (self.arg and self.arg.startswith("keepbindata")):
             os.remove(datafile)
             
-        
-class MarkApcLogDir(RunWithParallelAction):
-    def __init__(self, isExecutable, hasAutomaticCpuTimeChecking, baseRunner, keepLogs):
-        RunWithParallelAction.__init__(self, isExecutable, hasAutomaticCpuTimeChecking, baseRunner)
-        self.keepLogs = keepLogs
-    def getApcHostTmp(self, test):
-        resLine = ravebased.getEnvVarFromCONFIG("APC_TEMP_DIR", test)
-        if resLine.find("/") != -1:
-            return resLine
-        return "/tmp"
-    def getApcLogDir(self, test, pid = None):
-        # Logfile dir
-        subplanPath = os.path.realpath(test.makeTmpFileName("APC_FILES", forComparison=0))
-        subplanName, apcFiles = os.path.split(subplanPath)
-        baseSubPlan = os.path.basename(subplanName)
-        apcHostTmp = self.getApcHostTmp(test)
-        if pid:
-            logdir = os.path.join(apcHostTmp, baseSubPlan + "_" + gethostname() + "_" + pid)
-            if os.path.isdir(logdir):
-                return logdir
-            # maintain backward compatibility with the old APCbatch.sh (v1.38)
-            # collision prone naming scheme
-            return os.path.join(apcHostTmp, baseSubPlan + "_" + pid)
-        # Hmmm the code below might return something that doesn't "belong" to us
-        for file in os.listdir(apcHostTmp):
-            if file.startswith(baseSubPlan + "_"):
-                return os.path.join(apcHostTmp, file)
-    def handleNoTimeAvailable(self, test):
-        # We try to pick out the log directory, at least
-        apcLogDir = self.getApcLogDir(test)
-        if apcLogDir:
-            self.makeLinks(test, apcLogDir)
-    def makeLinks(self, test, apcTmpDir):
-        linkTarget = test.makeTmpFileName("apc_tmp_dir", forComparison=0)
-        try:
-            os.symlink(apcTmpDir, linkTarget)
-        except OSError:
-            print "Failed to create apc_tmp_dir link"
-            
-        viewLogScript = test.makeTmpFileName("view_apc_log", forFramework=1)
-        file = open(viewLogScript, "w")
-        logFileName = os.path.join(apcTmpDir, "apclog")
-        cmdArgs = [ "xon", gethostname(), "xterm -bg white -T " + test.name + " -e less +F " + logFileName ]
-        file.write(repr(cmdArgs))
-        file.close()
-    def performParallelAction(self, test, execProcess, parentProcess):
-        apcTmpDir = self.getApcLogDir(test, str(parentProcess.pid))
-        self.diag.info("APC log directory is " + apcTmpDir + " based on process " + parentProcess.getName())
-        if not os.path.isdir(apcTmpDir):
-            raise plugins.TextTestError, "ERROR : " + apcTmpDir + " does not exist - running process " + execProcess.getName()
-        self.makeLinks(test, apcTmpDir)
-        if self.keepLogs:
-            fileName = os.path.join(apcTmpDir, "apc_debug")
-            file = open(fileName, "w")
-            file.close()
 
-class ExtractApcLogs(plugins.Action):
+class ExtractApcLogs(apc_basic.HandleApcTmpDir):
     def __init__(self, args, keepTmp):
+        apc_basic.HandleApcTmpDir.__init__(self, keepTmp)
         self.diag = plugins.getDiagnostics("ExtractApcLogs")
         self.args = args
-        self.keepTmp = keepTmp
         if not self.args:
             print "No argument given, using default value for extract_logs"
             self.args = "default"
-    def __call__(self, test):
+    def extractFiles(self, test, apcTmpDir):
         if test.getEnvironment("DONTEXTRACTAPCLOG"):
             self.diag.info("Environment DONTEXTRACTAPCLOG is set, not extracting.")
-            return
-        apcTmpDir = test.makeTmpFileName("apc_tmp_dir", forComparison=0)
-        if not os.path.isdir(apcTmpDir):
             return
         self.diag.info("Extracting from APC tmp directory " + apcTmpDir)
 
@@ -775,16 +663,9 @@ class ExtractApcLogs(plugins.Action):
             if os.path.isfile(errFile):
                 os.remove(errFile)
 
-        realPath = os.path.realpath(apcTmpDir)
-        os.remove(apcTmpDir)
-        if self.keepTmp:
-            shutil.copytree(realPath, apcTmpDir) 
-        # Remove dir
-        plugins.rmtree(realPath)
     def __repr__(self):
         return "Extracting APC logfile for"
-    def getInterruptActions(self, fetchResults):
-        return []
+    
 
 class SaveTests(guiplugins.SaveTests):
     def diagnosticMode(self, apps):
@@ -1257,9 +1138,9 @@ class ImportTestSuite(ravebased.ImportTestSuite):
         return ravebased.ImportTestSuite.getCarmtmpDirName(self, carmUsr) + ".apc"
     
 # Graphical import
-class ImportTestCase(optimization.ImportTestCase):
+class ImportTestCase(apc_basic.ImportTestCase):
     def __init__(self):
-        optimization.ImportTestCase.__init__(self)
+        apc_basic.ImportTestCase.__init__(self)
         self.addOption("perm", "Import KPI group permutations", "aan,aat,adn,adt,dan,dat,ddn,ddt",
                        possibleValues = ["aan,aat,adn,adt"])
         self.addSwitch("kpi", "Import KPI group", 0)
@@ -1291,79 +1172,8 @@ class ImportTestCase(optimization.ImportTestCase):
             description = ""
             placement += 1
     def getSubplanName(self):
-        return optimization.ImportTestCase.getSubplanName(self) + self.perm
-    def getSubplanPath(self, carmdata):
-        return os.path.join(carmdata, "LOCAL_PLAN", self.getSubplanName())
-    def findRuleset(self, carmdata):
-        subplanPath = self.getSubplanPath(carmdata)
-        return self.getRuleSetName(subplanPath)
-    # copied from TestCaseInformation...
-    def getRuleSetName(self, absSubPlanDir):
-        problemPath = os.path.join(absSubPlanDir, "APC_FILES", "problems")
-        if not self.isCompressed(problemPath):
-            problemLines = open(problemPath).xreadlines()
-        else:
-            tmpName = os.tmpnam()
-            shutil.copyfile(problemPath, tmpName + ".Z")
-            os.system("uncompress " + tmpName + ".Z")
-            problemLines = open(tmpName).xreadlines()
-            os.remove(tmpName)
-        for line in problemLines:
-            if line[0:4] == "153;":
-                return line.split(";")[3]
-        return ""
-    def isCompressed(self, path):
-        if os.path.getsize(path) == 0:
-            return False
-        magic = open(path).read(2)
-        if magic[0] == chr(0x1f) and magic[1] == chr(0x9d):
-            return True
-        else:
-            return False
-    def writeResultsFiles(self, suite, testDir):
-        carmdataVar, carmdata = ravebased.getCarmdata(suite)
-        subPlanDir = self.getSubplanPath(carmdata)
-
-        collationFiles = suite.app.getConfigValue("collate_file")
-        for ttStem, relPath in collationFiles.items():
-            origFile = os.path.join(subPlanDir, relPath)
-            if os.path.isfile(origFile):
-                newFile = os.path.join(testDir, ttStem + "." + suite.app.name)
-                if not os.path.isfile(newFile):
-                    shutil.copyfile(origFile, newFile)
-        perf = self.getPerformance(os.path.join(testDir, "status." + suite.app.name))
-        perfFile = self.getWriteFile("performance", suite, testDir)
-        perfFile.write("CPU time   :     " + str(int(perf)) + ".0 sec. on tiptonville" + os.linesep)
-        perfFile.close()
-    def getEnvironment(self, suite):
-        env = seqdict()
-        carmdataVar, carmdata = ravebased.getCarmdata(suite)
-        spDir = self.getSubplanPath(carmdata)
-        env["SP_ETAB_DIR"] = os.path.join(spDir, "etable")
-        lpDir, local = os.path.split(spDir)
-        env["LP_ETAB_DIR"] = os.path.join(lpDir, "etable")
-        return env        
-    def getPerformance(self, statusPath):
-        if os.path.isfile(statusPath):
-            lastLines = os.popen("tail -10 " + statusPath).xreadlines()
-            for line in lastLines:
-                if line[0:5] == "Time:":
-                    return line.split(":")[1].split("s")[0]
-        # Give some default that will not end it up in the short queue
-        return "2500"
-    def getOptions(self, suite):
-        carmdataVar, carmdata = ravebased.getCarmdata(suite)
-        subplan = self.getSubplanName()
-        ruleset = self.findRuleset(carmdata)
-        application = ravebased.getRaveNames(suite)[0]
-        return self.buildOptions(carmdataVar, subplan, ruleset, application)
-    def buildOptions(self, carmdataVar, subplan, ruleSet, application):
-        path = os.path.join("$" + carmdataVar, "LOCAL_PLAN", subplan, "APC_FILES")
-        statusFile = os.path.join(path, "run_status")
-        ruleSetPath = os.path.join("${CARMTMP}", "crc", "rule_set", application.upper(), "PUTS_ARCH_HERE")
-        ruleSetFile = os.path.join(ruleSetPath, ruleSet)
-        return path + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
-
+        return apc_basic.ImportTestCase.getSubplanName(self) + self.perm
+    
 class PortApcTest(plugins.Action):
     def __repr__(self):
         return "Porting old"
@@ -1484,7 +1294,7 @@ class UpdatePerformance(plugins.Action):
                 continue
             self.describe(test, verText + " perf:" + str(totPerf) + ", status: " + str(lastTime) + ", on " + runHost)
             updatePerformanceFile = performanceFile
-            if version != "" and string.split(updatePerformanceFile, '.')[-1] != version:
+            if version != "" and updatePerformanceFile.split('.')[-1] != version:
                 updatePerformanceFile += '.' + version
             open(updatePerformanceFile, "w").write("CPU time   :      " + str(lastTime) + ".0 sec. on " + runHost + os.linesep)
     def interpretOptions(self, args):
@@ -1785,7 +1595,7 @@ class SelectKPIGroup(guiplugins.InteractiveTestAction):
         return tests
 
 # Specialization of plotting in the GUI for APC
-class PlotTestInGUIAPC(optimization.PlotTestInGUI):
+class PlotTestInGUI(optimization.PlotTestInGUI):
     def __init__(self, dynamic):
         optimization.PlotTestInGUI.__init__(self, dynamic)
         self.addSwitch("kpi", "Plot kpi group")
@@ -1942,7 +1752,51 @@ class Quit(guiplugins.Quit):
                     return "Tests have been runnning for %d minutes,\n are you sure you want to quit?" % elapsedTime
         return ""
 
-guiplugins.interactiveActionHandler.actionPostClasses += [ PlotTestInGUIAPC, SelectKPIGroup, PlotProfileInGUIAPC ]
+class CVSLogInGUI(guiplugins.InteractiveTestAction):
+    def __init__(self, dynamic):
+        guiplugins.InteractiveTestAction.__init__(self)
+    def inMenuOrToolBar(self):
+        return False
+    def performOnCurrent(self):
+        logFileStem = self.currentTest.app.getConfigValue("log_file")
+        files = [ logFileStem ]
+        files += self.currentTest.app.getConfigValue("cvs_log_for_files").split(",")
+        cvsInfo = ""
+        path = self.currentTest.getDirectory()
+        for file in files:
+            fileName = self.currentTest.getFileName(file)
+            if fileName:
+                cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
+        self.notify("Information", "CVS Logs" + os.linesep + os.linesep + cvsInfo)
+    def _getTitle(self):
+        return "CVS _Log"
+    def getCVSInfo(self, path, file):
+        info = os.path.basename(file) + ":" + os.linesep
+        cvsCommand = "cd " + path + ";cvs log -N -rHEAD " + file
+        stdin, stdouterr = os.popen4(cvsCommand)
+        cvsLines = stdouterr.readlines()
+        if len(cvsLines) > 0:            
+            addLine = None
+            for line in cvsLines:
+                isMinusLine = None
+                if line.startswith("-----------------"):
+                    addLine = 1
+                    isMinusLine = 1
+                if line.startswith("================="):
+                    addLine = None
+                if line.find("nothing known about") != -1:
+                    info += "Not CVS controlled"
+                    break
+                if line.find("No CVSROOT specified") != -1:
+                    info += "No CVSROOT specified"
+                    break
+                if addLine and not isMinusLine:
+                    info += line
+            info += os.linesep
+        return info
+
+guiplugins.interactiveActionHandler.actionExternalClasses += [ CVSLogInGUI ]
+guiplugins.interactiveActionHandler.actionPostClasses += [ SelectKPIGroup, PlotProfileInGUIAPC ]
 guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ]
 
 # A script that mimics _PlotTest in optimization.py, but that is specialized for

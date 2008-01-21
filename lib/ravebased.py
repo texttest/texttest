@@ -361,8 +361,8 @@ def getCrcCompileVars():
     return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMROLE", "CARMGROUP", "BITMODE", "_AUTOTEST__LOCAL_COMPILE_", "PATH", "USER" ] 
     
 class RuleBuildSubmitServer(QueueSystemServer):
-    def __init__(self, optionMap):
-        QueueSystemServer.__init__(self, optionMap)
+    def __init__(self, *args):
+        QueueSystemServer.__init__(self, *args)
         self.ruleBuildQueue = Queue()
         self.testsForRuleBuild = 0
         self.actualAddress = None

@@ -6,7 +6,7 @@ from usecase import ScriptEngine
 
 # Interface all responders must fulfil
 class Responder:
-    def __init__(self, optionMap=None):
+    def __init__(self, *args):
         if ScriptEngine.instance:
             self.scriptEngine = ScriptEngine.instance
         else:
@@ -50,8 +50,8 @@ class SaveState(Responder):
         test.saveState()
             
 class InteractiveResponder(Responder):
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
+    def __init__(self, optionMap, *args):
+        Responder.__init__(self)
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
         self.overwriteVersion = optionMap.get("o")

@@ -592,8 +592,8 @@ class CollectFeatures(plugins.Action):
             file.write(feature + "\n")
     
 class CreatePerformanceReport(guiplugins.SelectionAction):
-    def __init__(self):
-        guiplugins.SelectionAction.__init__(self)
+    def __init__(self, *args):
+        guiplugins.SelectionAction.__init__(self, *args)
         self.rootDir = ""
         self.versions = ["11", "12", "13", "master" ]
     def inToolBar(self): 

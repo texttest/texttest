@@ -10,7 +10,7 @@ from glob import glob
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder(Responder):
-    def __init__(self, optionMap):
+    def __init__(self, optionMap, allApps):
         Responder.__init__(self, optionMap)
         self.name2test = {}
         self.diag = plugins.getDiagnostics("Unique Names")
@@ -59,8 +59,8 @@ class UniqueNameFinder(Responder):
         test.setUniqueName(name)
 
 class Activator(Responder, plugins.Observable):
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
+    def __init__(self, optionMap, allApps):
+        Responder.__init__(self, optionMap, allApps)
         plugins.Observable.__init__(self)
         self.allowEmpty = optionMap.has_key("gx") or optionMap.runScript()
         self.suites = []
@@ -201,7 +201,7 @@ class TextTest(Responder, plugins.Observable):
         responderClasses += self.getBuiltinResponderClasses()
         filteredClasses = self.removeBaseClasses(responderClasses)
         self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
-        self.observers = map(lambda x : x(self.inputOptions), filteredClasses)
+        self.observers = map(lambda x : x(self.inputOptions, allApps), filteredClasses)
     def getBuiltinResponderClasses(self):
         return [ UniqueNameFinder, Activator, testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
     def removeBaseClasses(self, classes):

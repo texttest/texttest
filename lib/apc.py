@@ -1139,8 +1139,8 @@ class ImportTestSuite(ravebased.ImportTestSuite):
     
 # Graphical import
 class ImportTestCase(apc_basic.ImportTestCase):
-    def __init__(self):
-        apc_basic.ImportTestCase.__init__(self)
+    def __init__(self, *args):
+        apc_basic.ImportTestCase.__init__(self, *args)
         self.addOption("perm", "Import KPI group permutations", "aan,aat,adn,adt,dan,dat,ddn,ddt",
                        possibleValues = ["aan,aat,adn,adt"])
         self.addSwitch("kpi", "Import KPI group", 0)
@@ -1562,8 +1562,6 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
 
 # This is the action responsible for selecting a KPI group in the GUI.
 class SelectKPIGroup(guiplugins.InteractiveTestAction):
-    def __init__(self, dynamic):
-        guiplugins.InteractiveTestAction.__init__(self)
     def __repr__(self):
         return "Select KPI group"
     def _getTitle(self):
@@ -1596,8 +1594,8 @@ class SelectKPIGroup(guiplugins.InteractiveTestAction):
 
 # Specialization of plotting in the GUI for APC
 class PlotTestInGUI(optimization.PlotTestInGUI):
-    def __init__(self, dynamic):
-        optimization.PlotTestInGUI.__init__(self, dynamic)
+    def __init__(self, *args):
+        optimization.PlotTestInGUI.__init__(self, *args)
         self.addSwitch("kpi", "Plot kpi group")
         self.addSwitch("kpiscale", "Use kpi group percentage scale")
     def describeTests(self):
@@ -1636,11 +1634,11 @@ class PlotTestInGUI(optimization.PlotTestInGUI):
     
 # Specialization of plotting in the GUI for APC
 class PlotProfileInGUIAPC(guiplugins.SelectionAction):
-    def __init__(self, dynamic):
+    def __init__(self, allApps, dynamic):
         path = "/carm/proj/apc/bin"
         if not sys.path.count(path):
             sys.path.append(path)
-        guiplugins.SelectionAction.__init__(self)
+        guiplugins.SelectionAction.__init__(self, allApps, dynamic)
         self.dynamic = dynamic
         self.sizes = ["a4","a4l","a3","a3l"]
         self.addSwitch("size", "Size of plot:     ", 0, self.sizes);
@@ -1737,7 +1735,7 @@ class PlotProfileInGUIAPC(guiplugins.SelectionAction):
             
     
 class Quit(guiplugins.Quit):
-    def __init__(self, dynamic):
+    def __init__(self, allApps, dynamic):
         self.dynamic = dynamic
         guiplugins.InteractiveAction.__init__(self)
     def getConfirmationMessage(self):
@@ -1753,8 +1751,6 @@ class Quit(guiplugins.Quit):
         return ""
 
 class CVSLogInGUI(guiplugins.InteractiveTestAction):
-    def __init__(self, dynamic):
-        guiplugins.InteractiveTestAction.__init__(self)
     def inMenuOrToolBar(self):
         return False
     def performOnCurrent(self):

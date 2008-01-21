@@ -298,9 +298,10 @@ class IdleHandlerManager:
 class TextTestGUI(Responder, plugins.Observable):
     EXIT_NOTIFIED = 1
     COMPLETION_NOTIFIED = 2
-    def __init__(self, optionMap):
+    def __init__(self, optionMap, allApps):
         self.readGtkRCFiles()
         self.dynamic = not optionMap.has_key("gx")
+        guiplugins.setUpGlobals(self.dynamic, allApps)
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
@@ -310,7 +311,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.progressMonitor = TestProgressMonitor(self.dynamic)
         self.progressBarGUI = ProgressBarGUI(self.dynamic)
         self.idleManager = IdleHandlerManager()
-        self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic)
+        self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic, allApps)
         self.defaultActionGUIs, self.buttonBarGUIs = self.createActionGUIs()
         self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs()
         self.testColumnGUI = TestColumnGUI(self.dynamic)
@@ -351,7 +352,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ guiConfig, self.testColumnGUI, self.progressMonitor, self.testTreeGUI, \
+        return [ self.testColumnGUI, self.progressMonitor, self.testTreeGUI, \
                  self.appFileGUI, self.topWindowGUI ] + self.intvActions
 
     def setUpObservers(self):    
@@ -396,8 +397,8 @@ class TextTestGUI(Responder, plugins.Observable):
         file = os.path.join(configDir, ".gtkrc-2.0")
         if os.path.isfile(file):
             gtk.rc_add_default_file(file)
+    
     def setUpScriptEngine(self):
-        guiplugins.setUpGlobals(self.dynamic)
         global guilog, guiConfig, scriptEngine
         from guiplugins import guilog, guiConfig
         scriptEngine = ScriptEngine(guilog, enableShortcuts=1)

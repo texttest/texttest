@@ -969,16 +969,13 @@ class DescribePlotTest(plugins.Action):
 
 # Responder for plotting from the command line
 class GraphPlotResponder(Responder):
-    def __init__(self, optionMap):
+    def __init__(self, optionMap, allApps):
         Responder.__init__(self, optionMap)
         self.testGraph = TestGraph()
         plotStr = optionMap["plot"]
         if plotStr:
             self.testGraph.readCommandLine(plotStr.split())
-        self.writeDir = None
-    def addSuite(self, suite):
-        if not self.writeDir:
-            self.writeDir = suite.app.writeDirectory
+        self.writeDir = allApps[0].writeDirectory
     def notifyComplete(self, test):
         self.testGraph.createPlotObjectsForTest(test)
     def notifyAllComplete(self):
@@ -989,7 +986,7 @@ class GraphPlotResponder(Responder):
 
 # This is the action responsible for plotting from the GUI.
 class PlotTestInGUI(guiplugins.SelectionAction):
-    def __init__(self, dynamic):
+    def __init__(self, allApps, dynamic):
         guiplugins.SelectionAction.__init__(self)
         self.dynamic = dynamic
         self.testGraph = TestGraph(self.optionGroup)
@@ -1894,8 +1891,8 @@ class SelectorWeekend(testoverview.Selector):
         return "Weekend"
     
 class StartStudio(guiplugins.InteractiveTestAction):
-    def __init__(self):
-        guiplugins.InteractiveTestAction.__init__(self)
+    def __init__(self, *args):
+        guiplugins.InteractiveTestAction.__init__(self, *args)
         self.addOption("sys", "Studio CARMSYS to use")
     def __repr__(self):
         return "Studio"    

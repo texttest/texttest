@@ -20,8 +20,8 @@ class RunTest(default.RunTest):
 # we don't rely on sharing displays but create our own for each test run.
 class VirtualDisplayResponder(Responder):
     instance = None
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
+    def __init__(self, *args):
+        Responder.__init__(self, *args)
         self.displayName = None
         self.displayMachine = None
         self.displayPid = None

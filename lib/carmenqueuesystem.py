@@ -38,10 +38,6 @@ from ndict import seqdict
 from jobprocess import JobProcess
 from threading import Thread
 
-# Use cvs plugin for all Carmen suites
-from guiplugins import interactiveActionHandler
-interactiveActionHandler.loadModules.append("cvs")
-
 # All files should be opened 5 times before we conclude something is wrong
 origOpen = __builtin__.open
 
@@ -266,6 +262,8 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("maximum_cputime_for_short_queue", 10, "Maximum time a test can take and be sent to the short queue")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")
+        # ...and to use the plugin by default
+        app.addConfigEntry("interactive_action_module", "cvs")
         for batchSession in self.getFilteredBatchSessions():
             app.addConfigEntry(batchSession, "true", "batch_use_version_filtering")
         for var, value in self.getCarmenEnvironment(app):

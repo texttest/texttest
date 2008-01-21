@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.17 2008/01/17 17:07:18 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.18 2008/01/21 11:24:27 geoff Exp $
 #
 import ravebased, sandbox, plugins, guiplugins, subprocess
 import os, shutil, string
@@ -202,8 +202,8 @@ class ImportTestCase(guiplugins.ImportTestCase):
             shutil.copyfile(fullMacroPath, usecaseFile)
 
 class RecordTest(guiplugins.RecordTest):
-    def __init__(self):
-        guiplugins.RecordTest.__init__(self)
+    def __init__(self, *args):
+        guiplugins.RecordTest.__init__(self, *args)
         self.optionGroup.addOption("rset", "Compile this ruleset first")
         self.changedUseCaseVersion = ""
     def updateOptions(self):

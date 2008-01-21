@@ -1038,12 +1038,9 @@ class Application:
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
         self.readConfigFiles(configModuleInitialised=True)
-        from guiplugins import interactiveActionHandler # yuck, we should make this work properly!
         personalFile = self.getPersonalConfigFile()
         if personalFile:
             self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
-        for module in self.getConfigValue("interactive_action_module"):
-            interactiveActionHandler.loadModules.append(module)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
         self.writeDirectory = self.getWriteDirectory()
         self.rootTmpDir = os.path.dirname(self.writeDirectory)
@@ -1051,7 +1048,6 @@ class Application:
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
         self.optionGroups = self.createOptionGroups(inputOptions)
-        interactiveActionHandler.setCommandOptionGroups(self.optionGroups)
     def __repr__(self):
         return self.fullName + self.versionSuffix()
     def __hash__(self):
@@ -1248,11 +1244,13 @@ class Application:
         self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for settings besides the test structure")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
+        self.setConfigDefault("interactive_action_module", [],
+                              "Module to search for InteractiveActions for the GUI")
     def setDependentConfigDefaults(self):
         executable = self.getConfigValue("executable")
         # Set values which default to other values
-        self.setConfigDefault("interactive_action_module", [ self.getConfigValue("config_module") ],
-                              "Module to search for InteractiveActions for the GUI")
+        self.configDir["interactive_action_module"] = [ self.getConfigValue("config_module") ] + \
+                                                      self.getConfigValue("interactive_action_module")
         self.setConfigDefault("interpreter", plugins.getInterpreter(executable), "Program to use as interpreter for the SUT")
     def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]
@@ -1630,7 +1628,7 @@ class ApplicationEventResponder(Responder):
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.
 class AllCompleteResponder(Responder,plugins.Observable):
-    def __init__(self, inputOptions):
+    def __init__(self, inputOptions, allApps):
         Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.unfinishedTests = 0

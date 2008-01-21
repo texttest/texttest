@@ -4,6 +4,7 @@ from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
+from copy import copy
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
 # and they don't run into weird issues in being confused with escape characters
@@ -1005,6 +1006,18 @@ class OptionGroup:
             return False
         self.options[key] = TextOption(*args, **kwargs)
         return True
+    def mergeIn(self, group):
+        for key, switch in group.switches.items():
+            if not self.switches.has_key(key):
+                self.switches[key] = copy(switch)
+        for key, option in group.options.items():
+            if not self.options.has_key(key):
+                self.options[key] = copy(option)
+    def updateFrom(self, group):
+        for key, switch in group.switches.items():
+            self.setSwitchValue(key, switch.getValue())
+        for key, option in group.options.items():
+            self.setOptionValue(key, option.getValue())
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()
@@ -1029,6 +1042,7 @@ class OptionGroup:
     def setOptionValue(self, key, value):
         if self.options.has_key(key):
             return self.options[key].setValue(value)
+    
     def getCommandLines(self):
         commandLines = []
         for key, option in self.options.items():

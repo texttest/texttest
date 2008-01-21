@@ -14,7 +14,7 @@ class Cancelled(plugins.TestState):
 
 class BaseActionRunner(Responder, plugins.Observable):
     def __init__(self, optionMap, diagName):
-        Responder.__init__(self, optionMap)
+        Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.optionMap = optionMap
         self.testQueue = Queue()
@@ -95,7 +95,7 @@ class BaseActionRunner(Responder, plugins.Observable):
         return False # We block, so we shouldn't be the main thread...
             
 class ActionRunner(BaseActionRunner):
-    def __init__(self, optionMap):
+    def __init__(self, optionMap, allApps):
         BaseActionRunner.__init__(self, optionMap, "Action Runner")
         self.currentTestRunner = None
         self.previousTestRunner = None

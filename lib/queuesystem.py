@@ -40,8 +40,8 @@ def socketSerialise(test):
     return test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
 
 class SocketResponder(Responder,plugins.Observable):
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
+    def __init__(self, optionMap, *args):
+        Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.serverAddress = self.getServerAddress(optionMap)
     def getServerAddress(self, optionMap):
@@ -332,8 +332,8 @@ class SlaveRequestHandler(StreamRequestHandler):
         return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
 
 class SlaveServerResponder(Responder, TCPServer):
-    def __init__(self, optionMap):
-        Responder.__init__(self, optionMap)
+    def __init__(self, *args):
+        Responder.__init__(self, *args)
         TCPServer.__init__(self, (socket.gethostname(), 0), self.handlerClass())
         self.testMap = {}
         self.testClientInfo = {}
@@ -402,7 +402,7 @@ class MasterInteractiveResponder(InteractiveResponder):
 
 class QueueSystemServer(BaseActionRunner):
     instance = None
-    def __init__(self, optionMap):
+    def __init__(self, optionMap, allApps):
         BaseActionRunner.__init__(self, optionMap, "Queue System Submit")
         # queue for putting tests when we couldn't reuse the originals
         self.reuseFailureQueue = Queue()

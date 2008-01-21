@@ -38,7 +38,7 @@ from gtkusecase import TreeModelIndexer
 # Base class for all CVS actions.
 #
 class CVSAction(guiplugins.InteractiveAction):
-    def __init__(self, cvsArgs, dynamic=False):
+    def __init__(self, cvsArgs, allApps=[], dynamic=False):
         guiplugins.InteractiveAction.__init__(self)
         self.currTestSelection = []
         self.cvsArgs = cvsArgs
@@ -105,7 +105,8 @@ class CVSAction(guiplugins.InteractiveAction):
         dialog = CVSTreeViewDialog(dialog.parent, None, annotater)
         dialog.run()
     def viewDiffs(self, file, revision1, revision2, dialog):
-        differ = CVSDiff(revision1, revision2)
+        differ = CVSDiff()
+        differ.setRevisions(revision1, revision2)
         differ.currTestSelection = [ self.fileToTest[file] ]
         differ.currFileSelection = [ (file, None) ]
         differ.performOnCurrent()
@@ -202,8 +203,8 @@ class CVSAction(guiplugins.InteractiveAction):
 
 
 class CVSLog(CVSAction):
-    def __init__(self, dynamic=False):
-        CVSAction.__init__(self, [ "log", "-N", "-l" ], dynamic)
+    def __init__(self, *args):
+        CVSAction.__init__(self, [ "log", "-N", "-l" ], *args)
     def _getTitle(self):
         return "_Log"
     def _getScriptTitle(self):
@@ -287,8 +288,8 @@ class CVSLog(CVSAction):
             self.pages.append((relativeFilePath, currentOutput, currentLastDate))
 
 class CVSLogRecursive(CVSLog):
-    def __init__(self, dynamic=False):
-        CVSLog.__init__(self, dynamic)
+    def __init__(self, *args):
+        CVSLog.__init__(self, *args)
         self.cvsArgs = [ "log", "-N" ]
         self.recursive = True
     def _getTitle(self):
@@ -297,8 +298,8 @@ class CVSLogRecursive(CVSLog):
         return "recursive " + CVSLog._getScriptTitle(self)
 
 class CVSLogLatest(CVSLog):
-    def __init__(self, dynamic=False):
-        CVSLog.__init__(self, dynamic)
+    def __init__(self, *args):
+        CVSLog.__init__(self, *args)
         self.cvsArgs = [ "log", "-N", "-l", "-rHEAD" ]
     def _getTitle(self):
         return "Log Latest"
@@ -355,11 +356,11 @@ class CVSLogLatest(CVSLog):
         self.pages.append((self.getRelativePath(test.getDirectory(), rootDir), linesToShow))
 
 class CVSDiff(CVSAction):
-    def __init__(self, rev1 = "", rev2 = "", dynamic=False):
-        CVSAction.__init__(self, [ "diff", "-N", "-l" ], dynamic)
+    def __init__(self, *args):
+        CVSAction.__init__(self, [ "diff", "-N", "-l" ], *args)
         self.recursive = False
-        self.revision1 = rev1
-        self.revision2 = rev2
+        self.revision1 = ""
+        self.revision2 = ""
     def setRevisions(self, rev1, rev2):
         self.revision1 = rev1
         self.revision2 = rev2
@@ -456,8 +457,8 @@ class CVSDiff(CVSAction):
             self.pages.append((relPath, currentOutput, currentFile))
 
 class CVSDiffRecursive(CVSDiff):
-    def __init__(self, dynamic=False):
-        CVSDiff.__init__(self, "", "", dynamic)
+    def __init__(self, *args):
+        CVSDiff.__init__(self, *args)
         self.cvsArgs = [ "diff", "-N" ]
         self.recursive = True
     def _getTitle(self):
@@ -471,8 +472,8 @@ class CVSStatus(CVSAction):
     cvsWarningStates = [ "Locally Modified", "Locally Removed", "Locally Added" ]
     cvsErrorStates = [ "File had conflicts on merge", "Needs Checkout", "Unresolved Conflicts", "Needs Patch",
                        "Needs Merge", "Entry Invalid", "Unknown", "PROHIBITED" ]
-    def __init__(self, dynamic=False):
-        CVSAction.__init__(self, [ "status", "-l" ], dynamic)
+    def __init__(self, *args):
+        CVSAction.__init__(self, [ "status", "-l" ], *args)
     def _getTitle(self):
         return "_Status"
     def _getScriptTitle(self):
@@ -566,8 +567,8 @@ class CVSStatus(CVSAction):
             self.pages.append((self.getRelativePath(currentFile, rootDir), currentOutput, info))    
 
 class CVSStatusRecursive(CVSStatus):
-    def __init__(self, dynamic=False):
-        CVSStatus.__init__(self, dynamic)
+    def __init__(self, *args):
+        CVSStatus.__init__(self, *args)
         self.cvsArgs = [ "status" ]
         self.recursive = True
     def _getTitle(self):
@@ -577,8 +578,8 @@ class CVSStatusRecursive(CVSStatus):
 
 
 class CVSAnnotate(CVSAction):
-    def __init__(self, dynamic=False):
-        CVSAction.__init__(self, [ "annotate", "-l" ], dynamic)
+    def __init__(self, *args):
+        CVSAction.__init__(self, [ "annotate", "-l" ], *args)
     def _getTitle(self):
         return "A_nnotate"
     def _getScriptTitle(self):
@@ -643,51 +644,14 @@ class CVSAnnotate(CVSAction):
             self.pages.append((relPath, currentOutput, currentFile))
 
 class CVSAnnotateRecursive(CVSAnnotate):
-    def __init__(self, dynamic=False):
-        CVSAnnotate.__init__(self, dynamic)
+    def __init__(self, *args):
+        CVSAnnotate.__init__(self, *args)
         self.cvsArgs = [ "annotate" ]
         self.recursive = True
     def _getTitle(self):
         return "Annotate Recursive"
     def _getScriptTitle(self):
         return "recursive " + CVSAnnotate._getScriptTitle(self)
-
-class DynamicCVSLog(CVSLog):
-    def __init__(self):
-        CVSLog.__init__(self, True)
-
-class DynamicCVSLogRecursive(CVSLogRecursive):
-    def __init__(self):
-        CVSLogRecursive.__init__(self, True)
-
-class DynamicCVSLogLatest(CVSLogLatest):
-    def __init__(self):
-        CVSLogLatest.__init__(self, True)
-
-class DynamicCVSDiff(CVSDiff):
-    def __init__(self, rev1 = "", rev2 = ""):
-        CVSDiff.__init__(self, rev1, rev2, True)
-
-class DynamicCVSDiffRecursive(CVSDiffRecursive):
-    def __init__(self):
-        CVSDiffRecursive.__init__(self, True)
-
-class DynamicCVSStatus(CVSStatus):
-    def __init__(self):
-        CVSStatus.__init__(self, True)
-
-class DynamicCVSStatusRecursive(CVSStatusRecursive):
-    def __init__(self):
-        CVSStatusRecursive.__init__(self, True)
-
-class DynamicCVSAnnotate(CVSAnnotate):
-    def __init__(self):
-        CVSAnnotate.__init__(self, True)
-
-class DynamicCVSAnnotateRecursive(CVSAnnotateRecursive):
-    def __init__(self):
-        CVSAnnotateRecursive.__init__(self, True)
-
 
 #
 # Register cvs plugin at TextTest GUI 
@@ -698,28 +662,15 @@ texttestgui.pluginHandler.modules.append("cvs")
 # Add actions to static action list.
 #
 guiplugins.interactiveActionHandler.addMenu("CVS")
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSLog)
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSLogRecursive)
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSLogLatest)
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSDiff)
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSDiffRecursive)
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSStatus)
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSStatusRecursive)
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSAnnotate)
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CVSAnnotateRecursive)
-
-#
-# Add appropriate actions also to dynamic action list.
-#
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSLog)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSLogRecursive)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSLogLatest)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSDiff)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSDiffRecursive)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSStatus)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSStatusRecursive)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSAnnotate)
-guiplugins.interactiveActionHandler.actionDynamicClasses.append(DynamicCVSAnnotateRecursive)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSLog)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSLogRecursive)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSLogLatest)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSDiff)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSDiffRecursive)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSStatus)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSStatusRecursive)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSAnnotate)
+guiplugins.interactiveActionHandler.actionPreClasses.append(CVSAnnotateRecursive)
 
 #
 #

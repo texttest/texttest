@@ -150,7 +150,7 @@ class BatchApplicationData:
 
 # Works only on UNIX
 class BatchResponder(respond.Responder):
-    def __init__(self, optionMap):
+    def __init__(self, optionMap, *args):
         respond.Responder.__init__(self, optionMap)
         self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
@@ -171,7 +171,7 @@ class BatchResponder(respond.Responder):
         app = test.app
         self.batchAppData[app] = BatchApplicationData(rootSuite)
         self.allApps.setdefault(app.name, []).append(app)
-
+        
     def notifyAllComplete(self):
         mailSender = MailSender(self.sessionName, self.runId)
         for appList in self.allApps.values():
@@ -361,7 +361,7 @@ def calculateBatchDate():
 
 # Allow saving results to a historical repository
 class SaveState(respond.SaveState):
-    def __init__(self, optionMap):
+    def __init__(self, optionMap, *args):
         respond.SaveState.__init__(self, optionMap)
         self.batchSession = optionMap["b"]
         self.fileName = self.createFileName(optionMap.get("name"))

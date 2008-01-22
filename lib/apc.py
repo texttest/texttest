@@ -1737,7 +1737,7 @@ class PlotProfileInGUIAPC(guiplugins.SelectionAction):
 class Quit(guiplugins.Quit):
     def __init__(self, allApps, dynamic):
         self.dynamic = dynamic
-        guiplugins.InteractiveAction.__init__(self)
+        guiplugins.InteractiveAction.__init__(self, allApps)
     def getConfirmationMessage(self):
         if self.dynamic:
             firstApp = guiplugins.guiConfig.apps[0]
@@ -1791,9 +1791,12 @@ class CVSLogInGUI(guiplugins.InteractiveTestAction):
             info += os.linesep
         return info
 
-guiplugins.interactiveActionHandler.actionExternalClasses += [ CVSLogInGUI ]
-guiplugins.interactiveActionHandler.actionPostClasses += [ SelectKPIGroup, PlotProfileInGUIAPC ]
-guiplugins.interactiveActionHandler.actionDynamicClasses += [ ViewApcLog, SaveBestSolution ]
+def getInteractiveActionClasses(dynamic):
+    generic = [ PlotTestInGUI, CVSLogInGUI, SelectKPIGroup, PlotProfileInGUIAPC ]
+    if dynamic:
+        return [ ViewApcLog, SaveBestSolution ] + generic
+    else:
+        return generic
 
 # A script that mimics _PlotTest in optimization.py, but that is specialized for
 # APC to plot all (selected) KPI groups.

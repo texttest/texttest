@@ -41,7 +41,6 @@ matador.MigrateApcTest      - Take a test present in APC and migrate it to Matad
 
 import ravebased, os, shutil, filecmp, optimization, string, plugins, comparetest, unixonly, sys, guiplugins
 from time import time, ctime
-from optimization import GenerateWebPages
 
 def getConfig(optionMap):
     return MatadorConfig(optionMap)
@@ -291,7 +290,7 @@ class CopyEnvironment(plugins.Action):
 
                 if len(version) == 0:
                     oldcarmtmp = self.getCarmtmp(oldFile)
-                    root, local = os.path.split(os.path.normpath(oldcarmtmp))
+                    root, locals = os.path.split(os.path.normpath(oldcarmtmp))
                     newcarmtmp = self.getNewCarmtmp(oldcarmtmp, local)
                     self.replaceInFile(oldFile, oldcarmtmp, newcarmtmp)
                 else:
@@ -989,4 +988,9 @@ class PerformanceReportScript(plugins.ScriptWithArgs):
     def __del__(self):
         self.creator.createMainIndexFile()
 
-guiplugins.interactiveActionHandler.actionStaticClasses.append(CreatePerformanceReport)
+def getInteractiveActionClasses(dynamic):
+    basic = [ optimization.PlotTestInGUI ]
+    if not dynamic:
+        basic.append(CreatePerformanceReport)
+    return basic
+

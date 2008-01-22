@@ -491,14 +491,20 @@ class GenerateHistoricalReport(plugins.Action):
             plugins.printException()
     def generateWebPages(self, app, pageDir, extraVersions, relevantSubDirs):
         testoverview.colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
-        module = app.getConfigValue("interactive_action_module")
-        command = "from " + module[0] + " import GenerateWebPages"
-        try:
-            exec command
-        except:
-            GenerateWebPages = testoverview.GenerateWebPages
-        generator = GenerateWebPages(app.fullName, app.getFullVersion(), pageDir, extraVersions)
+        webPageGeneratorClass = self.getWebPageGeneratorClass(app)
+        generator = webPageGeneratorClass(app.fullName, app.getFullVersion(), pageDir, extraVersions)
         generator.generate(relevantSubDirs)
+    def getWebPageGeneratorClass(self, app):
+        # Take the most specific module first, see guiplugins.py comment for why...
+        for module in reversed(app.getConfigValue("interactive_action_module")):
+            command = "from " + module + " import GenerateWebPages"
+            try:
+                exec command
+                return GenerateWebPages
+            except:
+                pass
+        return testoverview.GenerateWebPages
+
     def findRelevantSubdirectories(self, repository, app, extraVersions):
         subdirs = []
         dirlist = os.listdir(repository)

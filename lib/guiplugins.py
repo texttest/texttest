@@ -107,16 +107,27 @@ class ProcessTerminationMonitor(plugins.Observable):
 processTerminationMonitor = ProcessTerminationMonitor()
        
 class InteractiveAction(plugins.Observable):
-    def __init__(self, *args):
+    def __init__(self, allApps, *args):
         plugins.Observable.__init__(self)
         self.currFileSelection = []
+        self.currAppSelection = []
         self.diag = plugins.getDiagnostics("Interactive Actions")
         self.optionGroup = plugins.OptionGroup(self.getTabTitle())
+        self.validApps = []
+        for app in allApps:
+            self.validApps.append(app)
+            self.validApps += app.extras
     def __repr__(self):
         if self.optionGroup.name:
             return self.optionGroup.name
         else:
             return self.getTitle()
+    def allAppsValid(self):
+        for app in self.currAppSelection:
+            if app not in self.validApps:
+                self.diag.info("Rejecting due to invalid selected app : " + repr(app))
+                return False
+        return True
     def addSuites(self, suites):
         pass
     def getOptionGroups(self):
@@ -126,12 +137,13 @@ class InteractiveAction(plugins.Observable):
             return [ self.optionGroup ]
     def createOptionGroupTab(self, optionGroup):
         return optionGroup.switches or optionGroup.options
-    def notifyNewTestSelection(self, tests, direct):
+    def notifyNewTestSelection(self, tests, apps, direct):
         self.updateSelection(tests)
-        newActive = self.isActiveOnCurrent()
+        self.currAppSelection = apps
+        newActive = self.allAppsValid() and self.isActiveOnCurrent()
         self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
         self.changeSensitivity(newActive)
-
+        
     def notifyLifecycleChange(self, test, state, desc):
         newActive = self.isActiveOnCurrent(test, state)
         self.diag.info("State change for " + self.getTitle() + "=" + state.category + " : new active = " + repr(newActive))
@@ -265,8 +277,8 @@ class InteractiveAction(plugins.Observable):
             self.endPerform()
     
 class SelectionAction(InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self)
+    def __init__(self, allApps, *args):
+        InteractiveAction.__init__(self, allApps)
         self.currTestSelection = []
     def updateSelection(self, tests):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
@@ -299,7 +311,7 @@ class Quit(InteractiveAction):
     def messageAfterPerform(self):
         # Don't provide one, the GUI isn't there to show it :)
         pass
-    def notifyNewTestSelection(self, tests, direct):
+    def notifyNewTestSelection(self, *args):
         pass # we don't care and don't want to screw things up...
     def performOnCurrent(self):
         self.notify("Quit")
@@ -315,15 +327,12 @@ class Quit(InteractiveAction):
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveTestAction(InteractiveAction):
     def __init__(self, validApps, *args):
-        InteractiveAction.__init__(self, *args)
+        InteractiveAction.__init__(self, validApps, *args)
         self.currentTest = None
-        self.validApps = validApps
     def isActiveOnCurrent(self, *args):
-        return self.currentTest is not None and self.correctTestClass() and self.correctApp()
+        return self.currentTest is not None and self.correctTestClass()
     def correctTestClass(self):
         return self.currentTest.classId() == "test-case"
-    def correctApp(self):
-        return self.currentTest.app in self.validApps
     def describeTests(self):
         return repr(self.currentTest)
     def inButtonBar(self):
@@ -347,13 +356,11 @@ class InteractiveTestAction(InteractiveAction):
         
 # Plugin for saving tests (standard)
 class SaveTests(SelectionAction):
-    def __init__(self, *args):
-        SelectionAction.__init__(self, *args)
+    def __init__(self, allApps, *args):
+        SelectionAction.__init__(self, allApps, *args)
         self.addOption("v", "Version to save")
         self.addSwitch("over", "Replace successfully compared files also", 0)
-        self.currApps = []
-    def addSuites(self, suites):
-        if self.hasPerformance(suites):
+        if self.hasPerformance(allApps):
             self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
     def getStockId(self):
         return "save"
@@ -374,51 +381,45 @@ class SaveTests(SelectionAction):
             message += "  Test '" + test.uniqueName + "' " + test.state.categoryRepr() + "\n"
         message += "Are you sure you want to do this?\n"
         return message
-    def getSelectedApps(self):
-        apps = []
-        for test in self.currTestSelection:
-            if test.app not in apps:
-                apps.append(test.app)
-        return apps
+    
     def getSaveableTests(self):
         return filter(lambda test: test.state.isSaveable(), self.currTestSelection)       
     def updateOptions(self):
-        apps = self.getSelectedApps()
-        if apps == self.currApps:
+        defaultSaveOption = self.getDefaultSaveOption()
+        currOption = self.optionGroup.getOption("v").defaultValue
+        if defaultSaveOption == currOption:
             return False
-        self.currApps = apps
-        defaultSaveOption = self.getDefaultSaveOption(apps)
         self.optionGroup.setOptionValue("v", defaultSaveOption)
         self.diag.info("Setting default save version to " + defaultSaveOption)
-        self.optionGroup.setPossibleValues("v", self.getPossibleVersions(apps))
+        self.optionGroup.setPossibleValues("v", self.getPossibleVersions())
         return True
-    def getDefaultSaveOption(self, apps):
-        saveVersions = self.getSaveVersions(apps)
+    def getDefaultSaveOption(self):
+        saveVersions = self.getSaveVersions()
         if saveVersions.find(",") != -1:
             return "<default> - " + saveVersions
         else:
             return saveVersions
-    def getPossibleVersions(self, apps):
+    def getPossibleVersions(self):
         extensions = []
-        for app in apps:
+        for app in self.currAppSelection:
             for ext in app.getSaveableVersions():
                 if not ext in extensions:
                     extensions.append(ext)
         # Include the default version always
         extensions.append("")
         return extensions
-    def getSaveVersions(self, apps):
+    def getSaveVersions(self):
         saveVersions = []
-        for app in apps:
+        for app in self.currAppSelection:
             ver = self.getDefaultSaveVersion(app)
             if not ver in saveVersions:
                 saveVersions.append(ver)
         return ",".join(saveVersions)
     def getDefaultSaveVersion(self, app):
         return app.getFullVersion(forSave = 1)
-    def hasPerformance(self, suites):
-        for suite in suites:
-            if suite.app.hasPerformance():
+    def hasPerformance(self, apps):
+        for app in apps:
+            if app.hasPerformance():
                 return True
         return False
     def getExactness(self):
@@ -1287,12 +1288,12 @@ class ResetGroups(InteractiveAction):
         return "Reset running options"
     def performOnCurrent(self):
         self.notify("Reset")
-    def notifyNewTestSelection(self, tests, direct):
+    def notifyNewTestSelection(self, *args):
         pass # we don't care and don't want to screw things up...
     
 class SaveSelection(SelectionAction):
     def __init__(self, allApps, *args):
-        SelectionAction.__init__(self, *args)
+        SelectionAction.__init__(self, allApps, *args)
         self.selectionGroup = self.findSelectGroup(allApps[0])
         self.fileName = ""
         self.saveTestList = ""
@@ -2000,18 +2001,17 @@ class RenameTest(InteractiveAction):
         except OSError, e:
             self.notify("Error", "Failed to rename test:\n" + str(e))
  
-class ShowFileProperties(InteractiveAction):
+class ShowFileProperties(SelectionAction):
     def __init__(self, allApps, dynamic):
-        InteractiveAction.__init__(self)
-        self.currTestSelection = []
+        SelectionAction.__init__(self, allApps)
         self.dynamic = dynamic
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) == 1 and \
                len(self.currFileSelection) > 0
+    def updateSelection(self, tests):
+        self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def notifyNewFileSelection(self, files):
         self.updateFileSelection(files)
-    def updateSelection(self, tests):
-        self.currTestSelection = tests
     def getResultDialogType(self):
         return "guidialogs.FilePropertiesDialog"
     def _getTitle(self):
@@ -2082,12 +2082,22 @@ class InteractiveActionHandler:
                                      RepositionTestFirst, RepositionTestUp, \
                                      RepositionTestDown, RepositionTestLast, \
                                      ReconnectToTests, LoadSelection, SaveSelection ]
-        self.actionExternalClasses = []
         self.actionPostClasses = [ MigrationNotes, VersionInformation, AboutTextTest ]
-        self.extraMenus = []
         self.diag = plugins.getDiagnostics("Interactive Actions")
-    def addMenu(self, name):
-        self.extraMenus.append(name)
+    def getMenuNames(self, allApps):
+        names = [ "file", "edit", "view", "actions", "site", "reorder", "help" ]
+        for app in allApps:
+            for module in app.getConfigValue("interactive_action_module"):
+                command = "from " + module + " import getMenuNames"
+                try:
+                    exec command
+                    for name in getMenuNames():
+                        if name not in names:
+                            names.append(name)
+                except ImportError:
+                    pass
+        return names
+    
     def getMode(self, dynamic):
         if dynamic:
             return "Dynamic"
@@ -2102,7 +2112,7 @@ class InteractiveActionHandler:
         instances = self.getListedInstances(self.actionPreClasses, allApps, dynamic)
         modeClassList = eval("self.action" + self.getMode(dynamic) + "Classes")
         instances += self.getListedInstances(modeClassList, allApps)
-        instances += self.getListedInstances(self.actionExternalClasses, allApps, dynamic)
+        instances += self.getExtraInstances(allApps, dynamic)
         instances += self.getListedInstances(self.actionPostClasses, allApps, dynamic)
         return instances
     def makeInstances(self, intvActionClass, allApps, *args):
@@ -2114,7 +2124,9 @@ class InteractiveActionHandler:
         return [ self.tryMakeInstance(className, apps, *args) for className, apps in classNames.items() ]
     def findClassFromModules(self, intvActionClass, app):
         self.diag.info("Trying to create action for " + intvActionClass.__name__)
-        for module in app.getConfigValue("interactive_action_module"):
+        # Reverse the order, as we want to pick up the most specific module first
+        # In other places we want more generic modules to come out first
+        for module in reversed(app.getConfigValue("interactive_action_module")):
             command = "from " + module + " import " + intvActionClass.__name__ + " as realClassName"
             try:
                 exec command
@@ -2124,6 +2136,25 @@ class InteractiveActionHandler:
                 pass
         self.diag.info("Used basic version")
         return intvActionClass
+    def getExtraInstances(self, allApps, dynamic):
+        classNames = seqdict()
+        for app in allApps:
+            for className in self.getExtraIntvActionClasses(app, dynamic):
+                self.diag.info("Creating extra instance for " + repr(app) + " : " + className.__name__)
+                classNames.setdefault(className, []).append(app)
+
+        return [ self.tryMakeInstance(className, apps, dynamic) for className, apps in classNames.items() ]
+    def getExtraIntvActionClasses(self, app, dynamic):
+        actions = []
+        for module in app.getConfigValue("interactive_action_module"):
+            command = "from " + module + " import getInteractiveActionClasses"
+            try:
+                exec command
+                actions += getInteractiveActionClasses(dynamic)
+            except:
+                pass
+        return actions
+    
     def tryMakeInstance(self, className, *args):
         # Basically a workaround for crap error message with variable className from python...
         try:

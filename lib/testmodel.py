@@ -1249,8 +1249,7 @@ class Application:
     def setDependentConfigDefaults(self):
         executable = self.getConfigValue("executable")
         # Set values which default to other values
-        self.configDir["interactive_action_module"] = [ self.getConfigValue("config_module") ] + \
-                                                      self.getConfigValue("interactive_action_module")
+        self.addConfigEntry("interactive_action_module", self.getConfigValue("config_module"))
         self.setConfigDefault("interpreter", plugins.getInterpreter(executable), "Program to use as interpreter for the SUT")
     def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]

@@ -39,7 +39,7 @@ from gtkusecase import TreeModelIndexer
 #
 class CVSAction(guiplugins.InteractiveAction):
     def __init__(self, cvsArgs, allApps=[], dynamic=False):
-        guiplugins.InteractiveAction.__init__(self)
+        guiplugins.InteractiveAction.__init__(self, allApps)
         self.currTestSelection = []
         self.cvsArgs = cvsArgs
         self.recursive = False
@@ -659,18 +659,14 @@ class CVSAnnotateRecursive(CVSAnnotate):
 texttestgui.pluginHandler.modules.append("cvs")
 
 #
-# Add actions to static action list.
+# Standard methods called by plugin mechanism
 #
-guiplugins.interactiveActionHandler.addMenu("CVS")
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSLog)
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSLogRecursive)
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSLogLatest)
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSDiff)
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSDiffRecursive)
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSStatus)
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSStatusRecursive)
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSAnnotate)
-guiplugins.interactiveActionHandler.actionPreClasses.append(CVSAnnotateRecursive)
+def getMenuNames():
+    return [ "CVS" ]
+
+def getInteractiveActionClasses(dynamic):
+    return [ CVSLog, CVSLogRecursive, CVSLogLatest, CVSDiff, CVSDiffRecursive, CVSStatus,
+             CVSStatusRecursive, CVSAnnotate, CVSAnnotateRecursive ]
 
 #
 #

@@ -217,7 +217,8 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault("skip_comparison_if_not_present", "error", "List of files that are compared only if they are created by the test, i.e. they will not be reported as missing")
         app.addConfigEntry("definition_file_stems", "raveparameters")
         app.addConfigEntry("plot_graph", "<control>p", "gui_accelerators")
-
+        # pick up the GUI stuff from here...
+        app.addConfigEntry("interactive_action_module", "optimization")
 
 # Insert the contents of all raveparameters into the temporary rules file
 # Also assume the subplan will be changed, but nothing else.
@@ -987,7 +988,7 @@ class GraphPlotResponder(Responder):
 # This is the action responsible for plotting from the GUI.
 class PlotTestInGUI(guiplugins.SelectionAction):
     def __init__(self, allApps, dynamic):
-        guiplugins.SelectionAction.__init__(self)
+        guiplugins.SelectionAction.__init__(self, allApps, dynamic)
         self.dynamic = dynamic
         self.testGraph = TestGraph(self.optionGroup)
     def __repr__(self):
@@ -1054,7 +1055,6 @@ class PlotTestInGUI(guiplugins.SelectionAction):
             self.testGraph = TestGraph(self.optionGroup)
 
 plotSubplanDone = None
-guiplugins.interactiveActionHandler.actionExternalClasses.append(PlotTestInGUI)
 
 class PlotSubplans(plugins.Action):
     def __init__(self, args = []):
@@ -1923,6 +1923,12 @@ class StartStudio(guiplugins.InteractiveTestAction):
         cmdArgs = [ studio, "-w", "-p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'" ]
         process = self.startViewer(cmdArgs, description="Studio on " + subPlan, env=environ)
         guiplugins.scriptEngine.monitorProcess("runs studio", process)
-        
-guiplugins.interactiveActionHandler.actionStaticClasses += [ StartStudio ]
-guiplugins.interactiveActionHandler.addMenu("optimization")
+
+def getInteractiveActionClasses(dynamic):
+    if dynamic:
+        return []
+    else:
+        return [ StartStudio ]
+
+def getMenuNames():
+    return [ "optimization" ]

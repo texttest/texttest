@@ -313,7 +313,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.idleManager = IdleHandlerManager()
         self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic, allApps)
         self.defaultActionGUIs, self.buttonBarGUIs = self.createActionGUIs()
-        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs()
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps)
         self.testColumnGUI = TestColumnGUI(self.dynamic)
         self.testTreeGUI = TestTreeGUI(self.dynamic, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = TestFileGUI(self.dynamic, testFilePopupGUI)
@@ -424,9 +424,9 @@ class TextTestGUI(Responder, plugins.Observable):
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, statusMonitor ]
         boxGUI = BoxGUI(parts, horizontal=False)
         return TopWindowGUI(boxGUI, self.dynamic)
-    def createMenuAndToolBarGUIs(self):
+    def createMenuAndToolBarGUIs(self, allApps):
         uiManager = gtk.UIManager()
-        menu = MenuBarGUI(self.dynamic, uiManager, self.defaultActionGUIs)
+        menu = MenuBarGUI(allApps, self.dynamic, uiManager, self.defaultActionGUIs)
         toolbar = ToolBarGUI(uiManager, self.defaultActionGUIs, self.progressBarGUI)
         testPopup = TestPopupMenuGUI(uiManager, self.defaultActionGUIs)
         testFilePopup = TestFilePopupMenuGUI(uiManager, self.defaultActionGUIs)
@@ -660,9 +660,10 @@ class TopWindowGUI(ContainerGUI):
         
 
 class MenuBarGUI(SubGUI):
-    def __init__(self, dynamic, uiManager, actionGUIs):
+    def __init__(self, allApps, dynamic, uiManager, actionGUIs):
         SubGUI.__init__(self)
         # Create GUI manager, and a few default action groups
+        self.menuNames = guiplugins.interactiveActionHandler.getMenuNames(allApps)
         self.dynamic = dynamic
         self.uiManager = uiManager
         self.actionGUIs = actionGUIs
@@ -706,11 +707,9 @@ class MenuBarGUI(SubGUI):
             gtkAction.connect("toggled", self.toggleVisibility, observer)
             scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
             self.toggleActions.append(gtkAction)
-    def getMenuNames(self):
-        return [ "file", "edit", "view", "actions", "site", "reorder", "help" ] + guiplugins.interactiveActionHandler.extraMenus
     def createView(self):
         # Initialize
-        for menuName in self.getMenuNames():
+        for menuName in self.menuNames:
             realMenuName = menuName
             if not menuName.isupper():
                 realMenuName = menuName.capitalize()
@@ -943,7 +942,7 @@ class TestColumnGUI(SubGUI):
     def notifyRemove(self, test):
         self.totalNofTests -= test.size()
         self.updateTitle()
-    def notifyNewTestSelection(self, tests, direct):
+    def notifyNewTestSelection(self, tests, *args):
         testcases = filter(lambda test: test.classId() == "test-case", tests)
         newCount = len(testcases)
         if self.nofSelectedTests != newCount:
@@ -1128,13 +1127,22 @@ class TestTreeGUI(ContainerGUI):
     def selectionChanged(self, direct):
         newSelection = self.getSelected()
         if newSelection != self.selectedTests:
-            self.diag.info("Selection now changed to " + repr(newSelection))
-            self.selectedTests = newSelection
-            self.notify("NewTestSelection", newSelection, direct)
+            self.sendSelectionNotification(newSelection, direct)
     def notifyRefreshTestSelection(self):
         # The selection hasn't changed, but we want to e.g.
         # recalculate the action sensitiveness.
-        self.notify("NewTestSelection", self.selectedTests, True)
+        self.sendSelectionNotification(self.selectedTests)
+    def getSelectedApps(self, tests):
+        apps = []
+        for test in tests:
+            if test.app not in apps:
+                apps.append(test.app)
+        return apps
+    def sendSelectionNotification(self, tests, direct=True):
+        self.diag.info("Selection now changed to " + repr(tests))
+        apps = self.getSelectedApps(tests)
+        self.selectedTests = tests
+        self.notify("NewTestSelection", tests, apps, direct)
     def getSelected(self):
         allSelected = []
         self.selection.selected_foreach(self.addSelTest, allSelected)
@@ -1257,9 +1265,8 @@ class TestTreeGUI(ContainerGUI):
         test = self.getTestForAutoSelect()
         if test:
             guilog.info("Only one test found, selecting " + test.uniqueName)
-            self.selectedTests = [ test ]
-            actualSelection = self.selectTestRows(self.selectedTests)
-            self.notify("NewTestSelection", actualSelection, True)        
+            actualSelection = self.selectTestRows([ test ])
+            self.sendSelectionNotification(actualSelection)
     
     def notifyAdd(self, test, initial):
         self.tryAddTest(test, initial)
@@ -1928,7 +1935,7 @@ class NotebookGUI(SubGUI):
             if tabGUI.shouldShowCurrent() and tabGUI.forceVisible(tests):
                 self.setCurrentPage(pageNum)
 
-    def notifyNewTestSelection(self, tests, direct):
+    def notifyNewTestSelection(self, tests, apps, direct):
         if not self.notebook:
             return
         self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.scriptTitle + "'")
@@ -2046,7 +2053,7 @@ class TextInfoGUI(SubGUI):
         buffer = self.view.get_buffer()
         guilog.info(plugins.encodeToLocale(buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter()), guilog).strip())
         guilog.info("--------------------------------------")
-    def notifyNewTestSelection(self, tests, direct):
+    def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:
             self.currentTest = None
         elif self.currentTest not in tests:
@@ -2273,7 +2280,7 @@ class TestFileGUI(FileViewGUI):
     def forceVisible(self, tests):
         return len(tests) == 1
     
-    def notifyNewTestSelection(self, tests, direct):
+    def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0 or (not self.dynamic and len(tests) > 1): # multiple tests in static GUI result in removal
             self.currentTest = None
             return

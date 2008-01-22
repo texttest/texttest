@@ -79,7 +79,7 @@ class VirtualDisplayResponder(Responder):
     def notifyExit(self, *args):
         self.cleanXvfb()
     def cleanXvfb(self):
-        if self.displayName:
+        if self.displayName and os.name == "posix":
             if self.displayMachine == "localhost":
                 print "Killing Xvfb process", self.displayPid
                 try:

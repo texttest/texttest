@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.18 2008/01/21 11:24:27 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.19 2008/01/22 16:03:41 geoff Exp $
 #
 import ravebased, sandbox, plugins, guiplugins, subprocess
 import os, shutil, string
@@ -21,9 +21,7 @@ class StudioConfig(ravebased.Config):
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues)
     def defaultBuildRules(self):
-        # Overriding this assures rule builds in the nightjob and with -v rave, without
-        # requiring constant checking if rulesets exist before running tests
-        return self.rebuildAllRulesets()
+        return True
     def getPerformanceExtractor(self):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
     def _getRuleSetNames(self, test):

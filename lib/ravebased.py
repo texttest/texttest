@@ -134,9 +134,11 @@ class Config(CarmenConfig):
             if group.name.startswith("Select"):
                 group.addOption("u", "CARMUSRs containing")
             elif group.name.startswith("Advanced"):
-                group.addSwitch("rulecomp", "Build all rulesets")
+                if self.buildRulesetsAlways(app):
+                    group.addSwitch("skip", "Skip ruleset builds")
+                else:
+                    group.addSwitch("rulecomp", "Build all rulesets")
                 group.addOption("build", "Build application target")
-                group.addSwitch("skip", "Build no rulesets")
                 group.addSwitch("debug", "Use debug rulesets")
                 group.addSwitch("raveexp", "Run with RAVE Explorer")
             elif group.name.startswith("Invisible"):
@@ -167,11 +169,13 @@ class Config(CarmenConfig):
         if self.optionMap.runScript() and self.optionMap["s"].endswith("PrintRulesets"):
             return False
         return CarmenConfig.ignoreExecutable(self)
-    def isRaveRun(self):
-        return self.optionValue("a").find("rave") != -1 or self.optionValue("v").find("rave") != -1
-    def rebuildAllRulesets(self):
+    def isRaveRun(self, app):
+        return app.name == "rave" or "rave" in app.versions
+    def buildRulesetsAlways(self, app):
+        return app.getConfigValue("build_rulesets_always") == "true"
+    def rebuildAllRulesets(self, app):
         return self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp"))\
-               or self.isRaveRun()
+               or self.isRaveRun(app) or self.buildRulesetsAlways(app)
     def buildRules(self):
         if self.optionMap.has_key("skip") or self.isReconnecting():
             return 0
@@ -310,6 +314,7 @@ class Config(CarmenConfig):
     def setApplicationDefaults(self, app):
         CarmenConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("rave_name", { "default" : [] }, "Name of application as used by rule compilation")
+        app.setConfigDefault("build_rulesets_always", "false", "Whether we build rulesets unless told otherwise")
         app.setConfigDefault("rave_static_library", "", "Library to link with when building static rulesets")
         app.setConfigDefault("lines_of_crc_compile", 30, "How many lines to present in textual previews of rave compilation failures")
         # dictionary of lists

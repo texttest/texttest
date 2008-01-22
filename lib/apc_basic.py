@@ -228,3 +228,6 @@ class ImportTestCase(optimization.ImportTestCase):
         ruleSetPath = os.path.join("${CARMTMP}", "crc", "rule_set", application.upper(), "PUTS_ARCH_HERE")
         ruleSetFile = os.path.join(ruleSetPath, ruleSet)
         return path + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
+
+def getInteractiveActionClasses(dynamic):
+    return [ optimization.PlotTestInGUI ]

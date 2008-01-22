@@ -15,9 +15,8 @@ abspath()
 }
 
 abspath $0 fullpath
-
-ARCH=`arch` 
-if [ $ARCH = "i386_linux" -o $ARCH = "x86_64_linux" ]; then
+ 
+if [ -d "/usr/local/tt-env" ]; then
     export TEXTTEST_SLAVE_CMD=$fullpath
 
     # Sets gtk/pygtk environment variables and sets PYTHON_TO_RUN 
@@ -26,6 +25,7 @@ if [ $ARCH = "i386_linux" -o $ARCH = "x86_64_linux" ]; then
 
     exec ttpython -u ${fullpath}.py "$@"
 else
+    ARCH=`arch`
     PATH=/usr/local/bin/carmen/master/:$PATH
     export ARCH PATH
     exec python -u ${fullpath}.py "$@"

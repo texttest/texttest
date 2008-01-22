@@ -350,9 +350,11 @@ class Test(plugins.Observable):
         return files
     def listDataFiles(self):
         existingDataFiles = []
-        for dataFile in self.app.getDataFileNames():
+        for dataFile in self.getDataFileNames():
+            self.diagnose("Searching for data files called " + dataFile)
             for fileName in self.dircache.findAllFiles(dataFile):
                 existingDataFiles += self.listFiles(fileName, dataFile)
+        self.diagnose("Found data files as " + repr(existingDataFiles))
         return existingDataFiles
     def listFiles(self, fileName, dataFile):
         filesToIgnore = self.getCompositeConfigValue("test_data_ignore", dataFile)
@@ -1162,9 +1164,11 @@ class Application:
         return configPath
     
     def getDataFileNames(self, getenvFunc=os.getenv):
-        return self.getConfigValue("link_test_path", getenvFunc=getenvFunc) + \
-               self.getConfigValue("copy_test_path", getenvFunc=getenvFunc) + \
-               self.getConfigValue("partial_copy_test_path", getenvFunc=getenvFunc)
+        allNames = self.getConfigValue("link_test_path", getenvFunc=getenvFunc) + \
+                   self.getConfigValue("copy_test_path", getenvFunc=getenvFunc) + \
+                   self.getConfigValue("partial_copy_test_path", getenvFunc=getenvFunc)
+        # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
+        return filter(lambda name: name.find(self.writeDirectory) != -1 or not os.path.isabs(name), allNames)
     def getFileName(self, dirList, stem, versionSetMethod=None):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem, versionSetMethod=versionSetMethod)

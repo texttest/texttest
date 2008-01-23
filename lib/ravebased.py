@@ -169,13 +169,11 @@ class Config(CarmenConfig):
         if self.optionMap.runScript() and self.optionMap["s"].endswith("PrintRulesets"):
             return False
         return CarmenConfig.ignoreExecutable(self)
-    def isRaveRun(self, app):
-        return app.name == "rave" or "rave" in app.versions
     def buildRulesetsAlways(self, app):
         return app.getConfigValue("build_rulesets_always") == "true"
     def rebuildAllRulesets(self, app):
         return self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp"))\
-               or self.isRaveRun(app) or self.buildRulesetsAlways(app)
+               or self.buildRulesetsAlways(app)
     def buildRules(self):
         if self.optionMap.has_key("skip") or self.isReconnecting():
             return 0

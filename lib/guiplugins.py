@@ -1254,30 +1254,26 @@ class SelectTests(SelectionAction):
         elif strategy == 3:
             return filter(self.isNotSelected, reqTests)
     def findTestCaseList(self, suite):
-        testcases = suite.testcases
         version = self.optionGroup.getOptionValue("vs")
         if len(version) == 0:
-            return testcases
+            return suite.testcases
 
         if version == "<default>":
             version = ""
+
         fullVersion = suite.app.getFullVersion()
-        self.diag.info("Trying to get test cases for version " + fullVersion)
+        versionToUse = self.findCombinedVersion(version, fullVersion)       
+        self.diag.info("Trying to get test cases for " + repr(suite) + ", version " + versionToUse)
+        return suite.findTestCases(versionToUse)
+
+    def findCombinedVersion(self, version, fullVersion):
+        combined = version
         if len(fullVersion) > 0 and len(version) > 0:
             parts = version.split(".")
-            for appVer in suite.app.versions:
+            for appVer in fullVersion.split("."):
                 if not appVer in parts:
-                    version += "." + appVer
-
-        self.diag.info("Finding test case list for " + repr(suite) + ", version " + version)
-        versionFile = suite.getFileName("testsuite", version)        
-        self.diag.info("Reading test cases from " + versionFile)
-        newTestNames = plugins.readList(versionFile)
-        newTestList = []
-        for testCase in testcases:
-            if testCase.name in newTestNames:
-                newTestList.append(testCase)
-        return newTestList
+                    combined += "." + appVer
+        return combined
 
 class ResetGroups(InteractiveAction):
     def getStockId(self):

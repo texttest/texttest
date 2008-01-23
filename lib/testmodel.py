@@ -794,6 +794,15 @@ class TestSuite(Test):
                 if not names.has_key(name):
                     names[name] = comment
         return names
+    def findTestCases(self, version):
+        versionFile = self.getFileName("testsuite", version)        
+        newTestNames = self.testSuiteFileHandler.read(versionFile)
+        newTestList = []
+        for testCase in self.testcases:
+            if testCase.name in newTestNames:
+                newTestList.append(testCase)
+        return newTestList
+
     def fileExists(self, name):
         return self.dircache.exists(name)
     def testCaseList(self):

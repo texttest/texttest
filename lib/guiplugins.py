@@ -597,30 +597,32 @@ class ViewInEditor(FileViewAction):
         return "View File"
     def getToolConfigEntry(self):
         return "view_program"
-    def viewFile(self, fileName, viewTool, exitHandler):
+    def viewFile(self, fileName, viewTool, exitHandler, exitHandlerArgs):
         cmdArgs, descriptor = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
         refresh = bool(exitHandler)
         guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
-        process = self.startViewer(cmdArgs, description=description, exitHandler=exitHandler)
+        process = self.startViewer(cmdArgs, description=description, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getViewCommand(self, fileName, viewProgram):
         # viewProgram might have arguments baked into it...
         return plugins.splitcmd(viewProgram) + [ fileName ], viewProgram
     
-    def findExitHandler(self, fileName):
+    def findExitHandlerInfo(self, fileName):
         if self.dynamic:
-            return None
+            return None, ()
 
         # options file can change appearance of test (environment refs etc.)
         if self.isTestDefinition("options", fileName):
-            return self.currentTest.filesChanged
+            return self.currentTest.filesChanged, ()
         elif self.isTestDefinition("testsuite", fileName):
             # refresh order of tests if this edited
-            return self.currentTest.contentChanged
+            return self.currentTest.contentChanged, (fileName,)
+        else:
+            return None, ()
     def performOnFile(self, fileName, comparison, viewTool):
-        exitHandler = self.findExitHandler(fileName)
-        return self.viewFile(fileName, viewTool, exitHandler)
+        exitHandler, exitHandlerArgs = self.findExitHandlerInfo(fileName)
+        return self.viewFile(fileName, viewTool, exitHandler, exitHandlerArgs)
     def notifyViewFile(self, fileName, comparison):
         if not self.differencesActive(comparison):
             fileToView = self.getFileToView(fileName, comparison)

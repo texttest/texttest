@@ -306,7 +306,7 @@ class TextTestGUI(Responder, plugins.Observable):
         plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
         
-        self.appFileGUI = ApplicationFileGUI(self.dynamic)
+        self.appFileGUI = ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = TextInfoGUI()
         self.progressMonitor = TestProgressMonitor(self.dynamic)
         self.progressBarGUI = ProgressBarGUI(self.dynamic)
@@ -353,7 +353,7 @@ class TextTestGUI(Responder, plugins.Observable):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
         return [ self.testColumnGUI, self.progressMonitor, \
-                 self.appFileGUI, self.topWindowGUI ] + self.intvActions
+                 self.topWindowGUI ] + self.intvActions
 
     def setUpObservers(self):    
         for observer in self.getTestTreeObservers():
@@ -2202,11 +2202,9 @@ class FileViewGUI(SubGUI):
         return fciter
   
 class ApplicationFileGUI(FileViewGUI):
-    def __init__(self, dynamic):
+    def __init__(self, dynamic, allApps):
         FileViewGUI.__init__(self, dynamic, "Configuration Files")
-        self.allApps = []
-    def addSuites(self, suites):
-        self.allApps = [ suite.app for suite in suites ]
+        self.allApps = allApps
     def shouldShow(self):
         return not self.dynamic
     def getGroupTabTitle(self):

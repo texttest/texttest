@@ -352,7 +352,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ self.testColumnGUI, self.progressMonitor, self.testTreeGUI, \
+        return [ self.testColumnGUI, self.progressMonitor, \
                  self.appFileGUI, self.topWindowGUI ] + self.intvActions
 
     def setUpObservers(self):    
@@ -855,9 +855,7 @@ class TestColumnGUI(SubGUI):
         self.newTestsVisible = newValue
 
     def addSuites(self, suites):
-        for suite in suites:
-            if not suite in self.allSuites:
-                self.allSuites.append(suite)
+        self.allSuites = suites
     def createView(self):
         testRenderer = gtk.CellRendererText()
         self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)
@@ -967,7 +965,7 @@ class TestTreeGUI(ContainerGUI):
         self.selecting = False
         self.selectedTests = []
         self.dynamic = dynamic
-        self.collapseStatic = False
+        self.collapseStatic = self.getCollapseStatic()
         self.successPerSuite = {} # map from suite to number succeeded
         self.collapsedRows = {}
         self.filteredModel = None
@@ -991,9 +989,11 @@ class TestTreeGUI(ContainerGUI):
             test = model.get_value(iter, 2)
             if test:
                 guilog.info("-> " + test.getIndent() + model.get_value(iter, 0))
-    def addSuites(self, suites):
-        if not self.dynamic:
-            self.collapseStatic = guiConfig.getValue("static_collapse_suites")
+    def getCollapseStatic(self):
+        if self.dynamic:
+            return False
+        else:
+            return guiConfig.getValue("static_collapse_suites")
     def notifyAllRead(self, suites):
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)

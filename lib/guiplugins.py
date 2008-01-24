@@ -57,7 +57,12 @@ class GUIConfig:
             return value
     def getWindowOption(self, name):
         return self.getCompositeValue("window_size", name, modeDependent=True)
-
+    def showCategoryByDefault(self, category):
+        if self.dynamic:
+            return category.lower() not in self.getValue("hide_test_category")
+        else:
+            return False    
+    
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
 # they can be terminated when TextTest is terminated.

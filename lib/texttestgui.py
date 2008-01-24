@@ -352,9 +352,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ self.testColumnGUI, self.progressMonitor, \
-                 self.topWindowGUI ] + self.intvActions
-
+        return [ self.testColumnGUI, self.topWindowGUI ] + self.intvActions
     def setUpObservers(self):    
         for observer in self.getTestTreeObservers():
             self.testTreeGUI.addObserver(observer)
@@ -847,7 +845,7 @@ class TestColumnGUI(SubGUI):
         self.totalNofTests = 0
         self.nofSelectedTests = 0
         self.totalNofTestsShown = 0
-        self.newTestsVisible = True
+        self.newTestsVisible = guiConfig.showCategoryByDefault("not_started")
         self.column = None
         self.dynamic = dynamic
         self.allSuites = []
@@ -970,7 +968,7 @@ class TestTreeGUI(ContainerGUI):
         self.collapsedRows = {}
         self.filteredModel = None
         self.treeView = None
-        self.newTestsVisible = True
+        self.newTestsVisible = guiConfig.showCategoryByDefault("not_started")
         self.diag = plugins.getDiagnostics("Test Tree")
     def notifyDefaultVisibility(self, newValue):
         self.newTestsVisible = newValue
@@ -2501,11 +2499,6 @@ class TestProgressMonitor(SubGUI):
         self.treeView = None
         self.dynamic = dynamic
         self.diag = plugins.getDiagnostics("Progress Monitor")
-    def addSuites(self, suites):
-        if self.dynamic:
-            self.notify("DefaultVisibility", self.showByDefault("not_started"))
-        else:
-            self.notify("DefaultVisibility", False)
     def getGroupTabTitle(self):
         return "Status"
     def shouldShow(self):
@@ -2625,7 +2618,7 @@ class TestProgressMonitor(SubGUI):
         allTests.append(test)
         self.treeModel.set_value(iter, 5, allTests)
     def addNewIter(self, classifier, parentIter, test, category):
-        showThis = self.showByDefault(category)
+        showThis = guiConfig.showCategoryByDefault(category)
         modelAttributes = [classifier, 1, showThis, getTestColour(test, category), "bold", [ test ]]
         newIter = self.treeModel.append(parentIter, modelAttributes)
         if parentIter:
@@ -2639,11 +2632,6 @@ class TestProgressMonitor(SubGUI):
                 return iter
             else:
                 iter = self.treeModel.iter_next(iter)
-    # Set default values for toggle buttons in the TreeView, based
-    # on the config files.
-    def showByDefault(self, category):
-        # Check config files
-        return category.lower() not in guiConfig.getValue("hide_test_category")
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeTest(test)
         self.insertTest(test, state)
